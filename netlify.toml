@@ -1,0 +1,15 @@
+[build]
+  command = """
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable &&
+    source $HOME/.cargo/env &&
+    cargo install wasm-pack &&
+    wasm-pack build --target web --out-dir pkg &&
+    cd app &&
+    npm ci &&
+    npm run build
+  """
+  publish = "www-dist"
+
+[build.environment]
+  RUSTUP_TOOLCHAIN = "stable"
+  NODE_VERSION = "20"

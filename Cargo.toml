@@ -1,0 +1,11 @@
+[package]
+name = "stamp_tool"
+version = "0.2.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2.108"
+png = "0.17"

@@ -1,0 +1,11 @@
+{
+    "name": "rust-wasm-photo-tool",
+    "version": "0.2.0",
+    "private": true,
+    "scripts": {
+      "dev": "cd app && pnpm run dev",
+      "build": "cd app && pnpm run build",
+      "build:wasm": "wasm-pack build --target web --out-dir pkg",
+      "build:all": "pnpm run build:wasm && pnpm run build"
+    }
+  }
