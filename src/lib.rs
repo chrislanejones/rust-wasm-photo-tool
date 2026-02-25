@@ -32,6 +32,7 @@ pub struct CloneStampTool {
 
 #[wasm_bindgen]
 impl CloneStampTool {
+    #[wasm_bindgen(constructor)]
     pub fn new(width: u32, height: u32) -> Self {
         Self {
             width,
@@ -59,6 +60,7 @@ impl CloneStampTool {
     pub fn width(&self) -> u32 {
         self.width
     }
+
     pub fn height(&self) -> u32 {
         self.height
     }
@@ -77,24 +79,23 @@ impl CloneStampTool {
     pub fn set_brush_size(&mut self, size: u32) {
         self.brush_size = size.max(1);
     }
-    pub fn get_brush_size(&self) -> u32 {
-        self.brush_size
-    }
+
     pub fn set_hardness(&mut self, h: f64) {
         self.hardness = h.clamp(0.0, 1.0);
     }
+
     pub fn set_opacity(&mut self, o: f64) {
         self.opacity = o.clamp(0.0, 1.0);
     }
+
     pub fn set_spacing(&mut self, s: f64) {
         self.spacing = s.clamp(0.05, 2.0);
     }
-    pub fn set_zoom(&mut self, z: f64) {
-        self.zoom = z.clamp(0.1, 10.0);
-    }
+
     pub fn get_zoom(&self) -> f64 {
         self.zoom
     }
+
     pub fn adjust_zoom(&mut self, delta: f64) {
         let factor = if delta > 0.0 { 1.1 } else { 1.0 / 1.1 };
         self.zoom = (self.zoom * factor).clamp(0.1, 10.0);
@@ -104,17 +105,19 @@ impl CloneStampTool {
         self.source_x = Some(x);
         self.source_y = Some(y);
     }
+
     pub fn has_source(&self) -> bool {
         self.source_x.is_some()
     }
 
-    pub fn begin_stroke(&mut self, dest_x: f64, dest_y: f64) -> bool {
+    /// Call once on mousedown. Locks in the offset and stamps the first dab.
+    pub fn begin_stroke(&mut self, dest_x: f64, dest_y: f64) {
         let (sx, sy) = match (self.source_x, self.source_y) {
             (Some(x), Some(y)) => (x as f64, y as f64),
-            _ => return false,
+            _ => return,
         };
         if self.stroke_active {
-            return true;
+            return;
         }
         self.offset_x = dest_x - sx;
         self.offset_y = dest_y - sy;
@@ -128,9 +131,9 @@ impl CloneStampTool {
         });
         self.redo_stack.clear();
         self.stamp_at(dest_x, dest_y);
-        true
     }
 
+    /// Call on mousemove while drawing.
     pub fn continue_stroke(&mut self, dest_x: f64, dest_y: f64) {
         if !self.stroke_active {
             return;
@@ -138,6 +141,7 @@ impl CloneStampTool {
         self.stroke_to(dest_x, dest_y);
     }
 
+    /// Call on mouseup.
     pub fn end_stroke(&mut self) {
         if !self.stroke_active {
             return;
@@ -182,6 +186,7 @@ impl CloneStampTool {
     pub fn undo_count(&self) -> usize {
         self.undo_stack.len()
     }
+
     pub fn redo_count(&self) -> usize {
         self.redo_stack.len()
     }
@@ -237,16 +242,11 @@ impl CloneStampTool {
     pub fn get_image_data(&self) -> Vec<u8> {
         self.data.clone()
     }
-    pub fn data_ptr(&self) -> *const u8 {
-        self.data.as_ptr()
-    }
-    pub fn data_len(&self) -> usize {
-        self.data.len()
-    }
 
     pub fn export_png(&self) -> Vec<u8> {
         let mut output = Vec::new();
-        let mut encoder = png::Encoder::new(&mut output, self.width, self.height);
+        let mut encoder =
+            png::Encoder::new(&mut output, self.width, self.height);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
         if let Ok(mut writer) = encoder.write_header() {
@@ -301,7 +301,11 @@ impl CloneStampTool {
         let src_max_x = (src_cx + r).ceil() as i32;
         let src_min_y = (src_cy - r).floor() as i32;
         let src_max_y = (src_cy + r).ceil() as i32;
-        if src_max_x < 0 || src_min_x >= w || src_max_y < 0 || src_min_y >= h {
+        if src_max_x < 0
+            || src_min_x >= w
+            || src_max_y < 0
+            || src_min_y >= h
+        {
             return;
         }
         for py in min_y..=max_y {
@@ -316,7 +320,8 @@ impl CloneStampTool {
                 let alpha = if norm <= self.hardness {
                     1.0
                 } else {
-                    let t = (norm - self.hardness) / (1.0 - self.hardness + 1e-9);
+                    let t =
+                        (norm - self.hardness) / (1.0 - self.hardness + 1e-9);
                     (1.0 - t * t).max(0.0)
                 } * self.opacity;
                 let sx = (src_cx + (px as f64 - cx)).round() as i32;

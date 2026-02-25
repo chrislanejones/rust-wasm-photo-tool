@@ -2,7 +2,7 @@ declare module "stamp_tool" {
   export default function init(): Promise<void>;
 
   export class CloneStampTool {
-    static new(width: number, height: number): CloneStampTool;
+    constructor(width: number, height: number);
     free(): void;
     load_image(pixels: Uint8Array): void;
     set_source(x: number, y: number): void;
@@ -15,15 +15,9 @@ declare module "stamp_tool" {
     set_zoom(z: number): void;
     get_zoom(): number;
     adjust_zoom(delta: number): void;
-    begin_stroke(): void;
-    stamp_line(
-      dest_x: number,
-      dest_y: number,
-      src_x: number,
-      src_y: number,
-    ): void;
+    begin_stroke(dest_x: number, dest_y: number): void;
+    continue_stroke(dest_x: number, dest_y: number): void;
     end_stroke(): void;
-    stamp(dest_x: number, dest_y: number): void;
     undo(): boolean;
     redo(): boolean;
     undo_count(): number;

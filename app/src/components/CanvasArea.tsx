@@ -23,13 +23,34 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     },
     ref,
   ) => {
-    const { onMouseDown, onMouseMove, onMouseUp } = hookResult;
+    const { onMouseDown, onMouseMove, onMouseUp, state } = hookResult;
+
+    // Convert canvas-space source coords to screen-space for the overlay.
+    // We need the canvas element — grab it from the forwarded ref.
+    const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
+    let markerStyle: React.CSSProperties | null = null;
+    if (state.sourcePos && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = rect.width / canvas.width;
+      const scaleY = rect.height / canvas.height;
+      markerStyle = {
+        left: rect.left + state.sourcePos.x * scaleX,
+        top: rect.top + state.sourcePos.y * scaleY,
+      };
+    }
+
+    const zoom = state.zoom;
 
     return (
       <div className="canvas-wrapper">
         <canvas
           ref={ref}
           className="main-canvas"
+          style={{
+            transform: zoom !== 1 ? `scale(${zoom})` : undefined,
+            transformOrigin: "center center",
+          }}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
@@ -49,6 +70,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               height: brushDiameter,
             }}
           />
+        )}
+        {markerStyle && (
+          <div className="source-marker" style={markerStyle} />
         )}
       </div>
     );

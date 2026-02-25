@@ -45,7 +45,7 @@ body {
 /* ── Layout ── */
 .app-layout {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   height: 100vh;
   overflow: hidden;
 }
@@ -54,6 +54,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 220px;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* ── Canvas ── */
@@ -389,4 +390,130 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .history-delete svg {
   width: 12px;
   height: 12px;
+}
+
+/* ── Status Bar ── */
+.status-bar {
+  grid-column: 1 / -1;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  padding: 0 16px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.status-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-center {
+  flex: 1;
+  justify-content: center;
+  gap: 6px;
+}
+
+.status-right {
+  justify-content: flex-end;
+  min-width: 60px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background 0.2s;
+}
+
+.source-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.source-status.has-source {
+  color: var(--success);
+}
+
+.source-status.has-source .status-dot {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+}
+
+.status-shortcut-hint {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+kbd {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0px 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 16px;
+}
+
+.status-divider {
+  width: 1px;
+  height: 12px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.status-zoom {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ── Source Marker Crosshair ── */
+.source-marker {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  z-index: 999;
+  transform: translate(-50%, -50%);
+}
+
+.source-marker::before,
+.source-marker::after {
+  content: "";
+  position: absolute;
+  background: var(--accent);
+}
+
+.source-marker::before {
+  width: 2px;
+  height: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.source-marker::after {
+  height: 2px;
+  width: 100%;
+  top: 50%;
+  transform: translateY(-50%);
 }
