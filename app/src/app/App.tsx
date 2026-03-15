@@ -1,5 +1,10 @@
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "./AppShell";
 
 export default function App() {
-  return <AppShell />;
+  return (
+    <TooltipProvider>
+      <AppShell />
+    </TooltipProvider>
+  );
 }

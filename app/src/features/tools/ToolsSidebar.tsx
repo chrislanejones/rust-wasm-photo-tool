@@ -6,7 +6,6 @@ import type { ToolType, StampSettings } from "@/lib/types";
 
 import { ToolGrid } from "./ToolGrid";
 import { StampSettings as StampSettingsPanel } from "./settings/StampSettings";
-import { TransformSettings } from "./settings/TransformSettings";
 
 /* ------------------------------------------------------------------ */
 /* Props                                                              */
@@ -21,14 +20,6 @@ interface ToolsSidebarProps {
   stampSettings: StampSettings;
   onStampSettingsChange: (s: StampSettings) => void;
   hasSource: boolean;
-
-  // Transform
-  imageReady: boolean;
-  onFlipH: () => void;
-  onFlipV: () => void;
-  onRotate90Cw: () => void;
-  onBrightness: (delta: number) => void;
-  onContrast: (factor: number) => void;
 
   // History
   onUndo: () => void;
@@ -52,12 +43,6 @@ export function ToolsSidebar({
   stampSettings,
   onStampSettingsChange,
   hasSource,
-  imageReady,
-  onFlipH,
-  onFlipV,
-  onRotate90Cw,
-  onBrightness,
-  onContrast,
   onUndo,
   onRedo,
   canUndo,
@@ -111,19 +96,8 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "transform" && (
-          <TransformSettings
-            disabled={!imageReady}
-            onFlipH={onFlipH}
-            onFlipV={onFlipV}
-            onRotate90Cw={onRotate90Cw}
-            onBrightness={onBrightness}
-            onContrast={onContrast}
-          />
-        )}
-
-        {/* Placeholder for future tools */}
-        {!["stamp", "transform"].includes(activeTool) && (
+        {/* Placeholder for non-stamp tools */}
+        {activeTool !== "stamp" && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <span className="text-2xl mb-3">🚧</span>
             <p className="text-xs text-[var(--text-muted)] font-mono">
@@ -144,7 +118,7 @@ export function ToolsSidebar({
           className="
             w-full flex items-center justify-center gap-2 py-2.5 rounded-lg
             text-sm font-semibold
-            bg-[var(--accent)] text-white
+            bg-[var(--accent)] text-[var(--accent-foreground)]
             hover:brightness-110 transition-all
             disabled:opacity-30 disabled:cursor-not-allowed
           "

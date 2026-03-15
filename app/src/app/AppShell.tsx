@@ -211,12 +211,6 @@ export function AppShell() {
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
             hasSource={stamp.state.hasSource}
-            imageReady={stamp.state.ready}
-            onFlipH={stamp.flipHorizontal}
-            onFlipV={stamp.flipVertical}
-            onRotate90Cw={stamp.rotate90Cw}
-            onBrightness={stamp.adjustBrightness}
-            onContrast={stamp.adjustContrast}
             onUndo={stamp.undo}
             onRedo={stamp.redo}
             canUndo={stamp.state.undoCount > 0}

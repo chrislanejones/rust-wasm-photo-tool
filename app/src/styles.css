@@ -5,25 +5,26 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* App design tokens */
-  --bg-primary: #0f1117;
-  --bg-secondary: #161b22;
-  --bg-tertiary: #1c2128;
-  --bg-elevated: #21262d;
-  --border: #30363d;
-  --border-active: #58a6ff;
-  --text-primary: #e6edf3;
-  --text-secondary: #b1bac4;
-  --text-muted: #6e7681;
-  --accent: #e94560;
-  --accent-dim: rgba(233, 69, 96, 0.15);
-  --accent-glow: rgba(233, 69, 96, 0.4);
+  /* App design tokens — earth tone / warm brown theme */
+  --bg-primary: #121212;
+  --bg-secondary: #181818;
+  --bg-tertiary: #222222;
+  --bg-elevated: #2b2b2b;
+  --border: #211f1a;
+  --border-active: #fcdfc2;
+  --text-primary: #eeeeee;
+  --text-secondary: #b4b4b4;
+  --text-muted: #8a8a8a;
+  --accent: #fcdfc2;
+  --accent-foreground: #3a3128;
+  --accent-dim: rgba(252, 223, 194, 0.15);
+  --accent-glow: rgba(252, 223, 194, 0.3);
   --success: #22c55e;
   --success-dim: rgba(34, 197, 94, 0.15);
   --warning: #f59e0b;
-  --undo-color: #58a6ff;
-  --redo-color: #8b949e;
-  --current-color: #22c55e;
+  --undo-color: #b4b4b4;
+  --redo-color: #484848;
+  --current-color: #fcdfc2;
   --radius: 6px;
   --radius-lg: 10px;
   --font-mono: "JetBrains Mono", monospace;
@@ -32,25 +33,25 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
 
-  /* shadcn/ui CSS variables — mapped to our dark theme */
-  --background: #0f1117;
-  --foreground: #e6edf3;
-  --card: #161b22;
-  --card-foreground: #e6edf3;
-  --popover: #1c2128;
-  --popover-foreground: #e6edf3;
-  --primary: #e94560;
-  --primary-foreground: #ffffff;
-  --secondary: #21262d;
-  --secondary-foreground: #b1bac4;
-  --muted: #21262d;
-  --muted-foreground: #6e7681;
-  --accent-ui: #1c2128;
-  --accent-ui-foreground: #b1bac4;
-  --destructive: #e94560;
+  /* shadcn/ui CSS variables — mapped to earth tone theme */
+  --background: #121212;
+  --foreground: #eeeeee;
+  --card: #181818;
+  --card-foreground: #eeeeee;
+  --popover: #181818;
+  --popover-foreground: #eeeeee;
+  --primary: #fcdfc2;
+  --primary-foreground: #3a3128;
+  --secondary: #3a3128;
+  --secondary-foreground: #fcdfc2;
+  --muted: #222222;
+  --muted-foreground: #b4b4b4;
+  --accent-ui: #2b2b2b;
+  --accent-ui-foreground: #eeeeee;
+  --destructive: #e55032;
   --destructive-foreground: #ffffff;
-  --input: #21262d;
-  --ring: #58a6ff;
+  --input: #484848;
+  --ring: #fcdfc2;
 }
 
 /* Map shadcn CSS vars to Tailwind v4 color utilities */
@@ -211,7 +212,7 @@ body {
 /* Brush cursor */
 .brush-cursor {
   position: fixed;
-  border: 1.5px solid rgba(233, 69, 96, 0.75);
+  border: 1.5px solid var(--accent);
   border-radius: 50%;
   pointer-events: none;
   transform: translate(-50%, -50%);
@@ -352,7 +353,7 @@ body {
 
 .history-item.type-current .history-dot {
   background: var(--current-color);
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+  box-shadow: 0 0 8px var(--accent-dim);
 }
 
 .history-item.type-redo .history-dot {
@@ -361,8 +362,8 @@ body {
 }
 
 .history-item.type-current {
-  background: var(--success-dim);
-  border-color: rgba(34, 197, 94, 0.2);
+  background: var(--accent-dim);
+  border-color: rgba(252, 223, 194, 0.2);
 }
 
 .history-item.type-redo {
@@ -384,7 +385,7 @@ body {
 }
 
 .history-item.type-current .history-label {
-  color: var(--current-color);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -603,6 +604,26 @@ input[type="range"]:disabled {
   cursor: not-allowed;
 }
 
+/* Overlay slider — sits inside a h-5 relative wrapper; track provided by sibling div */
+input[type="range"].slider-overlay {
+  background: transparent;
+  height: 100%;
+}
+
+input[type="range"].slider-overlay::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 8px;
+}
+
+input[type="range"].slider-overlay::-moz-range-track {
+  background: transparent;
+  height: 8px;
+}
+
+input[type="range"].slider-overlay::-moz-range-progress {
+  background: transparent;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    PHOTO THUMBNAILS (Gallery Bar)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -610,9 +631,9 @@ input[type="range"]:disabled {
 .photo-thumb {
   position: relative;
   flex-shrink: 0;
-  width: 52px;
-  height: 52px;
-  border-radius: 6px;
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   border: 2px solid transparent;
@@ -622,13 +643,15 @@ input[type="range"]:disabled {
 }
 
 .photo-thumb:hover {
-  border-color: var(--text-muted);
   transform: scale(1.04);
 }
 
+.photo-thumb:hover:not(.active) {
+  border-color: var(--text-muted);
+}
+
 .photo-thumb.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--accent);
 }
 
 .photo-thumb img {

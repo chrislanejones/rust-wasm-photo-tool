@@ -11,14 +11,15 @@ export interface ImageData {
 // "stamp" is the Rust/WASM clone stamp tool — the core power feature.
 // Others are future JS-canvas-based annotation tools.
 export type ToolType =
-  | "stamp"
+  | "compress"
+  | "crop"
   | "brush"
   | "text"
   | "arrow"
+  | "ai"
   | "shapes"
   | "blur"
-  | "crop"
-  | "transform";
+  | "stamp";
 
 // ── Stamp-specific settings (Rust/WASM bridge) ────────────────────────────
 export interface StampSettings {

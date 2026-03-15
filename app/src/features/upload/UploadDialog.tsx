@@ -95,7 +95,7 @@ export function UploadDialog({ open, onClose, onFiles }: Props) {
 
                   <button
                     onClick={() => inputRef.current?.click()}
-                    className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold bg-[var(--accent)] text-white hover:brightness-110 transition-all"
+                    className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold bg-[var(--accent)] text-[var(--accent-foreground)] hover:brightness-110 transition-all"
                   >
                     <FolderOpen className="h-5 w-5" />
                     Browse Files

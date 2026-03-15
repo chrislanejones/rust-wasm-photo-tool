@@ -3,7 +3,7 @@ import { slideFromTop } from "@/lib/animations";
 import {
   Upload,
   Image,
-  Wrench,
+  Paintbrush,
   ZoomIn,
   ZoomOut,
   History,
@@ -39,10 +39,34 @@ export function TopBar({
   imageCount,
 }: TopBarProps) {
   const toggleButtons = [
-    { key: "U", icon: Upload,  label: "Upload",  state: showUpload,  toggle: onToggleUpload },
-    { key: "S", icon: Wrench,  label: "Tools",   state: showTools,   toggle: onToggleTools },
-    { key: "I", icon: Image,   label: "Gallery", state: showGallery, toggle: onToggleGallery },
-    { key: "H", icon: History, label: "History", state: showHistory, toggle: onToggleHistory },
+    {
+      key: "U",
+      icon: Upload,
+      label: "Upload",
+      state: showUpload,
+      toggle: onToggleUpload,
+    },
+    {
+      key: "I",
+      icon: Image,
+      label: "Gallery",
+      state: showGallery,
+      toggle: onToggleGallery,
+    },
+    {
+      key: "S",
+      icon: Paintbrush,
+      label: "Tools",
+      state: showTools,
+      toggle: onToggleTools,
+    },
+    {
+      key: "H",
+      icon: History,
+      label: "History",
+      state: showHistory,
+      toggle: onToggleHistory,
+    },
   ];
 
   return (
@@ -55,8 +79,8 @@ export function TopBar({
     >
       <motion.div
         animate={{
-          paddingLeft: showTools ? 312 : 12,
-          paddingRight: showHistory ? 232 : 12,
+          paddingLeft: showTools ? 315 : 12,
+          paddingRight: showHistory ? 240 : 12,
         }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
@@ -85,20 +109,22 @@ export function TopBar({
 
             {/* Center — Upload / Tools / Gallery / History */}
             <div className="flex gap-1 p-1 rounded-lg bg-[var(--bg-tertiary)] justify-self-center">
-              {toggleButtons.map(({ key, icon: Icon, label, state, toggle }) => (
-                <button
-                  key={key}
-                  onClick={toggle}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold font-mono transition-all ${
-                    state
-                      ? "bg-[var(--accent)] text-white shadow-md"
-                      : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className="hidden sm:inline">{label}</span>
-                </button>
-              ))}
+              {toggleButtons.map(
+                ({ key, icon: Icon, label, state, toggle }) => (
+                  <button
+                    key={key}
+                    onClick={toggle}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold font-mono transition-all ${
+                      state
+                        ? "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-md"
+                        : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="hidden sm:inline">{label}</span>
+                  </button>
+                ),
+              )}
             </div>
 
             {/* Right — Image count */}

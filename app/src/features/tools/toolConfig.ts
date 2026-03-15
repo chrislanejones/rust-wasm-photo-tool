@@ -1,13 +1,14 @@
 import type { ToolType } from "@/lib/types";
 import {
-  Stamp,
+  Shrink,
+  Crop,
   Paintbrush,
   Type,
   ArrowUpRight,
+  Sparkles,
   Shapes,
   Droplets,
-  Crop,
-  SlidersHorizontal,
+  Stamp,
 } from "lucide-react";
 
 export interface ToolDefinition {
@@ -20,32 +21,25 @@ export interface ToolDefinition {
 
 export const TOOLS: ToolDefinition[] = [
   {
-    id: "stamp",
-    label: "Clone Stamp",
-    description: "WASM-powered clone stamp",
-    icon: Stamp,
-    gradient: "from-rose-500 to-red-600",
-  },
-  {
-    id: "transform",
-    label: "Transform",
-    description: "Flip, rotate, brightness",
-    icon: SlidersHorizontal,
-    gradient: "from-amber-500 to-orange-600",
+    id: "compress",
+    label: "Resize",
+    description: "Resize & optimize images",
+    icon: Shrink,
+    gradient: "from-orange-500 to-red-500",
   },
   {
     id: "crop",
     label: "Crop",
     description: "Crop & trim images",
     icon: Crop,
-    gradient: "from-cyan-500 to-blue-600",
+    gradient: "from-cyan-500 to-blue-500",
   },
   {
     id: "brush",
     label: "Paint",
     description: "Freehand drawing",
     icon: Paintbrush,
-    gradient: "from-blue-500 to-indigo-600",
+    gradient: "from-blue-500 to-indigo-500",
   },
   {
     id: "text",
@@ -59,14 +53,21 @@ export const TOOLS: ToolDefinition[] = [
     label: "Arrows",
     description: "Point & highlight areas",
     icon: ArrowUpRight,
-    gradient: "from-emerald-500 to-teal-600",
+    gradient: "from-emerald-500 to-teal-500",
+  },
+  {
+    id: "ai",
+    label: "AI",
+    description: "AI-powered tools",
+    icon: Sparkles,
+    gradient: "from-violet-500 to-purple-600",
   },
   {
     id: "shapes",
     label: "Shapes",
     description: "Add geometric shapes",
     icon: Shapes,
-    gradient: "from-pink-500 to-rose-600",
+    gradient: "from-pink-500 to-rose-500",
   },
   {
     id: "blur",
@@ -74,5 +75,12 @@ export const TOOLS: ToolDefinition[] = [
     description: "Blur sensitive areas",
     icon: Droplets,
     gradient: "from-slate-400 to-slate-600",
+  },
+  {
+    id: "stamp",
+    label: "Clone Stamp",
+    description: "WASM-powered clone stamp",
+    icon: Stamp,
+    gradient: "from-rose-500 to-red-600",
   },
 ];

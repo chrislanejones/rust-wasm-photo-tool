@@ -9,7 +9,9 @@ export function StatusBar({ state, imageCount }: Props) {
   return (
     <footer className="status-bar">
       <div className="status-section">
-        <span className={`source-status ${state.hasSource ? "has-source" : ""}`}>
+        <span
+          className={`source-status ${state.hasSource ? "has-source" : ""}`}
+        >
           <span className="status-dot" />
           {state.hasSource
             ? "Source set — click to paint"
@@ -31,7 +33,8 @@ export function StatusBar({ state, imageCount }: Props) {
         </span>
         <span className="status-divider" />
         <span className="status-shortcut-hint">
-          <kbd>Alt</kbd>+<kbd>[</kbd><kbd>]</kbd> brush
+          <kbd>Alt</kbd>+<kbd>[</kbd>
+          <kbd>]</kbd> brush
         </span>
       </div>
 
@@ -41,9 +44,7 @@ export function StatusBar({ state, imageCount }: Props) {
         </span>
         <span className="status-divider" />
         <span className="status-zoom">
-          {state.width && state.height
-            ? `${state.width}×${state.height}`
-            : "—"}
+          {state.width && state.height ? `${state.width}×${state.height}` : "—"}
         </span>
         <span className="status-divider" />
         <span className="status-zoom">{Math.round(state.zoom * 100)}%</span>
