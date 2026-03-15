@@ -16,11 +16,12 @@ export interface CloneStampState {
   redoCount: number;
   history: HistoryEntry[];
   zoom: number;
+  // Exposed so components can re-render when dimensions change (e.g. after rotate)
+  width: number;
+  height: number;
 }
 
-export function useCloneStamp(
-  canvasRef: RefObject<HTMLCanvasElement | null>,
-) {
+export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const toolRef = useRef<CloneStampTool | null>(null);
   const isDrawingRef = useRef(false);
   const sourcePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -33,6 +34,8 @@ export function useCloneStamp(
     redoCount: 0,
     history: [],
     zoom: 1,
+    width: 0,
+    height: 0,
   });
 
   const syncState = useCallback(() => {
@@ -57,6 +60,8 @@ export function useCloneStamp(
       redoCount: t.redo_count(),
       history,
       zoom: t.get_zoom(),
+      width: t.width(),
+      height: t.height(),
     });
   }, []);
 
@@ -64,6 +69,11 @@ export function useCloneStamp(
     const t = toolRef.current;
     const canvas = canvasRef.current;
     if (!t || !canvas) return;
+    // Resize canvas if dimensions changed (e.g. after rotate_90_cw)
+    if (canvas.width !== t.width() || canvas.height !== t.height()) {
+      canvas.width = t.width();
+      canvas.height = t.height();
+    }
     const ctx = canvas.getContext("2d")!;
     ctx.putImageData(
       new ImageData(
@@ -82,17 +92,14 @@ export function useCloneStamp(
       if (!canvas) return { x: 0, y: 0 };
       const rect = canvas.getBoundingClientRect();
       return {
-        x: Math.floor(
-          ((e.clientX - rect.left) * canvas.width) / rect.width,
-        ),
-        y: Math.floor(
-          ((e.clientY - rect.top) * canvas.height) / rect.height,
-        ),
+        x: Math.floor(((e.clientX - rect.left) * canvas.width) / rect.width),
+        y: Math.floor(((e.clientY - rect.top) * canvas.height) / rect.height),
       };
     },
     [canvasRef],
   );
 
+  // ── Image loading ─────────────────────────────────────────────────────────
   const loadImage = useCallback(
     async (file: File) => {
       const { default: init, CloneStampTool: Tool } =
@@ -120,6 +127,7 @@ export function useCloneStamp(
     [canvasRef, syncState],
   );
 
+  // ── Basic tool setters ───────────────────────────────────────────────────
   const setBrushSize = useCallback((size: number) => {
     toolRef.current?.set_brush_size(size);
   }, []);
@@ -136,6 +144,7 @@ export function useCloneStamp(
     toolRef.current?.set_spacing(s);
   }, []);
 
+  // ── History ───────────────────────────────────────────────────────────────
   const undo = useCallback(() => {
     if (toolRef.current?.undo()) {
       flushToCanvas();
@@ -175,6 +184,7 @@ export function useCloneStamp(
     syncState();
   }, [syncState]);
 
+  // ── Export ────────────────────────────────────────────────────────────────
   const exportPng = useCallback(() => {
     const t = toolRef.current;
     if (!t) return;
@@ -188,6 +198,7 @@ export function useCloneStamp(
     URL.revokeObjectURL(url);
   }, []);
 
+  // ── Mouse / stroke handlers ───────────────────────────────────────────────
   const onMouseDown = useCallback(
     (e: MouseEvent<HTMLCanvasElement>) => {
       const t = toolRef.current;
@@ -226,9 +237,9 @@ export function useCloneStamp(
     syncState();
   }, [syncState]);
 
+  // ── Zoom via Alt+Scroll ───────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
-    // Listen on the canvas wrapper (parent) so zoom works across the whole area
     const target = canvas?.parentElement ?? canvas;
     if (!target) return;
     const handler = (e: WheelEvent) => {
@@ -241,6 +252,7 @@ export function useCloneStamp(
     return () => target.removeEventListener("wheel", handler);
   }, [canvasRef, syncState]);
 
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
@@ -251,22 +263,190 @@ export function useCloneStamp(
     return () => window.removeEventListener("keydown", handler);
   }, [undo, redo]);
 
+  // ── NEW: Thumbnail generation ─────────────────────────────────────────────
+  /**
+   * Generates a bilinearly-scaled thumbnail using the Rust WASM core.
+   * Returns an ImageData-compatible object so JS can paint it onto a canvas
+   * or convert to a Blob URL for the PhotoStrip without any extra canvas work.
+   */
+  const generateThumbnail = useCallback(
+    (
+      maxPx: number,
+    ): { data: Uint8ClampedArray; width: number; height: number } | null => {
+      const t = toolRef.current;
+      if (!t) return null;
+      const w = t.thumbnail_width(maxPx);
+      const h = t.thumbnail_height(maxPx);
+      const raw = t.thumbnail_data(maxPx);
+      return { data: new Uint8ClampedArray(raw), width: w, height: h };
+    },
+    [],
+  );
+
+  /**
+   * Convenience: generates a thumbnail and returns an object-URL blob,
+   * ready to drop straight into an <img src=...>.
+   * Caller is responsible for calling URL.revokeObjectURL when done.
+   */
+  const generateThumbnailUrl = useCallback(
+    (maxPx: number): Promise<string | null> => {
+      return new Promise((resolve) => {
+        const thumb = generateThumbnail(maxPx);
+        if (!thumb) return resolve(null);
+        const offscreen = new OffscreenCanvas(thumb.width, thumb.height);
+        const ctx = offscreen.getContext("2d")!;
+        ctx.putImageData(
+          new ImageData(thumb.data, thumb.width, thumb.height),
+          0,
+          0,
+        );
+        offscreen
+          .convertToBlob({ type: "image/jpeg", quality: 0.82 })
+          .then((blob) => {
+            resolve(URL.createObjectURL(blob));
+          });
+      });
+    },
+    [generateThumbnail],
+  );
+
+  // ── NEW: Cross-photo copy / paste ─────────────────────────────────────────
+  /**
+   * Extracts a rectangular region as a plain Uint8ClampedArray (RGBA).
+   * Pass the result to `pasteRegion` on a different tool instance to
+   * composite content between photos.
+   */
+  const copyRegion = useCallback(
+    (x: number, y: number, w: number, h: number): Uint8ClampedArray | null => {
+      const t = toolRef.current;
+      if (!t) return null;
+      return new Uint8ClampedArray(t.copy_region(x, y, w, h));
+    },
+    [],
+  );
+
+  /**
+   * Alpha-composites `pixels` (srcW × srcH RGBA) onto the current image at
+   * (destX, destY).  Automatically pushes an undo snapshot.
+   */
+  const pasteRegion = useCallback(
+    (
+      pixels: Uint8ClampedArray,
+      srcW: number,
+      srcH: number,
+      destX: number,
+      destY: number,
+    ) => {
+      const t = toolRef.current;
+      if (!t) return;
+      t.paste_region(new Uint8Array(pixels.buffer), srcW, srcH, destX, destY);
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
+  // ── NEW: Geometric transforms ─────────────────────────────────────────────
+  const flipHorizontal = useCallback(() => {
+    const t = toolRef.current;
+    if (!t) return;
+    t.flip_horizontal();
+    // Mirror the tracked source position in React state too
+    if (sourcePosRef.current) {
+      sourcePosRef.current = {
+        x: t.width() - 1 - sourcePosRef.current.x,
+        y: sourcePosRef.current.y,
+      };
+    }
+    flushToCanvas();
+    syncState();
+  }, [flushToCanvas, syncState]);
+
+  const flipVertical = useCallback(() => {
+    const t = toolRef.current;
+    if (!t) return;
+    t.flip_vertical();
+    if (sourcePosRef.current) {
+      sourcePosRef.current = {
+        x: sourcePosRef.current.x,
+        y: t.height() - 1 - sourcePosRef.current.y,
+      };
+    }
+    flushToCanvas();
+    syncState();
+  }, [flushToCanvas, syncState]);
+
+  const rotate90Cw = useCallback(() => {
+    const t = toolRef.current;
+    if (!t) return;
+    t.rotate_90_cw();
+    // Source cleared inside Rust; mirror that in React
+    sourcePosRef.current = null;
+    flushToCanvas();
+    syncState();
+  }, [flushToCanvas, syncState]);
+
+  // ── NEW: Pixel adjustments ────────────────────────────────────────────────
+  /**
+   * Adjusts brightness by `delta` (−1.0 to +1.0).
+   * Each call is individually undo-able.
+   */
+  const adjustBrightness = useCallback(
+    (delta: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      t.adjust_brightness(delta);
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
+  /**
+   * Adjusts contrast by `factor` (0 = grey, 1 = original, 2 = doubled).
+   * Each call is individually undo-able.
+   */
+  const adjustContrast = useCallback(
+    (factor: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      t.adjust_contrast(factor);
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
   return {
     state,
     toolRef,
+    // Core
     loadImage,
     setBrushSize,
     setHardness,
     setOpacity,
     setSpacing,
+    // History
     undo,
     redo,
     jumpToHistory,
     deleteHistoryEntry,
     clearHistory,
+    // Export
     exportPng,
+    // Mouse
     onMouseDown,
     onMouseMove,
     onMouseUp,
+    // NEW ↓
+    generateThumbnail,
+    generateThumbnailUrl,
+    copyRegion,
+    pasteRegion,
+    flipHorizontal,
+    flipVertical,
+    rotate90Cw,
+    adjustBrightness,
+    adjustContrast,
   };
 }

@@ -31,6 +31,10 @@ export const StatusBar: React.FC<Props> = ({ state }) => {
         <span className="status-shortcut-hint">
           <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
         </span>
+        <span className="status-divider" />
+        <span className="status-shortcut-hint">
+          <kbd>Alt</kbd>+<kbd>[</kbd><kbd>]</kbd> brush size
+        </span>
       </div>
       <div className="status-section status-right">
         <span className="status-zoom">
