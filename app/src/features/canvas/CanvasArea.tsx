@@ -1,5 +1,6 @@
 import React from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
+import { CompareSlider } from "./CompareSlider";
 
 interface Props {
   hookResult: ReturnType<typeof useCloneStamp>;
@@ -8,6 +9,9 @@ interface Props {
   cursorVisible: boolean;
   onCanvasEnter: (rect: DOMRect) => void;
   onCanvasLeave: () => void;
+  // A/B compare
+  beforeUrl: string | null;
+  compareActive: boolean;
 }
 
 export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
@@ -19,12 +23,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       cursorVisible,
       onCanvasEnter,
       onCanvasLeave,
+      beforeUrl,
+      compareActive,
     },
     ref,
   ) => {
     const { onMouseDown, onMouseMove, onMouseUp, state } = hookResult;
-
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
+
     let markerStyle: React.CSSProperties | null = null;
     if (state.sourcePos && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -57,6 +63,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           }}
           onMouseOut={onCanvasLeave}
         />
+
+        <CompareSlider beforeUrl={beforeUrl} active={compareActive} />
+
         {cursorVisible && (
           <div
             className="brush-cursor"
@@ -68,24 +77,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             }}
           />
         )}
-        {markerStyle && <div className="source-marker" style={markerStyle} />}
 
-        {/* Empty state */}
-        {!state.ready && (
-          <div className="canvas-empty-state">
-            <div className="canvas-empty-icon">
-              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="4" y="8" width="40" height="32" rx="4" />
-                <circle cx="16" cy="20" r="4" />
-                <path d="M4 32l10-8 8 8 8-12 14 12" />
-              </svg>
-            </div>
-            <p className="canvas-empty-title">No image loaded</p>
-            <p className="canvas-empty-hint">
-              Use <kbd>Open</kbd> in the top bar to add images
-            </p>
-          </div>
-        )}
+        {markerStyle && <div className="source-marker" style={markerStyle} />}
       </div>
     );
   },

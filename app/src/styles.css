@@ -406,6 +406,22 @@ button:focus-visible {
 .history-item.type-current {
   background: var(--bg-tertiary);
   border-color: var(--border);
+  justify-content: center;
+}
+
+.history-item.type-current .history-dot {
+  background: var(--text-muted);
+}
+
+.history-item.type-current .history-index {
+  color: var(--text-muted);
+}
+
+.history-item.type-current .history-label {
+  color: var(--accent);
+  font-weight: 600;
+  text-align: center;
+  flex: 1;
 }
 
 .history-item.type-current .history-dot {
@@ -433,6 +449,14 @@ button:focus-visible {
 .history-item.type-current .history-label {
   color: var(--accent);
   font-weight: 600;
+}
+
+.history-item.type-current .history-dot {
+  background: var(--text-muted);
+}
+
+.history-item.type-current .history-index {
+  color: var(--text-muted);
 }
 
 .history-index {

@@ -1,21 +1,31 @@
 import { useCallback, useEffect, useState } from "react";
+import { SlidersHorizontal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /* ── Props ───────────────────────────────────────────────────────────── */
 
 interface ResizeSettingsProps {
-  /** Current WASM image width */
   imageWidth: number;
-  /** Current WASM image height */
   imageHeight: number;
-  /** Calls Rust resize_bilinear via WASM — pushes one undo snapshot */
   onResize: (newW: number, newH: number) => void;
-  /** Export quality 10-100 (browser-side, not Rust) */
   quality: number;
   onQualityChange: (q: number) => void;
-  /** Disabled when no image loaded */
   disabled: boolean;
+  /** Has the image been modified (resized, quality changed, etc.)? */
+  hasBeenModified: boolean;
+  /** Toggle A/B compare overlay */
+  compareActive: boolean;
+  onToggleCompare: () => void;
+  /** Auto compress all images */
+  onAutoCompress: () => void;
+  isCompressing: boolean;
+  compressProgress: { completed: number; total: number };
 }
 
 /* ── Component ───────────────────────────────────────────────────────── */
@@ -27,12 +37,17 @@ export function ResizeSettings({
   quality,
   onQualityChange,
   disabled,
+  hasBeenModified,
+  compareActive,
+  onToggleCompare,
+  onAutoCompress,
+  isCompressing,
+  compressProgress,
 }: ResizeSettingsProps) {
   const [width, setWidth] = useState(imageWidth);
   const [height, setHeight] = useState(imageHeight);
   const [lockAspect, setLockAspect] = useState(true);
 
-  // Sync when a new image is loaded or after resize commits
   useEffect(() => {
     setWidth(imageWidth);
     setHeight(imageHeight);
@@ -63,7 +78,7 @@ export function ResizeSettings({
     onResize(width, height);
   }, [width, height, imageWidth, imageHeight, onResize]);
 
-  // ── Metrics ─────────────────────────────────────────────────────────
+  // Metrics
   const originalArea = imageWidth * imageHeight;
   const newArea = width * height;
   const areaRatio = originalArea > 0 ? newArea / originalArea : 1;
@@ -81,6 +96,7 @@ export function ResizeSettings({
     v >= 80 ? "bg-emerald-500" : v >= 40 ? "bg-amber-500" : "bg-red-500";
 
   const dimensionsChanged = width !== imageWidth || height !== imageHeight;
+  const compareDisabled = disabled || !hasBeenModified;
 
   return (
     <div className="space-y-5">
@@ -90,7 +106,7 @@ export function ResizeSettings({
 
       {/* ── Dimensions ──────────────────────────────────────────── */}
       <div className="space-y-3">
-        <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
+        <h4 className="text-xs font-black uppercase text-text-primary tracking-widest">
           Dimensions
         </h4>
         <div className="grid grid-cols-2 gap-2">
@@ -100,7 +116,7 @@ export function ResizeSettings({
             onChange={(e) => handleWidthChange(e.target.value)}
             min={1}
             disabled={disabled}
-            className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-sm"
+            className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
           />
           <input
             type="number"
@@ -108,7 +124,7 @@ export function ResizeSettings({
             onChange={(e) => handleHeightChange(e.target.value)}
             min={1}
             disabled={disabled}
-            className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-sm"
+            className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
           />
         </div>
         <button
@@ -140,26 +156,52 @@ export function ResizeSettings({
           <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
             Quality
           </h4>
-          <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
+          <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest tabular-nums">
             {quality}%
           </span>
         </div>
-        <div className="relative h-2 w-full rounded-full bg-theme-muted">
-          <div
-            className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-            style={{ width: `${((quality - 10) / (100 - 10)) * 100}%` }}
-          />
-          <input
-            type="range"
-            min={10}
-            max={100}
-            step={1}
-            value={quality}
-            onChange={(e) => onQualityChange(Number(e.target.value))}
-            className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-          />
-        </div>
+        <Slider
+          value={[quality]}
+          onValueChange={([v]) => onQualityChange(v)}
+          min={10}
+          max={100}
+          step={1}
+          disabled={disabled}
+        />
       </div>
+
+      {/* ── A/B Compare Toggle ──────────────────────────────────── */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div>
+            <button
+              onClick={onToggleCompare}
+              disabled={compareDisabled}
+              className={[
+                "flex items-center gap-3 w-full p-3 rounded-lg transition-all",
+                "text-xs font-black uppercase tracking-widest",
+                compareActive
+                  ? "bg-theme-primary/15 ring-1 ring-theme-primary/40 text-theme-primary"
+                  : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground",
+                compareDisabled
+                  ? "opacity-40 cursor-not-allowed"
+                  : "cursor-pointer",
+              ].join(" ")}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {compareActive ? "Hide A/B Compare" : "Show A/B Compare"}
+            </button>
+          </div>
+        </TooltipTrigger>
+        {compareDisabled && (
+          <TooltipContent side="bottom" className="max-w-[220px] text-center">
+            <p className="text-xs">
+              Resize or compress an image first, then use A/B compare to see the
+              difference vs. the original.
+            </p>
+          </TooltipContent>
+        )}
+      </Tooltip>
 
       {/* ── Performance Gain ────────────────────────────────────── */}
       <div className="space-y-3">
@@ -200,13 +242,42 @@ export function ResizeSettings({
       {/* ── Resize Button ───────────────────────────────────────── */}
       <Button
         onClick={handleResize}
-        disabled={disabled}
+        disabled={disabled || !dimensionsChanged}
         className="w-full bg-accent text-text-primary hover:ring-2 hover:ring-theme-primary/50 hover:ring-offset-2 hover:ring-offset-theme-background"
       >
         {dimensionsChanged
           ? `Resize to ${width} × ${height}`
           : `Current: ${imageWidth} × ${imageHeight}`}
       </Button>
+
+      {/* ── Auto Compress All ───────────────────────────────────── */}
+      <div className="pt-3 border-t border-theme-sidebar-border">
+        <Button
+          onClick={onAutoCompress}
+          disabled={disabled || isCompressing}
+          className="w-full bg-accent text-text-primary hover:ring-2 hover:ring-theme-primary/50 hover:ring-offset-2 hover:ring-offset-theme-background"
+        >
+          <Zap className="h-4 w-4" />
+          {isCompressing
+            ? `Compressing ${compressProgress.completed}/${compressProgress.total}…`
+            : "Auto Compress All Images"}
+        </Button>
+        {isCompressing && (
+          <div className="mt-2 h-1.5 w-full bg-theme-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-300"
+              style={{
+                width: `${
+                  compressProgress.total > 0
+                    ? (compressProgress.completed / compressProgress.total) *
+                      100
+                    : 0
+                }%`,
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

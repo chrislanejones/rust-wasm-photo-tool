@@ -65,20 +65,9 @@ export function StampSettings({ settings, onChange, hasSource }: Props) {
       {/* Source indicator */}
       <div
         className={[
-          "flex items-center gap-2 px-3 py-2 rounded-lg text-xs",
-          hasSource
-            ? "bg-emerald-500/10 text-emerald-400"
-            : "bg-theme-accent text-theme-muted-foreground",
+          "flex justify-center gap-2 px-3 py-4 rounded-lg text-xs history-item type-current mb-2",
         ].join(" ")}
       >
-        <span
-          className={[
-            "w-2 h-2 rounded-full shrink-0",
-            hasSource
-              ? "bg-emerald-400 shadow-[0_0_6px_rgba(34,197,94,0.5)]"
-              : "bg-theme-muted-foreground",
-          ].join(" ")}
-        />
         {hasSource ? "Source set — click to paint" : "Alt+Click to set source"}
       </div>
 
@@ -98,7 +87,8 @@ export function StampSettings({ settings, onChange, hasSource }: Props) {
           value={settings.brushSize}
           onSelect={(v) => onChange({ ...settings, brushSize: v })}
           dot={(preset) => {
-            const dotSize = preset <= 5 ? 2 : preset <= 20 ? 4 : preset <= 60 ? 6 : 8;
+            const dotSize =
+              preset <= 5 ? 2 : preset <= 20 ? 4 : preset <= 60 ? 6 : 8;
             return (
               <span
                 className="rounded-full bg-theme-foreground"
@@ -111,7 +101,9 @@ export function StampSettings({ settings, onChange, hasSource }: Props) {
         <div className="relative h-2 w-full rounded-full bg-theme-muted">
           <div
             className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-            style={{ width: `${((settings.brushSize - 2) / (200 - 2)) * 100}%` }}
+            style={{
+              width: `${((settings.brushSize - 2) / (200 - 2)) * 100}%`,
+            }}
           />
           <input
             type="range"
@@ -119,7 +111,9 @@ export function StampSettings({ settings, onChange, hasSource }: Props) {
             max={200}
             step={1}
             value={settings.brushSize}
-            onChange={(e) => onChange({ ...settings, brushSize: Number(e.target.value) })}
+            onChange={(e) =>
+              onChange({ ...settings, brushSize: Number(e.target.value) })
+            }
             className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
           />
         </div>
@@ -141,7 +135,8 @@ export function StampSettings({ settings, onChange, hasSource }: Props) {
           value={Math.round(settings.hardness * 100)}
           onSelect={(v) => onChange({ ...settings, hardness: v / 100 })}
           dot={(preset) => {
-            const dotSize = preset <= 0 ? 2 : preset <= 33 ? 4 : preset <= 66 ? 6 : 8;
+            const dotSize =
+              preset <= 0 ? 2 : preset <= 33 ? 4 : preset <= 66 ? 6 : 8;
             return (
               <span
                 className="rounded-full bg-theme-foreground"
@@ -162,7 +157,9 @@ export function StampSettings({ settings, onChange, hasSource }: Props) {
             max={100}
             step={1}
             value={Math.round(settings.hardness * 100)}
-            onChange={(e) => onChange({ ...settings, hardness: Number(e.target.value) / 100 })}
+            onChange={(e) =>
+              onChange({ ...settings, hardness: Number(e.target.value) / 100 })
+            }
             className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
           />
         </div>
@@ -184,7 +181,8 @@ export function StampSettings({ settings, onChange, hasSource }: Props) {
           value={Math.round(settings.opacity * 100)}
           onSelect={(v) => onChange({ ...settings, opacity: v / 100 })}
           dot={(preset) => {
-            const dotSize = preset <= 25 ? 2 : preset <= 50 ? 4 : preset <= 75 ? 6 : 8;
+            const dotSize =
+              preset <= 25 ? 2 : preset <= 50 ? 4 : preset <= 75 ? 6 : 8;
             return (
               <span
                 className="rounded-full bg-theme-foreground"
@@ -205,7 +203,9 @@ export function StampSettings({ settings, onChange, hasSource }: Props) {
             max={100}
             step={1}
             value={Math.round(settings.opacity * 100)}
-            onChange={(e) => onChange({ ...settings, opacity: Number(e.target.value) / 100 })}
+            onChange={(e) =>
+              onChange({ ...settings, opacity: Number(e.target.value) / 100 })
+            }
             className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
           />
         </div>

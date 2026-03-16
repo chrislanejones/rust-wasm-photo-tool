@@ -15,6 +15,7 @@ import { HistoryPanel } from "@/features/canvas/HistoryPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
+import { useAutoCompress } from "@/hooks/useAutoCompress";
 
 export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
 
@@ -43,6 +44,12 @@ export function AppShell() {
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
 
+  // ── A/B Compare state ──────────────────────────────────────────────────
+  // Store the original image URL when first loaded so we can compare later
+  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
+  const [compareActive, setCompareActive] = useState(false);
+  const [hasBeenModified, setHasBeenModified] = useState(false);
+
   const handleAddPhotos = useCallback(
     (files: File[]) => {
       const newEntries: PhotoEntry[] = files.map((file) => ({
@@ -56,6 +63,10 @@ export function AppShell() {
       if (first) {
         stamp.loadImage(first.file);
         setActivePhotoId(first.id);
+        // Capture original URL for A/B compare
+        setOriginalUrl(first.url);
+        setHasBeenModified(false);
+        setCompareActive(false);
       }
     },
     [stamp],
@@ -65,6 +76,10 @@ export function AppShell() {
     (entry: PhotoEntry) => {
       stamp.loadImage(entry.file);
       setActivePhotoId(entry.id);
+      // Capture this photo's URL as the "original" for compare
+      setOriginalUrl(entry.url);
+      setHasBeenModified(false);
+      setCompareActive(false);
     },
     [stamp],
   );
@@ -80,8 +95,14 @@ export function AppShell() {
           const newActive = next[Math.min(idx, next.length - 1)];
           stamp.loadImage(newActive.file);
           setActivePhotoId(newActive.id);
+          setOriginalUrl(newActive.url);
+          setHasBeenModified(false);
+          setCompareActive(false);
         } else if (next.length === 0) {
           setActivePhotoId(null);
+          setOriginalUrl(null);
+          setHasBeenModified(false);
+          setCompareActive(false);
         }
         return next;
       });
@@ -96,13 +117,16 @@ export function AppShell() {
   // ── Panel visibility ────────────────────────────────────────────────────
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
-  const [showTools, setShowTools] = useState(false);
+  const [showTools, setShowTools] = useState(true);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showKbdHints, setShowKbdHints] = useState(false);
-  const [activeTool, setActiveTool] = useState<ToolType>("stamp");
+  const [activeTool, setActiveTool] = useState<ToolType>("compress");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
   const [quality, setQuality] = useState(75);
+
+  // ── Auto compress ───────────────────────────────────────────────────────
+  const { progress: compressProgress, compressAll } = useAutoCompress();
 
   const prevPhotoCount = useRef(0);
 
@@ -135,16 +159,19 @@ export function AppShell() {
     return undefined;
   }, [photos.length]);
 
-  // ── Export (format-aware) ────────────────────────────────────────────────
+  // ── Export (format-aware, quality-aware) ─────────────────────────────────
   const handleExport = useCallback(() => {
-    stamp.exportAs(exportFormat);
-  }, [stamp, exportFormat]);
+    stamp.exportAs(exportFormat, quality / 100);
+  }, [stamp, exportFormat, quality]);
 
   // ── Delete all photos ──────────────────────────────────────────────────
   const handleDeleteAll = useCallback(() => {
     photos.forEach((p) => URL.revokeObjectURL(p.url));
     setPhotos([]);
     setActivePhotoId(null);
+    setOriginalUrl(null);
+    setHasBeenModified(false);
+    setCompareActive(false);
   }, [photos]);
 
   // ── Keyboard shortcuts (centralized) ─────────────────────────────────────
@@ -165,13 +192,48 @@ export function AppShell() {
   // ── Zoom helpers for TopBar ─────────────────────────────────────────────
   const handleZoomIn = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(1);
-    // Force state sync — the hook's syncState doesn't get called from here
-    // so we poke the WASM and rely on the next render
   }, [stamp]);
 
   const handleZoomOut = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(-1);
   }, [stamp]);
+
+  // ── A/B Compare toggle ─────────────────────────────────────────────────
+  const handleToggleCompare = useCallback(() => {
+    setCompareActive((v) => !v);
+  }, []);
+
+  // ── WASM resize wrapper — marks image as modified ──────────────────────
+  const handleResize = useCallback(
+    (newW: number, newH: number) => {
+      stamp.resize(newW, newH);
+      setHasBeenModified(true);
+    },
+    [stamp],
+  );
+
+  // ── Auto compress all images ────────────────────────────────────────────
+  const handleAutoCompress = useCallback(() => {
+    compressAll(
+      photos,
+      {
+        maxWidth: 1920,
+        maxHeight: 1080,
+        quality: quality / 100,
+        format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
+      },
+      (id, newFile, newUrl) => {
+        setPhotos((prev) =>
+          prev.map((p) => {
+            if (p.id !== id) return p;
+            URL.revokeObjectURL(p.url);
+            return { ...p, file: newFile, url: newUrl };
+          }),
+        );
+      },
+    );
+    setHasBeenModified(true);
+  }, [photos, quality, exportFormat, compressAll]);
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -225,18 +287,24 @@ export function AppShell() {
             canRedo={stamp.state.redoCount > 0}
             onExport={handleExport}
             canExport={stamp.state.ready}
+            exportFormat={exportFormat}
             imageReady={stamp.state.ready}
             onFlipH={stamp.flipHorizontal}
             onFlipV={stamp.flipVertical}
             onRotate90Cw={stamp.rotate90Cw}
             onBrightness={stamp.adjustBrightness}
             onContrast={stamp.adjustContrast}
-            onResize={stamp.resize}
+            onResize={handleResize}
             imageWidth={stamp.state.width}
             imageHeight={stamp.state.height}
             quality={quality}
             onQualityChange={setQuality}
-            exportFormat={exportFormat}
+            hasBeenModified={hasBeenModified}
+            compareActive={compareActive}
+            onToggleCompare={handleToggleCompare}
+            onAutoCompress={handleAutoCompress}
+            isCompressing={compressProgress.running}
+            compressProgress={compressProgress}
           />
         )}
       </AnimatePresence>
@@ -258,6 +326,8 @@ export function AppShell() {
           cursorVisible={visible}
           onCanvasEnter={onCanvasEnter}
           onCanvasLeave={onCanvasLeave}
+          beforeUrl={originalUrl}
+          compareActive={compareActive}
         />
       </motion.main>
 
@@ -285,6 +355,7 @@ export function AppShell() {
             onClose={() => setShowGallery(false)}
             showTools={showTools}
             showHistory={showHistory}
+            compressionProgress={compressProgress.items}
           />
         )}
       </AnimatePresence>

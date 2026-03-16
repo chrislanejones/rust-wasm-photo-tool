@@ -133,15 +133,15 @@ export function TopBar({
         <div className="pointer-events-auto">
           <div className="flex items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border">
             {/* ── Zoom ─────────────────────────────────────────────── */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
               <button
                 onClick={onZoomOut}
                 disabled={zoom <= 0.25}
-                className="p-1.5 rounded-md hover:bg-bg-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-text-secondary"
+                className="btn-icon"
               >
                 <ZoomOut className="h-4 w-4" />
               </button>
-              <div className="flex flex-col items-center leading-none">
+              <div className="flex flex-col items-center leading-none px-2">
                 <span className="text-sm font-semibold font-mono w-12 text-center tabular-nums text-text-primary">
                   {Math.round(zoom * 100)}%
                 </span>
@@ -152,7 +152,7 @@ export function TopBar({
               <button
                 onClick={onZoomIn}
                 disabled={zoom >= 4}
-                className="p-1.5 rounded-md hover:bg-bg-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-text-secondary"
+                className="btn-icon"
               >
                 <ZoomIn className="h-4 w-4" />
               </button>
@@ -240,11 +240,11 @@ export function TopBar({
               <button
                 onClick={onDeleteAll}
                 disabled={imageCount === 0}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold font-mono text-text-muted hover:text-red-400 hover:bg-bg-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border text-text-muted hover:text-red-400 hover:border-border-active disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 title="Delete all images"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Delete All</span>
+                <span className="hidden sm:inline text-xs font-semibold font-mono">Delete All</span>
               </button>
             </div>
           </div>

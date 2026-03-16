@@ -18,23 +18,19 @@ interface ToolsSidebarProps {
   activeTool: ToolType;
   onToolChange: (t: ToolType) => void;
 
-  // Stamp settings
   stampSettings: StampSettings;
   onStampSettingsChange: (s: StampSettings) => void;
   hasSource: boolean;
 
-  // History
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
 
-  // Export
   onExport: () => void;
   canExport: boolean;
   exportFormat: string;
 
-  // WASM transforms
   onFlipH: () => void;
   onFlipV: () => void;
   onRotate90Cw: () => void;
@@ -42,14 +38,20 @@ interface ToolsSidebarProps {
   onContrast: (factor: number) => void;
   imageReady: boolean;
 
-  // WASM resize
   onResize: (newW: number, newH: number) => void;
   imageWidth: number;
   imageHeight: number;
   quality: number;
   onQualityChange: (q: number) => void;
 
-  // Crop (JS canvas for now)
+  hasBeenModified: boolean;
+  compareActive: boolean;
+  onToggleCompare: () => void;
+
+  onAutoCompress: () => void;
+  isCompressing: boolean;
+  compressProgress: { completed: number; total: number };
+
   onApplyCrop?: () => void;
 }
 
@@ -82,6 +84,12 @@ export function ToolsSidebar({
   imageHeight,
   quality,
   onQualityChange,
+  hasBeenModified,
+  compareActive,
+  onToggleCompare,
+  onAutoCompress,
+  isCompressing,
+  compressProgress,
   onApplyCrop,
 }: ToolsSidebarProps) {
   return (
@@ -103,8 +111,8 @@ export function ToolsSidebar({
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Wrench className="h-4 w-4" />
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary font-mono">
+          <Wrench className="h-4 w-4 text-accent" />
           Tools
         </h2>
         <button
@@ -139,6 +147,12 @@ export function ToolsSidebar({
             quality={quality}
             onQualityChange={onQualityChange}
             disabled={!imageReady}
+            hasBeenModified={hasBeenModified}
+            compareActive={compareActive}
+            onToggleCompare={onToggleCompare}
+            onAutoCompress={onAutoCompress}
+            isCompressing={isCompressing}
+            compressProgress={compressProgress}
           />
         )}
 
@@ -165,7 +179,6 @@ export function ToolsSidebar({
           />
         )}
 
-        {/* Placeholder for tools not yet wired */}
         {!["stamp", "compress", "transform", "crop"].includes(activeTool) && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <span className="text-2xl mb-3">🚧</span>

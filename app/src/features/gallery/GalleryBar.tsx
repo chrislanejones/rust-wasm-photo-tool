@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition } from "@/lib/animations";
-import { X, Image, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Image, Check, ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface PhotoEntry {
   id: string;
@@ -18,7 +18,14 @@ interface Props {
   onClose: () => void;
   showTools: boolean;
   showHistory: boolean;
+  /** Per-image compression progress: id → 0-100 (or -1 for error) */
+  compressionProgress?: Record<string, number>;
 }
+
+const MIN_PHOTOS = 3;
+const MAX_PHOTOS = 8;
+const THUMBNAIL_SIZE = 96;
+const GAP = 8;
 
 export function GalleryBar({
   photos,
@@ -28,8 +35,39 @@ export function GalleryBar({
   onClose,
   showTools,
   showHistory,
+  compressionProgress,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  const [photosPerPage, setPhotosPerPage] = useState(MIN_PHOTOS);
+
+  const calculatePhotosPerPage = useCallback(() => {
+    const availableWidth = showTools && showHistory 
+      ? window.innerWidth - 320 - 244 - 48 // tools + history + margins
+      : showTools || showHistory 
+        ? window.innerWidth - 320 - 48 // tools or history + margin
+        : window.innerWidth - 48; // no panels
+
+    const containerWidth = Math.max(300, availableWidth);
+    const photos = Math.floor((containerWidth - 80) / (THUMBNAIL_SIZE + GAP));
+    return Math.max(MIN_PHOTOS, Math.min(MAX_PHOTOS, photos));
+  }, [showTools, showHistory]);
+
+  useEffect(() => {
+    const updatePhotosPerPage = () => setPhotosPerPage(calculatePhotosPerPage());
+    updatePhotosPerPage();
+    window.addEventListener("resize", updatePhotosPerPage);
+    return () => window.removeEventListener("resize", updatePhotosPerPage);
+  }, [calculatePhotosPerPage]);
+
+  const totalPages = Math.ceil(photos.length / photosPerPage);
+
+  const startIdx = page * photosPerPage;
+  const visiblePhotos = photos.slice(startIdx, startIdx + photosPerPage);
+
+  useEffect(() => {
+    setPage(0);
+  }, [photos.length, photosPerPage]);
 
   useEffect(() => {
     if (!activeId || !stripRef.current) return;
@@ -41,7 +79,7 @@ export function GalleryBar({
       inline: "nearest",
       block: "nearest",
     });
-  }, [activeId, photos.length]);
+  }, [activeId, photos.length, page]);
 
   if (photos.length === 0) return null;
 
@@ -81,61 +119,147 @@ export function GalleryBar({
           </div>
 
           {/* Thumbnails + arrows */}
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
             {/* Left arrow */}
             <button
-              disabled
-              className="p-1.5 rounded-lg disabled:opacity-30 flex-shrink-0 transition-colors hover:bg-bg-elevated"
-              aria-label="Previous images"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="btn-icon disabled:opacity-30"
+              aria-label="Previous photos"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
 
-            {/* Scroll strip — py/px give ring room; negative margins cancel layout space */}
+            {/* Scroll strip */}
             <div
               ref={stripRef}
-              className="flex gap-2 overflow-x-auto scrollbar-hide py-2 -my-2 px-1 -mx-1"
+              className="flex gap-2 justify-center"
             >
-              {photos.map((entry) => (
-                <div
-                  key={entry.id}
-                  data-id={entry.id}
-                  className={`photo-thumb ${entry.id === activeId ? "active" : ""}`}
-                  onClick={() => onSelect(entry)}
-                  title={entry.name}
-                >
-                  <img src={entry.url} alt={entry.name} draggable={false} />
-                  <button
-                    className="photo-thumb-remove"
-                    title="Remove"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemove(entry.id);
-                    }}
+              {visiblePhotos.map((entry) => {
+                const progress = compressionProgress?.[entry.id];
+                const isCompressing =
+                  progress !== undefined && progress >= 0 && progress < 100;
+                const isDone = progress === 100;
+                const isError = progress === -1;
+
+                return (
+                  <div
+                    key={entry.id}
+                    data-id={entry.id}
+                    className={`photo-thumb ${entry.id === activeId ? "active" : ""} relative`}
+                    onClick={() => onSelect(entry)}
+                    title={entry.name}
                   >
-                    <svg
-                      viewBox="0 0 10 10"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
+                    <img src={entry.url} alt={entry.name} draggable={false} />
+
+                    {/* Compression overlay */}
+                    <AnimatePresence>
+                      {isCompressing && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-lg overflow-hidden"
+                        >
+                          <div
+                            className="absolute inset-0 bg-black/60 transition-all duration-300 ease-out"
+                            style={{
+                              clipPath: `inset(0 0 ${100 - (progress ?? 0)}% 0)`,
+                            }}
+                          />
+                          <div
+                            className="absolute inset-0 bg-emerald-500/20 transition-all duration-300 ease-out"
+                            style={{
+                              clipPath: `inset(0 0 ${100 - (progress ?? 0)}% 0)`,
+                            }}
+                          />
+                          <span className="relative z-20 text-white text-xs font-bold font-mono drop-shadow-lg tabular-nums">
+                            {progress}%
+                          </span>
+                        </motion.div>
+                      )}
+
+                      {isDone && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.5 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 25,
+                          }}
+                          className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-emerald-500/30"
+                        >
+                          <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
+                            <Check className="h-3.5 w-3.5 text-white" />
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {isError && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-red-500/30"
+                        >
+                          <span className="text-white text-xs font-bold">
+                            !
+                          </span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <button
+                      className="photo-thumb-remove"
+                      title="Remove"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove(entry.id);
+                      }}
                     >
-                      <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" />
-                    </svg>
-                  </button>
-                  <span className="photo-thumb-label">{entry.name}</span>
-                </div>
-              ))}
+                      <svg
+                        viewBox="0 0 10 10"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      >
+                        <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" />
+                      </svg>
+                    </button>
+                    <span className="photo-thumb-label">{entry.name}</span>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Right arrow */}
             <button
-              disabled
-              className="p-1.5 rounded-lg disabled:opacity-30 flex-shrink-0 transition-colors hover:bg-bg-elevated"
-              aria-label="Next images"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="btn-icon disabled:opacity-30"
+              aria-label="Next photos"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+
+          {/* Page indicator */}
+          {totalPages > 1 && (
+            <div className="flex justify-center gap-1 mt-2">
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPage(i)}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                    i === page ? "bg-accent" : "bg-bg-elevated hover:bg-text-muted"
+                  }`}
+                  aria-label={`Go to page ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>
