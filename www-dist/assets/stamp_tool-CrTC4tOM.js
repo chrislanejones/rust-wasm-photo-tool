@@ -25,10 +25,16 @@ class u {
   continue_stroke(t, o) {
     e.clonestamptool_continue_stroke(this.__wbg_ptr, t, o);
   }
-  copy_region(t, o, s, r) {
-    const _ = e.clonestamptool_copy_region(this.__wbg_ptr, t, o, s, r);
-    var l = a(_[0], _[1]).slice();
-    return e.__wbindgen_free(_[0], _[1] * 1, 1), l;
+  copy_region(t, o, _, r) {
+    const s = e.clonestamptool_copy_region(this.__wbg_ptr, t, o, _, r);
+    var l = a(s[0], s[1]).slice();
+    return e.__wbindgen_free(s[0], s[1] * 1, 1), l;
+  }
+  data_len() {
+    return e.clonestamptool_data_len(this.__wbg_ptr) >>> 0;
+  }
+  data_ptr() {
+    return e.clonestamptool_data_ptr(this.__wbg_ptr) >>> 0;
   }
   delete_history_entry(t) {
     return e.clonestamptool_delete_history_entry(this.__wbg_ptr, t) !== 0;
@@ -47,6 +53,9 @@ class u {
   flip_vertical() {
     e.clonestamptool_flip_vertical(this.__wbg_ptr);
   }
+  get_brush_size() {
+    return e.clonestamptool_get_brush_size(this.__wbg_ptr) >>> 0;
+  }
   get_image_data() {
     const t = e.clonestamptool_get_image_data(this.__wbg_ptr);
     var o = a(t[0], t[1]).slice();
@@ -64,8 +73,8 @@ class u {
   history_labels() {
     let t, o;
     try {
-      const s = e.clonestamptool_history_labels(this.__wbg_ptr);
-      return t = s[0], o = s[1], f(s[0], s[1]);
+      const _ = e.clonestamptool_history_labels(this.__wbg_ptr);
+      return t = _[0], o = _[1], f(_[0], _[1]);
     } finally {
       e.__wbindgen_free(t, o, 1);
     }
@@ -74,16 +83,16 @@ class u {
     return e.clonestamptool_jump_to_history(this.__wbg_ptr, t) !== 0;
   }
   load_image(t) {
-    const o = h(t, e.__wbindgen_malloc), s = g;
-    e.clonestamptool_load_image(this.__wbg_ptr, o, s);
+    const o = h(t, e.__wbindgen_malloc), _ = g;
+    e.clonestamptool_load_image(this.__wbg_ptr, o, _);
   }
   constructor(t, o) {
-    const s = e.clonestamptool_new(t, o);
-    return this.__wbg_ptr = s >>> 0, w.register(this, this.__wbg_ptr, this), this;
+    const _ = e.clonestamptool_new(t, o);
+    return this.__wbg_ptr = _ >>> 0, w.register(this, this.__wbg_ptr, this), this;
   }
-  paste_region(t, o, s, r, _) {
+  paste_region(t, o, _, r, s) {
     const l = h(t, e.__wbindgen_malloc), m = g;
-    e.clonestamptool_paste_region(this.__wbg_ptr, l, m, o, s, r, _);
+    e.clonestamptool_paste_region(this.__wbg_ptr, l, m, o, _, r, s);
   }
   redo() {
     return e.clonestamptool_redo(this.__wbg_ptr) !== 0;
@@ -109,10 +118,13 @@ class u {
   set_spacing(t) {
     e.clonestamptool_set_spacing(this.__wbg_ptr, t);
   }
+  set_zoom(t) {
+    e.clonestamptool_set_zoom(this.__wbg_ptr, t);
+  }
   thumbnail_data(t) {
     const o = e.clonestamptool_thumbnail_data(this.__wbg_ptr, t);
-    var s = a(o[0], o[1]).slice();
-    return e.__wbindgen_free(o[0], o[1] * 1, 1), s;
+    var _ = a(o[0], o[1]).slice();
+    return e.__wbindgen_free(o[0], o[1] * 1, 1), _;
   }
   thumbnail_height(t) {
     return e.clonestamptool_thumbnail_height(this.__wbg_ptr, t) >>> 0;
@@ -146,7 +158,7 @@ function a(n, t) {
   return n = n >>> 0, b().subarray(n / 1, n / 1 + t);
 }
 function f(n, t) {
-  return n = n >>> 0, A(n, t);
+  return n = n >>> 0, z(n, t);
 }
 let i = null;
 function b() {
@@ -160,11 +172,11 @@ let c = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
 c.decode();
 const y = 2146435072;
 let p = 0;
-function A(n, t) {
+function z(n, t) {
   return p += t, p >= y && (c = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), c.decode(), p = t), c.decode(b().subarray(n, n + t));
 }
 let g = 0, e;
-function v(n, t) {
+function A(n, t) {
   return e = n.exports, i = null, e.__wbindgen_start(), e;
 }
 async function R(n, t) {
@@ -175,14 +187,14 @@ async function R(n, t) {
       if (n.ok && o(n.type) && n.headers.get("Content-Type") !== "application/wasm") console.warn("`WebAssembly.instantiateStreaming` failed because your server does not serve Wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", r);
       else throw r;
     }
-    const s = await n.arrayBuffer();
-    return await WebAssembly.instantiate(s, t);
+    const _ = await n.arrayBuffer();
+    return await WebAssembly.instantiate(_, t);
   } else {
-    const s = await WebAssembly.instantiate(n, t);
-    return s instanceof WebAssembly.Instance ? { instance: s, module: n } : s;
+    const _ = await WebAssembly.instantiate(n, t);
+    return _ instanceof WebAssembly.Instance ? { instance: _, module: n } : _;
   }
-  function o(s) {
-    switch (s) {
+  function o(_) {
+    switch (_) {
       case "basic":
       case "cors":
       case "default":
@@ -191,15 +203,15 @@ async function R(n, t) {
     return false;
   }
 }
-async function z(n) {
+async function v(n) {
   if (e !== void 0) return e;
-  n !== void 0 && (Object.getPrototypeOf(n) === Object.prototype ? { module_or_path: n } = n : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), n === void 0 && (n = new URL("/assets/stamp_tool_bg-BFGZx_iW.wasm", import.meta.url));
+  n !== void 0 && (Object.getPrototypeOf(n) === Object.prototype ? { module_or_path: n } = n : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), n === void 0 && (n = new URL("/assets/stamp_tool_bg-C1YCOARK.wasm", import.meta.url));
   const t = d();
   (typeof n == "string" || typeof Request == "function" && n instanceof Request || typeof URL == "function" && n instanceof URL) && (n = fetch(n));
-  const { instance: o, module: s } = await R(await n, t);
-  return v(o);
+  const { instance: o, module: _ } = await R(await n, t);
+  return A(o);
 }
 export {
   u as CloneStampTool,
-  z as default
+  v as default
 };

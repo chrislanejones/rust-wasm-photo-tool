@@ -3,9 +3,10 @@ import type { CloneStampState } from "@/hooks/useCloneStamp";
 interface Props {
   state: CloneStampState;
   imageCount: number;
+  showKbdHints: boolean;
 }
 
-export function StatusBar({ state, imageCount }: Props) {
+export function StatusBar({ state, imageCount, showKbdHints: _showKbdHints }: Props) {
   return (
     <footer className="status-bar">
       <div className="status-section">
@@ -18,7 +19,6 @@ export function StatusBar({ state, imageCount }: Props) {
             : "Alt+Click to set source"}
         </span>
       </div>
-
       <div className="status-section status-center">
         <span className="status-shortcut-hint">
           <kbd>Alt</kbd>+<kbd>Click</kbd> source
@@ -36,8 +36,11 @@ export function StatusBar({ state, imageCount }: Props) {
           <kbd>Alt</kbd>+<kbd>[</kbd>
           <kbd>]</kbd> brush
         </span>
+        <span className="status-divider" />
+        <span className="status-shortcut-hint">
+          <kbd>Alt</kbd>+<kbd>/</kbd> shortcuts
+        </span>
       </div>
-
       <div className="status-section status-right">
         <span className="status-zoom-label">
           {imageCount} img{imageCount !== 1 ? "s" : ""}

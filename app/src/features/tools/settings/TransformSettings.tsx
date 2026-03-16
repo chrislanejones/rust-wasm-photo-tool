@@ -42,13 +42,13 @@ export function TransformSettings({
   };
 
   const btnClass = `flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-all
-    bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)]
-    hover:border-[var(--border-active)] hover:text-[var(--text-primary)]
+    bg-bg-elevated border border-border text-text-secondary
+    hover:border-border-active hover:text-text-primary
     disabled:opacity-30 disabled:cursor-not-allowed`;
 
   return (
     <div className="space-y-5">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)] font-mono">
+      <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
         Transform
       </h3>
 
@@ -68,11 +68,11 @@ export function TransformSettings({
       {/* Brightness */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Sun className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-          <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)] font-mono flex-1">
+          <Sun className="h-3.5 w-3.5 text-text-muted" />
+          <label className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono flex-1">
             Brightness
           </label>
-          <span className="text-xs font-mono text-[var(--text-secondary)] min-w-[3ch] text-right">
+          <span className="text-xs font-mono text-text-secondary min-w-[3ch] text-right">
             {brightness > 0 ? `+${brightness}` : brightness}
           </span>
         </div>
@@ -92,11 +92,11 @@ export function TransformSettings({
       {/* Contrast */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Contrast className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-          <label className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)] font-mono flex-1">
+          <Contrast className="h-3.5 w-3.5 text-text-muted" />
+          <label className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono flex-1">
             Contrast
           </label>
-          <span className="text-xs font-mono text-[var(--text-secondary)] min-w-[3ch] text-right">
+          <span className="text-xs font-mono text-text-secondary min-w-[3ch] text-right">
             {contrast}%
           </span>
         </div>

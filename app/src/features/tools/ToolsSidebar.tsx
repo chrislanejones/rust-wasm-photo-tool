@@ -6,6 +6,7 @@ import type { ToolType, StampSettings } from "@/lib/types";
 
 import { ToolGrid } from "./ToolGrid";
 import { StampSettings as StampSettingsPanel } from "./settings/StampSettings";
+import { TransformCropSettings } from "./settings/TransformCropSettings";
 
 /* ------------------------------------------------------------------ */
 /* Props                                                              */
@@ -30,6 +31,17 @@ interface ToolsSidebarProps {
   // Export
   onExport: () => void;
   canExport: boolean;
+
+  // WASM transforms
+  onFlipH: () => void;
+  onFlipV: () => void;
+  onRotate90Cw: () => void;
+  onBrightness: (delta: number) => void;
+  onContrast: (factor: number) => void;
+  imageReady: boolean;
+
+  // Crop (JS canvas for now)
+  onApplyCrop?: () => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -49,6 +61,13 @@ export function ToolsSidebar({
   canRedo,
   onExport,
   canExport,
+  onFlipH,
+  onFlipV,
+  onRotate90Cw,
+  onBrightness,
+  onContrast,
+  imageReady,
+  onApplyCrop,
 }: ToolsSidebarProps) {
   return (
     <motion.div
@@ -59,22 +78,23 @@ export function ToolsSidebar({
       className="
         fixed left-3 top-3 bottom-[48px] z-40
         w-[296px] rounded-xl
-        bg-[var(--bg-secondary)] border border-[var(--border)]
+        bg-bg-secondary border border-border
         flex flex-col overflow-hidden
       "
       style={{
-        boxShadow: "0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
+        boxShadow:
+          "0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)] font-mono">
-          <Wrench className="h-4 w-4 text-[var(--accent)]" />
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary font-mono">
+          <Wrench className="h-4 w-4 text-accent" />
           Tools
         </h2>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-md hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          className="p-1.5 rounded-md hover:bg-bg-elevated transition-colors text-text-muted hover:text-text-primary"
           aria-label="Close tools"
         >
           <X className="h-4 w-4" />
@@ -82,7 +102,7 @@ export function ToolsSidebar({
       </div>
 
       {/* Tool Grid */}
-      <div className="p-4 border-b border-[var(--border)]">
+      <div className="p-4 border-b border-border">
         <ToolGrid activeTool={activeTool} onToolChange={onToolChange} />
       </div>
 
@@ -96,14 +116,37 @@ export function ToolsSidebar({
           />
         )}
 
-        {/* Placeholder for non-stamp tools */}
-        {activeTool !== "stamp" && (
+        {activeTool === "transform" && (
+          <TransformCropSettings
+            disabled={!imageReady}
+            onFlipH={onFlipH}
+            onFlipV={onFlipV}
+            onRotate90Cw={onRotate90Cw}
+            onBrightness={onBrightness}
+            onContrast={onContrast}
+          />
+        )}
+
+        {activeTool === "crop" && (
+          <TransformCropSettings
+            disabled={!imageReady}
+            onFlipH={onFlipH}
+            onFlipV={onFlipV}
+            onRotate90Cw={onRotate90Cw}
+            onBrightness={onBrightness}
+            onContrast={onContrast}
+            onApplyCrop={onApplyCrop}
+          />
+        )}
+
+        {/* Placeholder for tools not yet wired */}
+        {!["stamp", "transform", "crop"].includes(activeTool) && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <span className="text-2xl mb-3">🚧</span>
-            <p className="text-xs text-[var(--text-muted)] font-mono">
+            <p className="text-xs text-text-muted font-mono">
               {activeTool.toUpperCase()} tool coming soon
             </p>
-            <p className="text-[10px] text-[var(--text-muted)] mt-1 opacity-60">
+            <p className="text-[10px] text-text-muted mt-1 opacity-60">
               Powered by Rust / WASM
             </p>
           </div>
@@ -111,14 +154,14 @@ export function ToolsSidebar({
       </div>
 
       {/* Export */}
-      <div className="p-4 border-t border-[var(--border)]">
+      <div className="p-4 border-t border-border">
         <button
           onClick={onExport}
           disabled={!canExport}
           className="
             w-full flex items-center justify-center gap-2 py-2.5 rounded-lg
             text-sm font-semibold
-            bg-[var(--accent)] text-[var(--accent-foreground)]
+            bg-accent text-text-primary
             hover:brightness-110 transition-all
             disabled:opacity-30 disabled:cursor-not-allowed
           "
@@ -136,9 +179,9 @@ export function ToolsSidebar({
           className="
             flex-1 flex items-center justify-center gap-2 py-2 rounded-lg
             text-xs font-semibold font-mono
-            bg-[var(--bg-elevated)] border border-[var(--border)]
-            text-[var(--text-secondary)]
-            hover:border-[var(--border-active)] hover:text-[var(--text-primary)]
+            bg-bg-elevated border border-border
+            text-text-secondary
+            hover:border-border-active hover:text-text-primary
             disabled:opacity-30 disabled:cursor-not-allowed transition-all
           "
         >
@@ -151,9 +194,9 @@ export function ToolsSidebar({
           className="
             flex-1 flex items-center justify-center gap-2 py-2 rounded-lg
             text-xs font-semibold font-mono
-            bg-[var(--bg-elevated)] border border-[var(--border)]
-            text-[var(--text-secondary)]
-            hover:border-[var(--border-active)] hover:text-[var(--text-primary)]
+            bg-bg-elevated border border-border
+            text-text-secondary
+            hover:border-border-active hover:text-text-primary
             disabled:opacity-30 disabled:cursor-not-allowed transition-all
           "
         >

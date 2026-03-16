@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, FolderOpen, X } from "lucide-react";
-import { fadeIn } from "@/lib/animations";
+import { fadeIn, quickSpring } from "@/lib/animations";
 
 interface Props {
   open: boolean;
@@ -51,19 +51,19 @@ export function UploadDialog({ open, onClose, onFiles }: Props) {
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-lg mx-4 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border)] shadow-2xl overflow-hidden"
+            transition={quickSpring}
+            className="relative w-full max-w-lg mx-4 bg-bg-secondary rounded-2xl border border-border shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-5 pb-3">
-              <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)] font-mono">
-                <Upload className="h-5 w-5 text-[var(--accent)]" />
+              <h2 className="flex items-center gap-2 text-base font-semibold text-text-primary font-mono">
+                <Upload className="h-5 w-5 text-accent" />
                 Open Images
               </h2>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-md hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                className="p-1.5 rounded-md hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -82,29 +82,30 @@ export function UploadDialog({ open, onClose, onFiles }: Props) {
               <div
                 className={`
                   border-2 border-dashed rounded-xl p-12 text-center transition-all
-                  ${dragging
-                    ? "border-[var(--accent)] bg-[var(--accent-dim)]"
-                    : "border-[var(--border)] bg-[var(--bg-tertiary)]"
+                  ${
+                    dragging
+                      ? "border-accent bg-accent-dim"
+                      : "border-border bg-bg-tertiary"
                   }
                 `}
               >
                 <div className="flex flex-col items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center">
-                    <Upload className="h-8 w-8 text-[var(--text-muted)]" />
+                  <div className="w-16 h-16 rounded-full bg-bg-elevated flex items-center justify-center">
+                    <Upload className="h-8 w-8 text-text-muted" />
                   </div>
 
                   <button
                     onClick={() => inputRef.current?.click()}
-                    className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold bg-[var(--accent)] text-[var(--accent-foreground)] hover:brightness-110 transition-all"
+                    className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold bg-accent text-primary hover:brightness-110 transition-all"
                   >
                     <FolderOpen className="h-5 w-5" />
                     Browse Files
                   </button>
 
-                  <p className="text-sm text-[var(--text-muted)]">
+                  <p className="text-sm text-text-muted">
                     or drag and drop images here
                   </p>
-                  <p className="text-xs text-[var(--text-muted)] opacity-50">
+                  <p className="text-xs text-text-muted opacity-50">
                     Supports PNG, JPG, GIF, WebP, AVIF
                   </p>
                 </div>

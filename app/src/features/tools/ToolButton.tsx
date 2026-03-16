@@ -14,7 +14,7 @@ export function ToolButton({ tool, active, onClick }: Props) {
       onClick={onClick}
       className={`relative p-0.5 rounded-xl transition-all ${
         active
-          ? "ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--bg-secondary)]"
+          ? "ring-2 ring-accent ring-offset-1 ring-offset-bg-secondary"
           : ""
       }`}
     >

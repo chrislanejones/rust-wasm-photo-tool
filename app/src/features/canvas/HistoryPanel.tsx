@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { slideFromRight } from "@/lib/animations";
 import type { HistoryEntry } from "@/hooks/useCloneStamp";
 
 interface Props {
@@ -18,10 +19,10 @@ export function HistoryPanel({
 }: Props) {
   return (
     <motion.aside
-      initial={{ x: "100%", opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: "100%", opacity: 0 }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+      variants={slideFromRight}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
       className="history-panel"
     >
       <div className="panel-header">

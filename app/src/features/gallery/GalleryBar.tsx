@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { slideFromBottom } from "@/lib/animations";
+import { slideFromBottom, panelSpacingTransition } from "@/lib/animations";
 import { X, Image, ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface PhotoEntry {
@@ -55,12 +55,12 @@ export function GalleryBar({
     >
       <motion.div
         animate={{
-          marginLeft: showTools ? 315 : 12,
-          marginRight: showHistory ? 240 : 12,
+          marginLeft: showTools ? 320 : 12,
+          marginRight: showHistory ? 244 : 12,
         }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        transition={panelSpacingTransition}
         style={{ position: "relative" }}
-        className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm rounded-xl shadow-2xl border border-[var(--border)]"
+        className="bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
       >
         <div className="p-4">
           {/* Header */}
@@ -68,13 +68,13 @@ export function GalleryBar({
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <Image className="h-4 w-4" />
               Gallery
-              <span className="text-xs text-[var(--text-muted)]">
+              <span className="text-xs text-text-muted">
                 ({photos.length})
               </span>
             </h2>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -85,7 +85,7 @@ export function GalleryBar({
             {/* Left arrow */}
             <button
               disabled
-              className="p-1.5 rounded-lg disabled:opacity-30 flex-shrink-0 transition-colors hover:bg-[var(--bg-elevated)]"
+              className="p-1.5 rounded-lg disabled:opacity-30 flex-shrink-0 transition-colors hover:bg-bg-elevated"
               aria-label="Previous images"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -130,7 +130,7 @@ export function GalleryBar({
             {/* Right arrow */}
             <button
               disabled
-              className="p-1.5 rounded-lg disabled:opacity-30 flex-shrink-0 transition-colors hover:bg-[var(--bg-elevated)]"
+              className="p-1.5 rounded-lg disabled:opacity-30 flex-shrink-0 transition-colors hover:bg-bg-elevated"
               aria-label="Next images"
             >
               <ChevronRight className="h-4 w-4" />

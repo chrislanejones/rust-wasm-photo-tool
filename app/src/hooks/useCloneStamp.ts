@@ -198,6 +198,41 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     URL.revokeObjectURL(url);
   }, []);
 
+  const exportAs = useCallback(
+    (format: "png" | "jpeg" | "webp" | "avif", quality: number = 0.92) => {
+      if (format === "png") {
+        exportPng();
+        return;
+      }
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const mimeMap: Record<string, string> = {
+        jpeg: "image/jpeg",
+        webp: "image/webp",
+        avif: "image/avif",
+      };
+      const extMap: Record<string, string> = {
+        jpeg: ".jpg",
+        webp: ".webp",
+        avif: ".avif",
+      };
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `stamp-result${extMap[format]}`;
+          a.click();
+          URL.revokeObjectURL(url);
+        },
+        mimeMap[format],
+        quality,
+      );
+    },
+    [canvasRef, exportPng],
+  );
+
   // ── Mouse / stroke handlers ───────────────────────────────────────────────
   const onMouseDown = useCallback(
     (e: MouseEvent<HTMLCanvasElement>) => {
@@ -434,6 +469,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     clearHistory,
     // Export
     exportPng,
+    exportAs,
     // Mouse
     onMouseDown,
     onMouseMove,

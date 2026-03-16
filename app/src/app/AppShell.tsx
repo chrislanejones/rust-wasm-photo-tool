@@ -4,14 +4,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
 import type { ToolType, StampSettings } from "@/lib/types";
+import { panelSpacingTransition } from "@/lib/animations";
 
 import { TopBar } from "@/components/TopBar";
 import { StatusBar } from "@/components/StatusBar";
+import { ShortcutModal } from "@/components/ShortcutModal";
 import { ToolsSidebar } from "@/features/tools";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { HistoryPanel } from "@/features/canvas/HistoryPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
+import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
+
+export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
 
 export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -94,7 +99,9 @@ export function AppShell() {
   const [showTools, setShowTools] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showKbdHints, setShowKbdHints] = useState(false);
   const [activeTool, setActiveTool] = useState<ToolType>("stamp");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
 
   const prevPhotoCount = useRef(0);
 
@@ -127,38 +134,32 @@ export function AppShell() {
     return undefined;
   }, [photos.length]);
 
-  // ── Keyboard shortcuts ──────────────────────────────────────────────────
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Ctrl+Z / Ctrl+Shift+Z
-      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
-        e.preventDefault();
-        e.shiftKey ? stamp.redo() : stamp.undo();
-        return;
-      }
+  // ── Export (format-aware) ────────────────────────────────────────────────
+  const handleExport = useCallback(() => {
+    stamp.exportAs(exportFormat);
+  }, [stamp, exportFormat]);
 
-      if (!e.altKey) return;
+  // ── Delete all photos ──────────────────────────────────────────────────
+  const handleDeleteAll = useCallback(() => {
+    photos.forEach((p) => URL.revokeObjectURL(p.url));
+    setPhotos([]);
+    setActivePhotoId(null);
+  }, [photos]);
 
-      // Alt+[ / Alt+] brush size
-      if (e.code === "BracketLeft") {
-        e.preventDefault();
-        setStampSettings((prev) => {
-          const next = Math.max(2, prev.brushSize - 5);
-          stamp.setBrushSize(next);
-          return { ...prev, brushSize: next };
-        });
-      } else if (e.code === "BracketRight") {
-        e.preventDefault();
-        setStampSettings((prev) => {
-          const next = Math.min(200, prev.brushSize + 5);
-          stamp.setBrushSize(next);
-          return { ...prev, brushSize: next };
-        });
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [stamp]);
+  // ── Keyboard shortcuts (centralized) ─────────────────────────────────────
+  useKeyboardShortcuts({
+    onUndo: stamp.undo,
+    onRedo: stamp.redo,
+    onExport: handleExport,
+    onDeleteAll: handleDeleteAll,
+    onBrushSizeChange: setStampSettings,
+    setBrushSizeOnTool: stamp.setBrushSize,
+    setShowUpload,
+    setShowTools,
+    setShowGallery,
+    setShowHistory,
+    setShowKbdHints,
+  });
 
   // ── Zoom helpers for TopBar ─────────────────────────────────────────────
   const handleZoomIn = useCallback(() => {
@@ -192,11 +193,17 @@ export function AppShell() {
             showTools={showTools}
             showGallery={showGallery}
             showHistory={showHistory}
+            showKbdHints={showKbdHints}
             onToggleUpload={() => setShowUpload((v) => !v)}
             onToggleTools={() => setShowTools((v) => !v)}
             onToggleGallery={() => setShowGallery((v) => !v)}
             onToggleHistory={() => setShowHistory((v) => !v)}
             imageCount={photos.length}
+            exportFormat={exportFormat}
+            onExportFormatChange={setExportFormat}
+            onExport={handleExport}
+            hasSelectedImage={stamp.state.ready}
+            onDeleteAll={handleDeleteAll}
           />
         )}
       </AnimatePresence>
@@ -211,11 +218,17 @@ export function AppShell() {
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
             hasSource={stamp.state.hasSource}
+            imageReady={stamp.state.ready}
+            onFlipH={stamp.flipHorizontal}
+            onFlipV={stamp.flipVertical}
+            onRotate90Cw={stamp.rotate90Cw}
+            onBrightness={stamp.adjustBrightness}
+            onContrast={stamp.adjustContrast}
             onUndo={stamp.undo}
             onRedo={stamp.redo}
             canUndo={stamp.state.undoCount > 0}
             canRedo={stamp.state.redoCount > 0}
-            onExport={stamp.exportPng}
+            onExport={handleExport}
             canExport={stamp.state.ready}
           />
         )}
@@ -224,10 +237,10 @@ export function AppShell() {
       {/* Main canvas area */}
       <motion.main
         animate={{
-          marginLeft: showTools ? 308 : 0,
-          marginRight: showHistory ? 220 : 0,
+          marginLeft: showTools ? 320 : 0,
+          marginRight: showHistory ? 244 : 0,
         }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        transition={panelSpacingTransition}
         className="main-content"
       >
         <CanvasArea
@@ -270,7 +283,17 @@ export function AppShell() {
       </AnimatePresence>
 
       {/* Status Bar */}
-      <StatusBar state={stamp.state} imageCount={photos.length} />
+      <StatusBar
+        state={stamp.state}
+        imageCount={photos.length}
+        showKbdHints={showKbdHints}
+      />
+
+      {/* Shortcut Reference Modal */}
+      <ShortcutModal
+        open={showKbdHints}
+        onClose={() => setShowKbdHints(false)}
+      />
     </div>
   );
 }
