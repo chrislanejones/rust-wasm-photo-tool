@@ -153,11 +153,15 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   }, [flushToCanvas, syncState]);
 
   const redo = useCallback(() => {
+    console.log("Redo function called, redoCount:", state.redoCount);
     if (toolRef.current?.redo()) {
+      console.log("Redo successful");
       flushToCanvas();
       syncState();
+    } else {
+      console.log("Redo failed or no redo available");
     }
-  }, [flushToCanvas, syncState]);
+  }, [flushToCanvas, syncState, state.redoCount]);
 
   const jumpToHistory = useCallback(
     (index: number) => {
@@ -415,11 +419,43 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     const t = toolRef.current;
     if (!t) return;
     t.rotate_90_cw();
-    // Source cleared inside Rust; mirror that in React
     sourcePosRef.current = null;
     flushToCanvas();
     syncState();
   }, [flushToCanvas, syncState]);
+
+  const rotate90Ccw = useCallback(() => {
+    const t = toolRef.current;
+    if (!t) return;
+    t.rotate_90_ccw();
+    sourcePosRef.current = null;
+    flushToCanvas();
+    syncState();
+  }, [flushToCanvas, syncState]);
+
+  const crop = useCallback(
+    (x: number, y: number, w: number, h: number) => {
+      const t = toolRef.current;
+      if (!t || w < 1 || h < 1) return;
+      t.crop(x, y, w, h);
+      sourcePosRef.current = null;
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
+  const resize = useCallback(
+    (newW: number, newH: number) => {
+      const t = toolRef.current;
+      if (!t || newW < 1 || newH < 1) return;
+      t.resize(newW, newH);
+      sourcePosRef.current = null;
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
 
   // ── NEW: Pixel adjustments ────────────────────────────────────────────────
   /**
@@ -482,6 +518,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     flipHorizontal,
     flipVertical,
     rotate90Cw,
+    rotate90Ccw,
+    crop,
+    resize,
     adjustBrightness,
     adjustContrast,
   };

@@ -136,3 +136,51 @@ pub fn paste_region(
         }
     }
 }
+
+/// Resize the image using bilinear interpolation.
+/// Returns (new_data, new_w, new_h). Minimum dimension is 1×1.
+pub fn resize_bilinear(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
+    let nw = new_w.max(1);
+    let nh = new_h.max(1);
+    let mut out = vec![0u8; (nw * nh * 4) as usize];
+    let sx = old_w as f64 / nw as f64;
+    let sy = old_h as f64 / nh as f64;
+
+    for ty in 0..nh {
+        for tx in 0..nw {
+            let fx = (tx as f64 + 0.5) * sx - 0.5;
+            let fy = (ty as f64 + 0.5) * sy - 0.5;
+
+            let x0 = fx.floor() as i32;
+            let y0 = fy.floor() as i32;
+            let frac_x = fx - fx.floor();
+            let frac_y = fy - fy.floor();
+
+            let sample = |xi: i32, yi: i32| -> [f64; 4] {
+                let xi = xi.clamp(0, old_w as i32 - 1) as usize;
+                let yi = yi.clamp(0, old_h as i32 - 1) as usize;
+                let idx = (yi * old_w as usize + xi) * 4;
+                [
+                    data[idx] as f64,
+                    data[idx + 1] as f64,
+                    data[idx + 2] as f64,
+                    data[idx + 3] as f64,
+                ]
+            };
+
+            let p00 = sample(x0, y0);
+            let p10 = sample(x0 + 1, y0);
+            let p01 = sample(x0, y0 + 1);
+            let p11 = sample(x0 + 1, y0 + 1);
+
+            let di = ((ty * nw + tx) * 4) as usize;
+            for c in 0..4 {
+                let top = p00[c] + (p10[c] - p00[c]) * frac_x;
+                let bot = p01[c] + (p11[c] - p01[c]) * frac_x;
+                let val = top + (bot - top) * frac_y;
+                out[di + c] = val.round().clamp(0.0, 255.0) as u8;
+            }
+        }
+    }
+    out
+}

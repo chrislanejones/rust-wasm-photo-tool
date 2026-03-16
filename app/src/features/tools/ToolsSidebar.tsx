@@ -7,6 +7,7 @@ import type { ToolType, StampSettings } from "@/lib/types";
 import { ToolGrid } from "./ToolGrid";
 import { StampSettings as StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
+import { ResizeSettings } from "./settings/ResizeSettings";
 
 /* ------------------------------------------------------------------ */
 /* Props                                                              */
@@ -31,6 +32,7 @@ interface ToolsSidebarProps {
   // Export
   onExport: () => void;
   canExport: boolean;
+  exportFormat: string;
 
   // WASM transforms
   onFlipH: () => void;
@@ -39,6 +41,13 @@ interface ToolsSidebarProps {
   onBrightness: (delta: number) => void;
   onContrast: (factor: number) => void;
   imageReady: boolean;
+
+  // WASM resize
+  onResize: (newW: number, newH: number) => void;
+  imageWidth: number;
+  imageHeight: number;
+  quality: number;
+  onQualityChange: (q: number) => void;
 
   // Crop (JS canvas for now)
   onApplyCrop?: () => void;
@@ -61,12 +70,18 @@ export function ToolsSidebar({
   canRedo,
   onExport,
   canExport,
+  exportFormat,
   onFlipH,
   onFlipV,
   onRotate90Cw,
   onBrightness,
   onContrast,
   imageReady,
+  onResize,
+  imageWidth,
+  imageHeight,
+  quality,
+  onQualityChange,
   onApplyCrop,
 }: ToolsSidebarProps) {
   return (
@@ -116,6 +131,17 @@ export function ToolsSidebar({
           />
         )}
 
+        {activeTool === "compress" && (
+          <ResizeSettings
+            imageWidth={imageWidth}
+            imageHeight={imageHeight}
+            onResize={onResize}
+            quality={quality}
+            onQualityChange={onQualityChange}
+            disabled={!imageReady}
+          />
+        )}
+
         {activeTool === "transform" && (
           <TransformCropSettings
             disabled={!imageReady}
@@ -140,7 +166,7 @@ export function ToolsSidebar({
         )}
 
         {/* Placeholder for tools not yet wired */}
-        {!["stamp", "transform", "crop"].includes(activeTool) && (
+        {!["stamp", "compress", "transform", "crop"].includes(activeTool) && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <span className="text-2xl mb-3">🚧</span>
             <p className="text-xs text-text-muted font-mono">
@@ -167,7 +193,7 @@ export function ToolsSidebar({
           "
         >
           <Download className="h-4 w-4" />
-          Export PNG
+          Export {exportFormat.toUpperCase()}
         </button>
       </div>
 

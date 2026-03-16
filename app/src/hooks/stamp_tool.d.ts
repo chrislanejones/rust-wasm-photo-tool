@@ -36,10 +36,18 @@ declare module "stamp_tool" {
     thumbnail_height(max_px: number): number;
     thumbnail_data(max_px: number): Uint8Array;
     copy_region(x: number, y: number, w: number, h: number): Uint8Array;
-    paste_region(pixels: Uint8Array, src_w: number, src_h: number, dest_x: number, dest_y: number): void;
+    paste_region(
+      pixels: Uint8Array,
+      src_w: number,
+      src_h: number,
+      dest_x: number,
+      dest_y: number,
+    ): void;
     flip_horizontal(): void;
     flip_vertical(): void;
-    rotate_90_cw(): void;
+    rotate_90_ccw(): void;
+    crop(x: number, y: number, w: number, h: number): void;
+    resize(new_w: number, new_h: number): void;
     adjust_brightness(delta: number): void;
     adjust_contrast(factor: number): void;
   }

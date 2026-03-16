@@ -43,9 +43,15 @@ export function useKeyboardShortcuts({
 
       // ── Ctrl/Cmd shortcuts ────────────────────────────────────────
       if (e.metaKey || e.ctrlKey) {
-        if (e.key === "z") {
+        if (e.key === "z" || e.key === "Z") {
           e.preventDefault();
-          e.shiftKey ? onRedo() : onUndo();
+          if (e.shiftKey) {
+            console.log("Redo hotkey triggered (Ctrl+Shift+Z)");
+            onRedo();
+          } else {
+            console.log("Undo hotkey triggered (Ctrl+Z)");
+            onUndo();
+          }
           return;
         }
       }

@@ -12,6 +12,7 @@ export interface ImageData {
 // Others are future JS-canvas-based annotation tools.
 export type ToolType =
   | "stamp"
+  | "compress" // ← add
   | "transform"
   | "brush"
   | "text"

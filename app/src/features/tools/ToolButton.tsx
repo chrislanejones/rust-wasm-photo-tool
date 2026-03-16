@@ -12,18 +12,20 @@ export function ToolButton({ tool, active, onClick }: Props) {
   return (
     <button
       onClick={onClick}
-      className={`relative p-0.5 rounded-xl transition-all ${
+      className={`relative p-0.5 rounded-xl transition-all duration-200 ${
         active
-          ? "ring-2 ring-accent ring-offset-1 ring-offset-bg-secondary"
-          : ""
+          ? "ring-2 ring-accent ring-offset-2 ring-offset-bg-secondary shadow-xl"
+          : "hover:ring-2 hover:ring-accent/50 hover:ring-offset-2 hover:ring-offset-bg-secondary"
       }`}
     >
       <span
-        className={`flex h-12 w-full aspect-square items-center justify-center rounded-xl bg-gradient-to-br ${tool.gradient} shadow-lg transition-transform hover:scale-105 ${
-          active ? "scale-105" : ""
+        className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${tool.gradient} shadow-lg transition-all duration-200 ${
+          active 
+            ? "scale-110 shadow-2xl" 
+            : "hover:scale-105 hover:shadow-xl"
         }`}
       >
-        <Icon className="h-6 w-6 text-white" />
+        <Icon className="h-5 w-5 text-white drop-shadow-sm" />
       </span>
     </button>
   );

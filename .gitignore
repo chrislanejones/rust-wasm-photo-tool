@@ -3,3 +3,9 @@
 node_modules
 app/node_modules
 app/dist
+
+# Added by roll_repo_for_ai.sh
+roll_repo_for_ai.sh
+
+# Added by roll_repo_for_ai.sh
+rolled_repo/

@@ -298,6 +298,27 @@ impl CloneStampTool {
         );
     }
 
+    // ── Resize ───────────────────────────────────────────────────────────
+
+    pub fn resize(&mut self, new_w: u32, new_h: u32) {
+        if new_w == 0 || new_h == 0 {
+            return;
+        }
+        self.hist.push_snapshot("Resize", &self.buf.data);
+        let resized = transform::resize_bilinear(
+            &self.buf.data,
+            self.buf.width,
+            self.buf.height,
+            new_w,
+            new_h,
+        );
+        self.buf.data = resized;
+        self.buf.width = new_w;
+        self.buf.height = new_h;
+        self.stamp.source_x = None;
+        self.stamp.source_y = None;
+    }
+
     // ── Filters ─────────────────────────────────────────────────────────
 
     pub fn adjust_brightness(&mut self, delta: f64) {

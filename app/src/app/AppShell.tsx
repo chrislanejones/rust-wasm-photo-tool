@@ -102,6 +102,7 @@ export function AppShell() {
   const [showKbdHints, setShowKbdHints] = useState(false);
   const [activeTool, setActiveTool] = useState<ToolType>("stamp");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
+  const [quality, setQuality] = useState(75);
 
   const prevPhotoCount = useRef(0);
 
@@ -218,18 +219,24 @@ export function AppShell() {
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
             hasSource={stamp.state.hasSource}
-            imageReady={stamp.state.ready}
-            onFlipH={stamp.flipHorizontal}
-            onFlipV={stamp.flipVertical}
-            onRotate90Cw={stamp.rotate90Cw}
-            onBrightness={stamp.adjustBrightness}
-            onContrast={stamp.adjustContrast}
             onUndo={stamp.undo}
             onRedo={stamp.redo}
             canUndo={stamp.state.undoCount > 0}
             canRedo={stamp.state.redoCount > 0}
             onExport={handleExport}
             canExport={stamp.state.ready}
+            imageReady={stamp.state.ready}
+            onFlipH={stamp.flipHorizontal}
+            onFlipV={stamp.flipVertical}
+            onRotate90Cw={stamp.rotate90Cw}
+            onBrightness={stamp.adjustBrightness}
+            onContrast={stamp.adjustContrast}
+            onResize={stamp.resize}
+            imageWidth={stamp.state.width}
+            imageHeight={stamp.state.height}
+            quality={quality}
+            onQualityChange={setQuality}
+            exportFormat={exportFormat}
           />
         )}
       </AnimatePresence>

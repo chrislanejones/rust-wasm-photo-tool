@@ -91,6 +91,18 @@
   --color-accent-dim: var(--accent-dim);
   --color-accent-glow: var(--accent-glow);
   --color-accent-foreground: var(--accent-foreground);
+
+  /* theme-* aliases — used by tool settings panels */
+  --color-theme-ring: var(--ring);
+  --color-theme-sidebar: var(--bg-secondary);
+  --color-theme-foreground: var(--foreground);
+  --color-theme-primary: var(--primary);
+  --color-theme-primary-foreground: var(--primary-foreground);
+  --color-theme-secondary: var(--secondary-foreground);
+  --color-theme-muted: var(--bg-elevated);
+  --color-theme-muted-foreground: var(--muted-foreground);
+  --color-theme-sidebar-border: var(--border);
+  --color-theme-chart4: #f0a060;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -245,6 +257,15 @@ body {
   pointer-events: none;
   z-index: 999;
   transform: translate(-50%, -50%);
+}
+
+/* Preset button focus states - remove default focus outlines */
+button:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: none;
 }
 
 .source-marker::before,
@@ -584,36 +605,60 @@ kbd {
 
 input[type="range"] {
   -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+}
+
+/* Track styles */
+input[type="range"]::-webkit-slider-runnable-track {
   width: 100%;
   height: 4px;
   background: var(--bg-elevated);
   border-radius: 2px;
-  outline: none;
   cursor: pointer;
 }
 
+input[type="range"]::-moz-range-track {
+  width: 100%;
+  height: 4px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* Thumb styles - properly centered */
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  appearance: none;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--accent);
   cursor: pointer;
-  box-shadow: 0 0 6px var(--accent-glow);
+  box-shadow: 0 0 8px var(--accent-glow);
   transition: transform 0.1s;
+  margin-top: -6px; /* Centers the thumb: (16px - 4px) / 2 */
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.2);
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--accent);
   cursor: pointer;
   border: none;
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: transform 0.1s;
 }
 
 input[type="range"]:disabled {
@@ -621,24 +666,100 @@ input[type="range"]:disabled {
   cursor: not-allowed;
 }
 
+/* Gradient-track slider — invisible thumb, sits over a visual track div */
+input[type="range"].slider-input::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 100%;
+}
+input[type="range"].slider-input::-moz-range-track {
+  background: transparent;
+  height: 100%;
+}
+input[type="range"].slider-input::-moz-range-progress {
+  background: transparent;
+}
+input[type="range"].slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: transform 0.1s;
+  position: relative;
+  top: -2px;
+}
+input[type="range"].slider-input::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+input[type="range"].slider-input::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: transform 0.1s;
+  position: relative;
+  top: -2px;
+}
+
 /* Overlay slider — sits inside a h-5 relative wrapper; track provided by sibling div */
 input[type="range"].slider-overlay {
   background: transparent;
   height: 100%;
+  position: absolute;
+  margin: 0;
+  padding: 0;
 }
 
 input[type="range"].slider-overlay::-webkit-slider-runnable-track {
   background: transparent;
-  height: 8px;
+  height: 20px;
+  cursor: pointer;
 }
 
 input[type="range"].slider-overlay::-moz-range-track {
   background: transparent;
-  height: 8px;
+  height: 20px;
+  cursor: pointer;
 }
 
 input[type="range"].slider-overlay::-moz-range-progress {
   background: transparent;
+}
+
+/* Ensure thumb is centered vertically */
+input[type="range"].slider-overlay::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: transform 0.1s;
+  position: relative;
+  top: 0;
+  margin-top: 0;
+}
+
+input[type="range"].slider-overlay::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+input[type="range"].slider-overlay::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: transform 0.1s;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
