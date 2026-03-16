@@ -94,7 +94,7 @@ export function GalleryBar({
             {/* Scroll strip — py/px give ring room; negative margins cancel layout space */}
             <div
               ref={stripRef}
-              className="flex gap-2 overflow-x-auto scrollbar-thin py-2 -my-2 px-1 -mx-1"
+              className="flex gap-2 overflow-x-auto scrollbar-hide py-2 -my-2 px-1 -mx-1"
             >
               {photos.map((entry) => (
                 <div

@@ -103,8 +103,8 @@ export function ToolsSidebar({
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary font-mono">
-          <Wrench className="h-4 w-4 text-accent" />
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <Wrench className="h-4 w-4" />
           Tools
         </h2>
         <button

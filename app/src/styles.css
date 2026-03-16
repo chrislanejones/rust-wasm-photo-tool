@@ -319,6 +319,10 @@ button:focus-visible {
   gap: 8px;
 }
 
+.panel-header h2 {
+  flex: 1;
+}
+
 .panel-title {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -400,8 +404,12 @@ button:focus-visible {
 }
 
 .history-item.type-current {
-  background: var(--accent-dim);
-  border-color: rgba(252, 223, 194, 0.2);
+  background: var(--bg-tertiary);
+  border-color: var(--border);
+}
+
+.history-item.type-current .history-dot {
+  background: var(--text-muted);
 }
 
 .history-item.type-redo {
@@ -785,10 +793,12 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 }
 
 .photo-thumb:hover:not(.active) {
-  border-color: var(--text-muted);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--text-muted);
 }
 
 .photo-thumb.active {
+  border-color: transparent;
   box-shadow:
     0 0 0 2px var(--bg-secondary),
     0 0 0 4px var(--accent);
@@ -797,10 +807,11 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 .photo-thumb img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   pointer-events: none;
   user-select: none;
+  background: var(--bg-tertiary);
 }
 
 .photo-thumb-label {
@@ -879,6 +890,14 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 2px;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

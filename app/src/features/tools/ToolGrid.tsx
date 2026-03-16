@@ -10,7 +10,7 @@ interface Props {
 
 export function ToolGrid({ activeTool, onToolChange }: Props) {
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-5 gap-3">
       {TOOLS.map((tool) => (
         <Tooltip key={tool.id}>
           <TooltipTrigger asChild>

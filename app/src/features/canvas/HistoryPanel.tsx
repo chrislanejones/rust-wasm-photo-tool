@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { History, RotateCcw, X } from "lucide-react";
 import { slideFromRight } from "@/lib/animations";
 import type { HistoryEntry } from "@/hooks/useCloneStamp";
 
@@ -26,32 +27,24 @@ export function HistoryPanel({
       className="history-panel"
     >
       <div className="panel-header">
-        <span className="panel-title">History</span>
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <History className="h-4 w-4" />
+          History
+        </h2>
         <span className="panel-count">{history.length}</span>
         <button
           className="btn-icon"
           onClick={onClear}
           title="Clear history"
-          style={{ marginLeft: "auto" }}
         >
-          <svg
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9h8l1-9" />
-          </svg>
+          <RotateCcw className="h-3.5 w-3.5" />
         </button>
-        <button className="btn-icon" onClick={onClose} title="Close history">
-          <svg
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <path d="M4 4l8 8M12 4l-8 8" />
-          </svg>
+        <button
+          onClick={onClose}
+          title="Close history"
+          className="ml-auto p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
+        >
+          <X className="h-4 w-4" />
         </button>
       </div>
 

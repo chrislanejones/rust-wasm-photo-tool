@@ -25,7 +25,7 @@ export function ToolButton({ tool, active, onClick }: Props) {
             : "hover:scale-105 hover:shadow-xl"
         }`}
       >
-        <Icon className="h-5 w-5 text-white drop-shadow-sm" />
+        <Icon className="h-7 w-7 text-white drop-shadow-sm" />
       </span>
     </button>
   );
