@@ -361,5 +361,52 @@ impl CloneStampTool {
     // Note: No end_blur_stroke needed — the snapshot is already saved.
     // Just call blur_region() repeatedly during the stroke, then
     // the next begin_blur_stroke() or other action creates a new snapshot.
+     // ── Drawing: Arrows ─────────────────────────────────────────
+    /// Save undo snapshot before drawing an arrow/shape.
+    /// Call once on mousedown, then draw_arrow/draw_shape on mouseup.
+    pub fn begin_draw_stroke(&mut self, label: &str) {
+        self.hist.push_snapshot(label, &self.buf.data);
+    }
+ 
+    /// Draw an arrow onto the image buffer.
+    /// style: 0 = single-headed, 1 = double-headed
+    /// color_hex: CSS hex like "#ef4444"
+    pub fn draw_arrow(
+        &mut self,
+        from_x: f64, from_y: f64,
+        to_x: f64, to_y: f64,
+        color_hex: &str,
+        stroke_width: f64,
+        style: u32,
+    ) {
+        let color = drawing::parse_hex_color(color_hex);
+        drawing::draw_arrow(
+            &mut self.buf.data,
+            self.buf.width, self.buf.height,
+            from_x, from_y, to_x, to_y,
+            color, stroke_width, style,
+        );
+    }
+ 
+    // ── Drawing: Shapes ─────────────────────────────────────────
+    /// Draw a shape onto the image buffer.
+    /// shape: 0=rect, 1=circle, 2=line
+    /// color_hex: CSS hex like "#ef4444"
+    pub fn draw_shape(
+        &mut self,
+        from_x: f64, from_y: f64,
+        to_x: f64, to_y: f64,
+        shape: u32,
+        color_hex: &str,
+        stroke_width: f64,
+    ) {
+        let color = drawing::parse_hex_color(color_hex);
+        drawing::draw_shape(
+            &mut self.buf.data,
+            self.buf.width, self.buf.height,
+            from_x, from_y, to_x, to_y,
+            shape, color, stroke_width,
+        );
+    }
  
 }

@@ -55,7 +55,7 @@ export function ShortcutModal({ open, onClose }: Props) {
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={onClose}
         >
           <motion.div

@@ -3,7 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
-import type { ToolType, StampSettings } from "@/lib/types";
+import { useDrawingTools } from "@/hooks/useDrawingTools";
+import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
+import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition } from "@/lib/animations";
 
 import { TopBar } from "@/components/TopBar";
@@ -17,7 +19,7 @@ import { UploadDialog } from "@/features/upload/UploadDialog";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 
-export type ExportFormat = "jpeg" | "png" | "webp" | "avif";
+export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
 
 export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -28,7 +30,6 @@ export function AppShell() {
     hardness: 0.8,
     opacity: 1.0,
   });
-
   const handleStampSettingsChange = useCallback(
     (s: StampSettings) => {
       setStampSettings(s);
@@ -39,15 +40,13 @@ export function AppShell() {
     [stamp],
   );
 
+  const [toolSettings, setToolSettings] =
+    useState<ToolSettings>(defaultToolSettings);
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
   const [hasBeenModified, setHasBeenModified] = useState(false);
-
-  /* ------------------------------------------------------------------ */
-  /* Photo management                                                   */
-  /* ------------------------------------------------------------------ */
 
   const handleAddPhotos = useCallback(
     (files: File[]) => {
@@ -88,7 +87,6 @@ export function AppShell() {
         const next = prev.filter((p) => p.id !== id);
         const removed = prev[idx];
         if (removed) URL.revokeObjectURL(removed.url);
-
         if (id === activePhotoId && next.length > 0) {
           const newActive = next[Math.min(idx, next.length - 1)]!;
           stamp.loadImage(newActive.file);
@@ -108,46 +106,27 @@ export function AppShell() {
     [activePhotoId, stamp],
   );
 
-  /* ------------------------------------------------------------------ */
-  /* Brush preview                                                      */
-  /* ------------------------------------------------------------------ */
-
   const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(stampSettings.brushSize, stamp.state.zoom, canvasRef);
-
-  /* ------------------------------------------------------------------ */
-  /* Panel state                                                        */
-  /* ------------------------------------------------------------------ */
 
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
   const [showTools, setShowTools] = useState(true);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showKbdHints, setShowKbdHints] = useState(false); // Alt+/
-  const [showShortcutModal, setShowShortcutModal] = useState(false); // Alt+?
+  const [showKbdHints, setShowKbdHints] = useState(false);
+  const [showShortcutModal, setShowShortcutModal] = useState(false);
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
-
-  // JPEG default
   const [exportFormat, setExportFormat] = useState<ExportFormat>("jpeg");
   const [quality, setQuality] = useState(75);
 
-  // Quality change enables A/B compare
   const handleQualityChange = useCallback((q: number) => {
     setQuality(q);
     setHasBeenModified(true);
   }, []);
 
-  /* ------------------------------------------------------------------ */
-  /* Auto compress                                                      */
-  /* ------------------------------------------------------------------ */
-
   const { progress: compressProgress, compressAll } = useAutoCompress();
-
-  /* ------------------------------------------------------------------ */
-  /* Panel sequencing                                                   */
-  /* ------------------------------------------------------------------ */
 
   const prevPhotoCount = useRef(0);
   useEffect(() => {
@@ -176,17 +155,9 @@ export function AppShell() {
     return undefined;
   }, [photos.length]);
 
-  /* ------------------------------------------------------------------ */
-  /* Export                                                              */
-  /* ------------------------------------------------------------------ */
-
   const handleExport = useCallback(() => {
     stamp.exportAs(exportFormat, quality / 100);
   }, [stamp, exportFormat, quality]);
-
-  /* ------------------------------------------------------------------ */
-  /* Delete all                                                         */
-  /* ------------------------------------------------------------------ */
 
   const handleDeleteAll = useCallback(() => {
     photos.forEach((p) => URL.revokeObjectURL(p.url));
@@ -196,20 +167,6 @@ export function AppShell() {
     setHasBeenModified(false);
     setCompareActive(false);
   }, [photos]);
-
-  /* ------------------------------------------------------------------ */
-  /* Blur tool — inline WASM bridge                                     */
-  /*                                                                    */
-  /* NOTE: blur_region / begin_blur_stroke are defined in Rust and      */
-  /* appear in pkg/stamp_tool.d.ts after `wasm-pack build`.             */
-  /* If your project copies the .d.ts into app/src/hooks/, make sure    */
-  /* that copy is up to date. We use (tool as any) to avoid TS errors   */
-  /* if the declaration hasn't propagated yet.                          */
-  /* ------------------------------------------------------------------ */
-
-  const isBlurringRef = useRef(false);
-  const blurSizeRef = useRef(32);
-  const blurIntensityRef = useRef(8);
 
   const flushCanvasFromTool = useCallback(() => {
     const t = stamp.toolRef.current;
@@ -231,37 +188,40 @@ export function AppShell() {
     );
   }, [stamp.toolRef]);
 
-  const getBlurCoords = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return { x: 0, y: 0 };
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: ((e.clientX - rect.left) * canvas.width) / rect.width,
-        y: ((e.clientY - rect.top) * canvas.height) / rect.height,
-      };
-    },
-    [],
-  );
+  /* ── Blur tool ── */
+  const isBlurringRef = useRef(false);
+  const getCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) * canvas.width) / rect.width,
+      y: ((e.clientY - rect.top) * canvas.height) / rect.height,
+    };
+  }, []);
 
   const blurOnMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const tool = stamp.toolRef.current;
       if (!tool || e.button !== 0) return;
       isBlurringRef.current = true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (tool as any).begin_blur_stroke();
-      const { x, y } = getBlurCoords(e);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (tool as any).blur_region(
+      tool.begin_blur_stroke();
+      const { x, y } = getCoords(e);
+      tool.blur_region(
         x,
         y,
-        blurSizeRef.current / 2,
-        blurIntensityRef.current,
+        toolSettings.blurSize / 2,
+        toolSettings.blurIntensity,
       );
       flushCanvasFromTool();
     },
-    [stamp.toolRef, getBlurCoords, flushCanvasFromTool],
+    [
+      stamp.toolRef,
+      getCoords,
+      flushCanvasFromTool,
+      toolSettings.blurSize,
+      toolSettings.blurIntensity,
+    ],
   );
 
   const blurOnMouseMove = useCallback(
@@ -269,37 +229,57 @@ export function AppShell() {
       if (!isBlurringRef.current) return;
       const tool = stamp.toolRef.current;
       if (!tool) return;
-      const { x, y } = getBlurCoords(e);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (tool as any).blur_region(
+      const { x, y } = getCoords(e);
+      tool.blur_region(
         x,
         y,
-        blurSizeRef.current / 2,
-        blurIntensityRef.current,
+        toolSettings.blurSize / 2,
+        toolSettings.blurIntensity,
       );
       flushCanvasFromTool();
     },
-    [stamp.toolRef, getBlurCoords, flushCanvasFromTool],
+    [
+      stamp.toolRef,
+      getCoords,
+      flushCanvasFromTool,
+      toolSettings.blurSize,
+      toolSettings.blurIntensity,
+    ],
   );
 
   const blurOnMouseUp = useCallback(() => {
     isBlurringRef.current = false;
   }, []);
 
-  // Override stamp mouse handlers when blur tool is active
-  const effectiveStamp =
-    activeTool === "blur"
-      ? {
-          ...stamp,
-          onMouseDown: blurOnMouseDown,
-          onMouseMove: blurOnMouseMove,
-          onMouseUp: blurOnMouseUp,
-        }
-      : stamp;
+  /* ── Arrow / Shapes / Crop ── */
+  const drawingTools = useDrawingTools({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    activeTool,
+    settings: toolSettings,
+    flushToCanvas: flushCanvasFromTool,
+  });
 
-  /* ------------------------------------------------------------------ */
-  /* Keyboard shortcuts                                                 */
-  /* ------------------------------------------------------------------ */
+  /* ── Route mouse events ── */
+  const effectiveStamp = (() => {
+    if (activeTool === "blur") {
+      return {
+        ...stamp,
+        onMouseDown: blurOnMouseDown,
+        onMouseMove: blurOnMouseMove,
+        onMouseUp: blurOnMouseUp,
+      };
+    }
+    if (["arrow", "shapes", "crop"].includes(activeTool)) {
+      return {
+        ...stamp,
+        onMouseDown: drawingTools.onMouseDown as typeof stamp.onMouseDown,
+        onMouseMove: drawingTools.onMouseMove as typeof stamp.onMouseMove,
+        onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
+      };
+    }
+    return stamp;
+  })();
 
   useKeyboardShortcuts({
     onUndo: stamp.undo,
@@ -316,22 +296,15 @@ export function AppShell() {
     setShowShortcutModal,
   });
 
-  /* ------------------------------------------------------------------ */
-  /* Zoom / Compare / Resize                                            */
-  /* ------------------------------------------------------------------ */
-
   const handleZoomIn = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(1);
   }, [stamp]);
-
   const handleZoomOut = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(-1);
   }, [stamp]);
-
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
   }, []);
-
   const handleResize = useCallback(
     (newW: number, newH: number) => {
       stamp.resize(newW, newH);
@@ -339,10 +312,6 @@ export function AppShell() {
     },
     [stamp],
   );
-
-  /* ------------------------------------------------------------------ */
-  /* Auto compress — maxWidth 2200                                      */
-  /* ------------------------------------------------------------------ */
 
   const handleAutoCompress = useCallback(() => {
     compressAll(
@@ -365,10 +334,6 @@ export function AppShell() {
     );
     setHasBeenModified(true);
   }, [photos, quality, exportFormat, compressAll]);
-
-  /* ------------------------------------------------------------------ */
-  /* Render                                                             */
-  /* ------------------------------------------------------------------ */
 
   return (
     <div className="app-shell">
@@ -436,12 +401,9 @@ export function AppShell() {
             onAutoCompress={handleAutoCompress}
             isCompressing={compressProgress.running}
             compressProgress={compressProgress}
-            onApplyCrop={() => {
-              // ToolsSidebar manages crop selection internally;
-              // it calls stamp.crop() via its own onApplyCrop handler.
-              // This is a no-op trigger — the actual crop logic lives
-              // in the sidebar's CropSettings which calls the canvas ref.
-            }}
+            onApplyCrop={drawingTools.applyCrop}
+            toolSettings={toolSettings}
+            onToolSettingsChange={setToolSettings}
           />
         )}
       </AnimatePresence>
@@ -478,6 +440,7 @@ export function AppShell() {
             showTools={showTools}
             showHistory={showHistory}
             compressionProgress={compressProgress.items}
+            compressionSavings={compressProgress.savings}
           />
         )}
       </AnimatePresence>
@@ -498,7 +461,6 @@ export function AppShell() {
         open={showShortcutModal}
         onClose={() => setShowShortcutModal(false)}
       />
-
       <StatusBar
         state={stamp.state}
         imageCount={photos.length}

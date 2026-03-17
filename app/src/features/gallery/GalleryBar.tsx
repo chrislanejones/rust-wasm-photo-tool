@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition } from "@/lib/animations";
-import { X, Image, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Image, Check, Zap, ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface PhotoEntry {
   id: string;
@@ -18,8 +18,8 @@ interface Props {
   onClose: () => void;
   showTools: boolean;
   showHistory: boolean;
-  /** Per-image compression progress: id → 0-100 (or -1 for error) */
-  compressionProgress?: Record<string, number>;
+  compressionProgress: Record<string, number>;
+  compressionSavings?: Record<string, { savingsPercent: number }>;
 }
 
 const MIN_PHOTOS = 3;
@@ -36,32 +36,34 @@ export function GalleryBar({
   showTools,
   showHistory,
   compressionProgress,
+  compressionSavings,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
   const [photosPerPage, setPhotosPerPage] = useState(MIN_PHOTOS);
 
   const calculatePhotosPerPage = useCallback(() => {
-    const availableWidth = showTools && showHistory 
-      ? window.innerWidth - 320 - 244 - 48 // tools + history + margins
-      : showTools || showHistory 
-        ? window.innerWidth - 320 - 48 // tools or history + margin
-        : window.innerWidth - 48; // no panels
+    const availableWidth =
+      showTools && showHistory
+        ? window.innerWidth - 320 - 244 - 48
+        : showTools || showHistory
+          ? window.innerWidth - 320 - 48
+          : window.innerWidth - 48;
 
     const containerWidth = Math.max(300, availableWidth);
-    const photos = Math.floor((containerWidth - 80) / (THUMBNAIL_SIZE + GAP));
-    return Math.max(MIN_PHOTOS, Math.min(MAX_PHOTOS, photos));
+    const count = Math.floor((containerWidth - 80) / (THUMBNAIL_SIZE + GAP));
+    return Math.max(MIN_PHOTOS, Math.min(MAX_PHOTOS, count));
   }, [showTools, showHistory]);
 
   useEffect(() => {
-    const updatePhotosPerPage = () => setPhotosPerPage(calculatePhotosPerPage());
+    const updatePhotosPerPage = () =>
+      setPhotosPerPage(calculatePhotosPerPage());
     updatePhotosPerPage();
     window.addEventListener("resize", updatePhotosPerPage);
     return () => window.removeEventListener("resize", updatePhotosPerPage);
   }, [calculatePhotosPerPage]);
 
   const totalPages = Math.ceil(photos.length / photosPerPage);
-
   const startIdx = page * photosPerPage;
   const visiblePhotos = photos.slice(startIdx, startIdx + photosPerPage);
 
@@ -106,9 +108,7 @@ export function GalleryBar({
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <Image className="h-4 w-4" />
               Gallery
-              <span className="text-xs text-text-muted">
-                ({photos.length})
-              </span>
+              <span className="text-xs text-text-muted">({photos.length})</span>
             </h2>
             <button
               onClick={onClose}
@@ -131,12 +131,10 @@ export function GalleryBar({
             </button>
 
             {/* Scroll strip */}
-            <div
-              ref={stripRef}
-              className="flex gap-2 justify-center"
-            >
+            <div ref={stripRef} className="flex gap-2 justify-center">
               {visiblePhotos.map((entry) => {
                 const progress = compressionProgress?.[entry.id];
+                const savings = compressionSavings?.[entry.id];
                 const isCompressing =
                   progress !== undefined && progress >= 0 && progress < 100;
                 const isDone = progress === 100;
@@ -152,8 +150,8 @@ export function GalleryBar({
                   >
                     <img src={entry.url} alt={entry.name} draggable={false} />
 
-                    {/* Compression overlay */}
                     <AnimatePresence>
+                      {/* ── Compressing: bottom-to-top fill ── */}
                       {isCompressing && (
                         <motion.div
                           initial={{ opacity: 0 }}
@@ -179,6 +177,7 @@ export function GalleryBar({
                         </motion.div>
                       )}
 
+                      {/* ── Done: checkmark + savings badge ── */}
                       {isDone && (
                         <motion.div
                           initial={{ opacity: 0, scale: 0.5 }}
@@ -191,12 +190,27 @@ export function GalleryBar({
                           }}
                           className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-emerald-500/30"
                         >
+                          {/* Savings badge — top-left */}
+                          {savings && savings.savingsPercent > 0 && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.15 }}
+                              className="absolute top-1 left-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-500/90 text-white text-[9px] font-bold font-mono shadow-lg"
+                            >
+                              <Zap className="h-2.5 w-2.5" />-
+                              {savings.savingsPercent}%
+                            </motion.div>
+                          )}
+
+                          {/* Checkmark — center */}
                           <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
                             <Check className="h-3.5 w-3.5 text-white" />
                           </div>
                         </motion.div>
                       )}
 
+                      {/* ── Error ── */}
                       {isError && (
                         <motion.div
                           initial={{ opacity: 0 }}
@@ -253,7 +267,9 @@ export function GalleryBar({
                   key={i}
                   onClick={() => setPage(i)}
                   className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                    i === page ? "bg-accent" : "bg-bg-elevated hover:bg-text-muted"
+                    i === page
+                      ? "bg-accent"
+                      : "bg-bg-elevated hover:bg-text-muted"
                   }`}
                   aria-label={`Go to page ${i + 1}`}
                 />
