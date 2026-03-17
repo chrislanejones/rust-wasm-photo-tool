@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
 import { useDrawingTools } from "@/hooks/useDrawingTools";
+import { useEmojiTool } from "@/hooks/useEmojiTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition } from "@/lib/animations";
@@ -18,6 +19,25 @@ import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
+
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+} from "@/components/ui/context-menu";
+import {
+  Undo,
+  Redo,
+  Download,
+  Clipboard,
+  Trash2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+} from "lucide-react";
 
 export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
 
@@ -88,10 +108,10 @@ export function AppShell() {
         const removed = prev[idx];
         if (removed) URL.revokeObjectURL(removed.url);
         if (id === activePhotoId && next.length > 0) {
-          const newActive = next[Math.min(idx, next.length - 1)]!;
-          stamp.loadImage(newActive.file);
-          setActivePhotoId(newActive.id);
-          setOriginalUrl(newActive.url);
+          const na = next[Math.min(idx, next.length - 1)]!;
+          stamp.loadImage(na.file);
+          setActivePhotoId(na.id);
+          setOriginalUrl(na.url);
           setHasBeenModified(false);
           setCompareActive(false);
         } else if (next.length === 0) {
@@ -120,7 +140,6 @@ export function AppShell() {
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("jpeg");
   const [quality, setQuality] = useState(75);
-
   const handleQualityChange = useCallback((q: number) => {
     setQuality(q);
     setHasBeenModified(true);
@@ -168,6 +187,7 @@ export function AppShell() {
     setCompareActive(false);
   }, [photos]);
 
+  /* ── Flush WASM → Canvas ── */
   const flushCanvasFromTool = useCallback(() => {
     const t = stamp.toolRef.current;
     const canvas = canvasRef.current;
@@ -260,27 +280,42 @@ export function AppShell() {
     flushToCanvas: flushCanvasFromTool,
   });
 
+  /* ── Emoji tool ── */
+  const emojiTool = useEmojiTool({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    flushToCanvas: flushCanvasFromTool,
+    emoji: toolSettings.emoji,
+    emojiSize: toolSettings.emojiSize,
+  });
+
   /* ── Route mouse events ── */
   const effectiveStamp = (() => {
-    if (activeTool === "blur") {
+    if (activeTool === "blur")
       return {
         ...stamp,
         onMouseDown: blurOnMouseDown,
         onMouseMove: blurOnMouseMove,
         onMouseUp: blurOnMouseUp,
       };
-    }
-    if (["arrow", "shapes", "crop"].includes(activeTool)) {
+    if (["arrow", "shapes", "crop"].includes(activeTool))
       return {
         ...stamp,
         onMouseDown: drawingTools.onMouseDown as typeof stamp.onMouseDown,
         onMouseMove: drawingTools.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
       };
-    }
+    if (activeTool === "emoji")
+      return {
+        ...stamp,
+        onMouseDown: emojiTool.onMouseDown as typeof stamp.onMouseDown,
+        onMouseMove: emojiTool.onMouseMove as typeof stamp.onMouseMove,
+        onMouseUp: emojiTool.onMouseUp as typeof stamp.onMouseUp,
+      };
     return stamp;
   })();
 
+  /* ── Keyboard shortcuts ── */
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
@@ -335,6 +370,27 @@ export function AppShell() {
     setHasBeenModified(true);
   }, [photos, quality, exportFormat, compressAll]);
 
+  /* ── Copy to clipboard ── */
+  const handleCopyToClipboard = useCallback(async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    try {
+      const blob = await new Promise<Blob | null>((res) =>
+        canvas.toBlob((b) => res(b), "image/png"),
+      );
+      if (blob)
+        await navigator.clipboard.write([
+          new ClipboardItem({ [blob.type]: blob }),
+        ]);
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
+  }, []);
+
+  const hasImage = stamp.state.ready;
+  const canUndo = stamp.state.undoCount > 0;
+  const canRedo = stamp.state.redoCount > 0;
+
   return (
     <div className="app-shell">
       <UploadDialog
@@ -362,7 +418,7 @@ export function AppShell() {
             exportFormat={exportFormat}
             onExportFormatChange={setExportFormat}
             onExport={handleExport}
-            hasSelectedImage={stamp.state.ready}
+            hasSelectedImage={hasImage}
             onDeleteAll={handleDeleteAll}
           />
         )}
@@ -379,17 +435,17 @@ export function AppShell() {
             hasSource={stamp.state.hasSource}
             onUndo={stamp.undo}
             onRedo={stamp.redo}
-            canUndo={stamp.state.undoCount > 0}
-            canRedo={stamp.state.redoCount > 0}
+            canUndo={canUndo}
+            canRedo={canRedo}
             onExport={handleExport}
-            canExport={stamp.state.ready}
+            canExport={hasImage}
             exportFormat={exportFormat}
             onFlipH={stamp.flipHorizontal}
             onFlipV={stamp.flipVertical}
             onRotate90Cw={stamp.rotate90Cw}
             onBrightness={stamp.adjustBrightness}
             onContrast={stamp.adjustContrast}
-            imageReady={stamp.state.ready}
+            imageReady={hasImage}
             onResize={handleResize}
             imageWidth={stamp.state.width}
             imageHeight={stamp.state.height}
@@ -408,26 +464,86 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      <motion.main
-        animate={{
-          marginLeft: showTools ? 320 : 0,
-          marginRight: showHistory ? 244 : 0,
-        }}
-        transition={panelSpacingTransition}
-        className="main-content"
-      >
-        <CanvasArea
-          ref={canvasRef}
-          hookResult={effectiveStamp}
-          brushDiameter={diameter}
-          cursorPos={pos}
-          cursorVisible={visible}
-          onCanvasEnter={onCanvasEnter}
-          onCanvasLeave={onCanvasLeave}
-          beforeUrl={originalUrl}
-          compareActive={compareActive}
-        />
-      </motion.main>
+      {/* ── Main canvas with right-click context menu ── */}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <motion.main
+            animate={{
+              marginLeft: showTools ? 320 : 0,
+              marginRight: showHistory ? 244 : 0,
+            }}
+            transition={panelSpacingTransition}
+            className="main-content"
+          >
+            <CanvasArea
+              ref={canvasRef}
+              hookResult={effectiveStamp}
+              brushDiameter={diameter}
+              cursorPos={pos}
+              cursorVisible={visible}
+              onCanvasEnter={onCanvasEnter}
+              onCanvasLeave={onCanvasLeave}
+              beforeUrl={originalUrl}
+              compareActive={compareActive}
+            />
+          </motion.main>
+        </ContextMenuTrigger>
+
+        <ContextMenuContent className="w-56">
+          <ContextMenuItem onClick={handleCopyToClipboard} disabled={!hasImage}>
+            <Clipboard className="mr-2 h-4 w-4" /> Copy to Clipboard
+            <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
+          </ContextMenuItem>
+
+          <ContextMenuSeparator />
+
+          <ContextMenuItem disabled={!canUndo} onSelect={stamp.undo}>
+            <Undo className="mr-2 h-4 w-4" /> Undo
+            <ContextMenuShortcut>Ctrl+Z</ContextMenuShortcut>
+          </ContextMenuItem>
+          <ContextMenuItem disabled={!canRedo} onSelect={stamp.redo}>
+            <Redo className="mr-2 h-4 w-4" /> Redo
+            <ContextMenuShortcut>Ctrl+Shift+Z</ContextMenuShortcut>
+          </ContextMenuItem>
+
+          <ContextMenuSeparator />
+
+          <ContextMenuItem
+            onSelect={handleZoomOut}
+            disabled={stamp.state.zoom <= 0.25}
+          >
+            <ZoomOut className="mr-2 h-4 w-4" /> Zoom Out
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={handleZoomIn}
+            disabled={stamp.state.zoom >= 4}
+          >
+            <ZoomIn className="mr-2 h-4 w-4" /> Zoom In
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => stamp.toolRef.current?.set_zoom(1)}>
+            <RotateCcw className="mr-2 h-4 w-4" /> Reset Zoom
+          </ContextMenuItem>
+
+          <ContextMenuSeparator />
+
+          <ContextMenuItem onSelect={handleExport} disabled={!hasImage}>
+            <Download className="mr-2 h-4 w-4" /> Export{" "}
+            {exportFormat.toUpperCase()}
+            <ContextMenuShortcut>Alt+E</ContextMenuShortcut>
+          </ContextMenuItem>
+
+          <ContextMenuSeparator />
+
+          <ContextMenuItem
+            onSelect={handleDeleteAll}
+            disabled={photos.length === 0}
+            className="text-red-400 focus:text-red-400"
+          >
+            <Trash2 className="mr-2 h-4 w-4" /> Delete All
+            <ContextMenuShortcut>Alt+D</ContextMenuShortcut>
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
 
       <AnimatePresence>
         {showGallery && (

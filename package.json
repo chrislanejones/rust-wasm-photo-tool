@@ -9,6 +9,9 @@
     "build:all": "pnpm run build:wasm && pnpm run build"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
+    "emoji-mart": "^5.6.0",
     "framer-motion": "^12.36.0",
     "lucide-react": "^0.577.0"
   },

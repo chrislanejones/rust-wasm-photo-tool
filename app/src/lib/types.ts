@@ -17,20 +17,8 @@ export type ToolType =
   | "arrow"
   | "ai"
   | "shapes"
-  | "blur";
-
-// Export format — JPEG first so it's the default everywhere
-export type ExportFormat = "jpeg" | "webp" | "avif" | "png";
-
-export const FORMAT_LABELS: Record<ExportFormat, string> = {
-  jpeg: "JPEG",
-  webp: "WebP",
-  avif: "AVIF",
-  png: "PNG",
-};
-
-// Ordered array for dropdowns — JPEG first
-export const FORMAT_OPTIONS: ExportFormat[] = ["jpeg", "webp", "avif", "png"];
+  | "blur"
+  | "emoji";
 
 export interface StampSettings {
   brushSize: number;
@@ -52,4 +40,8 @@ export interface ToolSettings extends StampSettings {
   // Blur
   blurSize: number;
   blurIntensity: number;
+
+  // Emoji
+  emoji: string;
+  emojiSize: number;
 }

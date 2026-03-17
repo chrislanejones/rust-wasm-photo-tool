@@ -1,8 +1,10 @@
 // ===== FILE: app/src/hooks/useDrawingTools.ts =====
-// Handles arrow, shape, and crop tool mouse interactions.
-// - Live preview: draws on JS canvas (fast, no undo cost)
-// - Final commit: uses WASM draw_arrow/draw_shape for pixel-perfect rendering
-// - Crop: selection overlay → commit via WASM crop()
+// Arrow, shape, and crop tool mouse interactions.
+// - Live preview: JS canvas (restore snapshot + draw preview each frame)
+// - Final commit: WASM draw_arrow/draw_shape on the WASM buffer directly
+// - Key fix: NO load_image — that clears history. WASM buffer already has
+//   the current image state. We just call begin_draw_stroke (saves undo),
+//   then draw_arrow/draw_shape (modifies buffer), then flush to canvas.
 
 import { useCallback, useRef, useState } from "react";
 import type { ToolType, ToolSettings } from "@/lib/types";
@@ -37,6 +39,7 @@ export function useDrawingTools({
 }: UseDrawingToolsOptions) {
   const isDrawing = useRef(false);
   const startPoint = useRef<Point | null>(null);
+  const lastPoint = useRef<Point | null>(null);
   const preSnapshot = useRef<ImageData | null>(null);
   const [cropSelection, setCropSelection] = useState<CropSelection | null>(
     null,
@@ -59,7 +62,6 @@ export function useDrawingTools({
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (e.button !== 0) return;
       if (!["arrow", "shapes", "crop"].includes(activeTool)) return;
-
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext("2d");
       if (!canvas || !ctx) return;
@@ -67,8 +69,8 @@ export function useDrawingTools({
       const p = getCoords(e);
       isDrawing.current = true;
       startPoint.current = p;
-
-      // Save canvas state for live preview (JS-side restore on each mousemove)
+      lastPoint.current = p;
+      // Save JS canvas snapshot for live preview restore
       preSnapshot.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
     },
     [activeTool, canvasRef, getCoords],
@@ -78,19 +80,18 @@ export function useDrawingTools({
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!isDrawing.current || !startPoint.current || !preSnapshot.current)
         return;
-
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext("2d");
       if (!canvas || !ctx) return;
 
       const p = getCoords(e);
+      lastPoint.current = p;
       const start = startPoint.current;
 
-      // Restore clean state before drawing preview
+      // Restore clean canvas for preview
       ctx.putImageData(preSnapshot.current, 0, 0);
 
       if (activeTool === "arrow") {
-        // JS preview — simple line + triangle
         drawArrowPreview(
           ctx,
           start,
@@ -109,18 +110,15 @@ export function useDrawingTools({
           settings.strokeWidth,
         );
       } else if (activeTool === "crop") {
-        // Crop overlay
         const x = Math.min(start.x, p.x);
         const y = Math.min(start.y, p.y);
         const w = Math.abs(p.x - start.x);
         const h = Math.abs(p.y - start.y);
-
         ctx.fillStyle = "rgba(0,0,0,0.5)";
         ctx.fillRect(0, 0, canvas.width, y);
         ctx.fillRect(0, y + h, canvas.width, canvas.height - (y + h));
         ctx.fillRect(0, y, x, h);
         ctx.fillRect(x + w, y, canvas.width - (x + w), h);
-
         ctx.strokeStyle = "white";
         ctx.setLineDash([5, 5]);
         ctx.lineWidth = 1;
@@ -131,106 +129,97 @@ export function useDrawingTools({
     [activeTool, canvasRef, getCoords, settings],
   );
 
-  const onMouseUp = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!isDrawing.current || !startPoint.current) return;
-      isDrawing.current = false;
+  // () => void to match stamp.onMouseUp
+  const onMouseUp = useCallback(() => {
+    if (!isDrawing.current || !startPoint.current) return;
+    isDrawing.current = false;
 
-      const tool = toolRef.current;
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext("2d");
-      const start = startPoint.current;
-      const p = getCoords(e);
+    const tool = toolRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    const start = startPoint.current;
+    const end = lastPoint.current ?? start;
 
-      if (activeTool === "crop") {
-        // Restore clean image, set crop selection for "Apply Crop" button
-        if (preSnapshot.current && ctx) {
-          ctx.putImageData(preSnapshot.current, 0, 0);
+    if (activeTool === "crop") {
+      // Restore clean image for crop selection display
+      if (preSnapshot.current && ctx) {
+        ctx.putImageData(preSnapshot.current, 0, 0);
+      }
+      const x = Math.min(start.x, end.x);
+      const y = Math.min(start.y, end.y);
+      const w = Math.abs(end.x - start.x);
+      const h = Math.abs(end.y - start.y);
+      if (w > 5 && h > 5) {
+        setCropSelection({
+          x: Math.round(x),
+          y: Math.round(y),
+          width: Math.round(w),
+          height: Math.round(h),
+        });
+        // Re-draw overlay so user sees the selection
+        if (ctx && canvas) {
+          ctx.fillStyle = "rgba(0,0,0,0.5)";
+          ctx.fillRect(0, 0, canvas.width, y);
+          ctx.fillRect(0, y + h, canvas.width, canvas.height - (y + h));
+          ctx.fillRect(0, y, x, h);
+          ctx.fillRect(x + w, y, canvas.width - (x + w), h);
+          ctx.strokeStyle = "white";
+          ctx.setLineDash([5, 5]);
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x, y, w, h);
+          ctx.setLineDash([]);
         }
+      }
+    } else if (tool && (activeTool === "arrow" || activeTool === "shapes")) {
+      // ── KEY FIX: draw directly in WASM, no load_image ──
+      // The WASM buffer already has the current image pixels.
+      // 1. begin_draw_stroke saves undo snapshot from WASM buffer
+      // 2. draw_arrow/draw_shape modifies the WASM buffer in place
+      // 3. flushToCanvas copies WASM buffer → JS canvas
+      // No load_image needed (that would clear history!)
 
-        const x = Math.min(start.x, p.x);
-        const y = Math.min(start.y, p.y);
-        const w = Math.abs(p.x - start.x);
-        const h = Math.abs(p.y - start.y);
-
-        if (w > 5 && h > 5) {
-          setCropSelection({
-            x: Math.round(x),
-            y: Math.round(y),
-            width: Math.round(w),
-            height: Math.round(h),
-          });
-
-          // Re-draw overlay so user sees selection
-          if (ctx && canvas) {
-            ctx.fillStyle = "rgba(0,0,0,0.5)";
-            ctx.fillRect(0, 0, canvas.width, y);
-            ctx.fillRect(0, y + h, canvas.width, canvas.height - (y + h));
-            ctx.fillRect(0, y, x, h);
-            ctx.fillRect(x + w, y, canvas.width - (x + w), h);
-            ctx.strokeStyle = "white";
-            ctx.setLineDash([5, 5]);
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x, y, w, h);
-            ctx.setLineDash([]);
-          }
-        }
-      } else if (tool && (activeTool === "arrow" || activeTool === "shapes")) {
-        // Restore clean state, then commit via WASM
-        if (preSnapshot.current && ctx) {
-          ctx.putImageData(preSnapshot.current, 0, 0);
-        }
-
-        // Push pixels back to WASM buffer
-        if (canvas && ctx) {
-          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          tool.load_image(new Uint8Array(imgData.data));
-        }
-
-        if (activeTool === "arrow") {
-          tool.begin_draw_stroke("Arrow");
-          tool.draw_arrow(
-            start.x,
-            start.y,
-            p.x,
-            p.y,
-            settings.strokeColor,
-            settings.strokeWidth,
-            settings.arrowStyle === "double" ? 1 : 0,
-          );
-        } else if (activeTool === "shapes") {
-          const shapeMap: Record<string, number> = {
-            rect: 0,
-            circle: 1,
-            handCircle: 1,
-            line: 2,
-          };
-          tool.begin_draw_stroke("Shape");
-          tool.draw_shape(
-            start.x,
-            start.y,
-            p.x,
-            p.y,
-            shapeMap[settings.shape ?? "rect"] ?? 0,
-            settings.strokeColor,
-            settings.strokeWidth,
-          );
-        }
-
-        flushToCanvas();
+      if (activeTool === "arrow") {
+        tool.begin_draw_stroke("Arrow");
+        tool.draw_arrow(
+          start.x,
+          start.y,
+          end.x,
+          end.y,
+          settings.strokeColor,
+          settings.strokeWidth,
+          settings.arrowStyle === "double" ? 1 : 0,
+        );
+      } else {
+        const shapeMap: Record<string, number> = {
+          rect: 0,
+          circle: 1,
+          handCircle: 1,
+          line: 2,
+        };
+        tool.begin_draw_stroke("Shape");
+        tool.draw_shape(
+          start.x,
+          start.y,
+          end.x,
+          end.y,
+          shapeMap[settings.shape ?? "rect"] ?? 0,
+          settings.strokeColor,
+          settings.strokeWidth,
+        );
       }
 
-      startPoint.current = null;
-      preSnapshot.current = null;
-    },
-    [activeTool, toolRef, canvasRef, getCoords, settings, flushToCanvas],
-  );
+      flushToCanvas();
+    }
+
+    startPoint.current = null;
+    lastPoint.current = null;
+    preSnapshot.current = null;
+  }, [activeTool, toolRef, canvasRef, settings, flushToCanvas]);
 
   const applyCrop = useCallback(() => {
     const tool = toolRef.current;
     const sel = cropSelection;
     if (!tool || !sel) return;
-
     tool.crop(sel.x, sel.y, sel.width, sel.height);
     flushToCanvas();
     setCropSelection(null);
@@ -246,8 +235,7 @@ export function useDrawingTools({
   };
 }
 
-/* ── JS Canvas Preview Helpers ── */
-/* These are lightweight previews while dragging — final rendering uses WASM */
+/* ── JS Canvas Preview Helpers (lightweight, for drag feedback only) ── */
 
 function drawArrowPreview(
   ctx: CanvasRenderingContext2D,
@@ -293,7 +281,6 @@ function drawArrowPreview(
     ctx.closePath();
     ctx.fill();
   };
-
   drawHead(to.x, to.y, angle);
   if (style === "double") drawHead(from.x, from.y, angle + Math.PI);
 }
@@ -316,19 +303,19 @@ function drawShapePreview(
   const w = Math.abs(to.x - from.x);
   const h = Math.abs(to.y - from.y);
 
-  ctx.beginPath();
   switch (shape) {
     case "rect":
+      ctx.beginPath();
       ctx.strokeRect(x, y, w, h);
       break;
     case "circle": {
       const r = Math.min(w, h) / 2;
+      ctx.beginPath();
       ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
       ctx.stroke();
       break;
     }
     case "handCircle": {
-      // Approximate hand-drawn look with jittered ellipse
       const cx = x + w / 2;
       const cy = y + h / 2;
       const rx = w / 2;
@@ -348,6 +335,7 @@ function drawShapePreview(
       break;
     }
     case "line":
+      ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(to.x, to.y);
       ctx.stroke();

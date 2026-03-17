@@ -10,6 +10,7 @@ import {
   Shapes,
   Droplets,
   Stamp,
+  Smile,
 } from "lucide-react";
 
 export interface ToolDefinition {
@@ -83,5 +84,12 @@ export const TOOLS: ToolDefinition[] = [
     description: "WASM-powered clone stamp",
     icon: Stamp,
     gradient: "from-rose-500 to-red-600",
+  },
+  {
+    id: "emoji",
+    label: "Emoji",
+    description: "Stamp emojis on images",
+    icon: Smile,
+    gradient: "from-yellow-400 to-orange-400",
   },
 ];

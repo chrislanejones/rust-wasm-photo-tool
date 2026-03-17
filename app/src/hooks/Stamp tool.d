@@ -36,13 +36,7 @@ declare module "stamp_tool" {
     thumbnail_height(max_px: number): number;
     thumbnail_data(max_px: number): Uint8Array;
     copy_region(x: number, y: number, w: number, h: number): Uint8Array;
-    paste_region(
-      pixels: Uint8Array,
-      src_w: number,
-      src_h: number,
-      dest_x: number,
-      dest_y: number,
-    ): void;
+    paste_region(pixels: Uint8Array, src_w: number, src_h: number, dest_x: number, dest_y: number): void;
     flip_horizontal(): void;
     flip_vertical(): void;
     rotate_90_cw(): void;
@@ -52,44 +46,17 @@ declare module "stamp_tool" {
     adjust_brightness(delta: number): void;
     adjust_contrast(factor: number): void;
 
-    // ── Blur (WASM Gaussian) ──
-    blur_region(
-      cx: number,
-      cy: number,
-      brush_radius: number,
-      intensity: number,
-    ): void;
+    // Blur (WASM Gaussian)
+    blur_region(cx: number, cy: number, brush_radius: number, intensity: number): void;
     begin_blur_stroke(): void;
 
-    // ── Drawing: Arrows & Shapes (WASM) ──
-    /** Save undo snapshot before drawing. label appears in history. */
+    // Drawing: Arrows & Shapes (WASM)
     begin_draw_stroke(label: string): void;
-    /** Draw arrow. style: 0=single, 1=double. color_hex: "#rrggbb" */
-    draw_arrow(
-      from_x: number,
-      from_y: number,
-      to_x: number,
-      to_y: number,
-      color_hex: string,
-      stroke_width: number,
-      style: number,
-    ): void;
-    /** Draw shape. shape: 0=rect, 1=circle, 2=line. color_hex: "#rrggbb" */
-    draw_shape(
-      from_x: number,
-      from_y: number,
-      to_x: number,
-      to_y: number,
-      shape: number,
-      color_hex: string,
-      stroke_width: number,
-    ): void;
-    stamp_pixels(
-      pixels: Uint8Array,
-      src_w: number,
-      src_h: number,
-      dest_x: number,
-      dest_y: number,
-    ): void;
+    draw_arrow(from_x: number, from_y: number, to_x: number, to_y: number, color_hex: string, stroke_width: number, style: number): void;
+    draw_shape(from_x: number, from_y: number, to_x: number, to_y: number, shape: number, color_hex: string, stroke_width: number): void;
+
+    // Emoji stamp (WASM compositing)
+    /** Composite RGBA pixels onto the buffer with alpha blending. Saves undo snapshot. */
+    stamp_pixels(pixels: Uint8Array, src_w: number, src_h: number, dest_x: number, dest_y: number): void;
   }
 }

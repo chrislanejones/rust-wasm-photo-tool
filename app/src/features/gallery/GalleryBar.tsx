@@ -49,18 +49,16 @@ export function GalleryBar({
         : showTools || showHistory
           ? window.innerWidth - 320 - 48
           : window.innerWidth - 48;
-
     const containerWidth = Math.max(300, availableWidth);
     const count = Math.floor((containerWidth - 80) / (THUMBNAIL_SIZE + GAP));
     return Math.max(MIN_PHOTOS, Math.min(MAX_PHOTOS, count));
   }, [showTools, showHistory]);
 
   useEffect(() => {
-    const updatePhotosPerPage = () =>
-      setPhotosPerPage(calculatePhotosPerPage());
-    updatePhotosPerPage();
-    window.addEventListener("resize", updatePhotosPerPage);
-    return () => window.removeEventListener("resize", updatePhotosPerPage);
+    const update = () => setPhotosPerPage(calculatePhotosPerPage());
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, [calculatePhotosPerPage]);
 
   const totalPages = Math.ceil(photos.length / photosPerPage);
@@ -103,7 +101,6 @@ export function GalleryBar({
         className="bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
       >
         <div className="p-4">
-          {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <Image className="h-4 w-4" />
@@ -118,9 +115,7 @@ export function GalleryBar({
             </button>
           </div>
 
-          {/* Thumbnails + arrows */}
           <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
-            {/* Left arrow */}
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
@@ -130,7 +125,6 @@ export function GalleryBar({
               <ChevronLeft className="h-4 w-4" />
             </button>
 
-            {/* Scroll strip */}
             <div ref={stripRef} className="flex gap-2 justify-center">
               {visiblePhotos.map((entry) => {
                 const progress = compressionProgress?.[entry.id];
@@ -139,6 +133,8 @@ export function GalleryBar({
                   progress !== undefined && progress >= 0 && progress < 100;
                 const isDone = progress === 100;
                 const isError = progress === -1;
+                const hasSavings =
+                  savings != null && savings.savingsPercent > 0;
 
                 return (
                   <div
@@ -151,9 +147,10 @@ export function GalleryBar({
                     <img src={entry.url} alt={entry.name} draggable={false} />
 
                     <AnimatePresence>
-                      {/* ── Compressing: bottom-to-top fill ── */}
+                      {/* Compressing: bottom-to-top fill */}
                       {isCompressing && (
                         <motion.div
+                          key="compressing"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
@@ -177,9 +174,10 @@ export function GalleryBar({
                         </motion.div>
                       )}
 
-                      {/* ── Done: checkmark + savings badge ── */}
+                      {/* Done checkmark (fades out after 2s) */}
                       {isDone && (
                         <motion.div
+                          key="done"
                           initial={{ opacity: 0, scale: 0.5 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0 }}
@@ -190,29 +188,15 @@ export function GalleryBar({
                           }}
                           className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-emerald-500/30"
                         >
-                          {/* Savings badge — top-left */}
-                          {savings && savings.savingsPercent > 0 && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 4 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.15 }}
-                              className="absolute top-1 left-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-500/90 text-white text-[9px] font-bold font-mono shadow-lg"
-                            >
-                              <Zap className="h-2.5 w-2.5" />-
-                              {savings.savingsPercent}%
-                            </motion.div>
-                          )}
-
-                          {/* Checkmark — center */}
                           <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
                             <Check className="h-3.5 w-3.5 text-white" />
                           </div>
                         </motion.div>
                       )}
 
-                      {/* ── Error ── */}
                       {isError && (
                         <motion.div
+                          key="error"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
@@ -224,6 +208,14 @@ export function GalleryBar({
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    {/* ── PERSISTENT savings badge — stays after animation clears ── */}
+                    {hasSavings && (
+                      <div className="absolute top-1 left-1 z-20 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-500/90 text-white text-[9px] font-bold font-mono shadow-lg pointer-events-none">
+                        <Zap className="h-2.5 w-2.5" />-{savings.savingsPercent}
+                        %
+                      </div>
+                    )}
 
                     <button
                       className="photo-thumb-remove"
@@ -248,7 +240,6 @@ export function GalleryBar({
               })}
             </div>
 
-            {/* Right arrow */}
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
@@ -259,7 +250,6 @@ export function GalleryBar({
             </button>
           </div>
 
-          {/* Page indicator */}
           {totalPages > 1 && (
             <div className="flex justify-center gap-1 mt-2">
               {Array.from({ length: totalPages }).map((_, i) => (

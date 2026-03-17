@@ -19,6 +19,7 @@ mod stamp;
 mod transform;
 mod filters;
 mod codec;
+mod drawing;
 
 use crate::core::ImageBuffer;
 use crate::history::History;
@@ -408,5 +409,31 @@ impl CloneStampTool {
             shape, color, stroke_width,
         );
     }
+    /// Stamp raw RGBA emoji pixels onto the image buffer at (dest_x, dest_y).
+    /// The JS side renders the emoji to an OffscreenCanvas, extracts the pixels,
+    /// and passes them here for alpha-compositing onto the WASM buffer.
+    /// This keeps compositing in Rust (fast) while JS handles text rendering
+    /// (which needs browser font/emoji support).
+    pub fn stamp_pixels(
+        &mut self,
+        pixels: &[u8],
+        src_w: u32,
+        src_h: u32,
+        dest_x: i32,
+        dest_y: i32,
+    ) {
+        self.hist.push_snapshot("Emoji", &self.buf.data);
+        transform::paste_region(
+            &mut self.buf.data,
+            self.buf.width as i32,
+            self.buf.height as i32,
+            pixels,
+            src_w,
+            src_h,
+            dest_x,
+            dest_y,
+        );
+    }
+ 
  
 }
