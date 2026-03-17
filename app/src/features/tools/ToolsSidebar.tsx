@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Wrench, Undo, Redo, Download } from "lucide-react";
 
@@ -8,6 +9,7 @@ import { ToolGrid } from "./ToolGrid";
 import { StampSettings as StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import { ResizeSettings } from "./settings/ResizeSettings";
+import { BlurSettings } from "./settings/Blursettings";
 
 /* ------------------------------------------------------------------ */
 /* Props                                                              */
@@ -92,6 +94,9 @@ export function ToolsSidebar({
   compressProgress,
   onApplyCrop,
 }: ToolsSidebarProps) {
+  const [blurSize, setBlurSize] = useState(32);
+  const [blurIntensity, setBlurIntensity] = useState(8);
+
   return (
     <motion.div
       variants={slideFromLeft}
@@ -112,7 +117,7 @@ export function ToolsSidebar({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary font-mono">
-          <Wrench className="h-4 w-4 text-accent" />
+          <Wrench className="h-4 w-4 text-white" />
           Tools
         </h2>
         <button
@@ -156,17 +161,6 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "transform" && (
-          <TransformCropSettings
-            disabled={!imageReady}
-            onFlipH={onFlipH}
-            onFlipV={onFlipV}
-            onRotate90Cw={onRotate90Cw}
-            onBrightness={onBrightness}
-            onContrast={onContrast}
-          />
-        )}
-
         {activeTool === "crop" && (
           <TransformCropSettings
             disabled={!imageReady}
@@ -179,7 +173,30 @@ export function ToolsSidebar({
           />
         )}
 
-        {!["stamp", "compress", "transform", "crop"].includes(activeTool) && (
+        {activeTool === "blur" && (
+          <BlurSettings
+            settings={{
+              ...stampSettings,
+              strokeWidth: 3,
+              strokeColor: "#ef4444",
+              arrowStyle: "single" as const,
+              brushColor: "#ef4444",
+              brushOpacity: 100,
+              fontSize: 24,
+              fontWeight: "normal" as const,
+              textColor: "#000000",
+              blurSize: blurSize,
+              blurIntensity: blurIntensity,
+            }}
+            onChange={(s) => {
+              setBlurSize(s.blurSize);
+              setBlurIntensity(s.blurIntensity);
+            }}
+          />
+        )}
+
+        {/* Coming soon fallback — excludes tools that have panels above */}
+        {!["stamp", "compress", "crop", "blur"].includes(activeTool) && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <span className="text-2xl mb-3">🚧</span>
             <p className="text-xs text-text-muted font-mono">

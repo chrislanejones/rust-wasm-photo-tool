@@ -1,21 +1,20 @@
+// ===== FILE: app/src/app/useKeyboardShortcuts.ts =====
 import { useEffect } from "react";
 import type { StampSettings } from "@/lib/types";
 
 interface KeyboardShortcutOptions {
-  // WASM tool actions
   onUndo: () => void;
   onRedo: () => void;
   onExport: () => void;
   onDeleteAll: () => void;
   onBrushSizeChange: (fn: (prev: StampSettings) => StampSettings) => void;
   setBrushSizeOnTool: (size: number) => void;
-
-  // Panel toggles
   setShowUpload: React.Dispatch<React.SetStateAction<boolean>>;
   setShowTools: React.Dispatch<React.SetStateAction<boolean>>;
   setShowGallery: React.Dispatch<React.SetStateAction<boolean>>;
   setShowHistory: React.Dispatch<React.SetStateAction<boolean>>;
   setShowKbdHints: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowShortcutModal: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function useKeyboardShortcuts({
@@ -30,10 +29,10 @@ export function useKeyboardShortcuts({
   setShowGallery,
   setShowHistory,
   setShowKbdHints,
+  setShowShortcutModal,
 }: KeyboardShortcutOptions) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Skip if user is typing in an input
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -41,26 +40,29 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // ── Ctrl/Cmd shortcuts ────────────────────────────────────────
+      // Ctrl/Cmd + Z / Shift+Z for undo/redo
       if (e.metaKey || e.ctrlKey) {
         if (e.key === "z" || e.key === "Z") {
           e.preventDefault();
           if (e.shiftKey) {
-            console.log("Redo hotkey triggered (Ctrl+Shift+Z)");
             onRedo();
           } else {
-            console.log("Undo hotkey triggered (Ctrl+Z)");
             onUndo();
           }
           return;
         }
       }
 
-      // ── Alt shortcuts ─────────────────────────────────────────────
       if (!e.altKey) return;
 
+      // Alt + ? (Shift + /) → open shortcut modal
+      if (e.shiftKey && e.code === "Slash") {
+        e.preventDefault();
+        setShowShortcutModal((v) => !v);
+        return;
+      }
+
       switch (e.code) {
-        // Panel toggles
         case "KeyU":
           e.preventDefault();
           setShowUpload((v) => !v);
@@ -78,11 +80,10 @@ export function useKeyboardShortcuts({
           setShowHistory((v) => !v);
           break;
         case "Slash":
+          // Alt + / (no shift) → toggle inline KBD hints
           e.preventDefault();
           setShowKbdHints((v) => !v);
           break;
-
-        // Brush size
         case "BracketLeft":
           e.preventDefault();
           onBrushSizeChange((prev) => {
@@ -99,14 +100,10 @@ export function useKeyboardShortcuts({
             return { ...prev, brushSize: next };
           });
           break;
-
-        // Export
         case "KeyE":
           e.preventDefault();
           onExport();
           break;
-
-        // Delete all
         case "KeyD":
           e.preventDefault();
           onDeleteAll();
@@ -128,5 +125,6 @@ export function useKeyboardShortcuts({
     setShowGallery,
     setShowHistory,
     setShowKbdHints,
+    setShowShortcutModal,
   ]);
 }

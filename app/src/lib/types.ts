@@ -1,4 +1,5 @@
-// ── Image data for gallery ──────────────────────────────────────────────────
+// ===== FILE: app/src/lib/types.ts =====
+
 export interface ImageData {
   id: string;
   file: File;
@@ -7,30 +8,37 @@ export interface ImageData {
   size: number;
 }
 
-// ── Tool types ─────────────────────────────────────────────────────────────
-// "stamp" is the Rust/WASM clone stamp tool — the core power feature.
-// Others are future JS-canvas-based annotation tools.
 export type ToolType =
   | "stamp"
-  | "compress" // ← add
-  | "transform"
+  | "compress"
+  | "crop"
   | "brush"
   | "text"
   | "arrow"
+  | "ai"
   | "shapes"
-  | "blur"
-  | "crop";
+  | "blur";
 
-// ── Stamp-specific settings (Rust/WASM bridge) ────────────────────────────
+// Export format — JPEG first so it's the default everywhere
+export type ExportFormat = "jpeg" | "webp" | "avif" | "png";
+
+export const FORMAT_LABELS: Record<ExportFormat, string> = {
+  jpeg: "JPEG",
+  webp: "WebP",
+  avif: "AVIF",
+  png: "PNG",
+};
+
+// Ordered array for dropdowns — JPEG first
+export const FORMAT_OPTIONS: ExportFormat[] = ["jpeg", "webp", "avif", "png"];
+
 export interface StampSettings {
   brushSize: number;
   hardness: number;
   opacity: number;
 }
 
-// ── Full tool settings bag ────────────────────────────────────────────────
 export interface ToolSettings extends StampSettings {
-  // Future annotation tool settings go here
   strokeWidth: number;
   strokeColor: string;
   arrowStyle: "single" | "double";
@@ -40,6 +48,8 @@ export interface ToolSettings extends StampSettings {
   fontWeight: "normal" | "bold";
   textColor: string;
   shape?: "rect" | "circle" | "handCircle" | "line";
+
+  // Blur
   blurSize: number;
   blurIntensity: number;
 }

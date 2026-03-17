@@ -421,11 +421,6 @@ button:focus-visible {
   color: var(--accent);
   font-weight: 600;
   text-align: center;
-  flex: 1;
-}
-
-.history-item.type-current .history-dot {
-  background: var(--text-muted);
 }
 
 .history-item.type-redo {

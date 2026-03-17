@@ -65,14 +65,18 @@ export function StampSettings({ settings, onChange, hasSource }: Props) {
       {/* Source indicator */}
       <div
         className={[
-          "flex justify-center gap-2 px-3 py-4 rounded-lg text-xs history-item type-current mb-2",
+          "flex justify-center gap-2 px-3 py-4 rounded-lg text-xs history-item type-current mb-5",
         ].join(" ")}
       >
-        {hasSource ? "Source set — click to paint" : "Alt+Click to set source"}
+        <span className="history-label">
+          {hasSource
+            ? "Source set — click to paint"
+            : "Alt+Click to set source"}
+        </span>
       </div>
 
       {/* ── Brush Size ────────────────────────────────────────────── */}
-      <div className="space-y-2.5">
+      <div className="space-y-2.5 py-4">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
             Size

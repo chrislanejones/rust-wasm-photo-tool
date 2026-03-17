@@ -1,3 +1,4 @@
+// ===== FILE: app/src/features/tools/toolConfig.ts =====
 import type { ToolType } from "@/lib/types";
 import {
   Shrink,
@@ -72,7 +73,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: "blur",
     label: "Blur",
-    description: "Blur sensitive areas",
+    description: "Blur sensitive areas (WASM)",
     icon: Droplets,
     gradient: "from-slate-400 to-slate-600",
   },

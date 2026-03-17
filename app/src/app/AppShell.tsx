@@ -1,6 +1,6 @@
+// ===== FILE: app/src/app/AppShell.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
 import type { ToolType, StampSettings } from "@/lib/types";
@@ -17,13 +17,12 @@ import { UploadDialog } from "@/features/upload/UploadDialog";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 
-export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
+export type ExportFormat = "jpeg" | "png" | "webp" | "avif";
 
 export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stamp = useCloneStamp(canvasRef);
 
-  // ── Stamp settings (local + synced to WASM) ─────────────────────────────
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     brushSize: 20,
     hardness: 0.8,
@@ -40,15 +39,15 @@ export function AppShell() {
     [stamp],
   );
 
-  // ── Multi-photo state ───────────────────────────────────────────────────
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
-
-  // ── A/B Compare state ──────────────────────────────────────────────────
-  // Store the original image URL when first loaded so we can compare later
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
   const [hasBeenModified, setHasBeenModified] = useState(false);
+
+  /* ------------------------------------------------------------------ */
+  /* Photo management                                                   */
+  /* ------------------------------------------------------------------ */
 
   const handleAddPhotos = useCallback(
     (files: File[]) => {
@@ -63,7 +62,6 @@ export function AppShell() {
       if (first) {
         stamp.loadImage(first.file);
         setActivePhotoId(first.id);
-        // Capture original URL for A/B compare
         setOriginalUrl(first.url);
         setHasBeenModified(false);
         setCompareActive(false);
@@ -76,7 +74,6 @@ export function AppShell() {
     (entry: PhotoEntry) => {
       stamp.loadImage(entry.file);
       setActivePhotoId(entry.id);
-      // Capture this photo's URL as the "original" for compare
       setOriginalUrl(entry.url);
       setHasBeenModified(false);
       setCompareActive(false);
@@ -91,8 +88,9 @@ export function AppShell() {
         const next = prev.filter((p) => p.id !== id);
         const removed = prev[idx];
         if (removed) URL.revokeObjectURL(removed.url);
+
         if (id === activePhotoId && next.length > 0) {
-          const newActive = next[Math.min(idx, next.length - 1)];
+          const newActive = next[Math.min(idx, next.length - 1)]!;
           stamp.loadImage(newActive.file);
           setActivePhotoId(newActive.id);
           setOriginalUrl(newActive.url);
@@ -110,30 +108,51 @@ export function AppShell() {
     [activePhotoId, stamp],
   );
 
-  // ── Brush preview ───────────────────────────────────────────────────────
+  /* ------------------------------------------------------------------ */
+  /* Brush preview                                                      */
+  /* ------------------------------------------------------------------ */
+
   const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(stampSettings.brushSize, stamp.state.zoom, canvasRef);
 
-  // ── Panel visibility ────────────────────────────────────────────────────
+  /* ------------------------------------------------------------------ */
+  /* Panel state                                                        */
+  /* ------------------------------------------------------------------ */
+
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
   const [showTools, setShowTools] = useState(true);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showKbdHints, setShowKbdHints] = useState(false);
+  const [showKbdHints, setShowKbdHints] = useState(false); // Alt+/
+  const [showShortcutModal, setShowShortcutModal] = useState(false); // Alt+?
+
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
+
+  // JPEG default
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("jpeg");
   const [quality, setQuality] = useState(75);
 
-  // ── Auto compress ───────────────────────────────────────────────────────
+  // Quality change enables A/B compare
+  const handleQualityChange = useCallback((q: number) => {
+    setQuality(q);
+    setHasBeenModified(true);
+  }, []);
+
+  /* ------------------------------------------------------------------ */
+  /* Auto compress                                                      */
+  /* ------------------------------------------------------------------ */
+
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
-  const prevPhotoCount = useRef(0);
+  /* ------------------------------------------------------------------ */
+  /* Panel sequencing                                                   */
+  /* ------------------------------------------------------------------ */
 
+  const prevPhotoCount = useRef(0);
   useEffect(() => {
     const prev = prevPhotoCount.current;
     const curr = photos.length;
-
     if (prev === 0 && curr > 0) {
       setShowUpload(false);
       const t1 = setTimeout(() => setShowTopBar(true), 150);
@@ -146,7 +165,6 @@ export function AppShell() {
         clearTimeout(t3);
       };
     }
-
     if (curr === 0) {
       setShowUpload(true);
       setShowTopBar(false);
@@ -154,17 +172,22 @@ export function AppShell() {
       setShowGallery(false);
       setShowHistory(false);
     }
-
     prevPhotoCount.current = curr;
     return undefined;
   }, [photos.length]);
 
-  // ── Export (format-aware, quality-aware) ─────────────────────────────────
+  /* ------------------------------------------------------------------ */
+  /* Export                                                              */
+  /* ------------------------------------------------------------------ */
+
   const handleExport = useCallback(() => {
     stamp.exportAs(exportFormat, quality / 100);
   }, [stamp, exportFormat, quality]);
 
-  // ── Delete all photos ──────────────────────────────────────────────────
+  /* ------------------------------------------------------------------ */
+  /* Delete all                                                         */
+  /* ------------------------------------------------------------------ */
+
   const handleDeleteAll = useCallback(() => {
     photos.forEach((p) => URL.revokeObjectURL(p.url));
     setPhotos([]);
@@ -174,7 +197,110 @@ export function AppShell() {
     setCompareActive(false);
   }, [photos]);
 
-  // ── Keyboard shortcuts (centralized) ─────────────────────────────────────
+  /* ------------------------------------------------------------------ */
+  /* Blur tool — inline WASM bridge                                     */
+  /*                                                                    */
+  /* NOTE: blur_region / begin_blur_stroke are defined in Rust and      */
+  /* appear in pkg/stamp_tool.d.ts after `wasm-pack build`.             */
+  /* If your project copies the .d.ts into app/src/hooks/, make sure    */
+  /* that copy is up to date. We use (tool as any) to avoid TS errors   */
+  /* if the declaration hasn't propagated yet.                          */
+  /* ------------------------------------------------------------------ */
+
+  const isBlurringRef = useRef(false);
+  const blurSizeRef = useRef(32);
+  const blurIntensityRef = useRef(8);
+
+  const flushCanvasFromTool = useCallback(() => {
+    const t = stamp.toolRef.current;
+    const canvas = canvasRef.current;
+    if (!t || !canvas) return;
+    if (canvas.width !== t.width() || canvas.height !== t.height()) {
+      canvas.width = t.width();
+      canvas.height = t.height();
+    }
+    const ctx = canvas.getContext("2d")!;
+    ctx.putImageData(
+      new ImageData(
+        new Uint8ClampedArray(t.get_image_data()),
+        t.width(),
+        t.height(),
+      ),
+      0,
+      0,
+    );
+  }, [stamp.toolRef]);
+
+  const getBlurCoords = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: ((e.clientX - rect.left) * canvas.width) / rect.width,
+        y: ((e.clientY - rect.top) * canvas.height) / rect.height,
+      };
+    },
+    [],
+  );
+
+  const blurOnMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const tool = stamp.toolRef.current;
+      if (!tool || e.button !== 0) return;
+      isBlurringRef.current = true;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (tool as any).begin_blur_stroke();
+      const { x, y } = getBlurCoords(e);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (tool as any).blur_region(
+        x,
+        y,
+        blurSizeRef.current / 2,
+        blurIntensityRef.current,
+      );
+      flushCanvasFromTool();
+    },
+    [stamp.toolRef, getBlurCoords, flushCanvasFromTool],
+  );
+
+  const blurOnMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!isBlurringRef.current) return;
+      const tool = stamp.toolRef.current;
+      if (!tool) return;
+      const { x, y } = getBlurCoords(e);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (tool as any).blur_region(
+        x,
+        y,
+        blurSizeRef.current / 2,
+        blurIntensityRef.current,
+      );
+      flushCanvasFromTool();
+    },
+    [stamp.toolRef, getBlurCoords, flushCanvasFromTool],
+  );
+
+  const blurOnMouseUp = useCallback(() => {
+    isBlurringRef.current = false;
+  }, []);
+
+  // Override stamp mouse handlers when blur tool is active
+  const effectiveStamp =
+    activeTool === "blur"
+      ? {
+          ...stamp,
+          onMouseDown: blurOnMouseDown,
+          onMouseMove: blurOnMouseMove,
+          onMouseUp: blurOnMouseUp,
+        }
+      : stamp;
+
+  /* ------------------------------------------------------------------ */
+  /* Keyboard shortcuts                                                 */
+  /* ------------------------------------------------------------------ */
+
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
@@ -187,9 +313,13 @@ export function AppShell() {
     setShowGallery,
     setShowHistory,
     setShowKbdHints,
+    setShowShortcutModal,
   });
 
-  // ── Zoom helpers for TopBar ─────────────────────────────────────────────
+  /* ------------------------------------------------------------------ */
+  /* Zoom / Compare / Resize                                            */
+  /* ------------------------------------------------------------------ */
+
   const handleZoomIn = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(1);
   }, [stamp]);
@@ -198,12 +328,10 @@ export function AppShell() {
     stamp.toolRef.current?.adjust_zoom(-1);
   }, [stamp]);
 
-  // ── A/B Compare toggle ─────────────────────────────────────────────────
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
   }, []);
 
-  // ── WASM resize wrapper — marks image as modified ──────────────────────
   const handleResize = useCallback(
     (newW: number, newH: number) => {
       stamp.resize(newW, newH);
@@ -212,13 +340,16 @@ export function AppShell() {
     [stamp],
   );
 
-  // ── Auto compress all images ────────────────────────────────────────────
+  /* ------------------------------------------------------------------ */
+  /* Auto compress — maxWidth 2200                                      */
+  /* ------------------------------------------------------------------ */
+
   const handleAutoCompress = useCallback(() => {
     compressAll(
       photos,
       {
-        maxWidth: 1920,
-        maxHeight: 1080,
+        maxWidth: 2200,
+        maxHeight: 2200,
         quality: quality / 100,
         format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
       },
@@ -235,17 +366,18 @@ export function AppShell() {
     setHasBeenModified(true);
   }, [photos, quality, exportFormat, compressAll]);
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  /* ------------------------------------------------------------------ */
+  /* Render                                                             */
+  /* ------------------------------------------------------------------ */
+
   return (
     <div className="app-shell">
-      {/* Upload Dialog */}
       <UploadDialog
         open={showUpload}
         onClose={() => setShowUpload(false)}
         onFiles={handleAddPhotos}
       />
 
-      {/* Top Bar */}
       <AnimatePresence>
         {showTopBar && (
           <TopBar
@@ -271,7 +403,6 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      {/* Tools Sidebar */}
       <AnimatePresence>
         {showTools && (
           <ToolsSidebar
@@ -288,28 +419,33 @@ export function AppShell() {
             onExport={handleExport}
             canExport={stamp.state.ready}
             exportFormat={exportFormat}
-            imageReady={stamp.state.ready}
             onFlipH={stamp.flipHorizontal}
             onFlipV={stamp.flipVertical}
             onRotate90Cw={stamp.rotate90Cw}
             onBrightness={stamp.adjustBrightness}
             onContrast={stamp.adjustContrast}
+            imageReady={stamp.state.ready}
             onResize={handleResize}
             imageWidth={stamp.state.width}
             imageHeight={stamp.state.height}
             quality={quality}
-            onQualityChange={setQuality}
+            onQualityChange={handleQualityChange}
             hasBeenModified={hasBeenModified}
             compareActive={compareActive}
             onToggleCompare={handleToggleCompare}
             onAutoCompress={handleAutoCompress}
             isCompressing={compressProgress.running}
             compressProgress={compressProgress}
+            onApplyCrop={() => {
+              // ToolsSidebar manages crop selection internally;
+              // it calls stamp.crop() via its own onApplyCrop handler.
+              // This is a no-op trigger — the actual crop logic lives
+              // in the sidebar's CropSettings which calls the canvas ref.
+            }}
           />
         )}
       </AnimatePresence>
 
-      {/* Main canvas area */}
       <motion.main
         animate={{
           marginLeft: showTools ? 320 : 0,
@@ -320,7 +456,7 @@ export function AppShell() {
       >
         <CanvasArea
           ref={canvasRef}
-          hookResult={stamp}
+          hookResult={effectiveStamp}
           brushDiameter={diameter}
           cursorPos={pos}
           cursorVisible={visible}
@@ -331,20 +467,6 @@ export function AppShell() {
         />
       </motion.main>
 
-      {/* History Panel */}
-      <AnimatePresence>
-        {showHistory && (
-          <HistoryPanel
-            history={stamp.state.history}
-            onJump={stamp.jumpToHistory}
-            onDelete={stamp.deleteHistoryEntry}
-            onClear={stamp.clearHistory}
-            onClose={() => setShowHistory(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Gallery Bar */}
       <AnimatePresence>
         {showGallery && (
           <GalleryBar
@@ -360,17 +482,27 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      {/* Status Bar */}
+      <AnimatePresence>
+        {showHistory && (
+          <HistoryPanel
+            history={stamp.state.history}
+            onJump={stamp.jumpToHistory}
+            onDelete={stamp.deleteHistoryEntry}
+            onClear={stamp.clearHistory}
+            onClose={() => setShowHistory(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <ShortcutModal
+        open={showShortcutModal}
+        onClose={() => setShowShortcutModal(false)}
+      />
+
       <StatusBar
         state={stamp.state}
         imageCount={photos.length}
         showKbdHints={showKbdHints}
-      />
-
-      {/* Shortcut Reference Modal */}
-      <ShortcutModal
-        open={showKbdHints}
-        onClose={() => setShowKbdHints(false)}
       />
     </div>
   );

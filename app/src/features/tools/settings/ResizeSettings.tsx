@@ -1,132 +1,155 @@
+// ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useState } from "react";
 import { SlidersHorizontal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-/* ── Props ───────────────────────────────────────────────────────────── */
-
 interface ResizeSettingsProps {
+  disabled: boolean;
   imageWidth: number;
   imageHeight: number;
-  onResize: (newW: number, newH: number) => void;
   quality: number;
   onQualityChange: (q: number) => void;
-  disabled: boolean;
-  /** Has the image been modified (resized, quality changed, etc.)? */
-  hasBeenModified: boolean;
-  /** Toggle A/B compare overlay */
+  onResize: (w: number, h: number) => void;
   compareActive: boolean;
   onToggleCompare: () => void;
-  /** Auto compress all images */
+  hasBeenModified: boolean;
   onAutoCompress: () => void;
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
 }
 
-/* ── Component ───────────────────────────────────────────────────────── */
+function trafficColor(score: number) {
+  if (score >= 80) return "bg-emerald-500";
+  if (score >= 40) return "bg-amber-500";
+  return "bg-red-500";
+}
 
 export function ResizeSettings({
+  disabled,
   imageWidth,
   imageHeight,
-  onResize,
   quality,
   onQualityChange,
-  disabled,
-  hasBeenModified,
+  onResize,
   compareActive,
   onToggleCompare,
+  hasBeenModified,
   onAutoCompress,
   isCompressing,
   compressProgress,
 }: ResizeSettingsProps) {
-  const [width, setWidth] = useState(imageWidth);
-  const [height, setHeight] = useState(imageHeight);
+  const [width, setWidth] = useState(String(imageWidth));
+  const [height, setHeight] = useState(String(imageHeight));
   const [lockAspect, setLockAspect] = useState(true);
 
   useEffect(() => {
-    setWidth(imageWidth);
-    setHeight(imageHeight);
+    setWidth(String(imageWidth));
+    setHeight(String(imageHeight));
   }, [imageWidth, imageHeight]);
 
-  const aspectRatio = imageWidth / (imageHeight || 1);
-
   const handleWidthChange = useCallback(
-    (raw: string) => {
-      const v = Math.max(1, Number(raw) || 1);
-      setWidth(v);
-      if (lockAspect) setHeight(Math.max(1, Math.round(v / aspectRatio)));
+    (val: string) => {
+      setWidth(val);
+      const w = parseInt(val, 10);
+      if (!isNaN(w) && w > 0 && lockAspect && imageWidth > 0) {
+        setHeight(String(Math.round((w / imageWidth) * imageHeight)));
+      }
     },
-    [lockAspect, aspectRatio],
+    [lockAspect, imageWidth, imageHeight],
   );
 
   const handleHeightChange = useCallback(
-    (raw: string) => {
-      const v = Math.max(1, Number(raw) || 1);
-      setHeight(v);
-      if (lockAspect) setWidth(Math.max(1, Math.round(v * aspectRatio)));
+    (val: string) => {
+      setHeight(val);
+      const h = parseInt(val, 10);
+      if (!isNaN(h) && h > 0 && lockAspect && imageHeight > 0) {
+        setWidth(String(Math.round((h / imageHeight) * imageWidth)));
+      }
     },
-    [lockAspect, aspectRatio],
+    [lockAspect, imageWidth, imageHeight],
   );
 
-  const handleResize = useCallback(() => {
-    if (width === imageWidth && height === imageHeight) return;
-    onResize(width, height);
-  }, [width, height, imageWidth, imageHeight, onResize]);
+  const handleApplyResize = () => {
+    const w = parseInt(width, 10);
+    const h = parseInt(height, 10);
+    if (w > 0 && h > 0) {
+      onResize(w, h);
+    }
+  };
 
-  // Metrics
+  // Quality change should also enable A/B compare (same as resize does)
+  const handleQualityChange = (val: number) => {
+    onQualityChange(val);
+  };
+
+  // Commit quality on pointer up — trigger compare availability
+  const handleQualityCommit = () => {
+    // Quality change counts as a modification for A/B compare
+    // The parent should set hasBeenModified when quality changes
+  };
+
+  const compareDisabled = !hasBeenModified;
+
+  // Lighthouse score calculation
   const originalArea = imageWidth * imageHeight;
-  const newArea = width * height;
+  const newW = parseInt(width, 10) || imageWidth;
+  const newH = parseInt(height, 10) || imageHeight;
+  const newArea = newW * newH;
   const areaRatio = originalArea > 0 ? newArea / originalArea : 1;
   const qualityRatio = quality / 100;
+  const scoreBase = areaRatio * qualityRatio;
+  const lighthouseScore = Math.min(
+    100,
+    Math.max(0, Math.round(100 - scoreBase * 50)),
+  );
+
   const savingsPercent = Math.max(
     0,
     Math.round((1 - areaRatio * qualityRatio) * 100),
   );
-  const lighthouseScore = Math.min(
-    100,
-    Math.max(0, Math.round(100 - areaRatio * qualityRatio * 50)),
-  );
-
-  const trafficColor = (v: number) =>
-    v >= 80 ? "bg-emerald-500" : v >= 40 ? "bg-amber-500" : "bg-red-500";
-
-  const dimensionsChanged = width !== imageWidth || height !== imageHeight;
-  const compareDisabled = disabled || !hasBeenModified;
 
   return (
     <div className="space-y-5">
-      <h3 className="text-sm font-medium text-theme-foreground">
-        Resize & Compress
+      <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
+        Resize &amp; Compress
       </h3>
 
-      {/* ── Dimensions ──────────────────────────────────────────── */}
+      {/* ── Dimensions ── */}
       <div className="space-y-3">
         <h4 className="text-xs font-black uppercase text-text-primary tracking-widest">
           Dimensions
         </h4>
         <div className="grid grid-cols-2 gap-2">
-          <input
-            type="number"
-            value={width}
-            onChange={(e) => handleWidthChange(e.target.value)}
-            min={1}
-            disabled={disabled}
-            className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
-          />
-          <input
-            type="number"
-            value={height}
-            onChange={(e) => handleHeightChange(e.target.value)}
-            min={1}
-            disabled={disabled}
-            className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
-          />
+          <div className="space-y-1">
+            <input
+              type="number"
+              value={width}
+              onChange={(e) => handleWidthChange(e.target.value)}
+              min={1}
+              disabled={disabled}
+              className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+            />
+            <span className="text-xs text-text-secondary">width</span>
+          </div>
+          <div className="space-y-1">
+            <input
+              type="number"
+              value={height}
+              onChange={(e) => handleHeightChange(e.target.value)}
+              min={1}
+              disabled={disabled}
+              className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+            />
+            <span className="text-xs text-text-secondary">height</span>
+          </div>
         </div>
+
+        {/* Lock Aspect */}
         <button
           onClick={() => setLockAspect((v) => !v)}
           className="flex items-center gap-3 w-full p-2 rounded-lg bg-theme-muted/20 hover:bg-theme-muted/30 transition-colors"
@@ -148,29 +171,47 @@ export function ResizeSettings({
             Lock Aspect
           </span>
         </button>
+
+        <Button
+          onClick={handleApplyResize}
+          disabled={disabled}
+          className="w-full gap-2"
+        >
+          Apply Resize
+        </Button>
       </div>
 
-      {/* ── Quality ─────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <div className="flex justify-between items-center">
-          <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
+      {/* ── Quality — Clone Stamp style slider ── */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
             Quality
-          </h4>
-          <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest tabular-nums">
+          </label>
+          <span className="text-xs text-theme-foreground tabular-nums">
             {quality}%
           </span>
         </div>
-        <Slider
-          value={[quality]}
-          onValueChange={([v]) => onQualityChange(v)}
-          min={10}
-          max={100}
-          step={1}
-          disabled={disabled}
-        />
+
+        {/* Clone Stamp style: gradient track + custom thumb */}
+        <div className="relative h-2 w-full rounded-full bg-theme-muted">
+          <div
+            className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
+            style={{ width: `${quality}%` }}
+          />
+          <input
+            type="range"
+            min={10}
+            max={100}
+            step={1}
+            value={quality}
+            onChange={(e) => handleQualityChange(Number(e.target.value))}
+            onPointerUp={handleQualityCommit}
+            className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
+          />
+        </div>
       </div>
 
-      {/* ── A/B Compare Toggle ──────────────────────────────────── */}
+      {/* ── A/B Compare ── */}
       <Tooltip>
         <TooltipTrigger asChild>
           <div>
@@ -196,14 +237,14 @@ export function ResizeSettings({
         {compareDisabled && (
           <TooltipContent side="bottom" className="max-w-[220px] text-center">
             <p className="text-xs">
-              Resize or compress an image first, then use A/B compare to see the
+              Resize or adjust quality first, then use A/B compare to see the
               difference vs. the original.
             </p>
           </TooltipContent>
         )}
       </Tooltip>
 
-      {/* ── Performance Gain ────────────────────────────────────── */}
+      {/* ── Performance Gain ── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
@@ -221,7 +262,7 @@ export function ResizeSettings({
         </div>
       </div>
 
-      {/* ── Lighthouse Score ────────────────────────────────────── */}
+      {/* ── Lighthouse Score ── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
@@ -239,18 +280,7 @@ export function ResizeSettings({
         </div>
       </div>
 
-      {/* ── Resize Button ───────────────────────────────────────── */}
-      <Button
-        onClick={handleResize}
-        disabled={disabled || !dimensionsChanged}
-        className="w-full bg-accent text-text-primary hover:ring-2 hover:ring-theme-primary/50 hover:ring-offset-2 hover:ring-offset-theme-background"
-      >
-        {dimensionsChanged
-          ? `Resize to ${width} × ${height}`
-          : `Current: ${imageWidth} × ${imageHeight}`}
-      </Button>
-
-      {/* ── Auto Compress All ───────────────────────────────────── */}
+      {/* ── Auto Compress All ── */}
       <div className="pt-3 border-t border-theme-sidebar-border">
         <Button
           onClick={onAutoCompress}
@@ -262,6 +292,7 @@ export function ResizeSettings({
             ? `Compressing ${compressProgress.completed}/${compressProgress.total}…`
             : "Auto Compress All Images"}
         </Button>
+
         {isCompressing && (
           <div className="mt-2 h-1.5 w-full bg-theme-muted rounded-full overflow-hidden">
             <div

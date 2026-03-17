@@ -192,7 +192,10 @@ export function TopBar({
             {/* ── Right: export + delete ──────────── */}
             <div className="flex items-center gap-2 shrink-0">
               {/* Export buttons group */}
-              <div className="flex gap-1 p-1 rounded-lg bg-bg-tertiary" ref={dropdownRef}>
+              <div
+                className="flex gap-1 p-1 rounded-lg bg-bg-tertiary"
+                ref={dropdownRef}
+              >
                 {/* Format selector */}
                 <div className="relative">
                   <button
@@ -244,7 +247,9 @@ export function TopBar({
                 title="Delete all images"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline text-xs font-semibold font-mono">Delete All</span>
+                <span className="hidden sm:inline text-xs font-semibold font-mono">
+                  Delete All
+                </span>
               </button>
             </div>
           </div>

@@ -1,3 +1,4 @@
+// ===== FILE: app/src/components/StatusBar/StatusBar.tsx =====
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 
 interface Props {
@@ -6,9 +7,14 @@ interface Props {
   showKbdHints: boolean;
 }
 
-export function StatusBar({ state, imageCount, showKbdHints: _showKbdHints }: Props) {
+export function StatusBar({
+  state,
+  imageCount,
+  showKbdHints: _showKbdHints,
+}: Props) {
   return (
     <footer className="status-bar">
+      {/* Left — Source status */}
       <div className="status-section">
         <span
           className={`source-status ${state.hasSource ? "has-source" : ""}`}
@@ -19,6 +25,8 @@ export function StatusBar({ state, imageCount, showKbdHints: _showKbdHints }: Pr
             : "Alt+Click to set source"}
         </span>
       </div>
+
+      {/* Center — Inline shortcut hints */}
       <div className="status-section status-center">
         <span className="status-shortcut-hint">
           <kbd>Alt</kbd>+<kbd>Click</kbd> source
@@ -37,10 +45,18 @@ export function StatusBar({ state, imageCount, showKbdHints: _showKbdHints }: Pr
           <kbd>]</kbd> brush
         </span>
         <span className="status-divider" />
+        {/* Alt+/ toggles inline KBD badges on bars */}
         <span className="status-shortcut-hint">
-          <kbd>Alt</kbd>+<kbd>/</kbd> shortcuts
+          <kbd>Alt</kbd>+<kbd>/</kbd> hints
+        </span>
+        <span className="status-divider" />
+        {/* Alt+? opens the full shortcut modal */}
+        <span className="status-shortcut-hint">
+          <kbd>Alt</kbd>+<kbd>?</kbd> shortcuts
         </span>
       </div>
+
+      {/* Right — Image count, dimensions, zoom */}
       <div className="status-section status-right">
         <span className="status-zoom-label">
           {imageCount} img{imageCount !== 1 ? "s" : ""}

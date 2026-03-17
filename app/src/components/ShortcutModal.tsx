@@ -1,3 +1,4 @@
+// ===== FILE: app/src/components/ShortcutModal.tsx =====
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Keyboard } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
@@ -15,7 +16,8 @@ const SHORTCUT_GROUPS = [
       { keys: ["Alt", "S"], action: "Toggle Tools" },
       { keys: ["Alt", "G"], action: "Toggle Gallery" },
       { keys: ["Alt", "H"], action: "Toggle History" },
-      { keys: ["Alt", "/"], action: "Toggle Shortcuts" },
+      { keys: ["Alt", "/"], action: "Toggle Inline Hints" },
+      { keys: ["Alt", "?"], action: "Toggle This Modal" },
     ],
   },
   {
@@ -65,13 +67,16 @@ export function ShortcutModal({ open, onClose }: Props) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="shortcut-modal-header">
-              <div className="shortcut-modal-title">
-                <Keyboard className="shortcut-modal-icon" />
-                <span>Keyboard Shortcuts</span>
-              </div>
-              <button onClick={onClose} className="shortcut-modal-close">
-                <X className="shortcut-modal-close-icon" />
+            <div className="flex items-center justify-between px-6 pt-5 pb-3">
+              <h2 className="flex items-center gap-2 text-base font-semibold">
+                <Keyboard className="h-5 w-5" />
+                Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
+              >
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -101,13 +106,11 @@ export function ShortcutModal({ open, onClose }: Props) {
               ))}
             </div>
 
-            {/* Footer */}
-            <div className="shortcut-modal-footer">
-              <span>
-                Press <kbd className="shortcut-kbd">Alt</kbd>
-                <span className="shortcut-plus">+</span>
-                <kbd className="shortcut-kbd">/</kbd> to close
-              </span>
+            {/* Footer hint */}
+            <div className="px-6 py-3 border-t border-border text-[10px] text-text-muted text-center">
+              <kbd>Alt</kbd>+<kbd>/</kbd> toggles inline hints on bars
+              &nbsp;·&nbsp;
+              <kbd>Alt</kbd>+<kbd>?</kbd> toggles this modal
             </div>
           </motion.div>
         </motion.div>

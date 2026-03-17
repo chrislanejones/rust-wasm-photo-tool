@@ -330,4 +330,36 @@ impl CloneStampTool {
         self.hist.push_snapshot("Contrast", &self.buf.data);
         filters::adjust_contrast(&mut self.buf.data, factor);
     }
+
+    // ── Gaussian Blur (WASM) ──────────────────────────────────────
+    // Call from JS:  tool.blur_region(cx, cy, brush_radius, intensity)
+    // brush_radius = half the brush-size slider value
+    // intensity    = the blur-intensity slider value (1..20)
+    pub fn blur_region(
+        &mut self,
+        cx: f64,
+        cy: f64,
+        brush_radius: f64,
+        intensity: u32,
+    ) {
+        filters::gaussian_blur_region(
+            &mut self.buf.data,
+            self.buf.width,
+            self.buf.height,
+            cx,
+            cy,
+            brush_radius,
+            intensity,
+        );
+    }
+ 
+    /// Begin a blur stroke — saves undo snapshot once
+    pub fn begin_blur_stroke(&mut self) {
+        self.hist.push_snapshot("Blur", &self.buf.data);
+    }
+ 
+    // Note: No end_blur_stroke needed — the snapshot is already saved.
+    // Just call blur_region() repeatedly during the stroke, then
+    // the next begin_blur_stroke() or other action creates a new snapshot.
+ 
 }
