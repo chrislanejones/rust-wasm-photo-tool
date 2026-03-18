@@ -5,6 +5,7 @@ import { useBrushPreview } from "@/hooks/useBrushPreview";
 import { useDrawingTools } from "@/hooks/useDrawingTools";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
+import { useTextTool } from "@/hooks/useTextTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
@@ -44,9 +45,9 @@ export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
 
 export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const stamp = useCloneStamp(canvasRef);
 
-  // ── Stamp settings ──
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     brushSize: 20,
     hardness: 0.8,
@@ -62,11 +63,8 @@ export function AppShell() {
     [stamp],
   );
 
-  // ── Tool settings (shared across blur/arrow/shapes/paint/text/emoji) ──
   const [toolSettings, setToolSettings] =
     useState<ToolSettings>(defaultToolSettings);
-
-  // ── Photos ──
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
@@ -173,11 +171,9 @@ export function AppShell() {
     [activePhotoId, stamp],
   );
 
-  // ── Brush preview ──
   const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(stampSettings.brushSize, stamp.state.zoom, canvasRef);
 
-  // ── Panel state ──
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
   const [showTools, setShowTools] = useState(true);
@@ -196,7 +192,6 @@ export function AppShell() {
 
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
-  // ── Panel sequencing ──
   const prevPhotoCount = useRef(0);
   useEffect(() => {
     const prev = prevPhotoCount.current;
@@ -227,7 +222,6 @@ export function AppShell() {
   const handleExport = useCallback(() => {
     stamp.exportAs(exportFormat, quality / 100);
   }, [stamp, exportFormat, quality]);
-
   const handleDeleteAll = useCallback(() => {
     photos.forEach((p) => URL.revokeObjectURL(p.url));
     setPhotos([]);
@@ -237,7 +231,6 @@ export function AppShell() {
     setCompareActive(false);
   }, [photos]);
 
-  // ── Flush + Sync (requires useCloneStamp to export these — see patch) ──
   const flushAndSync = useCallback(() => {
     stamp.flushToCanvas();
     stamp.syncState();
@@ -323,10 +316,18 @@ export function AppShell() {
     syncState: stamp.syncState,
   });
 
-  // ══════════════════════════════════════════════════════════════
-  // EFFECTIVE STAMP — routes mouse events based on active tool
-  // This is the critical piece that makes all tools work.
-  // ══════════════════════════════════════════════════════════════
+  // ── Text ──
+  const textTool = useTextTool({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    containerRef,
+    settings: toolSettings,
+    flushToCanvas: stamp.flushToCanvas,
+    syncState: stamp.syncState,
+    active: activeTool === "text",
+  });
+
+  // ── Route mouse events ──
   const effectiveStamp = (() => {
     if (activeTool === "blur")
       return {
@@ -356,11 +357,10 @@ export function AppShell() {
         onMouseMove: paintTool.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: paintTool.onMouseUp as typeof stamp.onMouseUp,
       };
-    // text tool uses canvas click handler inside CanvasArea, stamp handles the rest
+    // text tool handles its own click via CanvasArea's onClick prop
     return stamp;
   })();
 
-  // ── Keyboard shortcuts ──
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
@@ -376,7 +376,6 @@ export function AppShell() {
     setShowShortcutModal,
   });
 
-  // ── Zoom (works from TopBar buttons, context menu, Alt+scroll in useCloneStamp, Alt+-/+ in useKeyboardShortcuts) ──
   const handleZoomIn = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(1);
     stamp.syncState();
@@ -528,6 +527,19 @@ export function AppShell() {
               onCanvasLeave={onCanvasLeave}
               beforeUrl={originalUrl}
               compareActive={compareActive}
+              activeTool={activeTool}
+              containerRef={containerRef}
+              textInput={textTool.textInput}
+              textareaRef={textTool.textareaRef}
+              onCanvasClick={textTool.onCanvasClick}
+              onTextKeyDown={textTool.onTextKeyDown}
+              onTextChange={textTool.onTextChange}
+              onTextBlur={textTool.onTextBlur}
+              textSettings={{
+                fontSize: toolSettings.fontSize,
+                fontWeight: toolSettings.fontWeight,
+                textColor: toolSettings.textColor,
+              }}
             />
           </motion.main>
         </ContextMenuTrigger>
