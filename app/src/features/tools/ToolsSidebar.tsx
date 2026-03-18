@@ -1,8 +1,8 @@
-// ===== FILE: app/src/features/tools/ToolsSidebar.tsx =====
 import { motion } from "framer-motion";
 import { X, Wrench, Undo, Redo, Download } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
+import type { TextMemory } from "./settings/TextSettings";
 
 import { ToolGrid } from "./ToolGrid";
 import { StampSettings as StampSettingsPanel } from "./settings/StampSettings";
@@ -13,6 +13,7 @@ import { ArrowSettings } from "./settings/ArrowSettings";
 import { ShapesSettings } from "./settings/ShapeSettings";
 import { EmojiSettings } from "./settings/EmojiSettings";
 import { PaintSettings } from "./settings/PaintSettings";
+import { TextSettings } from "./settings/TextSettings";
 
 interface ToolsSidebarProps {
   onClose: () => void;
@@ -48,6 +49,8 @@ interface ToolsSidebarProps {
   onApplyCrop?: () => void;
   toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
+  recentTexts: TextMemory[];
+  onSelectRecentText: (m: TextMemory) => void;
 }
 
 export function ToolsSidebar({
@@ -84,6 +87,8 @@ export function ToolsSidebar({
   onApplyCrop,
   toolSettings,
   onToolSettingsChange,
+  recentTexts,
+  onSelectRecentText,
 }: ToolsSidebarProps) {
   return (
     <motion.div
@@ -104,7 +109,6 @@ export function ToolsSidebar({
         <button
           onClick={onClose}
           className="p-1.5 rounded-md hover:bg-bg-elevated transition-colors text-text-muted hover:text-text-primary"
-          aria-label="Close tools"
         >
           <X className="h-4 w-4" />
         </button>
@@ -155,6 +159,14 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
           />
         )}
+        {activeTool === "text" && (
+          <TextSettings
+            settings={toolSettings}
+            onChange={onToolSettingsChange}
+            recentTexts={recentTexts}
+            onSelectRecentText={onSelectRecentText}
+          />
+        )}
         {activeTool === "blur" && (
           <BlurSettings
             settings={toolSettings}
@@ -186,12 +198,12 @@ export function ToolsSidebar({
           />
         )}
 
-        {/* Coming soon — only tools without panels */}
         {![
           "stamp",
           "compress",
           "crop",
           "brush",
+          "text",
           "blur",
           "arrow",
           "shapes",

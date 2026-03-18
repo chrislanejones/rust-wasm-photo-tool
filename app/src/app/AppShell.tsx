@@ -1,4 +1,3 @@
-// ===== FILE: app/src/app/AppShell.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
@@ -7,6 +6,7 @@ import { useDrawingTools } from "@/hooks/useDrawingTools";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
+import type { TextMemory } from "@/features/tools/settings/TextSettings";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition } from "@/lib/animations";
 
@@ -46,9 +46,7 @@ export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stamp = useCloneStamp(canvasRef);
 
-  // NOTE: stamp.syncState and stamp.flushToCanvas must be exported
-  // from useCloneStamp (see USE_CLONE_STAMP_PATCH.txt)
-
+  // ── Stamp settings ──
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     brushSize: 20,
     hardness: 0.8,
@@ -64,14 +62,59 @@ export function AppShell() {
     [stamp],
   );
 
+  // ── Tool settings (shared across blur/arrow/shapes/paint/text/emoji) ──
   const [toolSettings, setToolSettings] =
     useState<ToolSettings>(defaultToolSettings);
+
+  // ── Photos ──
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
   const [hasBeenModified, setHasBeenModified] = useState(false);
 
+  // ── Text memory ──
+  const [recentTexts, setRecentTexts] = useState<TextMemory[]>([]);
+  const textIdCounter = useRef(0);
+
+  const handleTextCommit = useCallback(
+    (text: string) => {
+      if (!text.trim()) return;
+      const m: TextMemory = {
+        id: textIdCounter.current++,
+        text,
+        fontSize: toolSettings.fontSize,
+        fontWeight: toolSettings.fontWeight,
+        textColor: toolSettings.textColor,
+      };
+      setRecentTexts((prev) =>
+        [m, ...prev.filter((t) => t.text !== text)].slice(0, 3),
+      );
+    },
+    [toolSettings.fontSize, toolSettings.fontWeight, toolSettings.textColor],
+  );
+
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ text: string }>) =>
+      handleTextCommit(e.detail.text);
+    window.addEventListener("text-committed", handler as EventListener);
+    return () =>
+      window.removeEventListener("text-committed", handler as EventListener);
+  }, [handleTextCommit]);
+
+  const handleSelectRecentText = useCallback((m: TextMemory) => {
+    setToolSettings((prev) => ({
+      ...prev,
+      fontSize: m.fontSize,
+      fontWeight: m.fontWeight,
+      textColor: m.textColor,
+    }));
+    window.dispatchEvent(
+      new CustomEvent("prefill-text", { detail: { text: m.text } }),
+    );
+  }, []);
+
+  // ── Photo management ──
   const handleAddPhotos = useCallback(
     (files: File[]) => {
       const entries: PhotoEntry[] = files.map((f) => ({
@@ -130,9 +173,11 @@ export function AppShell() {
     [activePhotoId, stamp],
   );
 
+  // ── Brush preview ──
   const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(stampSettings.brushSize, stamp.state.zoom, canvasRef);
 
+  // ── Panel state ──
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
   const [showTools, setShowTools] = useState(true);
@@ -151,6 +196,7 @@ export function AppShell() {
 
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
+  // ── Panel sequencing ──
   const prevPhotoCount = useRef(0);
   useEffect(() => {
     const prev = prevPhotoCount.current;
@@ -191,32 +237,32 @@ export function AppShell() {
     setCompareActive(false);
   }, [photos]);
 
-  /* ── Flush + Sync helpers ── */
+  // ── Flush + Sync (requires useCloneStamp to export these — see patch) ──
   const flushAndSync = useCallback(() => {
     stamp.flushToCanvas();
     stamp.syncState();
   }, [stamp]);
 
-  /* ── Blur tool ── */
+  // ── Blur ──
   const isBlurringRef = useRef(false);
   const getCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
+    const c = canvasRef.current;
+    if (!c) return { x: 0, y: 0 };
+    const r = c.getBoundingClientRect();
     return {
-      x: ((e.clientX - rect.left) * canvas.width) / rect.width,
-      y: ((e.clientY - rect.top) * canvas.height) / rect.height,
+      x: ((e.clientX - r.left) * c.width) / r.width,
+      y: ((e.clientY - r.top) * c.height) / r.height,
     };
   }, []);
 
-  const blurOnMouseDown = useCallback(
+  const blurDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const tool = stamp.toolRef.current;
-      if (!tool || e.button !== 0) return;
+      const t = stamp.toolRef.current;
+      if (!t || e.button !== 0) return;
       isBlurringRef.current = true;
-      tool.begin_blur_stroke();
+      t.begin_blur_stroke();
       const { x, y } = getCoords(e);
-      tool.blur_region(
+      t.blur_region(
         x,
         y,
         toolSettings.blurSize / 2,
@@ -227,13 +273,13 @@ export function AppShell() {
     [stamp, getCoords, toolSettings.blurSize, toolSettings.blurIntensity],
   );
 
-  const blurOnMouseMove = useCallback(
+  const blurMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!isBlurringRef.current) return;
-      const tool = stamp.toolRef.current;
-      if (!tool) return;
+      const t = stamp.toolRef.current;
+      if (!t) return;
       const { x, y } = getCoords(e);
-      tool.blur_region(
+      t.blur_region(
         x,
         y,
         toolSettings.blurSize / 2,
@@ -244,31 +290,31 @@ export function AppShell() {
     [stamp, getCoords, toolSettings.blurSize, toolSettings.blurIntensity],
   );
 
-  const blurOnMouseUp = useCallback(() => {
+  const blurUp = useCallback(() => {
     if (!isBlurringRef.current) return;
     isBlurringRef.current = false;
-    stamp.syncState(); // ← updates history panel
+    stamp.syncState();
   }, [stamp]);
 
-  /* ── Arrow / Shapes / Crop — syncState called inside useDrawingTools via flushToCanvas wrapper ── */
+  // ── Arrow / Shapes / Crop ──
   const drawingTools = useDrawingTools({
     toolRef: stamp.toolRef,
     canvasRef,
     activeTool,
     settings: toolSettings,
-    flushToCanvas: flushAndSync, // ← flush + sync so history updates
+    flushToCanvas: flushAndSync,
   });
 
-  /* ── Emoji tool ── */
+  // ── Emoji ──
   const emojiTool = useEmojiTool({
     toolRef: stamp.toolRef,
     canvasRef,
-    flushToCanvas: flushAndSync, // ← flush + sync
+    flushToCanvas: flushAndSync,
     emoji: toolSettings.emoji,
     emojiSize: toolSettings.emojiSize,
   });
 
-  /* ── Paint tool ── */
+  // ── Paint ──
   const paintTool = usePaintTool({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -277,14 +323,17 @@ export function AppShell() {
     syncState: stamp.syncState,
   });
 
-  /* ── Route mouse events ── */
+  // ══════════════════════════════════════════════════════════════
+  // EFFECTIVE STAMP — routes mouse events based on active tool
+  // This is the critical piece that makes all tools work.
+  // ══════════════════════════════════════════════════════════════
   const effectiveStamp = (() => {
     if (activeTool === "blur")
       return {
         ...stamp,
-        onMouseDown: blurOnMouseDown,
-        onMouseMove: blurOnMouseMove,
-        onMouseUp: blurOnMouseUp,
+        onMouseDown: blurDown,
+        onMouseMove: blurMove,
+        onMouseUp: blurUp,
       };
     if (["arrow", "shapes", "crop"].includes(activeTool))
       return {
@@ -307,10 +356,11 @@ export function AppShell() {
         onMouseMove: paintTool.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: paintTool.onMouseUp as typeof stamp.onMouseUp,
       };
+    // text tool uses canvas click handler inside CanvasArea, stamp handles the rest
     return stamp;
   })();
 
-  /* ── Keyboard shortcuts ── */
+  // ── Keyboard shortcuts ──
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
@@ -326,18 +376,21 @@ export function AppShell() {
     setShowShortcutModal,
   });
 
+  // ── Zoom (works from TopBar buttons, context menu, Alt+scroll in useCloneStamp, Alt+-/+ in useKeyboardShortcuts) ──
   const handleZoomIn = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(1);
+    stamp.syncState();
   }, [stamp]);
   const handleZoomOut = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(-1);
+    stamp.syncState();
   }, [stamp]);
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
   }, []);
   const handleResize = useCallback(
-    (newW: number, newH: number) => {
-      stamp.resize(newW, newH);
+    (w: number, h: number) => {
+      stamp.resize(w, h);
       setHasBeenModified(true);
     },
     [stamp],
@@ -352,12 +405,12 @@ export function AppShell() {
         quality: quality / 100,
         format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
       },
-      (id, newFile, newUrl) => {
-        setPhotos((prev) =>
-          prev.map((p) => {
-            if (p.id !== id) return p;
-            URL.revokeObjectURL(p.url);
-            return { ...p, file: newFile, url: newUrl };
+      (id, nf, nu) => {
+        setPhotos((p) =>
+          p.map((x) => {
+            if (x.id !== id) return x;
+            URL.revokeObjectURL(x.url);
+            return { ...x, file: nf, url: nu };
           }),
         );
       },
@@ -366,19 +419,15 @@ export function AppShell() {
   }, [photos, quality, exportFormat, compressAll]);
 
   const handleCopyToClipboard = useCallback(async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const c = canvasRef.current;
+    if (!c) return;
     try {
-      const blob = await new Promise<Blob | null>((res) =>
-        canvas.toBlob((b) => res(b), "image/png"),
+      const b = await new Promise<Blob | null>((r) =>
+        c.toBlob((v) => r(v), "image/png"),
       );
-      if (blob)
-        await navigator.clipboard.write([
-          new ClipboardItem({ [blob.type]: blob }),
-        ]);
-    } catch (err) {
-      console.error("Copy failed:", err);
-    }
+      if (b)
+        await navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]);
+    } catch {}
   }, []);
 
   const hasImage = stamp.state.ready;
@@ -403,7 +452,6 @@ export function AppShell() {
             showTools={showTools}
             showGallery={showGallery}
             showHistory={showHistory}
-            showKbdHints={showKbdHints}
             onToggleUpload={() => setShowUpload((v) => !v)}
             onToggleTools={() => setShowTools((v) => !v)}
             onToggleGallery={() => setShowGallery((v) => !v)}
@@ -454,6 +502,8 @@ export function AppShell() {
             onApplyCrop={drawingTools.applyCrop}
             toolSettings={toolSettings}
             onToolSettingsChange={setToolSettings}
+            recentTexts={recentTexts}
+            onSelectRecentText={handleSelectRecentText}
           />
         )}
       </AnimatePresence>
@@ -493,22 +543,29 @@ export function AppShell() {
           </ContextMenuItem>
           <ContextMenuItem disabled={!canRedo} onSelect={stamp.redo}>
             <Redo className="mr-2 h-4 w-4" /> Redo{" "}
-            <ContextMenuShortcut>Ctrl+Shift+Z</ContextMenuShortcut>
+            <ContextMenuShortcut>Ctrl+⇧+Z</ContextMenuShortcut>
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem
             onSelect={handleZoomOut}
             disabled={stamp.state.zoom <= 0.25}
           >
-            <ZoomOut className="mr-2 h-4 w-4" /> Zoom Out
+            <ZoomOut className="mr-2 h-4 w-4" /> Zoom Out{" "}
+            <ContextMenuShortcut>Alt+−</ContextMenuShortcut>
           </ContextMenuItem>
           <ContextMenuItem
             onSelect={handleZoomIn}
             disabled={stamp.state.zoom >= 4}
           >
-            <ZoomIn className="mr-2 h-4 w-4" /> Zoom In
+            <ZoomIn className="mr-2 h-4 w-4" /> Zoom In{" "}
+            <ContextMenuShortcut>Alt+=</ContextMenuShortcut>
           </ContextMenuItem>
-          <ContextMenuItem onSelect={() => stamp.toolRef.current?.set_zoom(1)}>
+          <ContextMenuItem
+            onSelect={() => {
+              stamp.toolRef.current?.set_zoom(1);
+              stamp.syncState();
+            }}
+          >
             <RotateCcw className="mr-2 h-4 w-4" /> Reset Zoom
           </ContextMenuItem>
           <ContextMenuSeparator />
@@ -565,6 +622,7 @@ export function AppShell() {
         state={stamp.state}
         imageCount={photos.length}
         showKbdHints={showKbdHints}
+        activeTool={activeTool}
       />
     </div>
   );

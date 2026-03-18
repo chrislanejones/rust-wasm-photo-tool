@@ -1,20 +1,67 @@
-// ===== FILE: app/src/components/StatusBar/StatusBar.tsx =====
 import type { CloneStampState } from "@/hooks/useCloneStamp";
+import type { ToolType } from "@/lib/types";
 
 interface Props {
   state: CloneStampState;
   imageCount: number;
   showKbdHints: boolean;
+  activeTool?: ToolType;
 }
+
+const TOOL_HINTS: Record<string, { keys: string; action: string }[]> = {
+  stamp: [
+    { keys: "Alt+Click", action: "set source" },
+    { keys: "Alt+[ ]", action: "brush size" },
+    { keys: "Ctrl+Z", action: "undo" },
+  ],
+  compress: [
+    { keys: "Alt+E", action: "export" },
+    { keys: "Ctrl+Z", action: "undo" },
+  ],
+  crop: [
+    { keys: "Drag", action: "select area" },
+    { keys: "Ctrl+Z", action: "undo" },
+  ],
+  brush: [
+    { keys: "Drag", action: "paint" },
+    { keys: "Alt+[ ]", action: "brush size" },
+    { keys: "Ctrl+Z", action: "undo" },
+  ],
+  blur: [
+    { keys: "Drag", action: "blur area" },
+    { keys: "Alt+[ ]", action: "brush size" },
+    { keys: "Ctrl+Z", action: "undo" },
+  ],
+  arrow: [
+    { keys: "Drag", action: "draw arrow" },
+    { keys: "Ctrl+Z", action: "undo" },
+  ],
+  shapes: [
+    { keys: "Drag", action: "draw shape" },
+    { keys: "Ctrl+Z", action: "undo" },
+  ],
+  emoji: [
+    { keys: "Click", action: "stamp emoji" },
+    { keys: "Ctrl+Z", action: "undo" },
+  ],
+  text: [
+    { keys: "Click", action: "place text" },
+    { keys: "Enter", action: "commit" },
+    { keys: "Esc", action: "cancel" },
+  ],
+  ai: [{ keys: "Alt+E", action: "export" }],
+};
 
 export function StatusBar({
   state,
   imageCount,
   showKbdHints: _showKbdHints,
+  activeTool = "stamp",
 }: Props) {
+  const hints = TOOL_HINTS[activeTool] ?? TOOL_HINTS.stamp;
+
   return (
     <footer className="status-bar">
-      {/* Left — Source status */}
       <div className="status-section">
         <span
           className={`source-status ${state.hasSource ? "has-source" : ""}`}
@@ -26,37 +73,24 @@ export function StatusBar({
         </span>
       </div>
 
-      {/* Center — Inline shortcut hints */}
+      {/* Center — dynamic tool hints */}
       <div className="status-section status-center">
+        {hints.map((hint, i) => (
+          <span key={i} className="status-shortcut-hint">
+            {i > 0 && <span className="status-divider" />}
+            <kbd>{hint.keys}</kbd> {hint.action}
+          </span>
+        ))}
+        <span className="status-divider" />
         <span className="status-shortcut-hint">
-          <kbd>Alt</kbd>+<kbd>Click</kbd> source
+          <kbd>Alt+/</kbd> hints
         </span>
         <span className="status-divider" />
         <span className="status-shortcut-hint">
-          <kbd>Alt</kbd>+<kbd>Scroll</kbd> zoom
-        </span>
-        <span className="status-divider" />
-        <span className="status-shortcut-hint">
-          <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
-        </span>
-        <span className="status-divider" />
-        <span className="status-shortcut-hint">
-          <kbd>Alt</kbd>+<kbd>[</kbd>
-          <kbd>]</kbd> brush
-        </span>
-        <span className="status-divider" />
-        {/* Alt+/ toggles inline KBD badges on bars */}
-        <span className="status-shortcut-hint">
-          <kbd>Alt</kbd>+<kbd>/</kbd> hints
-        </span>
-        <span className="status-divider" />
-        {/* Alt+? opens the full shortcut modal */}
-        <span className="status-shortcut-hint">
-          <kbd>Alt</kbd>+<kbd>?</kbd> shortcuts
+          <kbd>Alt+?</kbd> shortcuts
         </span>
       </div>
 
-      {/* Right — Image count, dimensions, zoom */}
       <div className="status-section status-right">
         <span className="status-zoom-label">
           {imageCount} img{imageCount !== 1 ? "s" : ""}

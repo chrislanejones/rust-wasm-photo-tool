@@ -51,8 +51,6 @@ declare module "stamp_tool" {
     resize(new_w: number, new_h: number): void;
     adjust_brightness(delta: number): void;
     adjust_contrast(factor: number): void;
-
-    // ── Blur (WASM Gaussian) ──
     blur_region(
       cx: number,
       cy: number,
@@ -60,11 +58,7 @@ declare module "stamp_tool" {
       intensity: number,
     ): void;
     begin_blur_stroke(): void;
-
-    // ── Drawing: Arrows & Shapes (WASM) ──
-    /** Save undo snapshot before drawing. label appears in history. */
     begin_draw_stroke(label: string): void;
-    /** Draw arrow. style: 0=single, 1=double. color_hex: "#rrggbb" */
     draw_arrow(
       from_x: number,
       from_y: number,
@@ -74,7 +68,6 @@ declare module "stamp_tool" {
       stroke_width: number,
       style: number,
     ): void;
-    /** Draw shape. shape: 0=rect, 1=circle, 2=line. color_hex: "#rrggbb" */
     draw_shape(
       from_x: number,
       from_y: number,
@@ -91,13 +84,26 @@ declare module "stamp_tool" {
       dest_x: number,
       dest_y: number,
     ): void;
-
-    // ── Paint / Brush (WASM) ──
-    /** Save undo snapshot before a paint stroke. */
     paint_begin(): void;
-    /** Paint a single dab at (cx, cy) with given radius, color, opacity (0–1). */
-    paint_dab(cx: number, cy: number, radius: number, r: number, g: number, b: number, opacity: number): void;
-    /** Paint a line of dabs from (x0,y0) to (x1,y1) for smooth strokes. */
-    paint_stroke_to(x0: number, y0: number, x1: number, y1: number, radius: number, r: number, g: number, b: number, opacity: number): void;
+    paint_dab(
+      cx: number,
+      cy: number,
+      radius: number,
+      r: number,
+      g: number,
+      b: number,
+      opacity: number,
+    ): void;
+    paint_stroke_to(
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      radius: number,
+      r: number,
+      g: number,
+      b: number,
+      opacity: number,
+    ): void;
   }
 }

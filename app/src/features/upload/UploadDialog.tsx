@@ -1,7 +1,6 @@
-// ===== FILE: app/src/features/upload/UploadDialog.tsx =====
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FolderOpen, Clipboard, X, Link } from "lucide-react";
+import { Upload, FolderOpen, Clipboard, X, ExternalLink } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
 
 interface Props {
@@ -31,11 +30,6 @@ export function UploadDialog({ open, onClose, onFiles }: Props) {
     processFiles(Array.from(e.dataTransfer.files));
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    processFiles(Array.from(e.target.files ?? []));
-    e.target.value = "";
-  };
-
   const handlePasteClick = useCallback(async () => {
     try {
       const items = await navigator.clipboard.read();
@@ -44,28 +38,28 @@ export function UploadDialog({ open, onClose, onFiles }: Props) {
         for (const type of item.types) {
           if (type.startsWith("image/")) {
             const blob = await item.getType(type);
-            const ext = type.split("/")[1] ?? "png";
-            files.push(new File([blob], `pasted-image.${ext}`, { type }));
+            files.push(
+              new File([blob], `pasted-image.${type.split("/")[1] ?? "png"}`, {
+                type,
+              }),
+            );
           }
         }
       }
-      if (files.length) {
-        processFiles(files);
-      }
+      if (files.length) processFiles(files);
     } catch (err) {
-      console.warn("Clipboard read failed — use Ctrl+V instead:", err);
+      console.warn("Clipboard read failed — use Ctrl+V:", err);
     }
   }, [processFiles]);
 
-  // Global Ctrl+V / Cmd+V paste listener when dialog is open
   useEffect(() => {
     if (!open) return;
     const handler = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
       const files = Array.from(items)
-        .filter((item) => item.type.startsWith("image/"))
-        .map((item) => item.getAsFile())
+        .filter((i) => i.type.startsWith("image/"))
+        .map((i) => i.getAsFile())
         .filter((f): f is File => f !== null);
       if (files.length) {
         e.preventDefault();
@@ -98,7 +92,7 @@ export function UploadDialog({ open, onClose, onFiles }: Props) {
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-5 pb-2">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-text-primary">
-                <Upload className="h-5 w-5 text-accent" />
+                <Upload className="h-5 w-5 text-white" />
                 Upload Images
               </h2>
               <button
@@ -126,54 +120,55 @@ export function UploadDialog({ open, onClose, onFiles }: Props) {
                     : "border-border bg-bg-tertiary"
                 }`}
               >
-                <div className="flex flex-col items-center gap-4">
+                <div className="flex flex-col items-center gap-5">
                   <div className="w-16 h-16 rounded-full bg-bg-elevated flex items-center justify-center">
                     <Upload className="h-8 w-8 text-text-muted" />
                   </div>
 
-                  {/* Action buttons */}
+                  {/* Buttons */}
                   <div className="flex gap-3 flex-wrap justify-center">
                     <button
                       onClick={() => inputRef.current?.click()}
                       className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-accent text-text-primary hover:brightness-110 transition-all"
                     >
-                      <FolderOpen className="h-4 w-4" />
-                      Browse Files
+                      <FolderOpen className="h-4 w-4" /> Browse Files
                     </button>
-
                     <button
                       onClick={handlePasteClick}
                       className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all"
                     >
-                      <Clipboard className="h-4 w-4" />
-                      Paste Image
+                      <Clipboard className="h-4 w-4" /> Paste Image
                     </button>
                   </div>
 
-                  <p className="text-sm text-text-muted">
+                  {/* Drag & drop hint */}
+                  <p className="text-base text-text-secondary font-medium">
                     or drag and drop images here
                   </p>
 
-                  <div className="flex items-center gap-1.5 text-[10px] text-text-muted opacity-60">
-                    <kbd className="px-1 py-0.5 rounded bg-bg-elevated border border-border text-[9px]">
+                  {/* Ctrl+V hint */}
+                  <p className="text-sm text-text-secondary">
+                    <kbd className="px-1.5 py-0.5 rounded bg-bg-elevated border border-border text-xs font-mono">
                       Ctrl+V
-                    </kbd>
-                    <span>to paste from clipboard</span>
-                  </div>
+                    </kbd>{" "}
+                    to paste from clipboard
+                  </p>
 
-                  <p className="text-xs text-text-muted opacity-50">
+                  {/* Formats */}
+                  <p className="text-sm text-text-muted">
                     Supports PNG, JPG, GIF, WebP, AVIF
                   </p>
 
-                  {/* Squoosh link */}
+                  {/* Squoosh attribution */}
                   <a
                     href="https://squoosh.app/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-accent transition-colors mt-1"
+                    className="flex items-center gap-1.5 text-sm text-text-muted hover:text-accent transition-colors mt-1"
                   >
-                    <Link className="h-3 w-3" />
-                    Copy an image from squoosh.app then paste here
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Special thanks to squoosh.app — this app is loosely based on
+                    that image compression tool.
                   </a>
                 </div>
 
@@ -183,7 +178,10 @@ export function UploadDialog({ open, onClose, onFiles }: Props) {
                   multiple
                   accept="image/*"
                   hidden
-                  onChange={handleFileInput}
+                  onChange={(e) => {
+                    processFiles(Array.from(e.target.files ?? []));
+                    e.target.value = "";
+                  }}
                 />
               </div>
             </div>
