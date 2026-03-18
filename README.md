@@ -11,7 +11,7 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │  React UI Shell (Framer Motion, Tailwind CSS)            │   │
 │  │                                                          │   │
-│  │  TopBar · ToolsSidebar · GalleryBar · HistoryPanel       │   │
+│  │  TopBar · ToolsSidebar · GalleryBar · HistoryPanel        │   │
 │  │  UploadDialog · StatusBar · ShortcutModal                │   │
 │  └────────────────────┬─────────────────────────────────────┘   │
 │                       │ useCloneStamp hook                      │
@@ -24,11 +24,11 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 │  │  │ ImageBuf │ │ Brush    │ │ Flip/Rot  │ │ Bright   │   │   │
 │  │  │ Bilinear │ │ Dab/Strk │ │ Copy/Pste │ │ Contrast │   │   │
 │  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘   │   │
-│  │  ┌──────────┐ ┌──────────┐                               │   │
-│  │  │  codec   │ │ history  │  All share one pixel buffer   │   │
-│  │  │ PNG enc  │ │ Undo/Redo│  in WASM linear memory.       │   │
-│  │  │ Thumbnail│ │ Snapshot │  Zero-copy between modules.   │   │
-│  │  └──────────┘ └──────────┘                               │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐                │   │
+│  │  │  codec   │ │ history  │ │ drawing   │ All share one  │   │
+│  │  │ PNG enc  │ │ Undo/Redo│ │ Arrows    │ pixel buffer   │   │
+│  │  │ Thumbnail│ │ Snapshot │ │ Shapes    │ in WASM linear │   │
+│  │  └──────────┘ └──────────┘ └───────────┘ memory.        │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  JPEG/WebP/AVIF export → browser canvas.toBlob()                │
@@ -52,8 +52,9 @@ stamp_tool/src/
 ├── core.rs         ImageBuffer — width, height, data, load, bilinear sampling
 ├── history.rs      Snapshot, undo/redo stacks, push, jump, delete, labels
 ├── stamp.rs        Clone stamp engine — source, offset, stroke lifecycle, dab kernel
-├── transform.rs    Flip H/V, rotate 90° CW, copy_region, paste_region
-├── filters.rs      Brightness, contrast (future: blur, sharpen, HSL, curves)
+├── transform.rs    Flip H/V, rotate 90° CW/CCW, resize (bilinear), copy_region, paste_region
+├── filters.rs      Brightness, contrast, blur (box-blur region, stroke-based)
+├── drawing.rs      Arrow rendering (anti-aliased, arrowhead), geometric shapes (rect, circle, line)
 └── codec.rs        PNG encoding, thumbnail generation with bilinear scaling
 ```
 
@@ -70,6 +71,9 @@ app/src/
 ├── hooks/
 │   ├── useCloneStamp.ts              React hook wrapping the WASM CloneStampTool
 │   ├── useBrushPreview.ts            Cursor preview overlay
+│   ├── useDrawingTools.ts            Arrow and shape drawing via WASM drawing.rs
+│   ├── useEmojiTool.ts               Emoji stamp — OffscreenCanvas → WASM stamp_pixels
+│   ├── useAutoCompress.ts            Auto-compress hook for resize workflow
 │   └── stamp_tool.d.ts               TypeScript declarations for WASM interface
 ├── components/
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
@@ -78,19 +82,26 @@ app/src/
 ├── features/
 │   ├── canvas/
 │   │   ├── CanvasArea.tsx            WASM canvas + brush cursor + source marker
+│   │   ├── CompareSlider.tsx         Squoosh-style A/B before/after comparison slider
 │   │   └── HistoryPanel.tsx          Animated right-side undo/redo timeline
 │   ├── gallery/
-│   │   └── GalleryBar.tsx            Bottom photo strip with thumbnails
+│   │   ├── GalleryBar.tsx            Bottom photo strip with thumbnails
+│   │   └── PhotoThumb.tsx            Individual thumbnail component
 │   ├── tools/
 │   │   ├── ToolsSidebar.tsx          Animated left sidebar with tool grid
-│   │   ├── ToolGrid.tsx              4×2 gradient icon buttons
+│   │   ├── ToolGrid.tsx              Gradient icon buttons
 │   │   ├── ToolButton.tsx            Individual tool button
-│   │   ├── toolConfig.ts             Tool definitions (8 tools)
+│   │   ├── toolConfig.ts             Tool definitions (10 tools)
 │   │   └── settings/
 │   │       ├── StampSettings.tsx     Brush size, hardness, opacity, source indicator
-│   │       └── TransformSettings.tsx Flip, rotate, brightness, contrast
+│   │       ├── TransformSettings.tsx Flip, rotate, brightness, contrast
+│   │       ├── ResizeSettings.tsx    Width/height, aspect lock, format, quality
+│   │       ├── BlurSettings.tsx      Blur radius, brush size for region blur
+│   │       ├── ArrowSettings.tsx     Arrow color, stroke width, head size
+│   │       ├── ShapeSettings.tsx     Shape type, fill/stroke color, line width
+│   │       └── EmojiSettings.tsx     Emoji picker (@emoji-mart), size presets
 │   └── upload/
-│       └── UploadDialog.tsx          Drag-and-drop upload modal
+│       └── UploadDialog.tsx          Drag-and-drop + paste-from-clipboard upload modal
 └── lib/
     ├── types.ts                      Shared type definitions
     ├── animations.ts                 Framer Motion spring variants
@@ -121,20 +132,25 @@ app/src/
 ### Image Processing (Rust/WASM)
 
 - **Clone Stamp** — Alt+Click source, paint to clone with adjustable size, hardness, opacity, spacing
-- **Transforms** — Flip horizontal/vertical, rotate 90° CW
-- **Filters** — Brightness adjustment (−100% to +100%), contrast adjustment (0% to 400%)
+- **Transforms** — Flip horizontal/vertical, rotate 90° CW/CCW
+- **Resize** — Bilinear-scaled resize fully in WASM; no canvas round-trip
+- **Filters** — Brightness (−100% to +100%), contrast (0% to 400%), box-blur with stroke-based region masking
+- **Arrows** — Anti-aliased arrows with arrowhead, drawn directly on the pixel buffer via `drawing.rs`
+- **Shapes** — Rectangles, circles, and lines rendered in WASM with configurable fill/stroke
+- **Emoji Stamp** — Browser renders emoji to `OffscreenCanvas`, pixels sent to WASM `stamp_pixels()` for alpha compositing
 - **Export** — Lossless PNG via Rust encoder, JPEG/WebP/AVIF via browser
 - **Thumbnails** — Bilinear-scaled thumbnails generated in WASM
-- **Copy/Paste Regions** — Cross-photo pixel compositing with alpha blending
+- **Copy/Paste Regions** — Cross-photo pixel compositing with alpha blending; paste from clipboard supported
 - **History** — 50-step undo/redo with labeled snapshots, jump-to, delete entry
 
 ### UI (React)
 
 - **Animated Panels** — Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)
-- **Tool Grid** — 8 tools with gradient icons: Clone Stamp, Transform, Crop, Paint, Text, Arrows, Shapes, Blur
+- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows, Shapes, Blur, AI, Emoji
+- **A/B Compare Slider** — Squoosh-style draggable divider to compare before/after edits
 - **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch
 - **History Timeline** — Right-side panel with clickable undo/redo entries
-- **Upload** — Drag-and-drop modal with file browser
+- **Upload** — Drag-and-drop modal with file browser and paste-from-clipboard (Ctrl+V / paste button)
 - **Export Dropdown** — PNG, JPEG, WebP, AVIF format selector in the top bar
 - **Keyboard Hints** — Alt+/ shows badges on all buttons + shortcut reference modal
 - **Dark Theme** — JetBrains Mono + DM Sans, dark palette with accent highlights

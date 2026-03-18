@@ -1,7 +1,3 @@
-// ===== FILE: app/src/hooks/useEmojiTool.ts =====
-// Renders the emoji to an OffscreenCanvas (browser handles font/emoji glyphs),
-// extracts RGBA pixels, sends to WASM stamp_pixels() for alpha compositing.
-
 import { useCallback } from "react";
 import type { CloneStampTool } from "stamp_tool";
 

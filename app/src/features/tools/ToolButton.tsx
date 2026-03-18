@@ -1,4 +1,3 @@
-// ===== FILE: app/src/features/tools/ToolButton.tsx =====
 import type { ToolDefinition } from "./toolConfig";
 
 interface Props {

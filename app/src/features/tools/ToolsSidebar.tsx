@@ -1,7 +1,6 @@
 // ===== FILE: app/src/features/tools/ToolsSidebar.tsx =====
 import { motion } from "framer-motion";
 import { X, Wrench, Undo, Redo, Download } from "lucide-react";
-
 import { slideFromLeft } from "@/lib/animations";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 
@@ -13,10 +12,7 @@ import { BlurSettings } from "./settings/BlurSettings";
 import { ArrowSettings } from "./settings/ArrowSettings";
 import { ShapesSettings } from "./settings/ShapeSettings";
 import { EmojiSettings } from "./settings/EmojiSettings";
-
-/* ------------------------------------------------------------------ */
-/* Props                                                              */
-/* ------------------------------------------------------------------ */
+import { PaintSettings } from "./settings/PaintSettings";
 
 interface ToolsSidebarProps {
   onClose: () => void;
@@ -53,10 +49,6 @@ interface ToolsSidebarProps {
   toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
 }
-
-/* ------------------------------------------------------------------ */
-/* Sidebar                                                            */
-/* ------------------------------------------------------------------ */
 
 export function ToolsSidebar({
   onClose,
@@ -105,7 +97,6 @@ export function ToolsSidebar({
           "0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
       }}
     >
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary font-mono">
           <Wrench className="h-4 w-4 text-white" /> Tools
@@ -119,12 +110,10 @@ export function ToolsSidebar({
         </button>
       </div>
 
-      {/* Tool Grid — 10 tools, 5 columns */}
       <div className="p-4 border-b border-border">
         <ToolGrid activeTool={activeTool} onToolChange={onToolChange} />
       </div>
 
-      {/* Active Tool Panel */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {activeTool === "stamp" && (
           <StampSettingsPanel
@@ -133,7 +122,6 @@ export function ToolsSidebar({
             hasSource={hasSource}
           />
         )}
-
         {activeTool === "compress" && (
           <ResizeSettings
             imageWidth={imageWidth}
@@ -150,7 +138,6 @@ export function ToolsSidebar({
             compressProgress={compressProgress}
           />
         )}
-
         {activeTool === "crop" && (
           <TransformCropSettings
             disabled={!imageReady}
@@ -162,28 +149,30 @@ export function ToolsSidebar({
             onApplyCrop={onApplyCrop}
           />
         )}
-
+        {activeTool === "brush" && (
+          <PaintSettings
+            settings={toolSettings}
+            onChange={onToolSettingsChange}
+          />
+        )}
         {activeTool === "blur" && (
           <BlurSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}
           />
         )}
-
         {activeTool === "arrow" && (
           <ArrowSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}
           />
         )}
-
         {activeTool === "shapes" && (
           <ShapesSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}
           />
         )}
-
         {activeTool === "emoji" && (
           <EmojiSettings
             emoji={toolSettings.emoji}
@@ -202,6 +191,7 @@ export function ToolsSidebar({
           "stamp",
           "compress",
           "crop",
+          "brush",
           "blur",
           "arrow",
           "shapes",
@@ -219,7 +209,6 @@ export function ToolsSidebar({
         )}
       </div>
 
-      {/* Export */}
       <div className="p-4 border-t border-border">
         <button
           onClick={onExport}
@@ -230,7 +219,6 @@ export function ToolsSidebar({
         </button>
       </div>
 
-      {/* Undo / Redo */}
       <div className="px-4 pb-4 flex gap-2">
         <button
           onClick={onUndo}

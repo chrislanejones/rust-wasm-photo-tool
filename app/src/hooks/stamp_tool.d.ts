@@ -91,5 +91,13 @@ declare module "stamp_tool" {
       dest_x: number,
       dest_y: number,
     ): void;
+
+    // ── Paint / Brush (WASM) ──
+    /** Save undo snapshot before a paint stroke. */
+    paint_begin(): void;
+    /** Paint a single dab at (cx, cy) with given radius, color, opacity (0–1). */
+    paint_dab(cx: number, cy: number, radius: number, r: number, g: number, b: number, opacity: number): void;
+    /** Paint a line of dabs from (x0,y0) to (x1,y1) for smooth strokes. */
+    paint_stroke_to(x0: number, y0: number, x1: number, y1: number, radius: number, r: number, g: number, b: number, opacity: number): void;
   }
 }

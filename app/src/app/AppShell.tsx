@@ -5,6 +5,7 @@ import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
 import { useDrawingTools } from "@/hooks/useDrawingTools";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
+import { usePaintTool } from "@/hooks/usePaintTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition } from "@/lib/animations";
@@ -45,6 +46,9 @@ export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stamp = useCloneStamp(canvasRef);
 
+  // NOTE: stamp.syncState and stamp.flushToCanvas must be exported
+  // from useCloneStamp (see USE_CLONE_STAMP_PATCH.txt)
+
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     brushSize: 20,
     hardness: 0.8,
@@ -70,14 +74,14 @@ export function AppShell() {
 
   const handleAddPhotos = useCallback(
     (files: File[]) => {
-      const newEntries: PhotoEntry[] = files.map((file) => ({
+      const entries: PhotoEntry[] = files.map((f) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        url: URL.createObjectURL(file),
-        name: file.name.replace(/\.[^.]+$/, ""),
-        file,
+        url: URL.createObjectURL(f),
+        name: f.name.replace(/\.[^.]+$/, ""),
+        file: f,
       }));
-      setPhotos((prev) => [...prev, ...newEntries]);
-      const first = newEntries[0];
+      setPhotos((prev) => [...prev, ...entries]);
+      const first = entries[0];
       if (first) {
         stamp.loadImage(first.file);
         setActivePhotoId(first.id);
@@ -187,26 +191,11 @@ export function AppShell() {
     setCompareActive(false);
   }, [photos]);
 
-  /* ── Flush WASM → Canvas ── */
-  const flushCanvasFromTool = useCallback(() => {
-    const t = stamp.toolRef.current;
-    const canvas = canvasRef.current;
-    if (!t || !canvas) return;
-    if (canvas.width !== t.width() || canvas.height !== t.height()) {
-      canvas.width = t.width();
-      canvas.height = t.height();
-    }
-    const ctx = canvas.getContext("2d")!;
-    ctx.putImageData(
-      new ImageData(
-        new Uint8ClampedArray(t.get_image_data()),
-        t.width(),
-        t.height(),
-      ),
-      0,
-      0,
-    );
-  }, [stamp.toolRef]);
+  /* ── Flush + Sync helpers ── */
+  const flushAndSync = useCallback(() => {
+    stamp.flushToCanvas();
+    stamp.syncState();
+  }, [stamp]);
 
   /* ── Blur tool ── */
   const isBlurringRef = useRef(false);
@@ -233,15 +222,9 @@ export function AppShell() {
         toolSettings.blurSize / 2,
         toolSettings.blurIntensity,
       );
-      flushCanvasFromTool();
+      stamp.flushToCanvas();
     },
-    [
-      stamp.toolRef,
-      getCoords,
-      flushCanvasFromTool,
-      toolSettings.blurSize,
-      toolSettings.blurIntensity,
-    ],
+    [stamp, getCoords, toolSettings.blurSize, toolSettings.blurIntensity],
   );
 
   const blurOnMouseMove = useCallback(
@@ -256,37 +239,42 @@ export function AppShell() {
         toolSettings.blurSize / 2,
         toolSettings.blurIntensity,
       );
-      flushCanvasFromTool();
+      stamp.flushToCanvas();
     },
-    [
-      stamp.toolRef,
-      getCoords,
-      flushCanvasFromTool,
-      toolSettings.blurSize,
-      toolSettings.blurIntensity,
-    ],
+    [stamp, getCoords, toolSettings.blurSize, toolSettings.blurIntensity],
   );
 
   const blurOnMouseUp = useCallback(() => {
+    if (!isBlurringRef.current) return;
     isBlurringRef.current = false;
-  }, []);
+    stamp.syncState(); // ← updates history panel
+  }, [stamp]);
 
-  /* ── Arrow / Shapes / Crop ── */
+  /* ── Arrow / Shapes / Crop — syncState called inside useDrawingTools via flushToCanvas wrapper ── */
   const drawingTools = useDrawingTools({
     toolRef: stamp.toolRef,
     canvasRef,
     activeTool,
     settings: toolSettings,
-    flushToCanvas: flushCanvasFromTool,
+    flushToCanvas: flushAndSync, // ← flush + sync so history updates
   });
 
   /* ── Emoji tool ── */
   const emojiTool = useEmojiTool({
     toolRef: stamp.toolRef,
     canvasRef,
-    flushToCanvas: flushCanvasFromTool,
+    flushToCanvas: flushAndSync, // ← flush + sync
     emoji: toolSettings.emoji,
     emojiSize: toolSettings.emojiSize,
+  });
+
+  /* ── Paint tool ── */
+  const paintTool = usePaintTool({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    settings: toolSettings,
+    flushToCanvas: stamp.flushToCanvas,
+    syncState: stamp.syncState,
   });
 
   /* ── Route mouse events ── */
@@ -311,6 +299,13 @@ export function AppShell() {
         onMouseDown: emojiTool.onMouseDown as typeof stamp.onMouseDown,
         onMouseMove: emojiTool.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: emojiTool.onMouseUp as typeof stamp.onMouseUp,
+      };
+    if (activeTool === "brush")
+      return {
+        ...stamp,
+        onMouseDown: paintTool.onMouseDown as typeof stamp.onMouseDown,
+        onMouseMove: paintTool.onMouseMove as typeof stamp.onMouseMove,
+        onMouseUp: paintTool.onMouseUp as typeof stamp.onMouseUp,
       };
     return stamp;
   })();
@@ -370,7 +365,6 @@ export function AppShell() {
     setHasBeenModified(true);
   }, [photos, quality, exportFormat, compressAll]);
 
-  /* ── Copy to clipboard ── */
   const handleCopyToClipboard = useCallback(async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -464,7 +458,6 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      {/* ── Main canvas with right-click context menu ── */}
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <motion.main
@@ -488,26 +481,21 @@ export function AppShell() {
             />
           </motion.main>
         </ContextMenuTrigger>
-
         <ContextMenuContent className="w-56">
           <ContextMenuItem onClick={handleCopyToClipboard} disabled={!hasImage}>
-            <Clipboard className="mr-2 h-4 w-4" /> Copy to Clipboard
+            <Clipboard className="mr-2 h-4 w-4" /> Copy to Clipboard{" "}
             <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
           </ContextMenuItem>
-
           <ContextMenuSeparator />
-
           <ContextMenuItem disabled={!canUndo} onSelect={stamp.undo}>
-            <Undo className="mr-2 h-4 w-4" /> Undo
+            <Undo className="mr-2 h-4 w-4" /> Undo{" "}
             <ContextMenuShortcut>Ctrl+Z</ContextMenuShortcut>
           </ContextMenuItem>
           <ContextMenuItem disabled={!canRedo} onSelect={stamp.redo}>
-            <Redo className="mr-2 h-4 w-4" /> Redo
+            <Redo className="mr-2 h-4 w-4" /> Redo{" "}
             <ContextMenuShortcut>Ctrl+Shift+Z</ContextMenuShortcut>
           </ContextMenuItem>
-
           <ContextMenuSeparator />
-
           <ContextMenuItem
             onSelect={handleZoomOut}
             disabled={stamp.state.zoom <= 0.25}
@@ -523,23 +511,19 @@ export function AppShell() {
           <ContextMenuItem onSelect={() => stamp.toolRef.current?.set_zoom(1)}>
             <RotateCcw className="mr-2 h-4 w-4" /> Reset Zoom
           </ContextMenuItem>
-
           <ContextMenuSeparator />
-
           <ContextMenuItem onSelect={handleExport} disabled={!hasImage}>
             <Download className="mr-2 h-4 w-4" /> Export{" "}
-            {exportFormat.toUpperCase()}
+            {exportFormat.toUpperCase()}{" "}
             <ContextMenuShortcut>Alt+E</ContextMenuShortcut>
           </ContextMenuItem>
-
           <ContextMenuSeparator />
-
           <ContextMenuItem
             onSelect={handleDeleteAll}
             disabled={photos.length === 0}
             className="text-red-400 focus:text-red-400"
           >
-            <Trash2 className="mr-2 h-4 w-4" /> Delete All
+            <Trash2 className="mr-2 h-4 w-4" /> Delete All{" "}
             <ContextMenuShortcut>Alt+D</ContextMenuShortcut>
           </ContextMenuItem>
         </ContextMenuContent>

@@ -434,6 +434,95 @@ impl CloneStampTool {
             dest_y,
         );
     }
+     // ── Paint / Brush Tool ──────────────────────────────────────
+    // Freehand painting with configurable color, size, opacity.
+    // Uses the same dab-based approach as clone stamp but fills
+    // with a solid color instead of sampling from a source.
+ 
+    /// Begin a paint stroke — saves undo snapshot
+    pub fn paint_begin(&mut self) {
+        self.hist.push_snapshot("Paint", &self.buf.data);
+    }
+ 
+    /// Paint a single dab at (cx, cy) with given color, size, opacity.
+    /// color is [r, g, b, a] packed as u32: 0xRRGGBBAA
+    pub fn paint_dab(
+        &mut self,
+        cx: f64,
+        cy: f64,
+        radius: f64,
+        r: u8, g: u8, b: u8,
+        opacity: f64,
+    ) {
+        let w = self.buf.width as i32;
+        let h = self.buf.height as i32;
+        let data = &mut self.buf.data;
+        let alpha = opacity.clamp(0.0, 1.0);
+ 
+        let min_x = ((cx - radius).floor() as i32).max(0);
+        let max_x = ((cx + radius).ceil() as i32).min(w - 1);
+        let min_y = ((cy - radius).floor() as i32).max(0);
+        let max_y = ((cy + radius).ceil() as i32).min(h - 1);
+ 
+        for py in min_y..=max_y {
+            for px in min_x..=max_x {
+                let dx = px as f64 - cx;
+                let dy = py as f64 - cy;
+                let dist = (dx * dx + dy * dy).sqrt();
+                if dist > radius { continue; }
+ 
+                // Soft edge falloff
+                let edge = if radius > 1.0 {
+                    let norm = dist / radius;
+                    if norm < 0.7 { 1.0 } else {
+                        let t = (norm - 0.7) / 0.3;
+                        (1.0 - t * t).max(0.0)
+                    }
+                } else {
+                    1.0
+                };
+ 
+                let a = alpha * edge;
+                let idx = ((py * w + px) * 4) as usize;
+                if idx + 3 >= data.len() { continue; }
+ 
+                // Alpha blend
+                for c in 0..3usize {
+                    let src = [r, g, b][c] as f64;
+                    let dst = data[idx + c] as f64;
+                    data[idx + c] = (dst + (src - dst) * a).round().clamp(0.0, 255.0) as u8;
+                }
+                // Keep dest alpha at max
+                let da = data[idx + 3] as f64 / 255.0;
+                let out_a = a + da * (1.0 - a);
+                data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+            }
+        }
+    }
+ 
+    /// Paint a line of dabs from (x0,y0) to (x1,y1) with spacing.
+    /// Call this on mousemove for smooth strokes.
+    pub fn paint_stroke_to(
+        &mut self,
+        x0: f64, y0: f64,
+        x1: f64, y1: f64,
+        radius: f64,
+        r: u8, g: u8, b: u8,
+        opacity: f64,
+    ) {
+        let dx = x1 - x0;
+        let dy = y1 - y0;
+        let dist = (dx * dx + dy * dy).sqrt();
+        let step = (radius * 0.25).max(1.0);
+        let steps = (dist / step).ceil() as u32;
+ 
+        for i in 0..=steps {
+            let t = if steps == 0 { 1.0 } else { i as f64 / steps as f64 };
+            let cx = x0 + dx * t;
+            let cy = y0 + dy * t;
+            self.paint_dab(cx, cy, radius, r, g, b, opacity);
+        }
+    }
  
  
 }

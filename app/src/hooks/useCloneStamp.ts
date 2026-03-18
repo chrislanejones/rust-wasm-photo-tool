@@ -492,7 +492,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     state,
     toolRef,
     // Core
+    syncState,
     loadImage,
+    flushToCanvas,
     setBrushSize,
     setHardness,
     setOpacity,
