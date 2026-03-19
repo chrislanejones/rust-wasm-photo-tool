@@ -10,7 +10,6 @@ import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition } from "@/lib/animations";
-
 import { TopBar } from "@/components/TopBar";
 import { StatusBar } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
@@ -21,7 +20,6 @@ import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
-
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -53,6 +51,7 @@ export function AppShell() {
     hardness: 0.8,
     opacity: 1.0,
   });
+
   const handleStampSettingsChange = useCallback(
     (s: StampSettings) => {
       setStampSettings(s);
@@ -65,15 +64,19 @@ export function AppShell() {
 
   const [toolSettings, setToolSettings] =
     useState<ToolSettings>(defaultToolSettings);
+
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
   const [hasBeenModified, setHasBeenModified] = useState(false);
-
-  // ── Text memory ──
   const [recentTexts, setRecentTexts] = useState<TextMemory[]>([]);
   const textIdCounter = useRef(0);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+
+  // FIX #2: Loading progress state
+  const [loadProgress, setLoadProgress] = useState(0);
+  const loadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleTextCommit = useCallback(
     (text: string) => {
@@ -112,7 +115,38 @@ export function AppShell() {
     );
   }, []);
 
-  // ── Photo management ──
+  // FIX #2: Loading bar with progress simulation
+  const loadImageWithProgress = useCallback(
+    (file: File) => {
+      setIsImageLoading(true);
+      setLoadProgress(0);
+      if (loadIntervalRef.current) clearInterval(loadIntervalRef.current);
+      loadIntervalRef.current = setInterval(() => {
+        setLoadProgress((prev) => {
+          if (prev >= 90) return 90;
+          return prev + Math.random() * 15;
+        });
+      }, 100);
+      stamp.loadImage(file);
+    },
+    [stamp],
+  );
+
+  useEffect(() => {
+    if (stamp.state.ready && isImageLoading) {
+      if (loadIntervalRef.current) {
+        clearInterval(loadIntervalRef.current);
+        loadIntervalRef.current = null;
+      }
+      setLoadProgress(100);
+      const t = setTimeout(() => {
+        setIsImageLoading(false);
+        setLoadProgress(0);
+      }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [stamp.state.ready, isImageLoading]);
+
   const handleAddPhotos = useCallback(
     (files: File[]) => {
       const entries: PhotoEntry[] = files.map((f) => ({
@@ -122,27 +156,28 @@ export function AppShell() {
         file: f,
       }));
       setPhotos((prev) => [...prev, ...entries]);
+
       const first = entries[0];
       if (first) {
-        stamp.loadImage(first.file);
+        loadImageWithProgress(first.file);
         setActivePhotoId(first.id);
         setOriginalUrl(first.url);
         setHasBeenModified(false);
         setCompareActive(false);
       }
     },
-    [stamp],
+    [loadImageWithProgress],
   );
 
   const handleSelectPhoto = useCallback(
     (entry: PhotoEntry) => {
-      stamp.loadImage(entry.file);
+      loadImageWithProgress(entry.file);
       setActivePhotoId(entry.id);
       setOriginalUrl(entry.url);
       setHasBeenModified(false);
       setCompareActive(false);
     },
-    [stamp],
+    [loadImageWithProgress],
   );
 
   const handleRemovePhoto = useCallback(
@@ -152,9 +187,10 @@ export function AppShell() {
         const next = prev.filter((p) => p.id !== id);
         const removed = prev[idx];
         if (removed) URL.revokeObjectURL(removed.url);
+
         if (id === activePhotoId && next.length > 0) {
           const na = next[Math.min(idx, next.length - 1)]!;
-          stamp.loadImage(na.file);
+          loadImageWithProgress(na.file);
           setActivePhotoId(na.id);
           setOriginalUrl(na.url);
           setHasBeenModified(false);
@@ -168,23 +204,39 @@ export function AppShell() {
         return next;
       });
     },
-    [activePhotoId, stamp],
+    [activePhotoId, loadImageWithProgress],
   );
-
-  const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
-    useBrushPreview(stampSettings.brushSize, stamp.state.zoom, canvasRef);
 
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
   const [showTools, setShowTools] = useState(true);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showKbdHints, setShowKbdHints] = useState(false);
+  const [showKbdHints, setShowKbdHints] = useState(true);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("jpeg");
   const [quality, setQuality] = useState(75);
+
+  // Effective brush size for preview cursor — matches actual tool radius
+  const effectiveBrushSize = (() => {
+    switch (activeTool) {
+      case "brush":
+        return toolSettings.brushSize / 2;
+      case "emoji":
+        return (toolSettings.emojiSize * 1.2) / 2;
+      case "blur":
+        return toolSettings.blurSize / 2;
+      case "stamp":
+      default:
+        return stampSettings.brushSize;
+    }
+  })();
+
+  const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
+    useBrushPreview(effectiveBrushSize, stamp.state.zoom, canvasRef);
+
   const handleQualityChange = useCallback((q: number) => {
     setQuality(q);
     setHasBeenModified(true);
@@ -196,6 +248,7 @@ export function AppShell() {
   useEffect(() => {
     const prev = prevPhotoCount.current;
     const curr = photos.length;
+
     if (prev === 0 && curr > 0) {
       setShowUpload(false);
       const t1 = setTimeout(() => setShowTopBar(true), 150);
@@ -208,6 +261,7 @@ export function AppShell() {
         clearTimeout(t3);
       };
     }
+
     if (curr === 0) {
       setShowUpload(true);
       setShowTopBar(false);
@@ -215,6 +269,7 @@ export function AppShell() {
       setShowGallery(false);
       setShowHistory(false);
     }
+
     prevPhotoCount.current = curr;
     return undefined;
   }, [photos.length]);
@@ -222,13 +277,29 @@ export function AppShell() {
   const handleExport = useCallback(() => {
     stamp.exportAs(exportFormat, quality / 100);
   }, [stamp, exportFormat, quality]);
+
+  // Delete all — clear canvas, reset all state, show upload dialog
   const handleDeleteAll = useCallback(() => {
-    photos.forEach((p) => URL.revokeObjectURL(p.url));
-    setPhotos([]);
+    const toRevoke = photos.map((p) => p.url);
+
+    // Clear canvas pixels so last image doesn't linger
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+
     setActivePhotoId(null);
     setOriginalUrl(null);
     setHasBeenModified(false);
     setCompareActive(false);
+    setPhotos([]); // triggers the effect that shows upload + hides panels
+
+    requestAnimationFrame(() => {
+      toRevoke.forEach((url) => URL.revokeObjectURL(url));
+    });
   }, [photos]);
 
   const flushAndSync = useCallback(() => {
@@ -236,8 +307,8 @@ export function AppShell() {
     stamp.syncState();
   }, [stamp]);
 
-  // ── Blur ──
   const isBlurringRef = useRef(false);
+
   const getCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const c = canvasRef.current;
     if (!c) return { x: 0, y: 0 };
@@ -289,7 +360,6 @@ export function AppShell() {
     stamp.syncState();
   }, [stamp]);
 
-  // ── Arrow / Shapes / Crop ──
   const drawingTools = useDrawingTools({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -298,7 +368,6 @@ export function AppShell() {
     flushToCanvas: flushAndSync,
   });
 
-  // ── Emoji ──
   const emojiTool = useEmojiTool({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -307,7 +376,6 @@ export function AppShell() {
     emojiSize: toolSettings.emojiSize,
   });
 
-  // ── Paint ──
   const paintTool = usePaintTool({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -316,7 +384,6 @@ export function AppShell() {
     syncState: stamp.syncState,
   });
 
-  // ── Text ──
   const textTool = useTextTool({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -327,7 +394,6 @@ export function AppShell() {
     active: activeTool === "text",
   });
 
-  // ── Route mouse events ──
   const effectiveStamp = (() => {
     if (activeTool === "blur")
       return {
@@ -357,10 +423,38 @@ export function AppShell() {
         onMouseMove: paintTool.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: paintTool.onMouseUp as typeof stamp.onMouseUp,
       };
-    // text tool handles its own click via CanvasArea's onClick prop
     return stamp;
   })();
 
+  // Zoom handlers
+  const handleZoomIn = useCallback(() => {
+    stamp.toolRef.current?.adjust_zoom(1);
+    stamp.syncState();
+  }, [stamp]);
+
+  const handleZoomOut = useCallback(() => {
+    stamp.toolRef.current?.adjust_zoom(-1);
+    stamp.syncState();
+  }, [stamp]);
+
+  const handleZoomReset = useCallback(() => {
+    stamp.toolRef.current?.set_zoom(1.0);
+    stamp.syncState();
+  }, [stamp]);
+
+  const handleCopyToClipboard = useCallback(async () => {
+    const c = canvasRef.current;
+    if (!c) return;
+    try {
+      const b = await new Promise<Blob | null>((r) =>
+        c.toBlob((v) => r(v), "image/png"),
+      );
+      if (b)
+        await navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]);
+    } catch {}
+  }, []);
+
+  // Keyboard shortcuts — all of them
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
@@ -374,19 +468,20 @@ export function AppShell() {
     setShowHistory,
     setShowKbdHints,
     setShowShortcutModal,
+    onZoomIn: handleZoomIn,
+    onZoomOut: handleZoomOut,
+    onZoomReset: handleZoomReset,
+    onToolChange: setActiveTool,
+    onFlipH: stamp.flipHorizontal,
+    onFlipV: stamp.flipVertical,
+    onRotateCw: stamp.rotate90Cw,
+    onCopyToClipboard: handleCopyToClipboard,
   });
 
-  const handleZoomIn = useCallback(() => {
-    stamp.toolRef.current?.adjust_zoom(1);
-    stamp.syncState();
-  }, [stamp]);
-  const handleZoomOut = useCallback(() => {
-    stamp.toolRef.current?.adjust_zoom(-1);
-    stamp.syncState();
-  }, [stamp]);
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
   }, []);
+
   const handleResize = useCallback(
     (w: number, h: number) => {
       stamp.resize(w, h);
@@ -404,7 +499,7 @@ export function AppShell() {
         quality: quality / 100,
         format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
       },
-      (id, nf, nu) => {
+      (id: string, nf: File, nu: string) => {
         setPhotos((p) =>
           p.map((x) => {
             if (x.id !== id) return x;
@@ -417,28 +512,42 @@ export function AppShell() {
     setHasBeenModified(true);
   }, [photos, quality, exportFormat, compressAll]);
 
-  const handleCopyToClipboard = useCallback(async () => {
-    const c = canvasRef.current;
-    if (!c) return;
-    try {
-      const b = await new Promise<Blob | null>((r) =>
-        c.toBlob((v) => r(v), "image/png"),
-      );
-      if (b)
-        await navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]);
-    } catch {}
-  }, []);
-
   const hasImage = stamp.state.ready;
   const canUndo = stamp.state.undoCount > 0;
   const canRedo = stamp.state.redoCount > 0;
 
   return (
     <div className="app-shell">
+      {/* Global loading bar — fixed at very top of screen */}
+      <AnimatePresence>
+        {isImageLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed top-0 left-0 right-0 z-100 h-1 bg-bg-elevated"
+          >
+            <motion.div
+              className="h-full bg-linear-to-r from-accent via-accent to-accent/60 rounded-r-full"
+              initial={{ width: "0%" }}
+              animate={{ width: `${Math.min(loadProgress, 100)}%` }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <UploadDialog
         open={showUpload}
         onClose={() => setShowUpload(false)}
         onFiles={handleAddPhotos}
+        isLoading={isImageLoading}
+        loadProgress={loadProgress}
+      />
+
+      <ShortcutModal
+        open={showShortcutModal}
+        onClose={() => setShowShortcutModal(false)}
       />
 
       <AnimatePresence>
@@ -481,6 +590,7 @@ export function AppShell() {
             onExport={handleExport}
             canExport={hasImage}
             exportFormat={exportFormat}
+            onExportFormatChange={setExportFormat}
             onFlipH={stamp.flipHorizontal}
             onFlipV={stamp.flipVertical}
             onRotate90Cw={stamp.rotate90Cw}
@@ -516,83 +626,97 @@ export function AppShell() {
             }}
             transition={panelSpacingTransition}
             className="main-content"
+            style={{ position: "relative" }}
           >
-            <CanvasArea
-              ref={canvasRef}
-              hookResult={effectiveStamp}
-              brushDiameter={diameter}
-              cursorPos={pos}
-              cursorVisible={visible}
-              onCanvasEnter={onCanvasEnter}
-              onCanvasLeave={onCanvasLeave}
-              beforeUrl={originalUrl}
-              compareActive={compareActive}
-              activeTool={activeTool}
-              containerRef={containerRef}
-              textInput={textTool.textInput}
-              textareaRef={textTool.textareaRef}
-              onCanvasClick={textTool.onCanvasClick}
-              onTextKeyDown={textTool.onTextKeyDown}
-              onTextChange={textTool.onTextChange}
-              onTextBlur={textTool.onTextBlur}
-              textSettings={{
-                fontSize: toolSettings.fontSize,
-                fontWeight: toolSettings.fontWeight,
-                textColor: toolSettings.textColor,
-              }}
-            />
+            {/* Only show canvas when we have photos */}
+            {photos.length > 0 ? (
+              <CanvasArea
+                ref={canvasRef}
+                hookResult={effectiveStamp}
+                brushDiameter={diameter}
+                cursorPos={pos}
+                cursorVisible={visible}
+                onCanvasEnter={onCanvasEnter}
+                onCanvasLeave={onCanvasLeave}
+                beforeUrl={originalUrl}
+                compareActive={compareActive}
+                activeTool={activeTool}
+                textInput={textTool.textInput}
+                textareaRef={textTool.textareaRef}
+                onCanvasClick={textTool.onCanvasClick}
+                onTextKeyDown={textTool.onTextKeyDown}
+                onTextChange={textTool.onTextChange}
+                onTextBlur={textTool.onTextBlur}
+                textSettings={{
+                  fontSize: toolSettings.fontSize,
+                  fontWeight: toolSettings.fontWeight,
+                  textColor: toolSettings.textColor,
+                }}
+                containerRef={containerRef}
+              />
+            ) : (
+              /* Empty state — shown after delete all or before first upload */
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-bg-elevated/50 border border-border/50 flex items-center justify-center">
+                    <span className="text-3xl">🐴</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-text-muted font-medium">
+                      No images loaded
+                    </p>
+                    <p className="text-xs text-text-muted/60 mt-1">
+                      Press{" "}
+                      <kbd className="px-1.5 py-0.5 rounded bg-bg-elevated border border-border text-[10px] font-mono">
+                        Alt+U
+                      </kbd>{" "}
+                      to upload
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.main>
         </ContextMenuTrigger>
+
         <ContextMenuContent className="w-56">
-          <ContextMenuItem onClick={handleCopyToClipboard} disabled={!hasImage}>
-            <Clipboard className="mr-2 h-4 w-4" /> Copy to Clipboard{" "}
-            <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem disabled={!canUndo} onSelect={stamp.undo}>
-            <Undo className="mr-2 h-4 w-4" /> Undo{" "}
+          <ContextMenuItem onClick={stamp.undo} disabled={!canUndo}>
+            <Undo className="h-4 w-4 mr-2" /> Undo
             <ContextMenuShortcut>Ctrl+Z</ContextMenuShortcut>
           </ContextMenuItem>
-          <ContextMenuItem disabled={!canRedo} onSelect={stamp.redo}>
-            <Redo className="mr-2 h-4 w-4" /> Redo{" "}
-            <ContextMenuShortcut>Ctrl+⇧+Z</ContextMenuShortcut>
+          <ContextMenuItem onClick={stamp.redo} disabled={!canRedo}>
+            <Redo className="h-4 w-4 mr-2" /> Redo
+            <ContextMenuShortcut>Ctrl+Shift+Z</ContextMenuShortcut>
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem
-            onSelect={handleZoomOut}
-            disabled={stamp.state.zoom <= 0.25}
-          >
-            <ZoomOut className="mr-2 h-4 w-4" /> Zoom Out{" "}
-            <ContextMenuShortcut>Alt+−</ContextMenuShortcut>
+          <ContextMenuItem onClick={handleCopyToClipboard} disabled={!hasImage}>
+            <Clipboard className="h-4 w-4 mr-2" /> Copy to Clipboard
+            <ContextMenuShortcut>Ctrl+Shift+C</ContextMenuShortcut>
           </ContextMenuItem>
-          <ContextMenuItem
-            onSelect={handleZoomIn}
-            disabled={stamp.state.zoom >= 4}
-          >
-            <ZoomIn className="mr-2 h-4 w-4" /> Zoom In{" "}
-            <ContextMenuShortcut>Alt+=</ContextMenuShortcut>
-          </ContextMenuItem>
-          <ContextMenuItem
-            onSelect={() => {
-              stamp.toolRef.current?.set_zoom(1);
-              stamp.syncState();
-            }}
-          >
-            <RotateCcw className="mr-2 h-4 w-4" /> Reset Zoom
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={handleExport} disabled={!hasImage}>
-            <Download className="mr-2 h-4 w-4" /> Export{" "}
-            {exportFormat.toUpperCase()}{" "}
+          <ContextMenuItem onClick={handleExport} disabled={!hasImage}>
+            <Download className="h-4 w-4 mr-2" /> Export{" "}
+            {exportFormat.toUpperCase()}
             <ContextMenuShortcut>Alt+E</ContextMenuShortcut>
           </ContextMenuItem>
           <ContextMenuSeparator />
+          <ContextMenuItem onClick={handleZoomIn}>
+            <ZoomIn className="h-4 w-4 mr-2" /> Zoom In
+            <ContextMenuShortcut>Alt+=</ContextMenuShortcut>
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleZoomOut}>
+            <ZoomOut className="h-4 w-4 mr-2" /> Zoom Out
+            <ContextMenuShortcut>Alt+-</ContextMenuShortcut>
+          </ContextMenuItem>
+          <ContextMenuItem onClick={stamp.flipHorizontal} disabled={!hasImage}>
+            <RotateCcw className="h-4 w-4 mr-2" /> Flip Horizontal
+          </ContextMenuItem>
+          <ContextMenuSeparator />
           <ContextMenuItem
-            onSelect={handleDeleteAll}
+            onClick={handleDeleteAll}
             disabled={photos.length === 0}
             className="text-red-400 focus:text-red-400"
           >
-            <Trash2 className="mr-2 h-4 w-4" /> Delete All{" "}
+            <Trash2 className="h-4 w-4 mr-2" /> Delete All
             <ContextMenuShortcut>Alt+D</ContextMenuShortcut>
           </ContextMenuItem>
         </ContextMenuContent>
@@ -608,7 +732,7 @@ export function AppShell() {
             onClose={() => setShowGallery(false)}
             showTools={showTools}
             showHistory={showHistory}
-            compressionProgress={compressProgress.items}
+            compressionProgress={compressProgress.items ?? {}}
             compressionSavings={compressProgress.savings}
           />
         )}
@@ -626,16 +750,29 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      <ShortcutModal
-        open={showShortcutModal}
-        onClose={() => setShowShortcutModal(false)}
-      />
       <StatusBar
         state={stamp.state}
         imageCount={photos.length}
         showKbdHints={showKbdHints}
         activeTool={activeTool}
       />
+
+      {/* Brush cursor */}
+      {visible &&
+        (activeTool === "stamp" ||
+          activeTool === "blur" ||
+          activeTool === "brush" ||
+          activeTool === "emoji") && (
+          <div
+            className="brush-cursor"
+            style={{
+              left: pos.x,
+              top: pos.y,
+              width: diameter,
+              height: diameter,
+            }}
+          />
+        )}
     </div>
   );
 }

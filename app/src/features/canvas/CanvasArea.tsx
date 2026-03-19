@@ -30,6 +30,20 @@ interface Props {
   containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
+// Fix #6: map tool → cursor
+function getCursorForTool(tool?: string): string | undefined {
+  switch (tool) {
+    case "text":
+      return "text";
+    case "crop":
+    case "arrow":
+    case "shapes":
+      return "crosshair";
+    default:
+      return undefined; // default cursor (or brush preview handles it)
+  }
+}
+
 export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
   (
     {
@@ -70,6 +84,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
     const zoom = state.zoom;
     const isTextTool = activeTool === "text";
+    const cursor = getCursorForTool(activeTool);
 
     return (
       <div
@@ -82,7 +97,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           style={{
             transform: zoom !== 1 ? `scale(${zoom})` : undefined,
             transformOrigin: "center center",
-            cursor: isTextTool ? "text" : undefined,
+            cursor,
           }}
           onMouseDown={isTextTool ? undefined : onMouseDown}
           onMouseMove={isTextTool ? undefined : onMouseMove}
@@ -94,36 +109,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           }
           onMouseOut={onCanvasLeave}
         />
-
         <CompareSlider beforeUrl={beforeUrl} active={compareActive} />
 
-        {/* Text input overlay */}
-        {isTextTool && textInput && (
-          <textarea
-            ref={textareaRef as React.RefObject<HTMLTextAreaElement>}
-            value={textInput.text}
-            onChange={onTextChange}
-            onKeyDown={onTextKeyDown}
-            onBlur={onTextBlur}
-            placeholder="Type text..."
-            className="absolute bg-transparent border-2 border-dashed border-accent outline-none resize-none overflow-hidden z-20"
-            style={{
-              left: textInput.screenX,
-              top: textInput.screenY,
-              minWidth: 120,
-              minHeight: (textSettings?.fontSize ?? 24) * 1.5,
-              fontSize: (textSettings?.fontSize ?? 24) * zoom,
-              fontWeight: textSettings?.fontWeight ?? "normal",
-              color: textSettings?.textColor ?? "#000000",
-              fontFamily: "sans-serif",
-              lineHeight: 1.3,
-              padding: "2px 4px",
-            }}
-            autoFocus
-          />
-        )}
-
-        {cursorVisible && !isTextTool && (
+        {/* Brush cursor */}
+        {cursorVisible && !isTextTool && !cursor && (
           <div
             className="brush-cursor"
             style={{
@@ -134,7 +123,48 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             }}
           />
         )}
-        {markerStyle && <div className="source-marker" style={markerStyle} />}
+
+        {/* Source marker */}
+        {markerStyle && (
+          <div
+            className="source-marker"
+            style={{
+              position: "fixed",
+              ...markerStyle,
+              width: 12,
+              height: 12,
+              transform: "translate(-50%, -50%)",
+              pointerEvents: "none",
+              zIndex: 999,
+            }}
+          />
+        )}
+
+        {/* Text input overlay */}
+        {textInput && textSettings && (
+          <textarea
+            ref={textareaRef}
+            value={textInput.text}
+            onChange={onTextChange}
+            onKeyDown={onTextKeyDown}
+            onBlur={onTextBlur}
+            placeholder="Type text…"
+            className="absolute bg-transparent border-2 border-dashed border-accent outline-none resize-none overflow-hidden"
+            style={{
+              left: textInput.screenX,
+              top: textInput.screenY,
+              minWidth: 100,
+              minHeight: textSettings.fontSize * 1.5,
+              fontSize: textSettings.fontSize * zoom,
+              fontWeight: textSettings.fontWeight,
+              color: textSettings.textColor,
+              fontFamily: "sans-serif",
+              lineHeight: 1.2,
+              padding: "2px 4px",
+            }}
+            autoFocus
+          />
+        )}
       </div>
     );
   },

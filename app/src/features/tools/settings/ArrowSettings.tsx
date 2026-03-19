@@ -64,7 +64,7 @@ export function ArrowSettings({ settings, onChange }: ArrowSettingsProps) {
 
         <div className="relative h-2 w-full rounded-full bg-theme-muted">
           <div
-            className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
+            className="absolute h-full rounded-full bg-linear-to-r from-theme-primary to-theme-chart4"
             style={{ width: `${((settings.strokeWidth - 1) / 9) * 100}%` }}
           />
           <input

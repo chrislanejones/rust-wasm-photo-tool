@@ -1,6 +1,19 @@
-// ===== FILE: app/src/app/useKeyboardShortcuts.ts =====
 import { useEffect } from "react";
-import type { StampSettings } from "@/lib/types";
+import type { StampSettings, ToolType } from "@/lib/types";
+
+/** All ten tools in toolbar order — keys 1-9, 0 */
+const TOOL_BY_DIGIT: Record<string, ToolType> = {
+  Digit1: "compress",
+  Digit2: "crop",
+  Digit3: "brush",
+  Digit4: "text",
+  Digit5: "arrow",
+  Digit6: "ai",
+  Digit7: "shapes",
+  Digit8: "blur",
+  Digit9: "stamp",
+  Digit0: "emoji",
+};
 
 interface KeyboardShortcutOptions {
   onUndo: () => void;
@@ -15,6 +28,18 @@ interface KeyboardShortcutOptions {
   setShowHistory: React.Dispatch<React.SetStateAction<boolean>>;
   setShowKbdHints: React.Dispatch<React.SetStateAction<boolean>>;
   setShowShortcutModal: React.Dispatch<React.SetStateAction<boolean>>;
+  // Zoom
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset?: () => void;
+  // Tool switching
+  onToolChange?: (tool: ToolType) => void;
+  // Transform shortcuts
+  onFlipH?: () => void;
+  onFlipV?: () => void;
+  onRotateCw?: () => void;
+  // Copy to clipboard
+  onCopyToClipboard?: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -30,9 +55,18 @@ export function useKeyboardShortcuts({
   setShowHistory,
   setShowKbdHints,
   setShowShortcutModal,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
+  onToolChange,
+  onFlipH,
+  onFlipV,
+  onRotateCw,
+  onCopyToClipboard,
 }: KeyboardShortcutOptions) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Skip when typing in inputs
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -40,74 +74,117 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // Ctrl/Cmd + Z / Shift+Z for undo/redo
+      // ─── Ctrl/Cmd combos ─────────────────────────────
       if (e.metaKey || e.ctrlKey) {
         if (e.key === "z" || e.key === "Z") {
           e.preventDefault();
-          if (e.shiftKey) {
-            onRedo();
-          } else {
-            onUndo();
-          }
+          e.shiftKey ? onRedo() : onUndo();
           return;
         }
-      }
-
-      if (!e.altKey) return;
-
-      // Alt + ? (Shift + /) → open shortcut modal
-      if (e.shiftKey && e.code === "Slash") {
-        e.preventDefault();
-        setShowShortcutModal((v) => !v);
+        // Ctrl+Shift+C → copy to clipboard
+        if (e.shiftKey && e.code === "KeyC") {
+          e.preventDefault();
+          onCopyToClipboard?.();
+          return;
+        }
         return;
       }
 
-      switch (e.code) {
-        case "KeyU":
+      // ─── Alt combos ──────────────────────────────────
+      if (e.altKey) {
+        // Alt+Shift+/ → shortcut modal
+        if (e.shiftKey && e.code === "Slash") {
           e.preventDefault();
-          setShowUpload((v) => !v);
-          break;
-        case "KeyS":
-          e.preventDefault();
-          setShowTools((v) => !v);
-          break;
-        case "KeyG":
-          e.preventDefault();
-          setShowGallery((v) => !v);
-          break;
-        case "KeyH":
-          e.preventDefault();
-          setShowHistory((v) => !v);
-          break;
-        case "Slash":
-          // Alt + / (no shift) → toggle inline KBD hints
-          e.preventDefault();
-          setShowKbdHints((v) => !v);
-          break;
-        case "BracketLeft":
-          e.preventDefault();
-          onBrushSizeChange((prev) => {
-            const next = Math.max(2, prev.brushSize - 5);
-            setBrushSizeOnTool(next);
-            return { ...prev, brushSize: next };
-          });
-          break;
-        case "BracketRight":
-          e.preventDefault();
-          onBrushSizeChange((prev) => {
-            const next = Math.min(200, prev.brushSize + 5);
-            setBrushSizeOnTool(next);
-            return { ...prev, brushSize: next };
-          });
-          break;
-        case "KeyE":
-          e.preventDefault();
-          onExport();
-          break;
-        case "KeyD":
-          e.preventDefault();
-          onDeleteAll();
-          break;
+          setShowShortcutModal((v) => !v);
+          return;
+        }
+
+        switch (e.code) {
+          // Panels
+          case "KeyU":
+            e.preventDefault();
+            setShowUpload((v) => !v);
+            break;
+          case "KeyS":
+            e.preventDefault();
+            setShowTools((v) => !v);
+            break;
+          case "KeyG":
+            e.preventDefault();
+            setShowGallery((v) => !v);
+            break;
+          case "KeyH":
+            e.preventDefault();
+            setShowHistory((v) => !v);
+            break;
+          case "Slash":
+            e.preventDefault();
+            setShowKbdHints((v) => !v);
+            break;
+
+          // Brush size
+          case "BracketLeft":
+            e.preventDefault();
+            onBrushSizeChange((prev) => {
+              const next = Math.max(2, prev.brushSize - 5);
+              setBrushSizeOnTool(next);
+              return { ...prev, brushSize: next };
+            });
+            break;
+          case "BracketRight":
+            e.preventDefault();
+            onBrushSizeChange((prev) => {
+              const next = Math.min(200, prev.brushSize + 5);
+              setBrushSizeOnTool(next);
+              return { ...prev, brushSize: next };
+            });
+            break;
+
+          // Zoom
+          case "Equal": // Alt + = / Alt + +
+            e.preventDefault();
+            onZoomIn();
+            break;
+          case "Minus": // Alt + -
+            e.preventDefault();
+            onZoomOut();
+            break;
+          case "Digit0": // Alt + 0 → reset zoom
+            e.preventDefault();
+            onZoomReset?.();
+            break;
+
+          // Transform
+          case "KeyF": // Alt + F → flip horizontal
+            e.preventDefault();
+            onFlipH?.();
+            break;
+          case "KeyV": // Alt + Shift + F would conflict, so Alt+V for vertical flip
+            e.preventDefault();
+            onFlipV?.();
+            break;
+          case "KeyR": // Alt + R → rotate 90° CW
+            e.preventDefault();
+            onRotateCw?.();
+            break;
+
+          // Actions
+          case "KeyE":
+            e.preventDefault();
+            onExport();
+            break;
+          case "KeyD":
+            e.preventDefault();
+            onDeleteAll();
+            break;
+        }
+        return;
+      }
+
+      // ─── Bare number keys → tool switching (no modifier) ──
+      if (onToolChange && e.code in TOOL_BY_DIGIT) {
+        e.preventDefault();
+        onToolChange(TOOL_BY_DIGIT[e.code]);
       }
     };
 
@@ -126,5 +203,13 @@ export function useKeyboardShortcuts({
     setShowHistory,
     setShowKbdHints,
     setShowShortcutModal,
+    onZoomIn,
+    onZoomOut,
+    onZoomReset,
+    onToolChange,
+    onFlipH,
+    onFlipV,
+    onRotateCw,
+    onCopyToClipboard,
   ]);
 }

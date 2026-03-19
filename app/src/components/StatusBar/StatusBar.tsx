@@ -55,7 +55,7 @@ const TOOL_HINTS: Record<string, { keys: string; action: string }[]> = {
 export function StatusBar({
   state,
   imageCount,
-  showKbdHints: _showKbdHints,
+  showKbdHints,
   activeTool = "stamp",
 }: Props) {
   const hints = TOOL_HINTS[activeTool] ?? TOOL_HINTS.stamp;
@@ -73,21 +73,25 @@ export function StatusBar({
         </span>
       </div>
 
-      {/* Center — dynamic tool hints */}
+      {/* Center — dynamic tool hints (toggle with Alt+/) */}
       <div className="status-section status-center">
-        {hints.map((hint, i) => (
-          <span key={i} className="status-shortcut-hint">
-            {i > 0 && <span className="status-divider" />}
-            <kbd>{hint.keys}</kbd> {hint.action}
-          </span>
-        ))}
-        <span className="status-divider" />
+        {showKbdHints && (
+          <>
+            {hints.map((hint, i) => (
+              <span key={i} className="status-shortcut-hint">
+                {i > 0 && <span className="status-divider" />}
+                <kbd>{hint.keys}</kbd> {hint.action}
+              </span>
+            ))}
+            <span className="status-divider" />
+            <span className="status-shortcut-hint">
+              <kbd>Alt+?</kbd> shortcuts
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
         <span className="status-shortcut-hint">
           <kbd>Alt+/</kbd> hints
-        </span>
-        <span className="status-divider" />
-        <span className="status-shortcut-hint">
-          <kbd>Alt+?</kbd> shortcuts
         </span>
       </div>
 

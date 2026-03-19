@@ -1,11 +1,3 @@
-// ===== FILE: app/src/hooks/useDrawingTools.ts =====
-// Arrow, shape, and crop tool mouse interactions.
-// - Live preview: JS canvas (restore snapshot + draw preview each frame)
-// - Final commit: WASM draw_arrow/draw_shape on the WASM buffer directly
-// - Key fix: NO load_image — that clears history. WASM buffer already has
-//   the current image state. We just call begin_draw_stroke (saves undo),
-//   then draw_arrow/draw_shape (modifies buffer), then flush to canvas.
-
 import { useCallback, useRef, useState } from "react";
 import type { ToolType, ToolSettings } from "@/lib/types";
 import type { CloneStampTool } from "stamp_tool";
@@ -65,12 +57,10 @@ export function useDrawingTools({
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext("2d");
       if (!canvas || !ctx) return;
-
       const p = getCoords(e);
       isDrawing.current = true;
       startPoint.current = p;
       lastPoint.current = p;
-      // Save JS canvas snapshot for live preview restore
       preSnapshot.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
     },
     [activeTool, canvasRef, getCoords],
@@ -83,12 +73,9 @@ export function useDrawingTools({
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext("2d");
       if (!canvas || !ctx) return;
-
       const p = getCoords(e);
       lastPoint.current = p;
       const start = startPoint.current;
-
-      // Restore clean canvas for preview
       ctx.putImageData(preSnapshot.current, 0, 0);
 
       if (activeTool === "arrow") {
@@ -129,11 +116,9 @@ export function useDrawingTools({
     [activeTool, canvasRef, getCoords, settings],
   );
 
-  // () => void to match stamp.onMouseUp
   const onMouseUp = useCallback(() => {
     if (!isDrawing.current || !startPoint.current) return;
     isDrawing.current = false;
-
     const tool = toolRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -141,7 +126,6 @@ export function useDrawingTools({
     const end = lastPoint.current ?? start;
 
     if (activeTool === "crop") {
-      // Restore clean image for crop selection display
       if (preSnapshot.current && ctx) {
         ctx.putImageData(preSnapshot.current, 0, 0);
       }
@@ -156,7 +140,6 @@ export function useDrawingTools({
           width: Math.round(w),
           height: Math.round(h),
         });
-        // Re-draw overlay so user sees the selection
         if (ctx && canvas) {
           ctx.fillStyle = "rgba(0,0,0,0.5)";
           ctx.fillRect(0, 0, canvas.width, y);
@@ -171,13 +154,6 @@ export function useDrawingTools({
         }
       }
     } else if (tool && (activeTool === "arrow" || activeTool === "shapes")) {
-      // ── KEY FIX: draw directly in WASM, no load_image ──
-      // The WASM buffer already has the current image pixels.
-      // 1. begin_draw_stroke saves undo snapshot from WASM buffer
-      // 2. draw_arrow/draw_shape modifies the WASM buffer in place
-      // 3. flushToCanvas copies WASM buffer → JS canvas
-      // No load_image needed (that would clear history!)
-
       if (activeTool === "arrow") {
         tool.begin_draw_stroke("Arrow");
         tool.draw_arrow(
@@ -190,10 +166,11 @@ export function useDrawingTools({
           settings.arrowStyle === "double" ? 1 : 0,
         );
       } else {
+        // Shape map: 0=rect, 1=circle, 2=line, 3=handCircle (Rust)
         const shapeMap: Record<string, number> = {
           rect: 0,
           circle: 1,
-          handCircle: 1,
+          handCircle: 3,
           line: 2,
         };
         tool.begin_draw_stroke("Shape");
@@ -207,10 +184,8 @@ export function useDrawingTools({
           settings.strokeWidth,
         );
       }
-
       flushToCanvas();
     }
-
     startPoint.current = null;
     lastPoint.current = null;
     preSnapshot.current = null;
@@ -235,12 +210,16 @@ export function useDrawingTools({
   };
 }
 
-/* ── JS Canvas Preview Helpers (lightweight, for drag feedback only) ── */
+/* ------------------------------------------------------------------ */
+/* JS preview functions (used during drag only, not committed)         */
+/* These run on Canvas2D for real-time feedback. The Rust commit        */
+/* happens in onMouseUp above via tool.draw_arrow / tool.draw_shape.   */
+/* ------------------------------------------------------------------ */
 
 function drawArrowPreview(
   ctx: CanvasRenderingContext2D,
-  from: Point,
-  to: Point,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
   color: string,
   width: number,
   style: "single" | "double",
@@ -281,14 +260,15 @@ function drawArrowPreview(
     ctx.closePath();
     ctx.fill();
   };
+
   drawHead(to.x, to.y, angle);
   if (style === "double") drawHead(from.x, from.y, angle + Math.PI);
 }
 
 function drawShapePreview(
   ctx: CanvasRenderingContext2D,
-  from: Point,
-  to: Point,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
   shape: string,
   color: string,
   width: number,
@@ -303,39 +283,72 @@ function drawShapePreview(
   const w = Math.abs(to.x - from.x);
   const h = Math.abs(to.y - from.y);
 
+  ctx.beginPath();
+
   switch (shape) {
     case "rect":
-      ctx.beginPath();
       ctx.strokeRect(x, y, w, h);
       break;
+
     case "circle": {
       const r = Math.min(w, h) / 2;
-      ctx.beginPath();
       ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
       ctx.stroke();
       break;
     }
+
     case "handCircle": {
+      // Hand-drawn circle preview — wobbly ellipse with tail
       const cx = x + w / 2;
       const cy = y + h / 2;
       const rx = w / 2;
       const ry = h / 2;
-      const pts = 50;
-      const seed = from.x * 7 + from.y * 13;
+      const points = 60;
+
+      const startOffset = (from.x * 31.17 + from.y * 47.53) % (Math.PI * 2);
+      const mainArc = Math.PI * 2 - Math.PI * 0.15;
+      const seed =
+        from.x * 31.17 + from.y * 47.53 + to.x * 13.91 + to.y * 67.37;
+
+      const getNoise = (angle: number) =>
+        Math.sin(angle * 2.3 + seed) * 3 +
+        Math.sin(angle * 1.1 + seed * 0.7) * 2 +
+        Math.cos(angle * 3.7 + seed * 1.3) * 1.5;
+
+      const tilt = (((seed * 1000) % 1000) / 1000 - 0.5) * 0.15;
+
+      // Tail
+      const tailLength = Math.PI * 0.3;
       ctx.beginPath();
-      for (let i = 0; i <= pts; i++) {
-        const a = (2 * Math.PI * i) / pts;
-        const noise = Math.sin(a * 3 + seed) * 3 + Math.cos(a * 5 + seed) * 2;
-        const px = cx + (rx + noise) * Math.cos(a);
-        const py = cy + (ry + noise) * Math.sin(a);
+      for (let i = 0; i <= 10; i++) {
+        const t = i / 10;
+        const angle = startOffset - tailLength * (1 - t);
+        const noise = getNoise(angle) * t;
+        const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
+        const inward = (1 - t) * (rx * 0.15);
+        const px =
+          cx + (rx * squeeze - inward + noise) * Math.cos(angle + tilt);
+        const py =
+          cy + (ry / squeeze - inward + noise) * Math.sin(angle + tilt);
         if (i === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
+      }
+
+      // Main circle
+      for (let i = 0; i <= points; i++) {
+        const t = i / points;
+        const angle = startOffset + t * mainArc;
+        const noise = getNoise(angle);
+        const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
+        const px = cx + (rx * squeeze + noise) * Math.cos(angle + tilt);
+        const py = cy + (ry / squeeze + noise) * Math.sin(angle + tilt);
+        ctx.lineTo(px, py);
       }
       ctx.stroke();
       break;
     }
+
     case "line":
-      ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(to.x, to.y);
       ctx.stroke();

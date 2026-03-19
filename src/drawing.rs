@@ -1,10 +1,5 @@
-// src/drawing.rs
-// Arrow and shape rendering — operates directly on RGBA pixel buffer.
-// These run in WASM so they're fast on large images.
-
 use std::f64::consts::PI;
 
-/// Draw a line between two points with given color and width (anti-aliased Bresenham).
 fn draw_line_thick(
     data: &mut [u8],
     w: i32,
@@ -18,21 +13,16 @@ fn draw_line_thick(
     let dy = y1 - y0;
     let dist = (dx * dx + dy * dy).sqrt();
     if dist < 0.5 { return; }
-
     let steps = (dist * 2.0).ceil() as i32;
     let half_w = width / 2.0;
-
     for i in 0..=steps {
         let t = i as f64 / steps as f64;
         let cx = x0 + dx * t;
         let cy = y0 + dy * t;
-
-        // Fill a circle at each step point
         let min_x = ((cx - half_w).floor() as i32).max(0);
         let max_x = ((cx + half_w).ceil() as i32).min(w - 1);
         let min_y = ((cy - half_w).floor() as i32).max(0);
         let max_y = ((cy + half_w).ceil() as i32).min(h - 1);
-
         for py in min_y..=max_y {
             for px in min_x..=max_x {
                 let ddx = px as f64 - cx;
@@ -48,7 +38,6 @@ fn draw_line_thick(
     }
 }
 
-/// Alpha-blend a pixel onto the buffer
 fn blend_pixel(data: &mut [u8], idx: usize, color: [u8; 4]) {
     let sa = color[3] as f64 / 255.0;
     if sa < 0.001 { return; }
@@ -65,7 +54,6 @@ fn blend_pixel(data: &mut [u8], idx: usize, color: [u8; 4]) {
     data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
 }
 
-/// Fill a triangle (for arrowheads)
 fn fill_triangle(
     data: &mut [u8],
     w: i32, h: i32,
@@ -74,12 +62,10 @@ fn fill_triangle(
     p2: (f64, f64),
     color: [u8; 4],
 ) {
-    // Bounding box
     let min_x = (p0.0.min(p1.0).min(p2.0).floor() as i32).max(0);
     let max_x = (p0.0.max(p1.0).max(p2.0).ceil() as i32).min(w - 1);
     let min_y = (p0.1.min(p1.1).min(p2.1).floor() as i32).max(0);
     let max_y = (p0.1.max(p1.1).max(p2.1).ceil() as i32).min(h - 1);
-
     for py in min_y..=max_y {
         for px in min_x..=max_x {
             let p = (px as f64 + 0.5, py as f64 + 0.5);
@@ -106,7 +92,6 @@ fn sign(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64)) -> f64 {
     (p1.0 - p3.0) * (p2.1 - p3.1) - (p2.0 - p3.0) * (p1.1 - p3.1)
 }
 
-/// Parse a CSS hex color like "#ef4444" → [r, g, b, 255]
 pub fn parse_hex_color(hex: &str) -> [u8; 4] {
     let hex = hex.trim_start_matches('#');
     if hex.len() < 6 { return [0, 0, 0, 255]; }
@@ -116,8 +101,6 @@ pub fn parse_hex_color(hex: &str) -> [u8; 4] {
     [r, g, b, 255]
 }
 
-/// Draw an arrow (single or double-headed) on the pixel buffer.
-/// style: 0 = single, 1 = double
 pub fn draw_arrow(
     data: &mut [u8],
     w: u32, h: u32,
@@ -132,11 +115,8 @@ pub fn draw_arrow(
     let head_length = (20.0f64).max(stroke_width * 3.0);
     let head_width = PI / 5.0;
     let angle = (to_y - from_y).atan2(to_x - from_x);
-
-    // Shorten line so it doesn't poke through the arrowhead
     let end_x = to_x - head_length * 0.5 * angle.cos();
     let end_y = to_y - head_length * 0.5 * angle.sin();
-
     let (start_x, start_y) = if style == 1 {
         (
             from_x + head_length * 0.5 * angle.cos(),
@@ -145,11 +125,7 @@ pub fn draw_arrow(
     } else {
         (from_x, from_y)
     };
-
-    // Draw shaft
     draw_line_thick(data, wi, hi, start_x, start_y, end_x, end_y, color, stroke_width);
-
-    // Forward arrowhead
     let h1 = (
         to_x - head_length * (angle - head_width).cos(),
         to_y - head_length * (angle - head_width).sin(),
@@ -159,8 +135,6 @@ pub fn draw_arrow(
         to_y - head_length * (angle + head_width).sin(),
     );
     fill_triangle(data, wi, hi, (to_x, to_y), h1, h2, color);
-
-    // Backward arrowhead (double style)
     if style == 1 {
         let back_angle = angle + PI;
         let b1 = (
@@ -175,8 +149,6 @@ pub fn draw_arrow(
     }
 }
 
-/// Draw a shape on the pixel buffer.
-/// shape: 0=rect, 1=circle, 2=line
 pub fn draw_shape(
     data: &mut [u8],
     w: u32, h: u32,
@@ -188,21 +160,20 @@ pub fn draw_shape(
 ) {
     let wi = w as i32;
     let hi = h as i32;
-
     match shape {
+        // 0 = Rectangle
         0 => {
-            // Rectangle — four lines
             let x0 = from_x.min(to_x);
             let y0 = from_y.min(to_y);
             let x1 = from_x.max(to_x);
             let y1 = from_y.max(to_y);
-            draw_line_thick(data, wi, hi, x0, y0, x1, y0, color, stroke_width); // top
-            draw_line_thick(data, wi, hi, x1, y0, x1, y1, color, stroke_width); // right
-            draw_line_thick(data, wi, hi, x1, y1, x0, y1, color, stroke_width); // bottom
-            draw_line_thick(data, wi, hi, x0, y1, x0, y0, color, stroke_width); // left
+            draw_line_thick(data, wi, hi, x0, y0, x1, y0, color, stroke_width);
+            draw_line_thick(data, wi, hi, x1, y0, x1, y1, color, stroke_width);
+            draw_line_thick(data, wi, hi, x1, y1, x0, y1, color, stroke_width);
+            draw_line_thick(data, wi, hi, x0, y1, x0, y0, color, stroke_width);
         }
+        // 1 = Circle (clean)
         1 => {
-            // Circle
             let cx = (from_x + to_x) / 2.0;
             let cy = (from_y + to_y) / 2.0;
             let rw = (to_x - from_x).abs() / 2.0;
@@ -219,10 +190,169 @@ pub fn draw_shape(
                 draw_line_thick(data, wi, hi, x0, y0, x1, y1, color, stroke_width);
             }
         }
+        // 2 = Line
         2 => {
-            // Line
             draw_line_thick(data, wi, hi, from_x, from_y, to_x, to_y, color, stroke_width);
         }
+        // 3 = Hand-drawn circle
+        //
+        // Ported from drawShape.ts handCircle case.
+        // Uses sinusoidal noise for wobble, a slight random tilt,
+        // a lead-in tail, and a main arc that's slightly less than
+        // a full rotation — giving it a natural, sketched look.
+        //
+        // Since WASM has no Math.random(), we derive a seed from
+        // the bounding box coordinates so each position produces
+        // a unique but deterministic shape.
+        3 => {
+            draw_hand_circle(data, wi, hi, from_x, from_y, to_x, to_y, color, stroke_width);
+        }
         _ => {}
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Hand-drawn circle — shape 3                                         */
+/* ------------------------------------------------------------------ */
+
+/// Simple pseudo-random f64 in [0, 1) from a seed.
+/// Uses a basic hash to get variety without pulling in a crate.
+fn pseudo_rand(seed: f64) -> f64 {
+    let bits = (seed * 1000.0 + 0.5).to_bits();
+    let mixed = bits.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    (mixed >> 33) as f64 / (1u64 << 31) as f64
+}
+
+fn draw_hand_circle(
+    data: &mut [u8],
+    w: i32, h: i32,
+    from_x: f64, from_y: f64,
+    to_x: f64, to_y: f64,
+    color: [u8; 4],
+    stroke_width: f64,
+) {
+    let x = from_x.min(to_x);
+    let y = from_y.min(to_y);
+    let bw = (to_x - from_x).abs();
+    let bh = (to_y - from_y).abs();
+    if bw < 4.0 || bh < 4.0 { return; }
+
+    let cx = x + bw / 2.0;
+    let cy = y + bh / 2.0;
+    let rx = bw / 2.0;
+    let ry = bh / 2.0;
+
+    // Deterministic seed from position
+    let seed = from_x * 31.17 + from_y * 47.53 + to_x * 13.91 + to_y * 67.37;
+
+    // Randomized parameters (deterministic from seed)
+    let start_offset = pseudo_rand(seed) * PI * 2.0;
+    let main_arc = PI * 2.0 - PI * (0.1 + pseudo_rand(seed + 1.0) * 0.15);
+    let tilt = (pseudo_rand(seed + 2.0) - 0.5) * 0.15;
+    let tail_length = PI * (0.2 + pseudo_rand(seed + 3.0) * 0.25);
+
+    let num_points = 60usize;
+
+    // Noise function — smooth sinusoidal wobble
+    let noise = |angle: f64| -> f64 {
+        (angle * 2.3 + seed).sin() * 3.0
+            + (angle * 1.1 + seed * 0.7).sin() * 2.0
+            + (angle * 3.7 + seed * 1.3).cos() * 1.5
+    };
+
+    // --- Generate tail points (lead-in before the circle starts) ---
+    let tail_steps = 10usize;
+    let mut tail_points: Vec<(f64, f64)> = Vec::with_capacity(tail_steps + 1);
+
+    for i in 0..=tail_steps {
+        let t = i as f64 / tail_steps as f64;
+        let angle = start_offset - tail_length * (1.0 - t);
+        let n = noise(angle) * t; // fade noise toward tip
+        let squeeze = 1.0 + (angle * 2.0 + seed).sin() * 0.03;
+
+        // Tail curves inward slightly
+        let inward = (1.0 - t) * (rx * 0.15);
+        let px = cx + (rx * squeeze - inward + n) * (angle + tilt).cos();
+        let py = cy + (ry / squeeze - inward + n) * (angle + tilt).sin();
+        tail_points.push((px, py));
+    }
+
+    // --- Generate main circle points ---
+    let mut path_points: Vec<(f64, f64)> = Vec::with_capacity(num_points + 1);
+
+    for i in 0..=num_points {
+        let t = i as f64 / num_points as f64;
+        let angle = start_offset + t * main_arc;
+
+        let n = noise(angle);
+        let squeeze = 1.0 + (angle * 2.0 + seed).sin() * 0.03;
+
+        let px = cx + (rx * squeeze + n) * (angle + tilt).cos();
+        let py = cy + (ry / squeeze + n) * (angle + tilt).sin();
+        path_points.push((px, py));
+    }
+
+    // --- Draw tail segments ---
+    for i in 1..tail_points.len() {
+        let (x0, y0) = tail_points[i - 1];
+        let (x1, y1) = tail_points[i];
+        draw_line_thick(data, w, h, x0, y0, x1, y1, color, stroke_width);
+    }
+
+    // Connect tail end to circle start
+    if let (Some(&tail_last), Some(&circle_first)) = (tail_points.last(), path_points.first()) {
+        draw_line_thick(data, w, h, tail_last.0, tail_last.1, circle_first.0, circle_first.1, color, stroke_width);
+    }
+
+    // --- Draw main circle with smooth interpolation ---
+    // Use midpoint averaging (like quadratic curves) for smoothness
+    if path_points.len() >= 3 {
+        for i in 0..path_points.len() - 2 {
+            let (px, py) = path_points[i];
+            let (nx, ny) = path_points[i + 1];
+            // Midpoint between current and next
+            let mx = (px + nx) / 2.0;
+            let my = (py + ny) / 2.0;
+
+            if i == 0 {
+                draw_line_thick(data, w, h, px, py, mx, my, color, stroke_width);
+            } else {
+                // From previous midpoint to this midpoint through the control point
+                let (ppx, ppy) = path_points[i - 1];
+                let prev_mx = (ppx + px) / 2.0;
+                let prev_my = (ppy + py) / 2.0;
+
+                // Subdivide the quadratic curve segment for smoothness
+                let sub_steps = 4;
+                for s in 0..sub_steps {
+                    let t0 = s as f64 / sub_steps as f64;
+                    let t1 = (s + 1) as f64 / sub_steps as f64;
+
+                    // Quadratic bezier: B(t) = (1-t)²·P0 + 2(1-t)t·P1 + t²·P2
+                    let bx0 = (1.0 - t0) * (1.0 - t0) * prev_mx
+                        + 2.0 * (1.0 - t0) * t0 * px
+                        + t0 * t0 * mx;
+                    let by0 = (1.0 - t0) * (1.0 - t0) * prev_my
+                        + 2.0 * (1.0 - t0) * t0 * py
+                        + t0 * t0 * my;
+                    let bx1 = (1.0 - t1) * (1.0 - t1) * prev_mx
+                        + 2.0 * (1.0 - t1) * t1 * px
+                        + t1 * t1 * mx;
+                    let by1 = (1.0 - t1) * (1.0 - t1) * prev_my
+                        + 2.0 * (1.0 - t1) * t1 * py
+                        + t1 * t1 * my;
+
+                    draw_line_thick(data, w, h, bx0, by0, bx1, by1, color, stroke_width);
+                }
+            }
+        }
+
+        // Final segment to last point
+        let len = path_points.len();
+        let (sx, sy) = path_points[len - 2];
+        let (ex, ey) = path_points[len - 1];
+        let smx = (sx + ex) / 2.0;
+        let smy = (sy + ey) / 2.0;
+        draw_line_thick(data, w, h, smx, smy, ex, ey, color, stroke_width);
     }
 }

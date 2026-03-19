@@ -1,4 +1,3 @@
-// ===== FILE: app/src/components/ShortcutModal.tsx =====
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Keyboard } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
@@ -9,6 +8,21 @@ interface Props {
 }
 
 const SHORTCUT_GROUPS = [
+  {
+    title: "Tools (bare keys)",
+    shortcuts: [
+      { keys: ["1"], action: "Resize / Compress" },
+      { keys: ["2"], action: "Crop" },
+      { keys: ["3"], action: "Paint Brush" },
+      { keys: ["4"], action: "Text" },
+      { keys: ["5"], action: "Arrows" },
+      { keys: ["6"], action: "AI" },
+      { keys: ["7"], action: "Shapes" },
+      { keys: ["8"], action: "Blur" },
+      { keys: ["9"], action: "Clone Stamp" },
+      { keys: ["0"], action: "Emoji" },
+    ],
+  },
   {
     title: "Panels",
     shortcuts: [
@@ -25,7 +39,16 @@ const SHORTCUT_GROUPS = [
     shortcuts: [
       { keys: ["Ctrl", "Z"], action: "Undo" },
       { keys: ["Ctrl", "Shift", "Z"], action: "Redo" },
+      { keys: ["Ctrl", "Shift", "C"], action: "Copy to Clipboard" },
       { keys: ["Alt", "D"], action: "Delete All Images" },
+    ],
+  },
+  {
+    title: "Transform",
+    shortcuts: [
+      { keys: ["Alt", "F"], action: "Flip Horizontal" },
+      { keys: ["Alt", "V"], action: "Flip Vertical" },
+      { keys: ["Alt", "R"], action: "Rotate 90° CW" },
     ],
   },
   {
@@ -38,7 +61,12 @@ const SHORTCUT_GROUPS = [
   },
   {
     title: "View",
-    shortcuts: [{ keys: ["Alt", "Scroll"], action: "Zoom In / Out" }],
+    shortcuts: [
+      { keys: ["Alt", "Scroll"], action: "Zoom In / Out" },
+      { keys: ["Alt", "="], action: "Zoom In" },
+      { keys: ["Alt", "-"], action: "Zoom Out" },
+      { keys: ["Alt", "0"], action: "Reset Zoom (100%)" },
+    ],
   },
   {
     title: "Export",
@@ -66,21 +94,16 @@ export function ShortcutModal({ open, onClose }: Props) {
             className="shortcut-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-3">
-              <h2 className="flex items-center gap-2 text-base font-semibold">
-                <Keyboard className="h-5 w-5" />
+            <div className="shortcut-modal-header">
+              <div className="shortcut-modal-title">
+                <Keyboard className="shortcut-modal-icon" />
                 Keyboard Shortcuts
-              </h2>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
-              >
-                <X className="h-4 w-4" />
+              </div>
+              <button className="shortcut-modal-close" onClick={onClose}>
+                <X className="shortcut-modal-close-icon" />
               </button>
             </div>
 
-            {/* Body */}
             <div className="shortcut-modal-body">
               {SHORTCUT_GROUPS.map((group) => (
                 <div key={group.title} className="shortcut-group">
@@ -106,11 +129,10 @@ export function ShortcutModal({ open, onClose }: Props) {
               ))}
             </div>
 
-            {/* Footer hint */}
-            <div className="px-6 py-3 border-t border-border text-[10px] text-text-muted text-center">
-              <kbd>Alt</kbd>+<kbd>/</kbd> toggles inline hints on bars
-              &nbsp;·&nbsp;
-              <kbd>Alt</kbd>+<kbd>?</kbd> toggles this modal
+            <div className="shortcut-modal-footer">
+              Press <kbd className="shortcut-kbd">Alt</kbd>
+              <span className="shortcut-plus">+</span>
+              <kbd className="shortcut-kbd">?</kbd> to toggle this modal
             </div>
           </motion.div>
         </motion.div>
