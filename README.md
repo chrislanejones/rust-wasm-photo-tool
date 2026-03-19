@@ -1,5 +1,9 @@
 Rust WASM Photo Tool
 
+![Rust WASM Photo Tool](public/Rust-WASM-Photo-App.jpg)
+
+**Live:** [rust-wasm-photo-tool.netlify.app](https://rust-wasm-photo-tool.netlify.app/) &nbsp;·&nbsp; [Architecture](Architecture.md)
+
 A browser-based image annotation and editing tool powered by **Rust/WASM** for pixel-level operations and **React + TypeScript** for the UI.
 
 ## Architecture
@@ -73,6 +77,8 @@ app/src/
 │   ├── useBrushPreview.ts            Cursor preview overlay
 │   ├── useDrawingTools.ts            Arrow and shape drawing via WASM drawing.rs
 │   ├── useEmojiTool.ts               Emoji stamp — OffscreenCanvas → WASM stamp_pixels
+│   ├── usePaintTool.ts               Freehand paint/brush — WASM paint_dab + paint_stroke_to
+│   ├── useTextTool.ts                Text overlay — browser canvas renders font → WASM stamp_pixels
 │   ├── useAutoCompress.ts            Auto-compress hook for resize workflow
 │   └── stamp_tool.d.ts               TypeScript declarations for WASM interface
 ├── components/
@@ -99,7 +105,9 @@ app/src/
 │   │       ├── BlurSettings.tsx      Blur radius, brush size for region blur
 │   │       ├── ArrowSettings.tsx     Arrow color, stroke width, head size
 │   │       ├── ShapeSettings.tsx     Shape type, fill/stroke color, line width
-│   │       └── EmojiSettings.tsx     Emoji picker (@emoji-mart), size presets
+│   │       ├── EmojiSettings.tsx     Emoji picker (@emoji-mart), size presets
+│   │       ├── PaintSettings.tsx     Brush size presets, color palette, opacity
+│   │       └── TextSettings.tsx      Font size presets, weight, color, recent-text memory
 │   └── upload/
 │       └── UploadDialog.tsx          Drag-and-drop + paste-from-clipboard upload modal
 └── lib/
@@ -137,6 +145,8 @@ app/src/
 - **Filters** — Brightness (−100% to +100%), contrast (0% to 400%), box-blur with stroke-based region masking
 - **Arrows** — Anti-aliased arrows with arrowhead, drawn directly on the pixel buffer via `drawing.rs`
 - **Shapes** — Rectangles, circles, and lines rendered in WASM with configurable fill/stroke
+- **Paint / Brush** — Freehand painting via WASM `paint_dab` + `paint_stroke_to`; configurable brush size, color, and opacity with interpolated strokes
+- **Text** — Click-to-place text with configurable font size, weight, and color; browser renders the font, pixels composited into the buffer via `stamp_pixels()`; recent-text memory in sidebar
 - **Emoji Stamp** — Browser renders emoji to `OffscreenCanvas`, pixels sent to WASM `stamp_pixels()` for alpha compositing
 - **Export** — Lossless PNG via Rust encoder, JPEG/WebP/AVIF via browser
 - **Thumbnails** — Bilinear-scaled thumbnails generated in WASM
@@ -146,7 +156,7 @@ app/src/
 ### UI (React)
 
 - **Animated Panels** — Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)
-- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows, Shapes, Blur, AI, Emoji
+- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows, Shapes, Blur, Emoji, AI
 - **A/B Compare Slider** — Squoosh-style draggable divider to compare before/after edits
 - **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch
 - **History Timeline** — Right-side panel with clickable undo/redo entries

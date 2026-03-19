@@ -23,6 +23,7 @@ export default defineConfig({
       // Allow serving files from one level up (for ../pkg)
       allow: [".."],
     },
+    historyApiFallback: true,
   },
   build: {
     outDir: "../www-dist",

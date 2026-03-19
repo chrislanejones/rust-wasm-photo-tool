@@ -13,3 +13,8 @@
 [build.environment]
   RUSTUP_TOOLCHAIN = "stable"
   NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -101,6 +101,14 @@ export function StatusBar({
         </span>
         <span className="status-divider" />
         <span className="status-zoom">{Math.round(state.zoom * 100)}%</span>
+        <span className="status-divider" />
+        <a
+          href="/architecture"
+          className="status-zoom opacity-40 hover:opacity-100 transition-opacity"
+          title="Architecture diagram"
+        >
+          v0.9.1-beta
+        </a>
       </div>
     </footer>
   );
