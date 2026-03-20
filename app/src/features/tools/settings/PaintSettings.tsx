@@ -116,7 +116,7 @@ export function PaintSettings({ settings, onChange }: PaintSettingsProps) {
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Color
         </label>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-2 py-2">
           {COLORS.map((color) => {
             const active = settings.brushColor === color;
             return (

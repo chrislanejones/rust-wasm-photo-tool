@@ -28,22 +28,21 @@ interface ShapesSettingsProps {
   onChange: (s: ToolSettings) => void;
 }
 
-// FIX #9: Hand-drawn circle icon restored with proper SVG path
 function ShapeIcon({ type }: { type: ShapeType }) {
   switch (type) {
     case "rect":
       return (
-        <span className="inline-block w-4 h-4 border-2 border-current rounded-sm" />
+        <span className="inline-block w-3.5 h-3.5 border-2 border-current rounded-sm" />
       );
     case "circle":
       return (
-        <span className="inline-block w-4 h-4 border-2 border-current rounded-full" />
+        <span className="inline-block w-3.5 h-3.5 border-2 border-current rounded-full" />
       );
     case "handCircle":
       return (
         <svg
-          width="18"
-          height="18"
+          width="14"
+          height="14"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -51,14 +50,14 @@ function ShapeIcon({ type }: { type: ShapeType }) {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M12 2C7 2.5 3.5 6.5 3 12s3.5 9 9 9.5 9.5-4 10-9.5S17 1.5 12 2z" />
+          <path d="M4 12c0-4.4 3.6-8 8-8 1.5 0 2.9.4 4.1 1.1M20 12c0 4.4-3.6 8-8 8-1.5 0-2.9-.4-4.1-1.1M4 12c0 2.1.9 4 2.3 5.3M20 12c0-2.1-.9-4-2.3-5.3" />
         </svg>
       );
     case "line":
       return (
         <svg
-          width="18"
-          height="18"
+          width="14"
+          height="14"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -84,7 +83,7 @@ export function ShapesSettings({ settings, onChange }: ShapesSettingsProps) {
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Shape
         </label>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {SHAPES.map((shape) => {
             const active = currentShape === shape.id;
             return (
@@ -92,14 +91,14 @@ export function ShapesSettings({ settings, onChange }: ShapesSettingsProps) {
                 key={shape.id}
                 onClick={() => onChange({ ...settings, shape: shape.id })}
                 className={[
-                  "flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-medium transition-all",
+                  "flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold font-mono transition-all",
                   active
                     ? "bg-accent text-text-primary ring-2 ring-accent/50 shadow-md"
-                    : "bg-bg-elevated text-text-secondary hover:ring-2 hover:ring-accent/30",
+                    : "bg-bg-elevated border border-border text-text-secondary hover:border-border-active hover:text-text-primary",
                 ].join(" ")}
               >
                 <ShapeIcon type={shape.id} />
-                <span className="text-[10px]">{shape.label}</span>
+                <span>{shape.label}</span>
               </button>
             );
           })}
@@ -163,7 +162,7 @@ export function ShapesSettings({ settings, onChange }: ShapesSettingsProps) {
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Color
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 py-2">
           {COLORS.map((color) => (
             <button
               key={color}

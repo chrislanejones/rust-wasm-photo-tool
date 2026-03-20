@@ -27,7 +27,7 @@ export function BlurSettings({ settings, onChange }: BlurSettingsProps) {
         </div>
 
         {/* Dot presets — same pattern as Clone Stamp hardness/size */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between py-2">
           {SIZE_PRESETS.map((size) => {
             const active = settings.blurSize === size;
             // Visual dot scales with preset
@@ -83,7 +83,7 @@ export function BlurSettings({ settings, onChange }: BlurSettingsProps) {
 
       {/* ── Blur Intensity ── */}
       <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between py-2">
           <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
             Intensity
           </label>

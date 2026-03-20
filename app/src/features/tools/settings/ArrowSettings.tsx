@@ -86,7 +86,7 @@ export function ArrowSettings({ settings, onChange }: ArrowSettingsProps) {
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Arrow Style
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 py-2">
           {(["single", "double"] as const).map((style) => {
             const active = settings.arrowStyle === style;
             return (
@@ -112,7 +112,7 @@ export function ArrowSettings({ settings, onChange }: ArrowSettingsProps) {
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Color
         </label>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-2 my-2">
           {COLORS.map((color) => {
             const active = settings.strokeColor === color;
             return (

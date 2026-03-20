@@ -146,7 +146,7 @@ export function TextSettings({
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Font Weight
         </label>
-        <div className="flex gap-2">
+        <div className="flex gap-2 py-2">
           {(["normal", "bold"] as const).map((w) => (
             <button
               key={w}
@@ -170,7 +170,7 @@ export function TextSettings({
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Color
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 py-2">
           {COLORS.map((color) => (
             <button
               key={color}
