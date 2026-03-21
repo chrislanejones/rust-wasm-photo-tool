@@ -18,9 +18,17 @@ const SHORTCUT_GROUPS = [
       { keys: ["5"], action: "Arrows" },
       { keys: ["6"], action: "AI" },
       { keys: ["7"], action: "Shapes" },
-      { keys: ["8"], action: "Blur" },
+      { keys: ["8"], action: "Effects (Blur/Bright/Contrast)" },
       { keys: ["9"], action: "Clone Stamp" },
       { keys: ["0"], action: "Emoji" },
+    ],
+  },
+  {
+    title: "Navigation",
+    shortcuts: [
+      { keys: ["Space"], action: "Hold to Pan (drag image)" },
+      { keys: ["PgUp"], action: "Previous Photo" },
+      { keys: ["PgDn"], action: "Next Photo" },
     ],
   },
   {

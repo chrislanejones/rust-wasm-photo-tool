@@ -274,6 +274,42 @@ impl CloneStampTool {
         self.stamp.source_y = None;
     }
 
+    /// Preview crop overlay in WASM.
+    /// Saves a snapshot, applies darkening overlay + dashed border.
+    /// Call cancel_crop_preview() or apply_crop_from_preview() when done.
+    pub fn preview_crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        self.hist.push_snapshot("Crop Preview", &self.buf.data);
+        transform::apply_crop_overlay(
+            &mut self.buf.data,
+            self.buf.width,
+            self.buf.height,
+            x, y, w, h,
+            0.5,
+        );
+        transform::draw_crop_border(
+            &mut self.buf.data,
+            self.buf.width,
+            self.buf.height,
+            x, y, w, h,
+            [255, 255, 255, 200],
+            5,
+            5,
+        );
+    }
+
+    /// Remove the crop preview (undo the snapshot pushed by preview_crop).
+    pub fn cancel_crop_preview(&mut self) -> bool {
+        self.undo()
+    }
+
+    /// Apply crop after preview: undo preview first, then crop for real.
+    pub fn apply_crop_from_preview(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        if let Some(restored) = self.hist.undo(&self.buf.data) {
+            self.buf.data = restored;
+        }
+        self.crop(x, y, w, h);
+    }
+
     pub fn copy_region(&self, x: i32, y: i32, w: u32, h: u32) -> Vec<u8> {
         transform::copy_region(&self.buf.data, self.buf.width as i32, self.buf.height as i32, x, y, w, h)
     }

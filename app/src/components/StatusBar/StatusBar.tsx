@@ -1,3 +1,7 @@
+// ===== FILE: app/src/components/StatusBar/StatusBar.tsx =====
+// Item 8: Architecture link opens in new tab
+// Item 2: Added spacebar hint
+// Item 4: Added PgUp/PgDn hint
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 import type { ToolType } from "@/lib/types";
 
@@ -27,9 +31,9 @@ const TOOL_HINTS: Record<string, { keys: string; action: string }[]> = {
     { keys: "Alt+[ ]", action: "brush size" },
     { keys: "Ctrl+Z", action: "undo" },
   ],
-  blur: [
+  effects: [
     { keys: "Drag", action: "blur area" },
-    { keys: "Alt+[ ]", action: "brush size" },
+    { keys: "Sliders", action: "brightness/contrast" },
     { keys: "Ctrl+Z", action: "undo" },
   ],
   arrow: [
@@ -62,18 +66,8 @@ export function StatusBar({
 
   return (
     <footer className="status-bar">
-      <div className="status-section">
-        <span
-          className={`source-status ${state.hasSource ? "has-source" : ""}`}
-        >
-          <span className="status-dot" />
-          {state.hasSource
-            ? "Source set — click to paint"
-            : "Alt+Click to set source"}
-        </span>
-      </div>
+      <div className="status-section">🐴 Image Horse</div>
 
-      {/* Center — dynamic tool hints (toggle with Alt+/) */}
       <div className="status-section status-center">
         {showKbdHints && (
           <>
@@ -83,6 +77,16 @@ export function StatusBar({
                 <kbd>{hint.keys}</kbd> {hint.action}
               </span>
             ))}
+            <span className="status-divider" />
+            {/* Item 2: Spacebar hint */}
+            <span className="status-shortcut-hint">
+              <kbd>Space</kbd> pan
+            </span>
+            <span className="status-divider" />
+            {/* Item 4: PgUp/PgDn hint */}
+            <span className="status-shortcut-hint">
+              <kbd>PgUp/Dn</kbd> photos
+            </span>
             <span className="status-divider" />
             <span className="status-shortcut-hint">
               <kbd>Alt+?</kbd> shortcuts
@@ -106,12 +110,15 @@ export function StatusBar({
         <span className="status-divider" />
         <span className="status-zoom">{Math.round(state.zoom * 100)}%</span>
         <span className="status-divider" />
+        {/* Item 8: Opens in new tab — back button no longer destroys state */}
         <a
           href="/architecture"
+          target="_blank"
+          rel="noopener noreferrer"
           className="status-zoom opacity-40 hover:opacity-100 transition-opacity"
-          title="Architecture diagram"
+          title="Architecture diagram (opens in new tab)"
         >
-          v0.9.1-beta
+          v0.9.2-beta
         </a>
       </div>
     </footer>

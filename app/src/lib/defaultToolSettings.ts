@@ -15,6 +15,8 @@ export const defaultToolSettings: ToolSettings = {
   textColor: "#000000",
   blurSize: 32,
   blurIntensity: 8,
+  effectBrightness: 0,
+  effectContrast: 100,
   emoji: "😀",
   emojiSize: 64,
 };

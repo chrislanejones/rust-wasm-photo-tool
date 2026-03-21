@@ -105,5 +105,11 @@ declare module "stamp_tool" {
       b: number,
       opacity: number,
     ): void;
+
+    // Item 9: Crop preview in WASM
+    // Uncomment after adding the Rust implementations
+    // preview_crop(x: number, y: number, w: number, h: number): void;
+    // cancel_crop_preview(): boolean;
+    // apply_crop_from_preview(x: number, y: number, w: number, h: number): void;
   }
 }

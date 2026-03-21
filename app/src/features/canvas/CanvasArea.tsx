@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { CompareSlider } from "./CompareSlider";
 
@@ -28,10 +28,15 @@ interface Props {
   onTextBlur?: () => void;
   textSettings?: { fontSize: number; fontWeight: string; textColor: string };
   containerRef?: React.RefObject<HTMLDivElement | null>;
+  // Item 2: Pan mode
+  isPanning?: boolean;
 }
 
-// Fix #6: map tool → cursor
-function getCursorForTool(tool?: string): string | undefined {
+function getCursorForTool(
+  tool?: string,
+  isPanning?: boolean,
+): string | undefined {
+  if (isPanning) return "grab";
   switch (tool) {
     case "text":
       return "text";
@@ -40,7 +45,7 @@ function getCursorForTool(tool?: string): string | undefined {
     case "shapes":
       return "crosshair";
     default:
-      return undefined; // default cursor (or brush preview handles it)
+      return undefined;
   }
 }
 
@@ -64,6 +69,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onTextBlur,
       textSettings,
       containerRef: externalContainerRef,
+      isPanning = false,
     },
     ref,
   ) => {
@@ -71,6 +77,56 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
     const internalContainerRef = useRef<HTMLDivElement>(null);
     const containerRef = externalContainerRef ?? internalContainerRef;
+
+    // Item 2: Pan offset state
+    const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+    const panStartRef = useRef<{
+      x: number;
+      y: number;
+      ox: number;
+      oy: number;
+    } | null>(null);
+    const [isDraggingPan, setIsDraggingPan] = useState(false);
+
+    const handlePanMouseDown = useCallback(
+      (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (isPanning) {
+          e.preventDefault();
+          e.stopPropagation();
+          panStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            ox: panOffset.x,
+            oy: panOffset.y,
+          };
+          setIsDraggingPan(true);
+          return;
+        }
+      },
+      [isPanning, panOffset],
+    );
+
+    const handlePanMouseMove = useCallback(
+      (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (isDraggingPan && panStartRef.current) {
+          const dx = e.clientX - panStartRef.current.x;
+          const dy = e.clientY - panStartRef.current.y;
+          setPanOffset({
+            x: panStartRef.current.ox + dx,
+            y: panStartRef.current.oy + dy,
+          });
+          return;
+        }
+      },
+      [isDraggingPan],
+    );
+
+    const handlePanMouseUp = useCallback(() => {
+      if (isDraggingPan) {
+        setIsDraggingPan(false);
+        panStartRef.current = null;
+      }
+    }, [isDraggingPan]);
 
     let markerStyle: React.CSSProperties | null = null;
     if (state.sourcePos && canvasRef.current) {
@@ -84,7 +140,25 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
     const zoom = state.zoom;
     const isTextTool = activeTool === "text";
-    const cursor = getCursorForTool(activeTool);
+    const cursor = getCursorForTool(activeTool, isPanning);
+    const panCursor = isDraggingPan ? "grabbing" : cursor;
+
+    // Combined mouse handlers — pan takes priority when spacebar is held
+    const wrappedMouseDown = isPanning
+      ? handlePanMouseDown
+      : isTextTool
+        ? undefined
+        : onMouseDown;
+    const wrappedMouseMove = isPanning
+      ? handlePanMouseMove
+      : isTextTool
+        ? undefined
+        : onMouseMove;
+    const wrappedMouseUp = isPanning
+      ? handlePanMouseUp
+      : isTextTool
+        ? undefined
+        : onMouseUp;
 
     return (
       <div
@@ -95,14 +169,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           ref={ref}
           className="main-canvas"
           style={{
-            transform: zoom !== 1 ? `scale(${zoom})` : undefined,
+            // Item 3: Fixed zoom + pan transform
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
             transformOrigin: "center center",
-            cursor,
+            cursor: panCursor,
           }}
-          onMouseDown={isTextTool ? undefined : onMouseDown}
-          onMouseMove={isTextTool ? undefined : onMouseMove}
-          onMouseUp={isTextTool ? undefined : onMouseUp}
-          onMouseLeave={isTextTool ? undefined : onMouseUp}
+          onMouseDown={wrappedMouseDown}
+          onMouseMove={wrappedMouseMove}
+          onMouseUp={wrappedMouseUp}
+          onMouseLeave={
+            isPanning ? handlePanMouseUp : isTextTool ? undefined : onMouseUp
+          }
           onClick={isTextTool ? onCanvasClick : undefined}
           onMouseEnter={(e) =>
             onCanvasEnter(e.currentTarget.getBoundingClientRect())
@@ -111,8 +188,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         />
         <CompareSlider beforeUrl={beforeUrl} active={compareActive} />
 
-        {/* Brush cursor */}
-        {cursorVisible && !isTextTool && !cursor && (
+        {/* Brush cursor — hidden during pan */}
+        {cursorVisible && !isTextTool && !cursor && !isPanning && (
           <div
             className="brush-cursor"
             style={{

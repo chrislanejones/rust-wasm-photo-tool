@@ -1,4 +1,7 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
+// FIX: Removed premature </div> after "Apply Resize" button that broke the JSX tree.
+// The quality slider, A/B compare, performance gain, lighthouse score, and
+// Auto Compress All were all orphaned outside the root element.
 import { useCallback, useEffect, useState } from "react";
 import { SlidersHorizontal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -82,15 +85,8 @@ export function ResizeSettings({
     }
   };
 
-  // Quality change should also enable A/B compare (same as resize does)
   const handleQualityChange = (val: number) => {
     onQualityChange(val);
-  };
-
-  // Commit quality on pointer up — trigger compare availability
-  const handleQualityCommit = () => {
-    // Quality change counts as a modification for A/B compare
-    // The parent should set hasBeenModified when quality changes
   };
 
   const compareDisabled = !hasBeenModified;
@@ -107,7 +103,6 @@ export function ResizeSettings({
     100,
     Math.max(0, Math.round(100 - scoreBase * 50)),
   );
-
   const savingsPercent = Math.max(
     0,
     Math.round((1 - areaRatio * qualityRatio) * 100),
@@ -181,7 +176,7 @@ export function ResizeSettings({
         </Button>
       </div>
 
-      {/* ── Quality — Clone Stamp style slider ── */}
+      {/* ── Quality — gradient slider ── */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
@@ -192,7 +187,6 @@ export function ResizeSettings({
           </span>
         </div>
 
-        {/* Clone Stamp style: gradient track + custom thumb */}
         <div className="relative h-2 w-full rounded-full bg-theme-muted">
           <div
             className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
@@ -205,7 +199,6 @@ export function ResizeSettings({
             step={1}
             value={quality}
             onChange={(e) => handleQualityChange(Number(e.target.value))}
-            onPointerUp={handleQualityCommit}
             className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
           />
         </div>

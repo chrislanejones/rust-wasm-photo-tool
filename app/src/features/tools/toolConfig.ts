@@ -8,7 +8,7 @@ import {
   ArrowUpRight,
   Sparkles,
   Shapes,
-  Droplets,
+  Wand2, // Item 7: Changed from Droplets to Wand2
   Stamp,
   Smile,
 } from "lucide-react";
@@ -72,11 +72,12 @@ export const TOOLS: ToolDefinition[] = [
     gradient: "from-pink-500 to-rose-500",
   },
   {
-    id: "blur",
-    label: "Blur",
-    description: "Blur sensitive areas (WASM)",
-    icon: Droplets,
-    gradient: "from-slate-400 to-slate-600",
+    // Item 7: Renamed from "Blur" to "Effects"
+    id: "effects",
+    label: "Effects",
+    description: "Blur, brightness & contrast (WASM)",
+    icon: Wand2,
+    gradient: "from-indigo-400 to-violet-600",
   },
   {
     id: "stamp",

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { StampSettings, ToolType } from "@/lib/types";
 
 /** All ten tools in toolbar order — keys 1-9, 0 */
@@ -10,7 +10,7 @@ const TOOL_BY_DIGIT: Record<string, ToolType> = {
   Digit5: "arrow",
   Digit6: "ai",
   Digit7: "shapes",
-  Digit8: "blur",
+  Digit8: "effects",
   Digit9: "stamp",
   Digit0: "emoji",
 };
@@ -28,18 +28,20 @@ interface KeyboardShortcutOptions {
   setShowHistory: React.Dispatch<React.SetStateAction<boolean>>;
   setShowKbdHints: React.Dispatch<React.SetStateAction<boolean>>;
   setShowShortcutModal: React.Dispatch<React.SetStateAction<boolean>>;
-  // Zoom
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset?: () => void;
-  // Tool switching
   onToolChange?: (tool: ToolType) => void;
-  // Transform shortcuts
   onFlipH?: () => void;
   onFlipV?: () => void;
   onRotateCw?: () => void;
-  // Copy to clipboard
   onCopyToClipboard?: () => void;
+  // Item 4: Gallery cycling
+  onNextPhoto?: () => void;
+  onPrevPhoto?: () => void;
+  // Item 2: Spacebar pan
+  onSpaceDown?: () => void;
+  onSpaceUp?: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -63,10 +65,15 @@ export function useKeyboardShortcuts({
   onFlipV,
   onRotateCw,
   onCopyToClipboard,
+  onNextPhoto,
+  onPrevPhoto,
+  onSpaceDown,
+  onSpaceUp,
 }: KeyboardShortcutOptions) {
+  const spaceHeldRef = useRef(false);
+
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Skip when typing in inputs
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -74,14 +81,41 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // ─── Ctrl/Cmd combos ─────────────────────────────
+      // ─── Spacebar pan mode ──────────────────────────────
+      if (
+        e.code === "Space" &&
+        !e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.shiftKey
+      ) {
+        e.preventDefault();
+        if (!spaceHeldRef.current) {
+          spaceHeldRef.current = true;
+          onSpaceDown?.();
+        }
+        return;
+      }
+
+      // ─── PgUp / PgDn → gallery cycling ──────────────────
+      if (e.code === "PageUp") {
+        e.preventDefault();
+        onPrevPhoto?.();
+        return;
+      }
+      if (e.code === "PageDown") {
+        e.preventDefault();
+        onNextPhoto?.();
+        return;
+      }
+
+      // ─── Ctrl/Cmd combos ────────────────────────────────
       if (e.metaKey || e.ctrlKey) {
         if (e.key === "z" || e.key === "Z") {
           e.preventDefault();
           e.shiftKey ? onRedo() : onUndo();
           return;
         }
-        // Ctrl+Shift+C → copy to clipboard
         if (e.shiftKey && e.code === "KeyC") {
           e.preventDefault();
           onCopyToClipboard?.();
@@ -90,9 +124,8 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // ─── Alt combos ──────────────────────────────────
+      // ─── Alt combos ────────────────────────────────────
       if (e.altKey) {
-        // Alt+Shift+/ → shortcut modal
         if (e.shiftKey && e.code === "Slash") {
           e.preventDefault();
           setShowShortcutModal((v) => !v);
@@ -100,7 +133,6 @@ export function useKeyboardShortcuts({
         }
 
         switch (e.code) {
-          // Panels
           case "KeyU":
             e.preventDefault();
             setShowUpload((v) => !v);
@@ -121,8 +153,6 @@ export function useKeyboardShortcuts({
             e.preventDefault();
             setShowKbdHints((v) => !v);
             break;
-
-          // Brush size
           case "BracketLeft":
             e.preventDefault();
             onBrushSizeChange((prev) => {
@@ -139,36 +169,30 @@ export function useKeyboardShortcuts({
               return { ...prev, brushSize: next };
             });
             break;
-
-          // Zoom
-          case "Equal": // Alt + = / Alt + +
+          case "Equal":
             e.preventDefault();
             onZoomIn();
             break;
-          case "Minus": // Alt + -
+          case "Minus":
             e.preventDefault();
             onZoomOut();
             break;
-          case "Digit0": // Alt + 0 → reset zoom
+          case "Digit0":
             e.preventDefault();
             onZoomReset?.();
             break;
-
-          // Transform
-          case "KeyF": // Alt + F → flip horizontal
+          case "KeyF":
             e.preventDefault();
             onFlipH?.();
             break;
-          case "KeyV": // Alt + Shift + F would conflict, so Alt+V for vertical flip
+          case "KeyV":
             e.preventDefault();
             onFlipV?.();
             break;
-          case "KeyR": // Alt + R → rotate 90° CW
+          case "KeyR":
             e.preventDefault();
             onRotateCw?.();
             break;
-
-          // Actions
           case "KeyE":
             e.preventDefault();
             onExport();
@@ -181,15 +205,27 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // ─── Bare number keys → tool switching (no modifier) ──
+      // ─── Bare number keys → tool switching ──────────────
       if (onToolChange && e.code in TOOL_BY_DIGIT) {
         e.preventDefault();
         onToolChange(TOOL_BY_DIGIT[e.code]);
       }
     };
 
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        spaceHeldRef.current = false;
+        onSpaceUp?.();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
   }, [
     onUndo,
     onRedo,
@@ -211,5 +247,9 @@ export function useKeyboardShortcuts({
     onFlipV,
     onRotateCw,
     onCopyToClipboard,
+    onNextPhoto,
+    onPrevPhoto,
+    onSpaceDown,
+    onSpaceUp,
   ]);
 }

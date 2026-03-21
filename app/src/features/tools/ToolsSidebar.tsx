@@ -1,3 +1,5 @@
+// ===== FILE: app/src/features/tools/ToolsSidebar.tsx =====
+// Item 7: "effects" replaces "blur" — includes brightness, contrast, blur
 import { motion } from "framer-motion";
 import { X, Wrench, Undo, Redo, Download } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
@@ -12,7 +14,7 @@ import { ToolGrid } from "./ToolGrid";
 import * as StampSettingsModule from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import { ResizeSettings } from "./settings/ResizeSettings";
-import { BlurSettings } from "./settings/BlurSettings";
+import { EffectsSettings } from "./settings/EffectSettings";
 import { ArrowSettings } from "./settings/ArrowSettings";
 import { ShapesSettings } from "./settings/ShapeSettings";
 import { EmojiSettings } from "./settings/EmojiSettings";
@@ -112,12 +114,10 @@ export function ToolsSidebar({
           "0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
       }}
     >
-      {/* Tool Grid */}
       <div className="p-4 border-b border-border">
         <ToolGrid activeTool={activeTool} onToolChange={onToolChange} />
       </div>
 
-      {/* Undo / Redo */}
       <div className="flex gap-2 px-4 py-3 border-b border-border">
         <button
           onClick={onUndo}
@@ -135,7 +135,6 @@ export function ToolsSidebar({
         </button>
       </div>
 
-      {/* Tool-specific settings — ONE panel per tool, no cross-contamination */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
         {activeTool === "compress" && (
           <ResizeSettings
@@ -174,10 +173,14 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "blur" && (
-          <BlurSettings
+        {/* Item 7: Effects panel (was Blur) — brightness, contrast, blur */}
+        {activeTool === "effects" && (
+          <EffectsSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}
+            onBrightness={onBrightness}
+            onContrast={onContrast}
+            imageReady={imageReady}
           />
         )}
 
@@ -224,20 +227,85 @@ export function ToolsSidebar({
           />
         )}
 
+        {/* Item 5: AI Panel ideas */}
         {activeTool === "ai" && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
               AI Tools
             </h3>
-            <p className="text-xs text-text-muted leading-relaxed">
-              AI-powered features coming soon. Background removal, upscaling,
-              and inpainting.
+
+            {[
+              {
+                title: "Remove Background",
+                desc: "One-click background removal powered by rembg",
+                badge: "free",
+                icon: "🪄",
+              },
+              {
+                title: "4× Upscale",
+                desc: "Enhance resolution with Real-ESRGAN",
+                badge: "pro",
+                icon: "🔍",
+              },
+              {
+                title: "Object Removal",
+                desc: "Brush over objects to remove them with SD Inpaint",
+                badge: "pro",
+                icon: "🧹",
+              },
+              {
+                title: "Auto Alt Text",
+                desc: "Generate accessibility descriptions with BLIP",
+                badge: "free",
+                icon: "💬",
+              },
+              {
+                title: "Smart Crop",
+                desc: "AI-suggested crop regions based on subject detection",
+                badge: "pro",
+                icon: "✂️",
+              },
+              {
+                title: "Auto-Enhance",
+                desc: "One-click brightness/contrast/saturation optimization via WASM histogram analysis",
+                badge: "free",
+                icon: "✨",
+              },
+            ].map((feature) => (
+              <div
+                key={feature.title}
+                className="flex items-start gap-3 p-3 rounded-lg bg-bg-elevated/50 border border-border/50 opacity-60"
+              >
+                <span className="text-lg shrink-0">{feature.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-text-primary">
+                      {feature.title}
+                    </span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                        feature.badge === "free"
+                          ? "bg-emerald-500/20 text-emerald-400"
+                          : "bg-violet-500/20 text-violet-400"
+                      }`}
+                    >
+                      {feature.badge}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-text-muted mt-0.5 leading-relaxed">
+                    {feature.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+            <p className="text-[10px] text-text-muted/60 text-center pt-2">
+              Coming soon — Replicate + Convex pipeline
             </p>
           </div>
         )}
       </div>
 
-      {/* Export */}
       <div className="p-4 border-t border-border">
         <button
           onClick={onExport}

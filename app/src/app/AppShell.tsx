@@ -1,3 +1,9 @@
+// ===== FILE: app/src/app/AppShell.tsx =====
+// Changes:
+//   Item 2: Spacebar pan mode
+//   Item 4: PgUp/PgDn gallery cycling
+//   Item 7: blur → effects rename, brightness/contrast in effects panel
+//   All other existing functionality preserved
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
@@ -73,10 +79,11 @@ export function AppShell() {
   const [recentTexts, setRecentTexts] = useState<TextMemory[]>([]);
   const textIdCounter = useRef(0);
   const [isImageLoading, setIsImageLoading] = useState(false);
-
-  // FIX #2: Loading progress state
   const [loadProgress, setLoadProgress] = useState(0);
   const loadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Item 2: Pan mode state
+  const [isPanning, setIsPanning] = useState(false);
 
   const handleTextCommit = useCallback(
     (text: string) => {
@@ -115,7 +122,6 @@ export function AppShell() {
     );
   }, []);
 
-  // FIX #2: Loading bar with progress simulation
   const loadImageWithProgress = useCallback(
     (file: File) => {
       setIsImageLoading(true);
@@ -156,7 +162,6 @@ export function AppShell() {
         file: f,
       }));
       setPhotos((prev) => [...prev, ...entries]);
-
       const first = entries[0];
       if (first) {
         loadImageWithProgress(first.file);
@@ -180,6 +185,21 @@ export function AppShell() {
     [loadImageWithProgress],
   );
 
+  // Item 4: PgUp/PgDn gallery cycling
+  const handleNextPhoto = useCallback(() => {
+    if (photos.length === 0) return;
+    const idx = photos.findIndex((p) => p.id === activePhotoId);
+    const next = photos[(idx + 1) % photos.length];
+    if (next) handleSelectPhoto(next);
+  }, [photos, activePhotoId, handleSelectPhoto]);
+
+  const handlePrevPhoto = useCallback(() => {
+    if (photos.length === 0) return;
+    const idx = photos.findIndex((p) => p.id === activePhotoId);
+    const prev = photos[(idx - 1 + photos.length) % photos.length];
+    if (prev) handleSelectPhoto(prev);
+  }, [photos, activePhotoId, handleSelectPhoto]);
+
   const handleRemovePhoto = useCallback(
     (id: string) => {
       setPhotos((prev) => {
@@ -187,7 +207,6 @@ export function AppShell() {
         const next = prev.filter((p) => p.id !== id);
         const removed = prev[idx];
         if (removed) URL.revokeObjectURL(removed.url);
-
         if (id === activePhotoId && next.length > 0) {
           const na = next[Math.min(idx, next.length - 1)]!;
           loadImageWithProgress(na.file);
@@ -219,14 +238,13 @@ export function AppShell() {
   const [exportFormat, setExportFormat] = useState<ExportFormat>("jpeg");
   const [quality, setQuality] = useState(75);
 
-  // Effective brush size for preview cursor — matches actual tool radius
   const effectiveBrushSize = (() => {
     switch (activeTool) {
       case "brush":
         return toolSettings.brushSize / 2;
       case "emoji":
         return (toolSettings.emojiSize * 1.2) / 2;
-      case "blur":
+      case "effects": // was "blur"
         return toolSettings.blurSize / 2;
       case "stamp":
       default:
@@ -248,7 +266,6 @@ export function AppShell() {
   useEffect(() => {
     const prev = prevPhotoCount.current;
     const curr = photos.length;
-
     if (prev === 0 && curr > 0) {
       setShowUpload(false);
       const t1 = setTimeout(() => setShowTopBar(true), 150);
@@ -261,7 +278,6 @@ export function AppShell() {
         clearTimeout(t3);
       };
     }
-
     if (curr === 0) {
       setShowUpload(true);
       setShowTopBar(false);
@@ -269,7 +285,6 @@ export function AppShell() {
       setShowGallery(false);
       setShowHistory(false);
     }
-
     prevPhotoCount.current = curr;
     return undefined;
   }, [photos.length]);
@@ -278,11 +293,8 @@ export function AppShell() {
     stamp.exportAs(exportFormat, quality / 100);
   }, [stamp, exportFormat, quality]);
 
-  // Delete all — clear canvas, reset all state, show upload dialog
   const handleDeleteAll = useCallback(() => {
     const toRevoke = photos.map((p) => p.url);
-
-    // Clear canvas pixels so last image doesn't linger
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext("2d");
@@ -290,13 +302,11 @@ export function AppShell() {
       canvas.width = 0;
       canvas.height = 0;
     }
-
     setActivePhotoId(null);
     setOriginalUrl(null);
     setHasBeenModified(false);
     setCompareActive(false);
-    setPhotos([]); // triggers the effect that shows upload + hides panels
-
+    setPhotos([]);
     requestAnimationFrame(() => {
       toRevoke.forEach((url) => URL.revokeObjectURL(url));
     });
@@ -395,7 +405,8 @@ export function AppShell() {
   });
 
   const effectiveStamp = (() => {
-    if (activeTool === "blur")
+    // Item 7: "effects" tool uses blur mouse handlers (same as old "blur")
+    if (activeTool === "effects")
       return {
         ...stamp,
         onMouseDown: blurDown,
@@ -426,7 +437,6 @@ export function AppShell() {
     return stamp;
   })();
 
-  // Zoom handlers
   const handleZoomIn = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(1);
     stamp.syncState();
@@ -442,6 +452,23 @@ export function AppShell() {
     stamp.syncState();
   }, [stamp]);
 
+  // Alt+scroll zoom — registered as non-passive so preventDefault works
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.altKey) return;
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        handleZoomIn();
+      } else {
+        handleZoomOut();
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [handleZoomIn, handleZoomOut]);
+
   const handleCopyToClipboard = useCallback(async () => {
     const c = canvasRef.current;
     if (!c) return;
@@ -454,7 +481,6 @@ export function AppShell() {
     } catch {}
   }, []);
 
-  // Keyboard shortcuts — all of them
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
@@ -476,6 +502,12 @@ export function AppShell() {
     onFlipV: stamp.flipVertical,
     onRotateCw: stamp.rotate90Cw,
     onCopyToClipboard: handleCopyToClipboard,
+    // Item 4: Gallery cycling
+    onNextPhoto: handleNextPhoto,
+    onPrevPhoto: handlePrevPhoto,
+    // Item 2: Spacebar pan
+    onSpaceDown: () => setIsPanning(true),
+    onSpaceUp: () => setIsPanning(false),
   });
 
   const handleToggleCompare = useCallback(() => {
@@ -518,7 +550,6 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      {/* Global loading bar — fixed at very top of screen */}
       <AnimatePresence>
         {isImageLoading && (
           <motion.div
@@ -628,7 +659,6 @@ export function AppShell() {
             className="main-content"
             style={{ position: "relative" }}
           >
-            {/* Only show canvas when we have photos */}
             {photos.length > 0 ? (
               <CanvasArea
                 ref={canvasRef}
@@ -653,9 +683,9 @@ export function AppShell() {
                   textColor: toolSettings.textColor,
                 }}
                 containerRef={containerRef}
+                isPanning={isPanning}
               />
             ) : (
-              /* Empty state — shown after delete all or before first upload */
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4 text-center">
                   <div className="w-16 h-16 rounded-2xl bg-bg-elevated/50 border border-border/50 flex items-center justify-center">
@@ -757,10 +787,11 @@ export function AppShell() {
         activeTool={activeTool}
       />
 
-      {/* Brush cursor */}
+      {/* Brush cursor — hidden during pan mode */}
       {visible &&
+        !isPanning &&
         (activeTool === "stamp" ||
-          activeTool === "blur" ||
+          activeTool === "effects" ||
           activeTool === "brush" ||
           activeTool === "emoji") && (
           <div
