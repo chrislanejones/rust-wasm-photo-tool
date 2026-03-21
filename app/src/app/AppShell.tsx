@@ -11,6 +11,7 @@ import { useBrushPreview } from "@/hooks/useBrushPreview";
 import { useDrawingTools } from "@/hooks/useDrawingTools";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
+import { useRedStampTool } from "@/hooks/useRedStampTool";
 import { useTextTool } from "@/hooks/useTextTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
@@ -404,6 +405,14 @@ export function AppShell() {
     active: activeTool === "text",
   });
 
+  const redStampTool = useRedStampTool({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    flushToCanvas: stamp.flushToCanvas,
+    syncState: stamp.syncState,
+    active: activeTool === "stamp",
+  });
+
   const effectiveStamp = (() => {
     // Item 7: "effects" tool uses blur mouse handlers (same as old "blur")
     if (activeTool === "effects")
@@ -433,6 +442,13 @@ export function AppShell() {
         onMouseDown: paintTool.onMouseDown as typeof stamp.onMouseDown,
         onMouseMove: paintTool.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: paintTool.onMouseUp as typeof stamp.onMouseUp,
+      };
+    if (activeTool === "stamp")
+      return {
+        ...stamp,
+        onMouseDown: redStampTool.onMouseDown as typeof stamp.onMouseDown,
+        onMouseMove: redStampTool.onMouseMove as typeof stamp.onMouseMove,
+        onMouseUp: redStampTool.onMouseUp as typeof stamp.onMouseUp,
       };
     return stamp;
   })();

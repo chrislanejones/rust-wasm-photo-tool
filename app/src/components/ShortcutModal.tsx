@@ -19,7 +19,7 @@ const SHORTCUT_GROUPS = [
       { keys: ["6"], action: "AI" },
       { keys: ["7"], action: "Shapes" },
       { keys: ["8"], action: "Effects (Blur/Bright/Contrast)" },
-      { keys: ["9"], action: "Clone Stamp" },
+      { keys: ["9"], action: "Stamp Tool" },
       { keys: ["0"], action: "Emoji" },
     ],
   },
@@ -60,9 +60,9 @@ const SHORTCUT_GROUPS = [
     ],
   },
   {
-    title: "Clone Stamp",
+    title: "Stamp Tool",
     shortcuts: [
-      { keys: ["Alt", "Click"], action: "Set Source Point" },
+      { keys: ["Alt", "Click"], action: "Set Clone Source Point" },
       { keys: ["Alt", "["], action: "Decrease Brush Size" },
       { keys: ["Alt", "]"], action: "Increase Brush Size" },
     ],

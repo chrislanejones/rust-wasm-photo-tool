@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FolderOpen, Clipboard, X, Heart } from "lucide-react";
+import { Upload, FolderOpen, Clipboard, X } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
+const horseLogo = "/Image-Horse-Logo.svg";
 
 interface Props {
   open: boolean;
@@ -97,45 +98,42 @@ export function UploadDialog({
             className="relative w-full max-w-lg mx-4 bg-bg-secondary rounded-2xl border border-border shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* FIX #2: Loading progress bar */}
-            <AnimatePresence>
-              {isLoading && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute top-0 left-0 right-0 z-10 h-1 bg-bg-elevated overflow-hidden rounded-t-2xl"
-                >
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-accent to-[hsl(var(--accent)/0.7)]"
-                    initial={{ width: "0%" }}
-                    animate={{ width: `${Math.min(loadProgress, 100)}%` }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 pb-2">
-              <div>
-                {/* FIX #4: Rebrand to Image Horse */}
-                <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
-                  🐴 Image Horse
-                </h2>
-                <p className="text-sm text-text-muted mt-1">
-                  Upload images to start editing
-                </p>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+            {/* Logo + Title - Top Center */}
+            <div className="flex flex-col items-center pt-6 pb-2">
+              <img
+                src={horseLogo}
+                alt="Image Horse"
+                className="w-30 h-30 mb-2 drop-shadow-lg"
+              />
+              <h1 className="text-lg font-bold text-text-primary tracking-wide">
+                Image Horse
+              </h1>
             </div>
 
-            {/* Drop zone */}
+            {/* Close button */}
+            <button
+              className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {/* Loading bar */}
+            {isLoading && (
+              <div className="px-6 pt-2">
+                <div className="h-1.5 w-full rounded-full bg-bg-elevated overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-accent to-accent/60 rounded-full"
+                    initial={{ width: "0%" }}
+                    animate={{
+                      width: `${Math.min(loadProgress, 100)}%`,
+                    }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="p-6">
               <div
                 onDrop={handleDrop}
@@ -182,18 +180,6 @@ export function UploadDialog({
               </div>
             </div>
 
-            {/* FIX #3: Special Thanks styling */}
-            <div className="px-6 pb-5">
-              <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-bg-elevated/50 border border-border/50">
-                <Heart className="h-3.5 w-3.5 text-rose-400 fill-rose-400/30" />
-                <span className="text-[11px] text-text-muted font-mono">
-                  Powered by{" "}
-                  <span className="text-accent font-semibold">Rust/WASM</span>
-                  {" · "}All processing happens in your browser
-                </span>
-              </div>
-            </div>
-
             <input
               ref={inputRef}
               type="file"
@@ -203,7 +189,6 @@ export function UploadDialog({
               onChange={(e) => {
                 if (e.target.files) {
                   processFiles(Array.from(e.target.files));
-                  e.target.value = "";
                 }
               }}
             />

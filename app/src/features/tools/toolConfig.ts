@@ -1,4 +1,3 @@
-// ===== FILE: app/src/features/tools/toolConfig.ts =====
 import type { ToolType } from "@/lib/types";
 import {
   Shrink,
@@ -8,7 +7,7 @@ import {
   ArrowUpRight,
   Sparkles,
   Shapes,
-  Wand2, // Item 7: Changed from Droplets to Wand2
+  Wand2,
   Stamp,
   Smile,
 } from "lucide-react";
@@ -72,7 +71,6 @@ export const TOOLS: ToolDefinition[] = [
     gradient: "from-pink-500 to-rose-500",
   },
   {
-    // Item 7: Renamed from "Blur" to "Effects"
     id: "effects",
     label: "Effects",
     description: "Blur, brightness & contrast (WASM)",
@@ -81,8 +79,8 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "stamp",
-    label: "Clone Stamp",
-    description: "WASM-powered clone stamp",
+    label: "Stamp Tool",
+    description: "Clone stamp & red stamp presets",
     icon: Stamp,
     gradient: "from-rose-500 to-red-600",
   },

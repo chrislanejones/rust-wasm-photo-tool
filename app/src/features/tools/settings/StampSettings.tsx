@@ -1,12 +1,22 @@
 import type { StampSettings } from "@/lib/types";
 
-/* ── Preset configs ──────────────────────────────────────────────────── */
-
-const SIZE_PRESETS = [5, 20, 60, 120] as const;
+const SIZE_PRESETS = [8, 16, 24, 32] as const;
 const HARDNESS_PRESETS = [0, 33, 66, 100] as const;
-const OPACITY_PRESETS = [25, 50, 75, 100] as const;
 
-/* ── Reusable dot-preset row ─────────────────────────────────────────── */
+interface StampSettingsPanelProps {
+  settings: StampSettings;
+  onChange: (s: StampSettings) => void;
+  hasSource: boolean;
+}
+
+/** Red stamp presets that get rendered via OffscreenCanvas → Rust stamp_pixels */
+export const RED_STAMP_PRESETS = [
+  { id: "rejected", label: "REJECTED", color: "#dc2626" },
+  { id: "approved", label: "APPROVED", color: "#16a34a" },
+  { id: "draft", label: "DRAFT", color: "#d97706" },
+  { id: "confidential", label: "CONFIDENTIAL", color: "#dc2626" },
+  { id: "review", label: "UNDER REVIEW", color: "#2563eb" },
+] as const;
 
 function DotRow({
   presets,
@@ -47,173 +57,224 @@ function DotRow({
   );
 }
 
-/* ── Main component ──────────────────────────────────────────────────── */
+export function StampSettingsPanel({
+  settings,
+  onChange,
+  hasSource,
+}: StampSettingsPanelProps) {
+  const handleStampPreset = (label: string, color: string) => {
+    // Dispatch label + color; the useRedStampTool hook renders pixels
+    // at click time via OffscreenCanvas → Rust stamp_pixels for undo/redo
+    window.dispatchEvent(
+      new CustomEvent("red-stamp-select", {
+        detail: { label, color },
+      }),
+    );
+  };
 
-interface Props {
-  settings: StampSettings;
-  onChange: (s: StampSettings) => void;
-  hasSource: boolean;
-}
-
-export function StampSettings({ settings, onChange, hasSource }: Props) {
   return (
     <div className="space-y-5">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-        Clone Stamp
+      <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
+        Stamp Tool
       </h3>
 
-      {/* Source indicator */}
-      <div
-        className={[
-          "flex justify-center gap-2 px-3 py-4 rounded-lg text-xs history-item type-current mb-5",
-        ].join(" ")}
-      >
-        <span className="history-label">
-          {hasSource
-            ? "Source set — click to paint"
-            : "Alt+Click to set source"}
-        </span>
-      </div>
-
-      {/* ── Brush Size ────────────────────────────────────────────── */}
-      <div className="space-y-2.5 py-4">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-            Size
-          </label>
-          <span className="text-xs text-theme-foreground tabular-nums">
-            {settings.brushSize}px
+      {/* Clone Stamp Section */}
+      <div className="space-y-3">
+        <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-muted/70 font-mono">
+          Clone Stamp
+        </h4>
+        <div
+          className={[
+            "flex justify-center gap-2 px-3 py-4 rounded-lg text-xs history-item type-current",
+          ].join(" ")}
+        >
+          <span className="history-label">
+            {hasSource
+              ? "Source set — click to paint"
+              : "Alt+Click to set source"}
           </span>
         </div>
 
-        <DotRow
-          presets={SIZE_PRESETS}
-          value={settings.brushSize}
-          onSelect={(v) => onChange({ ...settings, brushSize: v })}
-          dot={(preset) => {
-            const dotSize =
-              preset <= 5 ? 2 : preset <= 20 ? 4 : preset <= 60 ? 6 : 8;
-            return (
-              <span
-                className="rounded-full bg-theme-foreground"
-                style={{ width: dotSize, height: dotSize }}
-              />
-            );
-          }}
-        />
-
-        <div className="relative h-2 w-full rounded-full bg-theme-muted">
-          <div
-            className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-            style={{
-              width: `${((settings.brushSize - 2) / (200 - 2)) * 100}%`,
+        {/* Brush Size */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+              Brush Size
+            </label>
+            <span className="text-xs text-theme-foreground tabular-nums">
+              {settings.brushSize}px
+            </span>
+          </div>
+          <DotRow
+            presets={SIZE_PRESETS}
+            value={settings.brushSize}
+            onSelect={(v) => onChange({ ...settings, brushSize: v })}
+            dot={(preset) => {
+              const dotSize =
+                preset <= 8 ? 4 : preset <= 16 ? 6 : preset <= 24 ? 8 : 10;
+              return (
+                <span
+                  className="rounded-full bg-theme-foreground"
+                  style={{ width: dotSize, height: dotSize }}
+                />
+              );
             }}
           />
-          <input
-            type="range"
-            min={2}
-            max={200}
-            step={1}
-            value={settings.brushSize}
-            onChange={(e) =>
-              onChange({ ...settings, brushSize: Number(e.target.value) })
-            }
-            className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-          />
-        </div>
-      </div>
-
-      {/* ── Hardness ──────────────────────────────────────────────── */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-            Hardness
-          </label>
-          <span className="text-xs text-theme-foreground tabular-nums">
-            {Math.round(settings.hardness * 100)}%
-          </span>
+          <div className="relative h-2 w-full rounded-full bg-theme-muted">
+            <div
+              className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
+              style={{
+                width: `${((settings.brushSize - 4) / (64 - 4)) * 100}%`,
+              }}
+            />
+            <input
+              type="range"
+              min={4}
+              max={64}
+              step={1}
+              value={settings.brushSize}
+              onChange={(e) =>
+                onChange({ ...settings, brushSize: Number(e.target.value) })
+              }
+              className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
+            />
+          </div>
         </div>
 
-        <DotRow
-          presets={HARDNESS_PRESETS}
-          value={Math.round(settings.hardness * 100)}
-          onSelect={(v) => onChange({ ...settings, hardness: v / 100 })}
-          dot={(preset) => {
-            const dotSize =
-              preset <= 0 ? 2 : preset <= 33 ? 4 : preset <= 66 ? 6 : 8;
-            return (
-              <span
-                className="rounded-full bg-theme-foreground"
-                style={{ width: dotSize, height: dotSize }}
-              />
-            );
-          }}
-        />
-
-        <div className="relative h-2 w-full rounded-full bg-theme-muted">
-          <div
-            className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-            style={{ width: `${Math.round(settings.hardness * 100)}%` }}
-          />
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={1}
+        {/* Hardness */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+              Hardness
+            </label>
+            <span className="text-xs text-theme-foreground tabular-nums">
+              {Math.round(settings.hardness * 100)}%
+            </span>
+          </div>
+          <DotRow
+            presets={HARDNESS_PRESETS}
             value={Math.round(settings.hardness * 100)}
-            onChange={(e) =>
-              onChange({ ...settings, hardness: Number(e.target.value) / 100 })
-            }
-            className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
+            onSelect={(v) => onChange({ ...settings, hardness: v / 100 })}
+            dot={(preset) => {
+              const dotSize =
+                preset <= 0 ? 2 : preset <= 33 ? 4 : preset <= 66 ? 6 : 8;
+              return (
+                <span
+                  className="rounded-full bg-theme-foreground"
+                  style={{ width: dotSize, height: dotSize }}
+                />
+              );
+            }}
           />
+          <div className="relative h-2 w-full rounded-full bg-theme-muted">
+            <div
+              className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
+              style={{ width: `${Math.round(settings.hardness * 100)}%` }}
+            />
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(settings.hardness * 100)}
+              onChange={(e) =>
+                onChange({
+                  ...settings,
+                  hardness: Number(e.target.value) / 100,
+                })
+              }
+              className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Opacity */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+              Opacity
+            </label>
+            <span className="text-xs text-theme-foreground tabular-nums">
+              {Math.round(settings.opacity * 100)}%
+            </span>
+          </div>
+          <div className="relative h-2 w-full rounded-full bg-theme-muted">
+            <div
+              className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
+              style={{ width: `${Math.round(settings.opacity * 100)}%` }}
+            />
+            <input
+              type="range"
+              min={10}
+              max={100}
+              step={1}
+              value={Math.round(settings.opacity * 100)}
+              onChange={(e) =>
+                onChange({
+                  ...settings,
+                  opacity: Number(e.target.value) / 100,
+                })
+              }
+              className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
+            />
+          </div>
         </div>
       </div>
 
-      {/* ── Opacity ───────────────────────────────────────────────── */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-            Opacity
-          </label>
-          <span className="text-xs text-theme-foreground tabular-nums">
-            {Math.round(settings.opacity * 100)}%
-          </span>
-        </div>
+      {/* Divider */}
+      <div className="border-t border-border" />
 
-        <DotRow
-          presets={OPACITY_PRESETS}
-          value={Math.round(settings.opacity * 100)}
-          onSelect={(v) => onChange({ ...settings, opacity: v / 100 })}
-          dot={(preset) => {
-            const dotSize =
-              preset <= 25 ? 2 : preset <= 50 ? 4 : preset <= 75 ? 6 : 8;
-            return (
+      {/* Red Stamp Presets Section */}
+      <div className="space-y-3">
+        <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-muted/70 font-mono">
+          Red Stamps
+        </h4>
+        <p className="text-[10px] text-text-muted/60 leading-relaxed">
+          Select a stamp below, then click on the image to place it. Passes
+          through Rust for full undo/redo support.
+        </p>
+        <div className="grid grid-cols-1 gap-2">
+          {RED_STAMP_PRESETS.map((stamp) => (
+            <button
+              key={stamp.id}
+              onClick={() => handleStampPreset(stamp.label, stamp.color)}
+              className="group relative flex items-center justify-center py-3 px-4 rounded-lg border-2 border-dashed transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{
+                borderColor: stamp.color + "60",
+                backgroundColor: stamp.color + "08",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor =
+                  stamp.color + "a0";
+                (e.currentTarget as HTMLElement).style.backgroundColor =
+                  stamp.color + "15";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor =
+                  stamp.color + "60";
+                (e.currentTarget as HTMLElement).style.backgroundColor =
+                  stamp.color + "08";
+              }}
+            >
               <span
-                className="rounded-full bg-theme-foreground"
-                style={{ width: dotSize, height: dotSize }}
-              />
-            );
-          }}
-        />
-
-        <div className="relative h-2 w-full rounded-full bg-theme-muted">
-          <div
-            className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-            style={{ width: `${Math.round(settings.opacity * 100)}%` }}
-          />
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={Math.round(settings.opacity * 100)}
-            onChange={(e) =>
-              onChange({ ...settings, opacity: Number(e.target.value) / 100 })
-            }
-            className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-          />
+                className="text-sm font-black tracking-[0.15em] uppercase"
+                style={{
+                  color: stamp.color,
+                  fontFamily: '"Arial Black", "Impact", sans-serif',
+                  transform: "rotate(-2deg)",
+                  display: "inline-block",
+                  textShadow: `0 0 20px ${stamp.color}20`,
+                }}
+              >
+                [{stamp.label}]
+              </span>
+            </button>
+          ))}
         </div>
       </div>
     </div>
   );
 }
+
+// Also export as StampSettings for backwards compat
+export { StampSettingsPanel as StampSettings };
