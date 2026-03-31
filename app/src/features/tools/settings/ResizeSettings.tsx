@@ -17,11 +17,12 @@ interface ResizeSettingsProps {
   imageHeight: number;
   quality: number;
   onQualityChange: (q: number) => void;
-  onResize: (w: number, h: number) => void;
+  onResize: (w: number, h: number, savingsPercent: number) => void;
   compareActive: boolean;
   onToggleCompare: () => void;
   hasBeenModified: boolean;
   onAutoCompress: () => void;
+  onAutoApplyAll: (w: number, h: number) => void;
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
 }
@@ -43,6 +44,7 @@ export function ResizeSettings({
   onToggleCompare,
   hasBeenModified,
   onAutoCompress,
+  onAutoApplyAll,
   isCompressing,
   compressProgress,
 }: ResizeSettingsProps) {
@@ -81,7 +83,7 @@ export function ResizeSettings({
     const w = parseInt(width, 10);
     const h = parseInt(height, 10);
     if (w > 0 && h > 0) {
-      onResize(w, h);
+      onResize(w, h, savingsPercent);
     }
   };
 
@@ -167,13 +169,6 @@ export function ResizeSettings({
           </span>
         </button>
 
-        <Button
-          onClick={handleApplyResize}
-          disabled={disabled}
-          className="w-full gap-2"
-        >
-          Apply Resize
-        </Button>
       </div>
 
       {/* ── Quality — gradient slider ── */}
@@ -202,6 +197,7 @@ export function ResizeSettings({
             className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
           />
         </div>
+
       </div>
 
       {/* ── A/B Compare ── */}
@@ -274,7 +270,14 @@ export function ResizeSettings({
       </div>
 
       {/* ── Auto Compress All ── */}
-      <div className="pt-3 border-t border-theme-sidebar-border">
+      <div className="pt-3 border-t border-theme-sidebar-border space-y-3">
+        <Button
+          onClick={handleApplyResize}
+          disabled={disabled}
+          className="w-full gap-2"
+        >
+          Apply Resize &amp; Quality
+        </Button>
         <Button
           onClick={onAutoCompress}
           disabled={disabled || isCompressing}

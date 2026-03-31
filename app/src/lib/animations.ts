@@ -62,3 +62,10 @@ export const fadeIn: Variants = {
   visible: { opacity: 1, transition: { duration: 0.15 } },
   exit: { opacity: 0, transition: { duration: 0.15 } },
 };
+
+// Staggered thumbnail pop-in for gallery strip
+export const thumbEnter = (i: number) => ({
+  initial: { opacity: 0, scale: 0.85 },
+  animate: { opacity: 1, scale: 1 },
+  transition: { duration: 0.2, delay: i * 0.05 },
+});

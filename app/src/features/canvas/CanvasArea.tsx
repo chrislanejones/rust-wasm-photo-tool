@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { CompareSlider } from "./CompareSlider";
+import { CanvasLoader } from "@/components/CanvasLoader";
 
 interface TextInputState {
   screenX: number;
@@ -28,8 +29,9 @@ interface Props {
   onTextBlur?: () => void;
   textSettings?: { fontSize: number; fontWeight: string; textColor: string };
   containerRef?: React.RefObject<HTMLDivElement | null>;
-  // Item 2: Pan mode
   isPanning?: boolean;
+  isImageLoading?: boolean;
+  loadProgress?: number;
 }
 
 function getCursorForTool(
@@ -70,6 +72,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       textSettings,
       containerRef: externalContainerRef,
       isPanning = false,
+      isImageLoading = false,
+      loadProgress = 0,
     },
     ref,
   ) => {
@@ -165,6 +169,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         className="canvas-wrapper"
         ref={containerRef as React.RefObject<HTMLDivElement>}
       >
+        <CanvasLoader visible={isImageLoading} progress={loadProgress} />
         <canvas
           ref={ref}
           className="main-canvas"

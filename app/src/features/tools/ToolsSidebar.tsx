@@ -47,7 +47,8 @@ interface ToolsSidebarProps {
   onBrightness: (delta: number) => void;
   onContrast: (factor: number) => void;
   imageReady: boolean;
-  onResize: (newW: number, newH: number) => void;
+  onResize: (newW: number, newH: number, savingsPercent: number) => void;
+  onAutoApplyAll: (w: number, h: number) => void;
   imageWidth: number;
   imageHeight: number;
   quality: number;
@@ -94,6 +95,7 @@ export function ToolsSidebar({
   compareActive,
   onToggleCompare,
   onAutoCompress,
+  onAutoApplyAll,
   isCompressing,
   compressProgress,
   onApplyCrop,
@@ -108,7 +110,7 @@ export function ToolsSidebar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="fixed left-3 top-3 bottom-[48px] z-40 w-[296px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
+      className="fixed left-3 top-3 bottom-[48px] z-50 w-[296px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
       style={{
         boxShadow:
           "0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
@@ -148,6 +150,7 @@ export function ToolsSidebar({
             onToggleCompare={onToggleCompare}
             hasBeenModified={hasBeenModified}
             onAutoCompress={onAutoCompress}
+            onAutoApplyAll={onAutoApplyAll}
             isCompressing={isCompressing}
             compressProgress={compressProgress}
           />

@@ -79,6 +79,7 @@ export function AppShell() {
   const [hasBeenModified, setHasBeenModified] = useState(false);
   const [recentTexts, setRecentTexts] = useState<TextMemory[]>([]);
   const textIdCounter = useRef(0);
+  const [manualSavings, setManualSavings] = useState<Record<string, { savingsPercent: number }>>({});
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const loadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -262,6 +263,12 @@ export function AppShell() {
   }, []);
 
   const { progress: compressProgress, compressAll } = useAutoCompress();
+
+  // Persist auto-compress savings into manualSavings so badges don't clear
+  useEffect(() => {
+    if (Object.keys(compressProgress.savings).length === 0) return;
+    setManualSavings((prev) => ({ ...prev, ...compressProgress.savings }));
+  }, [compressProgress.savings]);
 
   const prevPhotoCount = useRef(0);
   useEffect(() => {
@@ -531,11 +538,14 @@ export function AppShell() {
   }, []);
 
   const handleResize = useCallback(
-    (w: number, h: number) => {
+    (w: number, h: number, savingsPercent: number) => {
       stamp.resize(w, h);
       setHasBeenModified(true);
+      if (activePhotoId && savingsPercent > 0) {
+        setManualSavings((prev) => ({ ...prev, [activePhotoId]: { savingsPercent } }));
+      }
     },
-    [stamp],
+    [stamp, activePhotoId],
   );
 
   const handleAutoCompress = useCallback(() => {
@@ -559,6 +569,31 @@ export function AppShell() {
     );
     setHasBeenModified(true);
   }, [photos, quality, exportFormat, compressAll]);
+
+  const handleAutoApplyAll = useCallback(
+    (w: number, h: number) => {
+      compressAll(
+        photos,
+        {
+          maxWidth: w,
+          maxHeight: h,
+          quality: quality / 100,
+          format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
+        },
+        (id: string, nf: File, nu: string) => {
+          setPhotos((p) =>
+            p.map((x) => {
+              if (x.id !== id) return x;
+              URL.revokeObjectURL(x.url);
+              return { ...x, file: nf, url: nu };
+            }),
+          );
+        },
+      );
+      setHasBeenModified(true);
+    },
+    [photos, quality, exportFormat, compressAll],
+  );
 
   const hasImage = stamp.state.ready;
   const canUndo = stamp.state.undoCount > 0;
@@ -653,6 +688,7 @@ export function AppShell() {
             compareActive={compareActive}
             onToggleCompare={handleToggleCompare}
             onAutoCompress={handleAutoCompress}
+            onAutoApplyAll={handleAutoApplyAll}
             isCompressing={compressProgress.running}
             compressProgress={compressProgress}
             onApplyCrop={drawingTools.applyCrop}
@@ -779,7 +815,7 @@ export function AppShell() {
             showTools={showTools}
             showHistory={showHistory}
             compressionProgress={compressProgress.items ?? {}}
-            compressionSavings={compressProgress.savings}
+            compressionSavings={{ ...manualSavings, ...compressProgress.savings }}
           />
         )}
       </AnimatePresence>
