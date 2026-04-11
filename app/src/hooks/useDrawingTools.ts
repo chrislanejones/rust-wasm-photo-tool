@@ -62,6 +62,8 @@ export function useDrawingTools({
       startPoint.current = p;
       lastPoint.current = p;
       preSnapshot.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // Clear old selection so the SVG overlay disappears while re-drawing
+      if (activeTool === "crop") setCropSelection(null);
     },
     [activeTool, canvasRef, getCoords],
   );
@@ -140,18 +142,7 @@ export function useDrawingTools({
           width: Math.round(w),
           height: Math.round(h),
         });
-        if (ctx && canvas) {
-          ctx.fillStyle = "rgba(0,0,0,0.5)";
-          ctx.fillRect(0, 0, canvas.width, y);
-          ctx.fillRect(0, y + h, canvas.width, canvas.height - (y + h));
-          ctx.fillRect(0, y, x, h);
-          ctx.fillRect(x + w, y, canvas.width - (x + w), h);
-          ctx.strokeStyle = "white";
-          ctx.setLineDash([5, 5]);
-          ctx.lineWidth = 1;
-          ctx.strokeRect(x, y, w, h);
-          ctx.setLineDash([]);
-        }
+        // Canvas stays clean — SVG overlay handles the visual crop UI
       }
     } else if (tool && (activeTool === "arrow" || activeTool === "shapes")) {
       if (activeTool === "arrow") {
@@ -205,6 +196,7 @@ export function useDrawingTools({
     onMouseMove,
     onMouseUp,
     cropSelection,
+    setCropSelection,
     applyCrop,
     clearCropSelection: () => setCropSelection(null),
   };

@@ -1,4 +1,5 @@
 import type { ToolSettings } from "@/lib/types";
+import { TabGroup } from "@/components/TabGroup";
 
 const SHAPES = [
   { id: "rect", label: "Rectangle" },
@@ -73,17 +74,14 @@ export function ShapesSettings({ settings, onChange }: ShapesSettingsProps) {
   const currentShape = settings.shape ?? "rect";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
         Shapes
       </h3>
 
       {/* Shape Selector */}
-      <div className="space-y-2.5">
-        <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-          Shape
-        </label>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-8">
+        <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-bg-tertiary">
           {SHAPES.map((shape) => {
             const active = currentShape === shape.id;
             return (
@@ -91,10 +89,10 @@ export function ShapesSettings({ settings, onChange }: ShapesSettingsProps) {
                 key={shape.id}
                 onClick={() => onChange({ ...settings, shape: shape.id })}
                 className={[
-                  "flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold font-mono transition-all",
+                  "flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold font-mono transition-all",
                   active
-                    ? "bg-accent text-text-primary ring-2 ring-accent/50 shadow-md"
-                    : "bg-bg-elevated border border-border text-text-secondary hover:border-border-active hover:text-text-primary",
+                    ? "bg-accent text-text-primary shadow-md"
+                    : "text-text-muted hover:text-text-primary hover:bg-bg-elevated",
                 ].join(" ")}
               >
                 <ShapeIcon type={shape.id} />
@@ -106,7 +104,7 @@ export function ShapesSettings({ settings, onChange }: ShapesSettingsProps) {
       </div>
 
       {/* Stroke Width */}
-      <div className="space-y-2.5">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
             Stroke Width
@@ -158,7 +156,7 @@ export function ShapesSettings({ settings, onChange }: ShapesSettingsProps) {
       </div>
 
       {/* Color */}
-      <div className="space-y-2.5">
+      <div className="space-y-4">
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Color
         </label>

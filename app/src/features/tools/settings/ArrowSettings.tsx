@@ -1,5 +1,5 @@
-// ===== FILE: app/src/features/tools/settings/ArrowSettings.tsx =====
 import type { ToolSettings } from "@/lib/types";
+import { TabGroup } from "@/components/TabGroup";
 
 const COLORS = [
   "#ef4444",
@@ -22,13 +22,13 @@ interface ArrowSettingsProps {
 
 export function ArrowSettings({ settings, onChange }: ArrowSettingsProps) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
         Arrow &amp; Pointer
       </h3>
 
       {/* ── Stroke Width ── */}
-      <div className="space-y-2.5">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
             Stroke Width
@@ -64,7 +64,7 @@ export function ArrowSettings({ settings, onChange }: ArrowSettingsProps) {
 
         <div className="relative h-2 w-full rounded-full bg-theme-muted">
           <div
-            className="absolute h-full rounded-full bg-linear-to-r from-theme-primary to-theme-chart4"
+            className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
             style={{ width: `${((settings.strokeWidth - 1) / 9) * 100}%` }}
           />
           <input
@@ -82,37 +82,28 @@ export function ArrowSettings({ settings, onChange }: ArrowSettingsProps) {
       </div>
 
       {/* ── Arrow Style ── */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Arrow Style
         </label>
-        <div className="grid grid-cols-2 gap-2 py-2">
-          {(["single", "double"] as const).map((style) => {
-            const active = settings.arrowStyle === style;
-            return (
-              <button
-                key={style}
-                onClick={() => onChange({ ...settings, arrowStyle: style })}
-                className={[
-                  "flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-all",
-                  active
-                    ? "bg-accent text-text-primary ring-2 ring-accent/50 shadow-md"
-                    : "bg-bg-elevated text-text-secondary hover:ring-2 hover:ring-accent/30",
-                ].join(" ")}
-              >
-                {style === "single" ? "→ Single" : "↔ Double"}
-              </button>
-            );
-          })}
-        </div>
+        <TabGroup
+          tabs={[
+            { id: "single", label: "→ Single" },
+            { id: "double", label: "↔ Double" },
+          ]}
+          active={settings.arrowStyle ?? "single"}
+          onChange={(id) =>
+            onChange({ ...settings, arrowStyle: id as "single" | "double" })
+          }
+        />
       </div>
 
       {/* ── Color ── */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Color
         </label>
-        <div className="grid grid-cols-5 gap-2 my-2">
+        <div className="grid grid-cols-5 gap-2 py-2">
           {COLORS.map((color) => {
             const active = settings.strokeColor === color;
             return (

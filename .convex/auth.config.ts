@@ -1,7 +1,8 @@
+// .convex/auth.config.ts
 export default {
   providers: [
     {
-      domain: process.env.CONVEX_SITE_URL,
+      domain: "https://grateful-dingo-89.clerk.accounts.dev",
       applicationID: "convex",
     },
   ],

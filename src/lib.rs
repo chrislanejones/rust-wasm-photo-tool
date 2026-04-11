@@ -155,8 +155,10 @@ impl CloneStampTool {
     // ── History ─────────────────────────────────────────────────────────
 
     pub fn undo(&mut self) -> bool {
-        if let Some(restored) = self.hist.undo(&self.buf.data) {
-            self.buf.data = restored;
+        if let Some((data, w, h)) = self.hist.undo(&self.buf.data, self.buf.width, self.buf.height) {
+            self.buf.data = data;
+            self.buf.width = w;
+            self.buf.height = h;
             true
         } else {
             false
@@ -164,8 +166,10 @@ impl CloneStampTool {
     }
 
     pub fn redo(&mut self) -> bool {
-        if let Some(restored) = self.hist.redo(&self.buf.data) {
-            self.buf.data = restored;
+        if let Some((data, w, h)) = self.hist.redo(&self.buf.data, self.buf.width, self.buf.height) {
+            self.buf.data = data;
+            self.buf.width = w;
+            self.buf.height = h;
             true
         } else {
             false
@@ -185,12 +189,14 @@ impl CloneStampTool {
     }
 
     pub fn jump_to_history(&mut self, target_index: usize) -> bool {
-        self.hist.jump_to(target_index, &mut self.buf.data)
+        self.hist.jump_to(target_index, &mut self.buf.data, &mut self.buf.width, &mut self.buf.height)
     }
 
     pub fn delete_history_entry(&mut self, index: usize) -> bool {
-        if let Some(restored) = self.hist.delete_entry(index) {
-            self.buf.data = restored;
+        if let Some((data, w, h)) = self.hist.delete_entry(index) {
+            self.buf.data = data;
+            self.buf.width = w;
+            self.buf.height = h;
             true
         } else {
             false
@@ -222,7 +228,7 @@ impl CloneStampTool {
     // ── Transforms ──────────────────────────────────────────────────────
 
     pub fn flip_horizontal(&mut self) {
-        self.hist.push_snapshot("Flip H", &self.buf.data);
+        self.hist.push_snapshot("Flip H", &self.buf.data, self.buf.width, self.buf.height);
         let w = self.buf.width as usize;
         let h = self.buf.height as usize;
         transform::flip_horizontal(&mut self.buf.data, w, h);
@@ -232,7 +238,7 @@ impl CloneStampTool {
     }
 
     pub fn flip_vertical(&mut self) {
-        self.hist.push_snapshot("Flip V", &self.buf.data);
+        self.hist.push_snapshot("Flip V", &self.buf.data, self.buf.width, self.buf.height);
         let w = self.buf.width as usize;
         let h = self.buf.height as usize;
         transform::flip_vertical(&mut self.buf.data, w, h);
@@ -242,7 +248,7 @@ impl CloneStampTool {
     }
 
     pub fn rotate_90_cw(&mut self) {
-        self.hist.push_snapshot("Rotate 90° CW", &self.buf.data);
+        self.hist.push_snapshot("Rotate 90° CW", &self.buf.data, self.buf.width, self.buf.height);
         let (new_data, new_w, new_h) =
             transform::rotate_90_cw(&self.buf.data, self.buf.width as usize, self.buf.height as usize);
         self.buf.data = new_data;
@@ -253,7 +259,7 @@ impl CloneStampTool {
     }
 
     pub fn rotate_90_ccw(&mut self) {
-        self.hist.push_snapshot("Rotate 90° CCW", &self.buf.data);
+        self.hist.push_snapshot("Rotate 90° CCW", &self.buf.data, self.buf.width, self.buf.height);
         let (new_data, new_w, new_h) =
             transform::rotate_90_ccw(&self.buf.data, self.buf.width as usize, self.buf.height as usize);
         self.buf.data = new_data;
@@ -264,7 +270,7 @@ impl CloneStampTool {
     }
 
     pub fn crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        self.hist.push_snapshot("Crop", &self.buf.data);
+        self.hist.push_snapshot("Crop", &self.buf.data, self.buf.width, self.buf.height);
         let (new_data, new_w, new_h) =
             transform::crop(&self.buf.data, self.buf.width, self.buf.height, x, y, w, h);
         self.buf.data = new_data;
@@ -278,7 +284,7 @@ impl CloneStampTool {
     /// Saves a snapshot, applies darkening overlay + dashed border.
     /// Call cancel_crop_preview() or apply_crop_from_preview() when done.
     pub fn preview_crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        self.hist.push_snapshot("Crop Preview", &self.buf.data);
+        self.hist.push_snapshot("Crop Preview", &self.buf.data, self.buf.width, self.buf.height);
         transform::apply_crop_overlay(
             &mut self.buf.data,
             self.buf.width,
@@ -304,8 +310,10 @@ impl CloneStampTool {
 
     /// Apply crop after preview: undo preview first, then crop for real.
     pub fn apply_crop_from_preview(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        if let Some(restored) = self.hist.undo(&self.buf.data) {
-            self.buf.data = restored;
+        if let Some((data, bw, bh)) = self.hist.undo(&self.buf.data, self.buf.width, self.buf.height) {
+            self.buf.data = data;
+            self.buf.width = bw;
+            self.buf.height = bh;
         }
         self.crop(x, y, w, h);
     }
@@ -322,7 +330,7 @@ impl CloneStampTool {
         dest_x: i32,
         dest_y: i32,
     ) {
-        self.hist.push_snapshot("Paste", &self.buf.data);
+        self.hist.push_snapshot("Paste", &self.buf.data, self.buf.width, self.buf.height);
         transform::paste_region(
             &mut self.buf.data,
             self.buf.width as i32,
@@ -341,7 +349,7 @@ impl CloneStampTool {
         if new_w == 0 || new_h == 0 {
             return;
         }
-        self.hist.push_snapshot("Resize", &self.buf.data);
+        self.hist.push_snapshot("Resize", &self.buf.data, self.buf.width, self.buf.height);
         let resized = transform::resize_bilinear(
             &self.buf.data,
             self.buf.width,
@@ -359,12 +367,12 @@ impl CloneStampTool {
     // ── Filters ─────────────────────────────────────────────────────────
 
     pub fn adjust_brightness(&mut self, delta: f64) {
-        self.hist.push_snapshot("Brightness", &self.buf.data);
+        self.hist.push_snapshot("Brightness", &self.buf.data, self.buf.width, self.buf.height);
         filters::adjust_brightness(&mut self.buf.data, delta);
     }
 
     pub fn adjust_contrast(&mut self, factor: f64) {
-        self.hist.push_snapshot("Contrast", &self.buf.data);
+        self.hist.push_snapshot("Contrast", &self.buf.data, self.buf.width, self.buf.height);
         filters::adjust_contrast(&mut self.buf.data, factor);
     }
 
@@ -392,7 +400,7 @@ impl CloneStampTool {
  
     /// Begin a blur stroke — saves undo snapshot once
     pub fn begin_blur_stroke(&mut self) {
-        self.hist.push_snapshot("Blur", &self.buf.data);
+        self.hist.push_snapshot("Blur", &self.buf.data, self.buf.width, self.buf.height);
     }
  
     // Note: No end_blur_stroke needed — the snapshot is already saved.
@@ -402,7 +410,7 @@ impl CloneStampTool {
     /// Save undo snapshot before drawing an arrow/shape.
     /// Call once on mousedown, then draw_arrow/draw_shape on mouseup.
     pub fn begin_draw_stroke(&mut self, label: &str) {
-        self.hist.push_snapshot(label, &self.buf.data);
+        self.hist.push_snapshot(label, &self.buf.data, self.buf.width, self.buf.height);
     }
  
     /// Draw an arrow onto the image buffer.
@@ -458,7 +466,7 @@ impl CloneStampTool {
         dest_x: i32,
         dest_y: i32,
     ) {
-        self.hist.push_snapshot("Emoji", &self.buf.data);
+        self.hist.push_snapshot("Emoji", &self.buf.data, self.buf.width, self.buf.height);
         transform::paste_region(
             &mut self.buf.data,
             self.buf.width as i32,
@@ -470,10 +478,43 @@ impl CloneStampTool {
             dest_y,
         );
     }
+    /// Like stamp_pixels but scales the source to `target_size × target_size`
+    /// first (bilinear), then composites it centered on (dest_x, dest_y).
+    /// Pushes "Red Stamp" to history (not "Emoji").
+    pub fn stamp_red(
+        &mut self,
+        pixels: &[u8],
+        src_w: u32,
+        src_h: u32,
+        dest_x: i32,
+        dest_y: i32,
+        target_size: u32,
+    ) {
+        self.hist.push_snapshot("Red Stamp", &self.buf.data, self.buf.width, self.buf.height);
+        // Scale stamp to target_size preserving aspect ratio
+        let scale = target_size as f64 / src_w.max(src_h) as f64;
+        let new_w = ((src_w as f64 * scale).round() as u32).max(1);
+        let new_h = ((src_h as f64 * scale).round() as u32).max(1);
+        let scaled = transform::resize_bilinear(pixels, src_w, src_h, new_w, new_h);
+        // Center on dest
+        let cx = dest_x - (new_w as i32 / 2);
+        let cy = dest_y - (new_h as i32 / 2);
+        transform::paste_region(
+            &mut self.buf.data,
+            self.buf.width as i32,
+            self.buf.height as i32,
+            &scaled,
+            new_w,
+            new_h,
+            cx,
+            cy,
+        );
+    }
+
     // ── Paint / Brush Tool ──────────────────────────────────────
 
     pub fn paint_begin(&mut self) {
-        self.hist.push_snapshot("Paint", &self.buf.data);
+        self.hist.push_snapshot("Paint", &self.buf.data, self.buf.width, self.buf.height);
     }
 
     pub fn paint_dab(

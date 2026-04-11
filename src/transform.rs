@@ -200,17 +200,19 @@ pub fn apply_crop_overlay(
 ) {
     let alpha = opacity.clamp(0.0, 1.0);
     let inv = 1.0 - alpha;
-
+ 
     let cx_end = (crop_x + crop_w).min(img_w);
     let cy_end = (crop_y + crop_h).min(img_h);
-
+ 
     for y in 0..img_h {
         for x in 0..img_w {
+            // Skip pixels inside the crop rectangle
             if x >= crop_x && x < cx_end && y >= crop_y && y < cy_end {
                 continue;
             }
             let idx = ((y * img_w + x) * 4) as usize;
             if idx + 2 < data.len() {
+                // Darken RGB channels, preserve alpha
                 data[idx]     = (data[idx]     as f64 * inv).round() as u8;
                 data[idx + 1] = (data[idx + 1] as f64 * inv).round() as u8;
                 data[idx + 2] = (data[idx + 2] as f64 * inv).round() as u8;
@@ -236,10 +238,11 @@ pub fn draw_crop_border(
     let cx_end = (crop_x + crop_w).min(img_w);
     let cy_end = (crop_y + crop_h).min(img_h);
     let pattern = dash_len + gap_len;
-
+ 
+    // Helper: set pixel if in bounds and on a dash
     let set_pixel = |data: &mut [u8], x: u32, y: u32, pos: u32| {
         if x >= img_w || y >= img_h { return; }
-        if pos % pattern >= dash_len { return; }
+        if pos % pattern >= dash_len { return; } // in gap
         let idx = ((y * img_w + x) * 4) as usize;
         if idx + 3 < data.len() {
             data[idx]     = color[0];
@@ -248,16 +251,20 @@ pub fn draw_crop_border(
             data[idx + 3] = color[3];
         }
     };
-
+ 
+    // Top edge
     for x in crop_x..cx_end {
         set_pixel(data, x, crop_y, x - crop_x);
     }
+    // Bottom edge
     for x in crop_x..cx_end {
         set_pixel(data, x, cy_end.saturating_sub(1), x - crop_x);
     }
+    // Left edge
     for y in crop_y..cy_end {
         set_pixel(data, crop_x, y, y - crop_y);
     }
+    // Right edge
     for y in crop_y..cy_end {
         set_pixel(data, cx_end.saturating_sub(1), y, y - crop_y);
     }

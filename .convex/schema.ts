@@ -1,19 +1,24 @@
+// .convex/schema.ts
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { authTables } from "@convex-dev/auth/server";
 
-const applicationTables = {
-  // Extended user profile (supplements authTables users)
-  userProfiles: defineTable({
-    userId: v.id("users"),
+export default defineSchema({
+  // ── Clerk-synced users ──────────────────────────────────
+  users: defineTable({
+    clerkId: v.string(),
+    email: v.optional(v.string()),
+    name: v.optional(v.string()),
+    avatarUrl: v.optional(v.string()),
     tier: v.union(v.literal("free"), v.literal("pro"), v.literal("team")),
     dailyUsage: v.number(),
     usageResetAt: v.number(),
-    avatarUrl: v.optional(v.string()),
+    createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_userId", ["userId"]),
+    .index("by_clerkId", ["clerkId"])
+    .index("by_email", ["email"]),
 
+  // ── Subscriptions ───────────────────────────────────────
   subscriptions: defineTable({
     userId: v.id("users"),
     stripeCustomerId: v.string(),
@@ -22,7 +27,7 @@ const applicationTables = {
     status: v.union(
       v.literal("active"),
       v.literal("canceled"),
-      v.literal("past_due")
+      v.literal("past_due"),
     ),
     currentPeriodEnd: v.number(),
     cancelAtPeriodEnd: v.boolean(),
@@ -31,6 +36,7 @@ const applicationTables = {
     .index("by_stripeCustomerId", ["stripeCustomerId"])
     .index("by_stripeSubId", ["stripeSubId"]),
 
+  // ── Projects ────────────────────────────────────────────
   projects: defineTable({
     userId: v.id("users"),
     name: v.string(),
@@ -46,9 +52,11 @@ const applicationTables = {
     .index("by_userId_createdAt", ["userId", "createdAt"])
     .index("by_shareToken", ["shareToken"]),
 
+  // ── Images ──────────────────────────────────────────────
   images: defineTable({
     projectId: v.id("projects"),
     userId: v.id("users"),
+    storageId: v.optional(v.id("_storage")),
     originalUrl: v.string(),
     processedUrl: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
@@ -65,6 +73,7 @@ const applicationTables = {
     .index("by_userId", ["userId"])
     .index("by_projectId_order", ["projectId", "order"]),
 
+  // ── Layers ──────────────────────────────────────────────
   layers: defineTable({
     imageId: v.id("images"),
     name: v.string(),
@@ -84,12 +93,13 @@ const applicationTables = {
       v.literal("hard-light"),
       v.literal("soft-light"),
       v.literal("difference"),
-      v.literal("exclusion")
+      v.literal("exclusion"),
     ),
   })
     .index("by_imageId", ["imageId"])
     .index("by_imageId_order", ["imageId", "order"]),
 
+  // ── Annotations ─────────────────────────────────────────
   annotations: defineTable({
     imageId: v.id("images"),
     layerId: v.id("layers"),
@@ -98,7 +108,7 @@ const applicationTables = {
       v.literal("ellipse"),
       v.literal("path"),
       v.literal("text"),
-      v.literal("arrow")
+      v.literal("arrow"),
     ),
     data: v.any(),
     style: v.object({
@@ -120,6 +130,7 @@ const applicationTables = {
     .index("by_imageId", ["imageId"])
     .index("by_layerId", ["layerId"]),
 
+  // ── History ─────────────────────────────────────────────
   history: defineTable({
     imageId: v.id("images"),
     userId: v.id("users"),
@@ -130,12 +141,12 @@ const applicationTables = {
       v.literal("ai_rembg"),
       v.literal("ai_upscale"),
       v.literal("ai_inpaint"),
-      v.literal("ai_alt")
+      v.literal("ai_alt"),
     ),
     target: v.union(
       v.literal("annotation"),
       v.literal("layer"),
-      v.literal("image")
+      v.literal("image"),
     ),
     targetId: v.string(),
     prevState: v.optional(v.any()),
@@ -145,6 +156,7 @@ const applicationTables = {
     .index("by_imageId", ["imageId"])
     .index("by_imageId_createdAt", ["imageId", "createdAt"]),
 
+  // ── AI Jobs ─────────────────────────────────────────────
   ai_jobs: defineTable({
     userId: v.id("users"),
     imageId: v.id("images"),
@@ -152,13 +164,13 @@ const applicationTables = {
       v.literal("rembg"),
       v.literal("upscale"),
       v.literal("inpaint"),
-      v.literal("alt")
+      v.literal("alt"),
     ),
     status: v.union(
       v.literal("pending"),
       v.literal("running"),
       v.literal("done"),
-      v.literal("failed")
+      v.literal("failed"),
     ),
     replicateId: v.optional(v.string()),
     input: v.any(),
@@ -172,9 +184,4 @@ const applicationTables = {
     .index("by_imageId", ["imageId"])
     .index("by_replicateId", ["replicateId"])
     .index("by_status", ["status"]),
-};
-
-export default defineSchema({
-  ...authTables,
-  ...applicationTables,
 });

@@ -11,8 +11,8 @@ import { useBrushPreview } from "@/hooks/useBrushPreview";
 import { useDrawingTools } from "@/hooks/useDrawingTools";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
-import { useRedStampTool } from "@/hooks/useRedStampTool";
 import { useTextTool } from "@/hooks/useTextTool";
+import { useRedStampTool } from "@/hooks/useRedStampTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
@@ -79,7 +79,6 @@ export function AppShell() {
   const [hasBeenModified, setHasBeenModified] = useState(false);
   const [recentTexts, setRecentTexts] = useState<TextMemory[]>([]);
   const textIdCounter = useRef(0);
-  const [manualSavings, setManualSavings] = useState<Record<string, { savingsPercent: number }>>({});
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const loadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -98,7 +97,7 @@ export function AppShell() {
         textColor: toolSettings.textColor,
       };
       setRecentTexts((prev) =>
-        [m, ...prev.filter((t) => t.text !== text)].slice(0, 3),
+        [m, ...prev.filter((t) => t.text !== text)].slice(0, 8),
       );
     },
     [toolSettings.fontSize, toolSettings.fontWeight, toolSettings.textColor],
@@ -112,6 +111,8 @@ export function AppShell() {
       window.removeEventListener("text-committed", handler as EventListener);
   }, [handleTextCommit]);
 
+  const reopenWithRef = useRef<((text: string) => void) | null>(null);
+
   const handleSelectRecentText = useCallback((m: TextMemory) => {
     setToolSettings((prev) => ({
       ...prev,
@@ -119,9 +120,7 @@ export function AppShell() {
       fontWeight: m.fontWeight,
       textColor: m.textColor,
     }));
-    window.dispatchEvent(
-      new CustomEvent("prefill-text", { detail: { text: m.text } }),
-    );
+    reopenWithRef.current?.(m.text);
   }, []);
 
   const loadImageWithProgress = useCallback(
@@ -246,7 +245,7 @@ export function AppShell() {
         return toolSettings.brushSize / 2;
       case "emoji":
         return (toolSettings.emojiSize * 1.2) / 2;
-      case "effects": // was "blur"
+      case "effects":  // was "blur"
         return toolSettings.blurSize / 2;
       case "stamp":
       default:
@@ -264,12 +263,6 @@ export function AppShell() {
 
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
-  // Persist auto-compress savings into manualSavings so badges don't clear
-  useEffect(() => {
-    if (Object.keys(compressProgress.savings).length === 0) return;
-    setManualSavings((prev) => ({ ...prev, ...compressProgress.savings }));
-  }, [compressProgress.savings]);
-
   const prevPhotoCount = useRef(0);
   useEffect(() => {
     const prev = prevPhotoCount.current;
@@ -280,11 +273,7 @@ export function AppShell() {
       const t2 = setTimeout(() => setShowTools(true), 500);
       const t3 = setTimeout(() => setShowGallery(true), 850);
       prevPhotoCount.current = curr;
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-      };
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
     if (curr === 0) {
       setShowUpload(true);
@@ -344,12 +333,7 @@ export function AppShell() {
       isBlurringRef.current = true;
       t.begin_blur_stroke();
       const { x, y } = getCoords(e);
-      t.blur_region(
-        x,
-        y,
-        toolSettings.blurSize / 2,
-        toolSettings.blurIntensity,
-      );
+      t.blur_region(x, y, toolSettings.blurSize / 2, toolSettings.blurIntensity);
       stamp.flushToCanvas();
     },
     [stamp, getCoords, toolSettings.blurSize, toolSettings.blurIntensity],
@@ -361,12 +345,7 @@ export function AppShell() {
       const t = stamp.toolRef.current;
       if (!t) return;
       const { x, y } = getCoords(e);
-      t.blur_region(
-        x,
-        y,
-        toolSettings.blurSize / 2,
-        toolSettings.blurIntensity,
-      );
+      t.blur_region(x, y, toolSettings.blurSize / 2, toolSettings.blurIntensity);
       stamp.flushToCanvas();
     },
     [stamp, getCoords, toolSettings.blurSize, toolSettings.blurIntensity],
@@ -411,13 +390,15 @@ export function AppShell() {
     syncState: stamp.syncState,
     active: activeTool === "text",
   });
+  reopenWithRef.current = textTool.reopenWith;
 
   const redStampTool = useRedStampTool({
     toolRef: stamp.toolRef,
     canvasRef,
-    flushToCanvas: stamp.flushToCanvas,
+    flushToCanvas: flushAndSync,
     syncState: stamp.syncState,
     active: activeTool === "stamp",
+    brushSize: stampSettings.brushSize,
   });
 
   const effectiveStamp = (() => {
@@ -450,13 +431,20 @@ export function AppShell() {
         onMouseMove: paintTool.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: paintTool.onMouseUp as typeof stamp.onMouseUp,
       };
-    if (activeTool === "stamp")
+    if (activeTool === "stamp") {
+      // Route to red stamp if a preset is selected, else clone stamp
+      const combinedDown: typeof stamp.onMouseDown = (e) => {
+        if (redStampTool.hasPendingStamp()) {
+          redStampTool.onMouseDown(e as React.MouseEvent<HTMLCanvasElement>);
+        } else {
+          stamp.onMouseDown(e);
+        }
+      };
       return {
         ...stamp,
-        onMouseDown: redStampTool.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: redStampTool.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: redStampTool.onMouseUp as typeof stamp.onMouseUp,
+        onMouseDown: combinedDown,
       };
+    }
     return stamp;
   })();
 
@@ -474,23 +462,6 @@ export function AppShell() {
     stamp.toolRef.current?.set_zoom(1.0);
     stamp.syncState();
   }, [stamp]);
-
-  // Alt+scroll zoom — registered as non-passive so preventDefault works
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (!e.altKey) return;
-      e.preventDefault();
-      if (e.deltaY < 0) {
-        handleZoomIn();
-      } else {
-        handleZoomOut();
-      }
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [handleZoomIn, handleZoomOut]);
 
   const handleCopyToClipboard = useCallback(async () => {
     const c = canvasRef.current;
@@ -538,14 +509,11 @@ export function AppShell() {
   }, []);
 
   const handleResize = useCallback(
-    (w: number, h: number, savingsPercent: number) => {
+    (w: number, h: number) => {
       stamp.resize(w, h);
       setHasBeenModified(true);
-      if (activePhotoId && savingsPercent > 0) {
-        setManualSavings((prev) => ({ ...prev, [activePhotoId]: { savingsPercent } }));
-      }
     },
-    [stamp, activePhotoId],
+    [stamp],
   );
 
   const handleAutoCompress = useCallback(() => {
@@ -569,31 +537,6 @@ export function AppShell() {
     );
     setHasBeenModified(true);
   }, [photos, quality, exportFormat, compressAll]);
-
-  const handleAutoApplyAll = useCallback(
-    (w: number, h: number) => {
-      compressAll(
-        photos,
-        {
-          maxWidth: w,
-          maxHeight: h,
-          quality: quality / 100,
-          format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
-        },
-        (id: string, nf: File, nu: string) => {
-          setPhotos((p) =>
-            p.map((x) => {
-              if (x.id !== id) return x;
-              URL.revokeObjectURL(x.url);
-              return { ...x, file: nf, url: nu };
-            }),
-          );
-        },
-      );
-      setHasBeenModified(true);
-    },
-    [photos, quality, exportFormat, compressAll],
-  );
 
   const hasImage = stamp.state.ready;
   const canUndo = stamp.state.undoCount > 0;
@@ -688,7 +631,6 @@ export function AppShell() {
             compareActive={compareActive}
             onToggleCompare={handleToggleCompare}
             onAutoCompress={handleAutoCompress}
-            onAutoApplyAll={handleAutoApplyAll}
             isCompressing={compressProgress.running}
             compressProgress={compressProgress}
             onApplyCrop={drawingTools.applyCrop}
@@ -736,6 +678,8 @@ export function AppShell() {
                 }}
                 containerRef={containerRef}
                 isPanning={isPanning}
+                cropSelection={drawingTools.cropSelection}
+                onCropChange={(sel) => drawingTools.setCropSelection(sel)}
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -815,7 +759,7 @@ export function AppShell() {
             showTools={showTools}
             showHistory={showHistory}
             compressionProgress={compressProgress.items ?? {}}
-            compressionSavings={{ ...manualSavings, ...compressProgress.savings }}
+            compressionSavings={compressProgress.savings}
           />
         )}
       </AnimatePresence>

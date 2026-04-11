@@ -84,6 +84,14 @@ declare module "stamp_tool" {
       dest_x: number,
       dest_y: number,
     ): void;
+    stamp_red(
+      pixels: Uint8Array,
+      src_w: number,
+      src_h: number,
+      dest_x: number,
+      dest_y: number,
+      target_size: number,
+    ): void;
     paint_begin(): void;
     paint_dab(
       cx: number,

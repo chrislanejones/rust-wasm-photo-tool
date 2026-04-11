@@ -1,3 +1,5 @@
+// ===== FILE: app/src/lib/types.ts =====
+
 export interface ImageData {
   id: string;
   file: File;
@@ -15,7 +17,7 @@ export type ToolType =
   | "arrow"
   | "ai"
   | "shapes"
-  | "effects" // was "blur" — now includes brightness, contrast, blur
+  | "effects"   // was "blur" — now includes brightness, contrast, blur
   | "emoji";
 
 export interface StampSettings {
@@ -38,8 +40,8 @@ export interface ToolSettings extends StampSettings {
   // Effects (was Blur)
   blurSize: number;
   blurIntensity: number;
-  effectBrightness: number; // -100 to +100, applied on commit
-  effectContrast: number; // 0 to 300, applied on commit (100 = neutral)
+  effectBrightness: number;  // -100 to +100, applied on commit
+  effectContrast: number;    // 0 to 300, applied on commit (100 = neutral)
 
   // Emoji
   emoji: string;

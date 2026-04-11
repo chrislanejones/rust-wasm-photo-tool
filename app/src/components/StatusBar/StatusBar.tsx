@@ -66,7 +66,16 @@ export function StatusBar({
 
   return (
     <footer className="status-bar">
-      <div className="status-section">🐴 Image Horse</div>
+      <div className="status-section">
+        <span
+          className={`source-status ${state.hasSource ? "has-source" : ""}`}
+        >
+          <span className="status-dot" />
+          {state.hasSource
+            ? "Source set — click to paint"
+            : "Alt+Click to set source"}
+        </span>
+      </div>
 
       <div className="status-section status-center">
         {showKbdHints && (
@@ -118,7 +127,7 @@ export function StatusBar({
           className="status-zoom opacity-40 hover:opacity-100 transition-opacity"
           title="Architecture diagram (opens in new tab)"
         >
-          v0.9.2-beta
+          v0.9.6-beta
         </a>
       </div>
     </footer>

@@ -89,6 +89,8 @@ impl StampState {
         self.stroke_pre_snapshot = Some(Snapshot {
             label: format!("Stamp {}", self.stroke_counter),
             data: data.to_vec(),
+            width: w as u32,
+            height: h as u32,
         });
         redo_stack.clear();
         self.stamp_at(data, w, h, dest_x, dest_y);

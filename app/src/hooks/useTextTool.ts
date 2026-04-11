@@ -32,6 +32,7 @@ export function useTextTool({
   const [textInput, setTextInput] = useState<TextInput | null>(null);
   const [pendingText, setPendingText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lastPositionRef = useRef<Omit<TextInput, "text"> | null>(null);
 
   useEffect(() => {
     if (!active) return;
@@ -114,11 +115,30 @@ export function useTextTool({
 
       if (textInput) commitText();
 
-      setTextInput({ screenX, screenY, canvasX, canvasY, text: pendingText });
+      const pos = { screenX, screenY, canvasX, canvasY };
+      lastPositionRef.current = pos;
+      setTextInput({ ...pos, text: pendingText });
       if (pendingText) setPendingText("");
       setTimeout(() => textareaRef.current?.focus(), 10);
     },
     [active, canvasRef, containerRef, textInput, commitText, pendingText],
+  );
+
+  // Re-open the canvas text box at the last used position with the given text.
+  // Falls back to prefill if no position has been recorded yet.
+  const reopenWith = useCallback(
+    (text: string) => {
+      const pos = lastPositionRef.current;
+      if (!pos) {
+        // No prior position — just prefill for the next canvas click
+        setPendingText(text);
+        return;
+      }
+      if (textInput) commitText();
+      setTextInput({ ...pos, text });
+      setTimeout(() => textareaRef.current?.focus(), 10);
+    },
+    [textInput, commitText],
   );
 
   const onTextKeyDown = useCallback(
@@ -148,5 +168,6 @@ export function useTextTool({
     onTextKeyDown,
     onTextChange,
     onTextBlur,
+    reopenWith,
   };
 }

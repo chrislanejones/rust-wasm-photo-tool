@@ -82,13 +82,7 @@ export function useKeyboardShortcuts({
       }
 
       // ─── Spacebar pan mode ──────────────────────────────
-      if (
-        e.code === "Space" &&
-        !e.altKey &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.shiftKey
-      ) {
+      if (e.code === "Space" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault();
         if (!spaceHeldRef.current) {
           spaceHeldRef.current = true;
@@ -133,26 +127,11 @@ export function useKeyboardShortcuts({
         }
 
         switch (e.code) {
-          case "KeyU":
-            e.preventDefault();
-            setShowUpload((v) => !v);
-            break;
-          case "KeyS":
-            e.preventDefault();
-            setShowTools((v) => !v);
-            break;
-          case "KeyG":
-            e.preventDefault();
-            setShowGallery((v) => !v);
-            break;
-          case "KeyH":
-            e.preventDefault();
-            setShowHistory((v) => !v);
-            break;
-          case "Slash":
-            e.preventDefault();
-            setShowKbdHints((v) => !v);
-            break;
+          case "KeyU": e.preventDefault(); setShowUpload((v) => !v); break;
+          case "KeyS": e.preventDefault(); setShowTools((v) => !v); break;
+          case "KeyG": e.preventDefault(); setShowGallery((v) => !v); break;
+          case "KeyH": e.preventDefault(); setShowHistory((v) => !v); break;
+          case "Slash": e.preventDefault(); setShowKbdHints((v) => !v); break;
           case "BracketLeft":
             e.preventDefault();
             onBrushSizeChange((prev) => {
@@ -169,38 +148,14 @@ export function useKeyboardShortcuts({
               return { ...prev, brushSize: next };
             });
             break;
-          case "Equal":
-            e.preventDefault();
-            onZoomIn();
-            break;
-          case "Minus":
-            e.preventDefault();
-            onZoomOut();
-            break;
-          case "Digit0":
-            e.preventDefault();
-            onZoomReset?.();
-            break;
-          case "KeyF":
-            e.preventDefault();
-            onFlipH?.();
-            break;
-          case "KeyV":
-            e.preventDefault();
-            onFlipV?.();
-            break;
-          case "KeyR":
-            e.preventDefault();
-            onRotateCw?.();
-            break;
-          case "KeyE":
-            e.preventDefault();
-            onExport();
-            break;
-          case "KeyD":
-            e.preventDefault();
-            onDeleteAll();
-            break;
+          case "Equal": e.preventDefault(); onZoomIn(); break;
+          case "Minus": e.preventDefault(); onZoomOut(); break;
+          case "Digit0": e.preventDefault(); onZoomReset?.(); break;
+          case "KeyF": e.preventDefault(); onFlipH?.(); break;
+          case "KeyV": e.preventDefault(); onFlipV?.(); break;
+          case "KeyR": e.preventDefault(); onRotateCw?.(); break;
+          case "KeyE": e.preventDefault(); onExport(); break;
+          case "KeyD": e.preventDefault(); onDeleteAll(); break;
         }
         return;
       }
@@ -227,29 +182,10 @@ export function useKeyboardShortcuts({
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [
-    onUndo,
-    onRedo,
-    onExport,
-    onDeleteAll,
-    onBrushSizeChange,
-    setBrushSizeOnTool,
-    setShowUpload,
-    setShowTools,
-    setShowGallery,
-    setShowHistory,
-    setShowKbdHints,
-    setShowShortcutModal,
-    onZoomIn,
-    onZoomOut,
-    onZoomReset,
-    onToolChange,
-    onFlipH,
-    onFlipV,
-    onRotateCw,
-    onCopyToClipboard,
-    onNextPhoto,
-    onPrevPhoto,
-    onSpaceDown,
-    onSpaceUp,
+    onUndo, onRedo, onExport, onDeleteAll, onBrushSizeChange,
+    setBrushSizeOnTool, setShowUpload, setShowTools, setShowGallery,
+    setShowHistory, setShowKbdHints, setShowShortcutModal, onZoomIn,
+    onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,
+    onCopyToClipboard, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
   ]);
 }

@@ -4,6 +4,12 @@ node_modules
 app/node_modules
 app/dist
 
+# Environment files — never commit secrets
+.env.local
+.env.*.local
+app/.env.local
+app/.env.*.local
+
 # Added by roll_repo_for_ai.sh
 roll_repo_for_ai.sh
 

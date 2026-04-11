@@ -22,13 +22,13 @@ interface PaintSettingsProps {
 
 export function PaintSettings({ settings, onChange }: PaintSettingsProps) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
         Paint / Brush
       </h3>
 
       {/* ── Brush Size ── */}
-      <div className="space-y-2.5">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
             Brush Size
@@ -82,7 +82,7 @@ export function PaintSettings({ settings, onChange }: PaintSettingsProps) {
       </div>
 
       {/* ── Opacity ── */}
-      <div className="space-y-2.5">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
             Opacity
@@ -112,7 +112,7 @@ export function PaintSettings({ settings, onChange }: PaintSettingsProps) {
       </div>
 
       {/* ── Color ── */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
           Color
         </label>

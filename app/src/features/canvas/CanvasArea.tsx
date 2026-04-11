@@ -1,7 +1,10 @@
-import React, { useCallback, useRef, useState } from "react";
+// ===== FILE: app/src/features/canvas/CanvasArea.tsx =====
+// Item 2: Spacebar pan (Photoshop-style hand tool)
+// Item 3: Alt+Scroll zoom fix (zoom transform now uses panOffset)
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
+import type { CropSelection } from "@/hooks/useDrawingTools";
 import { CompareSlider } from "./CompareSlider";
-import { CanvasLoader } from "@/components/CanvasLoader";
 
 interface TextInputState {
   screenX: number;
@@ -29,15 +32,13 @@ interface Props {
   onTextBlur?: () => void;
   textSettings?: { fontSize: number; fontWeight: string; textColor: string };
   containerRef?: React.RefObject<HTMLDivElement | null>;
+  // Item 2: Pan mode
   isPanning?: boolean;
-  isImageLoading?: boolean;
-  loadProgress?: number;
+  cropSelection?: CropSelection | null;
+  onCropChange?: (sel: CropSelection) => void;
 }
 
-function getCursorForTool(
-  tool?: string,
-  isPanning?: boolean,
-): string | undefined {
+function getCursorForTool(tool?: string, isPanning?: boolean): string | undefined {
   if (isPanning) return "grab";
   switch (tool) {
     case "text":
@@ -72,8 +73,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       textSettings,
       containerRef: externalContainerRef,
       isPanning = false,
-      isImageLoading = false,
-      loadProgress = 0,
+      cropSelection,
+      onCropChange,
     },
     ref,
   ) => {
@@ -84,12 +85,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
     // Item 2: Pan offset state
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-    const panStartRef = useRef<{
-      x: number;
-      y: number;
-      ox: number;
-      oy: number;
-    } | null>(null);
+    const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
     const [isDraggingPan, setIsDraggingPan] = useState(false);
 
     const handlePanMouseDown = useCallback(
@@ -132,6 +128,79 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       }
     }, [isDraggingPan]);
 
+    // ── Crop handle drag ───────────────────────────────────────────────
+    const cropDragRef = useRef<{
+      handle: string;
+      startX: number;
+      startY: number;
+      startSel: CropSelection;
+      scaleX: number;
+      scaleY: number;
+    } | null>(null);
+
+    const onCropChangeRef = useRef(onCropChange);
+    useEffect(() => { onCropChangeRef.current = onCropChange; });
+
+    useEffect(() => {
+      const onMove = (e: PointerEvent) => {
+        const drag = cropDragRef.current;
+        if (!drag || !onCropChangeRef.current || !canvasRef.current) return;
+        const canvas = canvasRef.current;
+        const { handle, startX, startY, startSel, scaleX, scaleY } = drag;
+        const dx = (e.clientX - startX) / scaleX;
+        const dy = (e.clientY - startY) / scaleY;
+        let { x, y, width: w, height: h } = startSel;
+        switch (handle) {
+          case "nw": x += dx; y += dy; w -= dx; h -= dy; break;
+          case "n":  y += dy; h -= dy; break;
+          case "ne": y += dy; w += dx; h -= dy; break;
+          case "e":  w += dx; break;
+          case "se": w += dx; h += dy; break;
+          case "s":  h += dy; break;
+          case "sw": x += dx; w -= dx; h += dy; break;
+          case "w":  x += dx; w -= dx; break;
+        }
+        const min = 10;
+        w = Math.max(min, w);
+        h = Math.max(min, h);
+        x = Math.max(0, Math.min(x, canvas.width - min));
+        y = Math.max(0, Math.min(y, canvas.height - min));
+        w = Math.min(w, canvas.width - x);
+        h = Math.min(h, canvas.height - y);
+        onCropChangeRef.current({
+          x: Math.round(x), y: Math.round(y),
+          width: Math.round(w), height: Math.round(h),
+        });
+      };
+      const onUp = () => { cropDragRef.current = null; };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      return () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+    }, []);
+
+    const handleCropPointerDown = useCallback(
+      (e: React.PointerEvent<SVGRectElement>, handle: string) => {
+        if (!cropSelection || !canvasRef.current) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        cropDragRef.current = {
+          handle,
+          startX: e.clientX,
+          startY: e.clientY,
+          startSel: { ...cropSelection },
+          scaleX: rect.width / canvas.width,
+          scaleY: rect.height / canvas.height,
+        };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      },
+      [cropSelection, canvasRef],
+    );
+
     let markerStyle: React.CSSProperties | null = null;
     if (state.sourcePos && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -169,7 +238,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         className="canvas-wrapper"
         ref={containerRef as React.RefObject<HTMLDivElement>}
       >
-        <CanvasLoader visible={isImageLoading} progress={loadProgress} />
         <canvas
           ref={ref}
           className="main-canvas"
@@ -182,9 +250,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           onMouseDown={wrappedMouseDown}
           onMouseMove={wrappedMouseMove}
           onMouseUp={wrappedMouseUp}
-          onMouseLeave={
-            isPanning ? handlePanMouseUp : isTextTool ? undefined : onMouseUp
-          }
+          onMouseLeave={isPanning ? handlePanMouseUp : isTextTool ? undefined : onMouseUp}
           onClick={isTextTool ? onCanvasClick : undefined}
           onMouseEnter={(e) =>
             onCanvasEnter(e.currentTarget.getBoundingClientRect())
@@ -192,6 +258,76 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           onMouseOut={onCanvasLeave}
         />
         <CompareSlider beforeUrl={beforeUrl} active={compareActive} />
+
+        {/* ── Crop overlay: dark mask + rule-of-thirds + draggable handles ── */}
+        {activeTool === "crop" && cropSelection && canvasRef.current && (() => {
+          const canvas = canvasRef.current!;
+          const r = canvas.getBoundingClientRect();
+          const sx = r.width / canvas.width;
+          const sy = r.height / canvas.height;
+          const { x, y, width: sw, height: sh } = cropSelection;
+          const vx = r.left + x * sx;
+          const vy = r.top + y * sy;
+          const vw = sw * sx;
+          const vh = sh * sy;
+          const HS = 9; // handle size in screen px
+
+          const handles = [
+            { id: "nw", hx: vx,        hy: vy,       cursor: "nw-resize" },
+            { id: "n",  hx: vx+vw/2,   hy: vy,       cursor: "n-resize"  },
+            { id: "ne", hx: vx+vw,     hy: vy,       cursor: "ne-resize" },
+            { id: "e",  hx: vx+vw,     hy: vy+vh/2,  cursor: "e-resize"  },
+            { id: "se", hx: vx+vw,     hy: vy+vh,    cursor: "se-resize" },
+            { id: "s",  hx: vx+vw/2,   hy: vy+vh,    cursor: "s-resize"  },
+            { id: "sw", hx: vx,        hy: vy+vh,    cursor: "sw-resize" },
+            { id: "w",  hx: vx,        hy: vy+vh/2,  cursor: "w-resize"  },
+          ];
+
+          return (
+            <svg
+              style={{
+                position: "fixed",
+                inset: 0,
+                width: "100vw",
+                height: "100vh",
+                pointerEvents: "none",
+                zIndex: 40,
+                overflow: "hidden",
+              }}
+            >
+              {/* Dark overlay — 4 rects framing the crop selection */}
+              <rect x={r.left} y={r.top}   width={r.width}        height={Math.max(0, vy - r.top)}         fill="rgba(0,0,0,0.55)" />
+              <rect x={r.left} y={vy + vh} width={r.width}        height={Math.max(0, r.bottom - (vy+vh))} fill="rgba(0,0,0,0.55)" />
+              <rect x={r.left} y={vy}      width={Math.max(0, vx - r.left)}        height={vh} fill="rgba(0,0,0,0.55)" />
+              <rect x={vx+vw}  y={vy}      width={Math.max(0, r.right - (vx+vw))}  height={vh} fill="rgba(0,0,0,0.55)" />
+
+              {/* Dashed selection border */}
+              <rect x={vx} y={vy} width={vw} height={vh}
+                fill="none" stroke="white" strokeWidth={1} strokeDasharray="5 5" />
+
+              {/* Rule-of-thirds guides */}
+              <line x1={vx + vw/3}   y1={vy} x2={vx + vw/3}   y2={vy+vh} stroke="rgba(255,255,255,0.38)" strokeWidth={0.75} />
+              <line x1={vx + 2*vw/3} y1={vy} x2={vx + 2*vw/3} y2={vy+vh} stroke="rgba(255,255,255,0.38)" strokeWidth={0.75} />
+              <line x1={vx} y1={vy + vh/3}   x2={vx+vw} y2={vy + vh/3}   stroke="rgba(255,255,255,0.38)" strokeWidth={0.75} />
+              <line x1={vx} y1={vy + 2*vh/3} x2={vx+vw} y2={vy + 2*vh/3} stroke="rgba(255,255,255,0.38)" strokeWidth={0.75} />
+
+              {/* Resize handles */}
+              {handles.map(h => (
+                <rect
+                  key={h.id}
+                  x={h.hx - HS/2} y={h.hy - HS/2}
+                  width={HS} height={HS}
+                  fill="white"
+                  stroke="rgba(0,0,0,0.35)"
+                  strokeWidth={1}
+                  rx={1}
+                  style={{ cursor: h.cursor, pointerEvents: "all" }}
+                  onPointerDown={(e) => handleCropPointerDown(e, h.id)}
+                />
+              ))}
+            </svg>
+          );
+        })()}
 
         {/* Brush cursor — hidden during pan */}
         {cursorVisible && !isTextTool && !cursor && !isPanning && (

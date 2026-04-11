@@ -12,6 +12,7 @@ interface UseRedStampToolOptions {
   flushToCanvas: () => void;
   syncState: () => void;
   active: boolean;
+  brushSize?: number;
 }
 
 function renderStampPixels(
@@ -69,6 +70,7 @@ export function useRedStampTool({
   flushToCanvas,
   syncState,
   active,
+  brushSize = 120,
 }: UseRedStampToolOptions) {
   const pendingStamp = useRef<PendingStamp | null>(null);
 
@@ -81,6 +83,9 @@ export function useRedStampTool({
     return () =>
       window.removeEventListener("red-stamp-select", handler as EventListener);
   }, [active]);
+
+  const brushSizeRef = useRef(brushSize);
+  brushSizeRef.current = brushSize;
 
   const onMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -97,10 +102,16 @@ export function useRedStampTool({
       const pixels = renderStampPixels(label, color);
       if (!pixels) return;
 
-      const destX = Math.round(cx - pixels.w / 2);
-      const destY = Math.round(cy - pixels.h / 2);
-
-      tool.stamp_pixels(pixels.data, pixels.w, pixels.h, destX, destY);
+      // Use stamp_red so Rust scales to brushSize and logs "Red Stamp" history
+      const targetSize = Math.max(40, brushSizeRef.current * 4);
+      tool.stamp_red(
+        pixels.data,
+        pixels.w,
+        pixels.h,
+        Math.round(cx),
+        Math.round(cy),
+        targetSize,
+      );
       flushToCanvas();
       syncState();
     },
@@ -110,5 +121,7 @@ export function useRedStampTool({
   const onMouseMove = useCallback(() => {}, []);
   const onMouseUp = useCallback(() => {}, []);
 
-  return { onMouseDown, onMouseMove, onMouseUp };
+  const hasPendingStamp = useCallback(() => !!pendingStamp.current, []);
+
+  return { onMouseDown, onMouseMove, onMouseUp, hasPendingStamp };
 }

@@ -1,7 +1,4 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
-// FIX: Removed premature </div> after "Apply Resize" button that broke the JSX tree.
-// The quality slider, A/B compare, performance gain, lighthouse score, and
-// Auto Compress All were all orphaned outside the root element.
 import { useCallback, useEffect, useState } from "react";
 import { SlidersHorizontal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,12 +14,11 @@ interface ResizeSettingsProps {
   imageHeight: number;
   quality: number;
   onQualityChange: (q: number) => void;
-  onResize: (w: number, h: number, savingsPercent: number) => void;
+  onResize: (w: number, h: number) => void;
   compareActive: boolean;
   onToggleCompare: () => void;
   hasBeenModified: boolean;
   onAutoCompress: () => void;
-  onAutoApplyAll: (w: number, h: number) => void;
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
 }
@@ -44,7 +40,6 @@ export function ResizeSettings({
   onToggleCompare,
   hasBeenModified,
   onAutoCompress,
-  onAutoApplyAll,
   isCompressing,
   compressProgress,
 }: ResizeSettingsProps) {
@@ -83,7 +78,7 @@ export function ResizeSettings({
     const w = parseInt(width, 10);
     const h = parseInt(height, 10);
     if (w > 0 && h > 0) {
-      onResize(w, h, savingsPercent);
+      onResize(w, h);
     }
   };
 
@@ -111,42 +106,109 @@ export function ResizeSettings({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8 flex flex-col h-full">
       <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
         Resize &amp; Compress
       </h3>
 
-      {/* ── Dimensions ── */}
-      <div className="space-y-3">
-        <h4 className="text-xs font-black uppercase text-text-primary tracking-widest">
-          Dimensions
-        </h4>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <input
-              type="number"
-              value={width}
-              onChange={(e) => handleWidthChange(e.target.value)}
-              min={1}
-              disabled={disabled}
-              className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
-            />
-            <span className="text-xs text-text-secondary">width</span>
+      {/* ── Content ── */}
+      <div className="space-y-8 flex-1">
+        {/* ── Performance Gain ── */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
+              Performance Gain
+            </h4>
+            <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest tabular-nums">
+              +{savingsPercent}%
+            </span>
           </div>
-          <div className="space-y-1">
-            <input
-              type="number"
-              value={height}
-              onChange={(e) => handleHeightChange(e.target.value)}
-              min={1}
-              disabled={disabled}
-              className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-700 ease-out ${trafficColor(savingsPercent)}`}
+              style={{ width: `${savingsPercent}%` }}
             />
-            <span className="text-xs text-text-secondary">height</span>
           </div>
         </div>
 
-        {/* Lock Aspect */}
+        {/* ── Lighthouse Score ── */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
+              Lighthouse Score
+            </h4>
+            <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest tabular-nums">
+              {lighthouseScore}%
+            </span>
+          </div>
+          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-700 ease-out ${trafficColor(lighthouseScore)}`}
+              style={{ width: `${lighthouseScore}%` }}
+            />
+          </div>
+        </div>
+
+        {/* ── Quality — gradient slider ── */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+              Quality
+            </label>
+            <span className="text-xs text-theme-foreground tabular-nums">
+              {quality}%
+            </span>
+          </div>
+
+          <div className="relative h-2 w-full rounded-full bg-theme-muted">
+            <div
+              className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
+              style={{ width: `${quality}%` }}
+            />
+            <input
+              type="range"
+              min={10}
+              max={100}
+              step={1}
+              value={quality}
+              onChange={(e) => handleQualityChange(Number(e.target.value))}
+              className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
+            />
+          </div>
+        </div>
+
+        {/* ── Dimensions ── */}
+        <div className="space-y-4">
+          <h4 className="text-xs font-black uppercase text-text-primary tracking-widest">
+            Dimensions
+          </h4>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <input
+                type="number"
+                value={width}
+                onChange={(e) => handleWidthChange(e.target.value)}
+                min={1}
+                disabled={disabled}
+                className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+              />
+              <span className="text-xs text-text-secondary">width</span>
+            </div>
+            <div className="space-y-1">
+              <input
+                type="number"
+                value={height}
+                onChange={(e) => handleHeightChange(e.target.value)}
+                min={1}
+                disabled={disabled}
+                className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+              />
+              <span className="text-xs text-text-secondary">height</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Lock Aspect ── */}
         <button
           onClick={() => setLockAspect((v) => !v)}
           className="flex items-center gap-3 w-full p-2 rounded-lg bg-theme-muted/20 hover:bg-theme-muted/30 transition-colors"
@@ -169,128 +231,60 @@ export function ResizeSettings({
           </span>
         </button>
 
+        {/* ── A/B Compare ── */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <button
+                onClick={onToggleCompare}
+                disabled={compareDisabled}
+                className={[
+                  "flex items-center gap-3 w-full p-3 rounded-lg transition-all",
+                  "text-xs font-black uppercase tracking-widest",
+                  compareActive
+                    ? "bg-theme-primary/15 ring-1 ring-theme-primary/40 text-theme-primary"
+                    : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground",
+                  compareDisabled
+                    ? "opacity-40 cursor-not-allowed"
+                    : "cursor-pointer",
+                ].join(" ")}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                {compareActive ? "Hide A/B Compare" : "Show A/B Compare"}
+              </button>
+            </div>
+          </TooltipTrigger>
+          {compareDisabled && (
+            <TooltipContent side="bottom" className="max-w-[220px] text-center">
+              <p className="text-xs">
+                Resize or adjust quality first, then use A/B compare to see the
+                difference vs. the original.
+              </p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
 
-      {/* ── Quality — gradient slider ── */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-            Quality
-          </label>
-          <span className="text-xs text-theme-foreground tabular-nums">
-            {quality}%
-          </span>
-        </div>
-
-        <div className="relative h-2 w-full rounded-full bg-theme-muted">
-          <div
-            className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-            style={{ width: `${quality}%` }}
-          />
-          <input
-            type="range"
-            min={10}
-            max={100}
-            step={1}
-            value={quality}
-            onChange={(e) => handleQualityChange(Number(e.target.value))}
-            className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-          />
-        </div>
-
-      </div>
-
-      {/* ── A/B Compare ── */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div>
-            <button
-              onClick={onToggleCompare}
-              disabled={compareDisabled}
-              className={[
-                "flex items-center gap-3 w-full p-3 rounded-lg transition-all",
-                "text-xs font-black uppercase tracking-widest",
-                compareActive
-                  ? "bg-theme-primary/15 ring-1 ring-theme-primary/40 text-theme-primary"
-                  : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground",
-                compareDisabled
-                  ? "opacity-40 cursor-not-allowed"
-                  : "cursor-pointer",
-              ].join(" ")}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              {compareActive ? "Hide A/B Compare" : "Show A/B Compare"}
-            </button>
-          </div>
-        </TooltipTrigger>
-        {compareDisabled && (
-          <TooltipContent side="bottom" className="max-w-[220px] text-center">
-            <p className="text-xs">
-              Resize or adjust quality first, then use A/B compare to see the
-              difference vs. the original.
-            </p>
-          </TooltipContent>
-        )}
-      </Tooltip>
-
-      {/* ── Performance Gain ── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
-            Performance Gain
-          </h4>
-          <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest tabular-nums">
-            +{savingsPercent}%
-          </span>
-        </div>
-        <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-          <div
-            className={`h-full transition-all duration-700 ease-out ${trafficColor(savingsPercent)}`}
-            style={{ width: `${savingsPercent}%` }}
-          />
-        </div>
-      </div>
-
-      {/* ── Lighthouse Score ── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
-            Lighthouse Score
-          </h4>
-          <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest tabular-nums">
-            {lighthouseScore}%
-          </span>
-        </div>
-        <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-          <div
-            className={`h-full transition-all duration-700 ease-out ${trafficColor(lighthouseScore)}`}
-            style={{ width: `${lighthouseScore}%` }}
-          />
-        </div>
-      </div>
-
-      {/* ── Auto Compress All ── */}
-      <div className="pt-3 border-t border-theme-sidebar-border space-y-3">
+      {/* ── Bottom Buttons ── */}
+      <div className="border-t border-theme-sidebar-border pt-4 space-y-2">
         <Button
           onClick={handleApplyResize}
           disabled={disabled}
           className="w-full gap-2"
         >
-          Apply Resize &amp; Quality
+          Apply Resize
         </Button>
         <Button
           onClick={onAutoCompress}
           disabled={disabled || isCompressing}
-          className="w-full bg-accent text-text-primary hover:ring-2 hover:ring-theme-primary/50 hover:ring-offset-2 hover:ring-offset-theme-background"
+          className="w-full gap-2 bg-accent text-text-primary hover:ring-2 hover:ring-theme-primary/50 hover:ring-offset-2 hover:ring-offset-theme-background"
         >
           <Zap className="h-4 w-4" />
-          {isCompressing
-            ? `Compressing ${compressProgress.completed}/${compressProgress.total}…`
-            : "Auto Compress All Images"}
+          {isCompressing ? "Compressing…" : "Auto Compress"}
         </Button>
 
         {isCompressing && (
-          <div className="mt-2 h-1.5 w-full bg-theme-muted rounded-full overflow-hidden">
+          <div className="h-1.5 w-full bg-theme-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-300"
               style={{
