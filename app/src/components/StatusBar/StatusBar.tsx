@@ -67,14 +67,7 @@ export function StatusBar({
   return (
     <footer className="status-bar">
       <div className="status-section">
-        <span
-          className={`source-status ${state.hasSource ? "has-source" : ""}`}
-        >
-          <span className="status-dot" />
-          {state.hasSource
-            ? "Source set — click to paint"
-            : "Alt+Click to set source"}
-        </span>
+        <p>Image House</p>
       </div>
 
       <div className="status-section status-center">

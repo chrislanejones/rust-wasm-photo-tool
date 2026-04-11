@@ -19,6 +19,8 @@ export interface CloneStampState {
   // Exposed so components can re-render when dimensions change (e.g. after rotate)
   width: number;
   height: number;
+  /** True if the loaded image contains any transparent pixels (from Rust alpha scan). */
+  hasTransparency: boolean;
 }
 
 export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
@@ -36,6 +38,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     zoom: 1,
     width: 0,
     height: 0,
+    hasTransparency: false,
   });
 
   const syncState = useCallback(() => {
@@ -62,6 +65,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       zoom: t.get_zoom(),
       width: t.width(),
       height: t.height(),
+      hasTransparency: t.has_transparency(),
     });
   }, []);
 
@@ -189,7 +193,13 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   }, [syncState]);
 
   // ── Export ────────────────────────────────────────────────────────────────
-  const exportPng = useCallback(() => {
+  // Derive a download filename: strip original extension, append "-revised" + new ext.
+  function revisedName(sourceName: string, ext: string): string {
+    const stem = sourceName.replace(/\.[^.]+$/, "");
+    return `${stem}-revised${ext}`;
+  }
+
+  const exportPng = useCallback((sourceName = "image") => {
     const t = toolRef.current;
     if (!t) return;
     const png = t.export_png();
@@ -197,15 +207,15 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "stamp-result.png";
+    a.download = revisedName(sourceName, ".png");
     a.click();
     URL.revokeObjectURL(url);
   }, []);
 
   const exportAs = useCallback(
-    (format: "png" | "jpeg" | "webp" | "avif", quality: number = 0.92) => {
+    (format: "png" | "jpeg" | "webp" | "avif", quality: number = 0.92, sourceName = "image") => {
       if (format === "png") {
-        exportPng();
+        exportPng(sourceName);
         return;
       }
       const canvas = canvasRef.current;
@@ -226,7 +236,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = `stamp-result${extMap[format]}`;
+          a.download = revisedName(sourceName, extMap[format]);
           a.click();
           URL.revokeObjectURL(url);
         },

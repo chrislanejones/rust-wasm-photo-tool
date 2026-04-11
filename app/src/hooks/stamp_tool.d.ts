@@ -27,6 +27,8 @@ declare module "stamp_tool" {
     delete_history_entry(index: number): boolean;
     clear_history(): void;
     get_image_data(): Uint8Array;
+    /** Returns true if any pixel in the loaded image has alpha < 255. */
+    has_transparency(): boolean;
     export_png(): Uint8Array;
     width(): number;
     height(): number;
@@ -88,6 +90,27 @@ declare module "stamp_tool" {
       pixels: Uint8Array,
       src_w: number,
       src_h: number,
+      dest_x: number,
+      dest_y: number,
+      target_size: number,
+    ): void;
+    /** Render text with the embedded Liberation Sans font and composite onto the buffer. */
+    commit_text(
+      text: string,
+      font_size: number,
+      r: number,
+      g: number,
+      b: number,
+      bold: boolean,
+      dest_x: number,
+      dest_y: number,
+    ): void;
+    /** Render a stamp label (bordered, rotated) entirely in Rust and composite centred on dest. */
+    commit_red_stamp(
+      label: string,
+      r: number,
+      g: number,
+      b: number,
       dest_x: number,
       dest_y: number,
       target_size: number,

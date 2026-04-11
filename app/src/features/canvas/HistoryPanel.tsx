@@ -52,12 +52,12 @@ export function HistoryPanel({
         {history.map((entry) => (
           <li
             key={entry.index}
-            className={`history-item type-${entry.type}`}
+            className={`large-badge-item type-${entry.type}`}
             onClick={() => onJump(entry.index)}
           >
             <span className="history-dot" />
             <span className="history-index">{entry.index}</span>
-            <span className="history-label">{entry.label}</span>
+            <span className="large-badge">{entry.label}</span>
 
             {entry.type === "undo" && (
               <button

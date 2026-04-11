@@ -15,55 +15,6 @@ interface UseRedStampToolOptions {
   brushSize?: number;
 }
 
-function renderStampPixels(
-  label: string,
-  color: string,
-): { data: Uint8Array; w: number; h: number } | null {
-  const fontSize = 48;
-  const font = `bold ${fontSize}px "Arial Black", Impact, sans-serif`;
-
-  // Measure text
-  const measure = new OffscreenCanvas(1, 1);
-  const mctx = measure.getContext("2d")!;
-  mctx.font = font;
-  const metrics = mctx.measureText(label);
-  const textW = Math.ceil(metrics.width);
-  const textH = fontSize;
-
-  // Pad for border + rotation
-  const pad = 20;
-  const w = textW + pad * 2;
-  const h = textH + pad * 2;
-
-  const oc = new OffscreenCanvas(w, h);
-  const ctx = oc.getContext("2d")!;
-
-  // Rotate -5deg around center
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate((-5 * Math.PI) / 180);
-  ctx.translate(-w / 2, -h / 2);
-
-  // Border rect
-  const bx = pad / 2;
-  const by = pad / 2;
-  const bw = w - pad;
-  const bh = h - pad;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(bx, by, bw, bh);
-
-  // Text
-  ctx.font = font;
-  ctx.fillStyle = color;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.globalAlpha = 0.85;
-  ctx.fillText(label, w / 2, h / 2);
-
-  const imgData = ctx.getImageData(0, 0, w, h);
-  return { data: new Uint8Array(imgData.data), w, h };
-}
-
 export function useRedStampTool({
   toolRef,
   canvasRef,
@@ -99,19 +50,17 @@ export function useRedStampTool({
       const cy = ((e.clientY - rect.top) * canvas.height) / rect.height;
 
       const { label, color } = pendingStamp.current;
-      const pixels = renderStampPixels(label, color);
-      if (!pixels) return;
 
-      // Use stamp_red so Rust scales to brushSize and logs "Red Stamp" history
+      // Parse CSS hex color → r, g, b
+      const hex = color.replace("#", "");
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+
+      // Rust renders the label (bordered, -5° rotated), scales to brush size,
+      // composites centred on the click point, and pushes "Red Stamp" history.
       const targetSize = Math.max(40, brushSizeRef.current * 4);
-      tool.stamp_red(
-        pixels.data,
-        pixels.w,
-        pixels.h,
-        Math.round(cx),
-        Math.round(cy),
-        targetSize,
-      );
+      tool.commit_red_stamp(label, r, g, b, Math.round(cx), Math.round(cy), targetSize);
       flushToCanvas();
       syncState();
     },

@@ -31,11 +31,18 @@ export function PhotoThumb({
   const isDone = progress === 100;
   const isError = progress === -1;
 
+  const hasTransparency = ["image/png", "image/webp", "image/svg+xml"].includes(
+    entry.file.type,
+  );
+
   return (
     <div
       className={`photo-thumb ${isActive ? "active" : ""}`}
       onClick={onSelect}
     >
+      {hasTransparency && (
+        <div className="absolute inset-0 checkerboard" />
+      )}
       <img
         src={entry.url}
         alt={entry.name}

@@ -32,6 +32,8 @@ interface ThumbProps {
   savings?: { savingsPercent: number };
 }
 
+const TRANSPARENT_TYPES = new Set(["image/png", "image/webp", "image/svg+xml"]);
+
 function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings }: ThumbProps) {
   const [loading, setLoading] = useState(true);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -46,6 +48,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings }
   const isDone = progress === 100;
   const isError = progress === -1;
   const hasSavings = savings != null && savings.savingsPercent > 0;
+  const maybeTransparent = TRANSPARENT_TYPES.has(entry.file.type);
 
   return (
     <motion.div
@@ -55,6 +58,9 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings }
       title={entry.name}
       {...thumbEnter(index)}
     >
+      {maybeTransparent && (
+        <div className="absolute inset-0 checkerboard rounded-lg" />
+      )}
       <img
         ref={imgRef}
         src={entry.url}
@@ -168,7 +174,7 @@ export function GalleryBar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="fixed left-0 right-0 bottom-[48px] z-40"
+      className="fixed left-0 right-0 bottom-[48px] z-40 pointer-events-none"
     >
       <motion.div
         animate={{
@@ -177,7 +183,7 @@ export function GalleryBar({
         }}
         transition={panelSpacingTransition}
         style={{ position: "relative" }}
-        className="bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
+        className="pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
       >
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">

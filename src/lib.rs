@@ -20,6 +20,7 @@ mod transform;
 mod filters;
 mod codec;
 mod drawing;
+mod text;
 
 use crate::core::ImageBuffer;
 use crate::history::History;
@@ -70,6 +71,11 @@ impl CloneStampTool {
 
     pub fn get_image_data(&self) -> Vec<u8> {
         self.buf.data.clone()
+    }
+
+    /// Returns true if any pixel in the current buffer has alpha < 255.
+    pub fn has_transparency(&self) -> bool {
+        self.buf.data.chunks_exact(4).any(|px| px[3] < 255)
     }
 
     pub fn data_ptr(&self) -> *const u8 {
@@ -508,6 +514,64 @@ impl CloneStampTool {
             new_h,
             cx,
             cy,
+        );
+    }
+
+    /// Render text entirely in Rust (Liberation Sans, embedded font) and
+    /// composite it onto the image buffer at (dest_x, dest_y).
+    /// Replaces the JS OffscreenCanvas → stamp_pixels pipeline for the text tool.
+    /// `dest_x/dest_y` is the top-left corner of the rendered text block.
+    pub fn commit_text(
+        &mut self,
+        text: &str,
+        font_size: f32,
+        r: u8, g: u8, b: u8,
+        bold: bool,
+        dest_x: i32,
+        dest_y: i32,
+    ) {
+        let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
+        self.hist.push_snapshot("Text", &self.buf.data, self.buf.width, self.buf.height);
+        transform::paste_region(
+            &mut self.buf.data,
+            self.buf.width as i32,
+            self.buf.height as i32,
+            &rendered.pixels,
+            rendered.width,
+            rendered.height,
+            dest_x,
+            dest_y,
+        );
+    }
+
+    /// Render a stamp label (e.g. "REJECTED") in Rust, scale it to
+    /// `target_size`, and composite it centred on (dest_x, dest_y).
+    /// Replaces the JS OffscreenCanvas → stamp_red pipeline for red stamps.
+    pub fn commit_red_stamp(
+        &mut self,
+        label: &str,
+        r: u8, g: u8, b: u8,
+        dest_x: i32,
+        dest_y: i32,
+        target_size: u32,
+    ) {
+        let font_size = 48.0f32;
+        let rendered = crate::text::render_stamp_label(label, font_size, r, g, b);
+        // Scale to target_size preserving aspect ratio
+        let scale = target_size as f64 / rendered.width.max(rendered.height) as f64;
+        let new_w = ((rendered.width as f64 * scale).round() as u32).max(1);
+        let new_h = ((rendered.height as f64 * scale).round() as u32).max(1);
+        let scaled = transform::resize_bilinear(&rendered.pixels, rendered.width, rendered.height, new_w, new_h);
+        self.hist.push_snapshot("Red Stamp", &self.buf.data, self.buf.width, self.buf.height);
+        transform::paste_region(
+            &mut self.buf.data,
+            self.buf.width as i32,
+            self.buf.height as i32,
+            &scaled,
+            new_w,
+            new_h,
+            dest_x - new_w as i32 / 2,
+            dest_y - new_h as i32 / 2,
         );
     }
 

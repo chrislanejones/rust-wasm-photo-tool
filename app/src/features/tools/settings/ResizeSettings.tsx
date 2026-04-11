@@ -280,7 +280,7 @@ export function ResizeSettings({
           className="w-full gap-2 bg-accent text-text-primary hover:ring-2 hover:ring-theme-primary/50 hover:ring-offset-2 hover:ring-offset-theme-background"
         >
           <Zap className="h-4 w-4" />
-          {isCompressing ? "Compressing…" : "Auto Compress"}
+          {isCompressing ? "Compressing…" : "Auto Compress All Images"}
         </Button>
 
         {isCompressing && (

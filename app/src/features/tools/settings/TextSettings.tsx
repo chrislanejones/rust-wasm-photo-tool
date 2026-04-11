@@ -44,26 +44,27 @@ export function TextSettings({
   onSelectRecentText,
 }: TextSettingsProps) {
   return (
-    <div className="space-y-8">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
-        Text Tool
-      </h3>
-
-      <p className="text-[10px] text-theme-muted-foreground leading-relaxed">
-        Click anywhere on the image to place text. Press{" "}
-        <kbd className="px-1 py-0.5 rounded bg-bg-elevated border border-border text-[9px]">
-          Enter
-        </kbd>{" "}
-        to commit,{" "}
-        <kbd className="px-1 py-0.5 rounded bg-bg-elevated border border-border text-[9px]">
-          Shift+Enter
-        </kbd>{" "}
-        for newline,{" "}
-        <kbd className="px-1 py-0.5 rounded bg-bg-elevated border border-border text-[9px]">
-          Esc
-        </kbd>{" "}
-        to cancel.
-      </p>
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
+          Text Tool
+        </h3>
+        <p className="text-[10px] text-theme-muted-foreground leading-relaxed">
+          Click anywhere on the image to place text. Press{" "}
+          <kbd className="px-1 py-0.5 rounded bg-bg-elevated border border-border text-[9px]">
+            Enter
+          </kbd>{" "}
+          to commit,{" "}
+          <kbd className="px-1 py-0.5 rounded bg-bg-elevated border border-border text-[9px]">
+            Shift+Enter
+          </kbd>{" "}
+          for newline,{" "}
+          <kbd className="px-1 py-0.5 rounded bg-bg-elevated border border-border text-[9px]">
+            Esc
+          </kbd>{" "}
+          to cancel.
+        </p>
+      </div>
 
       {/* Font Size */}
       <div className="space-y-4">
@@ -157,11 +158,15 @@ export function TextSettings({
       </div>
 
       {/* Recent Texts — click to re-open the last text box with that text */}
-      {recentTexts.length > 0 && (
-        <div className="space-y-4">
-          <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-            Recent Texts
-          </label>
+      <div className="space-y-4">
+        <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+          Recent Texts
+        </label>
+        {recentTexts.length === 0 ? (
+          <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs large-badge-item type-current">
+            <span className="large-badge">Add Text to See Text History</span>
+          </div>
+        ) : (
           <div className="space-y-2">
             {recentTexts.slice(0, 8).map((memory) => (
               <button
@@ -176,8 +181,8 @@ export function TextSettings({
               </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

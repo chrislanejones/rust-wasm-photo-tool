@@ -233,11 +233,27 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         ? undefined
         : onMouseUp;
 
+    const { width: imgW, height: imgH, hasTransparency } = hookResult.state;
+
     return (
       <div
         className="canvas-wrapper"
         ref={containerRef as React.RefObject<HTMLDivElement>}
       >
+        {/* Checkerboard behind the canvas — only when the image has transparent pixels */}
+        {hasTransparency && imgW > 0 && imgH > 0 && (
+          <div
+            className="checkerboard"
+            style={{
+              position: "absolute",
+              width: imgW,
+              height: imgH,
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
+              transformOrigin: "center center",
+              pointerEvents: "none",
+            }}
+          />
+        )}
         <canvas
           ref={ref}
           className="main-canvas"

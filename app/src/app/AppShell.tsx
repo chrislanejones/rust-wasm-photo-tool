@@ -287,8 +287,10 @@ export function AppShell() {
   }, [photos.length]);
 
   const handleExport = useCallback(() => {
-    stamp.exportAs(exportFormat, quality / 100);
-  }, [stamp, exportFormat, quality]);
+    const activeName =
+      photos.find((p) => p.id === activePhotoId)?.name ?? "image";
+    stamp.exportAs(exportFormat, quality / 100, activeName);
+  }, [stamp, exportFormat, quality, photos, activePhotoId]);
 
   const handleDeleteAll = useCallback(() => {
     const toRevoke = photos.map((p) => p.url);

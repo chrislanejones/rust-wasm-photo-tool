@@ -93,8 +93,8 @@ export function StampSettingsPanel({
       {/* ── Clone Stamp panel ── */}
       {mode === "clone" && (
         <div className="space-y-8">
-          <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs history-item type-current">
-            <span className="history-label">
+          <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs large-badge-item type-current">
+            <span className="large-badge">
               {hasSource
                 ? "Source set — click to paint"
                 : "Alt+Click to set source"}

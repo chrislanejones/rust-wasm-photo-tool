@@ -56,37 +56,20 @@ export function useTextTool({
 
     const { text, canvasX, canvasY } = textInput;
     const { fontSize, fontWeight, textColor } = settings;
-    const lines = text.split("\n");
-    const lineHeight = fontSize * 1.3;
-    const totalHeight = Math.ceil(lines.length * lineHeight + fontSize * 0.3);
 
-    const mc = new OffscreenCanvas(1, 1);
-    const mctx = mc.getContext("2d")!;
-    mctx.font = `${fontWeight} ${fontSize}px sans-serif`;
-    let maxWidth = 0;
-    for (const line of lines)
-      maxWidth = Math.max(maxWidth, mctx.measureText(line).width);
-    const totalWidth = Math.ceil(maxWidth + fontSize * 0.5);
-    if (totalWidth <= 0 || totalHeight <= 0) {
-      setTextInput(null);
-      return;
-    }
+    // Parse CSS hex color → r, g, b
+    const hex = textColor.replace("#", "");
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
 
-    const oc = new OffscreenCanvas(totalWidth, totalHeight);
-    const ctx = oc.getContext("2d")!;
-    ctx.clearRect(0, 0, totalWidth, totalHeight);
-    ctx.font = `${fontWeight} ${fontSize}px sans-serif`;
-    ctx.fillStyle = textColor;
-    ctx.textBaseline = "top";
-    ctx.textAlign = "left";
-    for (let i = 0; i < lines.length; i++)
-      ctx.fillText(lines[i], 0, i * lineHeight);
-
-    const imgData = ctx.getImageData(0, 0, totalWidth, totalHeight);
-    tool.stamp_pixels(
-      new Uint8Array(imgData.data),
-      totalWidth,
-      totalHeight,
+    // Rust renders the text using the embedded Liberation Sans font,
+    // composites it onto the buffer, and pushes a "Text" history entry.
+    tool.commit_text(
+      text,
+      fontSize,
+      r, g, b,
+      fontWeight === "bold",
       Math.round(canvasX),
       Math.round(canvasY),
     );

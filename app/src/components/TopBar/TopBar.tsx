@@ -15,6 +15,8 @@ import {
   History,
   Trash2,
   ChevronDown,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { UserMenu } from "@/components/UserMenu";
 
@@ -132,6 +134,39 @@ export function TopBar({
       >
         <div className="pointer-events-auto">
           <div className="flex items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border">
+            {/* Zoom */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
+                  <button
+                    onClick={onZoomOut}
+                    disabled={zoom <= 0.25}
+                    className="btn-icon"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </button>
+                  <span className="text-sm font-semibold font-mono w-12 text-center tabular-nums text-text-primary">
+                    {Math.round(zoom * 100)}%
+                  </span>
+                  <button
+                    onClick={onZoomIn}
+                    disabled={zoom >= 4}
+                    className="btn-icon"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="font-medium">Zoom</p>
+                <p className="text-muted-foreground text-xs">
+                  Alt + Scroll · Alt + / Alt −
+                </p>
+              </TooltipContent>
+            </Tooltip>
+
+            <div className="w-px h-6 bg-border shrink-0" />
+
             <div className="flex-1 flex justify-center">
               <div className="flex gap-1 p-1 rounded-lg bg-bg-tertiary">
                 {toggleButtons.map(
@@ -170,7 +205,7 @@ export function TopBar({
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setFormatOpen((v) => !v)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold font-mono text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-all"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold font-mono bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all"
                   >
                     {FORMAT_LABELS[exportFormat]}
                     <ChevronDown className="h-3 w-3 opacity-50" />

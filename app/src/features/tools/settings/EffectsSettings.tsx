@@ -1,9 +1,11 @@
 // ===== FILE: app/src/features/tools/settings/EffectsSettings.tsx =====
 // Item 7: Replaces BlurSettings. Adds brightness + contrast using Rust WASM.
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Sun, Contrast } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { TabGroup } from "@/components/TabGroup";
+import { quickSpring } from "@/lib/animations";
 
 const SIZE_PRESETS = [8, 16, 32, 64] as const;
 
@@ -53,9 +55,17 @@ export function EffectsSettings({
         onChange={(id) => setMode(id as EffectsMode)}
       />
 
+      {/* ── Tab panels — animate on switch ── */}
+      <AnimatePresence mode="wait">
       {/* ── Effects panel ── */}
       {mode === "effects" && (
-        <div className="space-y-8">
+        <motion.div
+          key="effects"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0, transition: quickSpring }}
+          exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+          className="space-y-8"
+        >
           {/* ── Brightness (Rust WASM) ── */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -126,12 +136,18 @@ export function EffectsSettings({
               100% = original. Processed via Rust adjust_contrast().
             </p>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* ── Blur Brush panel ── */}
       {mode === "blur" && (
-        <div className="space-y-8">
+        <motion.div
+          key="blur"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0, transition: quickSpring }}
+          exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+          className="space-y-8"
+        >
           {/* ── Blur Size ── */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -236,8 +252,9 @@ export function EffectsSettings({
             Click and drag on the image to blur regions. Uses WASM separable
             Gaussian blur.
           </p>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }
