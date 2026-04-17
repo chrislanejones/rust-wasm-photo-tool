@@ -51,6 +51,7 @@ const TOOL_HINTS: Record<string, { keys: string; action: string }[]> = {
   text: [
     { keys: "Click", action: "place text" },
     { keys: "Enter", action: "commit" },
+    { keys: "Shift+Enter", action: "newline" },
     { keys: "Esc", action: "cancel" },
   ],
   ai: [{ keys: "Alt+E", action: "export" }],

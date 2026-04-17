@@ -18,7 +18,9 @@ import type * as layers from "../layers.js";
 import type * as projects from "../projects.js";
 import type * as router from "../router.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as textHistory from "../textHistory.js";
 import type * as userProfiles from "../userProfiles.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -37,7 +39,9 @@ declare const fullApi: ApiFromModules<{
   projects: typeof projects;
   router: typeof router;
   subscriptions: typeof subscriptions;
+  textHistory: typeof textHistory;
   userProfiles: typeof userProfiles;
+  users: typeof users;
 }>;
 
 /**

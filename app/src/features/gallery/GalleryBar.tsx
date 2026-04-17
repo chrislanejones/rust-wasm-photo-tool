@@ -179,7 +179,7 @@ export function GalleryBar({
       <motion.div
         animate={{
           marginLeft: showTools ? 320 : 12,
-          marginRight: showHistory ? 244 : 12,
+          marginRight: showHistory ? 284 : 12,
         }}
         transition={panelSpacingTransition}
         style={{ position: "relative" }}

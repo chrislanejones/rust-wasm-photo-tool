@@ -20,6 +20,7 @@ interface UseDrawingToolsOptions {
   activeTool: ToolType;
   settings: ToolSettings;
   flushToCanvas: () => void;
+  syncState: () => void;
 }
 
 export function useDrawingTools({
@@ -28,6 +29,7 @@ export function useDrawingTools({
   activeTool,
   settings,
   flushToCanvas,
+  syncState,
 }: UseDrawingToolsOptions) {
   const isDrawing = useRef(false);
   const startPoint = useRef<Point | null>(null);
@@ -62,7 +64,6 @@ export function useDrawingTools({
       startPoint.current = p;
       lastPoint.current = p;
       preSnapshot.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      // Clear old selection so the SVG overlay disappears while re-drawing
       if (activeTool === "crop") setCropSelection(null);
     },
     [activeTool, canvasRef, getCoords],
@@ -79,7 +80,6 @@ export function useDrawingTools({
       lastPoint.current = p;
       const start = startPoint.current;
       ctx.putImageData(preSnapshot.current, 0, 0);
-
       if (activeTool === "arrow") {
         drawArrowPreview(
           ctx,
@@ -126,7 +126,6 @@ export function useDrawingTools({
     const ctx = canvas?.getContext("2d");
     const start = startPoint.current;
     const end = lastPoint.current ?? start;
-
     if (activeTool === "crop") {
       if (preSnapshot.current && ctx) {
         ctx.putImageData(preSnapshot.current, 0, 0);
@@ -142,7 +141,6 @@ export function useDrawingTools({
           width: Math.round(w),
           height: Math.round(h),
         });
-        // Canvas stays clean — SVG overlay handles the visual crop UI
       }
     } else if (tool && (activeTool === "arrow" || activeTool === "shapes")) {
       if (activeTool === "arrow") {
@@ -157,7 +155,6 @@ export function useDrawingTools({
           settings.arrowStyle === "double" ? 1 : 0,
         );
       } else {
-        // Shape map: 0=rect, 1=circle, 2=line, 3=handCircle (Rust)
         const shapeMap: Record<string, number> = {
           rect: 0,
           circle: 1,
@@ -176,11 +173,13 @@ export function useDrawingTools({
         );
       }
       flushToCanvas();
+      // FIX: sync React state so history/undo counters update after draw strokes
+      syncState();
     }
     startPoint.current = null;
     lastPoint.current = null;
     preSnapshot.current = null;
-  }, [activeTool, toolRef, canvasRef, settings, flushToCanvas]);
+  }, [activeTool, toolRef, canvasRef, settings, flushToCanvas, syncState]);
 
   const applyCrop = useCallback(() => {
     const tool = toolRef.current;
@@ -188,8 +187,12 @@ export function useDrawingTools({
     if (!tool || !sel) return;
     tool.crop(sel.x, sel.y, sel.width, sel.height);
     flushToCanvas();
+    // FIX (issue #3): call syncState so new dimensions + history entry
+    // propagate to React. Without this, Apply Crop appears to do nothing
+    // and the undo stack stays stuck at the previous count.
+    syncState();
     setCropSelection(null);
-  }, [toolRef, cropSelection, flushToCanvas]);
+  }, [toolRef, cropSelection, flushToCanvas, syncState]);
 
   return {
     onMouseDown,

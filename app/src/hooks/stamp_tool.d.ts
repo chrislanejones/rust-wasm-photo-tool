@@ -105,6 +105,10 @@ declare module "stamp_tool" {
       dest_x: number,
       dest_y: number,
     ): void;
+    /** Extract a region as PNG bytes without modifying the buffer. */
+    extract_region_png(x: number, y: number, w: number, h: number): Uint8Array;
+    /** Returns [width, height] in pixels for the given text, without committing. */
+    measure_text(text: string, font_size: number, bold: boolean): Uint32Array;
     /** Render a stamp label (bordered, rotated) entirely in Rust and composite centred on dest. */
     commit_red_stamp(
       label: string,

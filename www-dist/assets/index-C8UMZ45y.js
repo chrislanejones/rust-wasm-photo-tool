@@ -1,0 +1,521 @@
+import { g as He } from "./index-BZZll5Zl.js";
+function Je(s, o) {
+  for (var n = 0; n < o.length; n++) {
+    const c = o[n];
+    if (typeof c != "string" && !Array.isArray(c)) {
+      for (const i in c) if (i !== "default" && !(i in s)) {
+        const f = Object.getOwnPropertyDescriptor(c, i);
+        f && Object.defineProperty(s, i, f.get ? f : { enumerable: true, get: () => c[i] });
+      }
+    }
+  }
+  return Object.freeze(Object.defineProperty(s, Symbol.toStringTag, { value: "Module" }));
+}
+var x = { exports: {} }, Se;
+function Ve() {
+  return Se || (Se = 1, (function(s) {
+    var o = (function(n) {
+      var c = Object.prototype, i = c.hasOwnProperty, f = Object.defineProperty || function(r, e, t) {
+        r[e] = t.value;
+      }, p, k = typeof Symbol == "function" ? Symbol : {}, G = k.iterator || "@@iterator", j = k.asyncIterator || "@@asyncIterator", M = k.toStringTag || "@@toStringTag";
+      function O(r, e, t) {
+        return Object.defineProperty(r, e, { value: t, enumerable: true, configurable: true, writable: true }), r[e];
+      }
+      try {
+        O({}, "");
+      } catch {
+        O = function(e, t, u) {
+          return e[t] = u;
+        };
+      }
+      function C(r, e, t, u) {
+        var a = e && e.prototype instanceof y ? e : y, h = Object.create(a.prototype), L = new H(u || []);
+        return f(h, "_invoke", { value: Q(r, t, L) }), h;
+      }
+      n.wrap = C;
+      function D(r, e, t) {
+        try {
+          return { type: "normal", arg: r.call(e, t) };
+        } catch (u) {
+          return { type: "throw", arg: u };
+        }
+      }
+      var z = "suspendedStart", g = "suspendedYield", m = "executing", U = "completed", w = {};
+      function y() {
+      }
+      function R() {
+      }
+      function T() {
+      }
+      var B = {};
+      O(B, G, function() {
+        return this;
+      });
+      var F = Object.getPrototypeOf, W = F && F(F(J([])));
+      W && W !== c && i.call(W, G) && (B = W);
+      var N = T.prototype = y.prototype = Object.create(B);
+      R.prototype = T, f(N, "constructor", { value: T, configurable: true }), f(T, "constructor", { value: R, configurable: true }), R.displayName = O(T, M, "GeneratorFunction");
+      function Y(r) {
+        ["next", "throw", "return"].forEach(function(e) {
+          O(r, e, function(t) {
+            return this._invoke(e, t);
+          });
+        });
+      }
+      n.isGeneratorFunction = function(r) {
+        var e = typeof r == "function" && r.constructor;
+        return e ? e === R || (e.displayName || e.name) === "GeneratorFunction" : false;
+      }, n.mark = function(r) {
+        return Object.setPrototypeOf ? Object.setPrototypeOf(r, T) : (r.__proto__ = T, O(r, M, "GeneratorFunction")), r.prototype = Object.create(N), r;
+      }, n.awrap = function(r) {
+        return { __await: r };
+      };
+      function $(r, e) {
+        function t(h, L, S, b) {
+          var E = D(r[h], r, L);
+          if (E.type === "throw") b(E.arg);
+          else {
+            var l = E.arg, d = l.value;
+            return d && typeof d == "object" && i.call(d, "__await") ? e.resolve(d.__await).then(function(v) {
+              t("next", v, S, b);
+            }, function(v) {
+              t("throw", v, S, b);
+            }) : e.resolve(d).then(function(v) {
+              l.value = v, S(l);
+            }, function(v) {
+              return t("throw", v, S, b);
+            });
+          }
+        }
+        var u;
+        function a(h, L) {
+          function S() {
+            return new e(function(b, E) {
+              t(h, L, b, E);
+            });
+          }
+          return u = u ? u.then(S, S) : S();
+        }
+        f(this, "_invoke", { value: a });
+      }
+      Y($.prototype), O($.prototype, j, function() {
+        return this;
+      }), n.AsyncIterator = $, n.async = function(r, e, t, u, a) {
+        a === void 0 && (a = Promise);
+        var h = new $(C(r, e, t, u), a);
+        return n.isGeneratorFunction(e) ? h : h.next().then(function(L) {
+          return L.done ? L.value : h.next();
+        });
+      };
+      function Q(r, e, t) {
+        var u = z;
+        return function(h, L) {
+          if (u === m) throw new Error("Generator is already running");
+          if (u === U) {
+            if (h === "throw") throw L;
+            return Z();
+          }
+          for (t.method = h, t.arg = L; ; ) {
+            var S = t.delegate;
+            if (S) {
+              var b = P(S, t);
+              if (b) {
+                if (b === w) continue;
+                return b;
+              }
+            }
+            if (t.method === "next") t.sent = t._sent = t.arg;
+            else if (t.method === "throw") {
+              if (u === z) throw u = U, t.arg;
+              t.dispatchException(t.arg);
+            } else t.method === "return" && t.abrupt("return", t.arg);
+            u = m;
+            var E = D(r, e, t);
+            if (E.type === "normal") {
+              if (u = t.done ? U : g, E.arg === w) continue;
+              return { value: E.arg, done: t.done };
+            } else E.type === "throw" && (u = U, t.method = "throw", t.arg = E.arg);
+          }
+        };
+      }
+      function P(r, e) {
+        var t = e.method, u = r.iterator[t];
+        if (u === p) return e.delegate = null, t === "throw" && r.iterator.return && (e.method = "return", e.arg = p, P(r, e), e.method === "throw") || t !== "return" && (e.method = "throw", e.arg = new TypeError("The iterator does not provide a '" + t + "' method")), w;
+        var a = D(u, r.iterator, e.arg);
+        if (a.type === "throw") return e.method = "throw", e.arg = a.arg, e.delegate = null, w;
+        var h = a.arg;
+        if (!h) return e.method = "throw", e.arg = new TypeError("iterator result is not an object"), e.delegate = null, w;
+        if (h.done) e[r.resultName] = h.value, e.next = r.nextLoc, e.method !== "return" && (e.method = "next", e.arg = p);
+        else return h;
+        return e.delegate = null, w;
+      }
+      Y(N), O(N, M, "Generator"), O(N, G, function() {
+        return this;
+      }), O(N, "toString", function() {
+        return "[object Generator]";
+      });
+      function A(r) {
+        var e = { tryLoc: r[0] };
+        1 in r && (e.catchLoc = r[1]), 2 in r && (e.finallyLoc = r[2], e.afterLoc = r[3]), this.tryEntries.push(e);
+      }
+      function K(r) {
+        var e = r.completion || {};
+        e.type = "normal", delete e.arg, r.completion = e;
+      }
+      function H(r) {
+        this.tryEntries = [{ tryLoc: "root" }], r.forEach(A, this), this.reset(true);
+      }
+      n.keys = function(r) {
+        var e = Object(r), t = [];
+        for (var u in e) t.push(u);
+        return t.reverse(), function a() {
+          for (; t.length; ) {
+            var h = t.pop();
+            if (h in e) return a.value = h, a.done = false, a;
+          }
+          return a.done = true, a;
+        };
+      };
+      function J(r) {
+        if (r) {
+          var e = r[G];
+          if (e) return e.call(r);
+          if (typeof r.next == "function") return r;
+          if (!isNaN(r.length)) {
+            var t = -1, u = function a() {
+              for (; ++t < r.length; ) if (i.call(r, t)) return a.value = r[t], a.done = false, a;
+              return a.value = p, a.done = true, a;
+            };
+            return u.next = u;
+          }
+        }
+        return { next: Z };
+      }
+      n.values = J;
+      function Z() {
+        return { value: p, done: true };
+      }
+      return H.prototype = { constructor: H, reset: function(r) {
+        if (this.prev = 0, this.next = 0, this.sent = this._sent = p, this.done = false, this.delegate = null, this.method = "next", this.arg = p, this.tryEntries.forEach(K), !r) for (var e in this) e.charAt(0) === "t" && i.call(this, e) && !isNaN(+e.slice(1)) && (this[e] = p);
+      }, stop: function() {
+        this.done = true;
+        var r = this.tryEntries[0], e = r.completion;
+        if (e.type === "throw") throw e.arg;
+        return this.rval;
+      }, dispatchException: function(r) {
+        if (this.done) throw r;
+        var e = this;
+        function t(b, E) {
+          return h.type = "throw", h.arg = r, e.next = b, E && (e.method = "next", e.arg = p), !!E;
+        }
+        for (var u = this.tryEntries.length - 1; u >= 0; --u) {
+          var a = this.tryEntries[u], h = a.completion;
+          if (a.tryLoc === "root") return t("end");
+          if (a.tryLoc <= this.prev) {
+            var L = i.call(a, "catchLoc"), S = i.call(a, "finallyLoc");
+            if (L && S) {
+              if (this.prev < a.catchLoc) return t(a.catchLoc, true);
+              if (this.prev < a.finallyLoc) return t(a.finallyLoc);
+            } else if (L) {
+              if (this.prev < a.catchLoc) return t(a.catchLoc, true);
+            } else if (S) {
+              if (this.prev < a.finallyLoc) return t(a.finallyLoc);
+            } else throw new Error("try statement without catch or finally");
+          }
+        }
+      }, abrupt: function(r, e) {
+        for (var t = this.tryEntries.length - 1; t >= 0; --t) {
+          var u = this.tryEntries[t];
+          if (u.tryLoc <= this.prev && i.call(u, "finallyLoc") && this.prev < u.finallyLoc) {
+            var a = u;
+            break;
+          }
+        }
+        a && (r === "break" || r === "continue") && a.tryLoc <= e && e <= a.finallyLoc && (a = null);
+        var h = a ? a.completion : {};
+        return h.type = r, h.arg = e, a ? (this.method = "next", this.next = a.finallyLoc, w) : this.complete(h);
+      }, complete: function(r, e) {
+        if (r.type === "throw") throw r.arg;
+        return r.type === "break" || r.type === "continue" ? this.next = r.arg : r.type === "return" ? (this.rval = this.arg = r.arg, this.method = "return", this.next = "end") : r.type === "normal" && e && (this.next = e), w;
+      }, finish: function(r) {
+        for (var e = this.tryEntries.length - 1; e >= 0; --e) {
+          var t = this.tryEntries[e];
+          if (t.finallyLoc === r) return this.complete(t.completion, t.afterLoc), K(t), w;
+        }
+      }, catch: function(r) {
+        for (var e = this.tryEntries.length - 1; e >= 0; --e) {
+          var t = this.tryEntries[e];
+          if (t.tryLoc === r) {
+            var u = t.completion;
+            if (u.type === "throw") {
+              var a = u.arg;
+              K(t);
+            }
+            return a;
+          }
+        }
+        throw new Error("illegal catch attempt");
+      }, delegateYield: function(r, e, t) {
+        return this.delegate = { iterator: J(r), resultName: e, nextLoc: t }, this.method === "next" && (this.arg = p), w;
+      } }, n;
+    })(s.exports);
+    try {
+      regeneratorRuntime = o;
+    } catch {
+      typeof globalThis == "object" ? globalThis.regeneratorRuntime = o : Function("r", "regeneratorRuntime = r")(o);
+    }
+  })(x)), x.exports;
+}
+var ee, Ee;
+function we() {
+  return Ee || (Ee = 1, ee = (s, o) => `${s}-${o}-${Math.random().toString(16).slice(3, 8)}`), ee;
+}
+var re, Oe;
+function Fe() {
+  if (Oe) return re;
+  Oe = 1;
+  const s = we();
+  let o = 0;
+  return re = ({ id: n, action: c, payload: i = {} }) => {
+    let f = n;
+    return typeof f > "u" && (f = s("Job", o), o += 1), { id: f, action: c, payload: i };
+  }, re;
+}
+var V = {}, Re;
+function Le() {
+  if (Re) return V;
+  Re = 1;
+  let s = false;
+  return V.logging = s, V.setLogging = (o) => {
+    s = o;
+  }, V.log = (...o) => s ? console.log.apply(this, o) : null, V;
+}
+var te, be;
+function Ze() {
+  if (be) return te;
+  be = 1;
+  const s = Fe(), { log: o } = Le(), n = we();
+  let c = 0;
+  return te = () => {
+    const i = n("Scheduler", c), f = {}, p = {};
+    let k = [];
+    c += 1;
+    const G = () => k.length, j = () => Object.keys(f).length, M = () => {
+      if (k.length !== 0) {
+        const g = Object.keys(f);
+        for (let m = 0; m < g.length; m += 1) if (typeof p[g[m]] > "u") {
+          k[0](f[g[m]]);
+          break;
+        }
+      }
+    }, O = (g, m) => new Promise((U, w) => {
+      const y = s({ action: g, payload: m });
+      k.push(async (R) => {
+        k.shift(), p[R.id] = y;
+        try {
+          U(await R[g].apply(this, [...m, y.id]));
+        } catch (T) {
+          w(T);
+        } finally {
+          delete p[R.id], M();
+        }
+      }), o(`[${i}]: Add ${y.id} to JobQueue`), o(`[${i}]: JobQueue length=${k.length}`), M();
+    });
+    return { addWorker: (g) => (f[g.id] = g, o(`[${i}]: Add ${g.id}`), o(`[${i}]: Number of workers=${j()}`), M(), g.id), addJob: async (g, ...m) => {
+      if (j() === 0) throw Error(`[${i}]: You need to have at least one worker before adding jobs`);
+      return O(g, m);
+    }, terminate: async () => {
+      Object.keys(f).forEach(async (g) => {
+        await f[g].terminate();
+      }), k = [];
+    }, getQueueLen: G, getNumWorkers: j };
+  }, te;
+}
+function Qe(s) {
+  throw new Error('Could not dynamically require "' + s + '". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');
+}
+var ne, ke;
+function Xe() {
+  return ke || (ke = 1, ne = (s) => {
+    const o = {};
+    return typeof WorkerGlobalScope < "u" ? o.type = "webworker" : typeof document == "object" ? o.type = "browser" : typeof process == "object" && typeof Qe == "function" && (o.type = "node"), typeof s > "u" ? o : o[s];
+  }), ne;
+}
+var oe, Te;
+function xe() {
+  if (Te) return oe;
+  Te = 1;
+  const o = Xe()("type") === "browser" ? (n) => new URL(n, window.location.href).href : (n) => n;
+  return oe = (n) => {
+    const c = { ...n };
+    return ["corePath", "workerPath", "langPath"].forEach((i) => {
+      n[i] && (c[i] = o(c[i]));
+    }), c;
+  }, oe;
+}
+var ae, Ae;
+function $e() {
+  return Ae || (Ae = 1, ae = { TESSERACT_ONLY: 0, LSTM_ONLY: 1, TESSERACT_LSTM_COMBINED: 2, DEFAULT: 3 }), ae;
+}
+const er = "7.0.0", rr = { version: er };
+var ie, _e;
+function tr() {
+  return _e || (_e = 1, ie = { workerBlobURL: true, logger: () => {
+  } }), ie;
+}
+var se, qe;
+function nr() {
+  if (qe) return se;
+  qe = 1;
+  const s = rr.version;
+  return se = { ...tr(), workerPath: `https://cdn.jsdelivr.net/npm/tesseract.js@v${s}/dist/worker.min.js` }, se;
+}
+var ue, Ne;
+function or() {
+  return Ne || (Ne = 1, ue = ({ workerPath: s, workerBlobURL: o }) => {
+    let n;
+    if (Blob && URL && o) {
+      const c = new Blob([`importScripts("${s}");`], { type: "application/javascript" });
+      n = new Worker(URL.createObjectURL(c));
+    } else n = new Worker(s);
+    return n;
+  }), ue;
+}
+var ce, Pe;
+function ar() {
+  return Pe || (Pe = 1, ce = (s) => {
+    s.terminate();
+  }), ce;
+}
+var le, Ie;
+function ir() {
+  return Ie || (Ie = 1, le = (s, o) => {
+    s.onmessage = ({ data: n }) => {
+      o(n);
+    };
+  }), le;
+}
+var fe, Me;
+function sr() {
+  return Me || (Me = 1, fe = async (s, o) => {
+    s.postMessage(o);
+  }), fe;
+}
+var de, Ce;
+function ur() {
+  if (Ce) return de;
+  Ce = 1;
+  const s = (n) => new Promise((c, i) => {
+    const f = new FileReader();
+    f.onload = () => {
+      c(f.result);
+    }, f.onerror = ({ target: { error: { code: p } } }) => {
+      i(Error(`File could not be read! Code=${p}`));
+    }, f.readAsArrayBuffer(n);
+  }), o = async (n) => {
+    let c = n;
+    if (typeof n > "u") return "undefined";
+    if (typeof n == "string") /data:image\/([a-zA-Z]*);base64,([^"]*)/.test(n) ? c = atob(n.split(",")[1]).split("").map((i) => i.charCodeAt(0)) : c = await (await fetch(n)).arrayBuffer();
+    else if (typeof HTMLElement < "u" && n instanceof HTMLElement) n.tagName === "IMG" && (c = await o(n.src)), n.tagName === "VIDEO" && (c = await o(n.poster)), n.tagName === "CANVAS" && await new Promise((i) => {
+      n.toBlob(async (f) => {
+        c = await s(f), i();
+      });
+    });
+    else if (typeof OffscreenCanvas < "u" && n instanceof OffscreenCanvas) {
+      const i = await n.convertToBlob();
+      c = await s(i);
+    } else (n instanceof File || n instanceof Blob) && (c = await s(n));
+    return new Uint8Array(c);
+  };
+  return de = o, de;
+}
+var he, Ge;
+function cr() {
+  if (Ge) return he;
+  Ge = 1;
+  const s = nr(), o = or(), n = ar(), c = ir(), i = sr(), f = ur();
+  return he = { defaultOptions: s, spawnWorker: o, terminateWorker: n, onMessage: c, send: i, loadImage: f }, he;
+}
+var pe, je;
+function ze() {
+  if (je) return pe;
+  je = 1;
+  const s = xe(), o = Fe(), { log: n } = Le(), c = we(), i = $e(), { defaultOptions: f, spawnWorker: p, terminateWorker: k, onMessage: G, loadImage: j, send: M } = cr();
+  let O = 0;
+  return pe = async (C = "eng", D = i.LSTM_ONLY, z = {}, g = {}) => {
+    const m = c("Worker", O), { logger: U, errorHandler: w, ...y } = s({ ...f, ...z }), R = {}, T = typeof C == "string" ? C.split("+") : C;
+    let B = D, F = g;
+    const W = [i.DEFAULT, i.LSTM_ONLY].includes(D) && !y.legacyCore;
+    let N, Y;
+    const $ = new Promise((l, d) => {
+      Y = l, N = d;
+    }), Q = (l) => {
+      N(l.message);
+    };
+    let P = p(y);
+    P.onerror = Q, O += 1;
+    const A = ({ id: l, action: d, payload: v }) => new Promise((_, q) => {
+      n(`[${m}]: Start ${l}, action=${d}`);
+      const I = `${d}-${l}`;
+      R[I] = { resolve: _, reject: q }, M(P, { workerId: m, jobId: l, action: d, payload: v });
+    }), K = () => console.warn("`load` is depreciated and should be removed from code (workers now come pre-loaded)"), H = (l) => A(o({ id: l, action: "load", payload: { options: { lstmOnly: W, corePath: y.corePath, logging: y.logging } } })), J = (l, d, v) => A(o({ id: v, action: "FS", payload: { method: "writeFile", args: [l, d] } })), Z = (l, d) => A(o({ id: d, action: "FS", payload: { method: "readFile", args: [l, { encoding: "utf8" }] } })), r = (l, d) => A(o({ id: d, action: "FS", payload: { method: "unlink", args: [l] } })), e = (l, d, v) => A(o({ id: v, action: "FS", payload: { method: l, args: d } })), t = (l, d) => A(o({ id: d, action: "loadLanguage", payload: { langs: l, options: { langPath: y.langPath, dataPath: y.dataPath, cachePath: y.cachePath, cacheMethod: y.cacheMethod, gzip: y.gzip, lstmOnly: [i.DEFAULT, i.LSTM_ONLY].includes(B) && !y.legacyLang } } })), u = (l, d, v, _) => A(o({ id: _, action: "initialize", payload: { langs: l, oem: d, config: v } })), a = (l = "eng", d, v, _) => {
+      if (W && [i.TESSERACT_ONLY, i.TESSERACT_LSTM_COMBINED].includes(d)) throw Error("Legacy model requested but code missing.");
+      const q = d || B;
+      B = q;
+      const I = v || F;
+      F = I;
+      const X = (typeof l == "string" ? l.split("+") : l).filter((Ke) => !T.includes(Ke));
+      return T.push(...X), X.length > 0 ? t(X, _).then(() => u(l, q, I, _)) : u(l, q, I, _);
+    }, h = (l = {}, d) => A(o({ id: d, action: "setParameters", payload: { params: l } })), L = async (l, d = {}, v = { text: true }, _) => A(o({ id: _, action: "recognize", payload: { image: await j(l), options: d, output: v } })), S = async (l, d) => {
+      if (W) throw Error("`worker.detect` requires Legacy model, which was not loaded.");
+      return A(o({ id: d, action: "detect", payload: { image: await j(l) } }));
+    }, b = async () => (P !== null && (k(P), P = null), Promise.resolve());
+    G(P, ({ workerId: l, jobId: d, status: v, action: _, data: q }) => {
+      const I = `${_}-${d}`;
+      if (v === "resolve") n(`[${l}]: Complete ${d}`), R[I].resolve({ jobId: d, data: q }), delete R[I];
+      else if (v === "reject") if (R[I].reject(q), delete R[I], _ === "load" && N(q), w) w(q);
+      else throw Error(q);
+      else v === "progress" && U({ ...q, userJobId: d });
+    });
+    const E = { id: m, worker: P, load: K, writeText: J, readText: Z, removeFile: r, FS: e, reinitialize: a, setParameters: h, recognize: L, detect: S, terminate: b };
+    return H().then(() => t(C)).then(() => u(C, D, g)).then(() => Y(E)).catch(() => {
+    }), $;
+  }, pe;
+}
+var ve, De;
+function lr() {
+  if (De) return ve;
+  De = 1;
+  const s = ze();
+  return ve = { recognize: async (c, i, f) => {
+    const p = await s(i, 1, f);
+    return p.recognize(c).finally(async () => {
+      await p.terminate();
+    });
+  }, detect: async (c, i) => {
+    const f = await s("osd", 0, i);
+    return f.detect(c).finally(async () => {
+      await f.terminate();
+    });
+  } }, ve;
+}
+var ge, Ue;
+function fr() {
+  return Ue || (Ue = 1, ge = { AFR: "afr", AMH: "amh", ARA: "ara", ASM: "asm", AZE: "aze", AZE_CYRL: "aze_cyrl", BEL: "bel", BEN: "ben", BOD: "bod", BOS: "bos", BUL: "bul", CAT: "cat", CEB: "ceb", CES: "ces", CHI_SIM: "chi_sim", CHI_TRA: "chi_tra", CHR: "chr", CYM: "cym", DAN: "dan", DEU: "deu", DZO: "dzo", ELL: "ell", ENG: "eng", ENM: "enm", EPO: "epo", EST: "est", EUS: "eus", FAS: "fas", FIN: "fin", FRA: "fra", FRK: "frk", FRM: "frm", GLE: "gle", GLG: "glg", GRC: "grc", GUJ: "guj", HAT: "hat", HEB: "heb", HIN: "hin", HRV: "hrv", HUN: "hun", IKU: "iku", IND: "ind", ISL: "isl", ITA: "ita", ITA_OLD: "ita_old", JAV: "jav", JPN: "jpn", KAN: "kan", KAT: "kat", KAT_OLD: "kat_old", KAZ: "kaz", KHM: "khm", KIR: "kir", KOR: "kor", KUR: "kur", LAO: "lao", LAT: "lat", LAV: "lav", LIT: "lit", MAL: "mal", MAR: "mar", MKD: "mkd", MLT: "mlt", MSA: "msa", MYA: "mya", NEP: "nep", NLD: "nld", NOR: "nor", ORI: "ori", PAN: "pan", POL: "pol", POR: "por", PUS: "pus", RON: "ron", RUS: "rus", SAN: "san", SIN: "sin", SLK: "slk", SLV: "slv", SPA: "spa", SPA_OLD: "spa_old", SQI: "sqi", SRP: "srp", SRP_LATN: "srp_latn", SWA: "swa", SWE: "swe", SYR: "syr", TAM: "tam", TEL: "tel", TGK: "tgk", TGL: "tgl", THA: "tha", TIR: "tir", TUR: "tur", UIG: "uig", UKR: "ukr", URD: "urd", UZB: "uzb", UZB_CYRL: "uzb_cyrl", VIE: "vie", YID: "yid" }), ge;
+}
+var ye, We;
+function dr() {
+  return We || (We = 1, ye = { OSD_ONLY: "0", AUTO_OSD: "1", AUTO_ONLY: "2", AUTO: "3", SINGLE_COLUMN: "4", SINGLE_BLOCK_VERT_TEXT: "5", SINGLE_BLOCK: "6", SINGLE_LINE: "7", SINGLE_WORD: "8", CIRCLE_WORD: "9", SINGLE_CHAR: "10", SPARSE_TEXT: "11", SPARSE_TEXT_OSD: "12", RAW_LINE: "13" }), ye;
+}
+var me, Be;
+function hr() {
+  if (Be) return me;
+  Be = 1, Ve();
+  const s = Ze(), o = ze(), n = lr(), c = fr(), i = $e(), f = dr(), { setLogging: p } = Le();
+  return me = { languages: c, OEM: i, PSM: f, createScheduler: s, createWorker: o, setLogging: p, ...n }, me;
+}
+var Ye = hr();
+const pr = He(Ye), yr = Je({ __proto__: null, default: pr }, [Ye]);
+export {
+  yr as i
+};

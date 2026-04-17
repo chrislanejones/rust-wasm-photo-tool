@@ -12,6 +12,7 @@ import { useDrawingTools } from "@/hooks/useDrawingTools";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
 import { useTextTool } from "@/hooks/useTextTool";
+import { useTextExtract } from "@/hooks/useTextExtract";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
@@ -236,6 +237,7 @@ export function AppShell() {
   const [showShortcutModal, setShowShortcutModal] = useState(false);
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
+  const [textExtractActive, setTextExtractActive] = useState(false);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("jpeg");
   const [quality, setQuality] = useState(75);
 
@@ -285,6 +287,10 @@ export function AppShell() {
     prevPhotoCount.current = curr;
     return undefined;
   }, [photos.length]);
+
+  const handleTextFontSizeChange = useCallback((size: number) => {
+    setToolSettings((prev) => ({ ...prev, fontSize: size }));
+  }, []);
 
   const handleExport = useCallback(() => {
     const activeName =
@@ -365,6 +371,7 @@ export function AppShell() {
     activeTool,
     settings: toolSettings,
     flushToCanvas: flushAndSync,
+    syncState: stamp.syncState, 
   });
 
   const emojiTool = useEmojiTool({
@@ -393,6 +400,13 @@ export function AppShell() {
     active: activeTool === "text",
   });
   reopenWithRef.current = textTool.reopenWith;
+
+  const textExtract = useTextExtract({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    active: textExtractActive && activeTool === "text",
+    flushToCanvas: stamp.flushToCanvas,
+  });
 
   const redStampTool = useRedStampTool({
     toolRef: stamp.toolRef,
@@ -606,7 +620,7 @@ export function AppShell() {
           <ToolsSidebar
             onClose={() => setShowTools(false)}
             activeTool={activeTool}
-            onToolChange={setActiveTool}
+            onToolChange={(t) => { setActiveTool(t); setTextExtractActive(false); }}
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
             hasSource={stamp.state.hasSource}
@@ -640,6 +654,11 @@ export function AppShell() {
             onToolSettingsChange={setToolSettings}
             recentTexts={recentTexts}
             onSelectRecentText={handleSelectRecentText}
+            onStartTextExtract={() => setTextExtractActive((v) => !v)}
+            textExtractActive={textExtractActive}
+            recognizedText={textExtract.recognizedText}
+            isRecognizing={textExtract.isRecognizing}
+            onClearRecognizedText={textExtract.clearText}
           />
         )}
       </AnimatePresence>
@@ -649,7 +668,7 @@ export function AppShell() {
           <motion.main
             animate={{
               marginLeft: showTools ? 320 : 0,
-              marginRight: showHistory ? 244 : 0,
+              marginRight: showHistory ? 284 : 0,
             }}
             transition={panelSpacingTransition}
             className="main-content"
@@ -679,6 +698,11 @@ export function AppShell() {
                   textColor: toolSettings.textColor,
                 }}
                 containerRef={containerRef}
+                onTextPositionChange={textTool.setTextPosition}
+                onTextFontSizeChange={handleTextFontSizeChange}
+                extractMouseDown={textExtract.onMouseDown}
+                extractMouseMove={textExtract.onMouseMove}
+                extractMouseUp={textExtract.onMouseUp}
                 isPanning={isPanning}
                 cropSelection={drawingTools.cropSelection}
                 onCropChange={(sel) => drawingTools.setCropSelection(sel)}

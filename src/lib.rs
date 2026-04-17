@@ -231,6 +231,26 @@ impl CloneStampTool {
         codec::thumbnail_data(&self.buf, max_px).0
     }
 
+    pub fn extract_region_png(&self, x: i32, y: i32, w: u32, h: u32) -> Vec<u8> {
+        // Reuse the existing copy_region which handles out-of-bounds
+        // sampling by filling with transparent pixels (0,0,0,0).
+        let pixels = transform::copy_region(
+            &self.buf.data,
+            self.buf.width as i32,
+            self.buf.height as i32,
+            x, y, w, h,
+        );
+        // Build a throwaway ImageBuffer at the region's dimensions and
+        // pipe it through the existing PNG encoder. Does NOT push a
+        // history snapshot or modify self.buf — this is a pure read.
+        let tmp = crate::core::ImageBuffer {
+            width: w,
+            height: h,
+            data: pixels,
+        };
+        codec::export_png(&tmp)
+    }
+
     // ── Transforms ──────────────────────────────────────────────────────
 
     pub fn flip_horizontal(&mut self) {
@@ -542,6 +562,13 @@ impl CloneStampTool {
             dest_x,
             dest_y,
         );
+    }
+
+    /// Returns [width, height] in pixels of the text as rendered by `commit_text`,
+    /// without modifying the image buffer. Used to size the text-input handle box.
+    pub fn measure_text(&self, text: &str, font_size: f32, bold: bool) -> Vec<u32> {
+        let (w, h) = crate::text::measure(text, font_size, bold);
+        vec![w, h]
     }
 
     /// Render a stamp label (e.g. "REJECTED") in Rust, scale it to

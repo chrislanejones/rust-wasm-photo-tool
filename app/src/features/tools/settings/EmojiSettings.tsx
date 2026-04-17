@@ -21,8 +21,10 @@ export function EmojiSettings({
       <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
         Emoji Stamp
       </h3>
-
-      <div className="rounded-lg overflow-hidden border border-border bg-bg-elevated">
+      {/* FIX (issue #6): removed wrapping bordered/elevated/rounded div.
+          The emoji-mart picker is rendered directly; padding and frame are
+          killed via `em-emoji-picker` overrides in styles.css. */}
+      <div className="emoji-picker-host">
         <Picker
           data={data}
           onEmojiSelect={(e: { native: string }) => {
@@ -34,9 +36,9 @@ export function EmojiSettings({
           navPosition="top"
           perLine={7}
           maxFrequentRows={1}
+          dynamicWidth={true}
         />
       </div>
-
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
@@ -46,7 +48,6 @@ export function EmojiSettings({
             {emojiSize}px
           </span>
         </div>
-
         <div className="flex items-center justify-between">
           {SIZE_PRESETS.map((size) => {
             const active = emojiSize === size;
@@ -67,7 +68,6 @@ export function EmojiSettings({
             );
           })}
         </div>
-
         <input
           type="range"
           min={16}
@@ -78,7 +78,6 @@ export function EmojiSettings({
           className="w-full h-2 rounded-full bg-bg-elevated appearance-none cursor-pointer accent-accent"
         />
       </div>
-
       {emoji && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/10 border border-accent/30">
           <span className="text-2xl">{emoji}</span>

@@ -61,6 +61,7 @@ export default defineSchema({
     processedUrl: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
     filename: v.string(),
+    displayName: v.optional(v.string()),
     mimeType: v.string(),
     width: v.number(),
     height: v.number(),
@@ -155,6 +156,18 @@ export default defineSchema({
   })
     .index("by_imageId", ["imageId"])
     .index("by_imageId_createdAt", ["imageId", "createdAt"]),
+
+  // ── Recent Texts (per-user text tool history) ───────────────────────────
+  recent_texts: defineTable({
+    userId: v.id("users"),
+    text: v.string(),
+    fontSize: v.number(),
+    fontWeight: v.union(v.literal("normal"), v.literal("bold")),
+    textColor: v.string(),
+    usedAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_usedAt", ["userId", "usedAt"]),
 
   // ── AI Jobs ─────────────────────────────────────────────
   ai_jobs: defineTable({

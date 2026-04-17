@@ -128,7 +128,7 @@ export function TopBar({
       <motion.div
         animate={{
           paddingLeft: showTools ? 320 : 12,
-          paddingRight: showHistory ? 244 : 12,
+          paddingRight: showHistory ? 284 : 12,
         }}
         transition={panelSpacingTransition}
       >

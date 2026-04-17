@@ -36,6 +36,7 @@ export function HistoryPanel({
           className="btn-icon"
           onClick={onClear}
           title="Clear history"
+          disabled={history.length === 0}
         >
           <RotateCcw className="h-3.5 w-3.5" />
         </button>
@@ -47,18 +48,28 @@ export function HistoryPanel({
           <X className="h-4 w-4" />
         </button>
       </div>
-
       <ul className="history-list">
-        {history.map((entry) => (
+        {history.length === 0 && (
+          <li className="history-empty">
+            <span className="large-badge">No history yet</span>
+          </li>
+        )}
+        {history.map((entry, listIdx) => (
+          // FIX: compound key so identical entry.index values across
+          // re-renders never collide (seen when redo stack rebuilds).
           <li
-            key={entry.index}
+            key={`${entry.type}-${entry.index}-${listIdx}`}
             className={`large-badge-item type-${entry.type}`}
             onClick={() => onJump(entry.index)}
+            title={
+              entry.type === "current"
+                ? "Current state"
+                : `Jump to: ${entry.label}`
+            }
           >
             <span className="history-dot" />
             <span className="history-index">{entry.index}</span>
             <span className="large-badge">{entry.label}</span>
-
             {entry.type === "undo" && (
               <button
                 className="history-delete"

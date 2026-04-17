@@ -316,7 +316,7 @@ button:focus-visible {
   right: 12px;
   top: 12px;
   bottom: 48px;
-  width: 220px;
+  width: 260px;
   z-index: 40;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -993,34 +993,8 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   RANGE INPUT — track fill (Webkit)
+   RANGE INPUT — focus ring (Webkit)
    ═══════════════════════════════════════════════════════════════════════════ */
-
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  background: var(--bg-elevated);
-  border-radius: 2px;
-}
-
-input[type="range"]:focus {
-  outline: none;
-}
-
-input[type="range"]:focus::-webkit-slider-thumb {
-  box-shadow:
-    0 0 0 3px var(--accent-dim),
-    0 0 8px var(--accent-glow);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   RANGE INPUT — track fill (Webkit)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  background: var(--bg-elevated);
-  border-radius: 2px;
-}
 
 input[type="range"]:focus {
   outline: none;
@@ -1200,4 +1174,48 @@ input[type="range"]:focus::-webkit-slider-thumb {
   min-width: 20px;
   height: 18px;
   padding: 0 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EMOJI PICKER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.emoji-picker-host {
+  width: 100%;
+}
+
+.emoji-picker-host em-emoji-picker {
+  --padding: 0 !important;
+  --padding-small: 0 !important;
+  --shadow: none !important;
+  --border-radius: 0 !important;
+  --rgb-background: 18, 18, 20 !important;
+  --rgb-input: 24, 24, 28 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: 100% !important;
+  min-height: 320px;
+  max-height: 380px;
+}
+
+.emoji-picker-host em-emoji-picker::part(search) {
+  margin: 0 !important;
+  padding: 4px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HISTORY EMPTY STATE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.history-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-style: italic;
+  opacity: 0.6;
 }

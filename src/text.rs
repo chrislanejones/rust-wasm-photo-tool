@@ -186,6 +186,40 @@ pub fn render_stamp_label(
     rotate_pixels(&pixels, canvas_w, canvas_h, -5.0)
 }
 
+/// Returns the (width, height) in pixels that `render_text` would produce,
+/// without allocating a full pixel buffer. Used by the JS UI to size the
+/// text-input bounding box before the user commits.
+pub fn measure(text: &str, font_size: f32, bold: bool) -> (u32, u32) {
+    let font_bytes = if bold { FONT_BOLD } else { FONT_REGULAR };
+    let font = FontRef::try_from_slice(font_bytes)
+        .unwrap_or_else(|_| FontRef::try_from_slice(FONT_REGULAR).expect("regular font"));
+    let scale = PxScale::from(font_size);
+    let sf = font.as_scaled(scale);
+
+    let lines: Vec<&str> = text.split('\n').collect();
+    let max_w = lines
+        .iter()
+        .map(|l| line_width(l, &font, scale))
+        .fold(0.0f32, f32::max);
+
+    let ascent = sf.ascent();
+    let descent = sf.descent();
+    let line_gap = sf.line_gap();
+    let line_height = ascent - descent + line_gap;
+
+    let total_h = if lines.is_empty() {
+        font_size
+    } else {
+        ascent - descent + (lines.len() as f32 - 1.0) * line_height
+    };
+
+    let padding = (font_size * 0.25).ceil();
+    (
+        (max_w.max(8.0) + padding * 2.0).ceil() as u32,
+        (total_h.max(font_size) + padding * 2.0).ceil() as u32,
+    )
+}
+
 /// Rotate an RGBA pixel buffer by `angle_deg` degrees (positive = CCW).
 /// The output is sized to the bounding box of the rotated image.
 fn rotate_pixels(data: &[u8], w: u32, h: u32, angle_deg: f32) -> RenderedText {

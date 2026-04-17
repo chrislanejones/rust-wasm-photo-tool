@@ -63,6 +63,11 @@ interface ToolsSidebarProps {
   onToolSettingsChange: (s: ToolSettings) => void;
   recentTexts: TextMemory[];
   onSelectRecentText: (m: TextMemory) => void;
+  onStartTextExtract?: () => void;
+  textExtractActive?: boolean;
+  recognizedText?: string;
+  isRecognizing?: boolean;
+  onClearRecognizedText?: () => void;
 }
 
 export function ToolsSidebar({
@@ -101,6 +106,11 @@ export function ToolsSidebar({
   onToolSettingsChange,
   recentTexts,
   onSelectRecentText,
+  onStartTextExtract,
+  textExtractActive,
+  recognizedText,
+  isRecognizing,
+  onClearRecognizedText,
 }: ToolsSidebarProps) {
   return (
     <motion.div
@@ -222,6 +232,12 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
             recentTexts={recentTexts}
             onSelectRecentText={onSelectRecentText}
+            onStartTextExtract={onStartTextExtract}
+            textExtractActive={textExtractActive}
+            imageReady={imageReady}
+            recognizedText={recognizedText}
+            isRecognizing={isRecognizing}
+            onClearRecognizedText={onClearRecognizedText}
           />
         )}
 

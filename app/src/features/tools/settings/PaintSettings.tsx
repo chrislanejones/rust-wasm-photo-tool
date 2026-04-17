@@ -1,19 +1,8 @@
 // ===== FILE: app/src/features/tools/settings/PaintSettings.tsx =====
 import type { ToolSettings } from "@/lib/types";
+import { PAINT_COLORS as COLORS } from "@/lib/colors";
 
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
-
-const COLORS = [
-  "#ffffff",
-  "#000000",
-  "#ef4444",
-  "#22c55e",
-  "#3b82f6",
-  "#eab308",
-  "#a855f7",
-  "#ec4899",
-  "#14b8a6",
-] as const;
 
 interface PaintSettingsProps {
   settings: ToolSettings;

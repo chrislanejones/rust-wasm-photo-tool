@@ -1,17 +1,6 @@
 import type { ToolSettings } from "@/lib/types";
+import { ARROW_COLORS as COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
-
-const COLORS = [
-  "#ef4444",
-  "#f97316",
-  "#eab308",
-  "#22c55e",
-  "#14b8a6",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ec4899",
-  "#000000",
-] as const;
 
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
 

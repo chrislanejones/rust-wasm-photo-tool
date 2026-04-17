@@ -32,6 +32,12 @@ interface Props {
   onTextBlur?: () => void;
   textSettings?: { fontSize: number; fontWeight: string; textColor: string };
   containerRef?: React.RefObject<HTMLDivElement | null>;
+  onTextPositionChange?: (canvasX: number, canvasY: number) => void;
+  onTextFontSizeChange?: (size: number) => void;
+  // Text extract drag events (active when extract mode is on)
+  extractMouseDown?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
+  extractMouseMove?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
+  extractMouseUp?: () => void;
   // Item 2: Pan mode
   isPanning?: boolean;
   cropSelection?: CropSelection | null;
@@ -72,6 +78,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onTextBlur,
       textSettings,
       containerRef: externalContainerRef,
+      onTextPositionChange,
+      onTextFontSizeChange,
+      extractMouseDown,
+      extractMouseMove,
+      extractMouseUp,
       isPanning = false,
       cropSelection,
       onCropChange,
@@ -220,17 +231,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const wrappedMouseDown = isPanning
       ? handlePanMouseDown
       : isTextTool
-        ? undefined
+        ? extractMouseDown
         : onMouseDown;
     const wrappedMouseMove = isPanning
       ? handlePanMouseMove
       : isTextTool
-        ? undefined
+        ? extractMouseMove
         : onMouseMove;
     const wrappedMouseUp = isPanning
       ? handlePanMouseUp
       : isTextTool
-        ? undefined
+        ? extractMouseUp
         : onMouseUp;
 
     const { width: imgW, height: imgH, hasTransparency } = hookResult.state;
@@ -266,7 +277,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           onMouseDown={wrappedMouseDown}
           onMouseMove={wrappedMouseMove}
           onMouseUp={wrappedMouseUp}
-          onMouseLeave={isPanning ? handlePanMouseUp : isTextTool ? undefined : onMouseUp}
+          onMouseLeave={isPanning ? handlePanMouseUp : isTextTool ? extractMouseUp : onMouseUp}
           onClick={isTextTool ? onCanvasClick : undefined}
           onMouseEnter={(e) =>
             onCanvasEnter(e.currentTarget.getBoundingClientRect())
@@ -374,31 +385,170 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           />
         )}
 
-        {/* Text input overlay */}
-        {textInput && textSettings && (
-          <textarea
-            ref={textareaRef}
-            value={textInput.text}
-            onChange={onTextChange}
-            onKeyDown={onTextKeyDown}
-            onBlur={onTextBlur}
-            placeholder="Type text…"
-            className="absolute bg-transparent border-2 border-dashed border-accent outline-none resize-none overflow-hidden"
-            style={{
-              left: textInput.screenX,
-              top: textInput.screenY,
-              minWidth: 100,
-              minHeight: textSettings.fontSize * 1.5,
-              fontSize: textSettings.fontSize * zoom,
-              fontWeight: textSettings.fontWeight,
-              color: textSettings.textColor,
-              fontFamily: "sans-serif",
-              lineHeight: 1.2,
-              padding: "2px 4px",
-            }}
-            autoFocus
-          />
-        )}
+        {/* Text input overlay with move/resize handles */}
+        {textInput && textSettings && canvasRef.current && containerRef.current && (() => {
+          const canvas = canvasRef.current!;
+          const container = containerRef.current!;
+          const cr = canvas.getBoundingClientRect();
+          const ctr = container.getBoundingClientRect();
+          const scaleX = cr.width / canvas.width;
+          const scaleY = cr.height / canvas.height;
+
+          // Screen-space position of the text anchor (top-left of text)
+          const sx = cr.left - ctr.left + textInput.canvasX * scaleX;
+          const sy = cr.top - ctr.top + textInput.canvasY * scaleY;
+
+          // Measure the text box in screen pixels
+          const offscreen = document.createElement("canvas");
+          const mctx = offscreen.getContext("2d")!;
+          const fs = textSettings.fontSize * scaleX;
+          mctx.font = `${textSettings.fontWeight} ${fs}px 'Liberation Sans', Arial, sans-serif`;
+          const lines = (textInput.text || " ").split("\n");
+          const rawW = Math.max(60, ...lines.map((l) => mctx.measureText(l || " ").width));
+          const boxW = Math.ceil(rawW + fs * 0.6);
+          const boxH = Math.ceil(lines.length * fs * 1.3 + fs * 0.3);
+
+          const HS = 9; // handle size px
+          const handles = [
+            { id: "nw", hx: sx,         hy: sy,          cursor: "nw-resize" },
+            { id: "n",  hx: sx + boxW/2, hy: sy,          cursor: "n-resize"  },
+            { id: "ne", hx: sx + boxW,   hy: sy,          cursor: "ne-resize" },
+            { id: "e",  hx: sx + boxW,   hy: sy + boxH/2, cursor: "e-resize"  },
+            { id: "se", hx: sx + boxW,   hy: sy + boxH,   cursor: "se-resize" },
+            { id: "s",  hx: sx + boxW/2, hy: sy + boxH,   cursor: "s-resize"  },
+            { id: "sw", hx: sx,          hy: sy + boxH,   cursor: "sw-resize" },
+            { id: "w",  hx: sx,          hy: sy + boxH/2, cursor: "w-resize"  },
+          ];
+
+          const handlePointerDown = (e: React.PointerEvent, _handleId: string) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const startFs = textSettings.fontSize;
+            const centerX = cr.left - ctr.left + textInput.canvasX * scaleX + boxW / 2;
+            const centerY = cr.top - ctr.top + textInput.canvasY * scaleY + boxH / 2;
+            const startDist = Math.hypot(e.clientX - (ctr.left + centerX), e.clientY - (ctr.top + centerY));
+
+            const onMove = (me: PointerEvent) => {
+              const dist = Math.hypot(me.clientX - (ctr.left + centerX), me.clientY - (ctr.top + centerY));
+              if (startDist > 4) {
+                const newFs = Math.round(Math.max(8, Math.min(120, startFs * (dist / startDist))));
+                onTextFontSizeChange?.(newFs);
+              }
+            };
+            const onUp = () => {
+              window.removeEventListener("pointermove", onMove);
+              window.removeEventListener("pointerup", onUp);
+            };
+            window.addEventListener("pointermove", onMove);
+            window.addEventListener("pointerup", onUp);
+          };
+
+          const handleBoxPointerDown = (e: React.PointerEvent) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startCx = textInput.canvasX;
+            const startCy = textInput.canvasY;
+
+            const onMove = (me: PointerEvent) => {
+              const dx = (me.clientX - startX) / scaleX;
+              const dy = (me.clientY - startY) / scaleY;
+              onTextPositionChange?.(startCx + dx, startCy + dy);
+            };
+            const onUp = () => {
+              window.removeEventListener("pointermove", onMove);
+              window.removeEventListener("pointerup", onUp);
+            };
+            window.addEventListener("pointermove", onMove);
+            window.addEventListener("pointerup", onUp);
+          };
+
+          return (
+            <>
+              {/* Draggable box body */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: sx,
+                  top: sy,
+                  width: boxW,
+                  height: boxH,
+                  cursor: "move",
+                  zIndex: 50,
+                }}
+                onPointerDown={handleBoxPointerDown}
+              />
+              {/* Text area — floats on top of the drag box */}
+              <textarea
+                ref={textareaRef}
+                value={textInput.text}
+                onChange={onTextChange}
+                onKeyDown={onTextKeyDown}
+                onBlur={onTextBlur}
+                placeholder="Type text…"
+                style={{
+                  position: "absolute",
+                  left: sx,
+                  top: sy,
+                  width: boxW,
+                  minHeight: boxH,
+                  fontSize: textSettings.fontSize * scaleX,
+                  fontWeight: textSettings.fontWeight,
+                  color: textSettings.textColor,
+                  fontFamily: "'Liberation Sans', Arial, sans-serif",
+                  lineHeight: 1.3,
+                  padding: "2px 4px",
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  resize: "none",
+                  overflow: "hidden",
+                  zIndex: 51,
+                  cursor: "text",
+                }}
+                autoFocus
+              />
+              {/* SVG overlay: dashed border + square handles */}
+              <svg
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  width: "100vw",
+                  height: "100vh",
+                  pointerEvents: "none",
+                  zIndex: 52,
+                  overflow: "hidden",
+                }}
+              >
+                {/* Dashed border */}
+                <rect
+                  x={ctr.left + sx} y={ctr.top + sy}
+                  width={boxW} height={boxH}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.85)"
+                  strokeWidth={1.5}
+                  strokeDasharray="5 4"
+                />
+                {/* Square handles */}
+                {handles.map((h) => (
+                  <rect
+                    key={h.id}
+                    x={ctr.left + h.hx - HS / 2}
+                    y={ctr.top + h.hy - HS / 2}
+                    width={HS} height={HS}
+                    fill="white"
+                    stroke="rgba(0,0,0,0.4)"
+                    strokeWidth={1}
+                    rx={1}
+                    style={{ cursor: h.cursor, pointerEvents: "all" }}
+                    onPointerDown={(e) => handlePointerDown(e, h.id)}
+                  />
+                ))}
+              </svg>
+            </>
+          );
+        })()}
       </div>
     );
   },

@@ -345,7 +345,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
         const offscreen = new OffscreenCanvas(thumb.width, thumb.height);
         const ctx = offscreen.getContext("2d")!;
         ctx.putImageData(
-          new ImageData(thumb.data, thumb.width, thumb.height),
+          new ImageData(new Uint8ClampedArray(thumb.data.buffer as ArrayBuffer), thumb.width, thumb.height),
           0,
           0,
         );

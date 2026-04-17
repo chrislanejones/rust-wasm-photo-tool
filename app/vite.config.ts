@@ -15,7 +15,7 @@ export default defineConfig({
       "@features": path.resolve(__dirname, "./src/features"),
       "@components": path.resolve(__dirname, "./src/components"),
       "@app": path.resolve(__dirname, "./src/app"),
-      stamp_tool: "/../pkg/stamp_tool.js",
+      stamp_tool: path.resolve(__dirname, "./pkg/stamp_tool.js"),
     },
   },
   server: {
