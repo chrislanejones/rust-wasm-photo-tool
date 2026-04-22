@@ -17,6 +17,8 @@ import {
   ChevronDown,
   ZoomIn,
   ZoomOut,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { UserMenu } from "@/components/UserMenu";
 
@@ -31,6 +33,10 @@ interface TopBarProps {
   zoom: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
   showUpload: boolean;
   showTools: boolean;
   showGallery: boolean;
@@ -51,6 +57,10 @@ export function TopBar({
   zoom,
   onZoomIn,
   onZoomOut,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
   showUpload,
   showTools,
   showGallery,
@@ -134,6 +144,42 @@ export function TopBar({
       >
         <div className="pointer-events-auto">
           <div className="flex items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border">
+            {/* Undo / Redo */}
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onUndo}
+                    disabled={!canUndo}
+                    className="btn-icon"
+                  >
+                    <Undo2 className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="font-medium">Undo</p>
+                  <p className="text-muted-foreground text-xs">Ctrl+Z</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onRedo}
+                    disabled={!canRedo}
+                    className="btn-icon"
+                  >
+                    <Redo2 className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="font-medium">Redo</p>
+                  <p className="text-muted-foreground text-xs">Ctrl+Shift+Z</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="w-px h-6 bg-border shrink-0" />
+
             {/* Zoom */}
             <Tooltip>
               <TooltipTrigger asChild>

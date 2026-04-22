@@ -1,5 +1,6 @@
-import { g as He } from "./index-BZZll5Zl.js";
-function Je(s, o) {
+import { g as He } from "./index-CWycxErS.js";
+import { c as Je } from "./_commonjs-dynamic-modules-TDtrdbi3.js";
+function Ve(s, o) {
   for (var n = 0; n < o.length; n++) {
     const c = o[n];
     if (typeof c != "string" && !Array.isArray(c)) {
@@ -12,7 +13,7 @@ function Je(s, o) {
   return Object.freeze(Object.defineProperty(s, Symbol.toStringTag, { value: "Module" }));
 }
 var x = { exports: {} }, Se;
-function Ve() {
+function Ze() {
   return Se || (Se = 1, (function(s) {
     var o = (function(n) {
       var c = Object.prototype, i = c.hasOwnProperty, f = Object.defineProperty || function(r, e, t) {
@@ -53,8 +54,8 @@ function Ve() {
       });
       var F = Object.getPrototypeOf, W = F && F(F(J([])));
       W && W !== c && i.call(W, G) && (B = W);
-      var N = T.prototype = y.prototype = Object.create(B);
-      R.prototype = T, f(N, "constructor", { value: T, configurable: true }), f(T, "constructor", { value: R, configurable: true }), R.displayName = O(T, M, "GeneratorFunction");
+      var I = T.prototype = y.prototype = Object.create(B);
+      R.prototype = T, f(I, "constructor", { value: T, configurable: true }), f(T, "constructor", { value: R, configurable: true }), R.displayName = O(T, M, "GeneratorFunction");
       function Y(r) {
         ["next", "throw", "return"].forEach(function(e) {
           O(r, e, function(t) {
@@ -66,7 +67,7 @@ function Ve() {
         var e = typeof r == "function" && r.constructor;
         return e ? e === R || (e.displayName || e.name) === "GeneratorFunction" : false;
       }, n.mark = function(r) {
-        return Object.setPrototypeOf ? Object.setPrototypeOf(r, T) : (r.__proto__ = T, O(r, M, "GeneratorFunction")), r.prototype = Object.create(N), r;
+        return Object.setPrototypeOf ? Object.setPrototypeOf(r, T) : (r.__proto__ = T, O(r, M, "GeneratorFunction")), r.prototype = Object.create(I), r;
       }, n.awrap = function(r) {
         return { __await: r };
       };
@@ -149,9 +150,9 @@ function Ve() {
         else return h;
         return e.delegate = null, w;
       }
-      Y(N), O(N, M, "Generator"), O(N, G, function() {
+      Y(I), O(I, M, "Generator"), O(I, G, function() {
         return this;
-      }), O(N, "toString", function() {
+      }), O(I, "toString", function() {
         return "[object Generator]";
       });
       function A(r) {
@@ -291,7 +292,7 @@ function Le() {
   }, V.log = (...o) => s ? console.log.apply(this, o) : null, V;
 }
 var te, be;
-function Ze() {
+function Qe() {
   if (be) return te;
   be = 1;
   const s = Fe(), { log: o } = Le(), n = we();
@@ -331,14 +332,11 @@ function Ze() {
     }, getQueueLen: G, getNumWorkers: j };
   }, te;
 }
-function Qe(s) {
-  throw new Error('Could not dynamically require "' + s + '". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');
-}
 var ne, ke;
 function Xe() {
   return ke || (ke = 1, ne = (s) => {
     const o = {};
-    return typeof WorkerGlobalScope < "u" ? o.type = "webworker" : typeof document == "object" ? o.type = "browser" : typeof process == "object" && typeof Qe == "function" && (o.type = "node"), typeof s > "u" ? o : o[s];
+    return typeof WorkerGlobalScope < "u" ? o.type = "webworker" : typeof document == "object" ? o.type = "browser" : typeof process == "object" && typeof Je == "function" && (o.type = "node"), typeof s > "u" ? o : o[s];
   }), ne;
 }
 var oe, Te;
@@ -363,16 +361,16 @@ function tr() {
   return _e || (_e = 1, ie = { workerBlobURL: true, logger: () => {
   } }), ie;
 }
-var se, qe;
+var se, Ne;
 function nr() {
-  if (qe) return se;
-  qe = 1;
+  if (Ne) return se;
+  Ne = 1;
   const s = rr.version;
   return se = { ...tr(), workerPath: `https://cdn.jsdelivr.net/npm/tesseract.js@v${s}/dist/worker.min.js` }, se;
 }
-var ue, Ne;
+var ue, Ie;
 function or() {
-  return Ne || (Ne = 1, ue = ({ workerPath: s, workerBlobURL: o }) => {
+  return Ie || (Ie = 1, ue = ({ workerPath: s, workerBlobURL: o }) => {
     let n;
     if (Blob && URL && o) {
       const c = new Blob([`importScripts("${s}");`], { type: "application/javascript" });
@@ -387,9 +385,9 @@ function ar() {
     s.terminate();
   }), ce;
 }
-var le, Ie;
+var le, qe;
 function ir() {
-  return Ie || (Ie = 1, le = (s, o) => {
+  return qe || (qe = 1, le = (s, o) => {
     s.onmessage = ({ data: n }) => {
       o(n);
     };
@@ -446,36 +444,36 @@ function ze() {
     const m = c("Worker", O), { logger: U, errorHandler: w, ...y } = s({ ...f, ...z }), R = {}, T = typeof C == "string" ? C.split("+") : C;
     let B = D, F = g;
     const W = [i.DEFAULT, i.LSTM_ONLY].includes(D) && !y.legacyCore;
-    let N, Y;
+    let I, Y;
     const $ = new Promise((l, d) => {
-      Y = l, N = d;
+      Y = l, I = d;
     }), Q = (l) => {
-      N(l.message);
+      I(l.message);
     };
     let P = p(y);
     P.onerror = Q, O += 1;
-    const A = ({ id: l, action: d, payload: v }) => new Promise((_, q) => {
+    const A = ({ id: l, action: d, payload: v }) => new Promise((_, N) => {
       n(`[${m}]: Start ${l}, action=${d}`);
-      const I = `${d}-${l}`;
-      R[I] = { resolve: _, reject: q }, M(P, { workerId: m, jobId: l, action: d, payload: v });
+      const q = `${d}-${l}`;
+      R[q] = { resolve: _, reject: N }, M(P, { workerId: m, jobId: l, action: d, payload: v });
     }), K = () => console.warn("`load` is depreciated and should be removed from code (workers now come pre-loaded)"), H = (l) => A(o({ id: l, action: "load", payload: { options: { lstmOnly: W, corePath: y.corePath, logging: y.logging } } })), J = (l, d, v) => A(o({ id: v, action: "FS", payload: { method: "writeFile", args: [l, d] } })), Z = (l, d) => A(o({ id: d, action: "FS", payload: { method: "readFile", args: [l, { encoding: "utf8" }] } })), r = (l, d) => A(o({ id: d, action: "FS", payload: { method: "unlink", args: [l] } })), e = (l, d, v) => A(o({ id: v, action: "FS", payload: { method: l, args: d } })), t = (l, d) => A(o({ id: d, action: "loadLanguage", payload: { langs: l, options: { langPath: y.langPath, dataPath: y.dataPath, cachePath: y.cachePath, cacheMethod: y.cacheMethod, gzip: y.gzip, lstmOnly: [i.DEFAULT, i.LSTM_ONLY].includes(B) && !y.legacyLang } } })), u = (l, d, v, _) => A(o({ id: _, action: "initialize", payload: { langs: l, oem: d, config: v } })), a = (l = "eng", d, v, _) => {
       if (W && [i.TESSERACT_ONLY, i.TESSERACT_LSTM_COMBINED].includes(d)) throw Error("Legacy model requested but code missing.");
-      const q = d || B;
-      B = q;
-      const I = v || F;
-      F = I;
+      const N = d || B;
+      B = N;
+      const q = v || F;
+      F = q;
       const X = (typeof l == "string" ? l.split("+") : l).filter((Ke) => !T.includes(Ke));
-      return T.push(...X), X.length > 0 ? t(X, _).then(() => u(l, q, I, _)) : u(l, q, I, _);
+      return T.push(...X), X.length > 0 ? t(X, _).then(() => u(l, N, q, _)) : u(l, N, q, _);
     }, h = (l = {}, d) => A(o({ id: d, action: "setParameters", payload: { params: l } })), L = async (l, d = {}, v = { text: true }, _) => A(o({ id: _, action: "recognize", payload: { image: await j(l), options: d, output: v } })), S = async (l, d) => {
       if (W) throw Error("`worker.detect` requires Legacy model, which was not loaded.");
       return A(o({ id: d, action: "detect", payload: { image: await j(l) } }));
     }, b = async () => (P !== null && (k(P), P = null), Promise.resolve());
-    G(P, ({ workerId: l, jobId: d, status: v, action: _, data: q }) => {
-      const I = `${_}-${d}`;
-      if (v === "resolve") n(`[${l}]: Complete ${d}`), R[I].resolve({ jobId: d, data: q }), delete R[I];
-      else if (v === "reject") if (R[I].reject(q), delete R[I], _ === "load" && N(q), w) w(q);
-      else throw Error(q);
-      else v === "progress" && U({ ...q, userJobId: d });
+    G(P, ({ workerId: l, jobId: d, status: v, action: _, data: N }) => {
+      const q = `${_}-${d}`;
+      if (v === "resolve") n(`[${l}]: Complete ${d}`), R[q].resolve({ jobId: d, data: N }), delete R[q];
+      else if (v === "reject") if (R[q].reject(N), delete R[q], _ === "load" && I(N), w) w(N);
+      else throw Error(N);
+      else v === "progress" && U({ ...N, userJobId: d });
     });
     const E = { id: m, worker: P, load: K, writeText: J, readText: Z, removeFile: r, FS: e, reinitialize: a, setParameters: h, recognize: L, detect: S, terminate: b };
     return H().then(() => t(C)).then(() => u(C, D, g)).then(() => Y(E)).catch(() => {
@@ -510,12 +508,12 @@ function dr() {
 var me, Be;
 function hr() {
   if (Be) return me;
-  Be = 1, Ve();
-  const s = Ze(), o = ze(), n = lr(), c = fr(), i = $e(), f = dr(), { setLogging: p } = Le();
+  Be = 1, Ze();
+  const s = Qe(), o = ze(), n = lr(), c = fr(), i = $e(), f = dr(), { setLogging: p } = Le();
   return me = { languages: c, OEM: i, PSM: f, createScheduler: s, createWorker: o, setLogging: p, ...n }, me;
 }
 var Ye = hr();
-const pr = He(Ye), yr = Je({ __proto__: null, default: pr }, [Ye]);
+const pr = He(Ye), mr = Ve({ __proto__: null, default: pr }, [Ye]);
 export {
-  yr as i
+  mr as i
 };

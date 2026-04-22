@@ -45,6 +45,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Archive,
 } from "lucide-react";
 
 export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
@@ -75,6 +76,8 @@ export function AppShell() {
 
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
+  const [imageSavings, setImageSavings] = useState<Record<string, { savingsPercent: number }>>({});
+  const [modifiedPhotos, setModifiedPhotos] = useState<Set<string>>(new Set());
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
   const [hasBeenModified, setHasBeenModified] = useState(false);
@@ -204,6 +207,16 @@ export function AppShell() {
 
   const handleRemovePhoto = useCallback(
     (id: string) => {
+      setImageSavings((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setModifiedPhotos((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       setPhotos((prev) => {
         const idx = prev.findIndex((p) => p.id === id);
         const next = prev.filter((p) => p.id !== id);
@@ -299,6 +312,8 @@ export function AppShell() {
   }, [stamp, exportFormat, quality, photos, activePhotoId]);
 
   const handleDeleteAll = useCallback(() => {
+    setImageSavings({});
+    setModifiedPhotos(new Set());
     const toRevoke = photos.map((p) => p.url);
     const canvas = canvasRef.current;
     if (canvas) {
@@ -526,10 +541,28 @@ export function AppShell() {
 
   const handleResize = useCallback(
     (w: number, h: number) => {
-      stamp.resize(w, h);
+      const origW = stamp.state.width;
+      const origH = stamp.state.height;
+      if (w !== origW || h !== origH) {
+        stamp.resize(w, h);
+      }
       setHasBeenModified(true);
+      if (activePhotoId) {
+        const areaRatio = origW * origH > 0 ? (w * h) / (origW * origH) : 1;
+        const qualityRatio = quality / 100;
+        const savingsPercent = Math.max(
+          0,
+          Math.round((1 - areaRatio * qualityRatio) * 100),
+        );
+        if (savingsPercent > 0) {
+          setImageSavings((prev) => ({
+            ...prev,
+            [activePhotoId]: { savingsPercent },
+          }));
+        }
+      }
     },
-    [stamp],
+    [stamp, activePhotoId, quality],
   );
 
   const handleAutoCompress = useCallback(() => {
@@ -553,6 +586,48 @@ export function AppShell() {
     );
     setHasBeenModified(true);
   }, [photos, quality, exportFormat, compressAll]);
+
+  // Track per-photo modification state (any tool change marks the photo)
+  useEffect(() => {
+    if (hasBeenModified && activePhotoId) {
+      setModifiedPhotos((prev) => {
+        if (prev.has(activePhotoId)) return prev;
+        const next = new Set(prev);
+        next.add(activePhotoId);
+        return next;
+      });
+    }
+  }, [hasBeenModified, activePhotoId]);
+
+  // Persist compression savings from auto-compress before they clear after 3s
+  useEffect(() => {
+    const entries = Object.entries(compressProgress.savings);
+    if (entries.length === 0) return;
+    setImageSavings((prev) => {
+      const merged = { ...prev };
+      for (const [id, s] of entries) {
+        merged[id] = { savingsPercent: s.savingsPercent };
+      }
+      return merged;
+    });
+  }, [compressProgress.savings]);
+
+  const handleExportAll = useCallback(async () => {
+    if (photos.length === 0) return;
+    const { default: JSZip } = await import("jszip");
+    const zip = new JSZip();
+    const ext = exportFormat === "jpeg" ? ".jpg" : `.${exportFormat}`;
+    for (const photo of photos) {
+      zip.file(`${photo.name}${ext}`, photo.file);
+    }
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "photos.zip";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [photos, exportFormat]);
 
   const hasImage = stamp.state.ready;
   const canUndo = stamp.state.undoCount > 0;
@@ -584,6 +659,7 @@ export function AppShell() {
         onFiles={handleAddPhotos}
         isLoading={isImageLoading}
         loadProgress={loadProgress}
+        canClose={photos.length > 0}
       />
 
       <ShortcutModal
@@ -597,6 +673,10 @@ export function AppShell() {
             zoom={stamp.state.zoom}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
+            onUndo={stamp.undo}
+            onRedo={stamp.redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
             showUpload={showUpload}
             showTools={showTools}
             showGallery={showGallery}
@@ -624,11 +704,8 @@ export function AppShell() {
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
             hasSource={stamp.state.hasSource}
-            onUndo={stamp.undo}
-            onRedo={stamp.redo}
-            canUndo={canUndo}
-            canRedo={canRedo}
             onExport={handleExport}
+            onExportAll={handleExportAll}
             canExport={hasImage}
             exportFormat={exportFormat}
             onExportFormatChange={setExportFormat}
@@ -641,6 +718,7 @@ export function AppShell() {
             onResize={handleResize}
             imageWidth={stamp.state.width}
             imageHeight={stamp.state.height}
+            activePhotoId={activePhotoId}
             quality={quality}
             onQualityChange={handleQualityChange}
             hasBeenModified={hasBeenModified}
@@ -731,7 +809,7 @@ export function AppShell() {
           </motion.main>
         </ContextMenuTrigger>
 
-        <ContextMenuContent className="w-56">
+        <ContextMenuContent className="w-72">
           <ContextMenuItem onClick={stamp.undo} disabled={!canUndo}>
             <Undo className="h-4 w-4 mr-2" /> Undo
             <ContextMenuShortcut>Ctrl+Z</ContextMenuShortcut>
@@ -749,6 +827,12 @@ export function AppShell() {
             <Download className="h-4 w-4 mr-2" /> Export{" "}
             {exportFormat.toUpperCase()}
             <ContextMenuShortcut>Alt+E</ContextMenuShortcut>
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={handleExportAll}
+            disabled={photos.length === 0}
+          >
+            <Archive className="h-4 w-4 mr-2" /> Export All (ZIP)
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onClick={handleZoomIn}>
@@ -785,7 +869,8 @@ export function AppShell() {
             showTools={showTools}
             showHistory={showHistory}
             compressionProgress={compressProgress.items ?? {}}
-            compressionSavings={compressProgress.savings}
+            compressionSavings={imageSavings}
+            modifiedPhotos={modifiedPhotos}
           />
         )}
       </AnimatePresence>

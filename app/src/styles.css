@@ -893,12 +893,12 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 
 .photo-thumb-remove {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 14px;
-  height: 14px;
+  bottom: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(185, 20, 20, 0.9);
   border: none;
   padding: 0;
   display: flex;
@@ -909,14 +909,10 @@ input[type="range"].slider-overlay::-moz-range-thumb {
   transition:
     opacity 0.15s,
     background 0.12s;
-  color: #ddd;
+  color: #fff;
   line-height: 1;
-}
-
-.photo-thumb-remove svg {
-  width: 7px;
-  height: 7px;
-  display: block;
+  z-index: 20;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
 .photo-thumb:hover .photo-thumb-remove {
@@ -924,8 +920,20 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 }
 
 .photo-thumb-remove:hover {
-  background: rgba(220, 60, 60, 0.85);
+  background: rgba(120, 0, 0, 1);
   color: #fff;
+}
+
+.photo-thumb-modified {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  z-index: 20;
+  pointer-events: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

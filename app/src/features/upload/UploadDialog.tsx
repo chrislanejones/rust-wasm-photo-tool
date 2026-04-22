@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { Upload, FolderOpen, Clipboard, X } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
 const horseLogo = "/Image-Horse-Logo.svg";
@@ -10,6 +10,7 @@ interface Props {
   onFiles: (files: File[]) => void;
   isLoading?: boolean;
   loadProgress?: number;
+  canClose?: boolean;
 }
 
 export function UploadDialog({
@@ -18,9 +19,27 @@ export function UploadDialog({
   onFiles,
   isLoading = false,
   loadProgress = 0,
+  canClose = true,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const controls = useAnimation();
+
+  const triggerShake = useCallback(async () => {
+    await controls.start({
+      x: [0, -14, 14, -10, 10, -6, 6, -3, 3, 0],
+      transition: { duration: 0.55, ease: "easeInOut" },
+    });
+    controls.set({ x: 0 });
+  }, [controls]);
+
+  const handleTryClose = useCallback(() => {
+    if (!canClose) {
+      triggerShake();
+    } else {
+      onClose();
+    }
+  }, [canClose, onClose, triggerShake]);
 
   const processFiles = useCallback(
     (files: File[]) => {
@@ -88,15 +107,19 @@ export function UploadDialog({
           animate="visible"
           exit="exit"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={onClose}
+          onClick={handleTryClose}
         >
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={quickSpring}
-            className="relative w-full max-w-lg mx-4 bg-bg-secondary rounded-2xl border border-border shadow-2xl overflow-hidden"
+            className="relative w-full max-w-lg mx-4"
             onClick={(e) => e.stopPropagation()}
+          >
+          <motion.div
+            animate={controls}
+            className="bg-bg-secondary rounded-2xl border border-border shadow-2xl overflow-hidden"
           >
             {/* Logo + Title - Top Center */}
             <div className="flex flex-col items-center pt-6 pb-2">
@@ -113,7 +136,7 @@ export function UploadDialog({
             {/* Close button */}
             <button
               className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
-              onClick={onClose}
+              onClick={handleTryClose}
             >
               <X className="h-4 w-4" />
             </button>
@@ -192,6 +215,7 @@ export function UploadDialog({
                 }
               }}
             />
+          </motion.div>
           </motion.div>
         </motion.div>
       )}

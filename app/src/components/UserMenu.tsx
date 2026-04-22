@@ -5,6 +5,7 @@ import {
   SignInButton,
   UserButton,
 } from "@clerk/clerk-react";
+import { User } from "lucide-react";
 
 export function UserMenu() {
   return (
@@ -13,17 +14,17 @@ export function UserMenu() {
         <UserButton
           appearance={{
             elements: {
-              avatarBox: "h-7 w-7",
+              avatarBox: "h-8 w-8",
               userButtonTrigger:
-                "rounded-lg hover:ring-2 hover:ring-accent/50 transition-all",
+                "rounded-full hover:ring-2 hover:ring-accent/50 transition-all",
             },
           }}
         />
       </SignedIn>
       <SignedOut>
         <SignInButton mode="modal">
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent text-text-primary text-xs font-semibold font-mono hover:brightness-110 transition-all">
-            Sign In
+          <button className="h-8 w-8 rounded-full bg-bg-elevated border border-border text-text-muted hover:text-text-primary hover:ring-2 hover:ring-accent/50 transition-all flex items-center justify-center">
+            <User className="h-4 w-4" />
           </button>
         </SignInButton>
       </SignedOut>

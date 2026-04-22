@@ -140,7 +140,7 @@ impl History {
         let snap = self.undo_stack[index].data.clone();
         let w = self.undo_stack[index].width;
         let h = self.undo_stack[index].height;
-        self.undo_stack.truncate(index);
+        self.undo_stack.remove(index);
         self.redo_stack.clear();
         Some((snap, w, h))
     }

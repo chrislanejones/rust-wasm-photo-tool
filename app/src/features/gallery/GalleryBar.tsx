@@ -20,6 +20,7 @@ interface Props {
   showHistory: boolean;
   compressionProgress: Record<string, number>;
   compressionSavings?: Record<string, { savingsPercent: number }>;
+  modifiedPhotos?: Set<string>;
 }
 
 interface ThumbProps {
@@ -30,11 +31,12 @@ interface ThumbProps {
   onRemove: () => void;
   progress?: number;
   savings?: { savingsPercent: number };
+  isModified?: boolean;
 }
 
 const TRANSPARENT_TYPES = new Set(["image/png", "image/webp", "image/svg+xml"]);
 
-function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings }: ThumbProps) {
+function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified }: ThumbProps) {
   const [loading, setLoading] = useState(true);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -133,14 +135,16 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings }
         </div>
       )}
 
+      {isModified && (
+        <div className="photo-thumb-modified" />
+      )}
+
       <button
         className="photo-thumb-remove"
         title="Remove"
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
       >
-        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" />
-        </svg>
+        <X className="h-2.5 w-2.5" />
       </button>
       <span className="photo-thumb-label">{entry.name}</span>
     </motion.div>
@@ -157,6 +161,7 @@ export function GalleryBar({
   showHistory,
   compressionProgress,
   compressionSavings,
+  modifiedPhotos,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
 
@@ -224,6 +229,7 @@ export function GalleryBar({
                   onRemove={() => onRemove(entry.id)}
                   progress={compressionProgress?.[entry.id]}
                   savings={compressionSavings?.[entry.id]}
+                  isModified={modifiedPhotos?.has(entry.id)}
                 />
               ))}
             </div>

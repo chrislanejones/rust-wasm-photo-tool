@@ -1,7 +1,7 @@
 // ===== FILE: app/src/features/tools/ToolsSidebar.tsx =====
 // Item 7: "effects" replaces "blur" — includes brightness, contrast, blur
 import { motion } from "framer-motion";
-import { X, Wrench, Undo, Redo, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
 import type {
   ToolType,
@@ -33,11 +33,8 @@ interface ToolsSidebarProps {
   stampSettings: StampSettingsType;
   onStampSettingsChange: (s: StampSettingsType) => void;
   hasSource: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
   onExport: () => void;
+  onExportAll: () => void;
   canExport: boolean;
   exportFormat: ExportFormat;
   onExportFormatChange?: (f: ExportFormat) => void;
@@ -50,6 +47,7 @@ interface ToolsSidebarProps {
   onResize: (newW: number, newH: number) => void;
   imageWidth: number;
   imageHeight: number;
+  activePhotoId: string | null;
   quality: number;
   onQualityChange: (q: number) => void;
   hasBeenModified: boolean;
@@ -77,11 +75,8 @@ export function ToolsSidebar({
   stampSettings,
   onStampSettingsChange,
   hasSource,
-  onUndo,
-  onRedo,
-  canUndo,
-  canRedo,
   onExport,
+  onExportAll,
   canExport,
   exportFormat,
   onFlipH,
@@ -93,6 +88,7 @@ export function ToolsSidebar({
   onResize,
   imageWidth,
   imageHeight,
+  activePhotoId,
   quality,
   onQualityChange,
   hasBeenModified,
@@ -128,29 +124,13 @@ export function ToolsSidebar({
         <ToolGrid activeTool={activeTool} onToolChange={onToolChange} />
       </div>
 
-      <div className="flex gap-2 px-4 py-3 border-b border-border">
-        <button
-          onClick={onUndo}
-          disabled={!canUndo}
-          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold font-mono bg-bg-elevated border border-border text-text-secondary hover:border-border-active hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-        >
-          <Undo className="h-3.5 w-3.5" /> Undo
-        </button>
-        <button
-          onClick={onRedo}
-          disabled={!canRedo}
-          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold font-mono bg-bg-elevated border border-border text-text-secondary hover:border-border-active hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-        >
-          <Redo className="h-3.5 w-3.5" /> Redo
-        </button>
-      </div>
-
       <div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
         {activeTool === "compress" && (
           <ResizeSettings
             disabled={!imageReady}
             imageWidth={imageWidth}
             imageHeight={imageHeight}
+            activePhotoId={activePhotoId}
             quality={quality}
             onQualityChange={onQualityChange}
             onResize={onResize}
@@ -320,13 +300,20 @@ export function ToolsSidebar({
         )}
       </div>
 
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border flex gap-2">
         <button
           onClick={onExport}
           disabled={!canExport}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-accent text-text-primary hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-accent text-text-primary hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Download className="h-4 w-4" /> Export {exportFormat.toUpperCase()}
+        </button>
+        <button
+          onClick={onExportAll}
+          disabled={!canExport}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <Download className="h-4 w-4" /> Export All
         </button>
       </div>
     </motion.div>

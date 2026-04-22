@@ -1,5 +1,5 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SlidersHorizontal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ interface ResizeSettingsProps {
   disabled: boolean;
   imageWidth: number;
   imageHeight: number;
+  activePhotoId: string | null;
   quality: number;
   onQualityChange: (q: number) => void;
   onResize: (w: number, h: number) => void;
@@ -33,6 +34,7 @@ export function ResizeSettings({
   disabled,
   imageWidth,
   imageHeight,
+  activePhotoId,
   quality,
   onQualityChange,
   onResize,
@@ -46,11 +48,14 @@ export function ResizeSettings({
   const [width, setWidth] = useState(String(imageWidth));
   const [height, setHeight] = useState(String(imageHeight));
   const [lockAspect, setLockAspect] = useState(true);
+  const baseQualityRef = useRef(quality);
 
   useEffect(() => {
     setWidth(String(imageWidth));
     setHeight(String(imageHeight));
-  }, [imageWidth, imageHeight]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    baseQualityRef.current = quality;
+  }, [imageWidth, imageHeight, activePhotoId]);
 
   const handleWidthChange = useCallback(
     (val: string) => {
@@ -79,6 +84,7 @@ export function ResizeSettings({
     const h = parseInt(height, 10);
     if (w > 0 && h > 0) {
       onResize(w, h);
+      baseQualityRef.current = quality;
     }
   };
 
@@ -87,6 +93,11 @@ export function ResizeSettings({
   };
 
   const compareDisabled = !hasBeenModified;
+  const qualityChanged = quality < baseQualityRef.current;
+  const resizeChanged =
+    parseInt(width, 10) !== imageWidth ||
+    parseInt(height, 10) !== imageHeight ||
+    qualityChanged;
 
   // Lighthouse score calculation
   const originalArea = imageWidth * imageHeight;
@@ -178,12 +189,36 @@ export function ResizeSettings({
         </div>
 
         {/* ── Dimensions ── */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-black uppercase text-text-primary tracking-widest">
-            Dimensions
-          </h4>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-black uppercase text-text-primary tracking-widest">
+              Dimensions
+            </h4>
+            <button
+              onClick={() => setLockAspect((v) => !v)}
+              className="flex items-center gap-2 rounded-lg bg-theme-muted/20 hover:bg-theme-muted/30 transition-colors px-2 py-1"
+            >
+              <span
+                className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${
+                  lockAspect ? "bg-theme-primary" : "bg-theme-muted"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-4 w-4 rounded-full transition-all duration-200 ${
+                    lockAspect
+                      ? "left-4 bg-theme-primary-foreground"
+                      : "left-0.5 bg-theme-foreground"
+                  }`}
+                />
+              </span>
+              <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
+                Lock Aspect
+              </span>
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-text-secondary">width</span>
               <input
                 type="number"
                 value={width}
@@ -192,9 +227,9 @@ export function ResizeSettings({
                 disabled={disabled}
                 className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
               />
-              <span className="text-xs text-text-secondary">width</span>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-text-secondary">height</span>
               <input
                 type="number"
                 value={height}
@@ -203,33 +238,9 @@ export function ResizeSettings({
                 disabled={disabled}
                 className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
               />
-              <span className="text-xs text-text-secondary">height</span>
             </div>
           </div>
         </div>
-
-        {/* ── Lock Aspect ── */}
-        <button
-          onClick={() => setLockAspect((v) => !v)}
-          className="flex items-center gap-3 w-full p-2 rounded-lg bg-theme-muted/20 hover:bg-theme-muted/30 transition-colors"
-        >
-          <span
-            className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${
-              lockAspect ? "bg-theme-primary" : "bg-theme-muted"
-            }`}
-          >
-            <span
-              className={`absolute top-1 h-4 w-4 rounded-full transition-all duration-200 ${
-                lockAspect
-                  ? "left-6 bg-theme-primary-foreground"
-                  : "left-1 bg-theme-foreground"
-              }`}
-            />
-          </span>
-          <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
-            Lock Aspect
-          </span>
-        </button>
 
         {/* ── A/B Compare ── */}
         <Tooltip>
@@ -269,7 +280,7 @@ export function ResizeSettings({
       <div className="border-t border-theme-sidebar-border pt-4 space-y-2">
         <Button
           onClick={handleApplyResize}
-          disabled={disabled}
+          disabled={disabled || !resizeChanged}
           className="w-full gap-2"
         >
           Apply Resize
