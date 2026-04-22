@@ -23,10 +23,8 @@ mod drawing;
 mod text;
 
 use crate::core::ImageBuffer;
-use crate::history::History;
+use crate::history::{History, Snapshot};
 use crate::stamp::StampState;
-
-const MAX_HISTORY: usize = 50;
 
 #[wasm_bindgen]
 pub struct CloneStampTool {
@@ -155,7 +153,7 @@ impl CloneStampTool {
 
     pub fn end_stroke(&mut self) {
         self.stamp
-            .end_stroke(&mut self.hist.undo_stack, MAX_HISTORY);
+            .end_stroke(&mut self.hist.undo_stack, history::MAX_HISTORY);
     }
 
     // ── History ─────────────────────────────────────────────────────────
@@ -199,18 +197,69 @@ impl CloneStampTool {
     }
 
     pub fn delete_history_entry(&mut self, index: usize) -> bool {
-        if let Some((data, w, h)) = self.hist.delete_entry(index) {
-            self.buf.data = data;
-            self.buf.width = w;
-            self.buf.height = h;
-            true
-        } else {
-            false
-        }
+        self.hist.delete_entry(index)
     }
 
     pub fn clear_history(&mut self) {
         self.hist.clear();
+    }
+
+    // ── History snapshot serialization (for JS-side persistence) ────────────
+
+    pub fn undo_snapshot_count(&self) -> usize {
+        self.hist.undo_stack.len()
+    }
+
+    pub fn redo_snapshot_count(&self) -> usize {
+        self.hist.redo_stack.len()
+    }
+
+    pub fn get_undo_snapshot_png(&self, index: usize) -> Vec<u8> {
+        match self.hist.undo_stack.get(index) {
+            None => Vec::new(),
+            Some(snap) => {
+                let tmp = ImageBuffer { width: snap.width, height: snap.height, data: snap.data.clone() };
+                codec::export_png(&tmp)
+            }
+        }
+    }
+
+    pub fn get_undo_snapshot_label(&self, index: usize) -> String {
+        self.hist.undo_stack.get(index).map(|s| s.label.clone()).unwrap_or_default()
+    }
+
+    pub fn get_redo_snapshot_png(&self, index: usize) -> Vec<u8> {
+        match self.hist.redo_stack.get(index) {
+            None => Vec::new(),
+            Some(snap) => {
+                let tmp = ImageBuffer { width: snap.width, height: snap.height, data: snap.data.clone() };
+                codec::export_png(&tmp)
+            }
+        }
+    }
+
+    pub fn get_redo_snapshot_label(&self, index: usize) -> String {
+        self.hist.redo_stack.get(index).map(|s| s.label.clone()).unwrap_or_default()
+    }
+
+    /// Append a raw-RGBA snapshot to the undo stack (used when restoring a session).
+    pub fn inject_undo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
+        self.hist.undo_stack.push(Snapshot {
+            label: label.to_string(),
+            data: data.to_vec(),
+            width: w,
+            height: h,
+        });
+    }
+
+    /// Append a raw-RGBA snapshot to the redo stack (used when restoring a session).
+    pub fn inject_redo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
+        self.hist.redo_stack.push(Snapshot {
+            label: label.to_string(),
+            data: data.to_vec(),
+            width: w,
+            height: h,
+        });
     }
 
     // ── Codec ───────────────────────────────────────────────────────────
@@ -616,7 +665,8 @@ impl CloneStampTool {
         let w = self.buf.width as i32;
         let h = self.buf.height as i32;
         let data = &mut self.buf.data;
-        let alpha = opacity.clamp(0.0, 1.0);
+        let brush_alpha = opacity.clamp(0.0, 1.0);
+        let r_sq = radius * radius;
         let min_x = ((cx - radius).floor() as i32).max(0);
         let max_x = ((cx + radius).ceil() as i32).min(w - 1);
         let min_y = ((cy - radius).floor() as i32).max(0);
@@ -626,26 +676,30 @@ impl CloneStampTool {
             for px in min_x..=max_x {
                 let dx = px as f64 - cx;
                 let dy = py as f64 - cy;
-                let dist = (dx * dx + dy * dy).sqrt();
-                if dist > radius { continue; }
+                let dist_sq = dx * dx + dy * dy;
+                if dist_sq > r_sq { continue; }
                 let edge = if radius > 1.0 {
-                    let norm = dist / radius;
+                    let norm = dist_sq.sqrt() / radius;
                     if norm < 0.7 { 1.0 } else {
                         let t = (norm - 0.7) / 0.3;
                         (1.0 - t * t).max(0.0)
                     }
                 } else { 1.0 };
-                let a = alpha * edge;
+                let sa = brush_alpha * edge;
                 let idx = ((py * w + px) * 4) as usize;
                 if idx + 3 >= data.len() { continue; }
-                for c in 0..3usize {
-                    let src = [r, g, b][c] as f64;
-                    let dst = data[idx + c] as f64;
-                    data[idx + c] = (dst + (src - dst) * a).round().clamp(0.0, 255.0) as u8;
-                }
+                // Porter-Duff source-over
                 let da = data[idx + 3] as f64 / 255.0;
-                let out_a = a + da * (1.0 - a);
+                let out_a = sa + da * (1.0 - sa);
                 data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+                if out_a > 1e-6 {
+                    for c in 0..3usize {
+                        let sv = [r, g, b][c] as f64 / 255.0;
+                        let dv = data[idx + c] as f64 / 255.0;
+                        let ov = (sv * sa + dv * da * (1.0 - sa)) / out_a;
+                        data[idx + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
+                    }
+                }
             }
         }
     }

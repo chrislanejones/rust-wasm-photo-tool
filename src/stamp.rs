@@ -19,6 +19,9 @@ pub struct StampState {
     pub stroke_counter: u32,
     last_stamp_x: Option<f64>,
     last_stamp_y: Option<f64>,
+    /// Frozen copy of the buffer taken at begin_stroke; used as the read-only
+    /// source for all dabs in the stroke so we never sample modified pixels.
+    stroke_src_data: Vec<u8>,
 }
 
 impl StampState {
@@ -37,6 +40,7 @@ impl StampState {
             stroke_counter: 0,
             last_stamp_x: None,
             last_stamp_y: None,
+            stroke_src_data: Vec::new(),
         }
     }
 
@@ -86,9 +90,10 @@ impl StampState {
         self.last_stamp_x = None;
         self.last_stamp_y = None;
         self.stroke_counter += 1;
+        self.stroke_src_data = data.to_vec();
         self.stroke_pre_snapshot = Some(Snapshot {
             label: format!("Stamp {}", self.stroke_counter),
-            data: data.to_vec(),
+            data: self.stroke_src_data.clone(),
             width: w as u32,
             height: h as u32,
         });
@@ -121,6 +126,7 @@ impl StampState {
                 undo_stack.remove(0);
             }
         }
+        self.stroke_src_data.clear();
         self.last_stamp_x = None;
         self.last_stamp_y = None;
     }
@@ -152,22 +158,32 @@ impl StampState {
     }
 
     fn stamp_at(&mut self, data: &mut [u8], w: i32, h: i32, dest_x: f64, dest_y: f64) {
-        let src_x = dest_x - self.offset_x;
-        let src_y = dest_y - self.offset_y;
-        apply_dab(data, w, h, self.brush_size, self.hardness, self.opacity, dest_x, dest_y, src_x, src_y);
+        let src_cx = dest_x - self.offset_x;
+        let src_cy = dest_y - self.offset_y;
+        let brush_size = self.brush_size;
+        let hardness = self.hardness;
+        let opacity = self.opacity;
+        apply_dab(&self.stroke_src_data, data, w, h, brush_size, hardness, opacity,
+                  dest_x, dest_y, src_cx, src_cy);
         self.last_stamp_x = Some(dest_x);
         self.last_stamp_y = Some(dest_y);
     }
 }
 
-/// Pure function — blends source pixels onto destination in a circular brush footprint.
+/// Blends source pixels onto destination in a circular brush footprint.
+/// `src` is a frozen snapshot of the canvas taken before the stroke began;
+/// `dst` is the live canvas being modified. Keeping them separate prevents
+/// reading already-painted pixels as source material during a single stroke.
+/// Uses Porter-Duff source-over compositing so transparency is handled correctly.
 fn apply_dab(
-    data: &mut [u8],
+    src: &[u8],
+    dst: &mut [u8],
     w: i32, h: i32,
     brush_size: u32, hardness: f64, opacity: f64,
     cx: f64, cy: f64, src_cx: f64, src_cy: f64,
 ) {
     let r = brush_size as f64;
+    let r_sq = r * r;
     let min_x = ((cx - r).floor() as i32).max(0);
     let max_x = ((cx + r).ceil() as i32).min(w - 1);
     let min_y = ((cy - r).floor() as i32).max(0);
@@ -176,6 +192,7 @@ fn apply_dab(
         || (src_cx - r).floor() as i32 >= w
         || (src_cy + r).ceil() as i32 <= 0
         || (src_cy - r).floor() as i32 >= h
+        || src.is_empty()
     {
         return;
     }
@@ -183,12 +200,12 @@ fn apply_dab(
         for px in min_x..=max_x {
             let dx = px as f64 - cx;
             let dy = py as f64 - cy;
-            let dist = (dx * dx + dy * dy).sqrt();
-            if dist > r {
+            let dist_sq = dx * dx + dy * dy;
+            if dist_sq > r_sq {
                 continue;
             }
-            let norm = dist / r;
-            let alpha = if norm <= hardness {
+            let norm = dist_sq.sqrt() / r;
+            let brush_alpha = if norm <= hardness {
                 1.0
             } else {
                 let t = (norm - hardness) / (1.0 - hardness + 1e-9);
@@ -201,10 +218,21 @@ fn apply_dab(
             }
             let si = ((sy * w + sx) * 4) as usize;
             let di = ((py * w + px) * 4) as usize;
-            for c in 0..3 {
-                let sv = data[si + c] as f64;
-                let dv = data[di + c] as f64;
-                data[di + c] = (dv + (sv - dv) * alpha).round() as u8;
+            if si + 3 >= src.len() || di + 3 >= dst.len() {
+                continue;
+            }
+            // Porter-Duff source-over: src_a scaled by brush_alpha
+            let sa = src[si + 3] as f64 / 255.0 * brush_alpha;
+            let da = dst[di + 3] as f64 / 255.0;
+            let out_a = sa + da * (1.0 - sa);
+            dst[di + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+            if out_a > 1e-6 {
+                for c in 0..3 {
+                    let sv = src[si + c] as f64 / 255.0;
+                    let dv = dst[di + c] as f64 / 255.0;
+                    let ov = (sv * sa + dv * da * (1.0 - sa)) / out_a;
+                    dst[di + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
+                }
             }
         }
     }

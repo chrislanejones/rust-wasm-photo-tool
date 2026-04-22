@@ -66,8 +66,11 @@ pub fn rotate_90_ccw(data: &[u8], old_w: usize, old_h: usize) -> (Vec<u8>, u32, 
 /// Crop the image to a rectangle. Returns (new_data, crop_w, crop_h).
 /// Clamps to image bounds.
 pub fn crop(data: &[u8], img_w: u32, img_h: u32, x: u32, y: u32, w: u32, h: u32) -> (Vec<u8>, u32, u32) {
-    let x = x.min(img_w);
-    let y = y.min(img_h);
+    if img_w == 0 || img_h == 0 {
+        return (Vec::new(), 0, 0);
+    }
+    let x = x.min(img_w - 1);
+    let y = y.min(img_h - 1);
     let w = w.min(img_w - x).max(1);
     let h = h.min(img_h - y).max(1);
     let mut out = vec![0u8; (w * h * 4) as usize];

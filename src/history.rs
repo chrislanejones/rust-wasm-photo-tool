@@ -5,7 +5,7 @@
 /// change the canvas size — without restoring width/height, undo would put the
 /// wrong dimensions back and corrupt the display.
 
-const MAX_HISTORY: usize = 50;
+pub const MAX_HISTORY: usize = 50;
 
 pub struct Snapshot {
     pub label: String,
@@ -131,18 +131,15 @@ impl History {
         true
     }
 
-    /// Delete a history entry and restore to that point.
-    /// Returns (pixel_data, width, height) at that entry, or None.
-    pub fn delete_entry(&mut self, index: usize) -> Option<(Vec<u8>, u32, u32)> {
+    /// Delete a history entry by index without restoring canvas state.
+    /// Returns true if the entry existed and was removed.
+    pub fn delete_entry(&mut self, index: usize) -> bool {
         if index >= self.undo_stack.len() {
-            return None;
+            return false;
         }
-        let snap = self.undo_stack[index].data.clone();
-        let w = self.undo_stack[index].width;
-        let h = self.undo_stack[index].height;
         self.undo_stack.remove(index);
         self.redo_stack.clear();
-        Some((snap, w, h))
+        true
     }
 
     pub fn clear(&mut self) {

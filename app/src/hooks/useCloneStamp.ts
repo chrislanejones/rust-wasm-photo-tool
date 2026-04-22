@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject, MouseEvent } from "react";
 import type { CloneStampTool } from "stamp_tool";
+import type { SavedEdit } from "@/lib/editPersistence";
+
+/** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
+async function decodePngToRgba(
+  png: Uint8Array,
+): Promise<{ rgba: Uint8ClampedArray; w: number; h: number }> {
+  const blob = new Blob([png], { type: "image/png" });
+  const bitmap = await createImageBitmap(blob);
+  const { width: w, height: h } = bitmap;
+  const oc = new OffscreenCanvas(w, h);
+  const ctx = oc.getContext("2d")!;
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return { rgba: ctx.getImageData(0, 0, w, h).data, w, h };
+}
 
 export interface HistoryEntry {
   type: "undo" | "current" | "redo";
@@ -129,6 +144,60 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       img.src = url;
     },
     [canvasRef, syncState],
+  );
+
+  /**
+   * Restore a previously-persisted photo session: canvas pixels + undo/redo
+   * history. Snapshots are stored as PNGs; each is decoded back to raw RGBA
+   * before being injected into the WASM history stack.
+   */
+  const loadFromSaved = useCallback(
+    async (saved: SavedEdit) => {
+      const { default: init, CloneStampTool: Tool } = await import("stamp_tool");
+      await init();
+
+      // Decode current canvas PNG → raw RGBA
+      const { rgba: canvasRgba } = await decodePngToRgba(saved.canvasPng);
+
+      // Construct a fresh tool at the saved dimensions and load the canvas
+      const tool = new Tool(saved.canvasW, saved.canvasH);
+      tool.load_image(new Uint8Array(canvasRgba.buffer as ArrayBuffer)); // clears history
+
+      // Re-inject undo snapshots (oldest first — preserves original order)
+      for (const snap of saved.undoStack) {
+        const { rgba, w, h } = await decodePngToRgba(snap.png);
+        tool.inject_undo_snapshot(
+          new Uint8Array(rgba.buffer as ArrayBuffer),
+          w,
+          h,
+          snap.label,
+        );
+      }
+
+      // Re-inject redo snapshots
+      for (const snap of saved.redoStack) {
+        const { rgba, w, h } = await decodePngToRgba(snap.png);
+        tool.inject_redo_snapshot(
+          new Uint8Array(rgba.buffer as ArrayBuffer),
+          w,
+          h,
+          snap.label,
+        );
+      }
+
+      toolRef.current = tool;
+      sourcePosRef.current = null;
+
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.width = saved.canvasW;
+        canvas.height = saved.canvasH;
+      }
+
+      flushToCanvas();
+      syncState();
+    },
+    [canvasRef, flushToCanvas, syncState],
   );
 
   // ── Basic tool setters ───────────────────────────────────────────────────
@@ -504,6 +573,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     // Core
     syncState,
     loadImage,
+    loadFromSaved,
     flushToCanvas,
     setBrushSize,
     setHardness,

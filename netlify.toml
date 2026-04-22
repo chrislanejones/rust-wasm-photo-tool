@@ -3,7 +3,7 @@
     curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable &&
     source $HOME/.cargo/env &&
     cargo install wasm-pack &&
-    wasm-pack build --target web --out-dir app/pkg &&
+    wasm-pack build --target web &&
     cd app &&
     pnpm install &&
     pnpm build

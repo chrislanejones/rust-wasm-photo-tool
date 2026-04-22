@@ -29,6 +29,12 @@ import { UploadDialog } from "@/features/upload/UploadDialog";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 import {
+  savePhotoEdit,
+  loadPhotoEdit,
+  deletePhotoEdit,
+  clearAllEdits,
+} from "@/lib/editPersistence";
+import {
   ContextMenu,
   ContextMenuTrigger,
   ContextMenuContent,
@@ -159,35 +165,83 @@ export function AppShell() {
   }, [stamp.state.ready, isImageLoading]);
 
   const handleAddPhotos = useCallback(
-    (files: File[]) => {
+    async (files: File[]) => {
       const entries: PhotoEntry[] = files.map((f) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         url: URL.createObjectURL(f),
         name: f.name.replace(/\.[^.]+$/, ""),
         file: f,
       }));
+      // Commit modification status before switching
+      if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
+        setModifiedPhotos((prev) => {
+          if (prev.has(activePhotoId)) return prev;
+          const next = new Set(prev);
+          next.add(activePhotoId);
+          return next;
+        });
+      }
+      // Persist current photo before switching to the first new one
+      if (activePhotoId && stamp.toolRef.current) {
+        await savePhotoEdit(activePhotoId, stamp.toolRef);
+      }
       setPhotos((prev) => [...prev, ...entries]);
       const first = entries[0];
       if (first) {
         loadImageWithProgress(first.file);
+        setHasBeenModified(false);
         setActivePhotoId(first.id);
         setOriginalUrl(first.url);
-        setHasBeenModified(false);
         setCompareActive(false);
       }
     },
-    [loadImageWithProgress],
+    [activePhotoId, hasBeenModified, stamp, loadImageWithProgress],
   );
 
   const handleSelectPhoto = useCallback(
-    (entry: PhotoEntry) => {
-      loadImageWithProgress(entry.file);
+    async (entry: PhotoEntry) => {
+      if (entry.id === activePhotoId) return;
+
+      // Synchronously commit the current photo's modified status before any
+      // state reset. undoCount > 0 catches all tool edits (brush, stamp, crop,
+      // etc.) that never call setHasBeenModified directly.
+      if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
+        setModifiedPhotos((prev) => {
+          if (prev.has(activePhotoId)) return prev;
+          const next = new Set(prev);
+          next.add(activePhotoId);
+          return next;
+        });
+      }
+
+      // Persist the current photo's canvas + full undo/redo history
+      if (activePhotoId && stamp.toolRef.current) {
+        await savePhotoEdit(activePhotoId, stamp.toolRef);
+      }
+
+      // Reset modification flag in the same batch as the activePhotoId change so
+      // the useEffect never sees a new id paired with the previous photo's dirty state.
+      setHasBeenModified(false);
       setActivePhotoId(entry.id);
       setOriginalUrl(entry.url);
-      setHasBeenModified(false);
       setCompareActive(false);
+
+      // Restore previously-saved edit for the target photo, or load fresh
+      const saved = await loadPhotoEdit(entry.id);
+      if (saved) {
+        setIsImageLoading(true);
+        setLoadProgress(20);
+        await stamp.loadFromSaved(saved);
+        setLoadProgress(100);
+        setTimeout(() => { setIsImageLoading(false); setLoadProgress(0); }, 400);
+        // Do NOT set hasBeenModified here — the photo is already in modifiedPhotos
+        // from when the edits were originally made; re-setting it would mark any
+        // photo with a saved edit as dirty just from clicking it.
+      } else {
+        loadImageWithProgress(entry.file);
+      }
     },
-    [loadImageWithProgress],
+    [activePhotoId, hasBeenModified, stamp, loadImageWithProgress],
   );
 
   // Item 4: PgUp/PgDn gallery cycling
@@ -207,6 +261,7 @@ export function AppShell() {
 
   const handleRemovePhoto = useCallback(
     (id: string) => {
+      deletePhotoEdit(id).catch(() => {});
       setImageSavings((prev) => {
         const next = { ...prev };
         delete next[id];
@@ -312,6 +367,7 @@ export function AppShell() {
   }, [stamp, exportFormat, quality, photos, activePhotoId]);
 
   const handleDeleteAll = useCallback(() => {
+    clearAllEdits().catch(() => {});
     setImageSavings({});
     setModifiedPhotos(new Set());
     const toRevoke = photos.map((p) => p.url);
@@ -887,12 +943,14 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      <StatusBar
-        state={stamp.state}
-        imageCount={photos.length}
-        showKbdHints={showKbdHints}
-        activeTool={activeTool}
-      />
+      {photos.length > 0 && (
+        <StatusBar
+          state={stamp.state}
+          imageCount={photos.length}
+          showKbdHints={showKbdHints}
+          activeTool={activeTool}
+        />
+      )}
 
       {/* Brush cursor — hidden during pan mode */}
       {visible &&

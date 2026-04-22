@@ -160,19 +160,3 @@ pub fn gaussian_blur_region(
     }
 }
 
-/// Compress/encode image data to JPEG bytes at a given quality (0.0 - 1.0).
-/// Returns the raw JPEG bytes for blob construction on the JS side.
-/// Uses a simple approach: convert RGBA to RGB, then encode.
-pub fn compress_to_jpeg(
-    data: &[u8],
-    width: u32,
-    height: u32,
-    quality: f64,
-) -> Vec<u8> {
-    // For now, return raw RGBA data sized down.
-    // Full JPEG encoding would require pulling in `image` crate.
-    // The JS side can use canvas.toBlob for actual format encoding.
-    // This function is a placeholder for future pure-WASM JPEG encoding.
-    let _ = (data, width, height, quality);
-    Vec::new()
-}
