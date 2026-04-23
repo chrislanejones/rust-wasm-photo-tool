@@ -31,12 +31,8 @@ import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
 import type { EffectsMode } from "@/features/tools/settings/EffectsSettings";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
-import {
-  savePhotoEdit,
-  loadPhotoEdit,
-  deletePhotoEdit,
-  clearAllEdits,
-} from "@/lib/editPersistence";
+import { useEditPersistence } from "@/hooks/useEditPersistence";
+import { useRecentTexts } from "@/hooks/useRecentTexts";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -73,6 +69,8 @@ export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stamp = useCloneStamp(canvasRef);
+  const { savePhotoEdit, loadPhotoEdit, deletePhotoEdit, clearAllEdits } = useEditPersistence();
+  const { recentTexts, addRecentText } = useRecentTexts();
 
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     brushSize: 20,
@@ -100,8 +98,6 @@ export function AppShell() {
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
   const [hasBeenModified, setHasBeenModified] = useState(false);
-  const [recentTexts, setRecentTexts] = useState<TextMemory[]>([]);
-  const textIdCounter = useRef(0);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const loadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -112,23 +108,22 @@ export function AppShell() {
   const [brushMode, setBrushMode] = useState<"paint" | "blur">("paint");
   const [effectsMode, setEffectsMode] = useState<EffectsMode>("levels");
   const [colorPickerActive, setColorPickerActive] = useState(false);
+  const [stampSubMode, setStampSubMode] = useState<"clone" | "red" | "emojis">("clone");
+  const [shapesMode, setShapesMode] = useState<"shapes" | "arrows">("shapes");
 
   const handleTextCommit = useCallback(
     (text: string) => {
       if (!text.trim()) return;
-      const m: TextMemory = {
-        id: textIdCounter.current++,
+      void addRecentText({
+        id: 0,
         text,
         fontSize: toolSettings.fontSize,
         fontFamily: toolSettings.fontFamily ?? "sans-serif",
         fontWeight: toolSettings.fontWeight,
         textColor: toolSettings.textColor,
-      };
-      setRecentTexts((prev) =>
-        [m, ...prev.filter((t) => t.text !== text)].slice(0, 8),
-      );
+      });
     },
-    [toolSettings.fontSize, toolSettings.fontWeight, toolSettings.textColor],
+    [addRecentText, toolSettings.fontSize, toolSettings.fontFamily, toolSettings.fontWeight, toolSettings.textColor],
   );
 
   useEffect(() => {
@@ -337,9 +332,9 @@ export function AppShell() {
     switch (activeTool) {
       case "brush":
         return brushMode === "blur" ? toolSettings.blurSize / 2 : toolSettings.brushSize / 2;
-      case "emoji":
-        return (toolSettings.emojiSize * 1.2) / 2;
       case "stamp":
+        if (stampSubMode === "emojis") return (toolSettings.emojiSize * 1.2) / 2;
+        return stampSettings.brushSize;
       default:
         return stampSettings.brushSize;
     }
@@ -476,13 +471,18 @@ export function AppShell() {
     stamp.syncState();
   }, [stamp]);
 
+  const effectiveDrawingTool =
+    activeTool === "shapes" && shapesMode === "arrows"
+      ? ("arrow" as const)
+      : activeTool;
+
   const drawingTools = useDrawingTools({
     toolRef: stamp.toolRef,
     canvasRef,
-    activeTool,
+    activeTool: effectiveDrawingTool,
     settings: toolSettings,
     flushToCanvas: flushAndSync,
-    syncState: stamp.syncState, 
+    syncState: stamp.syncState,
   });
 
   const emojiTool = useEmojiTool({
@@ -547,13 +547,6 @@ export function AppShell() {
         onMouseMove: drawingTools.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
       };
-    if (activeTool === "emoji")
-      return {
-        ...stamp,
-        onMouseDown: emojiTool.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: emojiTool.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: emojiTool.onMouseUp as typeof stamp.onMouseUp,
-      };
     if (activeTool === "brush") {
       if (brushMode === "blur") {
         return {
@@ -571,6 +564,14 @@ export function AppShell() {
       };
     }
     if (activeTool === "stamp") {
+      if (stampSubMode === "emojis") {
+        return {
+          ...stamp,
+          onMouseDown: emojiTool.onMouseDown as typeof stamp.onMouseDown,
+          onMouseMove: emojiTool.onMouseMove as typeof stamp.onMouseMove,
+          onMouseUp: emojiTool.onMouseUp as typeof stamp.onMouseUp,
+        };
+      }
       // Route to red stamp if a preset is selected, else clone stamp
       const combinedDown: typeof stamp.onMouseDown = (e) => {
         if (redStampTool.hasPendingStamp()) {
@@ -862,6 +863,8 @@ export function AppShell() {
             recognizedText={textExtract.recognizedText}
             isRecognizing={textExtract.isRecognizing}
             onClearRecognizedText={textExtract.clearText}
+            shapesMode={shapesMode}
+            onShapesModeChange={setShapesMode}
             brushMode={brushMode}
             onBrushModeChange={setBrushMode}
             effectsMode={effectsMode}
@@ -869,6 +872,12 @@ export function AppShell() {
             colorPickerActive={colorPickerActive}
             onSetColorPickerActive={setColorPickerActive}
             pickedColor={toolSettings.brushColor}
+            stampSubMode={stampSubMode}
+            onStampSubModeChange={setStampSubMode}
+            stampEmoji={toolSettings.emoji}
+            stampEmojiSize={toolSettings.emojiSize}
+            onStampEmojiChange={(e) => setToolSettings((prev) => ({ ...prev, emoji: e }))}
+            onStampEmojiSizeChange={(s) => setToolSettings((prev) => ({ ...prev, emojiSize: s }))}
           />
         )}
       </AnimatePresence>

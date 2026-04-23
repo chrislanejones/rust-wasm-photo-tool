@@ -5,12 +5,12 @@ import {
   Crop,
   Paintbrush,
   Type,
-  ArrowUpRight,
+  FileText,
   Brain,
   Shapes,
   Sparkles,
   Stamp,
-  Smile,
+  Images,
 } from "lucide-react";
 
 export interface ToolDefinition {
@@ -54,7 +54,7 @@ export const TOOLS: ToolDefinition[] = [
     id: "arrow",
     label: "Arrows",
     description: "Point & highlight areas",
-    icon: ArrowUpRight,
+    icon: FileText,
     gradient: "from-emerald-500 to-teal-500",
   },
   {
@@ -87,9 +87,9 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "emoji",
-    label: "Emoji",
-    description: "Stamp emojis on images",
-    icon: Smile,
+    label: "Images",
+    description: "Batch stamp icons across all images",
+    icon: Images,
     gradient: "from-yellow-400 to-orange-400",
   },
 ];

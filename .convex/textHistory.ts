@@ -10,6 +10,7 @@ export const addRecentText = mutation({
   args: {
     text: v.string(),
     fontSize: v.number(),
+    fontFamily: v.optional(v.string()),
     fontWeight: v.union(v.literal("normal"), v.literal("bold")),
     textColor: v.string(),
   },
@@ -30,6 +31,7 @@ export const addRecentText = mutation({
       userId: user._id,
       text: args.text,
       fontSize: args.fontSize,
+      fontFamily: args.fontFamily,
       fontWeight: args.fontWeight,
       textColor: args.textColor,
       usedAt: Date.now(),

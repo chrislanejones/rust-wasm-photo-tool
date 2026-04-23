@@ -162,12 +162,23 @@ export default defineSchema({
     userId: v.id("users"),
     text: v.string(),
     fontSize: v.number(),
+    fontFamily: v.optional(v.string()),
     fontWeight: v.union(v.literal("normal"), v.literal("bold")),
     textColor: v.string(),
     usedAt: v.number(),
   })
     .index("by_userId", ["userId"])
     .index("by_userId_usedAt", ["userId", "usedAt"]),
+
+  // ── Photo canvas edits (per-user, stored in Convex file storage) ────────
+  photo_edits: defineTable({
+    userId: v.id("users"),
+    photoKey: v.string(),
+    storageId: v.id("_storage"),
+    canvasW: v.number(),
+    canvasH: v.number(),
+    updatedAt: v.number(),
+  }).index("by_userId_photoKey", ["userId", "photoKey"]),
 
   // ── AI Jobs ─────────────────────────────────────────────
   ai_jobs: defineTable({

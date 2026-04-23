@@ -11,6 +11,8 @@ import type {
 import type { ExportFormat } from "@/app/AppShell";
 import type { TextMemory } from "./settings/TextSettings";
 import type { EffectsMode } from "./settings/EffectsSettings";
+import type { StampMode } from "./settings/StampSettings";
+import type { ShapesMode } from "./settings/ShapeSettings";
 import { ToolGrid } from "./ToolGrid";
 import * as StampSettingsModule from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
@@ -18,7 +20,7 @@ import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
 import { ArrowSettings } from "./settings/ArrowSettings";
 import { ShapesSettings } from "./settings/ShapeSettings";
-import { EmojiSettings } from "./settings/EmojiSettings";
+import { BatchSettings } from "./settings/BatchSettings";
 import { PaintSettings } from "./settings/PaintSettings";
 import { TextSettings } from "./settings/TextSettings";
 
@@ -76,6 +78,16 @@ interface ToolsSidebarProps {
   colorPickerActive?: boolean;
   onSetColorPickerActive?: (active: boolean) => void;
   pickedColor?: string;
+  // Shapes sub-mode
+  shapesMode?: ShapesMode;
+  onShapesModeChange?: (mode: ShapesMode) => void;
+  // Stamp sub-mode + emoji
+  stampSubMode?: StampMode;
+  onStampSubModeChange?: (mode: StampMode) => void;
+  stampEmoji?: string;
+  stampEmojiSize?: number;
+  onStampEmojiChange?: (e: string) => void;
+  onStampEmojiSizeChange?: (s: number) => void;
 }
 
 export function ToolsSidebar({
@@ -124,6 +136,14 @@ export function ToolsSidebar({
   colorPickerActive,
   onSetColorPickerActive,
   pickedColor,
+  shapesMode,
+  onShapesModeChange,
+  stampSubMode,
+  onStampSubModeChange,
+  stampEmoji,
+  stampEmojiSize,
+  onStampEmojiChange,
+  onStampEmojiSizeChange,
 }: ToolsSidebarProps) {
   return (
     <motion.div
@@ -175,6 +195,12 @@ export function ToolsSidebar({
             settings={stampSettings}
             onChange={onStampSettingsChange}
             hasSource={hasSource}
+            activeMode={stampSubMode}
+            onModeChange={onStampSubModeChange}
+            emoji={stampEmoji}
+            emojiSize={stampEmojiSize}
+            onEmojiChange={onStampEmojiChange}
+            onEmojiSizeChange={onStampEmojiSizeChange}
           />
         )}
 
@@ -204,21 +230,12 @@ export function ToolsSidebar({
           <ShapesSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}
+            activeMode={shapesMode}
+            onModeChange={onShapesModeChange}
           />
         )}
 
-        {activeTool === "emoji" && (
-          <EmojiSettings
-            emoji={toolSettings.emoji}
-            emojiSize={toolSettings.emojiSize}
-            onEmojiChange={(e) =>
-              onToolSettingsChange({ ...toolSettings, emoji: e })
-            }
-            onSizeChange={(s) =>
-              onToolSettingsChange({ ...toolSettings, emojiSize: s })
-            }
-          />
-        )}
+        {activeTool === "emoji" && <BatchSettings />}
 
         {activeTool === "brush" && (
           <PaintSettings

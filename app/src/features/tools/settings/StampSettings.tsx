@@ -1,14 +1,23 @@
 import { useState } from "react";
+import Picker from "@emoji-mart/react";
+import data from "@emoji-mart/data";
 import type { StampSettings } from "@/lib/types";
 import { TabGroup } from "@/components/TabGroup";
 
 const SIZE_PRESETS = [8, 16, 24, 32] as const;
 const HARDNESS_PRESETS = [0, 33, 66, 100] as const;
+const EMOJI_SIZE_PRESETS = [32, 48, 64, 96] as const;
 
 interface StampSettingsPanelProps {
   settings: StampSettings;
   onChange: (s: StampSettings) => void;
   hasSource: boolean;
+  emoji?: string;
+  emojiSize?: number;
+  onEmojiChange?: (e: string) => void;
+  onEmojiSizeChange?: (s: number) => void;
+  activeMode?: StampMode;
+  onModeChange?: (mode: StampMode) => void;
 }
 
 /** Red stamp presets that get rendered via OffscreenCanvas → Rust stamp_pixels */
@@ -59,15 +68,28 @@ function DotRow({
   );
 }
 
-type StampMode = "clone" | "red";
+export type StampMode = "clone" | "red" | "emojis";
 
 export function StampSettingsPanel({
   settings,
   onChange,
   hasSource,
+  emoji = "",
+  emojiSize = 48,
+  onEmojiChange,
+  onEmojiSizeChange,
+  activeMode,
+  onModeChange,
 }: StampSettingsPanelProps) {
-  const [mode, setMode] = useState<StampMode>("clone");
+  const [internalMode, setInternalMode] = useState<StampMode>("clone");
+  const mode = activeMode ?? internalMode;
   const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
+
+  const handleModeChange = (id: string) => {
+    const m = id as StampMode;
+    setInternalMode(m);
+    onModeChange?.(m);
+  };
 
   const handleStampPreset = (id: string, label: string, color: string) => {
     setSelectedStampId(id);
@@ -83,11 +105,12 @@ export function StampSettingsPanel({
       {/* ── Mode switcher ── */}
       <TabGroup
         tabs={[
-          { id: "clone", label: "Stamp Tool" },
-          { id: "red", label: "Red Stamps" },
+          { id: "clone", label: "Clone" },
+          { id: "red", label: "Stamps" },
+          { id: "emojis", label: "Emojis" },
         ]}
         active={mode}
-        onChange={(id) => setMode(id as StampMode)}
+        onChange={handleModeChange}
       />
 
       {/* ── Clone Stamp panel ── */}
@@ -309,7 +332,6 @@ export function StampSettingsPanel({
                         : "none",
                     }}
                   >
-                    {/* Selected dot */}
                     {isSelected && (
                       <span
                         className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
@@ -335,6 +357,78 @@ export function StampSettingsPanel({
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Emojis panel ── */}
+      {mode === "emojis" && (
+        <div className="space-y-4">
+          <div className="emoji-picker-host">
+            <Picker
+              data={data}
+              onEmojiSelect={(e: { native: string }) => onEmojiChange?.(e.native)}
+              theme="dark"
+              previewPosition="none"
+              skinTonePosition="none"
+              navPosition="top"
+              perLine={7}
+              maxFrequentRows={1}
+              dynamicWidth={true}
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+                Size
+              </label>
+              <span className="text-xs text-theme-foreground tabular-nums">
+                {emojiSize}px
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              {EMOJI_SIZE_PRESETS.map((size) => {
+                const active = emojiSize === size;
+                return (
+                  <button
+                    key={size}
+                    onClick={() => onEmojiSizeChange?.(size)}
+                    className={[
+                      "flex items-center justify-center w-10 h-10 rounded-lg transition-all",
+                      active
+                        ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar bg-theme-accent"
+                        : "hover:bg-theme-accent",
+                    ].join(" ")}
+                    aria-label={`Emoji size ${size}`}
+                  >
+                    <span style={{ fontSize: size * 0.4 }}>😀</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="relative h-2 w-full rounded-full bg-theme-muted">
+              <div
+                className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
+                style={{ width: `${((emojiSize - 16) / (128 - 16)) * 100}%` }}
+              />
+              <input
+                type="range"
+                min={16}
+                max={128}
+                step={1}
+                value={emojiSize}
+                onChange={(e) => onEmojiSizeChange?.(Number(e.target.value))}
+                className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
+              />
+            </div>
+          </div>
+          {emoji && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-primary/10 border border-theme-primary/30">
+              <span className="text-2xl">{emoji}</span>
+              <span className="text-xs text-theme-muted-foreground">
+                Selected
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

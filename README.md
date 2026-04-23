@@ -141,16 +141,19 @@ app/src/
 │   │   ├── ToolButton.tsx            Individual tool button
 │   │   ├── toolConfig.ts             Tool definitions (10 tools)
 │   │   └── settings/
-│   │       ├── StampSettings.tsx     Tab-switched: Clone Stamp (size/hardness/opacity) +
-│   │       │                         Red Stamps (presets with brush-size scaling)
+│   │       ├── StampSettings.tsx     3-tab: Clone Stamp (size/hardness/opacity) +
+│   │       │                         Stamps (red-stamp presets) + Emojis (full picker + size)
 │   │       ├── TransformCropSettings.tsx  Flip, rotate; crop apply button
 │   │       ├── ResizeSettings.tsx    Width/height, aspect lock, format, quality, A/B compare,
 │   │       │                         auto-compress, lighthouse score
 │   │       ├── EffectsSettings.tsx   Tab-switched: Levels (brightness/contrast sliders) +
 │   │       │                         Color Picker (eyedropper, activates magnifier overlay)
-│   │       ├── ArrowSettings.tsx     Arrow color, stroke width, head style
-│   │       ├── ShapeSettings.tsx     Shape type, fill/stroke color, line width
-│   │       ├── EmojiSettings.tsx     Emoji picker (@emoji-mart), size presets
+│   │       ├── ArrowSettings.tsx     Coming-soon panel (FileText icon); content moved to
+│   │       │                         ShapeSettings Arrows tab
+│   │       ├── ShapeSettings.tsx     2-tab: Shapes (4 buttons styled like Transform panel,
+│   │       │                         lucide icons, stroke/color) + Arrows (stroke, style, color);
+│   │       │                         shapesMode lifted to AppShell for correct canvas routing
+│   │       ├── BatchSettings.tsx     Coming-soon panel for Images toolbar tool (batch icon stamp)
 │   │       ├── PaintSettings.tsx     Tab-switched: Paint (size/color/opacity) +
 │   │       │                         Blur Brush (radius, intensity) — both route canvas events
 │   │       └── TextSettings.tsx      Font family (12 browser-safe fonts), size, weight, color;
@@ -209,11 +212,11 @@ app/src/
 - **Levels** — Brightness (−100% to +100%), contrast (0% to 300%); each adjustment is a separate undo snapshot
 - **Color Picker** — Eyedropper activates on Effects → Color Picker tab; hovering the canvas shows a floating 11×11 magnifier (sourced from Rust `get_pixel_region`); clicking picks the pixel color and sets it as both brush and text color
 - **Blur Brush** — Box-blur with stroke-based region masking; configurable radius and intensity; now lives in the Brush tool's "Blur Brush" tab
-- **Arrows** — Anti-aliased arrows with arrowhead (single or double), drawn directly on the pixel buffer
-- **Shapes** — Rectangles, circles, hand-drawn circles, and lines rendered in WASM
+- **Arrows** — Anti-aliased arrows with arrowhead (single or double), drawn directly on the pixel buffer; accessible from the Arrows sub-tab inside the Shapes tool
+- **Shapes** — Rectangles, circles, hand-drawn circles, and lines rendered in WASM; Shapes tool has a Shapes/Arrows tab switcher at the top
 - **Paint / Brush** — Freehand painting via WASM `paint_dab` + `paint_stroke_to`; configurable brush size, color, and opacity; tab-switched with Blur Brush in the same panel
 - **Text** — Click-to-place text with configurable font family (12 browser-safe options), size, weight, and color; up to 8 recent texts that re-open the canvas text box at the last used position, restoring all text settings
-- **Emoji Stamp** — Browser renders emoji to `OffscreenCanvas`, pixels sent to WASM `stamp_pixels()` for alpha compositing
+- **Emoji Stamp** — Browser renders emoji to `OffscreenCanvas`, pixels sent to WASM `stamp_pixels()` for alpha compositing; emoji picker lives in the Stamp tool's Emojis tab
 - **Export** — Lossless PNG via Rust encoder, JPEG/WebP/AVIF via browser
 - **Thumbnails** — Bilinear-scaled thumbnails generated in WASM
 - **Copy/Paste Regions** — Cross-photo pixel compositing with alpha blending; paste from clipboard supported
@@ -223,8 +226,8 @@ app/src/
 ### UI (React)
 
 - **Animated Panels** — Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)
-- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows, Shapes, Effects (Sparkles), Emoji, AI (Brain)
-- **Tab Switchers** — Stamp (Clone / Red Stamps), Paint (Paint / Blur Brush), Effects (Levels / Color Picker) via shared `TabGroup` component
+- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), Images (batch icon stamper, coming soon), AI (Brain)
+- **Tab Switchers** — Stamp (Clone / Stamps / Emojis), Shapes (Shapes / Arrows), Paint (Paint / Blur Brush), Effects (Levels / Color Picker) via shared `TabGroup` component
 - **Spacebar Pan** — Hold Space for grab-to-pan; all tool handlers bypassed during pan
 - **A/B Compare Slider** — Squoosh-style draggable divider to compare before/after edits
 - **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch; PgUp/PgDn cycling
@@ -321,6 +324,17 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 8 | Export All shortcut — `Alt + Shift + E` triggers ZIP export of all photos | Complete |
 | 9 | Redo hint in StatusBar — `Ctrl+Shift+Z` always visible in the status bar | Complete |
 | 10 | Keyboard shortcuts table expanded — all 24 shortcuts documented including bare-key tool switching, zoom, flip, rotate | Complete |
+
+## v2.4 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Stamp tool: 3-tab panel — Clone / Stamps / Emojis; Emojis tab houses the full `@emoji-mart` picker + size controls; emoji canvas routing activates when stamp tool + Emojis tab selected | Complete |
+| 2 | Emoji tool → Images tool — toolbar tool renamed to "Images" with `Images` lucide icon; panel shows BatchSettings (coming-soon batch Lucide icon stamper) | Complete |
+| 3 | Shapes tool: Shapes/Arrows tab switcher — Shapes tab has 4 shape buttons styled like the Transform panel (`Button` secondary, `grid-cols-2`, lucide icons); Arrows tab shows full arrow settings (stroke width, single/double style, color grid) | Complete |
+| 4 | Arrow tool → coming soon — panel replaced with coming-soon card (FileText icon); toolbar icon changed from `ArrowUpRight` to `FileText` | Complete |
+| 5 | Fix: arrows drawn when Arrows sub-tab active — `shapesMode` lifted to AppShell; `effectiveDrawingTool` overrides `activeTool` to `"arrow"` when shapes tool is in Arrows mode, routing preview and commit through `drawArrowPreview` / `tool.draw_arrow` | Complete |
+| 6 | Dual persistence — `useEditPersistence` routes canvas saves to Convex file storage (signed in) or IndexedDB (not signed in); `useRecentTexts` routes to Convex `recent_texts` or localStorage; `skipToken` used for conditional Convex queries | Complete |
 
 ## License
 
