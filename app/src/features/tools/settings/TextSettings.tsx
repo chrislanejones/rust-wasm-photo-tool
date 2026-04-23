@@ -1,11 +1,26 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Crop, Type } from "lucide-react";
+import { Crop, Type, ChevronDown } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS as COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
 import { Button } from "@/components/ui/button";
 import { quickSpring } from "@/lib/animations";
+
+const FONT_FAMILIES = [
+  { label: "Sans Serif", value: "sans-serif" },
+  { label: "Serif", value: "serif" },
+  { label: "Monospace", value: "monospace" },
+  { label: "Arial", value: "Arial, sans-serif" },
+  { label: "Georgia", value: "Georgia, serif" },
+  { label: "Times New Roman", value: "Times New Roman, serif" },
+  { label: "Courier New", value: "Courier New, monospace" },
+  { label: "Verdana", value: "Verdana, sans-serif" },
+  { label: "Impact", value: "Impact, sans-serif" },
+  { label: "Comic Sans", value: "Comic Sans MS, cursive" },
+  { label: "Trebuchet", value: "Trebuchet MS, sans-serif" },
+  { label: "Palatino", value: "Palatino, serif" },
+] as const;
 
 const FONT_SIZE_PRESETS = [16, 32, 48, 72] as const;
 
@@ -13,6 +28,7 @@ export interface TextMemory {
   id: number;
   text: string;
   fontSize: number;
+  fontFamily: string;
   fontWeight: "normal" | "bold";
   textColor: string;
 }
@@ -120,6 +136,28 @@ export function TextSettings({
                   }
                   className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
                 />
+              </div>
+            </div>
+
+            {/* Font Family */}
+            <div className="space-y-4">
+              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+                Font Family
+              </label>
+              <div className="relative">
+                <select
+                  value={settings.fontFamily ?? "sans-serif"}
+                  onChange={(e) => onChange({ ...settings, fontFamily: e.target.value })}
+                  className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+                  style={{ fontFamily: settings.fontFamily ?? "sans-serif" }}
+                >
+                  {FONT_FAMILIES.map((f) => (
+                    <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
               </div>
             </div>
 

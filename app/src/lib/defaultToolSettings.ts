@@ -11,6 +11,7 @@ export const defaultToolSettings: ToolSettings = {
   brushColor: "#ef4444",
   brushOpacity: 100,
   fontSize: 24,
+  fontFamily: "sans-serif",
   fontWeight: "normal",
   textColor: "#000000",
   blurSize: 32,

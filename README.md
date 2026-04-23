@@ -70,16 +70,22 @@ The `image` crate with all codec features adds ~800KB to the WASM binary. The br
 
 ```
 src/
-├── lib.rs          #[wasm_bindgen] glue — CloneStampTool struct, delegates to modules
-├── core.rs         ImageBuffer — width, height, data, load, bilinear sampling
-├── history.rs      Snapshot (data + dimensions), undo/redo stacks, push, jump, delete, labels
-├── stamp.rs        Clone stamp engine — source, offset, stroke lifecycle, dab kernel
+├── lib.rs          #[wasm_bindgen] glue — CloneStampTool struct, delegates to modules;
+│                   get_pixel(x,y) and get_pixel_region(cx,cy,radius) for color picker
+├── core.rs         ImageBuffer — width, height, data, load, bilinear sampling;
+│                   zero-size guard: sample_bilinear returns [0,0,0,0] when buffer is empty
+├── history.rs      Snapshot (data + dimensions), undo/redo stacks, push, jump, delete, labels;
+│                   pub const MAX_HISTORY = 50 (single source of truth)
+├── stamp.rs        Clone stamp engine — source, offset, stroke lifecycle, dab kernel;
+│                   stroke_src_data frozen buffer prevents feedback artifacts
 ├── transform.rs    Flip H/V, rotate 90° CW/CCW, resize (bilinear), copy_region, paste_region,
 │                   crop overlay compositing, dashed border drawing
-├── filters.rs      Brightness, contrast, blur (box-blur region, stroke-based)
+├── filters.rs      Brightness, contrast, Gaussian blur (separable 2-pass, bounding-box region)
 ├── drawing.rs      Arrow rendering (anti-aliased, arrowhead), geometric shapes (rect, circle, line,
 │                   hand-drawn circle)
-└── codec.rs        PNG encoding, thumbnail generation with bilinear scaling
+├── text.rs         Liberation Sans font embedded at compile time; renders text → pixel buffer
+└── codec.rs        PNG encoding, thumbnail generation with bilinear scaling;
+                    history snapshot serialization (get/inject undo/redo PNG blobs)
 ```
 
 ## Frontend Structure
@@ -93,25 +99,33 @@ app/src/
 │   ├── AppShell.tsx                  Master orchestrator — state, panels, WASM bridge
 │   └── useKeyboardShortcuts.ts       Centralized keyboard handler
 ├── hooks/
-│   ├── useCloneStamp.ts              React hook wrapping the WASM CloneStampTool
+│   ├── useCloneStamp.ts              React hook wrapping the WASM CloneStampTool; includes
+│   │                                 loadFromSaved() for restoring per-photo IDB sessions
 │   ├── useBrushPreview.ts            Cursor preview overlay
 │   ├── useDrawingTools.ts            Arrow/shape drawing + crop selection (SVG overlay)
 │   ├── useEmojiTool.ts               Emoji stamp — OffscreenCanvas → WASM stamp_pixels
 │   ├── usePaintTool.ts               Freehand paint/brush — WASM paint_dab + paint_stroke_to
+│   ├── useColorPicker.ts             Color picker eyedropper — WASM get_pixel / get_pixel_region;
+│   │                                 returns magnifier pixel grid + center hex color on mouse move
+│   ├── UseBlurTool.ts                Blur brush — WASM gaussian_blur_region per dab
 │   ├── useTextTool.ts                Text overlay — browser canvas renders font → WASM stamp_pixels;
 │   │                                 tracks last position for recent-text re-edit
+│   ├── useTextExtract.ts             Drag-to-OCR — Tesseract.js reads selected canvas region
 │   ├── useRedStampTool.ts            Red stamp presets — OffscreenCanvas renders label →
 │   │                                 WASM stamp_red (scales to brush size, "Red Stamp" history)
+│   ├── useStoreUser.ts               Syncs Clerk user into Convex users table on sign-in
 │   ├── useConvexHistory.ts           Convex history bridge (stub, ready for connection)
 │   ├── useAutoCompress.ts            Auto-compress hook for resize workflow
 │   └── stamp_tool.d.ts               TypeScript declarations for WASM interface
 ├── components/
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
-│   ├── StatusBar/                    Source status, shortcuts, dimensions, zoom %
-│   ├── TabGroup.tsx                  Reusable tab switcher (Stamp, Effects, future panels)
+│   ├── StatusBar/                    Source status, shortcuts (incl. Ctrl+Shift+Z redo), dimensions, zoom %
+│   ├── TabGroup.tsx                  Reusable tab switcher (Stamp, Effects, Brush, future panels)
+│   ├── MagnifierOverlay.tsx          Floating 11×11 pixel magnifier for color picker eyedropper;
+│   │                                 pixel grid sourced from WASM get_pixel_region, center hex shown
 │   ├── UserMenu.tsx                  Convex/Clerk user menu
 │   ├── ConvexClerkProvider.tsx       Auth provider wrapper
-│   └── ShortcutModal.tsx             Alt+/ keyboard reference overlay
+│   └── ShortcutModal.tsx             Alt+Shift+? keyboard reference overlay
 ├── features/
 │   ├── canvas/
 │   │   ├── CanvasArea.tsx            WASM canvas + brush cursor + SVG crop overlay with
@@ -132,43 +146,56 @@ app/src/
 │   │       ├── TransformCropSettings.tsx  Flip, rotate; crop apply button
 │   │       ├── ResizeSettings.tsx    Width/height, aspect lock, format, quality, A/B compare,
 │   │       │                         auto-compress, lighthouse score
-│   │       ├── EffectsSettings.tsx   Tab-switched: Effects (brightness/contrast) +
-│   │       │                         Blur Brush (radius, intensity)
+│   │       ├── EffectsSettings.tsx   Tab-switched: Levels (brightness/contrast sliders) +
+│   │       │                         Color Picker (eyedropper, activates magnifier overlay)
 │   │       ├── ArrowSettings.tsx     Arrow color, stroke width, head style
 │   │       ├── ShapeSettings.tsx     Shape type, fill/stroke color, line width
 │   │       ├── EmojiSettings.tsx     Emoji picker (@emoji-mart), size presets
-│   │       ├── PaintSettings.tsx     Brush size presets, color palette, opacity
-│   │       └── TextSettings.tsx      Font size/weight/color; up to 8 recent texts
-│   │                                 (click to re-open canvas box at last position)
+│   │       ├── PaintSettings.tsx     Tab-switched: Paint (size/color/opacity) +
+│   │       │                         Blur Brush (radius, intensity) — both route canvas events
+│   │       └── TextSettings.tsx      Font family (12 browser-safe fonts), size, weight, color;
+│   │                                 up to 8 recent texts (click to re-open canvas box at last
+│   │                                 position, restoring all settings including font)
 │   └── upload/
 │       └── UploadDialog.tsx          Drag-and-drop + paste-from-clipboard upload modal
 └── lib/
     ├── types.ts                      Shared type definitions
     ├── animations.ts                 Framer Motion spring variants
     ├── defaultToolSettings.ts        Default tool settings
+    ├── colors.ts                     Color utility helpers
+    ├── editPersistence.ts            Per-photo edit persistence via IndexedDB — saves full
+    │                                 canvas state + undo/redo history (PNG-encoded) so switching
+    │                                 between photos preserves all edits and history steps
     └── utils.ts                      cn() utility
 ```
 
 ## Keyboard Shortcuts
 
-| Shortcut           | Action                         |
-| ------------------ | ------------------------------ |
-| `Alt + U`          | Toggle Upload                  |
-| `Alt + S`          | Toggle Tools                   |
-| `Alt + G`          | Toggle Gallery                 |
-| `Alt + H`          | Toggle History                 |
-| `Alt + /`          | Show Shortcut Modal            |
-| `Ctrl + Z`         | Undo                           |
-| `Ctrl + Shift + Z` | Redo                           |
-| `Alt + E`          | Export                         |
-| `Alt + D`          | Delete All Images              |
-| `Alt + [`          | Decrease Brush Size            |
-| `Alt + ]`          | Increase Brush Size            |
-| `Alt + Click`      | Set Clone Source               |
-| `Alt + Scroll`     | Zoom In / Out                  |
-| `Space` (hold)     | Pan mode (grab to drag canvas) |
-| `PgUp / PgDn`      | Cycle gallery photos           |
-| `Ctrl + Shift + C` | Copy canvas to clipboard       |
+| Shortcut              | Action                              |
+| --------------------- | ----------------------------------- |
+| `1` – `0`             | Switch tools (Resize→…→Clone→Emoji) |
+| `Alt + U`             | Toggle Upload                       |
+| `Alt + S`             | Toggle Tools                        |
+| `Alt + G`             | Toggle Gallery                      |
+| `Alt + H`             | Toggle History                      |
+| `Alt + Shift + ?`     | Toggle Shortcut Modal               |
+| `Ctrl + Z`            | Undo                                |
+| `Ctrl + Shift + Z`    | Redo                                |
+| `Alt + E`             | Export current image                |
+| `Alt + Shift + E`     | Export all images (ZIP)             |
+| `Alt + D`             | Delete All Images                   |
+| `Alt + F`             | Flip Horizontal                     |
+| `Alt + V`             | Flip Vertical                       |
+| `Alt + R`             | Rotate 90° CW                       |
+| `Alt + [`             | Decrease Brush Size                 |
+| `Alt + ]`             | Increase Brush Size                 |
+| `Alt + Click`         | Set Clone Source                    |
+| `Alt + Scroll`        | Zoom In / Out                       |
+| `Alt + =` / `Alt + -` | Zoom In / Out                       |
+| `Alt + 0`             | Reset Zoom (100%)                   |
+| `Space` (hold)        | Pan mode (grab to drag canvas)      |
+| `PgUp / PgDn`         | Cycle gallery photos                |
+| `Ctrl + Shift + C`    | Copy canvas to clipboard            |
 
 ## Features
 
@@ -179,30 +206,32 @@ app/src/
 - **Transforms** — Flip horizontal/vertical, rotate 90° CW/CCW
 - **Crop** — Interactive SVG overlay with rule-of-thirds guides and 8 draggable resize handles; crop committed through Rust
 - **Resize** — Bilinear-scaled resize fully in WASM; no canvas round-trip
-- **Effects** — Brightness (−100% to +100%), contrast (0% to 300%); each adjustment is a separate undo snapshot
-- **Blur Brush** — Box-blur with stroke-based region masking; configurable radius and intensity
+- **Levels** — Brightness (−100% to +100%), contrast (0% to 300%); each adjustment is a separate undo snapshot
+- **Color Picker** — Eyedropper activates on Effects → Color Picker tab; hovering the canvas shows a floating 11×11 magnifier (sourced from Rust `get_pixel_region`); clicking picks the pixel color and sets it as both brush and text color
+- **Blur Brush** — Box-blur with stroke-based region masking; configurable radius and intensity; now lives in the Brush tool's "Blur Brush" tab
 - **Arrows** — Anti-aliased arrows with arrowhead (single or double), drawn directly on the pixel buffer
 - **Shapes** — Rectangles, circles, hand-drawn circles, and lines rendered in WASM
-- **Paint / Brush** — Freehand painting via WASM `paint_dab` + `paint_stroke_to`; configurable brush size, color, and opacity
-- **Text** — Click-to-place text with configurable font size, weight, and color; browser renders the font, pixels composited into the buffer via `stamp_pixels()`; up to 8 recent texts that re-open the canvas text box at the last used position
+- **Paint / Brush** — Freehand painting via WASM `paint_dab` + `paint_stroke_to`; configurable brush size, color, and opacity; tab-switched with Blur Brush in the same panel
+- **Text** — Click-to-place text with configurable font family (12 browser-safe options), size, weight, and color; up to 8 recent texts that re-open the canvas text box at the last used position, restoring all text settings
 - **Emoji Stamp** — Browser renders emoji to `OffscreenCanvas`, pixels sent to WASM `stamp_pixels()` for alpha compositing
 - **Export** — Lossless PNG via Rust encoder, JPEG/WebP/AVIF via browser
 - **Thumbnails** — Bilinear-scaled thumbnails generated in WASM
 - **Copy/Paste Regions** — Cross-photo pixel compositing with alpha blending; paste from clipboard supported
 - **History** — 50-step undo/redo with labeled snapshots (including dimensions for crop/resize/rotate correctness), jump-to, delete entry
+- **Per-photo Edit Persistence** — Switching photos saves the full WASM canvas + undo/redo stack to IndexedDB (PNG-encoded per snapshot). Switching back restores the exact edit session — same canvas state, same undo history, all redo steps intact
 
 ### UI (React)
 
 - **Animated Panels** — Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)
-- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows, Shapes, Effects, Emoji, AI
-- **Tab Switchers** — Stamp (Clone / Red Stamps), Effects (Effects / Blur Brush) via shared `TabGroup` component
+- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows, Shapes, Effects (Sparkles), Emoji, AI (Brain)
+- **Tab Switchers** — Stamp (Clone / Red Stamps), Paint (Paint / Blur Brush), Effects (Levels / Color Picker) via shared `TabGroup` component
 - **Spacebar Pan** — Hold Space for grab-to-pan; all tool handlers bypassed during pan
 - **A/B Compare Slider** — Squoosh-style draggable divider to compare before/after edits
 - **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch; PgUp/PgDn cycling
 - **History Timeline** — Right-side panel with clickable undo/redo entries
 - **Upload** — Drag-and-drop modal with file browser and paste-from-clipboard (Ctrl+V / paste button)
 - **Export Dropdown** — PNG, JPEG, WebP, AVIF format selector in the top bar
-- **Keyboard Hints** — Alt+/ shows badges on all buttons + shortcut reference modal
+- **Keyboard Shortcut Modal** — Alt+Shift+? opens a full reference overlay grouped by category
 - **AI Panel** — Placeholder cards for: Remove Background (rembg), 4× Upscale (Real-ESRGAN), Object Removal (SD Inpaint), Auto Alt Text (BLIP), Smart Crop, Auto-Enhance — wired to Convex `ai_jobs` + Replicate when ready
 - **Dark Theme** — JetBrains Mono + DM Sans, dark palette with accent highlights
 
@@ -259,6 +288,39 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 7 | Blur → Effects panel (brightness + contrast + blur brush) | Complete |
 | 8 | Architecture diagram opens in new tab | Complete |
 | 9 | Crop SVG overlay with rule-of-thirds + resize handles | Complete |
+
+## v2.2 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Per-photo edit persistence (IndexedDB) — full canvas + undo/redo history preserved on photo switch | Complete |
+| 2 | Clone stamp alpha compositing — Porter-Duff source-over; `stroke_src_data` frozen buffer prevents feedback artifacts | Complete |
+| 3 | Paint dab compositing — Porter-Duff fix; squared-distance circle rejection replaces sqrt in hot loop | Complete |
+| 4 | History `MAX_HISTORY` — single `pub const` in `history.rs`; `delete_entry` no longer restores canvas on delete | Complete |
+| 5 | Crop OOB clamp — boundary guard prevents out-of-bounds read on zero-area crops | Complete |
+| 6 | Zero-size buffer safety — `sample_bilinear` returns transparent pixel when width or height is 0 | Complete |
+| 7 | Netlify build fix — removed `--out-dir app/pkg` from wasm-pack; `app/pkg` is a symlink | Complete |
+| 8 | StatusBar hidden until first photo loaded | Complete |
+| 9 | Modified-photo dot — race condition fixed; dot only appears after actual brush/tool edits | Complete |
+| 10 | Convex `userProfiles.ts` removed — queried a table not in schema; `users.ts` covers all functionality | Complete |
+| 11 | `@emoji-mart` added to `app/package.json` — was only in root; Netlify build now installs it correctly | Complete |
+| 12 | Alt+Scroll zoom — listener moved to `window` to fix breakage when `CanvasArea` mounts after hook | Complete |
+| 13 | TypeScript — all frontend errors resolved; `vite-env.d.ts` added; WASM type declarations completed | Complete |
+
+## v2.3 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Brush tool split into "Paint \| Blur Brush" tabs — blur brush moved from Effects into Paint panel; canvas mouse routing controlled by sub-mode | Complete |
+| 2 | Effects tool tabs renamed "Levels \| Color Picker" — Levels keeps brightness/contrast; Color Picker adds eyedropper mode | Complete |
+| 3 | Color picker pixel magnifier — WASM `get_pixel_region(cx, cy, radius)` returns 11×11 RGBA grid; `MagnifierOverlay` renders it as a floating canvas near the cursor | Complete |
+| 4 | Color picker pick — WASM `get_pixel(x, y)` samples center pixel on click; sets brush color and text color | Complete |
+| 5 | Font family selector — 12 browser-safe fonts in a dropdown in the Text panel; font applied to the canvas text overlay textarea; stored in TextMemory so re-editing restores the font | Complete |
+| 6 | Recent text re-edit — clicking a recent text entry restores font family, size, weight, and color, then re-opens the canvas text box at the last used position | Complete |
+| 7 | Icon swap — AI tool uses `Brain` icon (lucide), Effects tool uses `Sparkles` icon | Complete |
+| 8 | Export All shortcut — `Alt + Shift + E` triggers ZIP export of all photos | Complete |
+| 9 | Redo hint in StatusBar — `Ctrl+Shift+Z` always visible in the status bar | Complete |
+| 10 | Keyboard shortcuts table expanded — all 24 shortcuts documented including bare-key tool switching, zoom, flip, rotate | Complete |
 
 ## License
 

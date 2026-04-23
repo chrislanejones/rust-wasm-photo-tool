@@ -141,6 +141,10 @@ declare module "stamp_tool" {
       opacity: number,
     ): void;
 
+    // Color picker helpers (Rust pixel sampling)
+    get_pixel(x: number, y: number): Uint8Array;
+    get_pixel_region(cx: number, cy: number, radius: number): Uint8Array;
+
     // History snapshot serialization (for JS-side persistence)
     undo_snapshot_count(): number;
     redo_snapshot_count(): number;

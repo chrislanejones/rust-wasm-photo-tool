@@ -27,6 +27,9 @@ import { HistoryPanel } from "@/features/canvas/HistoryPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
+import { useColorPicker } from "@/hooks/useColorPicker";
+import { MagnifierOverlay } from "@/components/MagnifierOverlay";
+import type { EffectsMode } from "@/features/tools/settings/EffectsSettings";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 import {
   savePhotoEdit,
@@ -42,6 +45,16 @@ import {
   ContextMenuSeparator,
   ContextMenuShortcut,
 } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import {
   Undo,
   Redo,
@@ -96,6 +109,10 @@ export function AppShell() {
   // Item 2: Pan mode state
   const [isPanning, setIsPanning] = useState(false);
 
+  const [brushMode, setBrushMode] = useState<"paint" | "blur">("paint");
+  const [effectsMode, setEffectsMode] = useState<EffectsMode>("levels");
+  const [colorPickerActive, setColorPickerActive] = useState(false);
+
   const handleTextCommit = useCallback(
     (text: string) => {
       if (!text.trim()) return;
@@ -103,6 +120,7 @@ export function AppShell() {
         id: textIdCounter.current++,
         text,
         fontSize: toolSettings.fontSize,
+        fontFamily: toolSettings.fontFamily ?? "sans-serif",
         fontWeight: toolSettings.fontWeight,
         textColor: toolSettings.textColor,
       };
@@ -127,6 +145,7 @@ export function AppShell() {
     setToolSettings((prev) => ({
       ...prev,
       fontSize: m.fontSize,
+      fontFamily: m.fontFamily ?? "sans-serif",
       fontWeight: m.fontWeight,
       textColor: m.textColor,
     }));
@@ -301,22 +320,25 @@ export function AppShell() {
   const [showTools, setShowTools] = useState(true);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showKbdHints, setShowKbdHints] = useState(true);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
   const [textExtractActive, setTextExtractActive] = useState(false);
+
+  useEffect(() => {
+    if (activeTool !== "effects") setColorPickerActive(false);
+  }, [activeTool]);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("jpeg");
   const [quality, setQuality] = useState(75);
 
   const effectiveBrushSize = (() => {
     switch (activeTool) {
       case "brush":
-        return toolSettings.brushSize / 2;
+        return brushMode === "blur" ? toolSettings.blurSize / 2 : toolSettings.brushSize / 2;
       case "emoji":
         return (toolSettings.emojiSize * 1.2) / 2;
-      case "effects":  // was "blur"
-        return toolSettings.blurSize / 2;
       case "stamp":
       default:
         return stampSettings.brushSize;
@@ -367,6 +389,11 @@ export function AppShell() {
   }, [stamp, exportFormat, quality, photos, activePhotoId]);
 
   const handleDeleteAll = useCallback(() => {
+    setDeleteAllOpen(true);
+  }, []);
+
+  const confirmDeleteAll = useCallback(() => {
+    setDeleteAllOpen(false);
     clearAllEdits().catch(() => {});
     setImageSavings({});
     setModifiedPhotos(new Set());
@@ -387,6 +414,19 @@ export function AppShell() {
       toRevoke.forEach((url) => URL.revokeObjectURL(url));
     });
   }, [photos]);
+
+  const handlePickColor = useCallback((hex: string) => {
+    setToolSettings((prev) => ({ ...prev, brushColor: hex, textColor: hex }));
+    setColorPickerActive(false);
+  }, []);
+
+  const colorPicker = useColorPicker({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    containerRef,
+    active: colorPickerActive && activeTool === "effects",
+    onPickColor: handlePickColor,
+  });
 
   const flushAndSync = useCallback(() => {
     stamp.flushToCanvas();
@@ -489,14 +529,17 @@ export function AppShell() {
   });
 
   const effectiveStamp = (() => {
-    // Item 7: "effects" tool uses blur mouse handlers (same as old "blur")
-    if (activeTool === "effects")
-      return {
-        ...stamp,
-        onMouseDown: blurDown,
-        onMouseMove: blurMove,
-        onMouseUp: blurUp,
-      };
+    if (activeTool === "effects") {
+      if (colorPickerActive) {
+        return {
+          ...stamp,
+          onMouseDown: colorPicker.onMouseDown as typeof stamp.onMouseDown,
+          onMouseMove: colorPicker.onMouseMove as typeof stamp.onMouseMove,
+          onMouseUp: stamp.onMouseUp,
+        };
+      }
+      return stamp;
+    }
     if (["arrow", "shapes", "crop"].includes(activeTool))
       return {
         ...stamp,
@@ -511,13 +554,22 @@ export function AppShell() {
         onMouseMove: emojiTool.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: emojiTool.onMouseUp as typeof stamp.onMouseUp,
       };
-    if (activeTool === "brush")
+    if (activeTool === "brush") {
+      if (brushMode === "blur") {
+        return {
+          ...stamp,
+          onMouseDown: blurDown,
+          onMouseMove: blurMove,
+          onMouseUp: blurUp,
+        };
+      }
       return {
         ...stamp,
         onMouseDown: paintTool.onMouseDown as typeof stamp.onMouseDown,
         onMouseMove: paintTool.onMouseMove as typeof stamp.onMouseMove,
         onMouseUp: paintTool.onMouseUp as typeof stamp.onMouseUp,
       };
+    }
     if (activeTool === "stamp") {
       // Route to red stamp if a preset is selected, else clone stamp
       const combinedDown: typeof stamp.onMouseDown = (e) => {
@@ -561,35 +613,6 @@ export function AppShell() {
         await navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]);
     } catch {}
   }, []);
-
-  useKeyboardShortcuts({
-    onUndo: stamp.undo,
-    onRedo: stamp.redo,
-    onExport: handleExport,
-    onDeleteAll: handleDeleteAll,
-    onBrushSizeChange: setStampSettings,
-    setBrushSizeOnTool: stamp.setBrushSize,
-    setShowUpload,
-    setShowTools,
-    setShowGallery,
-    setShowHistory,
-    setShowKbdHints,
-    setShowShortcutModal,
-    onZoomIn: handleZoomIn,
-    onZoomOut: handleZoomOut,
-    onZoomReset: handleZoomReset,
-    onToolChange: setActiveTool,
-    onFlipH: stamp.flipHorizontal,
-    onFlipV: stamp.flipVertical,
-    onRotateCw: stamp.rotate90Cw,
-    onCopyToClipboard: handleCopyToClipboard,
-    // Item 4: Gallery cycling
-    onNextPhoto: handleNextPhoto,
-    onPrevPhoto: handlePrevPhoto,
-    // Item 2: Spacebar pan
-    onSpaceDown: () => setIsPanning(true),
-    onSpaceUp: () => setIsPanning(false),
-  });
 
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
@@ -685,6 +708,33 @@ export function AppShell() {
     URL.revokeObjectURL(url);
   }, [photos, exportFormat]);
 
+  useKeyboardShortcuts({
+    onUndo: stamp.undo,
+    onRedo: stamp.redo,
+    onExport: handleExport,
+    onExportAll: handleExportAll,
+    onDeleteAll: handleDeleteAll,
+    onBrushSizeChange: setStampSettings,
+    setBrushSizeOnTool: stamp.setBrushSize,
+    setShowUpload,
+    setShowTools,
+    setShowGallery,
+    setShowHistory,
+    setShowShortcutModal,
+    onZoomIn: handleZoomIn,
+    onZoomOut: handleZoomOut,
+    onZoomReset: handleZoomReset,
+    onToolChange: setActiveTool,
+    onFlipH: stamp.flipHorizontal,
+    onFlipV: stamp.flipVertical,
+    onRotateCw: stamp.rotate90Cw,
+    onCopyToClipboard: handleCopyToClipboard,
+    onNextPhoto: handleNextPhoto,
+    onPrevPhoto: handlePrevPhoto,
+    onSpaceDown: () => setIsPanning(true),
+    onSpaceUp: () => setIsPanning(false),
+  });
+
   const hasImage = stamp.state.ready;
   const canUndo = stamp.state.undoCount > 0;
   const canRedo = stamp.state.redoCount > 0;
@@ -722,6 +772,25 @@ export function AppShell() {
         open={showShortcutModal}
         onClose={() => setShowShortcutModal(false)}
       />
+
+      <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete all images?</DialogTitle>
+            <DialogDescription>
+              This will remove all {photos.length} image{photos.length !== 1 ? "s" : ""} and their edit history. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={confirmDeleteAll}>
+              Delete all
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AnimatePresence>
         {showTopBar && (
@@ -793,6 +862,13 @@ export function AppShell() {
             recognizedText={textExtract.recognizedText}
             isRecognizing={textExtract.isRecognizing}
             onClearRecognizedText={textExtract.clearText}
+            brushMode={brushMode}
+            onBrushModeChange={setBrushMode}
+            effectsMode={effectsMode}
+            onEffectsModeChange={setEffectsMode}
+            colorPickerActive={colorPickerActive}
+            onSetColorPickerActive={setColorPickerActive}
+            pickedColor={toolSettings.brushColor}
           />
         )}
       </AnimatePresence>
@@ -809,6 +885,7 @@ export function AppShell() {
             style={{ position: "relative" }}
           >
             {photos.length > 0 ? (
+              <>
               <CanvasArea
                 ref={canvasRef}
                 hookResult={effectiveStamp}
@@ -816,7 +893,7 @@ export function AppShell() {
                 cursorPos={pos}
                 cursorVisible={visible}
                 onCanvasEnter={onCanvasEnter}
-                onCanvasLeave={onCanvasLeave}
+                onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
                 beforeUrl={originalUrl}
                 compareActive={compareActive}
                 activeTool={activeTool}
@@ -828,6 +905,7 @@ export function AppShell() {
                 onTextBlur={textTool.onTextBlur}
                 textSettings={{
                   fontSize: toolSettings.fontSize,
+                  fontFamily: toolSettings.fontFamily,
                   fontWeight: toolSettings.fontWeight,
                   textColor: toolSettings.textColor,
                 }}
@@ -840,7 +918,10 @@ export function AppShell() {
                 isPanning={isPanning}
                 cropSelection={drawingTools.cropSelection}
                 onCropChange={(sel) => drawingTools.setCropSelection(sel)}
+                colorPickerActive={colorPickerActive}
               />
+              <MagnifierOverlay magnifier={colorPicker.magnifier} />
+              </>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4 text-center">
@@ -947,16 +1028,14 @@ export function AppShell() {
         <StatusBar
           state={stamp.state}
           imageCount={photos.length}
-          showKbdHints={showKbdHints}
-          activeTool={activeTool}
         />
       )}
 
       {/* Brush cursor — hidden during pan mode */}
       {visible &&
         !isPanning &&
+        !colorPickerActive &&
         (activeTool === "stamp" ||
-          activeTool === "effects" ||
           activeTool === "brush" ||
           activeTool === "emoji") && (
           <div

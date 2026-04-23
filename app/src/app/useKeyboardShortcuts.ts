@@ -19,6 +19,7 @@ interface KeyboardShortcutOptions {
   onUndo: () => void;
   onRedo: () => void;
   onExport: () => void;
+  onExportAll?: () => void;
   onDeleteAll: () => void;
   onBrushSizeChange: (fn: (prev: StampSettings) => StampSettings) => void;
   setBrushSizeOnTool: (size: number) => void;
@@ -26,7 +27,6 @@ interface KeyboardShortcutOptions {
   setShowTools: React.Dispatch<React.SetStateAction<boolean>>;
   setShowGallery: React.Dispatch<React.SetStateAction<boolean>>;
   setShowHistory: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowKbdHints: React.Dispatch<React.SetStateAction<boolean>>;
   setShowShortcutModal: React.Dispatch<React.SetStateAction<boolean>>;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -48,6 +48,7 @@ export function useKeyboardShortcuts({
   onUndo,
   onRedo,
   onExport,
+  onExportAll,
   onDeleteAll,
   onBrushSizeChange,
   setBrushSizeOnTool,
@@ -55,7 +56,6 @@ export function useKeyboardShortcuts({
   setShowTools,
   setShowGallery,
   setShowHistory,
-  setShowKbdHints,
   setShowShortcutModal,
   onZoomIn,
   onZoomOut,
@@ -120,10 +120,17 @@ export function useKeyboardShortcuts({
 
       // ─── Alt combos ────────────────────────────────────
       if (e.altKey) {
-        if (e.shiftKey && e.code === "Slash") {
-          e.preventDefault();
-          setShowShortcutModal((v) => !v);
-          return;
+        if (e.shiftKey) {
+          if (e.code === "Slash") {
+            e.preventDefault();
+            setShowShortcutModal((v) => !v);
+            return;
+          }
+          if (e.code === "KeyE") {
+            e.preventDefault();
+            onExportAll?.();
+            return;
+          }
         }
 
         switch (e.code) {
@@ -131,7 +138,6 @@ export function useKeyboardShortcuts({
           case "KeyS": e.preventDefault(); setShowTools((v) => !v); break;
           case "KeyG": e.preventDefault(); setShowGallery((v) => !v); break;
           case "KeyH": e.preventDefault(); setShowHistory((v) => !v); break;
-          case "Slash": e.preventDefault(); setShowKbdHints((v) => !v); break;
           case "BracketLeft":
             e.preventDefault();
             onBrushSizeChange((prev) => {
@@ -182,9 +188,9 @@ export function useKeyboardShortcuts({
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [
-    onUndo, onRedo, onExport, onDeleteAll, onBrushSizeChange,
+    onUndo, onRedo, onExport, onExportAll, onDeleteAll, onBrushSizeChange,
     setBrushSizeOnTool, setShowUpload, setShowTools, setShowGallery,
-    setShowHistory, setShowKbdHints, setShowShortcutModal, onZoomIn,
+    setShowHistory, setShowShortcutModal, onZoomIn,
     onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
   ]);

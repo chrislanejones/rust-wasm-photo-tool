@@ -16,21 +16,21 @@ class x {
   adjust_zoom(t) {
     e.clonestamptool_adjust_zoom(this.__wbg_ptr, t);
   }
-  apply_crop_from_preview(t, _, n, r) {
-    e.clonestamptool_apply_crop_from_preview(this.__wbg_ptr, t, _, n, r);
+  apply_crop_from_preview(t, _, n, o) {
+    e.clonestamptool_apply_crop_from_preview(this.__wbg_ptr, t, _, n, o);
   }
   begin_blur_stroke() {
     e.clonestamptool_begin_blur_stroke(this.__wbg_ptr);
   }
   begin_draw_stroke(t) {
-    const _ = g(t, e.__wbindgen_malloc, e.__wbindgen_realloc), n = c;
+    const _ = b(t, e.__wbindgen_malloc, e.__wbindgen_realloc), n = c;
     e.clonestamptool_begin_draw_stroke(this.__wbg_ptr, _, n);
   }
   begin_stroke(t, _) {
     e.clonestamptool_begin_stroke(this.__wbg_ptr, t, _);
   }
-  blur_region(t, _, n, r) {
-    e.clonestamptool_blur_region(this.__wbg_ptr, t, _, n, r);
+  blur_region(t, _, n, o) {
+    e.clonestamptool_blur_region(this.__wbg_ptr, t, _, n, o);
   }
   cancel_crop_preview() {
     return e.clonestamptool_cancel_crop_preview(this.__wbg_ptr) !== 0;
@@ -38,24 +38,24 @@ class x {
   clear_history() {
     e.clonestamptool_clear_history(this.__wbg_ptr);
   }
-  commit_red_stamp(t, _, n, r, i, s, a) {
-    const l = g(t, e.__wbindgen_malloc, e.__wbindgen_realloc), p = c;
-    e.clonestamptool_commit_red_stamp(this.__wbg_ptr, l, p, _, n, r, i, s, a);
+  commit_red_stamp(t, _, n, o, i, s, l) {
+    const a = b(t, e.__wbindgen_malloc, e.__wbindgen_realloc), p = c;
+    e.clonestamptool_commit_red_stamp(this.__wbg_ptr, a, p, _, n, o, i, s, l);
   }
-  commit_text(t, _, n, r, i, s, a, l) {
-    const p = g(t, e.__wbindgen_malloc, e.__wbindgen_realloc), z = c;
-    e.clonestamptool_commit_text(this.__wbg_ptr, p, z, _, n, r, i, s, a, l);
+  commit_text(t, _, n, o, i, s, l, a) {
+    const p = b(t, e.__wbindgen_malloc, e.__wbindgen_realloc), z = c;
+    e.clonestamptool_commit_text(this.__wbg_ptr, p, z, _, n, o, i, s, l, a);
   }
   continue_stroke(t, _) {
     e.clonestamptool_continue_stroke(this.__wbg_ptr, t, _);
   }
-  copy_region(t, _, n, r) {
-    const i = e.clonestamptool_copy_region(this.__wbg_ptr, t, _, n, r);
-    var s = b(i[0], i[1]).slice();
+  copy_region(t, _, n, o) {
+    const i = e.clonestamptool_copy_region(this.__wbg_ptr, t, _, n, o);
+    var s = g(i[0], i[1]).slice();
     return e.__wbindgen_free(i[0], i[1] * 1, 1), s;
   }
-  crop(t, _, n, r) {
-    e.clonestamptool_crop(this.__wbg_ptr, t, _, n, r);
+  crop(t, _, n, o) {
+    e.clonestamptool_crop(this.__wbg_ptr, t, _, n, o);
   }
   data_len() {
     return e.clonestamptool_data_len(this.__wbg_ptr) >>> 0;
@@ -66,25 +66,25 @@ class x {
   delete_history_entry(t) {
     return e.clonestamptool_delete_history_entry(this.__wbg_ptr, t) !== 0;
   }
-  draw_arrow(t, _, n, r, i, s, a) {
-    const l = g(i, e.__wbindgen_malloc, e.__wbindgen_realloc), p = c;
-    e.clonestamptool_draw_arrow(this.__wbg_ptr, t, _, n, r, l, p, s, a);
+  draw_arrow(t, _, n, o, i, s, l) {
+    const a = b(i, e.__wbindgen_malloc, e.__wbindgen_realloc), p = c;
+    e.clonestamptool_draw_arrow(this.__wbg_ptr, t, _, n, o, a, p, s, l);
   }
-  draw_shape(t, _, n, r, i, s, a) {
-    const l = g(s, e.__wbindgen_malloc, e.__wbindgen_realloc), p = c;
-    e.clonestamptool_draw_shape(this.__wbg_ptr, t, _, n, r, i, l, p, a);
+  draw_shape(t, _, n, o, i, s, l) {
+    const a = b(s, e.__wbindgen_malloc, e.__wbindgen_realloc), p = c;
+    e.clonestamptool_draw_shape(this.__wbg_ptr, t, _, n, o, i, a, p, l);
   }
   end_stroke() {
     e.clonestamptool_end_stroke(this.__wbg_ptr);
   }
   export_png() {
     const t = e.clonestamptool_export_png(this.__wbg_ptr);
-    var _ = b(t[0], t[1]).slice();
+    var _ = g(t[0], t[1]).slice();
     return e.__wbindgen_free(t[0], t[1] * 1, 1), _;
   }
-  extract_region_png(t, _, n, r) {
-    const i = e.clonestamptool_extract_region_png(this.__wbg_ptr, t, _, n, r);
-    var s = b(i[0], i[1]).slice();
+  extract_region_png(t, _, n, o) {
+    const i = e.clonestamptool_extract_region_png(this.__wbg_ptr, t, _, n, o);
+    var s = g(i[0], i[1]).slice();
     return e.__wbindgen_free(i[0], i[1] * 1, 1), s;
   }
   flip_horizontal() {
@@ -98,35 +98,45 @@ class x {
   }
   get_image_data() {
     const t = e.clonestamptool_get_image_data(this.__wbg_ptr);
-    var _ = b(t[0], t[1]).slice();
+    var _ = g(t[0], t[1]).slice();
     return e.__wbindgen_free(t[0], t[1] * 1, 1), _;
+  }
+  get_pixel(t, _) {
+    const n = e.clonestamptool_get_pixel(this.__wbg_ptr, t, _);
+    var o = g(n[0], n[1]).slice();
+    return e.__wbindgen_free(n[0], n[1] * 1, 1), o;
+  }
+  get_pixel_region(t, _, n) {
+    const o = e.clonestamptool_get_pixel_region(this.__wbg_ptr, t, _, n);
+    var i = g(o[0], o[1]).slice();
+    return e.__wbindgen_free(o[0], o[1] * 1, 1), i;
   }
   get_redo_snapshot_label(t) {
     let _, n;
     try {
-      const r = e.clonestamptool_get_redo_snapshot_label(this.__wbg_ptr, t);
-      return _ = r[0], n = r[1], f(r[0], r[1]);
+      const o = e.clonestamptool_get_redo_snapshot_label(this.__wbg_ptr, t);
+      return _ = o[0], n = o[1], f(o[0], o[1]);
     } finally {
       e.__wbindgen_free(_, n, 1);
     }
   }
   get_redo_snapshot_png(t) {
     const _ = e.clonestamptool_get_redo_snapshot_png(this.__wbg_ptr, t);
-    var n = b(_[0], _[1]).slice();
+    var n = g(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), n;
   }
   get_undo_snapshot_label(t) {
     let _, n;
     try {
-      const r = e.clonestamptool_get_undo_snapshot_label(this.__wbg_ptr, t);
-      return _ = r[0], n = r[1], f(r[0], r[1]);
+      const o = e.clonestamptool_get_undo_snapshot_label(this.__wbg_ptr, t);
+      return _ = o[0], n = o[1], f(o[0], o[1]);
     } finally {
       e.__wbindgen_free(_, n, 1);
     }
   }
   get_undo_snapshot_png(t) {
     const _ = e.clonestamptool_get_undo_snapshot_png(this.__wbg_ptr, t);
-    var n = b(_[0], _[1]).slice();
+    var n = g(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), n;
   }
   get_zoom() {
@@ -150,13 +160,13 @@ class x {
       e.__wbindgen_free(t, _, 1);
     }
   }
-  inject_redo_snapshot(t, _, n, r) {
-    const i = w(t, e.__wbindgen_malloc), s = c, a = g(r, e.__wbindgen_malloc, e.__wbindgen_realloc), l = c;
-    e.clonestamptool_inject_redo_snapshot(this.__wbg_ptr, i, s, _, n, a, l);
+  inject_redo_snapshot(t, _, n, o) {
+    const i = w(t, e.__wbindgen_malloc), s = c, l = b(o, e.__wbindgen_malloc, e.__wbindgen_realloc), a = c;
+    e.clonestamptool_inject_redo_snapshot(this.__wbg_ptr, i, s, _, n, l, a);
   }
-  inject_undo_snapshot(t, _, n, r) {
-    const i = w(t, e.__wbindgen_malloc), s = c, a = g(r, e.__wbindgen_malloc, e.__wbindgen_realloc), l = c;
-    e.clonestamptool_inject_undo_snapshot(this.__wbg_ptr, i, s, _, n, a, l);
+  inject_undo_snapshot(t, _, n, o) {
+    const i = w(t, e.__wbindgen_malloc), s = c, l = b(o, e.__wbindgen_malloc, e.__wbindgen_realloc), a = c;
+    e.clonestamptool_inject_undo_snapshot(this.__wbg_ptr, i, s, _, n, l, a);
   }
   jump_to_history(t) {
     return e.clonestamptool_jump_to_history(this.__wbg_ptr, t) !== 0;
@@ -166,9 +176,9 @@ class x {
     e.clonestamptool_load_image(this.__wbg_ptr, _, n);
   }
   measure_text(t, _, n) {
-    const r = g(t, e.__wbindgen_malloc, e.__wbindgen_realloc), i = c, s = e.clonestamptool_measure_text(this.__wbg_ptr, r, i, _, n);
-    var a = k(s[0], s[1]).slice();
-    return e.__wbindgen_free(s[0], s[1] * 4, 4), a;
+    const o = b(t, e.__wbindgen_malloc, e.__wbindgen_realloc), i = c, s = e.clonestamptool_measure_text(this.__wbg_ptr, o, i, _, n);
+    var l = k(s[0], s[1]).slice();
+    return e.__wbindgen_free(s[0], s[1] * 4, 4), l;
   }
   constructor(t, _) {
     const n = e.clonestamptool_new(t, _);
@@ -177,18 +187,18 @@ class x {
   paint_begin() {
     e.clonestamptool_paint_begin(this.__wbg_ptr);
   }
-  paint_dab(t, _, n, r, i, s, a) {
-    e.clonestamptool_paint_dab(this.__wbg_ptr, t, _, n, r, i, s, a);
+  paint_dab(t, _, n, o, i, s, l) {
+    e.clonestamptool_paint_dab(this.__wbg_ptr, t, _, n, o, i, s, l);
   }
-  paint_stroke_to(t, _, n, r, i, s, a, l, p) {
-    e.clonestamptool_paint_stroke_to(this.__wbg_ptr, t, _, n, r, i, s, a, l, p);
+  paint_stroke_to(t, _, n, o, i, s, l, a, p) {
+    e.clonestamptool_paint_stroke_to(this.__wbg_ptr, t, _, n, o, i, s, l, a, p);
   }
-  paste_region(t, _, n, r, i) {
-    const s = w(t, e.__wbindgen_malloc), a = c;
-    e.clonestamptool_paste_region(this.__wbg_ptr, s, a, _, n, r, i);
+  paste_region(t, _, n, o, i) {
+    const s = w(t, e.__wbindgen_malloc), l = c;
+    e.clonestamptool_paste_region(this.__wbg_ptr, s, l, _, n, o, i);
   }
-  preview_crop(t, _, n, r) {
-    e.clonestamptool_preview_crop(this.__wbg_ptr, t, _, n, r);
+  preview_crop(t, _, n, o) {
+    e.clonestamptool_preview_crop(this.__wbg_ptr, t, _, n, o);
   }
   redo() {
     return e.clonestamptool_redo(this.__wbg_ptr) !== 0;
@@ -226,17 +236,17 @@ class x {
   set_zoom(t) {
     e.clonestamptool_set_zoom(this.__wbg_ptr, t);
   }
-  stamp_pixels(t, _, n, r, i) {
-    const s = w(t, e.__wbindgen_malloc), a = c;
-    e.clonestamptool_stamp_pixels(this.__wbg_ptr, s, a, _, n, r, i);
+  stamp_pixels(t, _, n, o, i) {
+    const s = w(t, e.__wbindgen_malloc), l = c;
+    e.clonestamptool_stamp_pixels(this.__wbg_ptr, s, l, _, n, o, i);
   }
-  stamp_red(t, _, n, r, i, s) {
-    const a = w(t, e.__wbindgen_malloc), l = c;
-    e.clonestamptool_stamp_red(this.__wbg_ptr, a, l, _, n, r, i, s);
+  stamp_red(t, _, n, o, i, s) {
+    const l = w(t, e.__wbindgen_malloc), a = c;
+    e.clonestamptool_stamp_red(this.__wbg_ptr, l, a, _, n, o, i, s);
   }
   thumbnail_data(t) {
     const _ = e.clonestamptool_thumbnail_data(this.__wbg_ptr, t);
-    var n = b(_[0], _[1]).slice();
+    var n = g(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), n;
   }
   thumbnail_height(t) {
@@ -269,15 +279,15 @@ function j() {
 }
 const A = typeof FinalizationRegistry > "u" ? { register: () => {
 }, unregister: () => {
-} } : new FinalizationRegistry((o) => e.__wbg_clonestamptool_free(o >>> 0, 1));
-function k(o, t) {
-  return o = o >>> 0, R().subarray(o / 4, o / 4 + t);
+} } : new FinalizationRegistry((r) => e.__wbg_clonestamptool_free(r >>> 0, 1));
+function k(r, t) {
+  return r = r >>> 0, R().subarray(r / 4, r / 4 + t);
 }
-function b(o, t) {
-  return o = o >>> 0, d().subarray(o / 1, o / 1 + t);
+function g(r, t) {
+  return r = r >>> 0, d().subarray(r / 1, r / 1 + t);
 }
-function f(o, t) {
-  return o = o >>> 0, W(o, t);
+function f(r, t) {
+  return r = r >>> 0, W(r, t);
 }
 let u = null;
 function R() {
@@ -287,59 +297,59 @@ let h = null;
 function d() {
   return (h === null || h.byteLength === 0) && (h = new Uint8Array(e.memory.buffer)), h;
 }
-function w(o, t) {
-  const _ = t(o.length * 1, 1) >>> 0;
-  return d().set(o, _ / 1), c = o.length, _;
+function w(r, t) {
+  const _ = t(r.length * 1, 1) >>> 0;
+  return d().set(r, _ / 1), c = r.length, _;
 }
-function g(o, t, _) {
+function b(r, t, _) {
   if (_ === void 0) {
-    const a = m.encode(o), l = t(a.length, 1) >>> 0;
-    return d().subarray(l, l + a.length).set(a), c = a.length, l;
+    const l = m.encode(r), a = t(l.length, 1) >>> 0;
+    return d().subarray(a, a + l.length).set(l), c = l.length, a;
   }
-  let n = o.length, r = t(n, 1) >>> 0;
+  let n = r.length, o = t(n, 1) >>> 0;
   const i = d();
   let s = 0;
   for (; s < n; s++) {
-    const a = o.charCodeAt(s);
-    if (a > 127) break;
-    i[r + s] = a;
+    const l = r.charCodeAt(s);
+    if (l > 127) break;
+    i[o + s] = l;
   }
   if (s !== n) {
-    s !== 0 && (o = o.slice(s)), r = _(r, n, n = s + o.length * 3, 1) >>> 0;
-    const a = d().subarray(r + s, r + n), l = m.encodeInto(o, a);
-    s += l.written, r = _(r, n, s, 1) >>> 0;
+    s !== 0 && (r = r.slice(s)), o = _(o, n, n = s + r.length * 3, 1) >>> 0;
+    const l = d().subarray(o + s, o + n), a = m.encodeInto(r, l);
+    s += a.written, o = _(o, n, s, 1) >>> 0;
   }
-  return c = s, r;
+  return c = s, o;
 }
 let y = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
 y.decode();
 const T = 2146435072;
 let v = 0;
-function W(o, t) {
-  return v += t, v >= T && (y = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), y.decode(), v = t), y.decode(d().subarray(o, o + t));
+function W(r, t) {
+  return v += t, v >= T && (y = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), y.decode(), v = t), y.decode(d().subarray(r, r + t));
 }
 const m = new TextEncoder();
-"encodeInto" in m || (m.encodeInto = function(o, t) {
-  const _ = m.encode(o);
-  return t.set(_), { read: o.length, written: _.length };
+"encodeInto" in m || (m.encodeInto = function(r, t) {
+  const _ = m.encode(r);
+  return t.set(_), { read: r.length, written: _.length };
 });
 let c = 0, e;
-function S(o, t) {
-  return e = o.exports, u = null, h = null, e.__wbindgen_start(), e;
+function S(r, t) {
+  return e = r.exports, u = null, h = null, e.__wbindgen_start(), e;
 }
-async function U(o, t) {
-  if (typeof Response == "function" && o instanceof Response) {
+async function U(r, t) {
+  if (typeof Response == "function" && r instanceof Response) {
     if (typeof WebAssembly.instantiateStreaming == "function") try {
-      return await WebAssembly.instantiateStreaming(o, t);
-    } catch (r) {
-      if (o.ok && _(o.type) && o.headers.get("Content-Type") !== "application/wasm") console.warn("`WebAssembly.instantiateStreaming` failed because your server does not serve Wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", r);
-      else throw r;
+      return await WebAssembly.instantiateStreaming(r, t);
+    } catch (o) {
+      if (r.ok && _(r.type) && r.headers.get("Content-Type") !== "application/wasm") console.warn("`WebAssembly.instantiateStreaming` failed because your server does not serve Wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", o);
+      else throw o;
     }
-    const n = await o.arrayBuffer();
+    const n = await r.arrayBuffer();
     return await WebAssembly.instantiate(n, t);
   } else {
-    const n = await WebAssembly.instantiate(o, t);
-    return n instanceof WebAssembly.Instance ? { instance: n, module: o } : n;
+    const n = await WebAssembly.instantiate(r, t);
+    return n instanceof WebAssembly.Instance ? { instance: n, module: r } : n;
   }
   function _(n) {
     switch (n) {
@@ -351,12 +361,12 @@ async function U(o, t) {
     return false;
   }
 }
-async function M(o) {
+async function M(r) {
   if (e !== void 0) return e;
-  o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module_or_path: o } = o : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), o === void 0 && (o = new URL("/assets/stamp_tool_bg-DAb6_u3O.wasm", import.meta.url));
+  r !== void 0 && (Object.getPrototypeOf(r) === Object.prototype ? { module_or_path: r } = r : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), r === void 0 && (r = new URL("/assets/stamp_tool_bg-B_lcxItV.wasm", import.meta.url));
   const t = j();
-  (typeof o == "string" || typeof Request == "function" && o instanceof Request || typeof URL == "function" && o instanceof URL) && (o = fetch(o));
-  const { instance: _, module: n } = await U(await o, t);
+  (typeof r == "string" || typeof Request == "function" && r instanceof Request || typeof URL == "function" && r instanceof URL) && (r = fetch(r));
+  const { instance: _, module: n } = await U(await r, t);
   return S(_);
 }
 export {

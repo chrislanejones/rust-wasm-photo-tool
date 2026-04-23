@@ -10,6 +10,7 @@ import type {
 } from "@/lib/types";
 import type { ExportFormat } from "@/app/AppShell";
 import type { TextMemory } from "./settings/TextSettings";
+import type { EffectsMode } from "./settings/EffectsSettings";
 import { ToolGrid } from "./ToolGrid";
 import * as StampSettingsModule from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
@@ -66,6 +67,15 @@ interface ToolsSidebarProps {
   recognizedText?: string;
   isRecognizing?: boolean;
   onClearRecognizedText?: () => void;
+  // Paint sub-mode (paint vs blur brush)
+  brushMode?: "paint" | "blur";
+  onBrushModeChange?: (mode: "paint" | "blur") => void;
+  // Effects sub-mode + color picker
+  effectsMode?: EffectsMode;
+  onEffectsModeChange?: (mode: EffectsMode) => void;
+  colorPickerActive?: boolean;
+  onSetColorPickerActive?: (active: boolean) => void;
+  pickedColor?: string;
 }
 
 export function ToolsSidebar({
@@ -107,6 +117,13 @@ export function ToolsSidebar({
   recognizedText,
   isRecognizing,
   onClearRecognizedText,
+  brushMode,
+  onBrushModeChange,
+  effectsMode,
+  onEffectsModeChange,
+  colorPickerActive,
+  onSetColorPickerActive,
+  pickedColor,
 }: ToolsSidebarProps) {
   return (
     <motion.div
@@ -161,7 +178,6 @@ export function ToolsSidebar({
           />
         )}
 
-        {/* Item 7: Effects panel (was Blur) — brightness, contrast, blur */}
         {activeTool === "effects" && (
           <EffectsSettings
             settings={toolSettings}
@@ -169,6 +185,11 @@ export function ToolsSidebar({
             onBrightness={onBrightness}
             onContrast={onContrast}
             imageReady={imageReady}
+            colorPickerActive={colorPickerActive}
+            onSetColorPickerActive={onSetColorPickerActive}
+            pickedColor={pickedColor}
+            activeMode={effectsMode}
+            onModeChange={onEffectsModeChange}
           />
         )}
 
@@ -203,6 +224,8 @@ export function ToolsSidebar({
           <PaintSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}
+            activeMode={brushMode}
+            onModeChange={onBrushModeChange}
           />
         )}
 

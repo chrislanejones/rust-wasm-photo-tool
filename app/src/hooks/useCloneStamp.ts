@@ -356,19 +356,18 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   }, [syncState]);
 
   // ── Zoom via Alt+Scroll ───────────────────────────────────────────────────
+  // Attached to window so it works even before the canvas element mounts
+  // (CanvasArea is conditionally rendered and canvasRef.current starts null).
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const target = canvas?.parentElement ?? canvas;
-    if (!target) return;
     const handler = (e: WheelEvent) => {
       if (!e.altKey || !toolRef.current) return;
       e.preventDefault();
       toolRef.current.adjust_zoom(e.deltaY < 0 ? 1 : -1);
       syncState();
     };
-    target.addEventListener("wheel", handler, { passive: false });
-    return () => target.removeEventListener("wheel", handler);
-  }, [canvasRef, syncState]);
+    window.addEventListener("wheel", handler, { passive: false });
+    return () => window.removeEventListener("wheel", handler);
+  }, [syncState]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {

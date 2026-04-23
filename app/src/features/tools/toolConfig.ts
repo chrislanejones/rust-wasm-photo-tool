@@ -6,9 +6,9 @@ import {
   Paintbrush,
   Type,
   ArrowUpRight,
-  Sparkles,
+  Brain,
   Shapes,
-  Wand2,       // Item 7: Changed from Droplets to Wand2
+  Sparkles,
   Stamp,
   Smile,
 } from "lucide-react";
@@ -61,7 +61,7 @@ export const TOOLS: ToolDefinition[] = [
     id: "ai",
     label: "AI",
     description: "AI-powered tools",
-    icon: Sparkles,
+    icon: Brain,
     gradient: "from-violet-500 to-purple-600",
   },
   {
@@ -72,11 +72,10 @@ export const TOOLS: ToolDefinition[] = [
     gradient: "from-pink-500 to-rose-500",
   },
   {
-    // Item 7: Renamed from "Blur" to "Effects"
     id: "effects",
     label: "Effects",
-    description: "Blur, brightness & contrast (WASM)",
-    icon: Wand2,
+    description: "Levels, color picker & blur (WASM)",
+    icon: Sparkles,
     gradient: "from-indigo-400 to-violet-600",
   },
   {

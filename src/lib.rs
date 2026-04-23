@@ -719,6 +719,39 @@ impl CloneStampTool {
             self.paint_dab(x0 + dx * t, y0 + dy * t, radius, r, g, b, opacity);
         }
     }
- 
- 
+
+    // ── Color picker helpers ─────────────────────────────────────────────
+
+    /// Returns [r, g, b, a] for the pixel at (x, y), clamped to image bounds.
+    pub fn get_pixel(&self, x: i32, y: i32) -> Vec<u8> {
+        let w = self.buf.width as i32;
+        let h = self.buf.height as i32;
+        if w == 0 || h == 0 || x < 0 || y < 0 || x >= w || y >= h {
+            return vec![0, 0, 0, 255];
+        }
+        let idx = (y as usize * self.buf.width as usize + x as usize) * 4;
+        self.buf.data[idx..idx + 4].to_vec()
+    }
+
+    /// Returns a flat RGBA grid of (2*radius+1)² pixels centred on (cx, cy).
+    /// Out-of-bounds pixels are returned as opaque black.
+    pub fn get_pixel_region(&self, cx: i32, cy: i32, radius: i32) -> Vec<u8> {
+        let side = 2 * radius + 1;
+        let mut out = Vec::with_capacity((side * side * 4) as usize);
+        let w = self.buf.width as i32;
+        let h = self.buf.height as i32;
+        for row in 0..side {
+            for col in 0..side {
+                let px = cx - radius + col;
+                let py = cy - radius + row;
+                if w == 0 || h == 0 || px < 0 || py < 0 || px >= w || py >= h {
+                    out.extend_from_slice(&[0, 0, 0, 255]);
+                } else {
+                    let idx = (py as usize * self.buf.width as usize + px as usize) * 4;
+                    out.extend_from_slice(&self.buf.data[idx..idx + 4]);
+                }
+            }
+        }
+        out
+    }
 }

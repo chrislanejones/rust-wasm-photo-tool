@@ -30,7 +30,8 @@ interface Props {
   onTextKeyDown?: (e: React.KeyboardEvent) => void;
   onTextChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onTextBlur?: () => void;
-  textSettings?: { fontSize: number; fontWeight: string; textColor: string };
+  textSettings?: { fontSize: number; fontFamily?: string; fontWeight: string; textColor: string };
+  colorPickerActive?: boolean;
   containerRef?: React.RefObject<HTMLDivElement | null>;
   onTextPositionChange?: (canvasX: number, canvasY: number) => void;
   onTextFontSizeChange?: (size: number) => void;
@@ -44,8 +45,9 @@ interface Props {
   onCropChange?: (sel: CropSelection) => void;
 }
 
-function getCursorForTool(tool?: string, isPanning?: boolean): string | undefined {
+function getCursorForTool(tool?: string, isPanning?: boolean, colorPickerActive?: boolean): string | undefined {
   if (isPanning) return "grab";
+  if (colorPickerActive && tool === "effects") return "crosshair";
   switch (tool) {
     case "text":
       return "text";
@@ -86,6 +88,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       isPanning = false,
       cropSelection,
       onCropChange,
+      colorPickerActive,
     },
     ref,
   ) => {
@@ -224,7 +227,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
     const zoom = state.zoom;
     const isTextTool = activeTool === "text";
-    const cursor = getCursorForTool(activeTool, isPanning);
+    const cursor = getCursorForTool(activeTool, isPanning, colorPickerActive);
     const panCursor = isDraggingPan ? "grabbing" : cursor;
 
     // Combined mouse handlers — pan takes priority when spacebar is held
@@ -496,7 +499,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   fontSize: textSettings.fontSize * scaleX,
                   fontWeight: textSettings.fontWeight,
                   color: textSettings.textColor,
-                  fontFamily: "'Liberation Sans', Arial, sans-serif",
+                  fontFamily: textSettings.fontFamily ?? "'Liberation Sans', Arial, sans-serif",
                   lineHeight: 1.3,
                   padding: "2px 4px",
                   background: "transparent",

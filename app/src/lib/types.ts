@@ -33,6 +33,7 @@ export interface ToolSettings extends StampSettings {
   brushColor: string;
   brushOpacity: number;
   fontSize: number;
+  fontFamily: string;
   fontWeight: "normal" | "bold";
   textColor: string;
   shape?: "rect" | "circle" | "handCircle" | "line";

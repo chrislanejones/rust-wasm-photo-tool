@@ -38,7 +38,6 @@ const SHORTCUT_GROUPS = [
       { keys: ["Alt", "S"], action: "Toggle Tools" },
       { keys: ["Alt", "G"], action: "Toggle Gallery" },
       { keys: ["Alt", "H"], action: "Toggle History" },
-      { keys: ["Alt", "/"], action: "Toggle Inline Hints" },
       { keys: ["Alt", "?"], action: "Toggle This Modal" },
     ],
   },
@@ -78,7 +77,10 @@ const SHORTCUT_GROUPS = [
   },
   {
     title: "Export",
-    shortcuts: [{ keys: ["Alt", "E"], action: "Export Image" }],
+    shortcuts: [
+      { keys: ["Alt", "E"], action: "Export current image" },
+      { keys: ["Alt", "Shift", "E"], action: "Export all images (ZIP)" },
+    ],
   },
 ];
 
@@ -139,6 +141,8 @@ export function ShortcutModal({ open, onClose }: Props) {
 
             <div className="shortcut-modal-footer">
               Press <kbd className="shortcut-kbd">Alt</kbd>
+              <span className="shortcut-plus">+</span>
+              <kbd className="shortcut-kbd">Shift</kbd>
               <span className="shortcut-plus">+</span>
               <kbd className="shortcut-kbd">?</kbd> to toggle this modal
             </div>
