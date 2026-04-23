@@ -32,6 +32,9 @@ impl ImageBuffer {
 
     /// Bilinear sample at fractional coordinates. Clamps to edges.
     pub fn sample_bilinear(&self, fx: f64, fy: f64) -> [u8; 4] {
+        if self.width == 0 || self.height == 0 {
+            return [0, 0, 0, 0];
+        }
         let w = self.width as i32;
         let h = self.height as i32;
         let x0 = fx.floor() as i32;

@@ -1,5 +1,4 @@
 import type { ToolSettings } from "@/lib/types";
-import { TabGroup } from "@/components/TabGroup";
 
 const SHAPES = [
   { id: "rect", label: "Rectangle" },

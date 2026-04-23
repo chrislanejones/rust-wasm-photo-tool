@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-BsvyF0xW.js","assets/_commonjs-dynamic-modules-TDtrdbi3.js","assets/jszip.min-CojdNn64.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-CA6Wv1Fv.js","assets/_commonjs-dynamic-modules-TDtrdbi3.js","assets/jszip.min-BblafXQ3.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
@@ -19832,7 +19832,7 @@ Error generating stack: ` + f.message + `
   const Ej = Tj;
   async function jm(e) {
     const n = new Blob([
-      e
+      e.buffer
     ], {
       type: "image/png"
     }), i = await createImageBitmap(n), { width: s, height: r } = i, d = new OffscreenCanvas(s, r).getContext("2d");
@@ -20667,7 +20667,7 @@ Error generating stack: ` + f.message + `
       const V = A.getImageData(R, L, D, P), W = document.createElement("canvas");
       W.width = D, W.height = P, W.getContext("2d").putImageData(V, 0, 0), s(), y(true), m("");
       try {
-        const ne = await Qd(() => import("./index-BsvyF0xW.js").then((oe) => oe.i), __vite__mapDeps([0,1])), { data: fe } = await ne.recognize(W, "eng");
+        const ne = await Qd(() => import("./index-CA6Wv1Fv.js").then((oe) => oe.i), __vite__mapDeps([0,1])), { data: fe } = await ne.recognize(W, "eng");
         m(fe.text.trim());
       } catch {
         m("[OCR failed]");
@@ -35243,7 +35243,7 @@ button {
     const Kn = k.useCallback(async () => {
       if (c.length === 0) return;
       const { default: de } = await Qd(async () => {
-        const { default: Tt } = await import("./jszip.min-CojdNn64.js").then((yi) => yi.j);
+        const { default: Tt } = await import("./jszip.min-BblafXQ3.js").then((yi) => yi.j);
         return {
           default: Tt
         };

@@ -69,7 +69,7 @@ interface ToolsSidebarProps {
 }
 
 export function ToolsSidebar({
-  onClose,
+  onClose: _onClose,
   activeTool,
   onToolChange,
   stampSettings,

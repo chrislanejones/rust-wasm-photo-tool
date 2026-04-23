@@ -19,7 +19,7 @@ interface UseTextExtractOptions {
  * is run through Tesseract.js OCR and the recognized text is returned.
  */
 export function useTextExtract({
-  toolRef,
+  toolRef: _toolRef,
   canvasRef,
   active,
   flushToCanvas,

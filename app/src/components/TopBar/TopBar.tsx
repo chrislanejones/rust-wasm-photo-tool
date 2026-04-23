@@ -72,8 +72,8 @@ export function TopBar({
   imageCount,
   exportFormat,
   onExportFormatChange,
-  onExport,
-  hasSelectedImage,
+  onExport: _onExport,
+  hasSelectedImage: _hasSelectedImage,
   onDeleteAll,
 }: TopBarProps) {
   const [formatOpen, setFormatOpen] = useState(false);

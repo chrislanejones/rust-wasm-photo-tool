@@ -7,7 +7,7 @@ import type { SavedEdit } from "@/lib/editPersistence";
 async function decodePngToRgba(
   png: Uint8Array,
 ): Promise<{ rgba: Uint8ClampedArray; w: number; h: number }> {
-  const blob = new Blob([png], { type: "image/png" });
+  const blob = new Blob([png.buffer as ArrayBuffer], { type: "image/png" });
   const bitmap = await createImageBitmap(blob);
   const { width: w, height: h } = bitmap;
   const oc = new OffscreenCanvas(w, h);
