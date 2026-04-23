@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
-import { useUser } from "@clerk/clerk-react";
-import { useQuery, useMutation } from "convex/react";
+import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { api } from "../../../.convex/_generated/api";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
 
@@ -21,18 +20,21 @@ function lsSave(texts: TextMemory[]) {
 let _idCounter = 0;
 
 export function useRecentTexts() {
-  const { isSignedIn } = useUser();
+  // useConvexAuth.isAuthenticated is true only after Convex completes the JWT
+  // handshake — unlike Clerk's isSignedIn which stays true even when the
+  // Convex auth provider rejects the token (e.g. dev keys vs prod deployment).
+  const { isAuthenticated } = useConvexAuth();
 
   const convexTexts = useQuery(
     api.textHistory.getRecentTexts,
-    isSignedIn ? {} : "skip",
+    isAuthenticated ? {} : "skip",
   );
 
   const addRecentTextMutation = useMutation(api.textHistory.addRecentText);
 
   const [localTexts, setLocalTexts] = useState<TextMemory[]>(() => lsLoad());
 
-  const recentTexts: TextMemory[] = isSignedIn
+  const recentTexts: TextMemory[] = isAuthenticated
     ? (convexTexts ?? []).map((t, i) => ({
         id: i,
         text: t.text,
@@ -45,14 +47,24 @@ export function useRecentTexts() {
 
   const addRecentText = useCallback(
     async (memory: TextMemory) => {
-      if (isSignedIn) {
-        await addRecentTextMutation({
-          text: memory.text,
-          fontSize: memory.fontSize,
-          fontFamily: memory.fontFamily ?? "sans-serif",
-          fontWeight: memory.fontWeight,
-          textColor: memory.textColor,
-        });
+      if (isAuthenticated) {
+        try {
+          await addRecentTextMutation({
+            text: memory.text,
+            fontSize: memory.fontSize,
+            fontFamily: memory.fontFamily ?? "sans-serif",
+            fontWeight: memory.fontWeight,
+            textColor: memory.textColor,
+          });
+        } catch {
+          // fall back to local storage if the Convex call fails
+          const m = { ...memory, id: _idCounter++ };
+          setLocalTexts((prev) => {
+            const next = [m, ...prev.filter((t) => t.text !== memory.text)].slice(0, 8);
+            lsSave(next);
+            return next;
+          });
+        }
       } else {
         const m = { ...memory, id: _idCounter++ };
         setLocalTexts((prev) => {
@@ -62,7 +74,7 @@ export function useRecentTexts() {
         });
       }
     },
-    [isSignedIn, addRecentTextMutation],
+    [isAuthenticated, addRecentTextMutation],
   );
 
   return { recentTexts, addRecentText };
