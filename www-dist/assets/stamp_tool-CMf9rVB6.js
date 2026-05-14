@@ -42,9 +42,9 @@ class x {
     const a = b(t, e.__wbindgen_malloc, e.__wbindgen_realloc), p = c;
     e.clonestamptool_commit_red_stamp(this.__wbg_ptr, a, p, _, n, o, i, s, l);
   }
-  commit_text(t, _, n, o, i, s, l, a) {
-    const p = b(t, e.__wbindgen_malloc, e.__wbindgen_realloc), z = c;
-    e.clonestamptool_commit_text(this.__wbg_ptr, p, z, _, n, o, i, s, l, a);
+  commit_text(t, _, n, o, i, s, l, a, p) {
+    const z = b(t, e.__wbindgen_malloc, e.__wbindgen_realloc), j = c;
+    e.clonestamptool_commit_text(this.__wbg_ptr, z, j, _, n, o, i, s, l, a, p);
   }
   continue_stroke(t, _) {
     e.clonestamptool_continue_stroke(this.__wbg_ptr, t, _);
@@ -177,7 +177,7 @@ class x {
   }
   measure_text(t, _, n) {
     const o = b(t, e.__wbindgen_malloc, e.__wbindgen_realloc), i = c, s = e.clonestamptool_measure_text(this.__wbg_ptr, o, i, _, n);
-    var l = k(s[0], s[1]).slice();
+    var l = R(s[0], s[1]).slice();
     return e.__wbindgen_free(s[0], s[1] * 4, 4), l;
   }
   constructor(t, _) {
@@ -269,7 +269,7 @@ class x {
   }
 }
 Symbol.dispose && (x.prototype[Symbol.dispose] = x.prototype.free);
-function j() {
+function k() {
   return { __proto__: null, "./stamp_tool_bg.js": { __proto__: null, __wbg___wbindgen_throw_be289d5034ed271b: function(t, _) {
     throw new Error(f(t, _));
   }, __wbindgen_init_externref_table: function() {
@@ -280,17 +280,17 @@ function j() {
 const A = typeof FinalizationRegistry > "u" ? { register: () => {
 }, unregister: () => {
 } } : new FinalizationRegistry((r) => e.__wbg_clonestamptool_free(r >>> 0, 1));
-function k(r, t) {
-  return r = r >>> 0, R().subarray(r / 4, r / 4 + t);
+function R(r, t) {
+  return r = r >>> 0, T().subarray(r / 4, r / 4 + t);
 }
 function g(r, t) {
   return r = r >>> 0, d().subarray(r / 1, r / 1 + t);
 }
 function f(r, t) {
-  return r = r >>> 0, W(r, t);
+  return r = r >>> 0, S(r, t);
 }
 let u = null;
-function R() {
+function T() {
   return (u === null || u.byteLength === 0) && (u = new Uint32Array(e.memory.buffer)), u;
 }
 let h = null;
@@ -323,10 +323,10 @@ function b(r, t, _) {
 }
 let y = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
 y.decode();
-const T = 2146435072;
+const W = 2146435072;
 let v = 0;
-function W(r, t) {
-  return v += t, v >= T && (y = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), y.decode(), v = t), y.decode(d().subarray(r, r + t));
+function S(r, t) {
+  return v += t, v >= W && (y = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), y.decode(), v = t), y.decode(d().subarray(r, r + t));
 }
 const m = new TextEncoder();
 "encodeInto" in m || (m.encodeInto = function(r, t) {
@@ -334,10 +334,10 @@ const m = new TextEncoder();
   return t.set(_), { read: r.length, written: _.length };
 });
 let c = 0, e;
-function S(r, t) {
+function U(r, t) {
   return e = r.exports, u = null, h = null, e.__wbindgen_start(), e;
 }
-async function U(r, t) {
+async function M(r, t) {
   if (typeof Response == "function" && r instanceof Response) {
     if (typeof WebAssembly.instantiateStreaming == "function") try {
       return await WebAssembly.instantiateStreaming(r, t);
@@ -361,15 +361,15 @@ async function U(r, t) {
     return false;
   }
 }
-async function M(r) {
+async function E(r) {
   if (e !== void 0) return e;
-  r !== void 0 && (Object.getPrototypeOf(r) === Object.prototype ? { module_or_path: r } = r : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), r === void 0 && (r = new URL("/assets/stamp_tool_bg-B_lcxItV.wasm", import.meta.url));
-  const t = j();
+  r !== void 0 && (Object.getPrototypeOf(r) === Object.prototype ? { module_or_path: r } = r : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), r === void 0 && (r = new URL("/assets/stamp_tool_bg-CzXfDXIe.wasm", import.meta.url));
+  const t = k();
   (typeof r == "string" || typeof Request == "function" && r instanceof Request || typeof URL == "function" && r instanceof URL) && (r = fetch(r));
-  const { instance: _, module: n } = await U(await r, t);
-  return S(_);
+  const { instance: _, module: n } = await M(await r, t);
+  return U(_);
 }
 export {
   x as CloneStampTool,
-  M as default
+  E as default
 };

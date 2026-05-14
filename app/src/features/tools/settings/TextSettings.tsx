@@ -2,9 +2,10 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Crop, Type, ChevronDown } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
-import { TEXT_COLORS as COLORS } from "@/lib/colors";
+import { TEXT_COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
+import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { Button } from "@/components/ui/button";
 import { quickSpring } from "@/lib/animations";
 
@@ -140,27 +141,11 @@ export function TextSettings({
             </div>
 
             {/* Color */}
-            <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                Color
-              </label>
-              <div className="flex flex-wrap gap-2 py-2">
-                {COLORS.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => onChange({ ...settings, textColor: color })}
-                    className={[
-                      "w-7 h-7 rounded-full border-2 transition-all",
-                      settings.textColor === color
-                        ? "border-accent scale-110 ring-2 ring-accent/30"
-                        : "border-transparent hover:scale-105",
-                    ].join(" ")}
-                    style={{ backgroundColor: color }}
-                    aria-label={`Color ${color}`}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorSwatchGrid
+              colors={TEXT_COLORS}
+              value={settings.textColor}
+              onChange={(color) => onChange({ ...settings, textColor: color })}
+            />
 
             {/* Recent Texts */}
             <div className="space-y-4">

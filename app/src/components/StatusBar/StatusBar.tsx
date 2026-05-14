@@ -4,16 +4,27 @@
 // Item 4: Added PgUp/PgDn hint
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 
+export type UserMode = "demo" | "loggedIn" | "paid";
+
 interface Props {
   state: CloneStampState;
   imageCount: number;
+  userMode?: UserMode;
 }
 
-export function StatusBar({ state, imageCount }: Props) {
+const USER_MODE_LABEL: Record<UserMode, string> = {
+  demo: "Demo mode",
+  loggedIn: "Logged in",
+  paid: "Paid user",
+};
+
+export function StatusBar({ state, imageCount, userMode = "demo" }: Props) {
   return (
     <footer className="status-bar">
       <div className="status-section">
-        <p>Image House</p>
+        <p>🐴 Image Horse</p>
+        <span className="status-divider" />
+        <span className="status-zoom-label">{USER_MODE_LABEL[userMode]}</span>
       </div>
 
       <div className="status-section status-center">

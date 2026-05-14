@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./users";
 
 const styleValidator = v.object({
   stroke: v.optional(v.string()),
@@ -20,7 +20,7 @@ const transformValidator = v.object({
 export const listByImage = query({
   args: { imageId: v.id("images") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return [];
     return await ctx.db
       .query("annotations")
@@ -32,7 +32,7 @@ export const listByImage = query({
 export const listByLayer = query({
   args: { layerId: v.id("layers") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return [];
     return await ctx.db
       .query("annotations")
@@ -57,7 +57,7 @@ export const create = mutation({
     transform: transformValidator,
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const image = await ctx.db.get(args.imageId);
     if (!image || image.userId !== userId) throw new Error("Not authorized");
@@ -78,7 +78,7 @@ export const update = mutation({
     locked: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const annotation = await ctx.db.get(args.annotationId);
     if (!annotation) throw new Error("Not found");
@@ -92,7 +92,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { annotationId: v.id("annotations") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const annotation = await ctx.db.get(args.annotationId);
     if (!annotation) throw new Error("Not found");

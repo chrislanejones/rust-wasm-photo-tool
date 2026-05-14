@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./users";
 
 export const getByUser = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return null;
     return await ctx.db
       .query("subscriptions")
@@ -28,7 +28,7 @@ export const upsert = mutation({
     cancelAtPeriodEnd: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const existing = await ctx.db
       .query("subscriptions")
@@ -45,7 +45,7 @@ export const upsert = mutation({
 export const cancel = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const sub = await ctx.db
       .query("subscriptions")

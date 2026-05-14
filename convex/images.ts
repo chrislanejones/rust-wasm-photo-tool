@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./users";
 
 export const listByProject = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return [];
     return await ctx.db
       .query("images")
@@ -20,7 +20,7 @@ export const listByProject = query({
 export const get = query({
   args: { imageId: v.id("images") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return null;
     return await ctx.db.get(args.imageId);
   },
@@ -39,7 +39,7 @@ export const create = mutation({
     altText: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const project = await ctx.db.get(args.projectId);
     if (!project || project.userId !== userId) throw new Error("Not found");
@@ -77,7 +77,7 @@ export const update = mutation({
     order: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const image = await ctx.db.get(args.imageId);
     if (!image || image.userId !== userId) throw new Error("Not found");
@@ -89,7 +89,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { imageId: v.id("images") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const image = await ctx.db.get(args.imageId);
     if (!image || image.userId !== userId) throw new Error("Not found");

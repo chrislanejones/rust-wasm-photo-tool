@@ -1,22 +1,9 @@
-import { convexAuth, getAuthUserId } from "@convex-dev/auth/server";
-import { Password } from "@convex-dev/auth/providers/Password";
-import { Anonymous } from "@convex-dev/auth/providers/Anonymous";
 import { query } from "./_generated/server";
+import { getUser } from "./users";
 
-export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-  providers: [Password, Anonymous],
-});
+// auth.config.ts handles JWT verification for the Clerk bridge.
+// All auth helpers live in users.ts; this file just exposes a convenience query.
 
 export const loggedInUser = query({
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      return null;
-    }
-    const user = await ctx.db.get("users", userId);
-    if (!user) {
-      return null;
-    }
-    return user;
-  },
+  handler: async (ctx) => getUser(ctx),
 });

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ToolSettings } from "@/lib/types";
-import { PAINT_COLORS as COLORS } from "@/lib/colors";
+import { PAINT_COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
+import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { quickSpring } from "@/lib/animations";
 
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
@@ -89,30 +90,11 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             </div>
 
             {/* Color */}
-            <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                Color
-              </label>
-              <div className="grid grid-cols-5 gap-2 py-2">
-                {COLORS.map((color) => {
-                  const active = settings.brushColor === color;
-                  return (
-                    <button
-                      key={color}
-                      onClick={() => onChange({ ...settings, brushColor: color })}
-                      className={[
-                        "w-8 h-8 rounded-lg transition-transform hover:scale-110",
-                        active
-                          ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
-                          : "",
-                      ].join(" ")}
-                      style={{ backgroundColor: color }}
-                      aria-label={`Brush color ${color}`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
+            <ColorSwatchGrid
+              colors={PAINT_COLORS}
+              value={settings.brushColor}
+              onChange={(color) => onChange({ ...settings, brushColor: color })}
+            />
 
             <p className="text-[10px] text-theme-muted-foreground leading-relaxed">
               Click and drag to paint. Rendering runs in WASM for smooth strokes.

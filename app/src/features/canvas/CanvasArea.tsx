@@ -12,6 +12,7 @@ interface TextInputState {
   canvasX: number;
   canvasY: number;
   text: string;
+  rotation: number;
 }
 
 interface Props {
@@ -35,6 +36,7 @@ interface Props {
   containerRef?: React.RefObject<HTMLDivElement | null>;
   onTextPositionChange?: (canvasX: number, canvasY: number) => void;
   onTextFontSizeChange?: (size: number) => void;
+  onTextRotationChange?: (angle: number) => void;
   // Text extract drag events (active when extract mode is on)
   extractMouseDown?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   extractMouseMove?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
@@ -82,6 +84,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       containerRef: externalContainerRef,
       onTextPositionChange,
       onTextFontSizeChange,
+      onTextRotationChange,
       extractMouseDown,
       extractMouseMove,
       extractMouseUp,
@@ -388,7 +391,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           />
         )}
 
-        {/* Text input overlay with move/resize handles */}
+        {/* Text input overlay — draggable body, textarea, SVG handles + rotate handle */}
         {textInput && textSettings && canvasRef.current && containerRef.current && (() => {
           const canvas = canvasRef.current!;
           const container = containerRef.current!;
@@ -397,7 +400,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const scaleX = cr.width / canvas.width;
           const scaleY = cr.height / canvas.height;
 
-          // Screen-space position of the text anchor (top-left of text)
+          // Screen-space position of the text anchor (top-left of text box)
           const sx = cr.left - ctr.left + textInput.canvasX * scaleX;
           const sy = cr.top - ctr.top + textInput.canvasY * scaleY;
 
@@ -411,7 +414,15 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const boxW = Math.ceil(rawW + fs * 0.6);
           const boxH = Math.ceil(lines.length * fs * 1.3 + fs * 0.3);
 
-          const HS = 9; // handle size px
+          const rotation = textInput.rotation ?? 0;
+
+          // Box centre in viewport coords (SVG is fixed)
+          const bcx = ctr.left + sx + boxW / 2;
+          const bcy = ctr.top + sy + boxH / 2;
+
+          const HS = 9; // resize handle size px
+          const ROTATE_OFFSET = 32; // px above top edge for rotate handle
+
           const handles = [
             { id: "nw", hx: sx,         hy: sy,          cursor: "nw-resize" },
             { id: "n",  hx: sx + boxW/2, hy: sy,          cursor: "n-resize"  },
@@ -423,16 +434,15 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             { id: "w",  hx: sx,          hy: sy + boxH/2, cursor: "w-resize"  },
           ];
 
-          const handlePointerDown = (e: React.PointerEvent, _handleId: string) => {
+          // Resize handle drag — scales font size proportionally from box centre
+          const handleResizePointerDown = (e: React.PointerEvent) => {
             e.stopPropagation();
             e.preventDefault();
             const startFs = textSettings.fontSize;
-            const centerX = cr.left - ctr.left + textInput.canvasX * scaleX + boxW / 2;
-            const centerY = cr.top - ctr.top + textInput.canvasY * scaleY + boxH / 2;
-            const startDist = Math.hypot(e.clientX - (ctr.left + centerX), e.clientY - (ctr.top + centerY));
+            const startDist = Math.hypot(e.clientX - bcx, e.clientY - bcy);
 
             const onMove = (me: PointerEvent) => {
-              const dist = Math.hypot(me.clientX - (ctr.left + centerX), me.clientY - (ctr.top + centerY));
+              const dist = Math.hypot(me.clientX - bcx, me.clientY - bcy);
               if (startDist > 4) {
                 const newFs = Math.round(Math.max(8, Math.min(120, startFs * (dist / startDist))));
                 onTextFontSizeChange?.(newFs);
@@ -446,6 +456,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             window.addEventListener("pointerup", onUp);
           };
 
+          // Move drag — translates the text box
           const handleBoxPointerDown = (e: React.PointerEvent) => {
             e.stopPropagation();
             e.preventDefault();
@@ -467,6 +478,26 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             window.addEventListener("pointerup", onUp);
           };
 
+          // Rotate drag — angle from box centre to mouse, 0° = handle pointing up
+          const handleRotatePointerDown = (e: React.PointerEvent<SVGCircleElement>) => {
+            e.stopPropagation();
+            e.preventDefault();
+            e.currentTarget.setPointerCapture(e.pointerId);
+
+            const onMove = (me: PointerEvent) => {
+              const dx = me.clientX - bcx;
+              const dy = me.clientY - bcy;
+              const angle = Math.atan2(dx, -dy) * (180 / Math.PI);
+              onTextRotationChange?.(Math.round(angle));
+            };
+            const onUp = () => {
+              window.removeEventListener("pointermove", onMove);
+              window.removeEventListener("pointerup", onUp);
+            };
+            window.addEventListener("pointermove", onMove);
+            window.addEventListener("pointerup", onUp);
+          };
+
           return (
             <>
               {/* Draggable box body */}
@@ -479,10 +510,12 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   height: boxH,
                   cursor: "move",
                   zIndex: 50,
+                  transform: `rotate(${rotation}deg)`,
+                  transformOrigin: "center center",
                 }}
                 onPointerDown={handleBoxPointerDown}
               />
-              {/* Text area — floats on top of the drag box */}
+              {/* Textarea — rotates visually to match */}
               <textarea
                 ref={textareaRef}
                 value={textInput.text}
@@ -496,7 +529,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   top: sy,
                   width: boxW,
                   minHeight: boxH,
-                  fontSize: textSettings.fontSize * scaleX,
+                  fontSize: fs,
                   fontWeight: textSettings.fontWeight,
                   color: textSettings.textColor,
                   fontFamily: textSettings.fontFamily ?? "'Liberation Sans', Arial, sans-serif",
@@ -509,10 +542,12 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   overflow: "hidden",
                   zIndex: 51,
                   cursor: "text",
+                  transform: `rotate(${rotation}deg)`,
+                  transformOrigin: "center center",
                 }}
                 autoFocus
               />
-              {/* SVG overlay: dashed border + square handles */}
+              {/* SVG overlay — all elements grouped and rotated around box centre */}
               <svg
                 style={{
                   position: "fixed",
@@ -524,30 +559,50 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   overflow: "hidden",
                 }}
               >
-                {/* Dashed border */}
-                <rect
-                  x={ctr.left + sx} y={ctr.top + sy}
-                  width={boxW} height={boxH}
-                  fill="none"
-                  stroke="rgba(255,255,255,0.85)"
-                  strokeWidth={1.5}
-                  strokeDasharray="5 4"
-                />
-                {/* Square handles */}
-                {handles.map((h) => (
+                <g transform={`rotate(${rotation}, ${bcx}, ${bcy})`}>
+                  {/* Dashed border */}
                   <rect
-                    key={h.id}
-                    x={ctr.left + h.hx - HS / 2}
-                    y={ctr.top + h.hy - HS / 2}
-                    width={HS} height={HS}
-                    fill="white"
-                    stroke="rgba(0,0,0,0.4)"
-                    strokeWidth={1}
-                    rx={1}
-                    style={{ cursor: h.cursor, pointerEvents: "all" }}
-                    onPointerDown={(e) => handlePointerDown(e, h.id)}
+                    x={ctr.left + sx} y={ctr.top + sy}
+                    width={boxW} height={boxH}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.85)"
+                    strokeWidth={1.5}
+                    strokeDasharray="5 4"
                   />
-                ))}
+                  {/* Stem line from top-centre to rotate handle */}
+                  <line
+                    x1={bcx} y1={ctr.top + sy}
+                    x2={bcx} y2={ctr.top + sy - ROTATE_OFFSET}
+                    stroke="rgba(255,255,255,0.7)"
+                    strokeWidth={1.5}
+                  />
+                  {/* Rotate handle circle */}
+                  <circle
+                    cx={bcx}
+                    cy={ctr.top + sy - ROTATE_OFFSET}
+                    r={7}
+                    fill="white"
+                    stroke="rgba(0,0,0,0.35)"
+                    strokeWidth={1}
+                    style={{ cursor: "crosshair", pointerEvents: "all" }}
+                    onPointerDown={handleRotatePointerDown}
+                  />
+                  {/* Resize handles */}
+                  {handles.map((h) => (
+                    <rect
+                      key={h.id}
+                      x={ctr.left + h.hx - HS / 2}
+                      y={ctr.top + h.hy - HS / 2}
+                      width={HS} height={HS}
+                      fill="white"
+                      stroke="rgba(0,0,0,0.4)"
+                      strokeWidth={1}
+                      rx={1}
+                      style={{ cursor: h.cursor, pointerEvents: "all" }}
+                      onPointerDown={handleResizePointerDown}
+                    />
+                  ))}
+                </g>
               </svg>
             </>
           );

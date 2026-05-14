@@ -104,6 +104,7 @@ declare module "stamp_tool" {
       bold: boolean,
       dest_x: number,
       dest_y: number,
+      angle_deg: number,
     ): void;
     /** Extract a region as PNG bytes without modifying the buffer. */
     extract_region_png(x: number, y: number, w: number, h: number): Uint8Array;

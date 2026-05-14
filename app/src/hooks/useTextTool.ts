@@ -8,6 +8,7 @@ export interface TextInput {
   canvasX: number;
   canvasY: number;
   text: string;
+  rotation: number; // degrees, clockwise (matches CSS rotate())
 }
 
 interface UseTextToolOptions {
@@ -67,6 +68,7 @@ export function useTextTool({
       fontWeight === "bold",
       Math.round(ti.canvasX),
       Math.round(ti.canvasY),
+      ti.rotation,
     );
     flushToCanvas();
     syncState();
@@ -88,7 +90,7 @@ export function useTextTool({
       const canvasX = ((e.clientX - cr.left) * canvas.width) / cr.width;
       const canvasY = ((e.clientY - cr.top) * canvas.height) / cr.height;
       if (textInputRef.current) commitText();
-      const pos = { screenX, screenY, canvasX, canvasY };
+      const pos = { screenX, screenY, canvasX, canvasY, rotation: 0 };
       lastPositionRef.current = pos;
       const next: TextInput = { ...pos, text: pendingText };
       textInputRef.current = next;
@@ -120,6 +122,15 @@ export function useTextTool({
     [canvasRef, containerRef],
   );
 
+  const setTextRotation = useCallback((rotation: number) => {
+    setTextInput((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, rotation };
+      textInputRef.current = next;
+      return next;
+    });
+  }, []);
+
   // FIX (issue #4): fall back to canvas center when no previous click position
   // exists. Previously this silently stashed pendingText and nothing visible
   // happened when the user clicked a recent text in a fresh session.
@@ -146,7 +157,7 @@ export function useTextTool({
       const canvasY = canvas.height / 2;
       const screenX = cr.left - ctr.left + cr.width / 2;
       const screenY = cr.top - ctr.top + cr.height / 2;
-      const fallback = { screenX, screenY, canvasX, canvasY };
+      const fallback = { screenX, screenY, canvasX, canvasY, rotation: 0 };
       lastPositionRef.current = fallback;
       if (textInputRef.current) commitText();
       const next: TextInput = { ...fallback, text };
@@ -195,5 +206,6 @@ export function useTextTool({
     onTextBlur,
     reopenWith,
     setTextPosition,
+    setTextRotation,
   };
 }

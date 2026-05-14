@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./users";
 
 const blendModeValidator = v.union(
   v.literal("normal"),
@@ -20,7 +20,7 @@ const blendModeValidator = v.union(
 export const listByImage = query({
   args: { imageId: v.id("images") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return [];
     return await ctx.db
       .query("layers")
@@ -39,7 +39,7 @@ export const create = mutation({
     opacity: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const image = await ctx.db.get(args.imageId);
     if (!image || image.userId !== userId) throw new Error("Not found");
@@ -72,7 +72,7 @@ export const update = mutation({
     blendMode: v.optional(blendModeValidator),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const layer = await ctx.db.get(args.layerId);
     if (!layer) throw new Error("Not found");
@@ -86,7 +86,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { layerId: v.id("layers") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const layer = await ctx.db.get(args.layerId);
     if (!layer) throw new Error("Not found");

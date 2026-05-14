@@ -5,6 +5,7 @@
 //   Item 7: blur → effects rename, brightness/contrast in effects panel
 //   All other existing functionality preserved
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useUser } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
@@ -19,7 +20,7 @@ import type { TextMemory } from "@/features/tools/settings/TextSettings";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition } from "@/lib/animations";
 import { TopBar } from "@/components/TopBar";
-import { StatusBar } from "@/components/StatusBar";
+import { StatusBar, type UserMode } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
 import { ToolsSidebar } from "@/features/tools";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
@@ -64,6 +65,22 @@ import {
 } from "lucide-react";
 
 export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
+
+const AUTH_ENABLED = !!(
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY &&
+  import.meta.env.VITE_CONVEX_URL
+);
+
+function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
+  const { isLoaded, isSignedIn } = useUser();
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    onMode(isSignedIn ? "loggedIn" : "demo");
+  }, [isLoaded, isSignedIn, onMode]);
+
+  return null;
+}
 
 export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -110,6 +127,8 @@ export function AppShell() {
   const [colorPickerActive, setColorPickerActive] = useState(false);
   const [stampSubMode, setStampSubMode] = useState<"clone" | "red" | "emojis">("clone");
   const [shapesMode, setShapesMode] = useState<"shapes" | "arrows">("shapes");
+  const [userMode, setUserMode] = useState<UserMode>("demo");
+  const handleAuthMode = useCallback((m: UserMode) => setUserMode(m), []);
 
   const handleTextCommit = useCallback(
     (text: string) => {
@@ -922,6 +941,7 @@ export function AppShell() {
                 containerRef={containerRef}
                 onTextPositionChange={textTool.setTextPosition}
                 onTextFontSizeChange={handleTextFontSizeChange}
+                onTextRotationChange={textTool.setTextRotation}
                 extractMouseDown={textExtract.onMouseDown}
                 extractMouseMove={textExtract.onMouseMove}
                 extractMouseUp={textExtract.onMouseUp}
@@ -1034,10 +1054,13 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
+      {AUTH_ENABLED && <AuthModeWatcher onMode={handleAuthMode} />}
+
       {photos.length > 0 && (
         <StatusBar
           state={stamp.state}
           imageCount={photos.length}
+          userMode={userMode}
         />
       )}
 

@@ -222,7 +222,7 @@ pub fn measure(text: &str, font_size: f32, bold: bool) -> (u32, u32) {
 
 /// Rotate an RGBA pixel buffer by `angle_deg` degrees (positive = CCW).
 /// The output is sized to the bounding box of the rotated image.
-fn rotate_pixels(data: &[u8], w: u32, h: u32, angle_deg: f32) -> RenderedText {
+pub(crate) fn rotate_pixels(data: &[u8], w: u32, h: u32, angle_deg: f32) -> RenderedText {
     let angle = angle_deg * std::f32::consts::PI / 180.0;
     let cos = angle.cos();
     let sin = angle.sin();

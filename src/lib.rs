@@ -32,6 +32,9 @@ pub struct CloneStampTool {
     hist: History,
     stamp: StampState,
     zoom: f64,
+    // Scratch buffers reused across blur_region calls to avoid per-stroke allocation.
+    blur_scratch_a: Vec<u8>,
+    blur_scratch_b: Vec<u8>,
 }
 
 #[wasm_bindgen]
@@ -45,6 +48,8 @@ impl CloneStampTool {
             hist: History::new(),
             stamp: StampState::new(),
             zoom: 1.0,
+            blur_scratch_a: Vec::new(),
+            blur_scratch_b: Vec::new(),
         }
     }
 
@@ -470,6 +475,8 @@ impl CloneStampTool {
             cy,
             brush_radius,
             intensity,
+            &mut self.blur_scratch_a,
+            &mut self.blur_scratch_b,
         );
     }
  
@@ -589,7 +596,8 @@ impl CloneStampTool {
     /// Render text entirely in Rust (Liberation Sans, embedded font) and
     /// composite it onto the image buffer at (dest_x, dest_y).
     /// Replaces the JS OffscreenCanvas → stamp_pixels pipeline for the text tool.
-    /// `dest_x/dest_y` is the top-left corner of the rendered text block.
+    /// `dest_x/dest_y` is the top-left corner of the unrotated text block.
+    /// `angle_deg` rotates the rendered text clockwise (positive) around its centre.
     pub fn commit_text(
         &mut self,
         text: &str,
@@ -598,19 +606,41 @@ impl CloneStampTool {
         bold: bool,
         dest_x: i32,
         dest_y: i32,
+        angle_deg: f32,
     ) {
         let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
         self.hist.push_snapshot("Text", &self.buf.data, self.buf.width, self.buf.height);
-        transform::paste_region(
-            &mut self.buf.data,
-            self.buf.width as i32,
-            self.buf.height as i32,
-            &rendered.pixels,
-            rendered.width,
-            rendered.height,
-            dest_x,
-            dest_y,
-        );
+
+        if angle_deg.abs() < 0.5 {
+            transform::paste_region(
+                &mut self.buf.data,
+                self.buf.width as i32,
+                self.buf.height as i32,
+                &rendered.pixels,
+                rendered.width,
+                rendered.height,
+                dest_x,
+                dest_y,
+            );
+        } else {
+            // Rotate around the text centre.  CSS rotate() is CW, rotate_pixels is CCW,
+            // so negate the angle.
+            let cx = dest_x + rendered.width as i32 / 2;
+            let cy = dest_y + rendered.height as i32 / 2;
+            let rotated = crate::text::rotate_pixels(&rendered.pixels, rendered.width, rendered.height, -angle_deg);
+            let paste_x = cx - rotated.width as i32 / 2;
+            let paste_y = cy - rotated.height as i32 / 2;
+            transform::paste_region(
+                &mut self.buf.data,
+                self.buf.width as i32,
+                self.buf.height as i32,
+                &rotated.pixels,
+                rotated.width,
+                rotated.height,
+                paste_x,
+                paste_y,
+            );
+        }
     }
 
     /// Returns [width, height] in pixels of the text as rendered by `commit_text`,

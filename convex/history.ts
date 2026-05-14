@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./users";
 
 export const listByImage = query({
   args: { imageId: v.id("images"), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return [];
     return await ctx.db
       .query("history")
@@ -39,7 +39,7 @@ export const push = mutation({
     nextState: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     return await ctx.db.insert("history", {
       ...args,
@@ -52,7 +52,7 @@ export const push = mutation({
 export const clearForImage = mutation({
   args: { imageId: v.id("images") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const rows = await ctx.db
       .query("history")

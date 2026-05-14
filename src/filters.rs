@@ -58,6 +58,8 @@ pub fn gaussian_blur_region(
     cy: f64,
     brush_radius: f64,
     intensity: u32,
+    scratch_a: &mut Vec<u8>,
+    scratch_b: &mut Vec<u8>,
 ) {
     let w = width as i32;
     let h = height as i32;
@@ -77,8 +79,11 @@ pub fn gaussian_blur_region(
         return;
     }
 
-    // Extract the bounding-box region into a temp buffer
-    let mut region = vec![0u8; bw * bh * 4];
+    // Reuse caller-supplied scratch buffers — grow if needed, never reallocate on shrink.
+    let needed = bw * bh * 4;
+    scratch_a.resize(needed, 0);
+    scratch_b.resize(needed, 0);
+    let region = &mut scratch_a[..needed];
     for ry in 0..bh {
         let sy = min_y + ry as i32;
         for rx in 0..bw {
@@ -90,7 +95,7 @@ pub fn gaussian_blur_region(
     }
 
     // Pass 1: Horizontal blur into a temp buffer
-    let mut h_pass = vec![0u8; bw * bh * 4];
+    let h_pass = &mut scratch_b[..needed];
     for ry in 0..bh {
         for rx in 0..bw {
             let mut r = 0.0f64;

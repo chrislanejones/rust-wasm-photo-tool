@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getUserId } from "./users";
 
 export const listByUser = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return [];
     return await ctx.db
       .query("ai_jobs")
@@ -18,7 +18,7 @@ export const listByUser = query({
 export const listByImage = query({
   args: { imageId: v.id("images") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) return [];
     return await ctx.db
       .query("ai_jobs")
@@ -40,7 +40,7 @@ export const create = mutation({
     input: v.any(),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const image = await ctx.db.get(args.imageId);
     if (!image || image.userId !== userId) throw new Error("Not authorized");
@@ -69,7 +69,7 @@ export const updateStatus = mutation({
     error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const job = await ctx.db.get(args.jobId);
     if (!job || job.userId !== userId) throw new Error("Not authorized");

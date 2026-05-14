@@ -48,6 +48,12 @@ export async function requireUser(ctx: MutationCtx) {
   return user;
 }
 
+/** Convenience: resolve Clerk JWT → internal user _id (or null). */
+export async function getUserId(ctx: QueryCtx | MutationCtx) {
+  const user = await getUser(ctx);
+  return user?._id ?? null;
+}
+
 // ── Public API ────────────────────────────────────────────
 
 /** Get the current user's profile (or null). */
