@@ -1,5 +1,8 @@
 /target
 /pkg
+
+# Convex auto-generated AI context files
+convex/_generated/ai/
 node_modules
 app/node_modules
 app/dist
@@ -18,3 +21,10 @@ rolled_repo/
 
 # Local Netlify folder
 .netlify
+
+# Claude Code / agent tooling
+.claude/
+.agents/
+AGENTS.md
+CLAUDE.md
+skills-lock.json
