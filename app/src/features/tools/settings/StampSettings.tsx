@@ -3,6 +3,7 @@ import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 import type { StampSettings } from "@/lib/types";
 import { TabGroup } from "@/components/TabGroup";
+import { SizeSlider } from "@/components/SizeSlider";
 
 const SIZE_PRESETS = [8, 16, 24, 32] as const;
 const HARDNESS_PRESETS = [0, 33, 66, 100] as const;
@@ -125,49 +126,15 @@ export function StampSettingsPanel({
           </div>
 
           {/* Brush Size */}
-          <div className="space-y-4 pt-8">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                Brush Size
-              </label>
-              <span className="text-xs text-theme-foreground tabular-nums">
-                {settings.brushSize}px
-              </span>
-            </div>
-            <DotRow
-              presets={SIZE_PRESETS}
+          <div className="pt-8">
+            <SizeSlider
+              label="Brush Size"
               value={settings.brushSize}
-              onSelect={(v) => onChange({ ...settings, brushSize: v })}
-              dot={(preset) => {
-                const dotSize =
-                  preset <= 8 ? 4 : preset <= 16 ? 6 : preset <= 24 ? 8 : 10;
-                return (
-                  <span
-                    className="rounded-full bg-theme-foreground"
-                    style={{ width: dotSize, height: dotSize }}
-                  />
-                );
-              }}
+              min={4}
+              max={64}
+              onChange={(v) => onChange({ ...settings, brushSize: v })}
+              presets={SIZE_PRESETS}
             />
-            <div className="relative h-2 w-full rounded-full bg-theme-muted">
-              <div
-                className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                style={{
-                  width: `${((settings.brushSize - 4) / (64 - 4)) * 100}%`,
-                }}
-              />
-              <input
-                type="range"
-                min={4}
-                max={64}
-                step={1}
-                value={settings.brushSize}
-                onChange={(e) =>
-                  onChange({ ...settings, brushSize: Number(e.target.value) })
-                }
-                className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-              />
-            </div>
           </div>
 
           {/* Hardness */}
@@ -259,50 +226,14 @@ export function StampSettingsPanel({
       {mode === "red" && (
         <div className="space-y-8">
           {/* Brush Size */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                Brush Size
-              </label>
-              <span className="text-xs text-theme-foreground tabular-nums">
-                {settings.brushSize}px
-              </span>
-            </div>
-            <DotRow
-              presets={SIZE_PRESETS}
-              value={settings.brushSize}
-              onSelect={(v) => onChange({ ...settings, brushSize: v })}
-              dot={(preset) => {
-                const dotSize =
-                  preset <= 8 ? 4 : preset <= 16 ? 6 : preset <= 24 ? 8 : 10;
-                return (
-                  <span
-                    className="rounded-full bg-theme-foreground"
-                    style={{ width: dotSize, height: dotSize }}
-                  />
-                );
-              }}
-            />
-            <div className="relative h-2 w-full rounded-full bg-theme-muted">
-              <div
-                className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                style={{
-                  width: `${((settings.brushSize - 4) / (64 - 4)) * 100}%`,
-                }}
-              />
-              <input
-                type="range"
-                min={4}
-                max={64}
-                step={1}
-                value={settings.brushSize}
-                onChange={(e) =>
-                  onChange({ ...settings, brushSize: Number(e.target.value) })
-                }
-                className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-              />
-            </div>
-          </div>
+          <SizeSlider
+            label="Brush Size"
+            value={settings.brushSize}
+            min={4}
+            max={64}
+            onChange={(v) => onChange({ ...settings, brushSize: v })}
+            presets={SIZE_PRESETS}
+          />
 
           <div className="space-y-4">
             <p className="text-[10px] text-text-muted/60 leading-relaxed">
@@ -376,51 +307,17 @@ export function StampSettingsPanel({
               dynamicWidth={true}
             />
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                Size
-              </label>
-              <span className="text-xs text-theme-foreground tabular-nums">
-                {emojiSize}px
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              {EMOJI_SIZE_PRESETS.map((size) => {
-                const active = emojiSize === size;
-                return (
-                  <button
-                    key={size}
-                    onClick={() => onEmojiSizeChange?.(size)}
-                    className={[
-                      "flex items-center justify-center w-10 h-10 rounded-lg transition-all",
-                      active
-                        ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar bg-theme-accent"
-                        : "hover:bg-theme-accent",
-                    ].join(" ")}
-                    aria-label={`Emoji size ${size}`}
-                  >
-                    <span style={{ fontSize: size * 0.4 }}>😀</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="relative h-2 w-full rounded-full bg-theme-muted">
-              <div
-                className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                style={{ width: `${((emojiSize - 16) / (128 - 16)) * 100}%` }}
-              />
-              <input
-                type="range"
-                min={16}
-                max={128}
-                step={1}
-                value={emojiSize}
-                onChange={(e) => onEmojiSizeChange?.(Number(e.target.value))}
-                className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-              />
-            </div>
-          </div>
+          <SizeSlider
+            label="Size"
+            value={emojiSize}
+            min={16}
+            max={128}
+            onChange={(v) => onEmojiSizeChange?.(v)}
+            presets={EMOJI_SIZE_PRESETS}
+            renderPreset={(size) => (
+              <span style={{ fontSize: size * 0.4 }}>😀</span>
+            )}
+          />
           {emoji && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-primary/10 border border-theme-primary/30">
               <span className="text-2xl">{emoji}</span>

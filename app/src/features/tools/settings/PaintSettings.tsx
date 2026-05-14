@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { ToolSettings } from "@/lib/types";
 import { PAINT_COLORS as COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
+import { SizeSlider } from "@/components/SizeSlider";
 import { quickSpring } from "@/lib/animations";
 
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
@@ -48,58 +49,14 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             className="space-y-8"
           >
             {/* Brush Size */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                  Brush Size
-                </label>
-                <span className="text-xs text-theme-foreground tabular-nums">
-                  {settings.brushSize}px
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                {BRUSH_SIZE_PRESETS.map((size) => {
-                  const active = settings.brushSize === size;
-                  return (
-                    <button
-                      key={size}
-                      onClick={() => onChange({ ...settings, brushSize: size })}
-                      className={[
-                        "flex items-center justify-center w-10 h-10 rounded-full transition-all",
-                        active
-                          ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
-                          : "hover:bg-theme-accent",
-                      ].join(" ")}
-                      aria-label={`Brush size ${size}`}
-                    >
-                      <span
-                        className="rounded-full bg-theme-foreground"
-                        style={{ width: size / 2, height: size / 2 }}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="relative h-2 w-full rounded-full bg-theme-muted">
-                <div
-                  className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                  style={{ width: `${((settings.brushSize - 1) / 49) * 100}%` }}
-                />
-                <input
-                  type="range"
-                  min={1}
-                  max={50}
-                  step={1}
-                  value={settings.brushSize}
-                  onChange={(e) =>
-                    onChange({ ...settings, brushSize: Number(e.target.value) })
-                  }
-                  className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-                />
-              </div>
-            </div>
+            <SizeSlider
+              label="Brush Size"
+              value={settings.brushSize}
+              min={1}
+              max={50}
+              onChange={(v) => onChange({ ...settings, brushSize: v })}
+              presets={BRUSH_SIZE_PRESETS}
+            />
 
             {/* Opacity */}
             <div className="space-y-4">
@@ -172,61 +129,15 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             className="space-y-8"
           >
             {/* Blur Size */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                  Brush Size
-                </label>
-                <span className="text-xs text-theme-foreground tabular-nums">
-                  {settings.blurSize}px
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between py-2">
-                {BLUR_SIZE_PRESETS.map((size) => {
-                  const active = settings.blurSize === size;
-                  const dotSize = size <= 8 ? 4 : size <= 16 ? 6 : size <= 32 ? 8 : 10;
-                  return (
-                    <button
-                      key={size}
-                      onClick={() => onChange({ ...settings, blurSize: size })}
-                      className={[
-                        "flex items-center justify-center w-10 h-10 rounded-full transition-all",
-                        active
-                          ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
-                          : "hover:bg-theme-accent",
-                      ].join(" ")}
-                      aria-label={`Blur size ${size}`}
-                    >
-                      <span
-                        className="rounded-full bg-theme-foreground/50"
-                        style={{ width: dotSize, height: dotSize, filter: "blur(1.5px)" }}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="relative h-2 w-full rounded-full bg-theme-muted">
-                <div
-                  className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                  style={{
-                    width: `${((settings.blurSize - 4) / (128 - 4)) * 100}%`,
-                  }}
-                />
-                <input
-                  type="range"
-                  min={4}
-                  max={128}
-                  step={1}
-                  value={settings.blurSize}
-                  onChange={(e) =>
-                    onChange({ ...settings, blurSize: Number(e.target.value) })
-                  }
-                  className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-                />
-              </div>
-            </div>
+            <SizeSlider
+              label="Brush Size"
+              value={settings.blurSize}
+              min={4}
+              max={128}
+              onChange={(v) => onChange({ ...settings, blurSize: v })}
+              presets={BLUR_SIZE_PRESETS}
+              blurredDots
+            />
 
             {/* Blur Intensity */}
             <div className="space-y-4">

@@ -840,6 +840,7 @@ export function AppShell() {
             onRotate90Cw={stamp.rotate90Cw}
             onBrightness={stamp.adjustBrightness}
             onContrast={stamp.adjustContrast}
+            onGlobalBlur={stamp.applyGlobalBlur}
             imageReady={hasImage}
             onResize={handleResize}
             imageWidth={stamp.state.width}

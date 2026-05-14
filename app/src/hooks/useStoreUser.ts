@@ -1,7 +1,7 @@
 // app/src/hooks/useStoreUser.ts
 import { useUser } from "@clerk/clerk-react";
 import { useMutation } from "convex/react";
-import { api } from "../../../.convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import { useEffect } from "react";
 
 /**

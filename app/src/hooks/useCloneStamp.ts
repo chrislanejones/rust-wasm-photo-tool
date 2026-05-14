@@ -566,6 +566,21 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [flushToCanvas, syncState],
   );
 
+  const applyGlobalBlur = useCallback(
+    (intensity: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      const cx = t.width() / 2;
+      const cy = t.height() / 2;
+      const r = Math.max(t.width(), t.height());
+      t.begin_blur_stroke();
+      t.blur_region(cx, cy, r, intensity);
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
   return {
     state,
     toolRef,
@@ -604,5 +619,6 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     resize,
     adjustBrightness,
     adjustContrast,
+    applyGlobalBlur,
   };
 }

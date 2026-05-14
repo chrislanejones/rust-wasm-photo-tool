@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useConvexAuth, useConvex, useMutation } from "convex/react";
-import { api } from "../../../.convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import type { RefObject } from "react";
 import type { CloneStampTool } from "stamp_tool";
 import {

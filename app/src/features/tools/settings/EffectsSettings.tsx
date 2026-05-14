@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sun, Contrast, Pipette } from "lucide-react";
+import { Sun, Contrast, Pipette, Waves, Wand2, Flame, Cloud, Moon } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { TabGroup } from "@/components/TabGroup";
 import { quickSpring } from "@/lib/animations";
@@ -10,8 +10,8 @@ interface EffectsSettingsProps {
   onChange: (settings: ToolSettings) => void;
   onBrightness: (delta: number) => void;
   onContrast: (factor: number) => void;
+  onGlobalBlur?: (intensity: number) => void;
   imageReady: boolean;
-  // Color picker
   colorPickerActive?: boolean;
   onSetColorPickerActive?: (active: boolean) => void;
   pickedColor?: string;
@@ -21,11 +21,19 @@ interface EffectsSettingsProps {
 
 export type EffectsMode = "levels" | "picker";
 
+const PRESETS = [
+  { label: "Enhance",  Icon: Wand2, brightness: 0.08,  contrast: 1.25 },
+  { label: "Vivid",    Icon: Flame, brightness: 0,      contrast: 1.5  },
+  { label: "Fade",     Icon: Cloud, brightness: 0.06,   contrast: 0.72 },
+  { label: "Dark",     Icon: Moon,  brightness: -0.12,  contrast: 1.1  },
+] as const;
+
 export function EffectsSettings({
   settings,
   onChange: _onChange,
   onBrightness,
   onContrast,
+  onGlobalBlur,
   imageReady,
   colorPickerActive = false,
   onSetColorPickerActive,
@@ -35,8 +43,18 @@ export function EffectsSettings({
 }: EffectsSettingsProps) {
   const [internalMode, setInternalMode] = useState<EffectsMode>("levels");
   const mode = activeMode ?? internalMode;
+
+  // Latching brightness: slider stays at released position.
+  // Each release applies only the delta since the last commit.
   const [brightness, setBrightness] = useState(0);
+  const [brightnessCommitted, setBrightnessCommitted] = useState(0);
+
+  // Latching contrast: same principle, but delta is a ratio.
   const [contrast, setContrast] = useState(100);
+  const [contrastCommitted, setContrastCommitted] = useState(100);
+
+  // Blur resets after each apply (applying more blur is additive anyway).
+  const [blur, setBlur] = useState(0);
 
   const handleModeChange = (id: string) => {
     const m = id as EffectsMode;
@@ -46,17 +64,30 @@ export function EffectsSettings({
   };
 
   const commitBrightness = (v: number) => {
-    if (v !== 0) {
-      onBrightness(v / 100);
-      setBrightness(0);
+    const delta = (v - brightnessCommitted) / 100;
+    if (delta !== 0) {
+      onBrightness(delta);
+      setBrightnessCommitted(v);
     }
   };
 
   const commitContrast = (v: number) => {
-    if (v !== 100) {
-      onContrast(v / 100);
-      setContrast(100);
+    if (v === contrastCommitted) return;
+    const factor = v / contrastCommitted;
+    onContrast(factor);
+    setContrastCommitted(v);
+  };
+
+  const commitBlur = (v: number) => {
+    if (v > 0 && onGlobalBlur) {
+      onGlobalBlur(v / 100);
+      setBlur(0);
     }
+  };
+
+  const applyPreset = (brightness: number, contrast: number) => {
+    if (brightness !== 0) onBrightness(brightness);
+    if (contrast !== 1) onContrast(contrast);
   };
 
   const displayColor = pickedColor ?? settings.brushColor;
@@ -79,10 +110,10 @@ export function EffectsSettings({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0, transition: quickSpring }}
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
-            className="space-y-8"
+            className="space-y-6"
           >
             {/* Brightness */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Sun className="h-3.5 w-3.5 text-theme-muted-foreground" />
                 <span className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground flex-1">
@@ -93,9 +124,13 @@ export function EffectsSettings({
                 </span>
               </div>
               <div className="relative h-2 w-full rounded-full bg-theme-muted">
+                {/* track fill from center */}
                 <div
                   className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                  style={{ width: `${((brightness + 100) / 200) * 100}%` }}
+                  style={{
+                    left: brightness >= 0 ? "50%" : `${((brightness + 100) / 200) * 100}%`,
+                    width: `${(Math.abs(brightness) / 200) * 100}%`,
+                  }}
                 />
                 <input
                   type="range"
@@ -112,29 +147,32 @@ export function EffectsSettings({
                 />
               </div>
               <p className="text-[9px] text-theme-muted-foreground">
-                Drag and release — processes in Rust. Each adjustment is undo-able.
+                Drag &amp; release — applies delta from current position. Undo-able.
               </p>
             </div>
 
             {/* Contrast */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Contrast className="h-3.5 w-3.5 text-theme-muted-foreground" />
                 <span className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground flex-1">
                   Contrast
                 </span>
                 <span className="text-xs text-theme-foreground min-w-[3.5ch] text-right tabular-nums">
-                  {contrast}%
+                  {contrast > 100 ? `+${contrast - 100}` : contrast < 100 ? `${contrast - 100}` : "0"}
                 </span>
               </div>
               <div className="relative h-2 w-full rounded-full bg-theme-muted">
                 <div
                   className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                  style={{ width: `${(contrast / 300) * 100}%` }}
+                  style={{
+                    left: contrast >= 100 ? "50%" : `${(contrast / 200) * 100}%`,
+                    width: `${(Math.abs(contrast - 100) / 200) * 100}%`,
+                  }}
                 />
                 <input
                   type="range"
-                  min={0}
+                  min={10}
                   max={300}
                   step={1}
                   value={contrast}
@@ -147,7 +185,67 @@ export function EffectsSettings({
                 />
               </div>
               <p className="text-[9px] text-theme-muted-foreground">
-                100% = original. Processed via Rust adjust_contrast().
+                100 = neutral. Slider latches — drag again to adjust further.
+              </p>
+            </div>
+
+            {/* Global Blur */}
+            {onGlobalBlur && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Waves className="h-3.5 w-3.5 text-theme-muted-foreground" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground flex-1">
+                    Blur
+                  </span>
+                  <span className="text-xs text-theme-foreground min-w-[3.5ch] text-right tabular-nums">
+                    {blur}%
+                  </span>
+                </div>
+                <div className="relative h-2 w-full rounded-full bg-theme-muted">
+                  <div
+                    className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
+                    style={{ width: `${blur}%` }}
+                  />
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={blur}
+                    disabled={!imageReady}
+                    onChange={(e) => setBlur(Number(e.target.value))}
+                    onPointerUp={(e) =>
+                      commitBlur(Number((e.target as HTMLInputElement).value))
+                    }
+                    className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
+                  />
+                </div>
+                <p className="text-[9px] text-theme-muted-foreground">
+                  Gaussian blur across the full image. Resets after apply.
+                </p>
+              </div>
+            )}
+
+            {/* Quick Presets */}
+            <div className="space-y-3 pt-2 border-t border-theme-sidebar-border">
+              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+                Quick Adjust
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {PRESETS.map(({ label, Icon, brightness: b, contrast: c }) => (
+                  <button
+                    key={label}
+                    disabled={!imageReady}
+                    onClick={() => applyPreset(b, c)}
+                    className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold bg-theme-muted text-theme-foreground hover:bg-theme-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[9px] text-theme-muted-foreground">
+                One-shot adjustments. Each is undo-able.
               </p>
             </div>
           </motion.div>
@@ -167,7 +265,6 @@ export function EffectsSettings({
               brush and text color.
             </p>
 
-            {/* Activate button */}
             <button
               disabled={!imageReady}
               onClick={() => onSetColorPickerActive?.(!colorPickerActive)}
@@ -183,7 +280,6 @@ export function EffectsSettings({
               {colorPickerActive ? "Click image to pick" : "Activate Eyedropper"}
             </button>
 
-            {/* Color swatch */}
             <div className="space-y-3">
               <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
                 Current Color

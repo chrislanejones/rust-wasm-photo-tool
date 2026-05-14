@@ -78,6 +78,7 @@ interface ToolsSidebarProps {
   colorPickerActive?: boolean;
   onSetColorPickerActive?: (active: boolean) => void;
   pickedColor?: string;
+  onGlobalBlur?: (intensity: number) => void;
   // Shapes sub-mode
   shapesMode?: ShapesMode;
   onShapesModeChange?: (mode: ShapesMode) => void;
@@ -136,6 +137,7 @@ export function ToolsSidebar({
   colorPickerActive,
   onSetColorPickerActive,
   pickedColor,
+  onGlobalBlur,
   shapesMode,
   onShapesModeChange,
   stampSubMode,
@@ -210,6 +212,7 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
             onBrightness={onBrightness}
             onContrast={onContrast}
+            onGlobalBlur={onGlobalBlur}
             imageReady={imageReady}
             colorPickerActive={colorPickerActive}
             onSetColorPickerActive={onSetColorPickerActive}

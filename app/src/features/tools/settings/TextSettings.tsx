@@ -4,6 +4,7 @@ import { Crop, Type, ChevronDown } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS as COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
+import { SizeSlider } from "@/components/SizeSlider";
 import { Button } from "@/components/ui/button";
 import { quickSpring } from "@/lib/animations";
 
@@ -89,55 +90,15 @@ export function TextSettings({
             className="space-y-5"
           >
             {/* Font Size */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                  Font Size
-                </label>
-                <span className="text-xs text-theme-foreground tabular-nums">
-                  {settings.fontSize}px
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                {FONT_SIZE_PRESETS.map((size) => {
-                  const active = settings.fontSize === size;
-                  return (
-                    <button
-                      key={size}
-                      onClick={() => onChange({ ...settings, fontSize: size })}
-                      className={[
-                        "flex items-center justify-center w-10 h-10 rounded-full transition-all text-xs font-mono",
-                        active
-                          ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
-                          : "hover:bg-theme-accent",
-                      ].join(" ")}
-                      aria-label={`Font size ${size}`}
-                    >
-                      {size}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="relative h-2 w-full rounded-full bg-theme-muted">
-                <div
-                  className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                  style={{
-                    width: `${((settings.fontSize - 8) / (120 - 8)) * 100}%`,
-                  }}
-                />
-                <input
-                  type="range"
-                  min={8}
-                  max={120}
-                  step={1}
-                  value={settings.fontSize}
-                  onChange={(e) =>
-                    onChange({ ...settings, fontSize: Number(e.target.value) })
-                  }
-                  className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-                />
-              </div>
-            </div>
+            <SizeSlider
+              label="Font Size"
+              value={settings.fontSize}
+              min={8}
+              max={120}
+              onChange={(v) => onChange({ ...settings, fontSize: v })}
+              presets={FONT_SIZE_PRESETS}
+              variant="numbers"
+            />
 
             {/* Font Family */}
             <div className="space-y-4">

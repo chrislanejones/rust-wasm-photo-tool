@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
-import { api } from "../../../.convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
 
 const LS_KEY = "image-horse-recent-texts";
