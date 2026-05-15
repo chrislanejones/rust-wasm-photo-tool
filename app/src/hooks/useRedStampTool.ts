@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 
 interface PendingStamp {
   label: string;
@@ -7,7 +7,7 @@ interface PendingStamp {
 }
 
 interface UseRedStampToolOptions {
-  toolRef: React.RefObject<CloneStampTool | null>;
+  toolRef: React.RefObject<ImageHorseTool | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   flushToCanvas: () => void;
   syncState: () => void;

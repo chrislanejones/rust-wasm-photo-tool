@@ -9,7 +9,7 @@
 //! - `filters`   — Brightness, contrast (future: blur, sharpen)
 //! - `codec`     — PNG encoding, thumbnail generation
 //!
-//! The JS side imports `CloneStampTool` — the API surface is unchanged.
+//! The JS side imports `ImageHorseTool` — the API surface is unchanged.
 
 use wasm_bindgen::prelude::*;
 
@@ -27,7 +27,7 @@ use crate::history::{History, Snapshot};
 use crate::stamp::StampState;
 
 #[wasm_bindgen]
-pub struct CloneStampTool {
+pub struct ImageHorseTool {
     buf: ImageBuffer,
     hist: History,
     stamp: StampState,
@@ -38,12 +38,12 @@ pub struct CloneStampTool {
 }
 
 #[wasm_bindgen]
-impl CloneStampTool {
+impl ImageHorseTool {
     // ── Constructor & dimensions ─────────────────────────────────────────
 
     #[wasm_bindgen(constructor)]
-    pub fn new(width: u32, height: u32) -> Self {
-        Self {
+    pub fn new(width: u32, height: u32) -> ImageHorseTool {
+        ImageHorseTool {
             buf: ImageBuffer::new(width, height),
             hist: History::new(),
             stamp: StampState::new(),

@@ -283,7 +283,7 @@ export function ResizeSettings({
           disabled={disabled || !resizeChanged}
           className="w-full gap-2"
         >
-          Apply Resize
+          Apply Resize and Quality
         </Button>
         <Button
           onClick={onAutoCompress}

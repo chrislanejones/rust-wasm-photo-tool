@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 
 const RADIUS = 5; // 11×11 pixel grid
 
@@ -8,7 +8,7 @@ function rgbaToHex(r: number, g: number, b: number): string {
 }
 
 interface UseColorPickerOptions {
-  toolRef: React.RefObject<CloneStampTool | null>;
+  toolRef: React.RefObject<ImageHorseTool | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   active: boolean;

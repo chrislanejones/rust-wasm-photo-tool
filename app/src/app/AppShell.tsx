@@ -18,7 +18,7 @@ import { useRedStampTool } from "@/hooks/useRedStampTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
-import { panelSpacingTransition } from "@/lib/animations";
+import { panelSpacingTransition, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
@@ -34,6 +34,8 @@ import type { EffectsMode } from "@/features/tools/settings/EffectsSettings";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
 import { useRecentTexts } from "@/hooks/useRecentTexts";
+import { putOriginal, getOriginal, getOriginalAsBlobUrl } from "@/lib/originalsStore";
+import { makeWorkingCopy, makeThumbnail } from "@/lib/workingCopy";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -112,6 +114,7 @@ export function AppShell() {
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [imageSavings, setImageSavings] = useState<Record<string, { savingsPercent: number }>>({});
   const [modifiedPhotos, setModifiedPhotos] = useState<Set<string>>(new Set());
+  // originalUrl is populated by the compare effect; not set on photo select
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
   const [hasBeenModified, setHasBeenModified] = useState(false);
@@ -166,20 +169,30 @@ export function AppShell() {
     reopenWithRef.current?.(m.text);
   }, []);
 
-  const loadImageWithProgress = useCallback(
-    (file: File) => {
+  // ── Pixel-based loading (downscaled working copy) ──────────────────────────
+  const loadImageFromPixels = useCallback(
+    (pixels: Uint8ClampedArray, width: number, height: number) => {
       setIsImageLoading(true);
       setLoadProgress(0);
       if (loadIntervalRef.current) clearInterval(loadIntervalRef.current);
       loadIntervalRef.current = setInterval(() => {
-        setLoadProgress((prev) => {
-          if (prev >= 90) return 90;
-          return prev + Math.random() * 15;
-        });
+        setLoadProgress((prev) => (prev >= 90 ? 90 : prev + Math.random() * 15));
       }, 100);
-      stamp.loadImage(file);
+      void stamp.loadImageFromPixels(pixels, width, height);
     },
     [stamp],
+  );
+
+  /** Load a photo entry from IndexedDB → downscale → hand to the tool. */
+  const loadPhotoFromEntry = useCallback(
+    async (entry: PhotoEntry) => {
+      const original = await getOriginal(entry.originalKey);
+      if (!original) return;
+      const file = new File([original.bytes], original.name, { type: original.mimeType });
+      const working = await makeWorkingCopy(file);
+      loadImageFromPixels(working.pixels, working.width, working.height);
+    },
+    [loadImageFromPixels],
   );
 
   useEffect(() => {
@@ -197,15 +210,34 @@ export function AppShell() {
     }
   }, [stamp.state.ready, isImageLoading]);
 
+  // ── Compare: fetch original from IndexedDB when slider activates ───────────
+  const activeEntry = photos.find((p) => p.id === activePhotoId) ?? null;
+  const activeOriginalKey = activeEntry?.originalKey ?? null;
+
+  useEffect(() => {
+    if (!compareActive || !activeOriginalKey) {
+      if (originalUrl) URL.revokeObjectURL(originalUrl);
+      setOriginalUrl(null);
+      return;
+    }
+    let cancelled = false;
+    let createdUrl: string | null = null;
+    void (async () => {
+      const u = await getOriginalAsBlobUrl(activeOriginalKey);
+      if (cancelled || !u) return;
+      createdUrl = u;
+      setOriginalUrl(u);
+    })();
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compareActive, activeOriginalKey]);
+
+  // ── Add photos ─────────────────────────────────────────────────────────────
   const handleAddPhotos = useCallback(
     async (files: File[]) => {
-      const entries: PhotoEntry[] = files.map((f) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        url: URL.createObjectURL(f),
-        name: f.name.replace(/\.[^.]+$/, ""),
-        file: f,
-      }));
-      // Commit modification status before switching
       if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
         setModifiedPhotos((prev) => {
           if (prev.has(activePhotoId)) return prev;
@@ -214,30 +246,53 @@ export function AppShell() {
           return next;
         });
       }
-      // Persist current photo before switching to the first new one
       if (activePhotoId && stamp.toolRef.current) {
         await savePhotoEdit(activePhotoId, stamp.toolRef);
       }
-      setPhotos((prev) => [...prev, ...entries]);
-      const first = entries[0];
-      if (first) {
-        loadImageWithProgress(first.file);
-        setHasBeenModified(false);
-        setActivePhotoId(first.id);
-        setOriginalUrl(first.url);
-        setCompareActive(false);
+
+      let firstLoaded = false;
+      for (const f of files) {
+        try {
+          const working = await makeWorkingCopy(f);
+          const [originalKey, thumbBlob] = await Promise.all([
+            putOriginal(f, working.origWidth, working.origHeight),
+            makeThumbnail(f),
+          ]);
+          const entry: PhotoEntry = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            name: f.name.replace(/\.[^.]+$/, ""),
+            mimeType: f.type || "application/octet-stream",
+            byteSize: f.size,
+            origWidth: working.origWidth,
+            origHeight: working.origHeight,
+            workingWidth: working.width,
+            workingHeight: working.height,
+            thumbBlob,
+            originalKey,
+          };
+
+          setPhotos((prev) => [...prev, entry]);
+
+          if (!firstLoaded) {
+            firstLoaded = true;
+            loadImageFromPixels(working.pixels, working.width, working.height);
+            setHasBeenModified(false);
+            setActivePhotoId(entry.id);
+            setCompareActive(false);
+          }
+        } catch (err) {
+          console.error("Failed to add photo:", f.name, err);
+        }
       }
     },
-    [activePhotoId, hasBeenModified, stamp, loadImageWithProgress],
+    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit],
   );
 
+  // ── Select photo ───────────────────────────────────────────────────────────
   const handleSelectPhoto = useCallback(
     async (entry: PhotoEntry) => {
       if (entry.id === activePhotoId) return;
 
-      // Synchronously commit the current photo's modified status before any
-      // state reset. undoCount > 0 catches all tool edits (brush, stamp, crop,
-      // etc.) that never call setHasBeenModified directly.
       if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
         setModifiedPhotos((prev) => {
           if (prev.has(activePhotoId)) return prev;
@@ -247,19 +302,14 @@ export function AppShell() {
         });
       }
 
-      // Persist the current photo's canvas + full undo/redo history
       if (activePhotoId && stamp.toolRef.current) {
         await savePhotoEdit(activePhotoId, stamp.toolRef);
       }
 
-      // Reset modification flag in the same batch as the activePhotoId change so
-      // the useEffect never sees a new id paired with the previous photo's dirty state.
       setHasBeenModified(false);
       setActivePhotoId(entry.id);
-      setOriginalUrl(entry.url);
       setCompareActive(false);
 
-      // Restore previously-saved edit for the target photo, or load fresh
       const saved = await loadPhotoEdit(entry.id);
       if (saved) {
         setIsImageLoading(true);
@@ -267,14 +317,11 @@ export function AppShell() {
         await stamp.loadFromSaved(saved);
         setLoadProgress(100);
         setTimeout(() => { setIsImageLoading(false); setLoadProgress(0); }, 400);
-        // Do NOT set hasBeenModified here — the photo is already in modifiedPhotos
-        // from when the edits were originally made; re-setting it would mark any
-        // photo with a saved edit as dirty just from clicking it.
       } else {
-        loadImageWithProgress(entry.file);
+        void loadPhotoFromEntry(entry);
       }
     },
-    [activePhotoId, hasBeenModified, stamp, loadImageWithProgress],
+    [activePhotoId, hasBeenModified, stamp, loadPhotoFromEntry, savePhotoEdit, loadPhotoEdit],
   );
 
   // Item 4: PgUp/PgDn gallery cycling
@@ -282,14 +329,14 @@ export function AppShell() {
     if (photos.length === 0) return;
     const idx = photos.findIndex((p) => p.id === activePhotoId);
     const next = photos[(idx + 1) % photos.length];
-    if (next) handleSelectPhoto(next);
+    if (next) void handleSelectPhoto(next);
   }, [photos, activePhotoId, handleSelectPhoto]);
 
   const handlePrevPhoto = useCallback(() => {
     if (photos.length === 0) return;
     const idx = photos.findIndex((p) => p.id === activePhotoId);
     const prev = photos[(idx - 1 + photos.length) % photos.length];
-    if (prev) handleSelectPhoto(prev);
+    if (prev) void handleSelectPhoto(prev);
   }, [photos, activePhotoId, handleSelectPhoto]);
 
   const handleRemovePhoto = useCallback(
@@ -308,35 +355,30 @@ export function AppShell() {
       setPhotos((prev) => {
         const idx = prev.findIndex((p) => p.id === id);
         const next = prev.filter((p) => p.id !== id);
-        const removed = prev[idx];
-        if (removed) URL.revokeObjectURL(removed.url);
         if (id === activePhotoId && next.length > 0) {
           const na = next[Math.min(idx, next.length - 1)]!;
-          loadImageWithProgress(na.file);
+          void loadPhotoFromEntry(na);
           setActivePhotoId(na.id);
-          setOriginalUrl(na.url);
           setHasBeenModified(false);
           setCompareActive(false);
         } else if (next.length === 0) {
           setActivePhotoId(null);
-          setOriginalUrl(null);
           setHasBeenModified(false);
           setCompareActive(false);
         }
         return next;
       });
     },
-    [activePhotoId, loadImageWithProgress],
+    [activePhotoId, loadPhotoFromEntry, deletePhotoEdit],
   );
 
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
-  const [showTools, setShowTools] = useState(true);
+  const [showTools, setShowTools] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
-
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
   const [textExtractActive, setTextExtractActive] = useState(false);
@@ -370,27 +412,30 @@ export function AppShell() {
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
   const prevPhotoCount = useRef(0);
+  const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => {
     const prev = prevPhotoCount.current;
     const curr = photos.length;
-    if (prev === 0 && curr > 0) {
+    prevPhotoCount.current = curr;
+    if (revealTimers.current.length === 0 && prev === 0 && curr > 0) {
       setShowUpload(false);
-      const t1 = setTimeout(() => setShowTopBar(true), 150);
-      const t2 = setTimeout(() => setShowTools(true), 500);
-      const t3 = setTimeout(() => setShowGallery(true), 850);
-      prevPhotoCount.current = curr;
-      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+      revealTimers.current = [
+        setTimeout(() => setShowTopBar(true), 150),
+        setTimeout(() => setShowTools(true), 500),
+        setTimeout(() => setShowGallery(true), 850),
+      ];
     }
     if (curr === 0) {
+      revealTimers.current.forEach(clearTimeout);
+      revealTimers.current = [];
       setShowUpload(true);
       setShowTopBar(false);
       setShowTools(false);
       setShowGallery(false);
       setShowHistory(false);
     }
-    prevPhotoCount.current = curr;
-    return undefined;
   }, [photos.length]);
+  useEffect(() => () => { revealTimers.current.forEach(clearTimeout); }, []);
 
   const handleTextFontSizeChange = useCallback((size: number) => {
     setToolSettings((prev) => ({ ...prev, fontSize: size }));
@@ -411,7 +456,6 @@ export function AppShell() {
     clearAllEdits().catch(() => {});
     setImageSavings({});
     setModifiedPhotos(new Set());
-    const toRevoke = photos.map((p) => p.url);
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext("2d");
@@ -424,10 +468,7 @@ export function AppShell() {
     setHasBeenModified(false);
     setCompareActive(false);
     setPhotos([]);
-    requestAnimationFrame(() => {
-      toRevoke.forEach((url) => URL.revokeObjectURL(url));
-    });
-  }, [photos]);
+  }, [clearAllEdits]);
 
   const handlePickColor = useCallback((hex: string) => {
     setToolSettings((prev) => ({ ...prev, brushColor: hex, textColor: hex }));
@@ -591,7 +632,6 @@ export function AppShell() {
           onMouseUp: emojiTool.onMouseUp as typeof stamp.onMouseUp,
         };
       }
-      // Route to red stamp if a preset is selected, else clone stamp
       const combinedDown: typeof stamp.onMouseDown = (e) => {
         if (redStampTool.hasPendingStamp()) {
           redStampTool.onMouseDown(e as React.MouseEvent<HTMLCanvasElement>);
@@ -664,9 +704,20 @@ export function AppShell() {
     [stamp, activePhotoId, quality],
   );
 
-  const handleAutoCompress = useCallback(() => {
+  const handleAutoCompress = useCallback(async () => {
+    // Load originals from IndexedDB to build File objects for the compress hook
+    const photosForCompress = (
+      await Promise.all(
+        photos.map(async (p) => {
+          const orig = await getOriginal(p.originalKey);
+          if (!orig) return null;
+          return { id: p.id, file: new File([orig.bytes], orig.name, { type: orig.mimeType }) };
+        }),
+      )
+    ).filter((x): x is { id: string; file: File } => x !== null);
+
     compressAll(
-      photos,
+      photosForCompress,
       {
         maxWidth: 2200,
         maxHeight: 2200,
@@ -674,19 +725,26 @@ export function AppShell() {
         format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
       },
       (id: string, nf: File, nu: string) => {
-        setPhotos((p) =>
-          p.map((x) => {
-            if (x.id !== id) return x;
-            URL.revokeObjectURL(x.url);
-            return { ...x, file: nf, url: nu };
-          }),
-        );
+        URL.revokeObjectURL(nu); // We store to IDB, don't need the blob URL
+        const photo = photos.find((p) => p.id === id);
+        if (!photo) return;
+        void (async () => {
+          const [newKey, newThumb] = await Promise.all([
+            putOriginal(nf, photo.workingWidth, photo.workingHeight),
+            makeThumbnail(nf),
+          ]);
+          setPhotos((p) =>
+            p.map((x) =>
+              x.id !== id ? x : { ...x, originalKey: newKey, thumbBlob: newThumb },
+            ),
+          );
+        })();
       },
     );
     setHasBeenModified(true);
   }, [photos, quality, exportFormat, compressAll]);
 
-  // Track per-photo modification state (any tool change marks the photo)
+  // Track per-photo modification state
   useEffect(() => {
     if (hasBeenModified && activePhotoId) {
       setModifiedPhotos((prev) => {
@@ -698,7 +756,7 @@ export function AppShell() {
     }
   }, [hasBeenModified, activePhotoId]);
 
-  // Persist compression savings from auto-compress before they clear after 3s
+  // Persist compression savings
   useEffect(() => {
     const entries = Object.entries(compressProgress.savings);
     if (entries.length === 0) return;
@@ -717,7 +775,13 @@ export function AppShell() {
     const zip = new JSZip();
     const ext = exportFormat === "jpeg" ? ".jpg" : `.${exportFormat}`;
     for (const photo of photos) {
-      zip.file(`${photo.name}${ext}`, photo.file);
+      const original = await getOriginal(photo.originalKey);
+      if (original) {
+        zip.file(
+          `${photo.name}${ext}`,
+          new Blob([original.bytes], { type: original.mimeType }),
+        );
+      }
     }
     const blob = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(blob);
@@ -764,16 +828,16 @@ export function AppShell() {
       <AnimatePresence>
         {isImageLoading && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={imageLoadBarFade}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             className="fixed top-0 left-0 right-0 z-100 h-1 bg-bg-elevated"
           >
             <motion.div
               className="h-full bg-linear-to-r from-accent via-accent to-accent/60 rounded-r-full"
-              initial={{ width: "0%" }}
+              {...imageLoadBarProgress}
               animate={{ width: `${Math.min(loadProgress, 100)}%` }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
             />
           </motion.div>
         )}
@@ -913,8 +977,7 @@ export function AppShell() {
             className="main-content"
             style={{ position: "relative" }}
           >
-            {photos.length > 0 ? (
-              <>
+            <>
               <CanvasArea
                 ref={canvasRef}
                 hookResult={effectiveStamp}
@@ -951,28 +1014,7 @@ export function AppShell() {
                 colorPickerActive={colorPickerActive}
               />
               <MagnifierOverlay magnifier={colorPicker.magnifier} />
-              </>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-bg-elevated/50 border border-border/50 flex items-center justify-center">
-                    <span className="text-3xl">🐴</span>
-                  </div>
-                  <div>
-                    <p className="text-sm text-text-muted font-medium">
-                      No images loaded
-                    </p>
-                    <p className="text-xs text-text-muted/60 mt-1">
-                      Press{" "}
-                      <kbd className="px-1.5 py-0.5 rounded bg-bg-elevated border border-border text-[10px] font-mono">
-                        Alt+U
-                      </kbd>{" "}
-                      to upload
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+            </>
           </motion.main>
         </ContextMenuTrigger>
 

@@ -1,8 +1,7 @@
 // ===== FILE: app/src/features/gallery/PhotoThumb.tsx =====
 // Per-thumbnail component with compression animation overlay.
-// `compression` is just a number (0..100 progress, -1 error)
-// matching the existing GalleryBar Record<string, number>.
 
+import { useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Zap } from "lucide-react";
 import type { PhotoEntry } from "./GalleryBar";
@@ -32,8 +31,11 @@ export function PhotoThumb({
   const isError = progress === -1;
 
   const hasTransparency = ["image/png", "image/webp", "image/svg+xml"].includes(
-    entry.file.type,
+    entry.mimeType,
   );
+
+  const thumbUrl = useMemo(() => URL.createObjectURL(entry.thumbBlob), [entry.thumbBlob]);
+  useEffect(() => () => URL.revokeObjectURL(thumbUrl), [thumbUrl]);
 
   return (
     <div
@@ -44,10 +46,12 @@ export function PhotoThumb({
         <div className="absolute inset-0 checkerboard" />
       )}
       <img
-        src={entry.url}
+        src={thumbUrl}
         alt={entry.name}
         className="photo-thumb-img"
         draggable={false}
+        decoding="async"
+        loading="lazy"
       />
 
       <AnimatePresence>

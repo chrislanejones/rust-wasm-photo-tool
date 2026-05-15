@@ -6,7 +6,7 @@
  */
 
 import type { RefObject } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 
 // ── Minimal IndexedDB wrapper ──────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ export interface SavedEdit {
  */
 export async function savePhotoEdit(
   photoId: string,
-  toolRef: RefObject<CloneStampTool | null>,
+  toolRef: RefObject<ImageHorseTool | null>,
 ): Promise<void> {
   const t = toolRef.current;
   if (!t) return;

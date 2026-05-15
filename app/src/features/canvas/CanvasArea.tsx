@@ -290,7 +290,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           }
           onMouseOut={onCanvasLeave}
         />
-        <CompareSlider beforeUrl={beforeUrl} active={compareActive} />
+        <CompareSlider beforeUrl={beforeUrl} canvasEl={canvasRef.current} active={compareActive} />
 
         {/* ── Crop overlay: dark mask + rule-of-thirds + draggable handles ── */}
         {activeTool === "crop" && cropSelection && canvasRef.current && (() => {

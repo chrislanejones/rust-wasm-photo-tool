@@ -1,10 +1,12 @@
-Rust WASM Photo Tool
+Image Horse
 
-![Rust WASM Photo Tool](public/Rust-WASM-Photo-App.jpg)
+![Image Horse](public/Rust-WASM-Photo-App.jpg)
 
 **Live:** [rust-wasm-photo-tool.netlify.app](https://rust-wasm-photo-tool.netlify.app/) &nbsp;·&nbsp; [Architecture](Architecture.md)
 
 A browser-based image annotation and editing tool powered by **Rust/WASM** for pixel-level operations, **React + TypeScript** for the UI, and **Convex** for persistent storage.
+
+> Previously called **Clone Stamp App** — the app grew well beyond its origins as a single clone stamp tool.
 
 ## Architecture
 
@@ -18,10 +20,10 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 │  │  TopBar · ToolsSidebar · GalleryBar · HistoryPanel        │   │
 │  │  UploadDialog · StatusBar · ShortcutModal                │   │
 │  └────────────────────┬─────────────────────────────────────┘   │
-│                       │ useCloneStamp hook                      │
+│                       │ useCloneStamp / useImageHorse hook      │
 │                       ▼                                         │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │  stamp_tool.wasm  (single binary, ~80KB gzipped)         │   │
+│  │  stamp_tool.wasm  (ImageHorseTool, ~80KB gzipped)        │   │
 │  │                                                          │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐   │   │
 │  │  │  core    │ │  stamp   │ │ transform │ │ filters  │   │   │
@@ -45,6 +47,8 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 │  │  Auth via @convex-dev/auth (Clerk)                       │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
+│  Originals → IndexedDB (SHA-256 keyed, content-addressed)       │
+│  Working copies downscaled to ≤2048px long edge on upload       │
 │  JPEG/WebP/AVIF export → browser canvas.toBlob()                │
 │  PNG export → Rust `png` crate (lossless, no canvas needed)     │
 └─────────────────────────────────────────────────────────────────┘
@@ -70,8 +74,8 @@ The `image` crate with all codec features adds ~800KB to the WASM binary. The br
 
 ```
 src/
-├── lib.rs          #[wasm_bindgen] glue — CloneStampTool struct, delegates to modules;
-│                   get_pixel(x,y) and get_pixel_region(cx,cy,radius) for color picker
+├── lib.rs          #[wasm_bindgen] glue — ImageHorseTool struct (was CloneStampTool),
+│                   delegates to modules; get_pixel(x,y) and get_pixel_region(cx,cy,radius)
 ├── core.rs         ImageBuffer — width, height, data, load, bilinear sampling;
 │                   zero-size guard: sample_bilinear returns [0,0,0,0] when buffer is empty
 ├── history.rs      Snapshot (data + dimensions), undo/redo stacks, push, jump, delete, labels;
@@ -99,8 +103,9 @@ app/src/
 │   ├── AppShell.tsx                  Master orchestrator — state, panels, WASM bridge
 │   └── useKeyboardShortcuts.ts       Centralized keyboard handler
 ├── hooks/
-│   ├── useCloneStamp.ts              React hook wrapping the WASM CloneStampTool; includes
-│   │                                 loadFromSaved() for restoring per-photo IDB sessions
+│   ├── useCloneStamp.ts              React hook wrapping the WASM ImageHorseTool; includes
+│   │                                 loadImage(), loadImageFromPixels() (pre-decoded, 2048-capped),
+│   │                                 and loadFromSaved() for restoring per-photo IDB sessions
 │   ├── useBrushPreview.ts            Cursor preview overlay
 │   ├── useDrawingTools.ts            Arrow/shape drawing + crop selection (SVG overlay)
 │   ├── useEmojiTool.ts               Emoji stamp — OffscreenCanvas → WASM stamp_pixels
@@ -169,6 +174,12 @@ app/src/
     ├── editPersistence.ts            Per-photo edit persistence via IndexedDB — saves full
     │                                 canvas state + undo/redo history (PNG-encoded) so switching
     │                                 between photos preserves all edits and history steps
+    ├── originalsStore.ts             Content-addressed IndexedDB store for original photo bytes;
+    │                                 keyed by SHA-256 hex via crypto.subtle; putOriginal /
+    │                                 getOriginal / getOriginalAsBlobUrl / deleteOriginal
+    ├── workingCopy.ts                makeWorkingCopy() — decodes + downscales to ≤2048px long
+    │                                 edge via createImageBitmap (high-quality); makeThumbnail()
+    │                                 produces 256px WebP blobs for the gallery strip
     └── utils.ts                      cn() utility
 ```
 
@@ -218,7 +229,7 @@ app/src/
 - **Text** — Click-to-place text with configurable font family (12 browser-safe options), size, weight, and color; up to 8 recent texts that re-open the canvas text box at the last used position, restoring all text settings
 - **Emoji Stamp** — Browser renders emoji to `OffscreenCanvas`, pixels sent to WASM `stamp_pixels()` for alpha compositing; emoji picker lives in the Stamp tool's Emojis tab
 - **Export** — Lossless PNG via Rust encoder, JPEG/WebP/AVIF via browser
-- **Thumbnails** — Bilinear-scaled thumbnails generated in WASM
+- **Thumbnails** — 256px WebP thumbnails generated from the original file via `createImageBitmap` on upload; working canvas stays at ≤2048px
 - **Copy/Paste Regions** — Cross-photo pixel compositing with alpha blending; paste from clipboard supported
 - **History** — 50-step undo/redo with labeled snapshots (including dimensions for crop/resize/rotate correctness), jump-to, delete entry
 - **Per-photo Edit Persistence** — Switching photos saves the full WASM canvas + undo/redo stack to IndexedDB (PNG-encoded per snapshot). Switching back restores the exact edit session — same canvas state, same undo history, all redo steps intact
@@ -229,8 +240,8 @@ app/src/
 - **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), Images (batch icon stamper, coming soon), AI (Brain)
 - **Tab Switchers** — Stamp (Clone / Stamps / Emojis), Shapes (Shapes / Arrows), Paint (Paint / Blur Brush), Effects (Levels / Color Picker) via shared `TabGroup` component
 - **Spacebar Pan** — Hold Space for grab-to-pan; all tool handlers bypassed during pan
-- **A/B Compare Slider** — Squoosh-style draggable divider to compare before/after edits
-- **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch; PgUp/PgDn cycling
+- **A/B Compare Slider** — Squoosh-style draggable divider; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned
+- **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch; PgUp/PgDn cycling; originals preserved in IndexedDB at full resolution regardless of working-copy downscale
 - **History Timeline** — Right-side panel with clickable undo/redo entries
 - **Upload** — Drag-and-drop modal with file browser and paste-from-clipboard (Ctrl+V / paste button)
 - **Export Dropdown** — PNG, JPEG, WebP, AVIF format selector in the top bar
@@ -335,6 +346,31 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 4 | Arrow tool → coming soon — panel replaced with coming-soon card (FileText icon); toolbar icon changed from `ArrowUpRight` to `FileText` | Complete |
 | 5 | Fix: arrows drawn when Arrows sub-tab active — `shapesMode` lifted to AppShell; `effectiveDrawingTool` overrides `activeTool` to `"arrow"` when shapes tool is in Arrows mode, routing preview and commit through `drawArrowPreview` / `tool.draw_arrow` | Complete |
 | 6 | Dual persistence — `useEditPersistence` routes canvas saves to Convex file storage (signed in) or IndexedDB (not signed in); `useRecentTexts` routes to Convex `recent_texts` or localStorage; `skipToken` used for conditional Convex queries | Complete |
+
+## v2.5 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Text rotate handle — SVG rotate circle rendered above text box in canvas overlay; drag to rotate text in-place before committing | Complete |
+| 2 | ColorSwatchGrid component — shared color swatch grid used in brush, text, arrow, and shape settings | Complete |
+| 3 | StatusBar auth mode — shows "Demo" or "Signed In" badge based on Clerk state | Complete |
+| 4 | Binary archive format for Convex edit history — canvas + undo/redo stack serialized as a compact binary archive; reduces storage and round-trips vs. per-snapshot Convex file uploads | Complete |
+| 5 | `session_edits` Convex table with 3-day expiry cron — edits older than 3 days cleaned up automatically | Complete |
+
+## v2.6 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | App renamed **Image Horse** — was *Clone Stamp App*; WASM struct renamed `CloneStampTool` → `ImageHorseTool`; all TS imports updated; WASM rebuilt | Complete |
+| 2 | `originalsStore.ts` — content-addressed IndexedDB store for original photo bytes; SHA-256 keyed via `crypto.subtle`; originals survive photo switching and page reload at full resolution | Complete |
+| 3 | `workingCopy.ts` — uploads downscaled to ≤2048px long edge via `createImageBitmap` (high-quality); 256px WebP thumbnail generated in parallel | Complete |
+| 4 | `PhotoEntry` shape change — `file` and `url` removed; replaced with `originalKey` (IDB key), `thumbBlob`, `mimeType`, `byteSize`, `origWidth/Height`, `workingWidth/Height` | Complete |
+| 5 | `loadImageFromPixels()` added to `useCloneStamp` — accepts pre-decoded `Uint8ClampedArray`; skips second decode; used by all photo-load paths | Complete |
+| 6 | CompareSlider alignment fix — overlay now tracks the canvas element's bounding box via `ResizeObserver`; "before" layer uses `background-size: 100% 100%` to fill that exact box; both layers share one coordinate space through zoom and pan | Complete |
+| 7 | Compare URL on demand — `originalUrl` populated by a `useEffect` that fires when compare activates, fetching from IndexedDB; revoked on cleanup; not stored on `PhotoEntry` | Complete |
+| 8 | AutoCompress reads/writes IndexedDB — fetches originals from IDB for compression, stores compressed result back under new key, regenerates thumbnail | Complete |
+| 9 | ExportAll reads IndexedDB — ZIP export streams original bytes from IDB instead of `photo.file` | Complete |
+| 10 | "Apply Resize and Quality" button — renamed from "Apply Resize"; disabled until width, height, or quality actually changes | Complete |
 
 ## License
 

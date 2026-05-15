@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { Upload, Clipboard, FolderOpen, Heart } from "lucide-react";
+import { shakeAnimation } from "@/lib/animations";
 
 interface Props {
   onFiles: (files: File[]) => void;
@@ -7,8 +9,13 @@ interface Props {
 
 export function UploadDropZone({ onFiles }: Props) {
   const [dragging, setDragging] = useState(false);
+  const [shaking, setShaking] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const shake = () => {
+    setShaking(true);
+  };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -19,6 +26,7 @@ export function UploadDropZone({ onFiles }: Props) {
     );
 
     if (files.length) onFiles(files);
+    else shake();
   };
 
   const handlePaste = (e: ClipboardEvent) => {
@@ -33,6 +41,8 @@ export function UploadDropZone({ onFiles }: Props) {
     if (files.length) {
       e.preventDefault();
       onFiles(files);
+    } else {
+      shake();
     }
   };
 
@@ -45,7 +55,7 @@ export function UploadDropZone({ onFiles }: Props) {
   }, []);
 
   return (
-    <div
+    <motion.div
       ref={containerRef}
       tabIndex={0}
       onDrop={handleDrop}
@@ -54,6 +64,9 @@ export function UploadDropZone({ onFiles }: Props) {
         setDragging(true);
       }}
       onDragLeave={() => setDragging(false)}
+      animate={shaking ? shakeAnimation.animate : { x: 0 }}
+      transition={shakeAnimation.transition}
+      onAnimationComplete={() => setShaking(false)}
       className={`border-2 border-dashed rounded-xl p-12 text-center transition-all focus:outline-none ${
         dragging
           ? "border-theme-primary bg-theme-primary/10"
@@ -106,6 +119,6 @@ export function UploadDropZone({ onFiles }: Props) {
         hidden
         onChange={(e) => onFiles(Array.from(e.target.files ?? []))}
       />
-    </div>
+    </motion.div>
   );
 }

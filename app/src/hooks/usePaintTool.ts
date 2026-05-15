@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 
 function parseHex(hex: string) {
@@ -12,7 +12,7 @@ function parseHex(hex: string) {
 }
 
 interface Opts {
-  toolRef: React.RefObject<CloneStampTool | null>;
+  toolRef: React.RefObject<ImageHorseTool | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   settings: ToolSettings;
   flushToCanvas: () => void;

@@ -1,7 +1,7 @@
 declare module "stamp_tool" {
   export default function init(): Promise<void>;
 
-  export class CloneStampTool {
+  export class ImageHorseTool {
     constructor(width: number, height: number);
     free(): void;
     load_image(pixels: Uint8Array): void;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 
 export interface TextInput {
@@ -12,7 +12,7 @@ export interface TextInput {
 }
 
 interface UseTextToolOptions {
-  toolRef: React.RefObject<CloneStampTool | null>;
+  toolRef: React.RefObject<ImageHorseTool | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   settings: ToolSettings;

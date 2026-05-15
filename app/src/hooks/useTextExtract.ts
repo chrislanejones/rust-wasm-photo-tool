@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 
 interface Point {
   x: number;
@@ -7,7 +7,7 @@ interface Point {
 }
 
 interface UseTextExtractOptions {
-  toolRef: React.RefObject<CloneStampTool | null>;
+  toolRef: React.RefObject<ImageHorseTool | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   active: boolean;
   flushToCanvas: () => void;
