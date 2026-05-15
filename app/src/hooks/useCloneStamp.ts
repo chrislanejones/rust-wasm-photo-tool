@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject, MouseEvent } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
 
 /** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
@@ -39,7 +39,7 @@ export interface CloneStampState {
 }
 
 export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
-  const toolRef = useRef<CloneStampTool | null>(null);
+  const toolRef = useRef<ImageHorseTool | null>(null);
   const isDrawingRef = useRef(false);
   const sourcePosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -121,7 +121,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   // ── Image loading ─────────────────────────────────────────────────────────
   const loadImage = useCallback(
     async (file: File) => {
-      const { default: init, CloneStampTool: Tool } =
+      const { default: init, ImageHorseTool: Tool } =
         await import("stamp_tool");
       await init();
       const url = URL.createObjectURL(file);
@@ -146,6 +146,27 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [canvasRef, syncState],
   );
 
+  /** Load pre-decoded RGBA pixels directly — skips a second decode and respects the 2048 cap. */
+  const loadImageFromPixels = useCallback(
+    async (pixels: Uint8ClampedArray, width: number, height: number) => {
+      const { default: init, ImageHorseTool: Tool } = await import("stamp_tool");
+      await init();
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      const clamped = new Uint8ClampedArray(pixels.buffer as ArrayBuffer);
+      ctx.putImageData(new ImageData(clamped, width, height), 0, 0);
+      const tool = new Tool(width, height);
+      tool.load_image(new Uint8Array(pixels.buffer as ArrayBuffer));
+      toolRef.current = tool;
+      sourcePosRef.current = null;
+      syncState();
+    },
+    [canvasRef, syncState],
+  );
+
   /**
    * Restore a previously-persisted photo session: canvas pixels + undo/redo
    * history. Snapshots are stored as PNGs; each is decoded back to raw RGBA
@@ -153,7 +174,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
    */
   const loadFromSaved = useCallback(
     async (saved: SavedEdit) => {
-      const { default: init, CloneStampTool: Tool } = await import("stamp_tool");
+      const { default: init, ImageHorseTool: Tool } = await import("stamp_tool");
       await init();
 
       // Decode current canvas PNG → raw RGBA
@@ -587,6 +608,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     // Core
     syncState,
     loadImage,
+    loadImageFromPixels,
     loadFromSaved,
     flushToCanvas,
     setBrushSize,

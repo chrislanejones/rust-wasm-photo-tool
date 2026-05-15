@@ -1,13 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
 import { X, Image, Check, Zap, ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface PhotoEntry {
   id: string;
-  url: string;
   name: string;
-  file: File;
+  mimeType: string;
+  byteSize: number;
+  origWidth: number;
+  origHeight: number;
+  workingWidth: number;
+  workingHeight: number;
+  /** WebP thumbnail blob for the gallery strip. */
+  thumbBlob: Blob;
+  /** SHA-256 hex key into IndexedDB for the untouched original bytes. */
+  originalKey: string;
 }
 
 interface Props {
@@ -40,17 +48,20 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
   const [loading, setLoading] = useState(true);
   const imgRef = useRef<HTMLImageElement>(null);
 
+  const thumbUrl = useMemo(() => URL.createObjectURL(entry.thumbBlob), [entry.thumbBlob]);
+  useEffect(() => () => URL.revokeObjectURL(thumbUrl), [thumbUrl]);
+
   useEffect(() => {
     setLoading(true);
     const img = imgRef.current;
     if (img && img.complete && img.naturalWidth > 0) setLoading(false);
-  }, [entry.url]);
+  }, [thumbUrl]);
 
   const isCompressing = progress !== undefined && progress >= 0 && progress < 100;
   const isDone = progress === 100;
   const isError = progress === -1;
   const hasSavings = savings != null && savings.savingsPercent > 0;
-  const maybeTransparent = TRANSPARENT_TYPES.has(entry.file.type);
+  const maybeTransparent = TRANSPARENT_TYPES.has(entry.mimeType);
 
   return (
     <motion.div
@@ -65,9 +76,11 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       )}
       <img
         ref={imgRef}
-        src={entry.url}
+        src={thumbUrl}
         alt={entry.name}
         draggable={false}
+        decoding="async"
+        loading="lazy"
         onLoad={() => setLoading(false)}
         onError={() => setLoading(false)}
       />

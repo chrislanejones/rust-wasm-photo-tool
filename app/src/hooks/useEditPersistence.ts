@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useConvexAuth, useConvex, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { RefObject } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 import {
   savePhotoEdit as idbSave,
   loadPhotoEdit as idbLoad,
@@ -107,7 +107,7 @@ export function useEditPersistence() {
   const clearAllConvex = useMutation(api.photoEdits.clearAll);
 
   const savePhotoEdit = useCallback(
-    async (photoId: string, toolRef: RefObject<CloneStampTool | null>) => {
+    async (photoId: string, toolRef: RefObject<ImageHorseTool | null>) => {
       if (isAuthenticated) {
         try {
           const tool = toolRef.current;

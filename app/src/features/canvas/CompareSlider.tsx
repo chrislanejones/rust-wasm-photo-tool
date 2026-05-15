@@ -1,42 +1,77 @@
-import { useCallback, useRef, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
-
-/**
- * Squoosh-style A/B comparison slider.
- * Overlays the "before" image (via URL) on the left side of a draggable divider.
- * Sits inside .canvas-wrapper, positioned absolutely over the <canvas>.
- */
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface CompareSliderProps {
-  /** URL of the original (unmodified) image */
+  /** Object URL or blob URL of the unedited original. */
   beforeUrl: string | null;
-  /** Whether the slider is visible */
+  /** The canvas element rendering the current edited image — we mirror its bounding box. */
+  canvasEl: HTMLCanvasElement | null;
   active: boolean;
 }
 
-export function CompareSlider({ beforeUrl, active }: CompareSliderProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+/**
+ * Squoosh-style A/B compare. Renders an overlay positioned exactly over the
+ * canvas. The "before" layer fills that same box via background-size 100% 100%,
+ * so both layers share one coordinate space regardless of zoom/pan.
+ */
+export function CompareSlider({ beforeUrl, canvasEl, active }: CompareSliderProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState(0.5);
   const [dragging, setDragging] = useState(false);
+  const [box, setBox] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!active || !canvasEl) {
+      setBox(null);
+      return;
+    }
+    const updateBox = () => {
+      const parent = canvasEl.offsetParent as HTMLElement | null;
+      if (!parent) return;
+      const parentRect = parent.getBoundingClientRect();
+      const rect = canvasEl.getBoundingClientRect();
+      setBox({
+        left: rect.left - parentRect.left,
+        top: rect.top - parentRect.top,
+        width: rect.width,
+        height: rect.height,
+      });
+    };
+    updateBox();
+    const ro = new ResizeObserver(updateBox);
+    ro.observe(canvasEl);
+    window.addEventListener("scroll", updateBox, true);
+    window.addEventListener("resize", updateBox);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("scroll", updateBox, true);
+      window.removeEventListener("resize", updateBox);
+    };
+  }, [active, canvasEl]);
 
   const getPosition = useCallback((clientX: number) => {
-    if (!containerRef.current) return 0.5;
-    const rect = containerRef.current.getBoundingClientRect();
+    const el = overlayRef.current;
+    if (!el) return 0.5;
+    const rect = el.getBoundingClientRect();
     return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   }, []);
 
-  const handlePointerDown = useCallback(
+  const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       setDragging(true);
       setPosition(getPosition(e.clientX));
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
     [getPosition],
   );
 
-  const handlePointerMove = useCallback(
+  const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!dragging) return;
       setPosition(getPosition(e.clientX));
@@ -44,56 +79,53 @@ export function CompareSlider({ beforeUrl, active }: CompareSliderProps) {
     [dragging, getPosition],
   );
 
-  const handlePointerUp = useCallback(() => {
-    setDragging(false);
-  }, []);
+  const onPointerUp = useCallback(() => setDragging(false), []);
 
-  if (!active || !beforeUrl) return null;
+  if (!active || !beforeUrl || !box) return null;
 
   const clipPercent = position * 100;
 
   return (
     <div
-      ref={containerRef}
-      className="absolute inset-0 z-10 cursor-col-resize"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      ref={overlayRef}
+      className="absolute z-20 cursor-col-resize select-none"
+      style={{
+        left: box.left,
+        top: box.top,
+        width: box.width,
+        height: box.height,
+        touchAction: "none",
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
     >
-      {/* Before image — clipped to the left side of the divider */}
-      <img
-        src={beforeUrl}
-        alt="Before"
-        draggable={false}
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+      {/* "Before" layer — original stretched to exactly the canvas's rendered box */}
+      <div
+        className="absolute inset-0 pointer-events-none"
         style={{
+          backgroundImage: `url(${beforeUrl})`,
+          backgroundSize: "100% 100%",
+          backgroundRepeat: "no-repeat",
           clipPath: `inset(0 ${100 - clipPercent}% 0 0)`,
         }}
       />
 
       {/* Divider line */}
       <div
-        className="absolute top-0 bottom-0 w-0.5 bg-white/80"
+        className="absolute top-0 bottom-0 w-0.5 bg-white pointer-events-none"
         style={{
           left: `${clipPercent}%`,
           transform: "translateX(-50%)",
           boxShadow: "0 0 8px rgba(0,0,0,0.5), 0 0 2px rgba(0,0,0,0.3)",
         }}
       >
-        {/* Drag handle */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center backdrop-blur-sm border border-white/20">
-          <SlidersHorizontal className="h-4 w-4 text-gray-700" />
-        </div>
-
-        {/* Before label */}
-        <div className="absolute top-3 right-3 px-2 py-1 rounded bg-black/70 text-[10px] text-white font-mono whitespace-nowrap select-none">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/70 text-[10px] text-white font-mono whitespace-nowrap select-none">
           Original
         </div>
-
-        {/* After label */}
-        <div className="absolute top-3 left-3 px-2 py-1 rounded bg-black/70 text-[10px] text-white font-mono whitespace-nowrap select-none">
-          Compressed
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/70 text-[10px] text-white font-mono whitespace-nowrap select-none">
+          Edited
         </div>
       </div>
     </div>

@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 
 interface UseEmojiToolOptions {
-  toolRef: React.RefObject<CloneStampTool | null>;
+  toolRef: React.RefObject<ImageHorseTool | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   flushToCanvas: () => void;
   emoji: string;

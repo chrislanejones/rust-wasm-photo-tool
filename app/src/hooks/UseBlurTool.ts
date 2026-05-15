@@ -1,17 +1,17 @@
 // ===== FILE: app/src/hooks/useBlurTool.ts =====
 //
-// This hook wires up the blur tool to the Rust/WASM CloneStampTool.
+// This hook wires up the blur tool to the Rust/WASM ImageHorseTool.
 // On mousedown it saves an undo snapshot via begin_blur_stroke(),
 // then on each mousemove it calls blur_region() which runs the
 // separable Gaussian blur in WASM — much faster than the JS
 // canvas.filter approach for large brush sizes.
 
 import { useCallback, useRef } from "react";
-import type { CloneStampTool } from "stamp_tool";
+import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 
 interface UseBlurToolOptions {
-  toolRef: React.RefObject<CloneStampTool | null>;
+  toolRef: React.RefObject<ImageHorseTool | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   settings: ToolSettings;
   flushToCanvas: () => void;
