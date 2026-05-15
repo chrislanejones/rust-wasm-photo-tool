@@ -18,7 +18,7 @@ import { useRedStampTool } from "@/hooks/useRedStampTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
-import { panelSpacingTransition } from "@/lib/animations";
+import { panelSpacingTransition, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
@@ -250,8 +250,9 @@ export function AppShell() {
         await savePhotoEdit(activePhotoId, stamp.toolRef);
       }
 
-      const built = await Promise.all(
-        files.map(async (f) => {
+      let firstLoaded = false;
+      for (const f of files) {
+        try {
           const working = await makeWorkingCopy(f);
           const [originalKey, thumbBlob] = await Promise.all([
             putOriginal(f, working.origWidth, working.origHeight),
@@ -269,19 +270,19 @@ export function AppShell() {
             thumbBlob,
             originalKey,
           };
-          return { entry, working };
-        }),
-      );
 
-      const entries = built.map((b) => b.entry);
-      setPhotos((prev) => [...prev, ...entries]);
+          setPhotos((prev) => [...prev, entry]);
 
-      const first = built[0];
-      if (first) {
-        loadImageFromPixels(first.working.pixels, first.working.width, first.working.height);
-        setHasBeenModified(false);
-        setActivePhotoId(first.entry.id);
-        setCompareActive(false);
+          if (!firstLoaded) {
+            firstLoaded = true;
+            loadImageFromPixels(working.pixels, working.width, working.height);
+            setHasBeenModified(false);
+            setActivePhotoId(entry.id);
+            setCompareActive(false);
+          }
+        } catch (err) {
+          console.error("Failed to add photo:", f.name, err);
+        }
       }
     },
     [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit],
@@ -373,7 +374,7 @@ export function AppShell() {
 
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
-  const [showTools, setShowTools] = useState(true);
+  const [showTools, setShowTools] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
@@ -411,27 +412,30 @@ export function AppShell() {
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
   const prevPhotoCount = useRef(0);
+  const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => {
     const prev = prevPhotoCount.current;
     const curr = photos.length;
-    if (prev === 0 && curr > 0) {
+    prevPhotoCount.current = curr;
+    if (revealTimers.current.length === 0 && prev === 0 && curr > 0) {
       setShowUpload(false);
-      const t1 = setTimeout(() => setShowTopBar(true), 150);
-      const t2 = setTimeout(() => setShowTools(true), 500);
-      const t3 = setTimeout(() => setShowGallery(true), 850);
-      prevPhotoCount.current = curr;
-      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+      revealTimers.current = [
+        setTimeout(() => setShowTopBar(true), 150),
+        setTimeout(() => setShowTools(true), 500),
+        setTimeout(() => setShowGallery(true), 850),
+      ];
     }
     if (curr === 0) {
+      revealTimers.current.forEach(clearTimeout);
+      revealTimers.current = [];
       setShowUpload(true);
       setShowTopBar(false);
       setShowTools(false);
       setShowGallery(false);
       setShowHistory(false);
     }
-    prevPhotoCount.current = curr;
-    return undefined;
   }, [photos.length]);
+  useEffect(() => () => { revealTimers.current.forEach(clearTimeout); }, []);
 
   const handleTextFontSizeChange = useCallback((size: number) => {
     setToolSettings((prev) => ({ ...prev, fontSize: size }));
@@ -824,16 +828,16 @@ export function AppShell() {
       <AnimatePresence>
         {isImageLoading && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={imageLoadBarFade}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             className="fixed top-0 left-0 right-0 z-100 h-1 bg-bg-elevated"
           >
             <motion.div
               className="h-full bg-linear-to-r from-accent via-accent to-accent/60 rounded-r-full"
-              initial={{ width: "0%" }}
+              {...imageLoadBarProgress}
               animate={{ width: `${Math.min(loadProgress, 100)}%` }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
             />
           </motion.div>
         )}
@@ -973,8 +977,7 @@ export function AppShell() {
             className="main-content"
             style={{ position: "relative" }}
           >
-            {photos.length > 0 ? (
-              <>
+            <>
               <CanvasArea
                 ref={canvasRef}
                 hookResult={effectiveStamp}
@@ -1011,28 +1014,7 @@ export function AppShell() {
                 colorPickerActive={colorPickerActive}
               />
               <MagnifierOverlay magnifier={colorPicker.magnifier} />
-              </>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-bg-elevated/50 border border-border/50 flex items-center justify-center">
-                    <span className="text-3xl">🐴</span>
-                  </div>
-                  <div>
-                    <p className="text-sm text-text-muted font-medium">
-                      No images loaded
-                    </p>
-                    <p className="text-xs text-text-muted/60 mt-1">
-                      Press{" "}
-                      <kbd className="px-1.5 py-0.5 rounded bg-bg-elevated border border-border text-[10px] font-mono">
-                        Alt+U
-                      </kbd>{" "}
-                      to upload
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+            </>
           </motion.main>
         </ContextMenuTrigger>
 

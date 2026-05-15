@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
 import { X, Image, Check, Zap, ChevronLeft, ChevronRight } from "lucide-react";
@@ -46,16 +46,15 @@ const TRANSPARENT_TYPES = new Set(["image/png", "image/webp", "image/svg+xml"]);
 
 function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified }: ThumbProps) {
   const [loading, setLoading] = useState(true);
+  const [thumbUrl, setThumbUrl] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
 
-  const thumbUrl = useMemo(() => URL.createObjectURL(entry.thumbBlob), [entry.thumbBlob]);
-  useEffect(() => () => URL.revokeObjectURL(thumbUrl), [thumbUrl]);
-
   useEffect(() => {
+    const url = URL.createObjectURL(entry.thumbBlob);
+    setThumbUrl(url);
     setLoading(true);
-    const img = imgRef.current;
-    if (img && img.complete && img.naturalWidth > 0) setLoading(false);
-  }, [thumbUrl]);
+    return () => URL.revokeObjectURL(url);
+  }, [entry.thumbBlob]);
 
   const isCompressing = progress !== undefined && progress >= 0 && progress < 100;
   const isDone = progress === 100;
