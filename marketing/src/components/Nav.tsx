@@ -1,5 +1,6 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
 import Logo from "./Logo";
+import { EDITOR_URL } from "../config";
 
 export default function Nav() {
   const loc = useLocation();
@@ -33,16 +34,20 @@ export default function Nav() {
         </div>
         <div className="flex items-center gap-3">
           <a
-            href="#"
+            href={EDITOR_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-sm text-zinc-400 hover:text-zinc-100 transition hidden sm:inline"
           >
             Sign in
           </a>
           <a
-            href={onHome ? "#cta" : "/#cta"}
+            href={EDITOR_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-sm font-medium px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-900 hover:bg-white transition"
           >
-            Try the demo
+            Beta Version →
           </a>
         </div>
       </div>

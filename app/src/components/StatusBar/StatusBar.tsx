@@ -5,7 +5,7 @@
 import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 
-const MARKETING_URL = "https://photo-horse.vercel.app";
+const MARKETING_URL = "https://image-horse.vercel.app";
 
 export type UserMode = "demo" | "loggedIn" | "paid";
 
@@ -30,7 +30,7 @@ export function StatusBar({ state, imageCount, userMode = "demo" }: Props) {
           target="_blank"
           rel="noopener noreferrer"
           className="status-brand-link"
-          title="Visit photo-horse.vercel.app"
+          title="Visit image-horse.vercel.app"
         >
           <span>🐴 Image Horse</span>
           <ExternalLink size={12} aria-hidden="true" />

@@ -263,7 +263,11 @@ app/src/
 
 ## Getting Started
 
+Repo lives in WSL (Debian) at `~/repo/rust-wasm-photo-tool/`:
+
 ```bash
+cd ~/repo/rust-wasm-photo-tool
+
 # Build the WASM module
 wasm-pack build --target web
 
@@ -272,6 +276,14 @@ cd app
 pnpm install
 
 # Start development server
+pnpm dev
+```
+
+To run the marketing site:
+
+```bash
+cd ~/repo/rust-wasm-photo-tool/marketing
+pnpm install
 pnpm dev
 ```
 

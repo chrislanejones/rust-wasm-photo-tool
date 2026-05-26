@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { EDITOR_URL } from "../config";
 
 export default function CTA() {
   return (
@@ -16,10 +17,12 @@ export default function CTA() {
         </p>
         <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
           <a
-            href="#"
+            href={EDITOR_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="px-5 py-3 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 text-white font-medium hover:opacity-90 transition glow"
           >
-            Launch the editor →
+            Beta Version →
           </a>
           <Link
             to="/architecture"
