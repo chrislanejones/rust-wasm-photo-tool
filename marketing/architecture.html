@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Architecture — Image Horse</title>
+    <meta
+      name="description"
+      content="Backend and runtime architecture for Image Horse — Rust/WASM client, Convex database, Clerk auth, Replicate AI, UploadThing storage."
+    />
+    <link rel="icon" href="/Image-Horse-Logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root { font-family: "DM Sans", system-ui, sans-serif; }
+      code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+      html { scroll-behavior: smooth; }
+    </style>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased">
+    <!-- Nav -->
+    <nav class="sticky top-0 z-50 backdrop-blur bg-zinc-950/70 border-b border-zinc-900">
+      <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <span class="font-semibold tracking-tight">Image Horse</span>
+        </a>
+        <div class="hidden md:flex items-center gap-7 text-sm text-zinc-400">
+          <a href="index.html#features" class="hover:text-zinc-100 transition">Features</a>
+          <a href="index.html#how" class="hover:text-zinc-100 transition">How it works</a>
+          <a href="index.html#pricing" class="hover:text-zinc-100 transition">Pricing</a>
+          <a href="architecture.html" class="text-orange-400">Architecture</a>
+        </div>
+        <a
+          href="index.html#cta"
+          class="text-sm font-medium px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-900 hover:bg-white transition"
+        >Try the demo</a>
+      </div>
+    </nav>
+
+    <div class="min-h-screen bg-zinc-950 text-zinc-100 p-8 overflow-x-auto">
+      <header class="max-w-7xl mx-auto mb-8">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h1 class="text-2xl font-semibold tracking-tight">Image Annotation App</h1>
+        </div>
+        <p class="text-zinc-500 text-sm">Backend Architecture · v2.0 — <span class="text-orange-400 font-medium">+ WASM / Rust</span></p>
+      </header>
+
+      <div class="max-w-7xl mx-auto relative">
+
+        <!-- ROW 1: Client Layer -->
+        <ih-label color="blue">Client Layer (Vercel Edge)</ih-label>
+        <div class="grid grid-cols-2 gap-4 mb-4 mt-2">
+          <ih-node title="React App" subtitle="TanStack Router" color="blue"></ih-node>
+          <ih-node title="Canvas Engine" subtitle="JS ↔ WASM Bridge" color="blue"></ih-node>
+        </div>
+
+        <ih-arrow-down></ih-arrow-down>
+
+        <!-- ROW 2: WASM + Rust Layer -->
+        <ih-label color="orange">WASM Processing Layer (Client-Side Rust)</ih-label>
+        <div class="grid grid-cols-4 gap-4 mb-4 mt-2">
+          <ih-node title="image-core.wasm" subtitle="Pixel Manipulation" color="orange" badge="new"></ih-node>
+          <ih-node title="filters.wasm" subtitle="Brightness · Contrast · Blur" color="orange" badge="new"></ih-node>
+          <ih-node title="annotation.wasm" subtitle="Shape Rasterization" color="orange" badge="new"></ih-node>
+          <ih-node title="codec.wasm" subtitle="Encode / Decode · Resize" color="orange" badge="new"></ih-node>
+        </div>
+
+        <!-- WASM detail callout -->
+        <div class="rounded-lg border border-orange-500/30 bg-orange-500/5 px-4 py-3 mb-4 text-xs text-zinc-400 leading-relaxed">
+          <div class="flex items-start gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="shrink-0">
+              <circle cx="12" cy="12" r="10" stroke="#f97316" stroke-width="1.5" />
+              <text x="12" y="16" text-anchor="middle" fill="#f97316" font-size="10" font-weight="bold" font-family="monospace">R</text>
+            </svg>
+            <div>
+              <span class="text-orange-400 font-semibold">Rust → wasm-pack → .wasm</span>
+              <span class="mx-2 text-zinc-600">|</span>
+              Built with <code class="text-orange-300/80 bg-orange-500/10 px-1 rounded">wasm-bindgen</code> + <code class="text-orange-300/80 bg-orange-500/10 px-1 rounded">image</code> crate
+              <span class="mx-2 text-zinc-600">|</span>
+              Loaded via <code class="text-orange-300/80 bg-orange-500/10 px-1 rounded">await init()</code> on first interaction
+              <span class="mx-2 text-zinc-600">|</span>
+              <span class="text-emerald-400">~200KB gzipped</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- WasmSplitArrow -->
+        <div class="flex justify-center py-3">
+          <svg width="100%" height="64" viewBox="0 0 600 64" preserveAspectRatio="xMidYMid meet" fill="none">
+            <path d="M300 0 L300 16" stroke="#f97316" stroke-width="2" />
+            <path d="M150 16 L450 16" stroke="#52525b" stroke-width="2" />
+            <path d="M150 16 L150 32" stroke="#f97316" stroke-width="2" />
+            <text x="150" y="48" text-anchor="middle" fill="#f97316" font-size="11" font-family="monospace">client-side ⟳</text>
+            <path d="M450 16 L450 56 M444 50 L450 56 L456 50" stroke="#52525b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <text x="450" y="28" text-anchor="middle" fill="#71717a" font-size="11" font-family="monospace">→ server</text>
+          </svg>
+        </div>
+
+        <!-- ROW 3: Auth -->
+        <ih-label color="violet">Authentication (Clerk)</ih-label>
+        <div class="grid grid-cols-4 gap-4 mb-4 mt-2">
+          <ih-node title="Clerk Auth" color="violet"></ih-node>
+          <ih-node title="Demo Mode" subtitle="Anonymous Session" color="zinc"></ih-node>
+          <ih-node title="Free Tier" subtitle="5 images/day" color="zinc"></ih-node>
+          <ih-node title="Paid Tier" subtitle="Unlimited" color="violet" highlighted></ih-node>
+        </div>
+
+        <ih-arrow-down></ih-arrow-down>
+
+        <!-- ROW 4: API Layer -->
+        <ih-label color="emerald">API Layer (Vercel Functions)</ih-label>
+        <div class="grid grid-cols-6 gap-3 mb-4 mt-2">
+          <ih-node title="/api/upload" size="sm" color="emerald"></ih-node>
+          <ih-node title="/api/process" size="sm" color="emerald"></ih-node>
+          <ih-node title="/api/ai/*" size="sm" color="violet"></ih-node>
+          <ih-node title="/api/history" size="sm" color="amber"></ih-node>
+          <ih-node title="/api/export" size="sm" color="rose"></ih-node>
+          <ih-node title="Middleware" subtitle="Rate Limit" size="sm" color="zinc"></ih-node>
+        </div>
+
+        <!-- BranchingArrows -->
+        <div class="flex justify-center py-3">
+          <svg width="100%" height="56" viewBox="0 0 600 56" preserveAspectRatio="xMidYMid meet" fill="none">
+            <path d="M300 0 L300 20" stroke="#52525b" stroke-width="2" />
+            <path d="M100 20 L500 20" stroke="#52525b" stroke-width="2" />
+            <path d="M100 20 L100 48 M94 42 L100 48 L106 42" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M300 20 L300 48 M294 42 L300 48 L306 42" stroke="#ec4899" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M500 20 L500 48 M494 42 L500 48 L506 42" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+
+        <!-- ROW 5: Services -->
+        <div class="grid grid-cols-3 gap-6 mt-2">
+          <div>
+            <ih-label color="amber">Storage Layer</ih-label>
+            <div class="space-y-2 mt-2">
+              <ih-node title="UploadThing" subtitle="Original Uploads" color="red"></ih-node>
+              <div class="flex justify-center py-1">
+                <svg width="16" height="20" viewBox="0 0 16 20" fill="none">
+                  <path d="M8 0 L8 14 M4 10 L8 14 L12 10" stroke="#52525b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </div>
+              <ih-node title="CDN Edge Cache" subtitle="Processed Images" color="amber"></ih-node>
+            </div>
+          </div>
+
+          <div>
+            <ih-label color="pink">Database (Convex)</ih-label>
+            <div class="mt-2 text-[10px] text-zinc-500 mb-2">
+              Real-time sync · Reactive queries · TypeScript schema
+            </div>
+            <div class="space-y-1">
+              <ih-tablemini name="users" icon="👤"></ih-tablemini>
+              <ih-tablemini name="projects" icon="📁"></ih-tablemini>
+              <ih-tablemini name="images" icon="🖼"></ih-tablemini>
+              <ih-tablemini name="annotations" icon="✏️" badge="new"></ih-tablemini>
+              <ih-tablemini name="layers" icon="📚" badge="new"></ih-tablemini>
+              <ih-tablemini name="history" icon="⏱"></ih-tablemini>
+              <ih-tablemini name="ai_jobs" icon="🤖"></ih-tablemini>
+              <ih-tablemini name="subscriptions" icon="💳" badge="new"></ih-tablemini>
+            </div>
+          </div>
+
+          <div>
+            <ih-label color="violet">AI (Replicate)</ih-label>
+            <div class="space-y-2 mt-2">
+              <ih-node title="rembg" subtitle="Background Removal" size="sm" color="violet" badge="free"></ih-node>
+              <ih-node title="Real-ESRGAN" subtitle="4x Upscaling" size="sm" color="violet" badge="pro"></ih-node>
+              <ih-node title="SD Inpaint" subtitle="Object Removal" size="sm" color="violet" badge="pro"></ih-node>
+              <ih-node title="BLIP" subtitle="Auto Alt Text" size="sm" color="violet" badge="free"></ih-node>
+            </div>
+          </div>
+        </div>
+
+        <!-- EXPANDED SCHEMA -->
+        <div class="mt-10 pt-6 border-t border-zinc-800">
+          <div class="flex items-center gap-3 mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="shrink-0">
+              <rect x="2" y="2" width="20" height="20" rx="4" stroke="#ec4899" stroke-width="1.5" />
+              <path d="M7 12 L12 7 L17 12 L12 17 Z" fill="#ec4899" fill-opacity="0.3" stroke="#ec4899" stroke-width="1" />
+            </svg>
+            <div>
+              <h2 class="text-lg font-semibold text-pink-400">Convex Database Schema</h2>
+              <p class="text-xs text-zinc-500">Detailed table structure with relationships and indexes</p>
+            </div>
+          </div>
+
+          <div id="schema-grid" class="grid grid-cols-4 gap-4"></div>
+
+          <!-- Relationship Diagram -->
+          <div class="mt-6 rounded-lg border border-pink-500/20 bg-pink-500/5 p-4">
+            <div class="text-pink-400 text-xs font-semibold mb-3">Entity Relationships</div>
+            <div class="flex items-center justify-center gap-2 text-xs text-zinc-400 flex-wrap">
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">users</span>
+              <span class="text-zinc-600">1 ─── ∞</span>
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">projects</span>
+              <span class="text-zinc-600">1 ─── ∞</span>
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">images</span>
+              <span class="text-zinc-600">1 ─── ∞</span>
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">layers</span>
+              <span class="text-zinc-600">1 ─── ∞</span>
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">annotations</span>
+            </div>
+            <div class="flex items-center justify-center gap-2 text-xs text-zinc-400 mt-2 flex-wrap">
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">users</span>
+              <span class="text-zinc-600">1 ─── 1</span>
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">subscriptions</span>
+              <span class="mx-4 text-zinc-700">|</span>
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">images</span>
+              <span class="text-zinc-600">1 ─── ∞</span>
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">history</span>
+              <span class="mx-4 text-zinc-700">|</span>
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">images</span>
+              <span class="text-zinc-600">1 ─── ∞</span>
+              <span class="px-2 py-1 rounded bg-pink-500/20 text-pink-300">ai_jobs</span>
+            </div>
+          </div>
+
+          <!-- Convex features -->
+          <div class="mt-4 grid grid-cols-4 gap-3 text-xs">
+            <div class="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+              <div class="text-pink-400 font-medium mb-1">⚡ Real-time</div>
+              <div class="text-zinc-500">useQuery hooks auto-update when data changes. No polling.</div>
+            </div>
+            <div class="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+              <div class="text-pink-400 font-medium mb-1">🔒 Row-level Auth</div>
+              <div class="text-zinc-500">ctx.auth in mutations + query filters for user-scoped data.</div>
+            </div>
+            <div class="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+              <div class="text-pink-400 font-medium mb-1">📦 File Storage</div>
+              <div class="text-zinc-500">Integrated blob storage for images via storage.getUrl().</div>
+            </div>
+            <div class="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+              <div class="text-pink-400 font-medium mb-1">🕐 Scheduled Jobs</div>
+              <div class="text-zinc-500">Cron for daily usage reset, AI job cleanup.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ConvergingArrows -->
+        <div class="flex justify-center py-3 mt-4">
+          <svg width="100%" height="56" viewBox="0 0 600 56" preserveAspectRatio="xMidYMid meet" fill="none">
+            <path d="M100 0 L100 20 L300 20" stroke="#52525b" stroke-width="2" stroke-dasharray="6 4" />
+            <path d="M500 0 L500 20 L300 20" stroke="#52525b" stroke-width="2" stroke-dasharray="6 4" />
+            <path d="M300 20 L300 48 M294 42 L300 48 L306 42" stroke="#52525b" stroke-width="2" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+
+        <!-- ROW 6: Webhooks -->
+        <ih-label color="zinc">Event Handlers (Webhooks)</ih-label>
+        <div class="grid grid-cols-4 gap-4 mt-2">
+          <ih-node title="Clerk Webhook" subtitle="User Sync → users table" size="sm" color="zinc"></ih-node>
+          <ih-node title="Stripe Webhook" subtitle="Sub changes → subscriptions" size="sm" color="zinc" badge="new"></ih-node>
+          <ih-node title="UploadThing Webhook" subtitle="File Ready → images table" size="sm" color="zinc"></ih-node>
+          <ih-node title="Replicate Webhook" subtitle="AI Complete → ai_jobs table" size="sm" color="zinc"></ih-node>
+        </div>
+
+        <!-- Legend -->
+        <div class="mt-10 pt-6 border-t border-zinc-800">
+          <div class="flex flex-wrap gap-6 text-xs text-zinc-500">
+            <ih-legend color="#3b82f6" label="Client Flow"></ih-legend>
+            <ih-legend color="#f97316" label="WASM / Rust"></ih-legend>
+            <ih-legend color="#10b981" label="API Flow"></ih-legend>
+            <ih-legend color="#8b5cf6" label="AI Processing"></ih-legend>
+            <ih-legend color="#f59e0b" label="Storage"></ih-legend>
+            <ih-legend color="#ec4899" label="Database"></ih-legend>
+            <ih-legend color="#71717a" label="Webhooks" dashed></ih-legend>
+          </div>
+        </div>
+
+        <div class="mt-12 text-center">
+          <a href="index.html#pricing" class="inline-block px-5 py-3 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 text-white font-medium hover:opacity-90 transition">
+            See pricing →
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <footer class="border-t border-zinc-900 mt-10">
+      <div class="max-w-7xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
+        <div class="flex items-center gap-2">
+          <div class="w-5 h-5 rounded bg-gradient-to-br from-orange-500 to-red-500"></div>
+          <span>© <span id="year"></span> Image Horse · Built with Rust + WASM</span>
+        </div>
+        <div class="flex items-center gap-5">
+          <a href="index.html" class="hover:text-zinc-300 transition">Home</a>
+          <a href="index.html#pricing" class="hover:text-zinc-300 transition">Pricing</a>
+          <a href="https://github.com/chrislanejones/rust-wasm-photo-tool" class="hover:text-zinc-300 transition">GitHub</a>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById("year").textContent = new Date().getFullYear();
+
+      // ============ Custom Elements ============
+      const COLORS = {
+        blue: "border-blue-500/50 bg-blue-500/10 text-blue-400",
+        violet: "border-violet-500/50 bg-violet-500/10 text-violet-400",
+        emerald: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400",
+        amber: "border-amber-500/50 bg-amber-500/10 text-amber-400",
+        pink: "border-pink-500/50 bg-pink-500/10 text-pink-400",
+        red: "border-red-500/50 bg-red-500/10 text-red-400",
+        rose: "border-rose-500/50 bg-rose-500/10 text-rose-400",
+        orange: "border-orange-500/50 bg-orange-500/10 text-orange-400",
+        zinc: "border-zinc-600/50 bg-zinc-800/50 text-zinc-300",
+      };
+      const BADGE = {
+        pro: "bg-violet-500/20 text-violet-400",
+        free: "bg-zinc-700 text-zinc-400",
+        new: "bg-orange-500/20 text-orange-400",
+      };
+      const LABEL = {
+        blue: ["text-blue-400", "bg-blue-500"],
+        violet: ["text-violet-400", "bg-violet-500"],
+        emerald: ["text-emerald-400", "bg-emerald-500"],
+        amber: ["text-amber-400", "bg-amber-500"],
+        pink: ["text-pink-400", "bg-pink-500"],
+        orange: ["text-orange-400", "bg-orange-500"],
+        zinc: ["text-zinc-400", "bg-zinc-500"],
+      };
+
+      customElements.define("ih-node", class extends HTMLElement {
+        connectedCallback() {
+          const title = this.getAttribute("title") || "";
+          const subtitle = this.getAttribute("subtitle") || "";
+          const color = this.getAttribute("color") || "zinc";
+          const size = this.getAttribute("size") || "md";
+          const highlighted = this.hasAttribute("highlighted");
+          const badge = this.getAttribute("badge");
+          const padding = size === "sm" ? "px-3 py-2" : "px-4 py-3";
+          const titleSize = size === "sm" ? "text-xs" : "text-sm";
+          this.outerHTML = `
+            <div class="rounded-lg border ${COLORS[color]} ${padding} ${highlighted ? "ring-2 ring-violet-500/50" : ""}">
+              <div class="flex items-center justify-between">
+                <div class="font-medium ${titleSize}">${title}</div>
+                ${badge ? `<span class="text-[10px] px-1.5 py-0.5 rounded font-medium ${BADGE[badge] || "bg-zinc-700 text-zinc-400"}">${badge}</span>` : ""}
+              </div>
+              ${subtitle ? `<div class="text-[11px] text-zinc-500 mt-0.5">${subtitle}</div>` : ""}
+            </div>`;
+        }
+      });
+
+      customElements.define("ih-label", class extends HTMLElement {
+        connectedCallback() {
+          const color = this.getAttribute("color") || "zinc";
+          const [t, dot] = LABEL[color];
+          const text = this.innerHTML;
+          this.outerHTML = `
+            <div class="text-xs font-medium uppercase tracking-wider flex items-center gap-2 mt-4 ${t}">
+              <div class="w-2 h-2 rounded-full ${dot}"></div>
+              ${text}
+            </div>`;
+        }
+      });
+
+      customElements.define("ih-tablemini", class extends HTMLElement {
+        connectedCallback() {
+          const name = this.getAttribute("name") || "";
+          const icon = this.getAttribute("icon") || "";
+          const badge = this.getAttribute("badge");
+          this.outerHTML = `
+            <div class="flex items-center justify-between px-2 py-1.5 rounded bg-pink-500/10 border border-pink-500/30">
+              <div class="flex items-center gap-2">
+                <span class="text-xs">${icon}</span>
+                <span class="text-xs font-mono text-pink-300">${name}</span>
+              </div>
+              ${badge ? `<span class="text-[9px] px-1 py-0.5 rounded bg-orange-500/20 text-orange-400 font-medium">${badge}</span>` : ""}
+            </div>`;
+        }
+      });
+
+      customElements.define("ih-arrow-down", class extends HTMLElement {
+        connectedCallback() {
+          this.outerHTML = `
+            <div class="flex justify-center py-3">
+              <svg width="24" height="36" viewBox="0 0 24 36" fill="none">
+                <path d="M12 0 L12 28 M6 22 L12 28 L18 22" stroke="#52525b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>`;
+        }
+      });
+
+      customElements.define("ih-legend", class extends HTMLElement {
+        connectedCallback() {
+          const color = this.getAttribute("color") || "#71717a";
+          const label = this.getAttribute("label") || "";
+          const dashed = this.hasAttribute("dashed");
+          this.outerHTML = `
+            <div class="flex items-center gap-2">
+              <svg width="24" height="4" viewBox="0 0 24 4">
+                <line x1="0" y1="2" x2="24" y2="2" stroke="${color}" stroke-width="3" stroke-dasharray="${dashed ? "4 3" : "none"}"/>
+              </svg>
+              <span>${label}</span>
+            </div>`;
+        }
+      });
+
+      // ============ Schema Tables ============
+      const TABLES = [
+        {
+          name: "users",
+          fields: [
+            { name: "_id", type: "Id<'users'>", key: "pk" },
+            { name: "clerkId", type: "string", key: "unique", indexed: true },
+            { name: "email", type: "string", indexed: true },
+            { name: "name", type: "string?" },
+            { name: "avatarUrl", type: "string?" },
+            { name: "tier", type: "'free' | 'pro' | 'team'" },
+            { name: "dailyUsage", type: "number" },
+            { name: "usageResetAt", type: "number" },
+            { name: "createdAt", type: "number" },
+            { name: "updatedAt", type: "number" },
+          ],
+          indexes: ["by_clerkId", "by_email"],
+        },
+        {
+          name: "subscriptions",
+          badge: "new",
+          fields: [
+            { name: "_id", type: "Id<'subscriptions'>", key: "pk" },
+            { name: "userId", type: "Id<'users'>", key: "fk", indexed: true },
+            { name: "stripeCustomerId", type: "string", indexed: true },
+            { name: "stripeSubId", type: "string", key: "unique" },
+            { name: "plan", type: "'pro' | 'team'" },
+            { name: "status", type: "'active' | 'canceled' | 'past_due'" },
+            { name: "currentPeriodEnd", type: "number" },
+            { name: "cancelAtPeriodEnd", type: "boolean" },
+          ],
+          indexes: ["by_userId", "by_stripeCustomerId"],
+        },
+        {
+          name: "projects",
+          fields: [
+            { name: "_id", type: "Id<'projects'>", key: "pk" },
+            { name: "userId", type: "Id<'users'>", key: "fk", indexed: true },
+            { name: "name", type: "string" },
+            { name: "description", type: "string?" },
+            { name: "thumbnail", type: "string?" },
+            { name: "isPublic", type: "boolean" },
+            { name: "shareToken", type: "string?", key: "unique" },
+            { name: "imageCount", type: "number" },
+            { name: "createdAt", type: "number", indexed: true },
+            { name: "updatedAt", type: "number" },
+          ],
+          indexes: ["by_userId", "by_userId_createdAt", "by_shareToken"],
+        },
+        {
+          name: "images",
+          fields: [
+            { name: "_id", type: "Id<'images'>", key: "pk" },
+            { name: "projectId", type: "Id<'projects'>", key: "fk", indexed: true },
+            { name: "userId", type: "Id<'users'>", key: "fk", indexed: true },
+            { name: "originalUrl", type: "string" },
+            { name: "processedUrl", type: "string?" },
+            { name: "thumbnailUrl", type: "string?" },
+            { name: "filename", type: "string" },
+            { name: "mimeType", type: "string" },
+            { name: "width", type: "number" },
+            { name: "height", type: "number" },
+            { name: "sizeBytes", type: "number" },
+            { name: "altText", type: "string?" },
+            { name: "order", type: "number" },
+            { name: "createdAt", type: "number" },
+          ],
+          indexes: ["by_projectId", "by_userId", "by_projectId_order"],
+        },
+        {
+          name: "annotations",
+          badge: "new",
+          fields: [
+            { name: "_id", type: "Id<'annotations'>", key: "pk" },
+            { name: "imageId", type: "Id<'images'>", key: "fk", indexed: true },
+            { name: "layerId", type: "Id<'layers'>", key: "fk", indexed: true },
+            { name: "type", type: "'rect' | 'ellipse' | 'path' | 'text' | 'arrow'" },
+            { name: "data", type: "JsonValue" },
+            { name: "style", type: "{ stroke, fill, opacity, ... }" },
+            { name: "transform", type: "{ x, y, rotation, scale }" },
+            { name: "locked", type: "boolean" },
+            { name: "createdAt", type: "number" },
+          ],
+          indexes: ["by_imageId", "by_layerId"],
+        },
+        {
+          name: "layers",
+          badge: "new",
+          fields: [
+            { name: "_id", type: "Id<'layers'>", key: "pk" },
+            { name: "imageId", type: "Id<'images'>", key: "fk", indexed: true },
+            { name: "name", type: "string" },
+            { name: "order", type: "number" },
+            { name: "visible", type: "boolean" },
+            { name: "locked", type: "boolean" },
+            { name: "opacity", type: "number" },
+            { name: "blendMode", type: "'normal' | 'multiply' | 'screen' | ..." },
+          ],
+          indexes: ["by_imageId", "by_imageId_order"],
+        },
+        {
+          name: "history",
+          fields: [
+            { name: "_id", type: "Id<'history'>", key: "pk" },
+            { name: "imageId", type: "Id<'images'>", key: "fk", indexed: true },
+            { name: "userId", type: "Id<'users'>", key: "fk" },
+            { name: "action", type: "'create' | 'update' | 'delete' | 'ai_*'" },
+            { name: "target", type: "'annotation' | 'layer' | 'image'" },
+            { name: "targetId", type: "string" },
+            { name: "prevState", type: "JsonValue?" },
+            { name: "nextState", type: "JsonValue?" },
+            { name: "createdAt", type: "number", indexed: true },
+          ],
+          indexes: ["by_imageId", "by_imageId_createdAt"],
+          note: "Undo/redo stack per image",
+        },
+        {
+          name: "ai_jobs",
+          fields: [
+            { name: "_id", type: "Id<'ai_jobs'>", key: "pk" },
+            { name: "userId", type: "Id<'users'>", key: "fk", indexed: true },
+            { name: "imageId", type: "Id<'images'>", key: "fk", indexed: true },
+            { name: "type", type: "'rembg' | 'upscale' | 'inpaint' | 'alt'" },
+            { name: "status", type: "'pending' | 'running' | 'done' | 'failed'" },
+            { name: "replicateId", type: "string?", indexed: true },
+            { name: "input", type: "JsonValue" },
+            { name: "output", type: "JsonValue?" },
+            { name: "error", type: "string?" },
+            { name: "startedAt", type: "number?" },
+            { name: "completedAt", type: "number?" },
+            { name: "createdAt", type: "number" },
+          ],
+          indexes: ["by_userId", "by_imageId", "by_replicateId", "by_status"],
+          note: "Webhook updates status",
+        },
+      ];
+
+      const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+      const grid = document.getElementById("schema-grid");
+      grid.innerHTML = TABLES.map((t) => {
+        const fields = t.fields.map((f) => {
+          const ic = f.key === "pk" ? "text-amber-400" : f.key === "fk" ? "text-blue-400" : f.key === "unique" ? "text-emerald-400" : "text-zinc-500";
+          const icon = f.key === "pk" ? "🔑" : f.key === "fk" ? "🔗" : f.key === "unique" ? "◆" : "·";
+          return `
+            <div class="flex items-start gap-1">
+              <span class="shrink-0 ${ic}">${icon}</span>
+              <span class="text-pink-200">${esc(f.name)}</span>
+              <span class="text-zinc-600">:</span>
+              <span class="text-zinc-400 truncate">${esc(f.type)}</span>
+              ${f.indexed ? `<span class="text-amber-500/60 text-[8px]">idx</span>` : ""}
+            </div>`;
+        }).join("");
+        const idx = (t.indexes && t.indexes.length)
+          ? `<div class="px-2 pb-2 pt-1 border-t border-pink-500/10">
+              <div class="text-[9px] text-zinc-600 mb-0.5">indexes:</div>
+              <div class="flex flex-wrap gap-1">${t.indexes.map((i) => `<span class="text-[9px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/80 font-mono">${esc(i)}</span>`).join("")}</div>
+            </div>` : "";
+        const note = t.note ? `<div class="px-2 pb-2 text-[9px] text-zinc-500 italic">${esc(t.note)}</div>` : "";
+        return `
+          <div class="rounded-lg border border-pink-500/30 bg-pink-500/5 overflow-hidden">
+            <div class="flex items-center justify-between px-3 py-2 bg-pink-500/10 border-b border-pink-500/20">
+              <span class="font-mono text-sm text-pink-300 font-medium">${t.name}</span>
+              ${t.badge ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-medium">${t.badge}</span>` : ""}
+            </div>
+            <div class="p-2 space-y-0.5 text-[10px] font-mono">${fields}</div>
+            ${idx}
+            ${note}
+          </div>`;
+      }).join("");
+    </script>
+  </body>
+</html>

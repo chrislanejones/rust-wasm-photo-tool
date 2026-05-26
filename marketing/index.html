@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Horse — Convert & annotate images, right in your browser</title>
+    <meta
+      name="description"
+      content="A WASM-powered image editor and annotator. Crop, filter, draw, and convert formats locally — no upload required for the demo."
+    />
+    <link rel="icon" href="/Image-Horse-Logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <style>
+      :root {
+        font-family: "DM Sans", system-ui, sans-serif;
+      }
+      code, .mono {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      .gradient-text {
+        background: linear-gradient(120deg, #f97316 0%, #ec4899 50%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .bg-grid {
+        background-image:
+          linear-gradient(rgba(244, 244, 245, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(244, 244, 245, 0.04) 1px, transparent 1px);
+        background-size: 48px 48px;
+      }
+      .glow {
+        box-shadow: 0 0 80px -20px rgba(249, 115, 22, 0.45);
+      }
+    </style>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased">
+    <!-- ============================ NAV ============================ -->
+    <nav class="sticky top-0 z-50 backdrop-blur bg-zinc-950/70 border-b border-zinc-900">
+      <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <span class="font-semibold tracking-tight">Image Horse</span>
+        </a>
+        <div class="hidden md:flex items-center gap-7 text-sm text-zinc-400">
+          <a href="#features" class="hover:text-zinc-100 transition">Features</a>
+          <a href="#how" class="hover:text-zinc-100 transition">How it works</a>
+          <a href="#pricing" class="hover:text-zinc-100 transition">Pricing</a>
+          <a href="architecture.html" class="hover:text-zinc-100 transition">Architecture</a>
+        </div>
+        <div class="flex items-center gap-3">
+          <a href="#" class="text-sm text-zinc-400 hover:text-zinc-100 transition hidden sm:inline">Sign in</a>
+          <a
+            href="#cta"
+            class="text-sm font-medium px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-900 hover:bg-white transition"
+            >Try the demo</a
+          >
+        </div>
+      </div>
+    </nav>
+
+    <!-- ============================ HERO ============================ -->
+    <section class="relative overflow-hidden">
+      <div class="absolute inset-0 bg-grid"></div>
+      <div
+        class="absolute inset-x-0 top-0 h-[520px] bg-gradient-to-b from-orange-500/10 via-pink-500/5 to-transparent pointer-events-none"
+      ></div>
+
+      <div class="relative max-w-7xl mx-auto px-6 pt-20 pb-24 text-center">
+        <div
+          class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/30 bg-orange-500/10 text-xs text-orange-300 mb-6"
+        >
+          <span class="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse"></span>
+          v2.0 — Now powered by Rust + WebAssembly
+        </div>
+
+        <h1 class="text-5xl sm:text-6xl md:text-7xl font-semibold tracking-tight max-w-4xl mx-auto leading-[1.05]">
+          Convert and annotate images
+          <span class="gradient-text">at native speed</span>
+        </h1>
+        <p class="mt-6 text-lg text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+          A browser-based photo studio that crops, filters, draws, and re-encodes
+          on your own machine. Built in Rust, shipped as WASM — your pixels never
+          leave the tab.
+        </p>
+
+        <div class="mt-9 flex items-center justify-center gap-3 flex-wrap">
+          <a
+            href="#cta"
+            class="px-5 py-3 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 text-white font-medium hover:opacity-90 transition glow"
+            >Open the editor →</a
+          >
+          <a
+            href="architecture.html"
+            class="px-5 py-3 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-200 font-medium transition"
+            >See the architecture</a
+          >
+        </div>
+
+        <div class="mt-10 flex items-center justify-center gap-6 text-xs text-zinc-500 flex-wrap">
+          <span class="flex items-center gap-1.5">
+            <span class="text-emerald-400">●</span> No upload for demo
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="text-orange-400">●</span> ~200KB WASM bundle
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="text-violet-400">●</span> Real-time multi-device sync
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="text-pink-400">●</span> Export PNG · JPEG · WebP · AVIF
+          </span>
+        </div>
+
+        <!-- App mock -->
+        <div class="mt-16 mx-auto max-w-5xl">
+          <div class="rounded-2xl border border-zinc-800 bg-zinc-900/60 shadow-2xl overflow-hidden">
+            <div class="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800 bg-zinc-900">
+              <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+              <span class="ml-3 text-[11px] text-zinc-500 mono">image-horse.app/edit</span>
+            </div>
+            <div class="grid grid-cols-12 h-[360px] sm:h-[420px]">
+              <!-- Toolbar -->
+              <aside class="col-span-2 border-r border-zinc-800 bg-zinc-950 p-3 space-y-2">
+                <div class="text-[10px] uppercase tracking-wider text-zinc-600 px-1">Tools</div>
+                <ih-toolbtn label="Crop"></ih-toolbtn>
+                <ih-toolbtn label="Brush" active></ih-toolbtn>
+                <ih-toolbtn label="Shapes"></ih-toolbtn>
+                <ih-toolbtn label="Text"></ih-toolbtn>
+                <ih-toolbtn label="Blur"></ih-toolbtn>
+                <ih-toolbtn label="Clone"></ih-toolbtn>
+              </aside>
+              <!-- Canvas -->
+              <div class="col-span-8 relative bg-[#1a1a1d] flex items-center justify-center overflow-hidden">
+                <div
+                  class="absolute inset-0 opacity-30"
+                  style="background-image: radial-gradient(circle at 30% 40%, #f97316 0%, transparent 40%), radial-gradient(circle at 70% 70%, #ec4899 0%, transparent 35%);"
+                ></div>
+                <div class="relative rounded-xl border border-zinc-700/80 bg-zinc-800/30 w-72 h-48 flex items-center justify-center">
+                  <svg class="w-12 h-12 text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+                  </svg>
+                  <!-- annotations -->
+                  <div class="absolute top-3 left-6 w-12 h-12 border-2 border-orange-400 rounded-sm"></div>
+                  <div class="absolute bottom-3 right-6 px-1.5 py-0.5 text-[10px] rounded bg-pink-500/80 text-white">label</div>
+                </div>
+                <div class="absolute bottom-3 left-3 flex items-center gap-1.5 text-[10px] text-zinc-500 mono">
+                  <span class="w-1.5 h-1.5 rounded-full bg-orange-400"></span> wasm ready · 100%
+                </div>
+              </div>
+              <!-- Right panel -->
+              <aside class="col-span-2 border-l border-zinc-800 bg-zinc-950 p-3 text-xs space-y-3">
+                <div>
+                  <div class="text-[10px] uppercase tracking-wider text-zinc-600 mb-1.5">Layers</div>
+                  <div class="space-y-1">
+                    <div class="px-2 py-1 rounded bg-pink-500/10 border border-pink-500/30 text-pink-300 text-[11px]">Annotations</div>
+                    <div class="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-[11px]">Base image</div>
+                  </div>
+                </div>
+                <div>
+                  <div class="text-[10px] uppercase tracking-wider text-zinc-600 mb-1.5">Export</div>
+                  <div class="flex flex-wrap gap-1">
+                    <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">PNG</span>
+                    <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">JPEG</span>
+                    <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">WebP</span>
+                    <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300">AVIF</span>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ FEATURES ============================ -->
+    <section id="features" class="border-t border-zinc-900">
+      <div class="max-w-7xl mx-auto px-6 py-20">
+        <div class="max-w-2xl mb-12">
+          <div class="text-xs uppercase tracking-wider text-orange-400 font-medium mb-2">Features</div>
+          <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Everything an image workflow needs, none of the upload tax.</h2>
+          <p class="mt-3 text-zinc-400">
+            Editing tools run locally in WebAssembly, so the demo is instant and
+            free. Sign in only when you need persistence, sharing, or AI.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4">
+          <ih-feature
+            color="orange"
+            title="WASM-powered editor"
+            body="Rust-compiled filters, transforms, and rasterization run at near-native speed on the visitor's CPU."
+            tags="Brightness · Contrast · Blur · Crop · Resize"></ih-feature>
+          <ih-feature
+            color="pink"
+            title="Layered annotations"
+            body="Rectangles, ellipses, arrows, paths, text, and emoji — organized in real-layer stacks with locking and blend modes."
+            tags="Rect · Ellipse · Path · Text · Arrow"></ih-feature>
+          <ih-feature
+            color="emerald"
+            title="Format conversion"
+            body="Encode and decode PNG, JPEG, WebP, and AVIF. Resize and re-compress in a single round-trip."
+            tags="PNG · JPEG · WebP · AVIF"></ih-feature>
+          <ih-feature
+            color="violet"
+            title="AI enhancements"
+            body="Background removal, 4× upscaling, object removal, and alt-text generation, on-demand via Replicate."
+            tags="rembg · Real-ESRGAN · SD Inpaint · BLIP"></ih-feature>
+          <ih-feature
+            color="amber"
+            title="Real-time projects"
+            body="Convex-backed projects sync edits, history, and shares across devices the moment you save."
+            tags="Projects · History · Share links"></ih-feature>
+          <ih-feature
+            color="blue"
+            title="Privacy by default"
+            body="Demo mode never uploads. Even on the paid tier, processing stays local — uploads exist for sharing, not computation."
+            tags="No server processing"></ih-feature>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ HOW IT WORKS ============================ -->
+    <section id="how" class="border-t border-zinc-900 bg-zinc-950">
+      <div class="max-w-7xl mx-auto px-6 py-20">
+        <div class="max-w-2xl mb-12">
+          <div class="text-xs uppercase tracking-wider text-orange-400 font-medium mb-2">How it works</div>
+          <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Open. Edit. Export. That's it.</h2>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4">
+          <ih-step n="01" title="Drop an image" body="PNG, JPEG, WebP, AVIF. Up to your browser's memory limit. Nothing is sent anywhere — the WASM module loads on first interaction."></ih-step>
+          <ih-step n="02" title="Edit in real time" body="Annotate, filter, crop, retouch. Every action is a Rust function executed on your CPU through wasm-bindgen."></ih-step>
+          <ih-step n="03" title="Export or sync" body="Download in any format, or sign in to keep projects in Convex with live history and shareable links."></ih-step>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ PRICING SECTION (from JSX) ============================ -->
+    <section id="pricing" class="border-t border-zinc-900">
+      <div class="max-w-7xl mx-auto px-6 py-20">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-7 h-7 rounded bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center text-xs">💡</div>
+          <div>
+            <div class="text-xs uppercase tracking-wider text-cyan-400 font-medium">Pricing</div>
+            <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight text-zinc-100">Tier strategy & access matrix</h2>
+            <p class="text-sm text-zinc-500 mt-1">Gate where money flows, not where CPU runs</p>
+          </div>
+        </div>
+
+        <!-- Core insight callout -->
+        <div class="rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-4 mb-8">
+          <div class="text-cyan-400 text-sm font-medium mb-2">🎯 Core insight</div>
+          <p class="text-sm text-zinc-300 leading-relaxed">
+            WASM editing tools cost <span class="text-emerald-400 font-semibold">exactly zero per user</span> — they run on the visitor's CPU.
+            Demo mode lets people use <span class="text-cyan-300">every editing tool freely</span>. That's the hook.
+            Gates only exist where our money flows: <span class="text-pink-400">Convex writes</span>, <span class="text-amber-400">UploadThing storage</span>, and <span class="text-violet-400">Replicate inference</span>.
+          </p>
+        </div>
+
+        <!-- Tier headline cards -->
+        <div class="grid md:grid-cols-3 gap-4 mb-8">
+          <ih-plancard
+            tier="Demo"
+            tag="anonymous"
+            price="$0"
+            sub="forever"
+            color="zinc"
+            features="All WASM tools · 3 image gallery · Session-only · No signup"></ih-plancard>
+          <ih-plancard
+            tier="Free"
+            tag="logged in"
+            price="$0"
+            sub="per month"
+            color="emerald"
+            features="Persistence · 10 images · 3 projects · 100MB · 5 AI runs/day"></ih-plancard>
+          <ih-plancard
+            tier="Pro"
+            tag="best value"
+            price="$10"
+            sub="per month"
+            color="violet"
+            highlight
+            features="Unlimited storage · Layers · 4× upscale · Object removal · AI unlimited"></ih-plancard>
+        </div>
+
+        <!-- Feature Access Matrix -->
+        <div class="rounded-lg border border-zinc-700 overflow-hidden">
+          <!-- Header -->
+          <div class="grid grid-cols-4 bg-zinc-800/80 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+            <div class="px-3 py-2 border-r border-zinc-700">Feature</div>
+            <div class="px-3 py-2 border-r border-zinc-700 text-center">
+              <span class="inline-block px-2 py-0.5 rounded bg-zinc-700 text-zinc-300 text-[9px] font-medium">Demo</span>
+              <div class="text-[9px] font-normal normal-case tracking-normal mt-0.5 text-zinc-500">anonymous</div>
+            </div>
+            <div class="px-3 py-2 border-r border-zinc-700 text-center">
+              <span class="inline-block px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-medium">Free</span>
+              <div class="text-[9px] font-normal normal-case tracking-normal mt-0.5 text-zinc-500">logged in</div>
+            </div>
+            <div class="px-3 py-2 text-center">
+              <span class="inline-block px-2 py-0.5 rounded bg-violet-500/20 text-violet-400 text-[9px] font-medium">Pro</span>
+              <div class="text-[9px] font-normal normal-case tracking-normal mt-0.5 text-zinc-500">$10/mo</div>
+            </div>
+          </div>
+
+          <!-- WASM Tools -->
+          <ih-cat>Editing tools (WASM — zero server cost)</ih-cat>
+          <ih-row feat="Clone stamp" d="yes" f="yes" p="yes"></ih-row>
+          <ih-row feat="Paint / brush" d="yes" f="yes" p="yes"></ih-row>
+          <ih-row feat="Arrows, shapes, text, emoji" d="yes" f="yes" p="yes"></ih-row>
+          <ih-row feat="Blur brush" d="yes" f="yes" p="yes"></ih-row>
+          <ih-row feat="Brightness / contrast" d="yes" f="yes" p="yes"></ih-row>
+          <ih-row feat="Crop / resize" d="yes" f="yes" p="yes"></ih-row>
+          <ih-row feat="Undo / redo (50 steps)" d="yes" f="yes" p="yes"></ih-row>
+          <ih-row feat="Export (PNG/JPEG/WebP/AVIF)" d="yes" f="yes" p="yes"></ih-row>
+
+          <!-- Gallery -->
+          <ih-cat>Gallery & storage</ih-cat>
+          <ih-row feat="Gallery" sub="photos loaded in session" d="3 images" f="10 images" p="unlimited"></ih-row>
+          <ih-row feat="Auto compress all" d="yes" f="yes" p="yes"></ih-row>
+          <ih-row feat="Image persistence" sub="saved across sessions" d="—" f="UploadThing" p="UploadThing"></ih-row>
+          <ih-row feat="File storage quota" d="—" f="100 MB" p="5 GB"></ih-row>
+
+          <!-- Convex -->
+          <ih-cat>Projects & data (Convex)</ih-cat>
+          <ih-row feat="Projects" sub="organize into folders" d="—" f="3 projects" p="unlimited"></ih-row>
+          <ih-row feat="Persistent history" sub="edit history saved" d="—" f="yes" p="yes"></ih-row>
+          <ih-row feat="Annotations sync" sub="shapes recoverable" d="—" f="yes" p="yes"></ih-row>
+          <ih-row feat="Layers" d="—" f="3 per image" p="unlimited"></ih-row>
+          <ih-row feat="Share links" sub="public project URLs" d="—" f="1 active" p="unlimited"></ih-row>
+
+          <!-- AI -->
+          <ih-cat>AI features (Replicate — costs us money)</ih-cat>
+          <ih-row feat="Background removal" sub="rembg" d="—" f="5/day" p="unlimited"></ih-row>
+          <ih-row feat="Auto alt text" sub="BLIP captioning" d="—" f="5/day" p="unlimited"></ih-row>
+          <ih-row feat="4× upscale" sub="Real-ESRGAN" d="—" f="—" p="unlimited"></ih-row>
+          <ih-row feat="Object removal" sub="SD Inpaint" d="—" f="—" p="unlimited"></ih-row>
+          <ih-row feat="Smart crop" d="—" f="—" p="unlimited"></ih-row>
+          <ih-row feat="Auto-enhance" sub="histogram optimization (WASM)" d="—" f="yes" p="yes"></ih-row>
+
+          <!-- Costs -->
+          <ih-cat>Our server cost per user</ih-cat>
+          <ih-row feat="Convex" d="$0" f="~$0.01/mo" p="~$0.05/mo" italic></ih-row>
+          <ih-row feat="UploadThing" d="$0" f="~$0.02/mo" p="~$0.10/mo" italic></ih-row>
+          <ih-row feat="Replicate AI" d="$0" f="~$0.05/mo" p="~$0.30/mo" italic></ih-row>
+          <ih-row feat="Total" d="$0" f="~$0.08/mo" p="~$0.45/mo" bold></ih-row>
+        </div>
+
+        <!-- Principle -->
+        <div class="mt-4 rounded-lg border border-zinc-700 bg-zinc-800/30 p-4">
+          <div class="text-xs text-zinc-300 leading-relaxed">
+            <span class="text-zinc-100 font-medium">Design principle:</span> Demo mode costs us nothing because WASM runs on the user's device.
+            The gallery limit (3 images) and session-only storage are the natural nudge toward signup — no artificial
+            "sign in to use blur" gates on tools that run locally. Convex, UploadThing, and Replicate only activate
+            after auth, so our bill scales with real users, not drive-by traffic.
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="mt-4 grid md:grid-cols-3 gap-3">
+          <div class="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+            <div class="text-amber-400 text-xs font-medium mb-1">📸 Demo → 3 gallery slots</div>
+            <div class="text-[11px] text-zinc-400 leading-relaxed">
+              Not about cost (local memory). It's about making the session feel limited. "I edited 3 photos and now I want to keep them" is the conversion moment.
+            </div>
+          </div>
+          <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+            <div class="text-emerald-400 text-xs font-medium mb-1">✨ Auto-enhance = Free tier</div>
+            <div class="text-[11px] text-zinc-400 leading-relaxed">
+              Runs entirely in WASM via histogram analysis. Giving free users one "magic" AI-feeling button that's actually local processing is a trust builder.
+            </div>
+          </div>
+          <div class="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3">
+            <div class="text-violet-400 text-xs font-medium mb-1">🤖 Free AI = 5/day cap</div>
+            <div class="text-[11px] text-zinc-400 leading-relaxed">
+              Via <code class="text-pink-300/70">dailyUsage</code> counter. A free user who loves background removal hits the wall and sees the upgrade prompt naturally.
+            </div>
+          </div>
+        </div>
+
+        <!-- Cost summary cards -->
+        <div class="mt-6 grid md:grid-cols-3 gap-4">
+          <div class="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+            <div class="text-emerald-400 text-sm font-medium">Low Usage</div>
+            <div class="text-2xl font-bold text-emerald-400">~$0</div>
+            <div class="text-xs text-zinc-500 mt-1">Free tiers cover it</div>
+          </div>
+          <div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <div class="text-amber-400 text-sm font-medium">At Scale (100 users)</div>
+            <div class="flex items-baseline gap-2">
+              <div class="text-2xl font-bold text-amber-400">~$60-150</div>
+              <div class="text-xs text-emerald-400">↓ 40%</div>
+            </div>
+            <div class="text-xs text-zinc-500 mt-1">per month · WASM offloads processing</div>
+          </div>
+          <div class="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4">
+            <div class="text-violet-400 text-sm font-medium">Break-even</div>
+            <div class="flex items-baseline gap-2">
+              <div class="text-2xl font-bold text-violet-400">~8 Pro</div>
+              <div class="text-xs text-emerald-400">↓ from 15</div>
+            </div>
+            <div class="text-xs text-zinc-500 mt-1">users at $10/mo</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ CTA ============================ -->
+    <section id="cta" class="border-t border-zinc-900 bg-gradient-to-b from-zinc-950 to-zinc-900">
+      <div class="max-w-4xl mx-auto px-6 py-20 text-center">
+        <h2 class="text-3xl sm:text-5xl font-semibold tracking-tight">Open it in a tab. Edit a photo. Decide.</h2>
+        <p class="mt-4 text-zinc-400 max-w-xl mx-auto">
+          No account, no email gate, no upload. Just the editor running locally
+          in your browser, talking to a Rust binary you can inspect.
+        </p>
+        <div class="mt-8 flex items-center justify-center gap-3 flex-wrap">
+          <a href="#" class="px-5 py-3 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 text-white font-medium hover:opacity-90 transition glow">Launch the editor →</a>
+          <a href="architecture.html" class="px-5 py-3 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-200 font-medium transition">Inspect the stack</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ FOOTER ============================ -->
+    <footer class="border-t border-zinc-900">
+      <div class="max-w-7xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
+        <div class="flex items-center gap-2">
+          <div class="w-5 h-5 rounded bg-gradient-to-br from-orange-500 to-red-500"></div>
+          <span>© <span id="year"></span> Image Horse · Built with Rust + WASM</span>
+        </div>
+        <div class="flex items-center gap-5">
+          <a href="architecture.html" class="hover:text-zinc-300 transition">Architecture</a>
+          <a href="#pricing" class="hover:text-zinc-300 transition">Pricing</a>
+          <a href="https://github.com/chrislanejones/rust-wasm-photo-tool" class="hover:text-zinc-300 transition">GitHub</a>
+        </div>
+      </div>
+    </footer>
+
+    <!-- ====== Tiny "component-like" inline macros (custom elements) ====== -->
+    <script>
+      document.getElementById("year").textContent = new Date().getFullYear();
+
+      // Lightweight custom elements so the markup above stays readable
+      class ToolBtn extends HTMLElement {
+        connectedCallback() {
+          const label = this.getAttribute("label") || "";
+          const active = this.hasAttribute("active");
+          this.outerHTML = `
+            <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-[11px] ${
+              active
+                ? "bg-orange-500/20 text-orange-300 border border-orange-500/40"
+                : "text-zinc-400 hover:bg-zinc-900 border border-transparent"
+            }">
+              <span class="w-1.5 h-1.5 rounded-full ${active ? "bg-orange-400" : "bg-zinc-700"}"></span>
+              ${label}
+            </button>`;
+        }
+      }
+      customElements.define("ih-toolbtn", ToolBtn);
+
+      class Feature extends HTMLElement {
+        connectedCallback() {
+          const c = this.getAttribute("color") || "zinc";
+          const title = this.getAttribute("title") || "";
+          const body = this.getAttribute("body") || "";
+          const tags = this.getAttribute("tags") || "";
+          const map = {
+            orange: ["border-orange-500/30", "bg-orange-500/5", "text-orange-400"],
+            pink: ["border-pink-500/30", "bg-pink-500/5", "text-pink-400"],
+            emerald: ["border-emerald-500/30", "bg-emerald-500/5", "text-emerald-400"],
+            violet: ["border-violet-500/30", "bg-violet-500/5", "text-violet-400"],
+            amber: ["border-amber-500/30", "bg-amber-500/5", "text-amber-400"],
+            blue: ["border-blue-500/30", "bg-blue-500/5", "text-blue-400"],
+          };
+          const [b, bg, t] = map[c] || map.orange;
+          this.outerHTML = `
+            <article class="rounded-xl border ${b} ${bg} p-5">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="w-2 h-2 rounded-full bg-current ${t}"></span>
+                <h3 class="font-medium text-zinc-100">${title}</h3>
+              </div>
+              <p class="text-sm text-zinc-400 leading-relaxed">${body}</p>
+              <div class="mt-3 text-[11px] mono ${t}">${tags}</div>
+            </article>`;
+        }
+      }
+      customElements.define("ih-feature", Feature);
+
+      class Step extends HTMLElement {
+        connectedCallback() {
+          const n = this.getAttribute("n") || "";
+          const t = this.getAttribute("title") || "";
+          const b = this.getAttribute("body") || "";
+          this.outerHTML = `
+            <div class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+              <div class="text-xs mono text-zinc-500 mb-2">${n}</div>
+              <h3 class="font-medium mb-1">${t}</h3>
+              <p class="text-sm text-zinc-400 leading-relaxed">${b}</p>
+            </div>`;
+        }
+      }
+      customElements.define("ih-step", Step);
+
+      class PlanCard extends HTMLElement {
+        connectedCallback() {
+          const tier = this.getAttribute("tier") || "";
+          const tag = this.getAttribute("tag") || "";
+          const price = this.getAttribute("price") || "";
+          const sub = this.getAttribute("sub") || "";
+          const features = this.getAttribute("features") || "";
+          const color = this.getAttribute("color") || "zinc";
+          const highlight = this.hasAttribute("highlight");
+          const map = {
+            zinc: ["border-zinc-700", "text-zinc-400"],
+            emerald: ["border-emerald-500/40", "text-emerald-400"],
+            violet: ["border-violet-500/60", "text-violet-400"],
+          };
+          const [b, t] = map[color] || map.zinc;
+          const feats = features.split(" · ").map(
+            (f) =>
+              `<li class="flex items-start gap-2 text-sm text-zinc-300"><span class="${t} mt-1.5">●</span><span>${f}</span></li>`
+          ).join("");
+          this.outerHTML = `
+            <div class="rounded-xl border ${b} ${
+              highlight ? "bg-violet-500/5 ring-2 ring-violet-500/40" : "bg-zinc-900/40"
+            } p-6 relative">
+              ${
+                highlight
+                  ? `<div class="absolute -top-2.5 right-4 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500 text-white">Most popular</div>`
+                  : ""
+              }
+              <div class="flex items-center justify-between mb-3">
+                <div class="font-semibold text-zinc-100 text-lg">${tier}</div>
+                <div class="text-[10px] uppercase tracking-wider ${t}">${tag}</div>
+              </div>
+              <div class="flex items-baseline gap-1 mb-5">
+                <div class="text-4xl font-semibold text-zinc-100">${price}</div>
+                <div class="text-xs text-zinc-500">${sub}</div>
+              </div>
+              <ul class="space-y-2 mb-5">${feats}</ul>
+              <a href="#cta" class="block text-center text-sm font-medium px-3 py-2 rounded-md ${
+                highlight
+                  ? "bg-violet-500 hover:bg-violet-400 text-white"
+                  : "bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
+              } transition">
+                ${highlight ? "Start Pro" : tier === "Demo" ? "Try it now" : "Create account"}
+              </a>
+            </div>`;
+        }
+      }
+      customElements.define("ih-plancard", PlanCard);
+
+      class Cat extends HTMLElement {
+        connectedCallback() {
+          this.outerHTML = `
+            <div class="grid grid-cols-4 bg-zinc-800/50 border-t border-zinc-700">
+              <div class="col-span-4 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                ${this.textContent}
+              </div>
+            </div>`;
+        }
+      }
+      customElements.define("ih-cat", Cat);
+
+      class Row extends HTMLElement {
+        connectedCallback() {
+          const feat = this.getAttribute("feat") || "";
+          const sub = this.getAttribute("sub") || "";
+          const d = this.getAttribute("d") || "";
+          const f = this.getAttribute("f") || "";
+          const p = this.getAttribute("p") || "";
+          const italic = this.hasAttribute("italic");
+          const bold = this.hasAttribute("bold");
+          const cellClass = (v) => {
+            if (v === "yes" || v === "unlimited") return "text-emerald-400 font-medium";
+            if (v === "—") return "text-zinc-600";
+            if (
+              v.includes("/day") || v.includes("images") || v.includes("MB") ||
+              v.includes("GB") || v.includes("projects") || v.includes("per image") ||
+              v.includes("active")
+            ) return "text-amber-400";
+            if (v.startsWith("$") || v.startsWith("~$"))
+              return italic
+                ? "text-zinc-500 italic"
+                : bold
+                ? "text-zinc-200 font-medium"
+                : "text-zinc-400";
+            return "text-zinc-300";
+          };
+          this.outerHTML = `
+            <div class="grid grid-cols-4 border-t border-zinc-800 text-[12px] ${
+              bold ? "bg-zinc-800/30" : ""
+            }">
+              <div class="px-3 py-1.5 border-r border-zinc-800">
+                <span class="text-zinc-300 ${bold ? "font-medium" : ""}">${feat}</span>
+                ${sub ? `<span class="block text-[10px] text-zinc-500 mt-0.5">${sub}</span>` : ""}
+              </div>
+              <div class="px-3 py-1.5 border-r border-zinc-800 text-center ${cellClass(d)}">${d}</div>
+              <div class="px-3 py-1.5 border-r border-zinc-800 text-center ${cellClass(f)}">${f}</div>
+              <div class="px-3 py-1.5 text-center ${cellClass(p)}">${p}</div>
+            </div>`;
+        }
+      }
+      customElements.define("ih-row", Row);
+    </script>
+  </body>
+</html>
