@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+:root {
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+
+code,
+.mono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.gradient-text {
+  background: linear-gradient(120deg, #f97316 0%, #ec4899 50%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(244, 244, 245, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(244, 244, 245, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.glow {
+  box-shadow: 0 0 80px -20px rgba(249, 115, 22, 0.45);
+}

@@ -533,6 +533,28 @@ button:focus-visible {
   gap: 8px;
 }
 
+.status-brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.status-brand-link:hover {
+  color: var(--text-primary, #fafafa);
+}
+
+.status-brand-link svg {
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.status-brand-link:hover svg {
+  opacity: 1;
+}
+
 .status-center {
   flex: 1;
   justify-content: center;
