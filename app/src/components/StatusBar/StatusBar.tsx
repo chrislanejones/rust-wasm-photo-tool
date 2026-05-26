@@ -2,7 +2,10 @@
 // Item 8: Architecture link opens in new tab
 // Item 2: Added spacebar hint
 // Item 4: Added PgUp/PgDn hint
+import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
+
+const MARKETING_URL = "https://photo-horse.vercel.app";
 
 export type UserMode = "demo" | "loggedIn" | "paid";
 
@@ -22,7 +25,16 @@ export function StatusBar({ state, imageCount, userMode = "demo" }: Props) {
   return (
     <footer className="status-bar">
       <div className="status-section">
-        <p>🐴 Image Horse</p>
+        <a
+          href={MARKETING_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="status-brand-link"
+          title="Visit photo-horse.vercel.app"
+        >
+          <span>🐴 Image Horse</span>
+          <ExternalLink size={12} aria-hidden="true" />
+        </a>
         <span className="status-divider" />
         <span className="status-zoom-label">{USER_MODE_LABEL[userMode]}</span>
       </div>
