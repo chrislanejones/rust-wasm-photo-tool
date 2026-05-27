@@ -3,9 +3,9 @@ import {
   FlipHorizontal,
   FlipVertical,
   RotateCw,
-  Sun,
-  Contrast,
 } from "lucide-react";
+import { ToolButton } from "@/components/ui/tool-button";
+import { SizeSlider } from "@/components/SizeSlider";
 
 interface Props {
   disabled: boolean;
@@ -41,77 +41,44 @@ export function TransformSettings({
     }
   };
 
-  const btnClass = `flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-all
-    bg-bg-elevated border border-border text-text-secondary
-    hover:border-border-active hover:text-text-primary
-    disabled:opacity-30 disabled:cursor-not-allowed`;
-
   return (
     <div className="space-y-5">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
-        Transform
-      </h3>
+      <span className="text-[11px] text-theme-muted-foreground">Transform</span>
 
       {/* Geometry buttons */}
       <div className="grid grid-cols-3 gap-2">
-        <button className={btnClass} onClick={onFlipH} disabled={disabled} title="Flip horizontal">
-          <FlipHorizontal className="h-4 w-4" />
-        </button>
-        <button className={btnClass} onClick={onFlipV} disabled={disabled} title="Flip vertical">
-          <FlipVertical className="h-4 w-4" />
-        </button>
-        <button className={btnClass} onClick={onRotate90Cw} disabled={disabled} title="Rotate 90° CW">
-          <RotateCw className="h-4 w-4" />
-        </button>
+        <ToolButton onClick={onFlipH} disabled={disabled} title="Flip horizontal">
+          <FlipHorizontal />
+        </ToolButton>
+        <ToolButton onClick={onFlipV} disabled={disabled} title="Flip vertical">
+          <FlipVertical />
+        </ToolButton>
+        <ToolButton onClick={onRotate90Cw} disabled={disabled} title="Rotate 90° CW">
+          <RotateCw />
+        </ToolButton>
       </div>
 
-      {/* Brightness */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Sun className="h-3.5 w-3.5 text-text-muted" />
-          <label className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono flex-1">
-            Brightness
-          </label>
-          <span className="text-xs font-mono text-text-secondary min-w-[3ch] text-right">
-            {brightness > 0 ? `+${brightness}` : brightness}
-          </span>
-        </div>
-        <input
-          type="range"
-          min={-100}
-          max={100}
-          step={1}
-          value={brightness}
-          disabled={disabled}
-          onChange={(e) => setBrightness(Number(e.target.value))}
-          onPointerUp={commitBrightness}
-          className="w-full"
-        />
-      </div>
+      <SizeSlider
+        label="Brightness"
+        value={brightness}
+        onChange={setBrightness}
+        onCommit={() => commitBrightness()}
+        min={-100}
+        max={100}
+        disabled={disabled}
+        valueDisplay={brightness > 0 ? `+${brightness}` : String(brightness)}
+      />
 
-      {/* Contrast */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Contrast className="h-3.5 w-3.5 text-text-muted" />
-          <label className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono flex-1">
-            Contrast
-          </label>
-          <span className="text-xs font-mono text-text-secondary min-w-[3ch] text-right">
-            {contrast}%
-          </span>
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={300}
-          step={1}
-          value={contrast}
-          disabled={disabled}
-          onChange={(e) => setContrast(Number(e.target.value))}
-          onPointerUp={commitContrast}
-          className="w-full"
-        />
-      </div>
+      <SizeSlider
+        label="Contrast"
+        value={contrast}
+        onChange={setContrast}
+        onCommit={() => commitContrast()}
+        min={0}
+        max={300}
+        unit="%"
+        disabled={disabled}
+      />
     </div>
   );
 }

@@ -85,3 +85,60 @@ export async function makeThumbnail(
   bitmap.close();
   return oc.convertToBlob({ type: "image/webp", quality: 0.78 });
 }
+
+/**
+ * Build a small WebP thumbnail directly from raw RGBA pixels using the
+ * Rust bilinear resizer. Use this when the caller already has the composited
+ * pixel buffer in memory (e.g. after a WASM `composite_pixels` call) so we
+ * can skip a redundant PNG decode round-trip.
+ *
+ * WebP encoding still happens via `OffscreenCanvas.convertToBlob` because the
+ * WASM binary deliberately omits the `image` crate's WebP encoder per the
+ * project's size-budget architecture docs.
+ */
+export async function makeThumbnailFromPixels(
+  pixels: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+  resizePixels: (
+    pixels: Uint8Array,
+    oldW: number,
+    oldH: number,
+    newW: number,
+    newH: number,
+  ) => Uint8Array,
+  maxEdge = THUMB_MAX_EDGE,
+): Promise<Blob> {
+  const longEdge = Math.max(width, height);
+  let tw = width;
+  let th = height;
+  if (longEdge > maxEdge) {
+    const scale = maxEdge / longEdge;
+    tw = Math.max(1, Math.round(width * scale));
+    th = Math.max(1, Math.round(height * scale));
+  }
+
+  // Rust expects a Uint8Array view; reuse the underlying buffer either way.
+  const srcBytes =
+    pixels instanceof Uint8Array
+      ? pixels
+      : new Uint8Array(pixels.buffer as ArrayBuffer, pixels.byteOffset, pixels.byteLength);
+
+  // Skip the resize if we're already at thumbnail size.
+  const scaledBytes =
+    tw === width && th === height
+      ? srcBytes
+      : resizePixels(srcBytes, width, height, tw, th);
+
+  // Wrap as ImageData → OffscreenCanvas → WebP blob.
+  const clamped = new Uint8ClampedArray(
+    scaledBytes.buffer as ArrayBuffer,
+    scaledBytes.byteOffset,
+    scaledBytes.byteLength,
+  );
+
+  const oc = new OffscreenCanvas(tw, th);
+  const ctx = oc.getContext("2d")!;
+  ctx.putImageData(new ImageData(clamped, tw, th), 0, 0);
+  return oc.convertToBlob({ type: "image/webp", quality: 0.78 });
+}

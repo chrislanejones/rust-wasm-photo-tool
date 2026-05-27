@@ -31,6 +31,14 @@ export default function Nav() {
           >
             Architecture
           </NavLink>
+          <NavLink
+            to="/shipped"
+            className={({ isActive }) =>
+              isActive ? "text-orange-400" : "hover:text-zinc-100 transition"
+            }
+          >
+            Shipped
+          </NavLink>
         </div>
         <div className="flex items-center gap-3">
           <a

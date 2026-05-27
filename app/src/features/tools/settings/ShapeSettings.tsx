@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Square, Circle, PenLine, Minus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ToolButton } from "@/components/ui/tool-button";
 import { TabGroup } from "@/components/TabGroup";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SizeSlider } from "@/components/SizeSlider";
@@ -49,19 +49,17 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
       {/* ── Shapes tab ── */}
       {mode === "shapes" && (
         <div className="space-y-6">
-          {/* Shape selector — styled like Transform buttons */}
+          {/* Shape selector */}
           <div className="grid grid-cols-2 gap-2">
             {SHAPES.map(({ id, label, Icon }) => (
-              <Button
+              <ToolButton
                 key={id}
-                variant={currentShape === id ? "default" : "secondary"}
-                size="sm"
-                className="gap-2"
+                active={currentShape === id}
                 onClick={() => onChange({ ...settings, shape: id })}
               >
-                <Icon className="h-4 w-4" />
+                <Icon />
                 {label}
-              </Button>
+              </ToolButton>
             ))}
           </div>
 

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SlidersHorizontal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SizeSlider } from "@/components/SizeSlider";
 import {
   Tooltip,
   TooltipContent,
@@ -160,33 +161,15 @@ export function ResizeSettings({
           </div>
         </div>
 
-        {/* ── Quality — gradient slider ── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-              Quality
-            </label>
-            <span className="text-xs text-theme-foreground tabular-nums">
-              {quality}%
-            </span>
-          </div>
-
-          <div className="relative h-2 w-full rounded-full bg-theme-muted">
-            <div
-              className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-              style={{ width: `${quality}%` }}
-            />
-            <input
-              type="range"
-              min={10}
-              max={100}
-              step={1}
-              value={quality}
-              onChange={(e) => handleQualityChange(Number(e.target.value))}
-              className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-            />
-          </div>
-        </div>
+        {/* ── Quality ── */}
+        <SizeSlider
+          label="Quality"
+          value={quality}
+          onChange={handleQualityChange}
+          min={10}
+          max={100}
+          unit="%"
+        />
 
         {/* ── Dimensions ── */}
         <div className="space-y-2">

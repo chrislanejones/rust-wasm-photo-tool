@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sun, Contrast, Pipette, Waves, Wand2, Flame, Cloud, Moon } from "lucide-react";
+import { Pipette, Wand2, Flame, Cloud, Moon } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { TabGroup } from "@/components/TabGroup";
+import { SizeSlider } from "@/components/SizeSlider";
+import { ToolButton } from "@/components/ui/tool-button";
 import { quickSpring } from "@/lib/animations";
 
 interface EffectsSettingsProps {
@@ -113,77 +115,40 @@ export function EffectsSettings({
             className="space-y-6"
           >
             {/* Brightness */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Sun className="h-3.5 w-3.5 text-theme-muted-foreground" />
-                <span className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground flex-1">
-                  Brightness
-                </span>
-                <span className="text-xs text-theme-foreground min-w-[3.5ch] text-right tabular-nums">
-                  {brightness > 0 ? `+${brightness}` : brightness}
-                </span>
-              </div>
-              <div className="relative h-2 w-full rounded-full bg-theme-muted">
-                {/* track fill from center */}
-                <div
-                  className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                  style={{
-                    left: brightness >= 0 ? "50%" : `${((brightness + 100) / 200) * 100}%`,
-                    width: `${(Math.abs(brightness) / 200) * 100}%`,
-                  }}
-                />
-                <input
-                  type="range"
-                  min={-100}
-                  max={100}
-                  step={1}
-                  value={brightness}
-                  disabled={!imageReady}
-                  onChange={(e) => setBrightness(Number(e.target.value))}
-                  onPointerUp={(e) =>
-                    commitBrightness(Number((e.target as HTMLInputElement).value))
-                  }
-                  className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <SizeSlider
+                label="Brightness"
+                value={brightness}
+                onChange={setBrightness}
+                onCommit={commitBrightness}
+                min={-100}
+                max={100}
+                disabled={!imageReady}
+                valueDisplay={brightness > 0 ? `+${brightness}` : String(brightness)}
+              />
               <p className="text-[9px] text-theme-muted-foreground">
                 Drag &amp; release — applies delta from current position. Undo-able.
               </p>
             </div>
 
             {/* Contrast */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Contrast className="h-3.5 w-3.5 text-theme-muted-foreground" />
-                <span className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground flex-1">
-                  Contrast
-                </span>
-                <span className="text-xs text-theme-foreground min-w-[3.5ch] text-right tabular-nums">
-                  {contrast > 100 ? `+${contrast - 100}` : contrast < 100 ? `${contrast - 100}` : "0"}
-                </span>
-              </div>
-              <div className="relative h-2 w-full rounded-full bg-theme-muted">
-                <div
-                  className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                  style={{
-                    left: contrast >= 100 ? "50%" : `${(contrast / 200) * 100}%`,
-                    width: `${(Math.abs(contrast - 100) / 200) * 100}%`,
-                  }}
-                />
-                <input
-                  type="range"
-                  min={10}
-                  max={300}
-                  step={1}
-                  value={contrast}
-                  disabled={!imageReady}
-                  onChange={(e) => setContrast(Number(e.target.value))}
-                  onPointerUp={(e) =>
-                    commitContrast(Number((e.target as HTMLInputElement).value))
-                  }
-                  className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <SizeSlider
+                label="Contrast"
+                value={contrast}
+                onChange={setContrast}
+                onCommit={commitContrast}
+                min={10}
+                max={300}
+                disabled={!imageReady}
+                valueDisplay={
+                  contrast > 100
+                    ? `+${contrast - 100}`
+                    : contrast < 100
+                      ? `${contrast - 100}`
+                      : "0"
+                }
+              />
               <p className="text-[9px] text-theme-muted-foreground">
                 100 = neutral. Slider latches — drag again to adjust further.
               </p>
@@ -191,35 +156,17 @@ export function EffectsSettings({
 
             {/* Global Blur */}
             {onGlobalBlur && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Waves className="h-3.5 w-3.5 text-theme-muted-foreground" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground flex-1">
-                    Blur
-                  </span>
-                  <span className="text-xs text-theme-foreground min-w-[3.5ch] text-right tabular-nums">
-                    {blur}%
-                  </span>
-                </div>
-                <div className="relative h-2 w-full rounded-full bg-theme-muted">
-                  <div
-                    className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                    style={{ width: `${blur}%` }}
-                  />
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={blur}
-                    disabled={!imageReady}
-                    onChange={(e) => setBlur(Number(e.target.value))}
-                    onPointerUp={(e) =>
-                      commitBlur(Number((e.target as HTMLInputElement).value))
-                    }
-                    className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <SizeSlider
+                  label="Blur"
+                  value={blur}
+                  onChange={setBlur}
+                  onCommit={commitBlur}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  disabled={!imageReady}
+                />
                 <p className="text-[9px] text-theme-muted-foreground">
                   Gaussian blur across the full image. Resets after apply.
                 </p>
@@ -228,20 +175,19 @@ export function EffectsSettings({
 
             {/* Quick Presets */}
             <div className="space-y-3 pt-2 border-t border-theme-sidebar-border">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+              <span className="text-[11px] text-theme-muted-foreground">
                 Quick Adjust
-              </label>
+              </span>
               <div className="grid grid-cols-2 gap-2">
                 {PRESETS.map(({ label, Icon, brightness: b, contrast: c }) => (
-                  <button
+                  <ToolButton
                     key={label}
                     disabled={!imageReady}
                     onClick={() => applyPreset(b, c)}
-                    className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold bg-theme-muted text-theme-foreground hover:bg-theme-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon />
                     {label}
-                  </button>
+                  </ToolButton>
                 ))}
               </div>
               <p className="text-[9px] text-theme-muted-foreground">

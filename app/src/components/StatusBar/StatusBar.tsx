@@ -80,7 +80,7 @@ export function StatusBar({ state, imageCount, userMode = "demo" }: Props) {
           className="status-zoom opacity-40 hover:opacity-100 transition-opacity"
           title="Architecture diagram (opens in new tab)"
         >
-          v0.9.6-beta
+          v0.9.7-beta
         </a>
       </div>
     </footer>

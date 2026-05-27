@@ -60,34 +60,14 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             />
 
             {/* Opacity */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                  Opacity
-                </label>
-                <span className="text-xs text-theme-foreground tabular-nums">
-                  {settings.brushOpacity}%
-                </span>
-              </div>
-
-              <div className="relative h-2 w-full rounded-full bg-theme-muted">
-                <div
-                  className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                  style={{ width: `${((settings.brushOpacity - 10) / 90) * 100}%` }}
-                />
-                <input
-                  type="range"
-                  min={10}
-                  max={100}
-                  step={1}
-                  value={settings.brushOpacity}
-                  onChange={(e) =>
-                    onChange({ ...settings, brushOpacity: Number(e.target.value) })
-                  }
-                  className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-                />
-              </div>
-            </div>
+            <SizeSlider
+              label="Opacity"
+              value={settings.brushOpacity}
+              onChange={(v) => onChange({ ...settings, brushOpacity: v })}
+              min={10}
+              max={100}
+              unit="%"
+            />
 
             {/* Color */}
             <ColorSwatchGrid
@@ -122,36 +102,14 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             />
 
             {/* Blur Intensity */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                  Blur Intensity
-                </label>
-                <span className="text-xs text-theme-foreground tabular-nums">
-                  {settings.blurIntensity}px
-                </span>
-              </div>
-
-              <div className="relative h-2 w-full rounded-full bg-theme-muted">
-                <div
-                  className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                  style={{
-                    width: `${((settings.blurIntensity - 1) / 19) * 100}%`,
-                  }}
-                />
-                <input
-                  type="range"
-                  min={1}
-                  max={20}
-                  step={1}
-                  value={settings.blurIntensity}
-                  onChange={(e) =>
-                    onChange({ ...settings, blurIntensity: Number(e.target.value) })
-                  }
-                  className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-                />
-              </div>
-            </div>
+            <SizeSlider
+              label="Blur Intensity"
+              value={settings.blurIntensity}
+              onChange={(v) => onChange({ ...settings, blurIntensity: v })}
+              min={1}
+              max={20}
+              unit="px"
+            />
 
             <p className="text-[10px] text-theme-muted-foreground leading-relaxed">
               Click and drag on the image to blur regions. Uses WASM separable Gaussian blur.

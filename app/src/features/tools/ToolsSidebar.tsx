@@ -21,6 +21,8 @@ import { EffectsSettings } from "./settings/EffectsSettings";
 import { ArrowSettings } from "./settings/ArrowSettings";
 import { ShapesSettings } from "./settings/ShapeSettings";
 import { BatchSettings } from "./settings/BatchSettings";
+import type { PhotoEntry } from "@/features/gallery/GalleryBar";
+import type { ImageHorseTool } from "stamp_tool";
 import { PaintSettings } from "./settings/PaintSettings";
 import { TextSettings } from "./settings/TextSettings";
 
@@ -89,6 +91,12 @@ interface ToolsSidebarProps {
   stampEmojiSize?: number;
   onStampEmojiChange?: (e: string) => void;
   onStampEmojiSizeChange?: (s: number) => void;
+  // Bulk-logo (Images / "emoji" tool)
+  photos: PhotoEntry[];
+  setPhotos: React.Dispatch<React.SetStateAction<PhotoEntry[]>>;
+  stampToolRef: React.MutableRefObject<ImageHorseTool | null>;
+  flushToCanvas: () => void;
+  syncState: () => void;
 }
 
 export function ToolsSidebar({
@@ -146,6 +154,11 @@ export function ToolsSidebar({
   stampEmojiSize,
   onStampEmojiChange,
   onStampEmojiSizeChange,
+  photos,
+  setPhotos,
+  stampToolRef,
+  flushToCanvas,
+  syncState,
 }: ToolsSidebarProps) {
   return (
     <motion.div
@@ -238,7 +251,16 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "emoji" && <BatchSettings />}
+        {activeTool === "emoji" && (
+          <BatchSettings
+            photos={photos}
+            activePhotoId={activePhotoId}
+            setPhotos={setPhotos}
+            stampToolRef={stampToolRef}
+            flushToCanvas={flushToCanvas}
+            syncState={syncState}
+          />
+        )}
 
         {activeTool === "brush" && (
           <PaintSettings

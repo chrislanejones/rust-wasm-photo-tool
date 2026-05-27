@@ -87,8 +87,8 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "emoji",
-    label: "Images",
-    description: "Batch stamp icons across all images",
+    label: "Batch Image Editor",
+    description: "Apply logo or text to all loaded images at once",
     icon: Images,
     gradient: "from-yellow-400 to-orange-400",
   },

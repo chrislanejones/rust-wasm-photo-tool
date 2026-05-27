@@ -215,6 +215,17 @@ export function UploadDialog({
                 }
               }}
             />
+
+            <div className="px-6 pb-4 text-center">
+              <a
+                href="https://image-horse.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-text-muted opacity-60 hover:opacity-100 hover:text-text-primary transition-opacity"
+              >
+                image-horse.vercel.app ↗
+              </a>
+            </div>
           </motion.div>
           </motion.div>
         </motion.div>

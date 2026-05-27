@@ -6,6 +6,7 @@ import {
   Crop,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ToolButton } from "@/components/ui/tool-button";
 
 /* ── Main component ──────────────────────────────────────────────────── */
 
@@ -28,39 +29,18 @@ export function TransformCropSettings({
     <div className="space-y-6">
       {/* ── Geometry ────────────────────────────────────────────────── */}
       <div className="space-y-3">
-        <h3 className="text-sm font-medium text-theme-foreground">Transform</h3>
+        <span className="text-[11px] text-theme-muted-foreground">Transform</span>
         <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="gap-2"
-            disabled={disabled}
-            onClick={onFlipH}
-          >
-            <FlipHorizontal className="h-4 w-4" /> Flip H
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="gap-2"
-            disabled={disabled}
-            onClick={onFlipV}
-          >
-            <FlipVertical className="h-4 w-4" /> Flip V
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="gap-2"
-            disabled={disabled}
-            onClick={onRotate90Cw}
-          >
-            <RotateCw className="h-4 w-4" /> Rotate 90°
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="gap-2"
+          <ToolButton disabled={disabled} onClick={onFlipH}>
+            <FlipHorizontal /> Flip H
+          </ToolButton>
+          <ToolButton disabled={disabled} onClick={onFlipV}>
+            <FlipVertical /> Flip V
+          </ToolButton>
+          <ToolButton disabled={disabled} onClick={onRotate90Cw}>
+            <RotateCw /> Rotate 90°
+          </ToolButton>
+          <ToolButton
             disabled={disabled}
             onClick={() => {
               onRotate90Cw();
@@ -68,8 +48,8 @@ export function TransformCropSettings({
               onRotate90Cw();
             }}
           >
-            <RotateCcw className="h-4 w-4" /> Rotate −90°
-          </Button>
+            <RotateCcw /> Rotate −90°
+          </ToolButton>
         </div>
       </div>
 

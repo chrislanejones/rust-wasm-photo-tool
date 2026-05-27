@@ -30,45 +30,6 @@ export const RED_STAMP_PRESETS = [
   { id: "review", label: "UNDER REVIEW", color: "#2563eb" },
 ] as const;
 
-function DotRow({
-  presets,
-  value,
-  onSelect,
-  dot,
-}: {
-  presets: readonly number[];
-  value: number;
-  onSelect: (v: number) => void;
-  dot: (preset: number, active: boolean) => React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      {presets.map((p) => {
-        const active = value === p;
-        return (
-          <button
-            key={p}
-            type="button"
-            onClick={() => onSelect(p)}
-            className={[
-              "flex items-center justify-center",
-              "w-10 h-10",
-              "rounded-full",
-              "transition-all",
-              active
-                ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
-                : "hover:bg-theme-accent",
-            ].join(" ")}
-            aria-label={String(p)}
-          >
-            {dot(p, active)}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export type StampMode = "clone" | "red" | "emojis";
 
 export function StampSettingsPanel({
@@ -138,87 +99,34 @@ export function StampSettingsPanel({
           </div>
 
           {/* Hardness */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                Hardness
-              </label>
-              <span className="text-xs text-theme-foreground tabular-nums">
-                {Math.round(settings.hardness * 100)}%
-              </span>
-            </div>
-            <DotRow
-              presets={HARDNESS_PRESETS}
-              value={Math.round(settings.hardness * 100)}
-              onSelect={(v) => onChange({ ...settings, hardness: v / 100 })}
-              dot={(preset) => {
-                const dotSize =
-                  preset <= 0 ? 2 : preset <= 33 ? 4 : preset <= 66 ? 6 : 8;
-                return (
-                  <span
-                    className="rounded-full bg-theme-foreground"
-                    style={{ width: dotSize, height: dotSize }}
-                  />
-                );
-              }}
-            />
-            <div className="relative h-2 w-full rounded-full bg-theme-muted">
-              <div
-                className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                style={{
-                  width: `${Math.round(settings.hardness * 100)}%`,
-                }}
-              />
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={Math.round(settings.hardness * 100)}
-                onChange={(e) =>
-                  onChange({
-                    ...settings,
-                    hardness: Number(e.target.value) / 100,
-                  })
-                }
-                className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-              />
-            </div>
-          </div>
+          <SizeSlider
+            variant="dots"
+            label="Hardness"
+            value={Math.round(settings.hardness * 100)}
+            onChange={(v) => onChange({ ...settings, hardness: v / 100 })}
+            presets={HARDNESS_PRESETS}
+            unit="%"
+            renderPreset={(preset) => {
+              const dotSize =
+                preset <= 0 ? 2 : preset <= 33 ? 4 : preset <= 66 ? 6 : 8;
+              return (
+                <span
+                  className="rounded-full bg-theme-foreground"
+                  style={{ width: dotSize, height: dotSize }}
+                />
+              );
+            }}
+          />
 
           {/* Opacity */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                Opacity
-              </label>
-              <span className="text-xs text-theme-foreground tabular-nums">
-                {Math.round(settings.opacity * 100)}%
-              </span>
-            </div>
-            <div className="relative h-2 w-full rounded-full bg-theme-muted">
-              <div
-                className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-                style={{
-                  width: `${Math.round(settings.opacity * 100)}%`,
-                }}
-              />
-              <input
-                type="range"
-                min={10}
-                max={100}
-                step={1}
-                value={Math.round(settings.opacity * 100)}
-                onChange={(e) =>
-                  onChange({
-                    ...settings,
-                    opacity: Number(e.target.value) / 100,
-                  })
-                }
-                className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
-              />
-            </div>
-          </div>
+          <SizeSlider
+            label="Opacity"
+            value={Math.round(settings.opacity * 100)}
+            onChange={(v) => onChange({ ...settings, opacity: v / 100 })}
+            min={10}
+            max={100}
+            unit="%"
+          />
         </div>
       )}
 

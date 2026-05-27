@@ -890,6 +890,21 @@ input[type="range"].slider-overlay::-moz-range-thumb {
   background-color: #d0d0d0;
 }
 
+.checkerboard-dark {
+  background-image:
+    linear-gradient(45deg, #2a2a2a 25%, transparent 25%),
+    linear-gradient(-45deg, #2a2a2a 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2a2a2a 75%),
+    linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
+  background-size: 14px 14px;
+  background-position:
+    0 0,
+    0 7px,
+    7px -7px,
+    -7px 0;
+  background-color: #1a1a1a;
+}
+
 .photo-thumb-label {
   position: absolute;
   bottom: 0;

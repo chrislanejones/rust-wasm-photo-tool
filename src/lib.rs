@@ -785,3 +785,72 @@ impl ImageHorseTool {
         out
     }
 }
+
+/// Stateless: composite `src` onto a copy of `target` at (dx, dy) with `opacity` (0.0..=1.0).
+/// Returns the new buffer. Used by the bulk-logo feature to stamp a logo onto many photos
+/// without disturbing the active canvas state.
+///
+/// `target` is `tw*th*4` RGBA bytes, `src` is `sw*sh*4` RGBA bytes. If lengths don't match,
+/// `target` is returned unchanged.
+#[wasm_bindgen]
+pub fn composite_pixels(
+    target: &[u8],
+    tw: u32,
+    th: u32,
+    src: &[u8],
+    sw: u32,
+    sh: u32,
+    dx: i32,
+    dy: i32,
+    opacity: f64,
+) -> Vec<u8> {
+    let expected_target = (tw as usize) * (th as usize) * 4;
+    let expected_src = (sw as usize) * (sh as usize) * 4;
+    if target.len() != expected_target {
+        return target.to_vec();
+    }
+    let mut out = target.to_vec();
+    if src.len() != expected_src {
+        return out;
+    }
+    let op = opacity.clamp(0.0, 1.0);
+    if (op - 1.0).abs() < 1e-6 {
+        transform::paste_region(&mut out, tw as i32, th as i32, src, sw, sh, dx, dy);
+    } else if op > 0.0 {
+        // Pre-scale src alpha by opacity so paste_region's alpha-compositing applies it.
+        let mut scaled = src.to_vec();
+        let mut i = 3;
+        while i < scaled.len() {
+            scaled[i] = ((scaled[i] as f64) * op).round().clamp(0.0, 255.0) as u8;
+            i += 4;
+        }
+        transform::paste_region(&mut out, tw as i32, th as i32, &scaled, sw, sh, dx, dy);
+    }
+    out
+}
+
+/// Stateless bilinear resize of an RGBA buffer. Used by the batch-logo feature
+/// to scale logos to a target width without round-tripping through OffscreenCanvas.
+#[wasm_bindgen]
+pub fn resize_pixels(
+    pixels: &[u8],
+    old_w: u32,
+    old_h: u32,
+    new_w: u32,
+    new_h: u32,
+) -> Vec<u8> {
+    transform::resize_bilinear(pixels, old_w, old_h, new_w, new_h)
+}
+
+/// Stateless: encode an RGBA pixel buffer as PNG bytes. Used by the batch-logo
+/// feature to skip the `OffscreenCanvas` → `convertToBlob` round-trip when
+/// persisting composited photos.
+#[wasm_bindgen]
+pub fn encode_png_pixels(pixels: &[u8], width: u32, height: u32) -> Vec<u8> {
+    let tmp = crate::core::ImageBuffer {
+        width,
+        height,
+        data: pixels.to_vec(),
+    };
+    codec::export_png(&tmp)
+}

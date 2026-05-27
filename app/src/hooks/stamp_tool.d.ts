@@ -1,6 +1,45 @@
 declare module "stamp_tool" {
   export default function init(): Promise<void>;
 
+  /**
+   * Stateless: composite `src` (RGBA, sw*sh*4 bytes) onto a copy of `target`
+   * (RGBA, tw*th*4 bytes) at (dx, dy) with opacity in [0, 1]. Returns the new
+   * buffer. Does not touch any ImageHorseTool state.
+   */
+  export function composite_pixels(
+    target: Uint8Array,
+    tw: number,
+    th: number,
+    src: Uint8Array,
+    sw: number,
+    sh: number,
+    dx: number,
+    dy: number,
+    opacity: number,
+  ): Uint8Array;
+
+  /**
+   * Stateless bilinear resize of an RGBA buffer.
+   * Used by the batch-logo feature to scale logos in Rust.
+   */
+  export function resize_pixels(
+    pixels: Uint8Array,
+    old_w: number,
+    old_h: number,
+    new_w: number,
+    new_h: number,
+  ): Uint8Array;
+
+  /**
+   * Stateless: encode an RGBA pixel buffer as PNG bytes.
+   * Used by the batch-logo feature to skip the OffscreenCanvas round-trip.
+   */
+  export function encode_png_pixels(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+  ): Uint8Array;
+
   export class ImageHorseTool {
     constructor(width: number, height: number);
     free(): void;

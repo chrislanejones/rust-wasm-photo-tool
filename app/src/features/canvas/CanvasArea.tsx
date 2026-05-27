@@ -95,10 +95,39 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     },
     ref,
   ) => {
-    const { onMouseDown, onMouseMove, onMouseUp, state } = hookResult;
+    const { onMouseDown, onMouseMove, onMouseUp, state, flushToCanvas } = hookResult;
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
     const internalContainerRef = useRef<HTMLDivElement>(null);
     const containerRef = externalContainerRef ?? internalContainerRef;
+
+    // ── Redraw bridge ──────────────────────────────────────────────────────
+    // The <canvas> DOM element gets re-created whenever the surrounding tool
+    // wrapper changes (e.g. switching activeTool between Batch Image Editor's
+    // grid host and the full-size host). A fresh canvas has default 300×150
+    // dimensions and an empty bitmap — WASM still holds the pixels but they
+    // need to be re-blitted. Likewise, if the container resizes and something
+    // mutates canvas.width/.height as a side-effect, the bitmap is cleared.
+    // This effect re-flushes the WASM buffer to the canvas whenever:
+    //   • the canvas element re-mounts (ref changes),
+    //   • the WASM image dimensions change (state.width / state.height),
+    //   • the surrounding container resizes (via ResizeObserver).
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
+      if (!state.ready || state.width === 0 || state.height === 0) return;
+
+      // Initial blit — covers fresh canvas mount and dimension changes.
+      flushToCanvas();
+
+      // Re-blit whenever the container resizes. flushToCanvas is a no-op when
+      // canvas dimensions already match WASM state, so this is cheap.
+      const ro = new ResizeObserver(() => {
+        flushToCanvas();
+      });
+      ro.observe(container);
+      return () => ro.disconnect();
+    }, [canvasRef, containerRef, flushToCanvas, state.ready, state.width, state.height]);
 
     // Item 2: Pan offset state
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });

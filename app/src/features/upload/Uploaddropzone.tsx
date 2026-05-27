@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, Clipboard, FolderOpen, Heart } from "lucide-react";
+import { Upload, Clipboard, FolderOpen, Heart, ExternalLink } from "lucide-react";
 import { shakeAnimation } from "@/lib/animations";
 
 interface Props {
@@ -100,6 +100,16 @@ export function UploadDropZone({ onFiles }: Props) {
         <p className="text-xs text-theme-muted-foreground opacity-60">
           Supports PNG, JPG, GIF, WebP, AVIF
         </p>
+
+        <a
+          href="https://image-horse.vercel.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-theme-secondary text-theme-secondary-foreground hover:ring-2 hover:ring-theme-primary/50 hover:ring-offset-2 hover:ring-offset-theme-background transition-all"
+        >
+          Try the new Image Horse
+          <ExternalLink className="h-4 w-4" />
+        </a>
 
         {/* Special Thanks Badge */}
         <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-theme-secondary/60 border border-theme-border backdrop-blur-sm">

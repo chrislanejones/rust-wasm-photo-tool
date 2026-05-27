@@ -24,6 +24,7 @@ import { StatusBar, type UserMode } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
 import { ToolsSidebar } from "@/features/tools";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
+import { GridThumbnails } from "@/features/canvas/GridThumbnails";
 import { HistoryPanel } from "@/features/canvas/HistoryPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
@@ -64,6 +65,7 @@ import {
   ZoomOut,
   RotateCcw,
   Archive,
+  ImagePlus,
 } from "lucide-react";
 
 export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
@@ -323,6 +325,15 @@ export function AppShell() {
     },
     [activePhotoId, hasBeenModified, stamp, loadPhotoFromEntry, savePhotoEdit, loadPhotoEdit],
   );
+
+  // Auto-select the first photo when none is active but photos exist. Keeps
+  // the grid hero (and normal canvas) populated after session restore or after
+  // the user deletes the previously active photo.
+  useEffect(() => {
+    if (!activePhotoId && photos.length > 0) {
+      void handleSelectPhoto(photos[0]);
+    }
+  }, [activePhotoId, photos, handleSelectPhoto]);
 
   // Item 4: PgUp/PgDn gallery cycling
   const handleNextPhoto = useCallback(() => {
@@ -962,6 +973,11 @@ export function AppShell() {
             stampEmojiSize={toolSettings.emojiSize}
             onStampEmojiChange={(e) => setToolSettings((prev) => ({ ...prev, emoji: e }))}
             onStampEmojiSizeChange={(s) => setToolSettings((prev) => ({ ...prev, emojiSize: s }))}
+            photos={photos}
+            setPhotos={setPhotos}
+            stampToolRef={stamp.toolRef}
+            flushToCanvas={stamp.flushToCanvas}
+            syncState={stamp.syncState}
           />
         )}
       </AnimatePresence>
@@ -978,41 +994,154 @@ export function AppShell() {
             style={{ position: "relative" }}
           >
             <>
-              <CanvasArea
-                ref={canvasRef}
-                hookResult={effectiveStamp}
-                brushDiameter={diameter}
-                cursorPos={pos}
-                cursorVisible={visible}
-                onCanvasEnter={onCanvasEnter}
-                onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
-                beforeUrl={originalUrl}
-                compareActive={compareActive}
-                activeTool={activeTool}
-                textInput={textTool.textInput}
-                textareaRef={textTool.textareaRef}
-                onCanvasClick={textTool.onCanvasClick}
-                onTextKeyDown={textTool.onTextKeyDown}
-                onTextChange={textTool.onTextChange}
-                onTextBlur={textTool.onTextBlur}
-                textSettings={{
-                  fontSize: toolSettings.fontSize,
-                  fontFamily: toolSettings.fontFamily,
-                  fontWeight: toolSettings.fontWeight,
-                  textColor: toolSettings.textColor,
-                }}
-                containerRef={containerRef}
-                onTextPositionChange={textTool.setTextPosition}
-                onTextFontSizeChange={handleTextFontSizeChange}
-                onTextRotationChange={textTool.setTextRotation}
-                extractMouseDown={textExtract.onMouseDown}
-                extractMouseMove={textExtract.onMouseMove}
-                extractMouseUp={textExtract.onMouseUp}
-                isPanning={isPanning}
-                cropSelection={drawingTools.cropSelection}
-                onCropChange={(sel) => drawingTools.setCropSelection(sel)}
-                colorPickerActive={colorPickerActive}
-              />
+              {/* Emoji-grid mode: wrap the grid host in a flex pane sized to
+                  fit between the fixed TopBar and GalleryBar. The grid sits
+                  inside, capped at a 5:3 aspect ratio with gap + padding for
+                  breathing room. Non-emoji mode falls through to the regular
+                  full-size canvas host. The CanvasArea below is rendered ONCE
+                  (a stable React subtree) so the canvas DOM + WASM pixels
+                  survive tool switches; only the wrapper around it changes. */}
+              {activeTool === "emoji" ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: showTopBar ? 80 : 12,
+                    bottom: showGallery ? 168 : 56,
+                    left: 12,
+                    right: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: 0,
+                    minWidth: 0,
+                  }}
+                >
+                  <div
+                    className="canvas-grid-host checkerboard-dark"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(5, 1fr)",
+                      gridTemplateRows: "repeat(3, 1fr)",
+                      gap: "12px",
+                      padding: "12px",
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      width: "auto",
+                      margin: "auto",
+                      aspectRatio: "5 / 3",
+                    }}
+                  >
+                    <div
+                      className={`canvas-grid-hero${
+                        activePhotoId && photos.length > 0
+                          ? " ring-2 ring-orange-400"
+                          : ""
+                      }`}
+                      style={{
+                        gridArea: "1 / 1 / 3 / 3",
+                        position: "relative",
+                        overflow: "hidden",
+                        borderRadius: "0.375rem",
+                      }}
+                    >
+                      <div style={{ position: "absolute", inset: 0 }}>
+                        <CanvasArea
+                          ref={canvasRef}
+                          hookResult={effectiveStamp}
+                          brushDiameter={diameter}
+                          cursorPos={pos}
+                          cursorVisible={visible}
+                          onCanvasEnter={onCanvasEnter}
+                          onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
+                          beforeUrl={originalUrl}
+                          compareActive={compareActive}
+                          activeTool={activeTool}
+                          textInput={textTool.textInput}
+                          textareaRef={textTool.textareaRef}
+                          onCanvasClick={textTool.onCanvasClick}
+                          onTextKeyDown={textTool.onTextKeyDown}
+                          onTextChange={textTool.onTextChange}
+                          onTextBlur={textTool.onTextBlur}
+                          textSettings={{
+                            fontSize: toolSettings.fontSize,
+                            fontFamily: toolSettings.fontFamily,
+                            fontWeight: toolSettings.fontWeight,
+                            textColor: toolSettings.textColor,
+                          }}
+                          containerRef={containerRef}
+                          onTextPositionChange={textTool.setTextPosition}
+                          onTextFontSizeChange={handleTextFontSizeChange}
+                          onTextRotationChange={textTool.setTextRotation}
+                          extractMouseDown={textExtract.onMouseDown}
+                          extractMouseMove={textExtract.onMouseMove}
+                          extractMouseUp={textExtract.onMouseUp}
+                          isPanning={isPanning}
+                          cropSelection={drawingTools.cropSelection}
+                          onCropChange={(sel) => drawingTools.setCropSelection(sel)}
+                          colorPickerActive={colorPickerActive}
+                        />
+                      </div>
+                      {(!activePhotoId || photos.length === 0) && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-zinc-950/95 text-center text-theme-muted-foreground">
+                          <ImagePlus className="h-10 w-10 opacity-60" />
+                          <p className="text-sm font-medium">No photos loaded</p>
+                          <p className="text-xs">Upload images to start batch editing</p>
+                        </div>
+                      )}
+                      {activePhotoId && photos.length > 0 && (
+                        <div className="absolute top-2 left-2 z-20 rounded-full bg-orange-500 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white shadow-md">
+                          Selected
+                        </div>
+                      )}
+                    </div>
+                    <GridThumbnails
+                      photos={photos}
+                      activePhotoId={activePhotoId}
+                      onSelectPhoto={handleSelectPhoto}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="canvas-fullsize-host">
+                  <div className="canvas-fullsize-slot">
+                    <CanvasArea
+                      ref={canvasRef}
+                      hookResult={effectiveStamp}
+                      brushDiameter={diameter}
+                      cursorPos={pos}
+                      cursorVisible={visible}
+                      onCanvasEnter={onCanvasEnter}
+                      onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
+                      beforeUrl={originalUrl}
+                      compareActive={compareActive}
+                      activeTool={activeTool}
+                      textInput={textTool.textInput}
+                      textareaRef={textTool.textareaRef}
+                      onCanvasClick={textTool.onCanvasClick}
+                      onTextKeyDown={textTool.onTextKeyDown}
+                      onTextChange={textTool.onTextChange}
+                      onTextBlur={textTool.onTextBlur}
+                      textSettings={{
+                        fontSize: toolSettings.fontSize,
+                        fontFamily: toolSettings.fontFamily,
+                        fontWeight: toolSettings.fontWeight,
+                        textColor: toolSettings.textColor,
+                      }}
+                      containerRef={containerRef}
+                      onTextPositionChange={textTool.setTextPosition}
+                      onTextFontSizeChange={handleTextFontSizeChange}
+                      onTextRotationChange={textTool.setTextRotation}
+                      extractMouseDown={textExtract.onMouseDown}
+                      extractMouseMove={textExtract.onMouseMove}
+                      extractMouseUp={textExtract.onMouseUp}
+                      isPanning={isPanning}
+                      cropSelection={drawingTools.cropSelection}
+                      onCropChange={(sel) => drawingTools.setCropSelection(sel)}
+                      colorPickerActive={colorPickerActive}
+                    />
+                  </div>
+                </div>
+              )}
               <MagnifierOverlay magnifier={colorPicker.magnifier} />
             </>
           </motion.main>

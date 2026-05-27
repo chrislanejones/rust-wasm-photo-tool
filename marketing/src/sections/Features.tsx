@@ -44,8 +44,8 @@ export default function Features() {
           <Feature color="orange"  title="WASM-powered editor"   body="Rust-compiled filters, transforms, and rasterization run at near-native speed on the visitor's CPU." tags="Brightness · Contrast · Blur · Crop · Resize" />
           <Feature color="pink"    title="Layered annotations"   body="Rectangles, ellipses, arrows, paths, text, and emoji — organized in real-layer stacks with locking and blend modes." tags="Rect · Ellipse · Path · Text · Arrow" />
           <Feature color="emerald" title="Format conversion"     body="Encode and decode PNG, JPEG, WebP, and AVIF. Resize and re-compress in a single round-trip." tags="PNG · JPEG · WebP · AVIF" />
+          <Feature color="amber"   title="Batch Image Editor"    body="Stamp a logo onto every photo in one pass, or browse the gallery as a 5×3 grid mosaic with the active photo as the hero tile. Compositing, scaling, and PNG encoding all run in Rust — zero canvas round-trips." tags="Bulk logo · Grid view · SVG logos · Rust composite" />
           <Feature color="violet"  title="AI enhancements"       body="Background removal, 4× upscaling, object removal, and alt-text generation, on-demand via Replicate." tags="rembg · Real-ESRGAN · SD Inpaint · BLIP" />
-          <Feature color="amber"   title="Real-time projects"    body="Convex-backed projects sync edits, history, and shares across devices the moment you save." tags="Projects · History · Share links" />
           <Feature color="blue"    title="Privacy by default"    body="Demo mode never uploads. Even on the paid tier, processing stays local — uploads exist for sharing, not computation." tags="No server processing" />
         </div>
       </div>

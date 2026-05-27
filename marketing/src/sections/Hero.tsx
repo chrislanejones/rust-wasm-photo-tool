@@ -363,7 +363,7 @@ function StatusBarMock() {
         <span className="text-zinc-700">·</span>
         <span>2048×1536</span>
         <span className="text-zinc-700">·</span>
-        <span className="text-orange-400">v0.9.6</span>
+        <span className="text-orange-400">v0.9.7</span>
       </div>
     </div>
   );

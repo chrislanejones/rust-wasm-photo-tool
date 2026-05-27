@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-// Presets divide the slider into equal segments so the thumb lines up under each circle.
-// e.g. 4 presets → segments at 0%, 33%, 67%, 100% matching justify-between circle positions.
+// Presets divide the slider into equal segments so the thumb lines up under each dot.
+// e.g. 4 presets → segments at 0%, 33%, 67%, 100%.
 function valueToPos(val: number, presets: readonly number[]): number {
   const n = presets.length;
   if (val <= presets[0]) return 0;
@@ -27,97 +27,122 @@ function posToValue(pos: number, presets: readonly number[]): number {
   return Math.round(presets[segIdx] + t * (presets[segIdx + 1] - presets[segIdx]));
 }
 
-interface SizeSliderProps {
+interface CommonProps {
   label: string;
   value: number;
+  onChange: (v: number) => void;
+  unit?: string;
+  valueDisplay?: string;
+  disabled?: boolean;
+  onCommit?: (v: number) => void;
+}
+
+interface PlainSliderProps extends CommonProps {
+  variant?: "slider";
   min: number;
   max: number;
-  onChange: (v: number) => void;
-  presets: readonly number[];
-  unit?: string;
+  step?: number;
+  presets?: undefined;
+}
+
+interface DotsSliderProps extends CommonProps {
   variant?: "dots" | "numbers";
+  presets: readonly number[];
+  min?: number;
+  max?: number;
   blurredDots?: boolean;
   renderPreset?: (preset: number, index: number, isActive: boolean) => ReactNode;
 }
 
-export function SizeSlider({
-  label,
-  value,
-  min: _min,
-  max: _max,
-  onChange,
-  presets,
-  unit = "px",
-  variant = "dots",
-  blurredDots = false,
-  renderPreset,
-}: SizeSliderProps) {
-  const sliderPos = valueToPos(value, presets);
+type SizeSliderProps = PlainSliderProps | DotsSliderProps;
 
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-          {label}
-        </label>
-        <span className="text-xs text-theme-foreground tabular-nums">
-          {value}{unit}
-        </span>
-      </div>
+export function SizeSlider(props: SizeSliderProps) {
+  const { label, value, onChange, unit = "", valueDisplay, disabled, onCommit } = props;
+  const display = valueDisplay ?? `${value}${unit}`;
 
-      {/* Preset circles — top section, evenly spaced */}
-      <div className="flex items-center justify-between">
-        {presets.map((preset, i) => {
-          const isActive = value === preset;
-          return (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => onChange(preset)}
-              className={[
-                "flex items-center justify-center w-10 h-10 rounded-full transition-all",
-                isActive
-                  ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
-                  : "hover:bg-theme-accent",
-              ].join(" ")}
-              aria-label={`${label} ${preset}${unit}`}
-            >
-              {renderPreset ? (
-                renderPreset(preset, i, isActive)
-              ) : variant === "numbers" ? (
-                <span className="text-xs font-mono text-theme-foreground">{preset}</span>
-              ) : (
-                <span
-                  className="rounded-full bg-theme-foreground"
-                  style={{
-                    width: 4 + i * 2,
-                    height: 4 + i * 2,
-                    ...(blurredDots ? { opacity: 0.5, filter: "blur(1.5px)" } : {}),
-                  }}
-                />
-              )}
-            </button>
-          );
-        })}
-      </div>
+  const labelRow = (
+    <div className="flex items-center justify-between text-[11px]">
+      <span className="text-theme-muted-foreground">{label}</span>
+      <span className="text-theme-foreground tabular-nums">{display}</span>
+    </div>
+  );
 
-      {/* Slider — separate row below with more breathing room.
-          Thumb aligns with circles because sliderPos uses the same equal-segment scale. */}
-      <div className="relative h-2 w-full rounded-full bg-theme-muted mt-5">
-        <div
-          className="absolute h-full rounded-full bg-gradient-to-r from-theme-primary to-theme-chart4"
-          style={{ width: `${sliderPos}%` }}
-        />
+  const onPointerUp = onCommit
+    ? (e: React.PointerEvent<HTMLInputElement>) =>
+        onCommit(Number((e.target as HTMLInputElement).value))
+    : undefined;
+
+  if (props.presets) {
+    const { presets, blurredDots, renderPreset, variant = "dots" } = props;
+    const sliderPos = valueToPos(value, presets);
+    return (
+      <div className="space-y-2">
+        {labelRow}
+        <div className="flex items-center justify-between px-1">
+          {presets.map((preset, i) => {
+            const isActive = value === preset;
+            return (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => onChange(preset)}
+                disabled={disabled}
+                className={[
+                  "flex items-center justify-center w-9 h-9 rounded-full transition-all",
+                  isActive
+                    ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
+                    : "hover:bg-theme-accent",
+                ].join(" ")}
+                aria-label={`${label} ${preset}${unit}`}
+              >
+                {renderPreset ? (
+                  renderPreset(preset, i, isActive)
+                ) : variant === "numbers" ? (
+                  <span className="text-xs font-mono text-theme-foreground">{preset}</span>
+                ) : (
+                  <span
+                    className="rounded-full bg-theme-foreground"
+                    style={{
+                      width: 4 + i * 2,
+                      height: 4 + i * 2,
+                      ...(blurredDots ? { opacity: 0.5, filter: "blur(1.5px)" } : {}),
+                    }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
         <input
           type="range"
           min={0}
           max={100}
           step={1}
           value={Math.round(sliderPos)}
+          disabled={disabled}
           onChange={(e) => onChange(posToValue(Number(e.target.value), presets))}
-          className="slider-input absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent"
+          onPointerUp={onPointerUp}
+          className="w-full"
         />
       </div>
+    );
+  }
+
+  const { min, max, step = 1 } = props as PlainSliderProps;
+  return (
+    <div className="space-y-1.5">
+      {labelRow}
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(Number(e.target.value))}
+        onPointerUp={onPointerUp}
+        className="w-full"
+      />
     </div>
   );
 }
