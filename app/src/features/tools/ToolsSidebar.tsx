@@ -25,6 +25,7 @@ import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { PaintSettings } from "./settings/PaintSettings";
 import { TextSettings } from "./settings/TextSettings";
+import { AISettings } from "./settings/AISettings";
 
 const StampSettingsPanel =
   (StampSettingsModule as any).StampSettingsPanel ??
@@ -66,11 +67,6 @@ interface ToolsSidebarProps {
   onToolSettingsChange: (s: ToolSettings) => void;
   recentTexts: TextMemory[];
   onSelectRecentText: (m: TextMemory) => void;
-  onStartTextExtract?: () => void;
-  textExtractActive?: boolean;
-  recognizedText?: string;
-  isRecognizing?: boolean;
-  onClearRecognizedText?: () => void;
   // Paint sub-mode (paint vs blur brush)
   brushMode?: "paint" | "blur";
   onBrushModeChange?: (mode: "paint" | "blur") => void;
@@ -133,11 +129,6 @@ export function ToolsSidebar({
   onToolSettingsChange,
   recentTexts,
   onSelectRecentText,
-  onStartTextExtract,
-  textExtractActive,
-  recognizedText,
-  isRecognizing,
-  onClearRecognizedText,
   brushMode,
   onBrushModeChange,
   effectsMode,
@@ -277,92 +268,10 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
             recentTexts={recentTexts}
             onSelectRecentText={onSelectRecentText}
-            onStartTextExtract={onStartTextExtract}
-            textExtractActive={textExtractActive}
-            imageReady={imageReady}
-            recognizedText={recognizedText}
-            isRecognizing={isRecognizing}
-            onClearRecognizedText={onClearRecognizedText}
           />
         )}
 
-        {/* Item 5: AI Panel ideas */}
-        {activeTool === "ai" && (
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
-              AI Tools
-            </h3>
-
-            {[
-              {
-                title: "Remove Background",
-                desc: "One-click background removal powered by rembg",
-                badge: "free",
-                icon: "🪄",
-              },
-              {
-                title: "4× Upscale",
-                desc: "Enhance resolution with Real-ESRGAN",
-                badge: "pro",
-                icon: "🔍",
-              },
-              {
-                title: "Object Removal",
-                desc: "Brush over objects to remove them with SD Inpaint",
-                badge: "pro",
-                icon: "🧹",
-              },
-              {
-                title: "Auto Alt Text",
-                desc: "Generate accessibility descriptions with BLIP",
-                badge: "free",
-                icon: "💬",
-              },
-              {
-                title: "Smart Crop",
-                desc: "AI-suggested crop regions based on subject detection",
-                badge: "pro",
-                icon: "✂️",
-              },
-              {
-                title: "Auto-Enhance",
-                desc: "One-click brightness/contrast/saturation optimization via WASM histogram analysis",
-                badge: "free",
-                icon: "✨",
-              },
-            ].map((feature) => (
-              <div
-                key={feature.title}
-                className="flex items-start gap-3 p-3 rounded-lg bg-bg-elevated/50 border border-border/50 opacity-60"
-              >
-                <span className="text-lg shrink-0">{feature.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-text-primary">
-                      {feature.title}
-                    </span>
-                    <span
-                      className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
-                        feature.badge === "free"
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : "bg-violet-500/20 text-violet-400"
-                      }`}
-                    >
-                      {feature.badge}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-text-muted mt-0.5 leading-relaxed">
-                    {feature.desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-
-            <p className="text-[10px] text-text-muted/60 text-center pt-2">
-              Coming soon — Replicate + Convex pipeline
-            </p>
-          </div>
-        )}
+        {activeTool === "ai" && <AISettings />}
       </div>
 
       <div className="p-4 border-t border-border flex gap-2">

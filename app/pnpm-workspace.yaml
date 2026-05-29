@@ -1,0 +1,5 @@
+allowBuilds:
+  '@clerk/shared': set this to true or false
+  '@swc/core': set this to true or false
+  esbuild: set this to true or false
+  tesseract.js: set this to true or false

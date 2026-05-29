@@ -40,6 +40,14 @@ declare module "stamp_tool" {
     height: number,
   ): Uint8Array;
 
+  /**
+   * Parse a CSS-ish color string into RGBA bytes.
+   * Accepts: #rgb, #rgba, #rrggbb, #rrggbbaa, rgb(...), rgba(...).
+   * Returns a 4-byte Uint8Array [r, g, b, a] on success, or an empty
+   * Uint8Array on parse failure.
+   */
+  export function parse_color(input: string): Uint8Array;
+
   export class ImageHorseTool {
     constructor(width: number, height: number);
     free(): void;
@@ -145,8 +153,6 @@ declare module "stamp_tool" {
       dest_y: number,
       angle_deg: number,
     ): void;
-    /** Extract a region as PNG bytes without modifying the buffer. */
-    extract_region_png(x: number, y: number, w: number, h: number): Uint8Array;
     /** Returns [width, height] in pixels for the given text, without committing. */
     measure_text(text: string, font_size: number, bold: boolean): Uint32Array;
     /** Render a stamp label (bordered, rotated) entirely in Rust and composite centred on dest. */
@@ -185,6 +191,52 @@ declare module "stamp_tool" {
     get_pixel(x: number, y: number): Uint8Array;
     get_pixel_region(cx: number, cy: number, radius: number): Uint8Array;
 
+    // ── Text annotations (live overlay, re-editable until flattened) ──
+    add_text_annotation(
+      text: string,
+      font_size: number,
+      r: number,
+      g: number,
+      b: number,
+      bold: boolean,
+      x: number,
+      y: number,
+      rotation_deg: number,
+      background_kind: number,
+      bg_r: number,
+      bg_g: number,
+      bg_b: number,
+      bg_a: number,
+      bg_padding: number,
+      bg_corner_radius: number,
+      bg_tail: number,
+    ): number;
+    update_text_annotation(
+      id: number,
+      text: string,
+      font_size: number,
+      r: number,
+      g: number,
+      b: number,
+      bold: boolean,
+      x: number,
+      y: number,
+      rotation_deg: number,
+      background_kind: number,
+      bg_r: number,
+      bg_g: number,
+      bg_b: number,
+      bg_a: number,
+      bg_padding: number,
+      bg_corner_radius: number,
+      bg_tail: number,
+    ): boolean;
+    remove_text_annotation(id: number): boolean;
+    text_annotation_at(x: number, y: number): number;
+    text_annotation_count(): number;
+    get_text_annotations(): string;
+    flatten_text_annotations(): void;
+
     // History snapshot serialization (for JS-side persistence)
     undo_snapshot_count(): number;
     redo_snapshot_count(): number;
@@ -192,13 +244,97 @@ declare module "stamp_tool" {
     get_undo_snapshot_label(index: number): string;
     get_redo_snapshot_png(index: number): Uint8Array;
     get_redo_snapshot_label(index: number): string;
+    /** Per-snapshot annotation list as JSON (same shape as get_text_annotations). */
+    get_undo_snapshot_annotations(index: number): string;
+    get_redo_snapshot_annotations(index: number): string;
     inject_undo_snapshot(data: Uint8Array, w: number, h: number, label: string): void;
     inject_redo_snapshot(data: Uint8Array, w: number, h: number, label: string): void;
+    /**
+     * Append one annotation onto the snapshot at `snap_idx`. The tile is
+     * re-rendered from the config so callers don't need to persist tile bytes.
+     * Returns false if the index is out of range.
+     */
+    push_annotation_to_undo_snapshot(
+      snap_idx: number,
+      text: string,
+      font_size: number,
+      r: number, g: number, b: number,
+      bold: boolean,
+      x: number, y: number,
+      rotation_deg: number,
+      background_kind: number,
+      bg_r: number, bg_g: number, bg_b: number, bg_a: number,
+      bg_padding: number,
+      bg_corner_radius: number,
+      bg_tail: number,
+    ): boolean;
+    push_annotation_to_redo_snapshot(
+      snap_idx: number,
+      text: string,
+      font_size: number,
+      r: number, g: number, b: number,
+      bold: boolean,
+      x: number, y: number,
+      rotation_deg: number,
+      background_kind: number,
+      bg_r: number, bg_g: number, bg_b: number, bg_a: number,
+      bg_padding: number,
+      bg_corner_radius: number,
+      bg_tail: number,
+    ): boolean;
 
     // Item 9: Crop preview in WASM
     // Uncomment after adding the Rust implementations
     // preview_crop(x: number, y: number, w: number, h: number): void;
     // cancel_crop_preview(): boolean;
     // apply_crop_from_preview(x: number, y: number, w: number, h: number): void;
+
+    // Live text annotations (non-destructive overlay layer)
+    text_annotation_count(): number;
+    add_text_annotation(
+      text: string,
+      font_size: number,
+      r: number,
+      g: number,
+      b: number,
+      bold: boolean,
+      x: number,
+      y: number,
+      rotation_deg: number,
+      background_kind: number,
+      bg_r: number,
+      bg_g: number,
+      bg_b: number,
+      bg_a: number,
+      bg_padding: number,
+      bg_corner_radius: number,
+      bg_tail: number,
+    ): number;
+    update_text_annotation(
+      id: number,
+      text: string,
+      font_size: number,
+      r: number,
+      g: number,
+      b: number,
+      bold: boolean,
+      x: number,
+      y: number,
+      rotation_deg: number,
+      background_kind: number,
+      bg_r: number,
+      bg_g: number,
+      bg_b: number,
+      bg_a: number,
+      bg_padding: number,
+      bg_corner_radius: number,
+      bg_tail: number,
+    ): boolean;
+    remove_text_annotation(id: number): boolean;
+    get_text_annotations(): string;
+    /** Returns the matching annotation id, or -1 if no hit. */
+    text_annotation_at(x: number, y: number): number;
+    render_with_annotations(): Uint8Array;
+    flatten_text_annotations(): void;
   }
 }

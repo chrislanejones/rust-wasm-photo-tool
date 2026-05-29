@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ToolSettings } from "@/lib/types";
-import { PAINT_COLORS } from "@/lib/colors";
+import { TEXT_COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
@@ -71,7 +71,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
 
             {/* Color */}
             <ColorSwatchGrid
-              colors={PAINT_COLORS}
+              colors={TEXT_COLORS}
               value={settings.brushColor}
               onChange={(color) => onChange({ ...settings, brushColor: color })}
             />

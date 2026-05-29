@@ -69,6 +69,34 @@ export interface SnapEntry {
   /** PNG-encoded snapshot (losslessly compressed RGBA). */
   png: Uint8Array;
   label: string;
+  /** Live text annotations active at this history step. Optional for
+   *  backwards-compat with older persisted entries; omitted ≡ empty. */
+  annotations?: PersistedAnnotation[];
+}
+
+/** One live (non-destructive) text annotation. Mirrors the JSON shape
+ *  emitted by Rust's `get_text_annotations` — except `tile_*` fields are
+ *  intentionally dropped since the tile is re-rendered on restore. */
+export interface PersistedAnnotation {
+  id: number;
+  text: string;
+  x: number;
+  y: number;
+  font_size: number;
+  r: number;
+  g: number;
+  b: number;
+  bold: boolean;
+  rotation_deg: number;
+  // Background fields (optional for backwards-compat with old persisted entries).
+  background_kind?: number;
+  bg_r?: number;
+  bg_g?: number;
+  bg_b?: number;
+  bg_a?: number;
+  bg_padding?: number;
+  bg_corner_radius?: number;
+  bg_tail?: number;
 }
 
 export interface SavedEdit {
@@ -80,6 +108,43 @@ export interface SavedEdit {
   undoStack: SnapEntry[];
   /** Redo stack, oldest → newest (same order as internal WASM redo_stack). */
   redoStack: SnapEntry[];
+  /** Live text annotations (re-editable overlay layer). Optional for
+   *  backwards-compat with older persisted entries. */
+  annotations?: PersistedAnnotation[];
+}
+
+/** Parse the JSON emitted by `get_*_snapshot_annotations`. Drops tile_*
+ *  fields since the tile is re-rendered on injection. */
+export function parseSnapshotAnnotations(raw: string): PersistedAnnotation[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Array<
+      PersistedAnnotation & {
+        tile_w?: number; tile_h?: number;
+        tile_offset_x?: number; tile_offset_y?: number;
+      }
+    >;
+    return parsed.map((a) => ({
+      id: a.id,
+      text: a.text,
+      x: a.x,
+      y: a.y,
+      font_size: a.font_size,
+      r: a.r, g: a.g, b: a.b,
+      bold: a.bold,
+      rotation_deg: a.rotation_deg,
+      background_kind: a.background_kind,
+      bg_r: a.bg_r,
+      bg_g: a.bg_g,
+      bg_b: a.bg_b,
+      bg_a: a.bg_a,
+      bg_padding: a.bg_padding,
+      bg_corner_radius: a.bg_corner_radius,
+      bg_tail: a.bg_tail,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
@@ -106,6 +171,7 @@ export async function savePhotoEdit(
     undoStack.push({
       png: new Uint8Array(t.get_undo_snapshot_png(i)),
       label: t.get_undo_snapshot_label(i),
+      annotations: parseSnapshotAnnotations(t.get_undo_snapshot_annotations(i)),
     });
   }
 
@@ -115,7 +181,39 @@ export async function savePhotoEdit(
     redoStack.push({
       png: new Uint8Array(t.get_redo_snapshot_png(i)),
       label: t.get_redo_snapshot_label(i),
+      annotations: parseSnapshotAnnotations(t.get_redo_snapshot_annotations(i)),
     });
+  }
+
+  // Live (non-destructive) text annotations.
+  let annotations: PersistedAnnotation[] = [];
+  try {
+    const raw = t.get_text_annotations();
+    const parsed = JSON.parse(raw) as Array<
+      PersistedAnnotation & { tile_w: number; tile_h: number; tile_offset_x: number; tile_offset_y: number }
+    >;
+    annotations = parsed.map((a) => ({
+      id: a.id,
+      text: a.text,
+      x: a.x,
+      y: a.y,
+      font_size: a.font_size,
+      r: a.r,
+      g: a.g,
+      b: a.b,
+      bold: a.bold,
+      rotation_deg: a.rotation_deg,
+      background_kind: a.background_kind,
+      bg_r: a.bg_r,
+      bg_g: a.bg_g,
+      bg_b: a.bg_b,
+      bg_a: a.bg_a,
+      bg_padding: a.bg_padding,
+      bg_corner_radius: a.bg_corner_radius,
+      bg_tail: a.bg_tail,
+    }));
+  } catch {
+    annotations = [];
   }
 
   await idbSet<SavedEdit>(`edit-${photoId}`, {
@@ -124,6 +222,7 @@ export async function savePhotoEdit(
     canvasPng,
     undoStack,
     redoStack,
+    annotations,
   });
 }
 

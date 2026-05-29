@@ -94,12 +94,14 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       canvas.height = t.height();
     }
     const ctx = canvas.getContext("2d")!;
+    // If any live text annotations exist, render them composited on top so
+    // the display canvas matches what export would produce.
+    const pixels =
+      t.text_annotation_count() > 0
+        ? t.render_with_annotations()
+        : t.get_image_data();
     ctx.putImageData(
-      new ImageData(
-        new Uint8ClampedArray(t.get_image_data()),
-        t.width(),
-        t.height(),
-      ),
+      new ImageData(new Uint8ClampedArray(pixels), t.width(), t.height()),
       0,
       0,
     );
@@ -184,8 +186,11 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       const tool = new Tool(saved.canvasW, saved.canvasH);
       tool.load_image(new Uint8Array(canvasRgba.buffer as ArrayBuffer)); // clears history
 
-      // Re-inject undo snapshots (oldest first — preserves original order)
-      for (const snap of saved.undoStack) {
+      // Re-inject undo snapshots (oldest first — preserves original order).
+      // Each snapshot's annotations are pushed via per-annotation calls so
+      // Rust rebuilds the tile cache (we don't store tile bytes on disk).
+      for (let i = 0; i < saved.undoStack.length; i++) {
+        const snap = saved.undoStack[i];
         const { rgba, w, h } = await decodePngToRgba(snap.png);
         tool.inject_undo_snapshot(
           new Uint8Array(rgba.buffer as ArrayBuffer),
@@ -193,10 +198,32 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
           h,
           snap.label,
         );
+        if (snap.annotations) {
+          for (const a of snap.annotations) {
+            tool.push_annotation_to_undo_snapshot(
+              i,
+              a.text,
+              a.font_size,
+              a.r, a.g, a.b,
+              a.bold,
+              a.x, a.y,
+              a.rotation_deg,
+              a.background_kind ?? 0,
+              a.bg_r ?? 255,
+              a.bg_g ?? 255,
+              a.bg_b ?? 255,
+              a.bg_a ?? 255,
+              a.bg_padding ?? 8,
+              a.bg_corner_radius ?? 8,
+              a.bg_tail ?? 0,
+            );
+          }
+        }
       }
 
       // Re-inject redo snapshots
-      for (const snap of saved.redoStack) {
+      for (let i = 0; i < saved.redoStack.length; i++) {
+        const snap = saved.redoStack[i];
         const { rgba, w, h } = await decodePngToRgba(snap.png);
         tool.inject_redo_snapshot(
           new Uint8Array(rgba.buffer as ArrayBuffer),
@@ -204,6 +231,27 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
           h,
           snap.label,
         );
+        if (snap.annotations) {
+          for (const a of snap.annotations) {
+            tool.push_annotation_to_redo_snapshot(
+              i,
+              a.text,
+              a.font_size,
+              a.r, a.g, a.b,
+              a.bold,
+              a.x, a.y,
+              a.rotation_deg,
+              a.background_kind ?? 0,
+              a.bg_r ?? 255,
+              a.bg_g ?? 255,
+              a.bg_b ?? 255,
+              a.bg_a ?? 255,
+              a.bg_padding ?? 8,
+              a.bg_corner_radius ?? 8,
+              a.bg_tail ?? 0,
+            );
+          }
+        }
       }
 
       toolRef.current = tool;
@@ -213,6 +261,28 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       if (canvas) {
         canvas.width = saved.canvasW;
         canvas.height = saved.canvasH;
+      }
+
+      // Re-create live text annotations (non-destructive overlay layer).
+      if (saved.annotations && saved.annotations.length > 0) {
+        for (const a of saved.annotations) {
+          tool.add_text_annotation(
+            a.text,
+            a.font_size,
+            a.r, a.g, a.b,
+            a.bold,
+            a.x, a.y,
+            a.rotation_deg,
+            a.background_kind ?? 0,
+            a.bg_r ?? 255,
+            a.bg_g ?? 255,
+            a.bg_b ?? 255,
+            a.bg_a ?? 255,
+            a.bg_padding ?? 8,
+            a.bg_corner_radius ?? 8,
+            a.bg_tail ?? 0,
+          );
+        }
       }
 
       flushToCanvas();
@@ -239,12 +309,20 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   }, []);
 
   // ── History ───────────────────────────────────────────────────────────────
+  /** Fire a window event so consumers (e.g. the text tool) can re-sync any
+   *  derived state (the live annotation list, hover/edit selection, etc.)
+   *  after an undo/redo/jump that may have restored a different overlay. */
+  const broadcastAnnotationsChanged = useCallback(() => {
+    window.dispatchEvent(new Event("text-annotations-changed"));
+  }, []);
+
   const undo = useCallback(() => {
     if (toolRef.current?.undo()) {
       flushToCanvas();
       syncState();
+      broadcastAnnotationsChanged();
     }
-  }, [flushToCanvas, syncState]);
+  }, [flushToCanvas, syncState, broadcastAnnotationsChanged]);
 
   const redo = useCallback(() => {
     console.log("Redo function called, redoCount:", state.redoCount);
@@ -252,19 +330,21 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       console.log("Redo successful");
       flushToCanvas();
       syncState();
+      broadcastAnnotationsChanged();
     } else {
       console.log("Redo failed or no redo available");
     }
-  }, [flushToCanvas, syncState, state.redoCount]);
+  }, [flushToCanvas, syncState, state.redoCount, broadcastAnnotationsChanged]);
 
   const jumpToHistory = useCallback(
     (index: number) => {
       if (toolRef.current?.jump_to_history(index)) {
         flushToCanvas();
         syncState();
+        broadcastAnnotationsChanged();
       }
     },
-    [flushToCanvas, syncState],
+    [flushToCanvas, syncState, broadcastAnnotationsChanged],
   );
 
   const deleteHistoryEntry = useCallback(
@@ -292,6 +372,14 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const exportPng = useCallback((sourceName = "image") => {
     const t = toolRef.current;
     if (!t) return;
+    // Burn any live text annotations into pixels first so the export
+    // includes them (with one history snapshot so undo restores the
+    // live-overlay state).
+    if (t.text_annotation_count() > 0) {
+      t.flatten_text_annotations();
+      flushToCanvas();
+      syncState();
+    }
     const png = t.export_png();
     const blob = new Blob([new Uint8Array(png)], { type: "image/png" });
     const url = URL.createObjectURL(blob);
@@ -300,7 +388,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     a.download = revisedName(sourceName, ".png");
     a.click();
     URL.revokeObjectURL(url);
-  }, []);
+  }, [flushToCanvas, syncState]);
 
   const exportAs = useCallback(
     (format: "png" | "jpeg" | "webp" | "avif", quality: number = 0.92, sourceName = "image") => {
@@ -310,6 +398,14 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       }
       const canvas = canvasRef.current;
       if (!canvas) return;
+      // Non-PNG export reads the canvas pixels via toBlob, so make sure
+      // annotations are burned into the buffer (and the canvas) first.
+      const t = toolRef.current;
+      if (t && t.text_annotation_count() > 0) {
+        t.flatten_text_annotations();
+        flushToCanvas();
+        syncState();
+      }
       const mimeMap: Record<string, string> = {
         jpeg: "image/jpeg",
         webp: "image/webp",
@@ -334,7 +430,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
         quality,
       );
     },
-    [canvasRef, exportPng],
+    [canvasRef, exportPng, flushToCanvas, syncState],
   );
 
   // ── Mouse / stroke handlers ───────────────────────────────────────────────

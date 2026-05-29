@@ -20,4 +20,10 @@ export const defaultToolSettings: ToolSettings = {
   effectContrast: 100,
   emoji: "😀",
   emojiSize: 64,
+  bgKind: "none",
+  bgColor: "#ffffff",
+  bgOpacity: 100,
+  bgPadding: 8,
+  bgCornerRadius: 8,
+  bgTail: "bottomleft",
 };

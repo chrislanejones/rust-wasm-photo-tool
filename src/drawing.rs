@@ -38,6 +38,83 @@ fn draw_line_thick(
     }
 }
 
+/// Public filled rounded-rect helper. Renders into an RGBA buffer of size
+/// (w*h*4) with Porter-Duff source-over blending. Approximates rounded
+/// corners by composing a centre rectangle, two edge strips, plus four
+/// filled quarter-disks at the corners. The corners use a per-pixel
+/// distance test so they are anti-aliased to about ±0.5 px.
+///
+/// Coordinates are inclusive of `x0,y0` and exclusive of `x1,y1`
+/// (i.e. rect width = x1-x0, height = y1-y0).
+pub fn fill_rounded_rect(
+    out: &mut [u8],
+    w: u32, h: u32,
+    x0: i32, y0: i32,
+    x1: i32, y1: i32,
+    radius: u32,
+    r: u8, g: u8, b: u8, a: u8,
+) {
+    let wi = w as i32;
+    let hi = h as i32;
+    let x0c = x0.max(0);
+    let y0c = y0.max(0);
+    let x1c = x1.min(wi);
+    let y1c = y1.min(hi);
+    if x0c >= x1c || y0c >= y1c { return; }
+
+    let rw = (x1 - x0).max(0) as u32;
+    let rh = (y1 - y0).max(0) as u32;
+    let max_r = (rw.min(rh) / 2).max(0);
+    let rad = radius.min(max_r);
+    let radf = rad as f64;
+
+    let color = [r, g, b, a];
+    for py in y0c..y1c {
+        for px in x0c..x1c {
+            // Distance from the nearest "rounded" corner anchor.
+            let lx = (x0 + rad as i32) as f64;
+            let rx = (x1 - rad as i32 - 1) as f64;
+            let ty = (y0 + rad as i32) as f64;
+            let by = (y1 - rad as i32 - 1) as f64;
+            let dx = if (px as f64) < lx { (px as f64) - lx }
+                     else if (px as f64) > rx { (px as f64) - rx }
+                     else { 0.0 };
+            let dy = if (py as f64) < ty { (py as f64) - ty }
+                     else if (py as f64) > by { (py as f64) - by }
+                     else { 0.0 };
+            let dist = (dx * dx + dy * dy).sqrt();
+            let cov = if rad == 0 {
+                1.0
+            } else if dist <= radf - 0.5 {
+                1.0
+            } else if dist >= radf + 0.5 {
+                0.0
+            } else {
+                (radf + 0.5 - dist).clamp(0.0, 1.0)
+            };
+            if cov <= 0.0 { continue; }
+            let idx = ((py * wi + px) * 4) as usize;
+            if idx + 3 >= out.len() { continue; }
+            let mut c = color;
+            c[3] = (a as f64 * cov).round().clamp(0.0, 255.0) as u8;
+            blend_pixel(out, idx, c);
+        }
+    }
+}
+
+/// Public filled triangle helper (Porter-Duff source-over blend) for the
+/// speech-bubble tail.
+pub fn fill_triangle_public(
+    out: &mut [u8],
+    w: u32, h: u32,
+    p1: (f64, f64),
+    p2: (f64, f64),
+    p3: (f64, f64),
+    r: u8, g: u8, b: u8, a: u8,
+) {
+    fill_triangle(out, w as i32, h as i32, p1, p2, p3, [r, g, b, a]);
+}
+
 fn blend_pixel(data: &mut [u8], idx: usize, color: [u8; 4]) {
     let sa = color[3] as f64 / 255.0;
     if sa < 0.001 { return; }

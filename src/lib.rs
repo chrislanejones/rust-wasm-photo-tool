@@ -26,6 +26,37 @@ use crate::core::ImageBuffer;
 use crate::history::{History, Snapshot};
 use crate::stamp::StampState;
 
+/// A live (non-destructive) text annotation that sits in an overlay
+/// composited over the main pixel buffer on render. Annotations are
+/// re-editable until `flatten_text_annotations` burns them into pixels
+/// (used at export time and on explicit flatten).
+///
+/// `Clone` is derived so each history snapshot can carry an independent
+/// copy of the annotation list (so undo/redo restores the overlay too).
+#[derive(Clone)]
+pub struct TextAnnotation {
+    pub id: u32,
+    pub text: String,
+    pub x: i32,       // unrotated top-left in canvas coords
+    pub y: i32,
+    pub font_size: f32,
+    pub r: u8, pub g: u8, pub b: u8,
+    pub bold: bool,
+    pub rotation_deg: f64,
+    // cached pre-rendered tile (rotated): updated whenever the annotation changes.
+    pub tile_pixels: Vec<u8>,
+    pub tile_w: u32,
+    pub tile_h: u32,
+    pub tile_offset_x: i32,  // offset of tile origin from (x,y) due to rotation expanding bounds
+    pub tile_offset_y: i32,
+    // Text background (optional fill behind the text)
+    pub background_kind: u8,   // 0 = None, 1 = Rect, 2 = SpeechBubble
+    pub bg_r: u8, pub bg_g: u8, pub bg_b: u8, pub bg_a: u8,
+    pub bg_padding: u32,
+    pub bg_corner_radius: u32,
+    pub bg_tail: u8,           // 0 none, 1 Left, 2 Right, 3 TopLeft, 4 BottomRight, 5 BottomLeft
+}
+
 #[wasm_bindgen]
 pub struct ImageHorseTool {
     buf: ImageBuffer,
@@ -35,6 +66,232 @@ pub struct ImageHorseTool {
     // Scratch buffers reused across blur_region calls to avoid per-stroke allocation.
     blur_scratch_a: Vec<u8>,
     blur_scratch_b: Vec<u8>,
+    text_annotations: Vec<TextAnnotation>,
+    next_text_id: u32,
+}
+
+/// Escape a string as a JSON string body (without surrounding quotes).
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\u{08}' => out.push_str("\\b"),
+            '\u{0c}' => out.push_str("\\f"),
+            c if (c as u32) < 0x20 => {
+                out.push_str(&format!("\\u{:04x}", c as u32));
+            }
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Build a complete TextAnnotation (config + pre-rendered tile) ready to
+/// either push onto the live overlay list or onto a history snapshot's
+/// annotation vector. Centralizes the tile-rebuild logic so add/update
+/// and snapshot-restore all share the same path.
+fn build_text_annotation(
+    id: u32,
+    text: &str,
+    font_size: f32,
+    r: u8, g: u8, b: u8,
+    bold: bool,
+    x: i32,
+    y: i32,
+    rotation_deg: f64,
+    background_kind: u8,
+    bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+    bg_padding: u32,
+    bg_corner_radius: u32,
+    bg_tail: u8,
+) -> TextAnnotation {
+    let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
+        build_annotation_tile(
+            text, font_size, r, g, b, bold, rotation_deg,
+            background_kind,
+            bg_r, bg_g, bg_b, bg_a,
+            bg_padding, bg_corner_radius, bg_tail,
+        );
+    TextAnnotation {
+        id,
+        text: text.to_string(),
+        x, y,
+        font_size,
+        r, g, b,
+        bold,
+        rotation_deg,
+        tile_pixels,
+        tile_w, tile_h,
+        tile_offset_x, tile_offset_y,
+        background_kind,
+        bg_r, bg_g, bg_b, bg_a,
+        bg_padding,
+        bg_corner_radius,
+        bg_tail,
+    }
+}
+
+/// Serialize a list of annotations to the JSON format consumed by JS.
+/// Tile dimensions are included so the JS overlay can lay out chevrons
+/// and selection rectangles without a Rust round-trip per frame.
+fn annotations_to_json(anns: &[TextAnnotation]) -> String {
+    let mut out = String::from("[");
+    for (i, a) in anns.iter().enumerate() {
+        if i > 0 { out.push(','); }
+        out.push_str(&format!(
+            "{{\"id\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{}}}",
+            a.id,
+            json_escape(&a.text),
+            a.x, a.y,
+            a.font_size,
+            a.r, a.g, a.b,
+            a.bold,
+            a.rotation_deg,
+            a.tile_w, a.tile_h,
+            a.tile_offset_x, a.tile_offset_y,
+            a.background_kind,
+            a.bg_r, a.bg_g, a.bg_b, a.bg_a,
+            a.bg_padding, a.bg_corner_radius, a.bg_tail,
+        ));
+    }
+    out.push(']');
+    out
+}
+
+/// Build the cached tile (rotated if needed) for an annotation's current
+/// text / font / colour / rotation, optionally including a filled
+/// background (rect or speech bubble). Returns (pixels, w, h, off_x, off_y).
+/// `off_x/off_y` are the offsets of the rotated bounding box relative to
+/// the unrotated top-left (x,y) so that rotation pivots around the centre
+/// of the unrotated tile.
+///
+/// `background_kind`: 0 = none, 1 = filled rounded rect, 2 = rounded rect
+/// with a small triangular tail.
+fn build_annotation_tile(
+    text: &str,
+    font_size: f32,
+    r: u8, g: u8, b: u8,
+    bold: bool,
+    rotation_deg: f64,
+    background_kind: u8,
+    bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+    bg_padding: u32,
+    bg_corner_radius: u32,
+    bg_tail: u8,
+) -> (Vec<u8>, u32, u32, i32, i32) {
+    let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
+    let raw_w = rendered.width;
+    let raw_h = rendered.height;
+
+    // If no background, the historical fast-path applies.
+    if background_kind == 0 {
+        if rotation_deg.abs() < 0.5 {
+            return (rendered.pixels, raw_w, raw_h, 0, 0);
+        }
+        let rotated = crate::text::rotate_pixels(
+            &rendered.pixels,
+            raw_w,
+            raw_h,
+            -(rotation_deg as f32),
+        );
+        let cx = raw_w as i32 / 2;
+        let cy = raw_h as i32 / 2;
+        let off_x = cx - rotated.width as i32 / 2;
+        let off_y = cy - rotated.height as i32 / 2;
+        return (rotated.pixels, rotated.width, rotated.height, off_x, off_y);
+    }
+
+    // Background path: expand the tile by `bg_padding` on all sides, and
+    // by ~TAIL_EXTENT (16 px on the tail axis, 12 px on the perpendicular)
+    // when there's a speech-bubble tail.
+    const TAIL_LEN: u32 = 16;     // how far the tail sticks out
+    const TAIL_HALF: u32 = 8;     // half-width of the tail base
+    let (tail_l, tail_r, tail_t, tail_b) = if background_kind == 2 {
+        match bg_tail {
+            1 => (TAIL_LEN, 0, 0, 0),                          // Left
+            2 => (0, TAIL_LEN, 0, 0),                          // Right
+            3 => (0, 0, TAIL_LEN, 0),                          // TopLeft (extends up)
+            4 => (0, TAIL_LEN, 0, TAIL_LEN),                   // BottomRight
+            5 => (TAIL_LEN, 0, 0, TAIL_LEN),                   // BottomLeft
+            _ => (0, 0, 0, 0),
+        }
+    } else {
+        (0, 0, 0, 0)
+    };
+    let pad = bg_padding;
+    let tile_w = raw_w + pad * 2 + tail_l + tail_r;
+    let tile_h = raw_h + pad * 2 + tail_t + tail_b;
+    let mut tile = vec![0u8; (tile_w * tile_h * 4) as usize];
+
+    // Background rect occupies the padded text area inside the tile.
+    let rect_x0 = tail_l as i32;
+    let rect_y0 = tail_t as i32;
+    let rect_x1 = (tail_l + raw_w + pad * 2) as i32;
+    let rect_y1 = (tail_t + raw_h + pad * 2) as i32;
+
+    crate::drawing::fill_rounded_rect(
+        &mut tile, tile_w, tile_h,
+        rect_x0, rect_y0, rect_x1, rect_y1,
+        bg_corner_radius,
+        bg_r, bg_g, bg_b, bg_a,
+    );
+
+    // Optional speech-bubble tail. The tail attaches to the rect's edge
+    // and extends outward; size ~ TAIL_LEN x (TAIL_HALF*2).
+    if background_kind == 2 && bg_tail != 0 {
+        let rx0 = rect_x0 as f64;
+        let ry0 = rect_y0 as f64;
+        let rx1 = rect_x1 as f64;
+        let ry1 = rect_y1 as f64;
+        let _mid_x = (rx0 + rx1) * 0.5;
+        let mid_y = (ry0 + ry1) * 0.5;
+        let hf = TAIL_HALF as f64;
+        let tl = TAIL_LEN as f64;
+        let (p1, p2, p3) = match bg_tail {
+            1 => ((rx0, mid_y - hf), (rx0, mid_y + hf), (rx0 - tl, mid_y)),
+            2 => ((rx1, mid_y - hf), (rx1, mid_y + hf), (rx1 + tl, mid_y)),
+            3 => ((rx0 + hf, ry0), (rx0 + hf * 3.0, ry0), (rx0, ry0 - tl)),
+            4 => ((rx1 - hf, ry1), (rx1 - hf * 3.0, ry1), (rx1, ry1 + tl)),
+            5 => ((rx0 + hf, ry1), (rx0 + hf * 3.0, ry1), (rx0, ry1 + tl)),
+            _ => ((0.0, 0.0), (0.0, 0.0), (0.0, 0.0)),
+        };
+        crate::drawing::fill_triangle_public(
+            &mut tile, tile_w, tile_h,
+            p1, p2, p3,
+            bg_r, bg_g, bg_b, bg_a,
+        );
+    }
+
+    // Composite the text on top of the background. The text sits inside
+    // the rect with `pad` margin.
+    let text_dx = (tail_l + pad) as i32;
+    let text_dy = (tail_t + pad) as i32;
+    crate::transform::paste_region(
+        &mut tile,
+        tile_w as i32,
+        tile_h as i32,
+        &rendered.pixels,
+        raw_w,
+        raw_h,
+        text_dx,
+        text_dy,
+    );
+
+    if rotation_deg.abs() < 0.5 {
+        return (tile, tile_w, tile_h, 0, 0);
+    }
+    // Rotate the composed tile (background + text together).
+    let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, -(rotation_deg as f32));
+    let cx = tile_w as i32 / 2;
+    let cy = tile_h as i32 / 2;
+    let off_x = cx - rotated.width as i32 / 2;
+    let off_y = cy - rotated.height as i32 / 2;
+    (rotated.pixels, rotated.width, rotated.height, off_x, off_y)
 }
 
 #[wasm_bindgen]
@@ -50,6 +307,8 @@ impl ImageHorseTool {
             zoom: 1.0,
             blur_scratch_a: Vec::new(),
             blur_scratch_b: Vec::new(),
+            text_annotations: Vec::new(),
+            next_text_id: 1,
         }
     }
 
@@ -69,6 +328,8 @@ impl ImageHorseTool {
             self.stamp.stroke_counter = 0;
             self.stamp.source_x = None;
             self.stamp.source_y = None;
+            self.text_annotations.clear();
+            self.next_text_id = 1;
         }
     }
 
@@ -139,6 +400,7 @@ impl ImageHorseTool {
     pub fn begin_stroke(&mut self, dest_x: f64, dest_y: f64) {
         let w = self.buf.width as i32;
         let h = self.buf.height as i32;
+        let anns = self.text_annotations.clone();
         self.stamp.begin_stroke(
             &mut self.buf.data,
             w,
@@ -146,6 +408,7 @@ impl ImageHorseTool {
             &mut self.hist.redo_stack,
             dest_x,
             dest_y,
+            anns,
         );
     }
 
@@ -164,10 +427,14 @@ impl ImageHorseTool {
     // ── History ─────────────────────────────────────────────────────────
 
     pub fn undo(&mut self) -> bool {
-        if let Some((data, w, h)) = self.hist.undo(&self.buf.data, self.buf.width, self.buf.height) {
+        let anns = std::mem::take(&mut self.text_annotations);
+        if let Some((data, w, h, restored_anns)) =
+            self.hist.undo(&self.buf.data, self.buf.width, self.buf.height, anns)
+        {
             self.buf.data = data;
             self.buf.width = w;
             self.buf.height = h;
+            self.text_annotations = restored_anns;
             true
         } else {
             false
@@ -175,10 +442,14 @@ impl ImageHorseTool {
     }
 
     pub fn redo(&mut self) -> bool {
-        if let Some((data, w, h)) = self.hist.redo(&self.buf.data, self.buf.width, self.buf.height) {
+        let anns = std::mem::take(&mut self.text_annotations);
+        if let Some((data, w, h, restored_anns)) =
+            self.hist.redo(&self.buf.data, self.buf.width, self.buf.height, anns)
+        {
             self.buf.data = data;
             self.buf.width = w;
             self.buf.height = h;
+            self.text_annotations = restored_anns;
             true
         } else {
             false
@@ -198,7 +469,13 @@ impl ImageHorseTool {
     }
 
     pub fn jump_to_history(&mut self, target_index: usize) -> bool {
-        self.hist.jump_to(target_index, &mut self.buf.data, &mut self.buf.width, &mut self.buf.height)
+        self.hist.jump_to(
+            target_index,
+            &mut self.buf.data,
+            &mut self.buf.width,
+            &mut self.buf.height,
+            &mut self.text_annotations,
+        )
     }
 
     pub fn delete_history_entry(&mut self, index: usize) -> bool {
@@ -247,13 +524,16 @@ impl ImageHorseTool {
         self.hist.redo_stack.get(index).map(|s| s.label.clone()).unwrap_or_default()
     }
 
-    /// Append a raw-RGBA snapshot to the undo stack (used when restoring a session).
+    /// Append a raw-RGBA snapshot to the undo stack (used when restoring a
+    /// session). Annotations start empty — the JS side adds them one by one
+    /// with `push_annotation_to_undo_snapshot` after this returns.
     pub fn inject_undo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
         self.hist.undo_stack.push(Snapshot {
             label: label.to_string(),
             data: data.to_vec(),
             width: w,
             height: h,
+            annotations: Vec::new(),
         });
     }
 
@@ -264,7 +544,86 @@ impl ImageHorseTool {
             data: data.to_vec(),
             width: w,
             height: h,
+            annotations: Vec::new(),
         });
+    }
+
+    /// Per-snapshot annotation state as JSON. Mirrors `get_text_annotations`
+    /// so JS can read snapshot overlays with the same parser. Used by the
+    /// persistence layer for round-trip saves.
+    pub fn get_undo_snapshot_annotations(&self, index: usize) -> String {
+        match self.hist.undo_stack.get(index) {
+            None => String::from("[]"),
+            Some(snap) => annotations_to_json(&snap.annotations),
+        }
+    }
+
+    pub fn get_redo_snapshot_annotations(&self, index: usize) -> String {
+        match self.hist.redo_stack.get(index) {
+            None => String::from("[]"),
+            Some(snap) => annotations_to_json(&snap.annotations),
+        }
+    }
+
+    /// Push one annotation onto the undo-snapshot at `snap_idx`. The tile is
+    /// rebuilt from the config so the persistence layer doesn't have to store
+    /// pre-rotated tile bytes. Returns false if the index is out of range.
+    pub fn push_annotation_to_undo_snapshot(
+        &mut self,
+        snap_idx: usize,
+        text: &str,
+        font_size: f32,
+        r: u8, g: u8, b: u8,
+        bold: bool,
+        x: i32,
+        y: i32,
+        rotation_deg: f64,
+        background_kind: u8,
+        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_padding: u32,
+        bg_corner_radius: u32,
+        bg_tail: u8,
+    ) -> bool {
+        let id = self.next_text_id;
+        self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
+        let ann = build_text_annotation(
+            id, text, font_size, r, g, b, bold, x, y, rotation_deg,
+            background_kind, bg_r, bg_g, bg_b, bg_a,
+            bg_padding, bg_corner_radius, bg_tail,
+        );
+        match self.hist.undo_stack.get_mut(snap_idx) {
+            None => false,
+            Some(snap) => { snap.annotations.push(ann); true }
+        }
+    }
+
+    pub fn push_annotation_to_redo_snapshot(
+        &mut self,
+        snap_idx: usize,
+        text: &str,
+        font_size: f32,
+        r: u8, g: u8, b: u8,
+        bold: bool,
+        x: i32,
+        y: i32,
+        rotation_deg: f64,
+        background_kind: u8,
+        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_padding: u32,
+        bg_corner_radius: u32,
+        bg_tail: u8,
+    ) -> bool {
+        let id = self.next_text_id;
+        self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
+        let ann = build_text_annotation(
+            id, text, font_size, r, g, b, bold, x, y, rotation_deg,
+            background_kind, bg_r, bg_g, bg_b, bg_a,
+            bg_padding, bg_corner_radius, bg_tail,
+        );
+        match self.hist.redo_stack.get_mut(snap_idx) {
+            None => false,
+            Some(snap) => { snap.annotations.push(ann); true }
+        }
     }
 
     // ── Codec ───────────────────────────────────────────────────────────
@@ -285,30 +644,10 @@ impl ImageHorseTool {
         codec::thumbnail_data(&self.buf, max_px).0
     }
 
-    pub fn extract_region_png(&self, x: i32, y: i32, w: u32, h: u32) -> Vec<u8> {
-        // Reuse the existing copy_region which handles out-of-bounds
-        // sampling by filling with transparent pixels (0,0,0,0).
-        let pixels = transform::copy_region(
-            &self.buf.data,
-            self.buf.width as i32,
-            self.buf.height as i32,
-            x, y, w, h,
-        );
-        // Build a throwaway ImageBuffer at the region's dimensions and
-        // pipe it through the existing PNG encoder. Does NOT push a
-        // history snapshot or modify self.buf — this is a pure read.
-        let tmp = crate::core::ImageBuffer {
-            width: w,
-            height: h,
-            data: pixels,
-        };
-        codec::export_png(&tmp)
-    }
-
     // ── Transforms ──────────────────────────────────────────────────────
 
     pub fn flip_horizontal(&mut self) {
-        self.hist.push_snapshot("Flip H", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Flip H", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         let w = self.buf.width as usize;
         let h = self.buf.height as usize;
         transform::flip_horizontal(&mut self.buf.data, w, h);
@@ -318,7 +657,7 @@ impl ImageHorseTool {
     }
 
     pub fn flip_vertical(&mut self) {
-        self.hist.push_snapshot("Flip V", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Flip V", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         let w = self.buf.width as usize;
         let h = self.buf.height as usize;
         transform::flip_vertical(&mut self.buf.data, w, h);
@@ -328,7 +667,7 @@ impl ImageHorseTool {
     }
 
     pub fn rotate_90_cw(&mut self) {
-        self.hist.push_snapshot("Rotate 90° CW", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Rotate 90° CW", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         let (new_data, new_w, new_h) =
             transform::rotate_90_cw(&self.buf.data, self.buf.width as usize, self.buf.height as usize);
         self.buf.data = new_data;
@@ -339,7 +678,7 @@ impl ImageHorseTool {
     }
 
     pub fn rotate_90_ccw(&mut self) {
-        self.hist.push_snapshot("Rotate 90° CCW", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Rotate 90° CCW", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         let (new_data, new_w, new_h) =
             transform::rotate_90_ccw(&self.buf.data, self.buf.width as usize, self.buf.height as usize);
         self.buf.data = new_data;
@@ -350,7 +689,7 @@ impl ImageHorseTool {
     }
 
     pub fn crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        self.hist.push_snapshot("Crop", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Crop", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         let (new_data, new_w, new_h) =
             transform::crop(&self.buf.data, self.buf.width, self.buf.height, x, y, w, h);
         self.buf.data = new_data;
@@ -364,7 +703,7 @@ impl ImageHorseTool {
     /// Saves a snapshot, applies darkening overlay + dashed border.
     /// Call cancel_crop_preview() or apply_crop_from_preview() when done.
     pub fn preview_crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        self.hist.push_snapshot("Crop Preview", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Crop Preview", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         transform::apply_crop_overlay(
             &mut self.buf.data,
             self.buf.width,
@@ -390,10 +729,14 @@ impl ImageHorseTool {
 
     /// Apply crop after preview: undo preview first, then crop for real.
     pub fn apply_crop_from_preview(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        if let Some((data, bw, bh)) = self.hist.undo(&self.buf.data, self.buf.width, self.buf.height) {
+        let anns = std::mem::take(&mut self.text_annotations);
+        if let Some((data, bw, bh, restored_anns)) =
+            self.hist.undo(&self.buf.data, self.buf.width, self.buf.height, anns)
+        {
             self.buf.data = data;
             self.buf.width = bw;
             self.buf.height = bh;
+            self.text_annotations = restored_anns;
         }
         self.crop(x, y, w, h);
     }
@@ -410,7 +753,7 @@ impl ImageHorseTool {
         dest_x: i32,
         dest_y: i32,
     ) {
-        self.hist.push_snapshot("Paste", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Paste", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         transform::paste_region(
             &mut self.buf.data,
             self.buf.width as i32,
@@ -429,7 +772,7 @@ impl ImageHorseTool {
         if new_w == 0 || new_h == 0 {
             return;
         }
-        self.hist.push_snapshot("Resize", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Resize", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         let resized = transform::resize_bilinear(
             &self.buf.data,
             self.buf.width,
@@ -447,12 +790,12 @@ impl ImageHorseTool {
     // ── Filters ─────────────────────────────────────────────────────────
 
     pub fn adjust_brightness(&mut self, delta: f64) {
-        self.hist.push_snapshot("Brightness", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Brightness", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         filters::adjust_brightness(&mut self.buf.data, delta);
     }
 
     pub fn adjust_contrast(&mut self, factor: f64) {
-        self.hist.push_snapshot("Contrast", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Contrast", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         filters::adjust_contrast(&mut self.buf.data, factor);
     }
 
@@ -482,7 +825,7 @@ impl ImageHorseTool {
  
     /// Begin a blur stroke — saves undo snapshot once
     pub fn begin_blur_stroke(&mut self) {
-        self.hist.push_snapshot("Blur", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Blur", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
     }
  
     // Note: No end_blur_stroke needed — the snapshot is already saved.
@@ -492,7 +835,13 @@ impl ImageHorseTool {
     /// Save undo snapshot before drawing an arrow/shape.
     /// Call once on mousedown, then draw_arrow/draw_shape on mouseup.
     pub fn begin_draw_stroke(&mut self, label: &str) {
-        self.hist.push_snapshot(label, &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot(
+            label,
+            &self.buf.data,
+            self.buf.width,
+            self.buf.height,
+            self.text_annotations.clone(),
+        );
     }
  
     /// Draw an arrow onto the image buffer.
@@ -548,7 +897,7 @@ impl ImageHorseTool {
         dest_x: i32,
         dest_y: i32,
     ) {
-        self.hist.push_snapshot("Emoji", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Emoji", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         transform::paste_region(
             &mut self.buf.data,
             self.buf.width as i32,
@@ -572,7 +921,7 @@ impl ImageHorseTool {
         dest_y: i32,
         target_size: u32,
     ) {
-        self.hist.push_snapshot("Red Stamp", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Red Stamp", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         // Scale stamp to target_size preserving aspect ratio
         let scale = target_size as f64 / src_w.max(src_h) as f64;
         let new_w = ((src_w as f64 * scale).round() as u32).max(1);
@@ -593,6 +942,10 @@ impl ImageHorseTool {
         );
     }
 
+    /// DEPRECATED: prefer `add_text_annotation` + `flatten_text_annotations`
+    /// for the re-editable overlay flow. Kept as a one-shot direct-to-pixels
+    /// fallback for callers that don't need re-edit.
+    ///
     /// Render text entirely in Rust (Liberation Sans, embedded font) and
     /// composite it onto the image buffer at (dest_x, dest_y).
     /// Replaces the JS OffscreenCanvas → stamp_pixels pipeline for the text tool.
@@ -609,7 +962,7 @@ impl ImageHorseTool {
         angle_deg: f32,
     ) {
         let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
-        self.hist.push_snapshot("Text", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Text", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
 
         if angle_deg.abs() < 0.5 {
             transform::paste_region(
@@ -668,7 +1021,7 @@ impl ImageHorseTool {
         let new_w = ((rendered.width as f64 * scale).round() as u32).max(1);
         let new_h = ((rendered.height as f64 * scale).round() as u32).max(1);
         let scaled = transform::resize_bilinear(&rendered.pixels, rendered.width, rendered.height, new_w, new_h);
-        self.hist.push_snapshot("Red Stamp", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Red Stamp", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
         transform::paste_region(
             &mut self.buf.data,
             self.buf.width as i32,
@@ -684,7 +1037,7 @@ impl ImageHorseTool {
     // ── Paint / Brush Tool ──────────────────────────────────────
 
     pub fn paint_begin(&mut self) {
-        self.hist.push_snapshot("Paint", &self.buf.data, self.buf.width, self.buf.height);
+        self.hist.push_snapshot("Paint", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
     }
 
     pub fn paint_dab(
@@ -784,6 +1137,193 @@ impl ImageHorseTool {
         }
         out
     }
+
+    // ── Live text annotations (non-destructive overlay) ─────────────────
+    // Annotations live as Rust state, get composited onto the buffer for
+    // display via `render_with_annotations`, and are burnt into pixels
+    // (one history snapshot) by `flatten_text_annotations` before export.
+
+    /// Number of live (uncommitted) text annotations. Cheap getter so JS
+    /// can decide whether to do the overlay-aware flush.
+    pub fn text_annotation_count(&self) -> usize {
+        self.text_annotations.len()
+    }
+
+    /// Add a new text annotation. Pre-renders the rotated tile, stores it,
+    /// returns the new annotation's id. Pushes an "Add Text" history snapshot
+    /// so undo restores the state with this annotation absent.
+    pub fn add_text_annotation(
+        &mut self,
+        text: &str,
+        font_size: f32,
+        r: u8, g: u8, b: u8,
+        bold: bool,
+        x: i32,
+        y: i32,
+        rotation_deg: f64,
+        background_kind: u8,
+        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_padding: u32,
+        bg_corner_radius: u32,
+        bg_tail: u8,
+    ) -> u32 {
+        self.hist.push_snapshot(
+            "Add Text",
+            &self.buf.data,
+            self.buf.width,
+            self.buf.height,
+            self.text_annotations.clone(),
+        );
+        let id = self.next_text_id;
+        self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
+        let ann = build_text_annotation(
+            id, text, font_size, r, g, b, bold, x, y, rotation_deg,
+            background_kind, bg_r, bg_g, bg_b, bg_a,
+            bg_padding, bg_corner_radius, bg_tail,
+        );
+        self.text_annotations.push(ann);
+        id
+    }
+
+    /// Update an existing annotation in place. Returns true if found.
+    /// Pushes an "Edit Text" history snapshot so undo restores prior values.
+    pub fn update_text_annotation(
+        &mut self,
+        id: u32,
+        text: &str,
+        font_size: f32,
+        r: u8, g: u8, b: u8,
+        bold: bool,
+        x: i32,
+        y: i32,
+        rotation_deg: f64,
+        background_kind: u8,
+        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_padding: u32,
+        bg_corner_radius: u32,
+        bg_tail: u8,
+    ) -> bool {
+        let Some(idx) = self.text_annotations.iter().position(|a| a.id == id) else {
+            return false;
+        };
+        self.hist.push_snapshot(
+            "Edit Text",
+            &self.buf.data,
+            self.buf.width,
+            self.buf.height,
+            self.text_annotations.clone(),
+        );
+        let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
+            build_annotation_tile(
+                text, font_size, r, g, b, bold, rotation_deg,
+                background_kind,
+                bg_r, bg_g, bg_b, bg_a,
+                bg_padding, bg_corner_radius, bg_tail,
+            );
+        let a = &mut self.text_annotations[idx];
+        a.text = text.to_string();
+        a.font_size = font_size;
+        a.r = r; a.g = g; a.b = b;
+        a.bold = bold;
+        a.x = x; a.y = y;
+        a.rotation_deg = rotation_deg;
+        a.tile_pixels = tile_pixels;
+        a.tile_w = tile_w;
+        a.tile_h = tile_h;
+        a.tile_offset_x = tile_offset_x;
+        a.tile_offset_y = tile_offset_y;
+        a.background_kind = background_kind;
+        a.bg_r = bg_r; a.bg_g = bg_g; a.bg_b = bg_b; a.bg_a = bg_a;
+        a.bg_padding = bg_padding;
+        a.bg_corner_radius = bg_corner_radius;
+        a.bg_tail = bg_tail;
+        true
+    }
+
+    /// Remove an annotation. Returns true if found. Pushes a "Delete Text"
+    /// history snapshot so undo restores the removed annotation.
+    pub fn remove_text_annotation(&mut self, id: u32) -> bool {
+        if !self.text_annotations.iter().any(|a| a.id == id) {
+            return false;
+        }
+        self.hist.push_snapshot(
+            "Delete Text",
+            &self.buf.data,
+            self.buf.width,
+            self.buf.height,
+            self.text_annotations.clone(),
+        );
+        self.text_annotations.retain(|a| a.id != id);
+        true
+    }
+
+    /// JSON dump of all annotations (metadata only — tile pixels stay in
+    /// Rust). Used by the JS overlay for hit-testing bounds and by
+    /// editPersistence for round-tripping across photo switches.
+    pub fn get_text_annotations(&self) -> String {
+        annotations_to_json(&self.text_annotations)
+    }
+
+    /// Hit-test annotations against a canvas-space point. Iterates
+    /// newest-first (last-added wins on overlap). Returns the id, or -1.
+    /// (Sentinel -1 is used because wasm-bindgen Option support is uneven.)
+    pub fn text_annotation_at(&self, x: i32, y: i32) -> i32 {
+        for a in self.text_annotations.iter().rev() {
+            let tx = a.x + a.tile_offset_x;
+            let ty = a.y + a.tile_offset_y;
+            if x >= tx && y >= ty
+                && x < tx + a.tile_w as i32
+                && y < ty + a.tile_h as i32
+            {
+                return a.id as i32;
+            }
+        }
+        -1
+    }
+
+    /// Returns the main buffer with all annotation tiles composited on top.
+    /// Used by the display canvas blit so on-screen matches export.
+    pub fn render_with_annotations(&self) -> Vec<u8> {
+        if self.text_annotations.is_empty() {
+            return self.buf.data.clone();
+        }
+        let mut out = self.buf.data.clone();
+        let w = self.buf.width as i32;
+        let h = self.buf.height as i32;
+        for a in &self.text_annotations {
+            transform::paste_region(
+                &mut out,
+                w, h,
+                &a.tile_pixels,
+                a.tile_w, a.tile_h,
+                a.x + a.tile_offset_x,
+                a.y + a.tile_offset_y,
+            );
+        }
+        out
+    }
+
+    /// Burn all annotations into the main buffer with a single history
+    /// snapshot, then clear the annotation list. Used at export time and
+    /// when the user explicitly wants to flatten.
+    pub fn flatten_text_annotations(&mut self) {
+        if self.text_annotations.is_empty() { return; }
+        self.hist.push_snapshot("Flatten text", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        let w = self.buf.width as i32;
+        let h = self.buf.height as i32;
+        // Drain so we move tile pixels rather than cloning per annotation.
+        let anns = std::mem::take(&mut self.text_annotations);
+        for a in &anns {
+            transform::paste_region(
+                &mut self.buf.data,
+                w, h,
+                &a.tile_pixels,
+                a.tile_w, a.tile_h,
+                a.x + a.tile_offset_x,
+                a.y + a.tile_offset_y,
+            );
+        }
+    }
 }
 
 /// Stateless: composite `src` onto a copy of `target` at (dx, dy) with `opacity` (0.0..=1.0).
@@ -853,4 +1393,145 @@ pub fn encode_png_pixels(pixels: &[u8], width: u32, height: u32) -> Vec<u8> {
         data: pixels.to_vec(),
     };
     codec::export_png(&tmp)
+}
+
+/// Parse a CSS-ish color string into RGBA bytes. Accepts:
+///   #rgb, #rgba, #rrggbb, #rrggbbaa
+///   rgb(r, g, b)       — components 0–255 or 0–255 (no percentages)
+///   rgba(r, g, b, a)   — alpha is 0.0–1.0 OR 0–255 (we sniff which)
+///
+/// Returns a 4-byte `Vec<u8>` `[r, g, b, a]` on success, or an empty vec on
+/// any parse failure. Used by the color-swatch picker so the JS side doesn't
+/// have to maintain its own regex.
+#[wasm_bindgen]
+pub fn parse_color(input: &str) -> Vec<u8> {
+    let s = input.trim();
+    if s.is_empty() {
+        return Vec::new();
+    }
+
+    // ── Hex ────────────────────────────────────────────────────────────
+    if let Some(hex) = s.strip_prefix('#') {
+        return parse_hex(hex).map(|c| c.to_vec()).unwrap_or_default();
+    }
+
+    // ── Functional notation: rgb(...) / rgba(...) ──────────────────────
+    let lower = s.to_ascii_lowercase();
+    let (has_alpha, body) = if let Some(rest) = lower.strip_prefix("rgba(") {
+        (true, rest)
+    } else if let Some(rest) = lower.strip_prefix("rgb(") {
+        (false, rest)
+    } else {
+        return Vec::new();
+    };
+    let Some(body) = body.strip_suffix(')') else {
+        return Vec::new();
+    };
+
+    // Allow comma OR whitespace separators (CSS Color 4); split on either.
+    let parts: Vec<&str> = body
+        .split(|c: char| c == ',' || c == '/' || c.is_whitespace())
+        .filter(|p| !p.is_empty())
+        .collect();
+
+    let expected = if has_alpha { 4 } else { 3 };
+    if parts.len() != expected {
+        return Vec::new();
+    }
+
+    let r = parse_component(parts[0]);
+    let g = parse_component(parts[1]);
+    let b = parse_component(parts[2]);
+    let a = if has_alpha {
+        parse_alpha(parts[3])
+    } else {
+        Some(255u8)
+    };
+    match (r, g, b, a) {
+        (Some(r), Some(g), Some(b), Some(a)) => vec![r, g, b, a],
+        _ => Vec::new(),
+    }
+}
+
+/// Parse a hex string (no leading `#`). Returns `[r,g,b,a]` on success.
+fn parse_hex(hex: &str) -> Option<[u8; 4]> {
+    fn h(c: u8) -> Option<u8> {
+        match c {
+            b'0'..=b'9' => Some(c - b'0'),
+            b'a'..=b'f' => Some(c - b'a' + 10),
+            b'A'..=b'F' => Some(c - b'A' + 10),
+            _ => None,
+        }
+    }
+    let bytes = hex.as_bytes();
+    match bytes.len() {
+        3 => {
+            let r = h(bytes[0])?;
+            let g = h(bytes[1])?;
+            let b = h(bytes[2])?;
+            Some([r * 17, g * 17, b * 17, 255])
+        }
+        4 => {
+            let r = h(bytes[0])?;
+            let g = h(bytes[1])?;
+            let b = h(bytes[2])?;
+            let a = h(bytes[3])?;
+            Some([r * 17, g * 17, b * 17, a * 17])
+        }
+        6 => {
+            let r = (h(bytes[0])? << 4) | h(bytes[1])?;
+            let g = (h(bytes[2])? << 4) | h(bytes[3])?;
+            let b = (h(bytes[4])? << 4) | h(bytes[5])?;
+            Some([r, g, b, 255])
+        }
+        8 => {
+            let r = (h(bytes[0])? << 4) | h(bytes[1])?;
+            let g = (h(bytes[2])? << 4) | h(bytes[3])?;
+            let b = (h(bytes[4])? << 4) | h(bytes[5])?;
+            let a = (h(bytes[6])? << 4) | h(bytes[7])?;
+            Some([r, g, b, a])
+        }
+        _ => None,
+    }
+}
+
+/// 0–255 integer, with optional trailing `%` (0–100).
+fn parse_component(s: &str) -> Option<u8> {
+    let s = s.trim();
+    if let Some(pct) = s.strip_suffix('%') {
+        let v: f32 = pct.trim().parse().ok()?;
+        if !(0.0..=100.0).contains(&v) {
+            return None;
+        }
+        Some((v * 2.55).round().clamp(0.0, 255.0) as u8)
+    } else {
+        let v: f32 = s.parse().ok()?;
+        if !(0.0..=255.0).contains(&v) {
+            return None;
+        }
+        Some(v.round().clamp(0.0, 255.0) as u8)
+    }
+}
+
+/// Alpha: 0.0–1.0 OR 0–255 (sniffed by `>1`) OR `N%` (0–100).
+fn parse_alpha(s: &str) -> Option<u8> {
+    let s = s.trim();
+    if let Some(pct) = s.strip_suffix('%') {
+        let v: f32 = pct.trim().parse().ok()?;
+        if !(0.0..=100.0).contains(&v) {
+            return None;
+        }
+        return Some((v * 2.55).round().clamp(0.0, 255.0) as u8);
+    }
+    let v: f32 = s.parse().ok()?;
+    if v < 0.0 {
+        return None;
+    }
+    if v <= 1.0 {
+        Some((v * 255.0).round().clamp(0.0, 255.0) as u8)
+    } else if v <= 255.0 {
+        Some(v.round() as u8)
+    } else {
+        None
+    }
 }

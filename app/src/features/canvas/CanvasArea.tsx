@@ -6,6 +6,22 @@ import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import type { CropSelection } from "@/hooks/useDrawingTools";
 import { CompareSlider } from "./CompareSlider";
 
+// Data-URI SVG cursor for the rotate handle — there's no standard CSS
+// rotation cursor, so we draw a small curved-arrow glyph. Falls back to
+// `grab` if the browser can't decode the data-URI. Two stacked strokes
+// (black outer 3.5, white inner 2.5) keep it visible against any background.
+const ROTATE_CURSOR =
+  "url(\"data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'>
+      <path d='M21 12a9 9 0 1 1-3-6.7' stroke='black' stroke-width='3.5'/>
+      <polyline points='21 4 21 12 13 12' stroke='black' stroke-width='3.5'/>
+      <path d='M21 12a9 9 0 1 1-3-6.7' stroke='white' stroke-width='2.5'/>
+      <polyline points='21 4 21 12 13 12' stroke='white' stroke-width='2.5'/>
+    </svg>`,
+  ) +
+  "\") 12 12, grab";
+
 interface TextInputState {
   screenX: number;
   screenY: number;
@@ -13,6 +29,17 @@ interface TextInputState {
   canvasY: number;
   text: string;
   rotation: number;
+  fontSize?: number;
+  fontWeight?: string;
+  textColor?: string;
+}
+
+interface AnnotationBox {
+  id: number;
+  x: number;            // canvas-space top-left of the *rotated* tile bbox
+  y: number;
+  tile_w: number;
+  tile_h: number;
 }
 
 interface Props {
@@ -37,10 +64,14 @@ interface Props {
   onTextPositionChange?: (canvasX: number, canvasY: number) => void;
   onTextFontSizeChange?: (size: number) => void;
   onTextRotationChange?: (angle: number) => void;
-  // Text extract drag events (active when extract mode is on)
-  extractMouseDown?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  extractMouseMove?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  extractMouseUp?: () => void;
+  /** Live, non-destructive text annotations (bbox + id). The text-tool
+   *  hover highlight is drawn over the one whose id matches
+   *  `hoveredAnnotationId`. */
+  annotations?: AnnotationBox[];
+  hoveredAnnotationId?: number | null;
+  /** Mousemove handler used to drive the hover highlight while the text
+   *  tool is active. */
+  onCanvasHover?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   // Item 2: Pan mode
   isPanning?: boolean;
   cropSelection?: CropSelection | null;
@@ -85,9 +116,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onTextPositionChange,
       onTextFontSizeChange,
       onTextRotationChange,
-      extractMouseDown,
-      extractMouseMove,
-      extractMouseUp,
+      annotations,
+      hoveredAnnotationId,
+      onCanvasHover,
       isPanning = false,
       cropSelection,
       onCropChange,
@@ -263,21 +294,16 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const panCursor = isDraggingPan ? "grabbing" : cursor;
 
     // Combined mouse handlers — pan takes priority when spacebar is held
-    const wrappedMouseDown = isPanning
-      ? handlePanMouseDown
-      : isTextTool
-        ? extractMouseDown
-        : onMouseDown;
-    const wrappedMouseMove = isPanning
-      ? handlePanMouseMove
-      : isTextTool
-        ? extractMouseMove
-        : onMouseMove;
-    const wrappedMouseUp = isPanning
-      ? handlePanMouseUp
-      : isTextTool
-        ? extractMouseUp
-        : onMouseUp;
+    const wrappedMouseDown = isPanning ? handlePanMouseDown : onMouseDown;
+    const baseMouseMove = isPanning ? handlePanMouseMove : onMouseMove;
+    // Text-tool hover highlight runs alongside the regular mousemove.
+    const wrappedMouseMove = isTextTool
+      ? (e: React.MouseEvent<HTMLCanvasElement>) => {
+          baseMouseMove?.(e);
+          onCanvasHover?.(e);
+        }
+      : baseMouseMove;
+    const wrappedMouseUp = isPanning ? handlePanMouseUp : onMouseUp;
 
     const { width: imgW, height: imgH, hasTransparency } = hookResult.state;
 
@@ -312,7 +338,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           onMouseDown={wrappedMouseDown}
           onMouseMove={wrappedMouseMove}
           onMouseUp={wrappedMouseUp}
-          onMouseLeave={isPanning ? handlePanMouseUp : isTextTool ? extractMouseUp : onMouseUp}
+          onMouseLeave={isPanning ? handlePanMouseUp : onMouseUp}
           onClick={isTextTool ? onCanvasClick : undefined}
           onMouseEnter={(e) =>
             onCanvasEnter(e.currentTarget.getBoundingClientRect())
@@ -420,7 +446,41 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           />
         )}
 
-        {/* Text input overlay — draggable body, textarea, SVG handles + rotate handle */}
+        {/* Live annotation hover highlight (text-tool only) */}
+        {isTextTool &&
+          annotations &&
+          annotations.length > 0 &&
+          hoveredAnnotationId !== null &&
+          hoveredAnnotationId !== undefined &&
+          canvasRef.current && (() => {
+            const canvas = canvasRef.current!;
+            const ann = annotations.find((a) => a.id === hoveredAnnotationId);
+            if (!ann) return null;
+            const r = canvas.getBoundingClientRect();
+            const sX = r.width / canvas.width;
+            const sY = r.height / canvas.height;
+            const left = r.left + ann.x * sX;
+            const top = r.top + ann.y * sY;
+            const w = ann.tile_w * sX;
+            const h = ann.tile_h * sY;
+            return (
+              <div
+                style={{
+                  position: "fixed",
+                  left,
+                  top,
+                  width: w,
+                  height: h,
+                  outline: "2px dashed rgba(255,136,0,0.95)",
+                  outlineOffset: -1,
+                  pointerEvents: "none",
+                  zIndex: 49,
+                }}
+              />
+            );
+          })()}
+
+        {/* Text input overlay — draggable body, textarea, line+dot move/rotate handles */}
         {textInput && textSettings && canvasRef.current && containerRef.current && (() => {
           const canvas = canvasRef.current!;
           const container = containerRef.current!;
@@ -433,11 +493,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const sx = cr.left - ctr.left + textInput.canvasX * scaleX;
           const sy = cr.top - ctr.top + textInput.canvasY * scaleY;
 
+          // Style snapshot: prefer the input's own style (re-edit may use a
+          // different style than the current toolbar settings).
+          const effFontSize = textInput.fontSize ?? textSettings.fontSize;
+          const effFontWeight = textInput.fontWeight ?? textSettings.fontWeight;
+          const effTextColor = textInput.textColor ?? textSettings.textColor;
+
           // Measure the text box in screen pixels
           const offscreen = document.createElement("canvas");
           const mctx = offscreen.getContext("2d")!;
-          const fs = textSettings.fontSize * scaleX;
-          mctx.font = `${textSettings.fontWeight} ${fs}px 'Liberation Sans', Arial, sans-serif`;
+          const fs = effFontSize * scaleX;
+          mctx.font = `${effFontWeight} ${fs}px 'Liberation Sans', Arial, sans-serif`;
           const lines = (textInput.text || " ").split("\n");
           const rawW = Math.max(60, ...lines.map((l) => mctx.measureText(l || " ").width));
           const boxW = Math.ceil(rawW + fs * 0.6);
@@ -450,7 +516,15 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const bcy = ctr.top + sy + boxH / 2;
 
           const HS = 9; // resize handle size px
-          const ROTATE_OFFSET = 32; // px above top edge for rotate handle
+          // Line+dot handle geometry (screen px, unrotated frame). The handle
+          // is drawn inside the rotated <g>, so it visually tracks the box.
+          const STEM_GAP = 4;     // gap between textarea edge and start of stem
+          const STEM_LEN = 18;    // length of straight stem
+          const DOT_OFFSET = 4;   // distance from stem end to dot center
+          const DOT_R = 5;
+          // Rotate-handle arc (sits between bottom edge and stem)
+          const ARC_GAP = 4;
+          const ARC_R = 6;
 
           const handles = [
             { id: "nw", hx: sx,         hy: sy,          cursor: "nw-resize" },
@@ -467,7 +541,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const handleResizePointerDown = (e: React.PointerEvent) => {
             e.stopPropagation();
             e.preventDefault();
-            const startFs = textSettings.fontSize;
+            const startFs = effFontSize;
             const startDist = Math.hypot(e.clientX - bcx, e.clientY - bcy);
 
             const onMove = (me: PointerEvent) => {
@@ -507,8 +581,31 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             window.addEventListener("pointerup", onUp);
           };
 
+          // Move drag — separate from box-body drag so chevron has its own
+          // grab handle (cursor-grab feedback even outside the textarea).
+          const handleMoveChevronPointerDown = (e: React.PointerEvent<SVGElement>) => {
+            e.stopPropagation();
+            e.preventDefault();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startCx = textInput.canvasX;
+            const startCy = textInput.canvasY;
+            const onMove = (me: PointerEvent) => {
+              const dx = (me.clientX - startX) / scaleX;
+              const dy = (me.clientY - startY) / scaleY;
+              onTextPositionChange?.(startCx + dx, startCy + dy);
+            };
+            const onUp = () => {
+              window.removeEventListener("pointermove", onMove);
+              window.removeEventListener("pointerup", onUp);
+            };
+            window.addEventListener("pointermove", onMove);
+            window.addEventListener("pointerup", onUp);
+          };
+
           // Rotate drag — angle from box centre to mouse, 0° = handle pointing up
-          const handleRotatePointerDown = (e: React.PointerEvent<SVGCircleElement>) => {
+          const handleRotatePointerDown = (e: React.PointerEvent<SVGElement>) => {
             e.stopPropagation();
             e.preventDefault();
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -531,6 +628,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             <>
               {/* Draggable box body */}
               <div
+                data-text-overlay
                 style={{
                   position: "absolute",
                   left: sx,
@@ -546,6 +644,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               />
               {/* Textarea — rotates visually to match */}
               <textarea
+                data-text-overlay
                 ref={textareaRef}
                 value={textInput.text}
                 onChange={onTextChange}
@@ -559,8 +658,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   width: boxW,
                   minHeight: boxH,
                   fontSize: fs,
-                  fontWeight: textSettings.fontWeight,
-                  color: textSettings.textColor,
+                  fontWeight: effFontWeight,
+                  color: effTextColor,
                   fontFamily: textSettings.fontFamily ?? "'Liberation Sans', Arial, sans-serif",
                   lineHeight: 1.3,
                   padding: "2px 4px",
@@ -578,6 +677,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               />
               {/* SVG overlay — all elements grouped and rotated around box centre */}
               <svg
+                data-text-overlay
                 style={{
                   position: "fixed",
                   inset: 0,
@@ -598,24 +698,97 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     strokeWidth={1.5}
                     strokeDasharray="5 4"
                   />
-                  {/* Stem line from top-centre to rotate handle */}
-                  <line
-                    x1={bcx} y1={ctr.top + sy}
-                    x2={bcx} y2={ctr.top + sy - ROTATE_OFFSET}
-                    stroke="rgba(255,255,255,0.7)"
-                    strokeWidth={1.5}
-                  />
-                  {/* Rotate handle circle */}
-                  <circle
-                    cx={bcx}
-                    cy={ctr.top + sy - ROTATE_OFFSET}
-                    r={7}
-                    fill="white"
-                    stroke="rgba(0,0,0,0.35)"
-                    strokeWidth={1}
-                    style={{ cursor: "crosshair", pointerEvents: "all" }}
-                    onPointerDown={handleRotatePointerDown}
-                  />
+                  {/* Move handle: vertical line + dot ("balloon string") above the textarea */}
+                  {(() => {
+                    const cx = ctr.left + sx + boxW / 2;
+                    const topEdge = ctr.top + sy;
+                    const stemTop = topEdge - STEM_GAP;
+                    const stemBot = stemTop - STEM_LEN;
+                    const dotCy = stemBot - DOT_OFFSET;
+                    const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                    return (
+                      <g
+                        style={{ cursor: "move", pointerEvents: "all", filter }}
+                        onPointerDown={handleMoveChevronPointerDown}
+                      >
+                        {/* Invisible fat hit target for easier grabbing */}
+                        <rect
+                          x={cx - 8}
+                          y={dotCy - DOT_R - 2}
+                          width={16}
+                          height={topEdge - (dotCy - DOT_R - 2)}
+                          fill="transparent"
+                        />
+                        <line
+                          x1={cx}
+                          y1={stemTop}
+                          x2={cx}
+                          y2={stemBot}
+                          stroke="white"
+                          strokeWidth={2}
+                        />
+                        <circle
+                          cx={cx}
+                          cy={dotCy}
+                          r={DOT_R}
+                          fill="white"
+                          stroke="rgba(0,0,0,0.5)"
+                          strokeWidth={1}
+                        />
+                      </g>
+                    );
+                  })()}
+                  {/* Rotate handle: arc + line + dot ("hook") below the textarea */}
+                  {(() => {
+                    const cx = ctr.left + sx + boxW / 2;
+                    const bottomEdge = ctr.top + sy + boxH;
+                    const arcTop = bottomEdge + ARC_GAP;
+                    // Arc spans from (cx-ARC_R, arcTop) to (cx+ARC_R, arcTop),
+                    // curving downward by ARC_R.
+                    const arcBottomY = arcTop + ARC_R;
+                    const stemTop = arcBottomY;
+                    const stemBot = stemTop + STEM_LEN - ARC_R;
+                    const dotCy = stemBot + DOT_OFFSET;
+                    const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                    const arcD = `M ${cx - ARC_R} ${arcTop} A ${ARC_R} ${ARC_R} 0 1 0 ${cx + ARC_R} ${arcTop}`;
+                    return (
+                      <g
+                        style={{ cursor: ROTATE_CURSOR, pointerEvents: "all", filter }}
+                        onPointerDown={handleRotatePointerDown}
+                      >
+                        {/* Invisible fat hit target */}
+                        <rect
+                          x={cx - 10}
+                          y={bottomEdge}
+                          width={20}
+                          height={dotCy + DOT_R + 2 - bottomEdge}
+                          fill="transparent"
+                        />
+                        <path
+                          d={arcD}
+                          stroke="white"
+                          strokeWidth={2}
+                          fill="none"
+                        />
+                        <line
+                          x1={cx}
+                          y1={stemTop}
+                          x2={cx}
+                          y2={stemBot}
+                          stroke="white"
+                          strokeWidth={2}
+                        />
+                        <circle
+                          cx={cx}
+                          cy={dotCy}
+                          r={DOT_R}
+                          fill="white"
+                          stroke="rgba(0,0,0,0.5)"
+                          strokeWidth={1}
+                        />
+                      </g>
+                    );
+                  })()}
                   {/* Resize handles */}
                   {handles.map((h) => (
                     <rect

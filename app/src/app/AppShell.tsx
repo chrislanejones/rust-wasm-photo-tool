@@ -13,7 +13,6 @@ import { useDrawingTools } from "@/hooks/useDrawingTools";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
 import { useTextTool } from "@/hooks/useTextTool";
-import { useTextExtract } from "@/hooks/useTextExtract";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import type { TextMemory } from "@/features/tools/settings/TextSettings";
@@ -22,6 +21,7 @@ import { panelSpacingTransition, imageLoadBarFade, imageLoadBarProgress } from "
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
+import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
@@ -392,7 +392,6 @@ export function AppShell() {
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
-  const [textExtractActive, setTextExtractActive] = useState(false);
 
   useEffect(() => {
     if (activeTool !== "effects") setColorPickerActive(false);
@@ -583,12 +582,14 @@ export function AppShell() {
   });
   reopenWithRef.current = textTool.reopenWith;
 
-  const textExtract = useTextExtract({
-    toolRef: stamp.toolRef,
-    canvasRef,
-    active: textExtractActive && activeTool === "text",
-    flushToCanvas: stamp.flushToCanvas,
-  });
+  // Live-annotation bounding boxes for the CanvasArea hover highlight.
+  const annotationBoxes = textTool.annotations.map((a) => ({
+    id: a.id,
+    x: a.x + a.tile_offset_x,
+    y: a.y + a.tile_offset_y,
+    tile_w: a.tile_w,
+    tile_h: a.tile_h,
+  }));
 
   const redStampTool = useRedStampTool({
     toolRef: stamp.toolRef,
@@ -674,16 +675,25 @@ export function AppShell() {
   }, [stamp]);
 
   const handleCopyToClipboard = useCallback(async () => {
-    const c = canvasRef.current;
-    if (!c) return;
+    const tool = stamp.toolRef.current;
+    if (!tool) {
+      toast.error("No image to copy");
+      return;
+    }
     try {
-      const b = await new Promise<Blob | null>((r) =>
-        c.toBlob((v) => r(v), "image/png"),
-      );
-      if (b)
-        await navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]);
-    } catch {}
-  }, []);
+      const pngBytes = tool.export_png();
+      const blob = new Blob([pngBytes.buffer as ArrayBuffer], {
+        type: "image/png",
+      });
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": blob }),
+      ]);
+      toast.success("Copied to clipboard");
+    } catch (err) {
+      console.error("Copy to clipboard failed:", err);
+      toast.error("Couldn't copy to clipboard");
+    }
+  }, [stamp]);
 
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
@@ -868,6 +878,8 @@ export function AppShell() {
         onClose={() => setShowShortcutModal(false)}
       />
 
+      <Toaster />
+
       <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -920,7 +932,7 @@ export function AppShell() {
           <ToolsSidebar
             onClose={() => setShowTools(false)}
             activeTool={activeTool}
-            onToolChange={(t) => { setActiveTool(t); setTextExtractActive(false); }}
+            onToolChange={(t) => { setActiveTool(t); }}
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
             hasSource={stamp.state.hasSource}
@@ -953,11 +965,6 @@ export function AppShell() {
             onToolSettingsChange={setToolSettings}
             recentTexts={recentTexts}
             onSelectRecentText={handleSelectRecentText}
-            onStartTextExtract={() => setTextExtractActive((v) => !v)}
-            textExtractActive={textExtractActive}
-            recognizedText={textExtract.recognizedText}
-            isRecognizing={textExtract.isRecognizing}
-            onClearRecognizedText={textExtract.clearText}
             shapesMode={shapesMode}
             onShapesModeChange={setShapesMode}
             brushMode={brushMode}
@@ -1072,9 +1079,9 @@ export function AppShell() {
                           onTextPositionChange={textTool.setTextPosition}
                           onTextFontSizeChange={handleTextFontSizeChange}
                           onTextRotationChange={textTool.setTextRotation}
-                          extractMouseDown={textExtract.onMouseDown}
-                          extractMouseMove={textExtract.onMouseMove}
-                          extractMouseUp={textExtract.onMouseUp}
+                          annotations={annotationBoxes}
+                          hoveredAnnotationId={textTool.hoveredAnnotationId}
+                          onCanvasHover={textTool.onCanvasHover}
                           isPanning={isPanning}
                           cropSelection={drawingTools.cropSelection}
                           onCropChange={(sel) => drawingTools.setCropSelection(sel)}
@@ -1131,9 +1138,9 @@ export function AppShell() {
                       onTextPositionChange={textTool.setTextPosition}
                       onTextFontSizeChange={handleTextFontSizeChange}
                       onTextRotationChange={textTool.setTextRotation}
-                      extractMouseDown={textExtract.onMouseDown}
-                      extractMouseMove={textExtract.onMouseMove}
-                      extractMouseUp={textExtract.onMouseUp}
+                      annotations={annotationBoxes}
+                      hoveredAnnotationId={textTool.hoveredAnnotationId}
+                      onCanvasHover={textTool.onCanvasHover}
                       isPanning={isPanning}
                       cropSelection={drawingTools.cropSelection}
                       onCropChange={(sel) => drawingTools.setCropSelection(sel)}

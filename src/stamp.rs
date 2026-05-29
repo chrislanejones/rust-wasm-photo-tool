@@ -76,6 +76,7 @@ impl StampState {
         redo_stack: &mut Vec<Snapshot>,
         dest_x: f64,
         dest_y: f64,
+        annotations: Vec<crate::TextAnnotation>,
     ) {
         let (sx, sy) = match (self.source_x, self.source_y) {
             (Some(x), Some(y)) => (x as f64, y as f64),
@@ -96,6 +97,7 @@ impl StampState {
             data: self.stroke_src_data.clone(),
             width: w as u32,
             height: h as u32,
+            annotations,
         });
         redo_stack.clear();
         self.stamp_at(data, w, h, dest_x, dest_y);

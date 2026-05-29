@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Crop, Type, ChevronDown } from "lucide-react";
+import { Type, ChevronDown } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
@@ -26,6 +26,20 @@ const FONT_FAMILIES = [
 
 const FONT_SIZE_PRESETS = [16, 32, 48, 72] as const;
 
+const BG_KIND_OPTIONS = [
+  { id: "none", label: "None" },
+  { id: "rect", label: "Text BG" },
+  { id: "bubble", label: "Bubble" },
+] as const;
+
+const BG_TAIL_OPTIONS = [
+  { id: "left", label: "Left" },
+  { id: "right", label: "Right" },
+  { id: "topleft", label: "TopLeft" },
+  { id: "bottomright", label: "BotRight" },
+  { id: "bottomleft", label: "BotLeft" },
+] as const;
+
 export interface TextMemory {
   id: number;
   text: string;
@@ -35,19 +49,13 @@ export interface TextMemory {
   textColor: string;
 }
 
-type TextMode = "text" | "extract";
+type TextMode = "text" | "background";
 
 interface TextSettingsProps {
   settings: ToolSettings;
   onChange: (s: ToolSettings) => void;
   recentTexts: TextMemory[];
   onSelectRecentText: (memory: TextMemory) => void;
-  onStartTextExtract?: () => void;
-  textExtractActive?: boolean;
-  imageReady?: boolean;
-  recognizedText?: string;
-  isRecognizing?: boolean;
-  onClearRecognizedText?: () => void;
 }
 
 function truncate(text: string, max = 16): string {
@@ -61,21 +69,15 @@ export function TextSettings({
   onChange,
   recentTexts,
   onSelectRecentText,
-  onStartTextExtract,
-  textExtractActive = false,
-  imageReady = true,
-  recognizedText = "",
-  isRecognizing = false,
-  onClearRecognizedText,
 }: TextSettingsProps) {
   const [mode, setMode] = useState<TextMode>("text");
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-text-panel>
       <TabGroup
         tabs={[
           { id: "text", label: "Text" },
-          { id: "extract", label: "Text Extract" },
+          { id: "background", label: "Text Background" },
         ]}
         active={mode}
         onChange={(id) => setMode(id as TextMode)}
@@ -177,70 +179,98 @@ export function TextSettings({
           </motion.div>
         )}
 
-        {mode === "extract" && (
+        {mode === "background" && (
           <motion.div
-            key="extract"
+            key="background"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0, transition: quickSpring }}
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
-            className="space-y-4"
+            className="space-y-5"
           >
-            <p className="text-[10px] text-theme-muted-foreground leading-relaxed">
-              Drag a region on the image to OCR text from it. The recognized
-              text will appear below.
-            </p>
-            {onStartTextExtract && (
-              <Button
-                onClick={onStartTextExtract}
-                disabled={!imageReady || isRecognizing}
-                className={`w-full gap-2 ${
-                  textExtractActive
-                    ? "bg-accent text-text-primary ring-2 ring-accent/50"
-                    : ""
-                }`}
-              >
-                <Crop className="h-4 w-4" />
-                {isRecognizing
-                  ? "Recognizing…"
-                  : textExtractActive
-                    ? "Drag region on image…"
-                    : "Start OCR"}
-              </Button>
-            )}
-
-            {isRecognizing && (
-              <div className="flex items-center justify-center py-4">
-                <div className="canvas-spinner" />
+            {/* Style toggle */}
+            <div className="space-y-4">
+              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+                Style
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {BG_KIND_OPTIONS.map((opt) => (
+                  <Button
+                    key={opt.id}
+                    type="button"
+                    variant={settings.bgKind === opt.id ? "default" : "outline"}
+                    className="text-[11px]"
+                    onClick={() => onChange({ ...settings, bgKind: opt.id })}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
               </div>
-            )}
+            </div>
 
-            {recognizedText && !isRecognizing && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                    Result
-                  </label>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => navigator.clipboard.writeText(recognizedText)}
-                      className="text-[10px] px-2 py-0.5 rounded bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all"
-                    >
-                      Copy
-                    </button>
-                    {onClearRecognizedText && (
-                      <button
-                        onClick={onClearRecognizedText}
-                        className="text-[10px] px-2 py-0.5 rounded bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all"
-                      >
-                        Clear
-                      </button>
-                    )}
+            {settings.bgKind !== "none" && (
+              <>
+                {/* Background color */}
+                <ColorSwatchGrid
+                  label="Background Color"
+                  colors={TEXT_COLORS}
+                  value={settings.bgColor}
+                  onChange={(color) => onChange({ ...settings, bgColor: color })}
+                />
+
+                {/* Padding */}
+                <SizeSlider
+                  label="Padding"
+                  value={settings.bgPadding}
+                  min={0}
+                  max={40}
+                  unit="px"
+                  onChange={(v) => onChange({ ...settings, bgPadding: v })}
+                />
+
+                {/* Corner Radius — rect only */}
+                {settings.bgKind === "rect" && (
+                  <SizeSlider
+                    label="Corner Radius"
+                    value={settings.bgCornerRadius}
+                    min={0}
+                    max={32}
+                    unit="px"
+                    onChange={(v) => onChange({ ...settings, bgCornerRadius: v })}
+                  />
+                )}
+
+                {/* Tail direction — bubble only */}
+                {settings.bgKind === "bubble" && (
+                  <div className="space-y-4">
+                    <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+                      Tail Direction
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {BG_TAIL_OPTIONS.map((opt) => (
+                        <Button
+                          key={opt.id}
+                          type="button"
+                          variant={settings.bgTail === opt.id ? "default" : "outline"}
+                          className="text-[10px]"
+                          onClick={() => onChange({ ...settings, bgTail: opt.id })}
+                        >
+                          {opt.label}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div className="p-3 rounded-lg bg-bg-elevated border border-border text-sm text-text-primary font-mono leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto scrollbar-thin">
-                  {recognizedText}
-                </div>
-              </div>
+                )}
+
+                {/* Opacity */}
+                <SizeSlider
+                  label="Opacity"
+                  value={settings.bgOpacity}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  onChange={(v) => onChange({ ...settings, bgOpacity: v })}
+                />
+              </>
             )}
           </motion.div>
         )}

@@ -47,4 +47,12 @@ export interface ToolSettings extends StampSettings {
   // Emoji
   emoji: string;
   emojiSize: number;
+
+  // Text Background (renders inside the text annotation tile)
+  bgKind: "none" | "rect" | "bubble";
+  bgColor: string;
+  bgOpacity: number;        // 0-100
+  bgPadding: number;        // 0-40 px
+  bgCornerRadius: number;   // 0-32 px (rect only)
+  bgTail: "left" | "right" | "topleft" | "bottomright" | "bottomleft";
 }

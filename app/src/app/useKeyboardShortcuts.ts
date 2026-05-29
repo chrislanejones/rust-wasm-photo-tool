@@ -120,12 +120,14 @@ export function useKeyboardShortcuts({
 
       // ─── Alt combos ────────────────────────────────────
       if (e.altKey) {
+        // Alt+/ toggles the shortcut modal (with or without Shift, so users
+        // can press the literal "/" key or the shifted "?" interchangeably).
+        if (e.code === "Slash") {
+          e.preventDefault();
+          setShowShortcutModal((v) => !v);
+          return;
+        }
         if (e.shiftKey) {
-          if (e.code === "Slash") {
-            e.preventDefault();
-            setShowShortcutModal((v) => !v);
-            return;
-          }
           if (e.code === "KeyE") {
             e.preventDefault();
             onExportAll?.();

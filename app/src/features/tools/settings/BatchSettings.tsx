@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { ToolButton } from "@/components/ui/tool-button";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
+import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
+import { TEXT_COLORS } from "@/lib/colors";
 import { getOriginal, putOriginal } from "@/lib/originalsStore";
 import {
   makeWorkingCopy,
@@ -678,17 +680,11 @@ function TextBatchPanel() {
         </select>
       </div>
 
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
-          Color
-        </p>
-        <input
-          type="color"
-          value={textColor}
-          onChange={(e) => setTextColor(e.target.value)}
-          className="h-8 w-full cursor-pointer rounded-md border border-border bg-theme-muted/20"
-        />
-      </div>
+      <ColorSwatchGrid
+        colors={TEXT_COLORS}
+        value={textColor}
+        onChange={setTextColor}
+      />
 
       <div>
         <p className="text-[10px] font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">

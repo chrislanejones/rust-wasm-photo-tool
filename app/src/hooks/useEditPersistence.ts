@@ -8,8 +8,9 @@ import {
   loadPhotoEdit as idbLoad,
   deletePhotoEdit as idbDelete,
   clearAllEdits as idbClear,
+  parseSnapshotAnnotations,
 } from "@/lib/editPersistence";
-import type { SavedEdit, SnapEntry } from "@/lib/editPersistence";
+import type { SavedEdit, SnapEntry, PersistedAnnotation } from "@/lib/editPersistence";
 
 // ── Archive encoding ───────────────────────────────────────────────────────
 // Packs canvas + full undo/redo history into a single binary blob so one
@@ -22,7 +23,10 @@ import type { SavedEdit, SnapEntry } from "@/lib/editPersistence";
 //   redo_count(4)  { label_len(4) label(...) png_len(4) png(...) } × N
 
 const MAGIC = 0x49485354; // "IHST"
-const VERSION = 1;
+/** v3 appends a per-snapshot annotations JSON blob after each PNG so
+ *  per-step text overlays survive cross-session reload. v2 archives are
+ *  still loadable; their snapshots come back with empty overlays. */
+const VERSION = 3;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -32,12 +36,26 @@ function encodeArchive(
   canvasPng: Uint8Array,
   undoStack: SnapEntry[],
   redoStack: SnapEntry[],
+  annotationsJson: string,
 ): Uint8Array {
   const labelBytes = (s: string) => enc.encode(s);
+  const annBytes = enc.encode(annotationsJson);
+  // Pre-encode per-snapshot annotation JSON to avoid double work.
+  const undoAnnBytes = undoStack.map((s) =>
+    enc.encode(s.annotations ? JSON.stringify(s.annotations) : "[]"),
+  );
+  const redoAnnBytes = redoStack.map((s) =>
+    enc.encode(s.annotations ? JSON.stringify(s.annotations) : "[]"),
+  );
 
   let size = 4 + 4 + 4 + 4 + 4 + canvasPng.length + 4 + 4;
-  for (const s of undoStack) size += 4 + labelBytes(s.label).length + 4 + s.png.length;
-  for (const s of redoStack) size += 4 + labelBytes(s.label).length + 4 + s.png.length;
+  for (let i = 0; i < undoStack.length; i++) {
+    size += 4 + labelBytes(undoStack[i].label).length + 4 + undoStack[i].png.length + 4 + undoAnnBytes[i].length;
+  }
+  for (let i = 0; i < redoStack.length; i++) {
+    size += 4 + labelBytes(redoStack[i].label).length + 4 + redoStack[i].png.length + 4 + redoAnnBytes[i].length;
+  }
+  size += 4 + annBytes.length; // trailing current-state annotations JSON
 
   const buf = new ArrayBuffer(size);
   const view = new DataView(buf);
@@ -52,10 +70,20 @@ function encodeArchive(
   w32(canvasPng.length); wb(canvasPng);
 
   w32(undoStack.length);
-  for (const s of undoStack) { wstr(s.label); w32(s.png.length); wb(s.png); }
+  for (let i = 0; i < undoStack.length; i++) {
+    wstr(undoStack[i].label);
+    w32(undoStack[i].png.length); wb(undoStack[i].png);
+    w32(undoAnnBytes[i].length); wb(undoAnnBytes[i]);
+  }
 
   w32(redoStack.length);
-  for (const s of redoStack) { wstr(s.label); w32(s.png.length); wb(s.png); }
+  for (let i = 0; i < redoStack.length; i++) {
+    wstr(redoStack[i].label);
+    w32(redoStack[i].png.length); wb(redoStack[i].png);
+    w32(redoAnnBytes[i].length); wb(redoAnnBytes[i]);
+  }
+
+  w32(annBytes.length); wb(annBytes);
 
   return u8;
 }
@@ -68,8 +96,11 @@ function decodeArchive(data: Uint8Array): SavedEdit {
   const rb   = (n: number) => { const v = data.slice(pos, pos + n); pos += n; return v; };
   const rstr = () => dec.decode(rb(r32()));
 
-  if (r32() !== MAGIC)   throw new Error("Invalid archive");
-  if (r32() !== VERSION) throw new Error("Unknown archive version");
+  if (r32() !== MAGIC) throw new Error("Invalid archive");
+  const version = r32();
+  if (version !== 1 && version !== 2 && version !== 3) {
+    throw new Error("Unknown archive version");
+  }
 
   const canvasW = r32();
   const canvasH = r32();
@@ -80,7 +111,11 @@ function decodeArchive(data: Uint8Array): SavedEdit {
   for (let i = 0; i < undoCount; i++) {
     const label = rstr();
     const png = rb(r32());
-    undoStack.push({ png, label });
+    let annotations: PersistedAnnotation[] | undefined;
+    if (version >= 3) {
+      annotations = parseSnapshotAnnotations(rstr());
+    }
+    undoStack.push({ png, label, annotations });
   }
 
   const redoStack: SnapEntry[] = [];
@@ -88,10 +123,24 @@ function decodeArchive(data: Uint8Array): SavedEdit {
   for (let i = 0; i < redoCount; i++) {
     const label = rstr();
     const png = rb(r32());
-    redoStack.push({ png, label });
+    let annotations: PersistedAnnotation[] | undefined;
+    if (version >= 3) {
+      annotations = parseSnapshotAnnotations(rstr());
+    }
+    redoStack.push({ png, label, annotations });
   }
 
-  return { canvasW, canvasH, canvasPng, undoStack, redoStack };
+  let annotations: PersistedAnnotation[] = [];
+  if (version >= 2 && pos < data.length) {
+    try {
+      const annJson = rstr();
+      if (annJson) annotations = JSON.parse(annJson) as PersistedAnnotation[];
+    } catch {
+      annotations = [];
+    }
+  }
+
+  return { canvasW, canvasH, canvasPng, undoStack, redoStack, annotations };
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────
@@ -122,6 +171,9 @@ export function useEditPersistence() {
             undoStack.push({
               png: new Uint8Array(tool.get_undo_snapshot_png(i)),
               label: tool.get_undo_snapshot_label(i),
+              annotations: parseSnapshotAnnotations(
+                tool.get_undo_snapshot_annotations(i),
+              ),
             });
           }
           const redoStack: SnapEntry[] = [];
@@ -129,10 +181,48 @@ export function useEditPersistence() {
             redoStack.push({
               png: new Uint8Array(tool.get_redo_snapshot_png(i)),
               label: tool.get_redo_snapshot_label(i),
+              annotations: parseSnapshotAnnotations(
+                tool.get_redo_snapshot_annotations(i),
+              ),
             });
           }
 
-          const archive = encodeArchive(canvasW, canvasH, canvasPng, undoStack, redoStack);
+          // Live text annotations (re-editable overlay). Strip tile_* so
+          // we don't bake stale pre-rotated tile cache into the archive —
+          // tiles are re-rendered on load.
+          let annotationsJson = "[]";
+          try {
+            const raw = tool.get_text_annotations();
+            const parsed = JSON.parse(raw) as Array<
+              PersistedAnnotation & {
+                tile_w: number; tile_h: number;
+                tile_offset_x: number; tile_offset_y: number;
+              }
+            >;
+            const stripped: PersistedAnnotation[] = parsed.map((a) => ({
+              id: a.id,
+              text: a.text,
+              x: a.x,
+              y: a.y,
+              font_size: a.font_size,
+              r: a.r, g: a.g, b: a.b,
+              bold: a.bold,
+              rotation_deg: a.rotation_deg,
+              background_kind: a.background_kind,
+              bg_r: a.bg_r,
+              bg_g: a.bg_g,
+              bg_b: a.bg_b,
+              bg_a: a.bg_a,
+              bg_padding: a.bg_padding,
+              bg_corner_radius: a.bg_corner_radius,
+              bg_tail: a.bg_tail,
+            }));
+            annotationsJson = JSON.stringify(stripped);
+          } catch {
+            annotationsJson = "[]";
+          }
+
+          const archive = encodeArchive(canvasW, canvasH, canvasPng, undoStack, redoStack, annotationsJson);
           const uploadUrl = await generateUploadUrl();
           const resp = await fetch(uploadUrl, {
             method: "POST",
@@ -170,7 +260,7 @@ export function useEditPersistence() {
               return decodeArchive(data);
             } catch {
               // Legacy single-PNG blob — fall back gracefully
-              return { canvasW: edit.canvasW, canvasH: edit.canvasH, canvasPng: data, undoStack: [], redoStack: [] };
+              return { canvasW: edit.canvasW, canvasH: edit.canvasH, canvasPng: data, undoStack: [], redoStack: [], annotations: [] };
             }
           }
         } catch {}

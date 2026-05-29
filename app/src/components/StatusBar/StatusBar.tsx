@@ -57,7 +57,7 @@ export function StatusBar({ state, imageCount, userMode = "demo" }: Props) {
         </span>
         <span className="status-divider" />
         <span className="status-shortcut-hint">
-          <kbd>Alt+?</kbd> shortcuts
+          <kbd>Alt+/</kbd> shortcuts
         </span>
       </div>
 

@@ -5,7 +5,7 @@ import { TabGroup } from "@/components/TabGroup";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SizeSlider } from "@/components/SizeSlider";
 import type { ToolSettings } from "@/lib/types";
-import { ARROW_COLORS } from "@/lib/colors";
+import { TEXT_COLORS } from "@/lib/colors";
 
 const SHAPES = [
   { id: "rect",       label: "Rectangle",   Icon: Square   },
@@ -81,7 +81,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
 
           {/* Color */}
           <ColorSwatchGrid
-            colors={ARROW_COLORS}
+            colors={TEXT_COLORS}
             value={settings.strokeColor}
             onChange={(color) => onChange({ ...settings, strokeColor: color })}
           />
@@ -126,7 +126,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
 
           {/* Color */}
           <ColorSwatchGrid
-            colors={ARROW_COLORS}
+            colors={TEXT_COLORS}
             value={settings.strokeColor}
             onChange={(color) => onChange({ ...settings, strokeColor: color })}
           />

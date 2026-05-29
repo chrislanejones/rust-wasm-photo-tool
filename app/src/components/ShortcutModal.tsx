@@ -38,7 +38,7 @@ const SHORTCUT_GROUPS = [
       { keys: ["Alt", "S"], action: "Toggle Tools" },
       { keys: ["Alt", "G"], action: "Toggle Gallery" },
       { keys: ["Alt", "H"], action: "Toggle History" },
-      { keys: ["Alt", "?"], action: "Toggle This Modal" },
+      { keys: ["Alt", "/"], action: "Toggle This Modal" },
     ],
   },
   {
@@ -142,9 +142,7 @@ export function ShortcutModal({ open, onClose }: Props) {
             <div className="shortcut-modal-footer">
               Press <kbd className="shortcut-kbd">Alt</kbd>
               <span className="shortcut-plus">+</span>
-              <kbd className="shortcut-kbd">Shift</kbd>
-              <span className="shortcut-plus">+</span>
-              <kbd className="shortcut-kbd">?</kbd> to toggle this modal
+              <kbd className="shortcut-kbd">/</kbd> to toggle this modal
             </div>
           </motion.div>
         </motion.div>
