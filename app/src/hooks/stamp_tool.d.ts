@@ -1,6 +1,9 @@
 declare module "stamp_tool" {
   export default function init(): Promise<void>;
 
+  /** Gallery photo cap for an account tier ("demo" | "loggedIn" | "paid"). */
+  export function photo_limit(tier: string): number;
+
   /**
    * Stateless: composite `src` (RGBA, sw*sh*4 bytes) onto a copy of `target`
    * (RGBA, tw*th*4 bytes) at (dx, dy) with opacity in [0, 1]. Returns the new
@@ -47,6 +50,35 @@ declare module "stamp_tool" {
    * Uint8Array on parse failure.
    */
   export function parse_color(input: string): Uint8Array;
+
+  /**
+   * Compute the largest centred rectangle with the given aspect ratio
+   * that fits inside an `image_w` × `image_h` image. Returns `[x, y, w, h]`
+   * as a Uint32Array, or an empty array if any input is 0.
+   */
+  export function compute_aspect_crop(
+    image_w: number,
+    image_h: number,
+    ratio_w: number,
+    ratio_h: number,
+  ): Uint32Array;
+
+  /**
+   * Snap a free drag to a locked aspect ratio. Anchored at (start_x, start_y),
+   * extends toward (end_x, end_y), scaled so width/height match ratio_w/ratio_h,
+   * clipped to image bounds. Returns `[x, y, w, h]` as a Uint32Array, or empty
+   * on invalid input.
+   */
+  export function constrain_crop_to_ratio(
+    start_x: number,
+    start_y: number,
+    end_x: number,
+    end_y: number,
+    ratio_w: number,
+    ratio_h: number,
+    image_w: number,
+    image_h: number,
+  ): Uint32Array;
 
   export class ImageHorseTool {
     constructor(width: number, height: number);

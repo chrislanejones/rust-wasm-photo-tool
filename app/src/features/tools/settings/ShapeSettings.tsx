@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Square, Circle, PenLine, Minus } from "lucide-react";
-import { ToolButton } from "@/components/ui/tool-button";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { TabGroup } from "@/components/TabGroup";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SizeSlider } from "@/components/SizeSlider";
@@ -8,10 +8,10 @@ import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
 
 const SHAPES = [
-  { id: "rect",       label: "Rectangle",   Icon: Square   },
-  { id: "circle",     label: "Circle",       Icon: Circle   },
-  { id: "handCircle", label: "Hand-drawn",   Icon: PenLine  },
-  { id: "line",       label: "Line",         Icon: Minus    },
+  { id: "rect",       label: "Rectangle", icon: Square  },
+  { id: "circle",     label: "Circle",    icon: Circle  },
+  { id: "handCircle", label: "Hand-drawn", icon: PenLine },
+  { id: "line",       label: "Line",      icon: Minus   },
 ] as const;
 
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
@@ -50,18 +50,11 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
       {mode === "shapes" && (
         <div className="space-y-6">
           {/* Shape selector */}
-          <div className="grid grid-cols-2 gap-2">
-            {SHAPES.map(({ id, label, Icon }) => (
-              <ToolButton
-                key={id}
-                active={currentShape === id}
-                onClick={() => onChange({ ...settings, shape: id })}
-              >
-                <Icon />
-                {label}
-              </ToolButton>
-            ))}
-          </div>
+          <ToolButtonGroup
+            options={SHAPES}
+            value={currentShape}
+            onChange={(id) => onChange({ ...settings, shape: id })}
+          />
 
           {/* Stroke Width */}
           <SizeSlider

@@ -138,15 +138,15 @@ export default function Pricing() {
         <div className="grid md:grid-cols-3 gap-4 mb-8">
           <PlanCard
             tier="Demo" tag="anonymous" price="$0" sub="forever" color="zinc" cta="Try it now"
-            features={["All WASM tools", "3 image gallery", "Session-only", "No signup"]}
+            features={["All WASM tools", "12 image gallery", "Session-only", "No signup"]}
           />
           <PlanCard
             tier="Free" tag="logged in" price="$0" sub="per month" color="emerald" cta="Create account"
-            features={["Persistence", "10 images", "3 projects", "100 MB", "5 AI runs / day"]}
+            features={["Persistence", "24 images", "3 projects", "100 MB", "5 AI runs / day"]}
           />
           <PlanCard
             tier="Pro" tag="best value" price="$10" sub="per month" color="violet" highlight cta="Start Pro"
-            features={["Unlimited storage", "Unlimited layers", "4× upscale", "Object removal", "AI unlimited"]}
+            features={["100 photos (coming soon)", "Unlimited storage", "Unlimited layers", "4× upscale", "Object removal", "AI unlimited"]}
           />
         </div>
 
@@ -179,7 +179,7 @@ export default function Pricing() {
           <TierRow feature="Export (PNG/JPEG/WebP/AVIF)" demo="yes" free="yes" pro="yes" />
 
           <TierCategory label="Gallery & storage" />
-          <TierRow feature="Gallery" sub="photos loaded in session" demo="3 images" free="10 images" pro="unlimited" />
+          <TierRow feature="Gallery" sub="photos loaded in session" demo="12 images" free="24 images" pro="100 (soon)" />
           <TierRow feature="Auto compress all" demo="yes" free="yes" pro="yes" />
           <TierRow feature="Image persistence" sub="saved across sessions" demo="—" free="UploadThing" pro="UploadThing" />
           <TierRow feature="File storage quota" demo="—" free="100 MB" pro="5 GB" />
@@ -210,7 +210,7 @@ export default function Pricing() {
         <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-800/30 p-4">
           <div className="text-xs text-zinc-300 leading-relaxed">
             <span className="text-zinc-100 font-medium">Design principle:</span> Demo mode costs us nothing because WASM runs on the user's device.
-            The gallery limit (3 images) and session-only storage are the natural nudge toward signup — no artificial
+            The gallery limits (12 images in demo, 24 once signed in) and session-only storage are the natural nudge toward signup — no artificial
             "sign in to use blur" gates on tools that run locally. Convex, UploadThing, and Replicate only activate
             after auth, so our bill scales with real users, not drive-by traffic.
           </div>
@@ -219,9 +219,9 @@ export default function Pricing() {
         {/* Recommendations */}
         <div className="mt-4 grid md:grid-cols-3 gap-3">
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-            <div className="text-amber-400 text-xs font-medium mb-1">📸 Demo → 3 gallery slots</div>
+            <div className="text-amber-400 text-xs font-medium mb-1">📸 Demo → 12 gallery slots</div>
             <div className="text-[11px] text-zinc-400 leading-relaxed">
-              Not about cost (local memory). It's about making the session feel limited. "I edited 3 photos and now I want to keep them" is the conversion moment.
+              Not about cost (local memory). It's about making the session feel limited. "I edited a dozen photos and now I want to keep them" is the conversion moment.
             </div>
           </div>
           <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">

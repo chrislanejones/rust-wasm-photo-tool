@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
 import { X, Image, Check, Zap, ChevronLeft, ChevronRight } from "lucide-react";
@@ -29,6 +29,8 @@ interface Props {
   compressionProgress: Record<string, number>;
   compressionSavings?: Record<string, { savingsPercent: number }>;
   modifiedPhotos?: Set<string>;
+  /** Per-tier gallery cap, shown next to the count (e.g. "3 / 12"). */
+  maxPhotos?: number;
 }
 
 interface ThumbProps {
@@ -174,14 +176,42 @@ export function GalleryBar({
   compressionProgress,
   compressionSavings,
   modifiedPhotos,
+  maxPhotos,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
+
+  // Overflow-aware arrow state. Each arrow is enabled only when the strip can
+  // actually scroll that way. When all thumbs fit (e.g. desktop, ≤12 photos)
+  // there's no overflow so both arrows disable; on narrow/mobile widths the
+  // strip overflows and the arrows light up.
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 1);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
 
   useEffect(() => {
     if (!activeId || !stripRef.current) return;
     const el = stripRef.current.querySelector<HTMLElement>(`[data-id="${activeId}"]`);
     el?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
   }, [activeId, photos.length]);
+
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    updateScrollState();
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      ro.disconnect();
+    };
+  }, [updateScrollState, photos.length, showTools, showHistory]);
 
   if (photos.length === 0) return null;
 
@@ -207,7 +237,9 @@ export function GalleryBar({
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <Image className="h-4 w-4" />
               Gallery
-              <span className="text-xs text-text-muted">({photos.length})</span>
+              <span className="text-xs text-text-muted">
+                ({photos.length}{maxPhotos ? ` / ${maxPhotos}` : ""})
+              </span>
             </h2>
             <button
               onClick={onClose}
@@ -220,7 +252,8 @@ export function GalleryBar({
           <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
             <button
               onClick={() => stripRef.current?.scrollBy({ left: -220, behavior: "smooth" })}
-              className="btn-icon flex-shrink-0"
+              disabled={!canScrollLeft}
+              className="btn-icon flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Scroll left"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -248,7 +281,8 @@ export function GalleryBar({
 
             <button
               onClick={() => stripRef.current?.scrollBy({ left: 220, behavior: "smooth" })}
-              className="btn-icon flex-shrink-0"
+              disabled={!canScrollRight}
+              className="btn-icon flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Scroll right"
             >
               <ChevronRight className="h-4 w-4" />

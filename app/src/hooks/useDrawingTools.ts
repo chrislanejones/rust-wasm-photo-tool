@@ -21,6 +21,11 @@ interface UseDrawingToolsOptions {
   settings: ToolSettings;
   flushToCanvas: () => void;
   syncState: () => void;
+  /** Locked aspect ratio for crop drags as `[w, h]`. Null = free drag. */
+  cropRatio?: [number, number] | null;
+  /** Image dimensions used to clip the constrained crop to the canvas. */
+  imageWidth?: number;
+  imageHeight?: number;
 }
 
 export function useDrawingTools({
@@ -30,7 +35,74 @@ export function useDrawingTools({
   settings,
   flushToCanvas,
   syncState,
+  cropRatio,
+  imageWidth,
+  imageHeight,
 }: UseDrawingToolsOptions) {
+  // Keep ratio + image dims in a ref so onMouseMove/Up closures see the
+  // freshest values without forcing a reattach of all the handlers.
+  const cropRatioRef = useRef(cropRatio);
+  cropRatioRef.current = cropRatio;
+  const imageDimsRef = useRef({ w: imageWidth ?? 0, h: imageHeight ?? 0 });
+  imageDimsRef.current = { w: imageWidth ?? 0, h: imageHeight ?? 0 };
+
+  // Cache the synchronous Rust constrain entry point. WASM is already
+  // initialized by the time the crop tool is reachable, but we fall back
+  // to a JS computation if it's somehow missing.
+  const constrainRef = useRef<
+    | ((
+        sx: number, sy: number, ex: number, ey: number,
+        rw: number, rh: number, iw: number, ih: number,
+      ) => Uint32Array)
+    | null
+  >(null);
+  if (!constrainRef.current) {
+    void import("stamp_tool").then(async (mod) => {
+      await mod.default();
+      constrainRef.current = mod.constrain_crop_to_ratio;
+    }).catch(() => {});
+  }
+
+  /** Apply the locked-ratio constraint to a raw drag rect. Returns null
+   *  when no ratio is locked so callers fall back to the free path. */
+  const constrainDrag = useCallback(
+    (start: Point, end: Point): { x: number; y: number; w: number; h: number } | null => {
+      const ratio = cropRatioRef.current;
+      const dims = imageDimsRef.current;
+      if (!ratio || !dims.w || !dims.h) return null;
+      const fn = constrainRef.current;
+      if (fn) {
+        const out = fn(
+          Math.round(start.x), Math.round(start.y),
+          Math.round(end.x), Math.round(end.y),
+          ratio[0], ratio[1],
+          dims.w, dims.h,
+        );
+        if (out.length === 4) {
+          return { x: out[0], y: out[1], w: out[2], h: out[3] };
+        }
+      }
+      // Cold-cache JS fallback — equivalent geometry.
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const r = ratio[0] / ratio[1];
+      let w = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
+        ? Math.abs(dx) : Math.abs(dy) * r;
+      let h = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
+        ? Math.abs(dx) / r : Math.abs(dy);
+      let x = start.x;
+      let y = start.y;
+      if (dx < 0) x -= w;
+      if (dy < 0) y -= h;
+      return {
+        x: Math.max(0, Math.round(x)),
+        y: Math.max(0, Math.round(y)),
+        w: Math.max(1, Math.round(w)),
+        h: Math.max(1, Math.round(h)),
+      };
+    },
+    [],
+  );
   const isDrawing = useRef(false);
   const startPoint = useRef<Point | null>(null);
   const lastPoint = useRef<Point | null>(null);
@@ -99,10 +171,12 @@ export function useDrawingTools({
           settings.strokeWidth,
         );
       } else if (activeTool === "crop") {
-        const x = Math.min(start.x, p.x);
-        const y = Math.min(start.y, p.y);
-        const w = Math.abs(p.x - start.x);
-        const h = Math.abs(p.y - start.y);
+        // If a ratio is locked, snap the drag rect via Rust; otherwise free.
+        const constrained = constrainDrag(start, p);
+        const x = constrained ? constrained.x : Math.min(start.x, p.x);
+        const y = constrained ? constrained.y : Math.min(start.y, p.y);
+        const w = constrained ? constrained.w : Math.abs(p.x - start.x);
+        const h = constrained ? constrained.h : Math.abs(p.y - start.y);
         ctx.fillStyle = "rgba(0,0,0,0.5)";
         ctx.fillRect(0, 0, canvas.width, y);
         ctx.fillRect(0, y + h, canvas.width, canvas.height - (y + h));
@@ -115,7 +189,7 @@ export function useDrawingTools({
         ctx.setLineDash([]);
       }
     },
-    [activeTool, canvasRef, getCoords, settings],
+    [activeTool, canvasRef, getCoords, settings, constrainDrag],
   );
 
   const onMouseUp = useCallback(() => {
@@ -130,10 +204,11 @@ export function useDrawingTools({
       if (preSnapshot.current && ctx) {
         ctx.putImageData(preSnapshot.current, 0, 0);
       }
-      const x = Math.min(start.x, end.x);
-      const y = Math.min(start.y, end.y);
-      const w = Math.abs(end.x - start.x);
-      const h = Math.abs(end.y - start.y);
+      const constrained = constrainDrag(start, end);
+      const x = constrained ? constrained.x : Math.min(start.x, end.x);
+      const y = constrained ? constrained.y : Math.min(start.y, end.y);
+      const w = constrained ? constrained.w : Math.abs(end.x - start.x);
+      const h = constrained ? constrained.h : Math.abs(end.y - start.y);
       if (w > 5 && h > 5) {
         setCropSelection({
           x: Math.round(x),
@@ -179,7 +254,7 @@ export function useDrawingTools({
     startPoint.current = null;
     lastPoint.current = null;
     preSnapshot.current = null;
-  }, [activeTool, toolRef, canvasRef, settings, flushToCanvas, syncState]);
+  }, [activeTool, toolRef, canvasRef, settings, flushToCanvas, syncState, constrainDrag]);
 
   const applyCrop = useCallback(() => {
     const tool = toolRef.current;

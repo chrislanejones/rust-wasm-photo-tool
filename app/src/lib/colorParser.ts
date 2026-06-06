@@ -2,10 +2,15 @@
 // init so subsequent parses are sync after the first await.
 
 let parserPromise: Promise<(input: string) => Uint8Array> | null = null;
+/** Cached sync handle, set as soon as the async load resolves. Other parts
+ *  of the app (e.g. useTextTool) need to parse colors synchronously inside
+ *  commit handlers; this lets them skip the await when WASM is already up. */
+let syncParser: ((input: string) => Uint8Array) | null = null;
 
 async function loadParser(): Promise<(input: string) => Uint8Array> {
   const mod = await import("stamp_tool");
   await mod.default();
+  syncParser = mod.parse_color;
   return mod.parse_color;
 }
 
@@ -50,4 +55,24 @@ export async function parseColor(input: string): Promise<ParsedColor | null> {
 /** Eagerly warm the parser so the first picker click is instant. */
 export function warmColorParser(): void {
   void getParser().catch(() => {});
+}
+
+/**
+ * Sync color parser. Returns null if WASM hasn't loaded yet OR the input
+ * isn't a valid color string. Used by commit-path code (event handlers
+ * that can't await) — callers should `warmColorParser()` at mount and
+ * provide their own fallback for the unlikely cold-cache case.
+ */
+export function parseColorSync(input: string): ParsedColor | null {
+  if (!syncParser) return null;
+  const bytes = syncParser(input);
+  if (bytes.length !== 4) return null;
+  const [r, g, b, a] = bytes;
+  const hex =
+    a === 255
+      ? `#${toHex(r)}${toHex(g)}${toHex(b)}`
+      : `#${toHex(r)}${toHex(g)}${toHex(b)}${toHex(a)}`;
+  const css =
+    a === 255 ? hex : `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+  return { r, g, b, a, hex, css };
 }

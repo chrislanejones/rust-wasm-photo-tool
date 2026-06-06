@@ -13,6 +13,8 @@ interface Props {
   state: CloneStampState;
   imageCount: number;
   userMode?: UserMode;
+  /** Per-tier gallery cap, shown as "count / max" when provided. */
+  maxPhotos?: number;
 }
 
 const USER_MODE_LABEL: Record<UserMode, string> = {
@@ -21,7 +23,7 @@ const USER_MODE_LABEL: Record<UserMode, string> = {
   paid: "Paid user",
 };
 
-export function StatusBar({ state, imageCount, userMode = "demo" }: Props) {
+export function StatusBar({ state, imageCount, userMode = "demo", maxPhotos }: Props) {
   return (
     <footer className="status-bar">
       <div className="status-section">
@@ -63,7 +65,7 @@ export function StatusBar({ state, imageCount, userMode = "demo" }: Props) {
 
       <div className="status-section status-right">
         <span className="status-zoom-label">
-          {imageCount} img{imageCount !== 1 ? "s" : ""}
+          {imageCount}{maxPhotos ? ` / ${maxPhotos}` : ""} img{imageCount !== 1 ? "s" : ""}
         </span>
         <span className="status-divider" />
         <span className="status-zoom">

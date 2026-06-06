@@ -28,6 +28,7 @@ import { GridThumbnails } from "@/features/canvas/GridThumbnails";
 import { HistoryPanel } from "@/features/canvas/HistoryPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
+import { getPhotoLimit, DEFAULT_PHOTO_LIMIT } from "@/lib/photoLimits";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
@@ -74,6 +75,15 @@ const AUTH_ENABLED = !!(
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY &&
   import.meta.env.VITE_CONVEX_URL
 );
+
+/** User-facing message when the gallery cap is reached, nudging toward the next tier. */
+function capMessage(mode: UserMode, max: number): string {
+  if (mode === "demo")
+    return `Demo galleries hold ${max} photos. Sign in to load up to 24.`;
+  if (mode === "loggedIn")
+    return `Free accounts hold ${max} photos. Pro (100) is coming soon.`;
+  return `Gallery is limited to ${max} photos.`;
+}
 
 function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
   const { isLoaded, isSignedIn } = useUser();
@@ -132,8 +142,25 @@ export function AppShell() {
   const [colorPickerActive, setColorPickerActive] = useState(false);
   const [stampSubMode, setStampSubMode] = useState<"clone" | "red" | "emojis">("clone");
   const [shapesMode, setShapesMode] = useState<"shapes" | "arrows">("shapes");
+  /** Active Crop-tool aspect ratio. `null` ≡ "Free" (no constraint).
+   *  Drags in useDrawingTools snap to this ratio via Rust when set. */
+  const [cropRatio, setCropRatio] = useState<[number, number] | null>(null);
   const [userMode, setUserMode] = useState<UserMode>("demo");
   const handleAuthMode = useCallback((m: UserMode) => setUserMode(m), []);
+
+  // Gallery photo cap for the current tier. Resolved from Rust (`photo_limit`)
+  // so the WASM layer is the single source of truth. Starts at the most
+  // restrictive limit until the wasm lookup resolves.
+  const [maxPhotos, setMaxPhotos] = useState(DEFAULT_PHOTO_LIMIT);
+  useEffect(() => {
+    let alive = true;
+    void getPhotoLimit(userMode).then((n) => {
+      if (alive) setMaxPhotos(n);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [userMode]);
 
   const handleTextCommit = useCallback(
     (text: string) => {
@@ -240,6 +267,19 @@ export function AppShell() {
   // ── Add photos ─────────────────────────────────────────────────────────────
   const handleAddPhotos = useCallback(
     async (files: File[]) => {
+      // ── Tier cap ─────────────────────────────────────────────────────────
+      // Enforce the per-tier gallery limit (from Rust `photo_limit`). Accept
+      // as many as fit, then notify if the batch was trimmed or already full.
+      const remaining = Math.max(0, maxPhotos - photos.length);
+      if (remaining <= 0) {
+        toast.error(capMessage(userMode, maxPhotos));
+        return;
+      }
+      const accepted = files.length > remaining ? files.slice(0, remaining) : files;
+      if (files.length > remaining) {
+        toast.error(capMessage(userMode, maxPhotos));
+      }
+
       if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
         setModifiedPhotos((prev) => {
           if (prev.has(activePhotoId)) return prev;
@@ -253,7 +293,7 @@ export function AppShell() {
       }
 
       let firstLoaded = false;
-      for (const f of files) {
+      for (const f of accepted) {
         try {
           const working = await makeWorkingCopy(f);
           const [originalKey, thumbBlob] = await Promise.all([
@@ -287,7 +327,7 @@ export function AppShell() {
         }
       }
     },
-    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit],
+    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, userMode],
   );
 
   // ── Select photo ───────────────────────────────────────────────────────────
@@ -553,6 +593,9 @@ export function AppShell() {
     settings: toolSettings,
     flushToCanvas: flushAndSync,
     syncState: stamp.syncState,
+    cropRatio,
+    imageWidth: stamp.state.width,
+    imageHeight: stamp.state.height,
   });
 
   const emojiTool = useEmojiTool({
@@ -581,6 +624,31 @@ export function AppShell() {
     active: activeTool === "text",
   });
   reopenWithRef.current = textTool.reopenWith;
+
+  /**
+   * Wrap setToolSettings so that when the text-input overlay is open, any
+   * change to textColor / fontWeight / fontSize is forwarded to the text
+   * tool's setters too. Without this, the toolbar updates `toolSettings`
+   * but the open textarea keeps showing the captured-on-open style. BG
+   * fields are read directly from `toolSettings` by CanvasArea, so they
+   * already update live without forwarding.
+   */
+  const handleToolSettingsChange = useCallback(
+    (next: ToolSettings) => {
+      setToolSettings((prev) => {
+        if (textTool.textInput) {
+          if (next.textColor !== prev.textColor)
+            textTool.setTextColor(next.textColor);
+          if (next.fontWeight !== prev.fontWeight)
+            textTool.setTextFontWeight(next.fontWeight);
+          if (next.fontSize !== prev.fontSize)
+            textTool.setTextFontSize(next.fontSize);
+        }
+        return next;
+      });
+    },
+    [textTool],
+  );
 
   // Live-annotation bounding boxes for the CanvasArea hover highlight.
   const annotationBoxes = textTool.annotations.map((a) => ({
@@ -681,17 +749,30 @@ export function AppShell() {
       return;
     }
     try {
-      const pngBytes = tool.export_png();
-      const blob = new Blob([pngBytes.buffer as ArrayBuffer], {
-        type: "image/png",
-      });
+      // Match the export-path semantics: bake any live text overlays into
+      // pixels first so the clipboard image reflects what's on screen.
+      if (tool.text_annotation_count() > 0) {
+        tool.flatten_text_annotations();
+        stamp.flushToCanvas();
+        stamp.syncState();
+      }
+      // Important: `tool.export_png()` returns a Uint8Array view into wasm
+      // memory. Passing `.buffer` to Blob() would include the entire wasm
+      // heap, not just the PNG slice — the resulting blob is huge and the
+      // clipboard write fails. Copy the slice into a fresh ArrayBuffer
+      // (detached from wasm memory) before handing it to Blob.
+      const pngView = tool.export_png();
+      const pngBytes = new Uint8Array(pngView.length);
+      pngBytes.set(pngView);
+      const blob = new Blob([pngBytes], { type: "image/png" });
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": blob }),
       ]);
       toast.success("Copied to clipboard");
     } catch (err) {
       console.error("Copy to clipboard failed:", err);
-      toast.error("Couldn't copy to clipboard");
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Couldn't copy to clipboard: ${msg}`);
     }
   }, [stamp]);
 
@@ -829,7 +910,12 @@ export function AppShell() {
     onZoomIn: handleZoomIn,
     onZoomOut: handleZoomOut,
     onZoomReset: handleZoomReset,
-    onToolChange: setActiveTool,
+    onToolChange: (t) => {
+      // Batch Image Editor requires 2+ photos; ignore the shortcut otherwise
+      // so the keyboard path matches the disabled sidebar icon.
+      if (t === "emoji" && photos.length <= 1) return;
+      setActiveTool(t);
+    },
     onFlipH: stamp.flipHorizontal,
     onFlipV: stamp.flipVertical,
     onRotateCw: stamp.rotate90Cw,
@@ -961,8 +1047,11 @@ export function AppShell() {
             isCompressing={compressProgress.running}
             compressProgress={compressProgress}
             onApplyCrop={drawingTools.applyCrop}
+            onSetCropSelection={drawingTools.setCropSelection}
+            cropRatio={cropRatio}
+            onCropRatioChange={setCropRatio}
             toolSettings={toolSettings}
-            onToolSettingsChange={setToolSettings}
+            onToolSettingsChange={handleToolSettingsChange}
             recentTexts={recentTexts}
             onSelectRecentText={handleSelectRecentText}
             shapesMode={shapesMode}
@@ -1074,6 +1163,12 @@ export function AppShell() {
                             fontFamily: toolSettings.fontFamily,
                             fontWeight: toolSettings.fontWeight,
                             textColor: toolSettings.textColor,
+                            bgKind: toolSettings.bgKind,
+                            bgColor: toolSettings.bgColor,
+                            bgOpacity: toolSettings.bgOpacity,
+                            bgPadding: toolSettings.bgPadding,
+                            bgCornerRadius: toolSettings.bgCornerRadius,
+                            bgTail: toolSettings.bgTail,
                           }}
                           containerRef={containerRef}
                           onTextPositionChange={textTool.setTextPosition}
@@ -1133,6 +1228,12 @@ export function AppShell() {
                         fontFamily: toolSettings.fontFamily,
                         fontWeight: toolSettings.fontWeight,
                         textColor: toolSettings.textColor,
+                        bgKind: toolSettings.bgKind,
+                        bgColor: toolSettings.bgColor,
+                        bgOpacity: toolSettings.bgOpacity,
+                        bgPadding: toolSettings.bgPadding,
+                        bgCornerRadius: toolSettings.bgCornerRadius,
+                        bgTail: toolSettings.bgTail,
                       }}
                       containerRef={containerRef}
                       onTextPositionChange={textTool.setTextPosition}
@@ -1216,6 +1317,7 @@ export function AppShell() {
             compressionProgress={compressProgress.items ?? {}}
             compressionSavings={imageSavings}
             modifiedPhotos={modifiedPhotos}
+            maxPhotos={maxPhotos}
           />
         )}
       </AnimatePresence>
@@ -1239,6 +1341,7 @@ export function AppShell() {
           state={stamp.state}
           imageCount={photos.length}
           userMode={userMode}
+          maxPhotos={maxPhotos}
         />
       )}
 

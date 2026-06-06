@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 export interface CompressionProgress {
   /** Progress per photo ID: 0..100 for progress, -1 for error. Matches existing GalleryBar type. */
   items: Record<string, number>;
-  /** Savings info per photo (for future PhotoThumb Zap badge). */
+  /** Savings info per photo (drives the gallery thumb Zap badge). */
   savings: Record<
     string,
     { originalSize: number; compressedSize: number; savingsPercent: number }

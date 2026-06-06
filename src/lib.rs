@@ -26,6 +26,25 @@ use crate::core::ImageBuffer;
 use crate::history::{History, Snapshot};
 use crate::stamp::StampState;
 
+/// Maximum number of gallery photos allowed for a given account tier.
+///
+/// Single source of truth for the gallery cap, shared by the upload gate
+/// (`handleAddPhotos`) and the gallery UI on the JS side.
+///
+/// - `"demo"`     — anonymous / not signed in → **12**
+/// - `"loggedIn"` — free account             → **24**
+/// - `"paid"`     — Pro (coming soon)         → **100**
+///
+/// Unknown tiers fall back to the most restrictive demo limit.
+#[wasm_bindgen]
+pub fn photo_limit(tier: &str) -> u32 {
+    match tier {
+        "loggedIn" => 24,
+        "paid" => 100,
+        _ => 12,
+    }
+}
+
 /// A live (non-destructive) text annotation that sits in an overlay
 /// composited over the main pixel buffer on render. Annotations are
 /// re-editable until `flatten_text_annotations` burns them into pixels
@@ -209,8 +228,8 @@ fn build_annotation_tile(
     // Background path: expand the tile by `bg_padding` on all sides, and
     // by ~TAIL_EXTENT (16 px on the tail axis, 12 px on the perpendicular)
     // when there's a speech-bubble tail.
-    const TAIL_LEN: u32 = 16;     // how far the tail sticks out
-    const TAIL_HALF: u32 = 8;     // half-width of the tail base
+    const TAIL_LEN: u32 = 32;     // how far the tail sticks out
+    const TAIL_HALF: u32 = 16;    // half-width of the tail base
     let (tail_l, tail_r, tail_t, tail_b) = if background_kind == 2 {
         match bg_tail {
             1 => (TAIL_LEN, 0, 0, 0),                          // Left
@@ -1534,4 +1553,114 @@ fn parse_alpha(s: &str) -> Option<u8> {
     } else {
         None
     }
+}
+
+/// Snap a free drag to a locked aspect ratio. The user starts a drag at
+/// (`start_x`, `start_y`) and the cursor is currently at (`end_x`, `end_y`);
+/// this returns the rect that respects `ratio_w` : `ratio_h`, anchored at
+/// the start corner and growing toward the cursor's quadrant. The longer
+/// drag axis "leads" — the perpendicular axis is sized to match the ratio,
+/// so the box always reaches at least as far as the cursor in the leading
+/// direction. The result is clipped to the image bounds. Returns
+/// `[x, y, w, h]` as a `Uint32Array`, or an empty array on invalid input.
+#[wasm_bindgen]
+pub fn constrain_crop_to_ratio(
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+    ratio_w: u32,
+    ratio_h: u32,
+    image_w: u32,
+    image_h: u32,
+) -> Vec<u32> {
+    if ratio_w == 0 || ratio_h == 0 || image_w == 0 || image_h == 0 {
+        return Vec::new();
+    }
+    let r = ratio_w as f64 / ratio_h as f64;
+    // Signed deltas tell us which quadrant the cursor's in.
+    let dx = (end_x - start_x) as f64;
+    let dy = (end_y - start_y) as f64;
+    let sign_x = if dx < 0.0 { -1.0 } else { 1.0 };
+    let sign_y = if dy < 0.0 { -1.0 } else { 1.0 };
+    let adx = dx.abs();
+    let ady = dy.abs();
+
+    // Pick the leading axis: whichever produces the larger ratio-matched
+    // rect. |dx|/|dy| > r → width is the binding constraint; else height.
+    let (mut w, mut h) = if ady == 0.0 || (adx / ady.max(1e-9)) > r {
+        (adx, adx / r)
+    } else {
+        (ady * r, ady)
+    };
+    if w < 1.0 || h < 1.0 {
+        return vec![start_x.max(0) as u32, start_y.max(0) as u32, 1, 1];
+    }
+
+    // Anchor at start, extend in cursor's direction.
+    let mut x0 = start_x as f64;
+    let mut y0 = start_y as f64;
+    if sign_x < 0.0 { x0 -= w; }
+    if sign_y < 0.0 { y0 -= h; }
+
+    // Clip to image: if the rect runs off the edge, scale uniformly so the
+    // ratio is preserved instead of letting one side get cut.
+    let iw = image_w as f64;
+    let ih = image_h as f64;
+    // Recompute fully-clipped bounds with ratio preservation.
+    let max_x = if sign_x >= 0.0 { iw - x0 } else { x0 + w };
+    let max_y = if sign_y >= 0.0 { ih - y0 } else { y0 + h };
+    let avail_w = max_x.min(iw).max(0.0);
+    let avail_h = max_y.min(ih).max(0.0);
+    if w > avail_w {
+        let scale = avail_w / w;
+        w *= scale;
+        h *= scale;
+        if sign_x < 0.0 { x0 = start_x as f64 - w; }
+    }
+    if h > avail_h {
+        let scale = avail_h / h;
+        w *= scale;
+        h *= scale;
+        if sign_y < 0.0 { y0 = start_y as f64 - h; }
+    }
+    // Final hard clamp (handles negative start positions).
+    let x = x0.max(0.0).min(iw - 1.0);
+    let y = y0.max(0.0).min(ih - 1.0);
+    let w_u = w.floor().clamp(1.0, iw - x) as u32;
+    let h_u = h.floor().clamp(1.0, ih - y) as u32;
+    vec![x as u32, y as u32, w_u, h_u]
+}
+
+/// Compute the largest centred rectangle with the given aspect ratio that
+/// fits inside an `image_w` × `image_h` image. Used by the Crop tool's
+/// ratio buttons (1:1, 4:3, 16:9, …) so the JS side doesn't reinvent the
+/// math. Returns `[x, y, w, h]` as a `Uint32Array`. Any non-positive input
+/// returns an empty array.
+#[wasm_bindgen]
+pub fn compute_aspect_crop(
+    image_w: u32,
+    image_h: u32,
+    ratio_w: u32,
+    ratio_h: u32,
+) -> Vec<u32> {
+    if image_w == 0 || image_h == 0 || ratio_w == 0 || ratio_h == 0 {
+        return Vec::new();
+    }
+    let iw = image_w as f64;
+    let ih = image_h as f64;
+    let r = ratio_w as f64 / ratio_h as f64;
+    let image_r = iw / ih;
+    let (cw, ch) = if r > image_r {
+        // Ratio wider than image → bounded by image width
+        (iw, iw / r)
+    } else {
+        // Ratio taller or equal → bounded by image height
+        (ih * r, ih)
+    };
+    let cw_u = cw.floor().clamp(1.0, iw) as u32;
+    let ch_u = ch.floor().clamp(1.0, ih) as u32;
+    let x = (image_w - cw_u) / 2;
+    let y = (image_h - ch_u) / 2;
+    vec![x, y, cw_u, ch_u]
 }

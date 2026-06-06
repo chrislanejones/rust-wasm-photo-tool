@@ -6,7 +6,7 @@ import { TEXT_COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
-import { Button } from "@/components/ui/button";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { quickSpring } from "@/lib/animations";
 
 const FONT_FAMILIES = [
@@ -188,24 +188,13 @@ export function TextSettings({
             className="space-y-5"
           >
             {/* Style toggle */}
-            <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                Style
-              </label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {BG_KIND_OPTIONS.map((opt) => (
-                  <Button
-                    key={opt.id}
-                    type="button"
-                    variant={settings.bgKind === opt.id ? "default" : "outline"}
-                    className="text-[11px]"
-                    onClick={() => onChange({ ...settings, bgKind: opt.id })}
-                  >
-                    {opt.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
+            <ToolButtonGroup
+              label="Style"
+              options={BG_KIND_OPTIONS}
+              value={settings.bgKind}
+              onChange={(id) => onChange({ ...settings, bgKind: id })}
+              columns={3}
+            />
 
             {settings.bgKind !== "none" && (
               <>
@@ -241,24 +230,13 @@ export function TextSettings({
 
                 {/* Tail direction — bubble only */}
                 {settings.bgKind === "bubble" && (
-                  <div className="space-y-4">
-                    <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                      Tail Direction
-                    </label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {BG_TAIL_OPTIONS.map((opt) => (
-                        <Button
-                          key={opt.id}
-                          type="button"
-                          variant={settings.bgTail === opt.id ? "default" : "outline"}
-                          className="text-[10px]"
-                          onClick={() => onChange({ ...settings, bgTail: opt.id })}
-                        >
-                          {opt.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
+                  <ToolButtonGroup
+                    label="Tail Direction"
+                    options={BG_TAIL_OPTIONS}
+                    value={settings.bgTail}
+                    onChange={(id) => onChange({ ...settings, bgTail: id })}
+                    columns={3}
+                  />
                 )}
 
                 {/* Opacity */}

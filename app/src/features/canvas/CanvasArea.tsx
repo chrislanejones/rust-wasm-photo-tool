@@ -58,7 +58,20 @@ interface Props {
   onTextKeyDown?: (e: React.KeyboardEvent) => void;
   onTextChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onTextBlur?: () => void;
-  textSettings?: { fontSize: number; fontFamily?: string; fontWeight: string; textColor: string };
+  textSettings?: {
+    fontSize: number;
+    fontFamily?: string;
+    fontWeight: string;
+    textColor: string;
+    /** Background-preview fields. The open textarea renders a live preview
+     *  using these so the user can configure their BG before committing. */
+    bgKind?: "none" | "rect" | "bubble";
+    bgColor?: string;
+    bgOpacity?: number;
+    bgPadding?: number;
+    bgCornerRadius?: number;
+    bgTail?: "left" | "right" | "topleft" | "bottomright" | "bottomleft";
+  };
   colorPickerActive?: boolean;
   containerRef?: React.RefObject<HTMLDivElement | null>;
   onTextPositionChange?: (canvasX: number, canvasY: number) => void;
@@ -624,8 +637,123 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             window.addEventListener("pointerup", onUp);
           };
 
+          // Live BG preview behind the textarea. Mirrors the Rust geometry
+          // in `build_annotation_tile` so what the user sees here matches
+          // what gets committed. Tail sizes match TAIL_LEN/TAIL_HALF.
+          const bgKind = textSettings.bgKind ?? "none";
+          const bgPad = Math.max(0, Math.round(textSettings.bgPadding ?? 0)) * scaleX;
+          const bgRadius =
+            Math.max(0, Math.round(textSettings.bgCornerRadius ?? 0)) * scaleX;
+          const bgOpacity01 =
+            Math.max(0, Math.min(100, textSettings.bgOpacity ?? 100)) / 100;
+          const bgColorRaw = textSettings.bgColor ?? "#ffffff";
+          const tailLen = 32 * scaleX;
+          const tailHalf = 16 * scaleX;
+          // Render the BG only when the toolbar has a non-"none" choice AND
+          // the textarea has actual dimensions to wrap.
+          const showBg = bgKind !== "none" && boxW > 0 && boxH > 0;
+
+          const tail = bgKind === "bubble" ? (textSettings.bgTail ?? "right") : null;
+          const padL = bgPad + (tail === "left" ? tailLen : 0);
+          const padR = bgPad + (tail === "right" || tail === "bottomright" ? tailLen : 0);
+          const padT = bgPad + (tail === "topleft" ? tailLen : 0);
+          const padB =
+            bgPad + (tail === "bottomright" || tail === "bottomleft" ? tailLen : 0);
+
+          const bgLeft = sx - padL;
+          const bgTop = sy - padT;
+          const bgW = boxW + padL + padR;
+          const bgH = boxH + padT + padB;
+
+          // Triangle tail rendered as an SVG inside the rotated wrapper so
+          // it tracks the textarea's orientation. Anchor at the rect edge
+          // closest to the requested direction.
+          const tailSvg = (() => {
+            if (!tail) return null;
+            const rectX0 = tail === "left" ? tailLen : 0;
+            const rectY0 = tail === "topleft" ? tailLen : 0;
+            const rectX1 = rectX0 + boxW + bgPad * 2;
+            const rectY1 = rectY0 + boxH + bgPad * 2;
+            const midY = (rectY0 + rectY1) / 2;
+            let p1: [number, number];
+            let p2: [number, number];
+            let p3: [number, number];
+            switch (tail) {
+              case "left":
+                p1 = [rectX0, midY - tailHalf];
+                p2 = [rectX0, midY + tailHalf];
+                p3 = [rectX0 - tailLen, midY];
+                break;
+              case "right":
+                p1 = [rectX1, midY - tailHalf];
+                p2 = [rectX1, midY + tailHalf];
+                p3 = [rectX1 + tailLen, midY];
+                break;
+              case "topleft":
+                p1 = [rectX0 + tailHalf, rectY0];
+                p2 = [rectX0 + tailHalf * 3, rectY0];
+                p3 = [rectX0, rectY0 - tailLen];
+                break;
+              case "bottomright":
+                p1 = [rectX1 - tailHalf, rectY1];
+                p2 = [rectX1 - tailHalf * 3, rectY1];
+                p3 = [rectX1, rectY1 + tailLen];
+                break;
+              case "bottomleft":
+                p1 = [rectX0 + tailHalf, rectY1];
+                p2 = [rectX0 + tailHalf * 3, rectY1];
+                p3 = [rectX0, rectY1 + tailLen];
+                break;
+            }
+            return (
+              <svg
+                width={bgW}
+                height={bgH}
+                style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }}
+              >
+                <polygon
+                  points={`${p1[0]},${p1[1]} ${p2[0]},${p2[1]} ${p3[0]},${p3[1]}`}
+                  fill={bgColorRaw}
+                  opacity={bgOpacity01}
+                />
+              </svg>
+            );
+          })();
+
           return (
             <>
+              {/* Background preview — sits behind the textarea, rotates with it */}
+              {showBg && (
+                <div
+                  data-text-overlay
+                  style={{
+                    position: "absolute",
+                    left: bgLeft,
+                    top: bgTop,
+                    width: bgW,
+                    height: bgH,
+                    pointerEvents: "none",
+                    zIndex: 49,
+                    transform: `rotate(${rotation}deg)`,
+                    transformOrigin: "center center",
+                  }}
+                >
+                  {/* The rounded rect itself */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: tail === "left" ? tailLen : 0,
+                      top: tail === "topleft" ? tailLen : 0,
+                      width: boxW + bgPad * 2,
+                      height: boxH + bgPad * 2,
+                      backgroundColor: bgColorRaw,
+                      opacity: bgOpacity01,
+                      borderRadius: bgKind === "rect" ? bgRadius : 12 * scaleX,
+                    }}
+                  />
+                  {tailSvg}
+                </div>
+              )}
               {/* Draggable box body */}
               <div
                 data-text-overlay

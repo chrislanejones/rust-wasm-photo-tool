@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
+import { parseColorSync, warmColorParser } from "@/lib/colorParser";
 
 export interface TextInput {
   screenX: number;
@@ -50,8 +51,19 @@ function rgbToHex(r: number, g: number, b: number): string {
   return `#${h(r)}${h(g)}${h(b)}`;
 }
 
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
+/**
+ * Parse a color string to RGB bytes. Routes through the Rust `parse_color`
+ * WASM export so we accept the same forms (#rgb, #rrggbb, #rrggbbaa, rgb(),
+ * rgba()) as the swatch grid's + button. Alpha is dropped since text fill
+ * is rendered opaque. Falls back to a minimal #rrggbb parser only if WASM
+ * hasn't loaded yet (extremely unlikely — useTextTool is always reached
+ * after the WASM tool is constructed).
+ */
+function hexToRgb(input: string): [number, number, number] {
+  const parsed = parseColorSync(input);
+  if (parsed) return [parsed.r, parsed.g, parsed.b];
+  // Cold-cache fallback for the very first text commit after a hard refresh.
+  const h = input.replace("#", "");
   if (h.length < 6) return [0, 0, 0];
   return [
     parseInt(h.slice(0, 2), 16),
@@ -119,6 +131,12 @@ export function useTextTool({
     return () =>
       window.removeEventListener("prefill-text", handler as EventListener);
   }, [active]);
+
+  // Warm the Rust color parser so the first text-commit's hex→rgb runs
+  // entirely through WASM (rather than the JS fallback).
+  useEffect(() => {
+    warmColorParser();
+  }, []);
 
   // Keep annotations roughly in sync after photo loads or external mutations.
   useEffect(() => {
@@ -398,6 +416,27 @@ export function useTextTool({
     });
   }, []);
 
+  /** Live-update the open input's color. Called from AppShell when the
+   *  toolbar ColorSwatchGrid fires onChange. */
+  const setTextColor = useCallback((textColor: string) => {
+    setTextInput((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, textColor };
+      textInputRef.current = next;
+      return next;
+    });
+  }, []);
+
+  /** Live-update the open input's font weight. */
+  const setTextFontWeight = useCallback((fontWeight: string) => {
+    setTextInput((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, fontWeight };
+      textInputRef.current = next;
+      return next;
+    });
+  }, []);
+
   // FIX (issue #4): fall back to canvas center when no previous click position
   // exists. Previously this silently stashed pendingText and nothing visible
   // happened when the user clicked a recent text in a fresh session.
@@ -543,6 +582,8 @@ export function useTextTool({
     setTextPosition,
     setTextRotation,
     setTextFontSize,
+    setTextColor,
+    setTextFontWeight,
     annotations,
     refreshAnnotations,
     hoveredAnnotationId,

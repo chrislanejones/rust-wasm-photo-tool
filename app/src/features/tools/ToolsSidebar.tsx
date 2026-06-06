@@ -63,6 +63,14 @@ interface ToolsSidebarProps {
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
   onApplyCrop?: () => void;
+  /** Allows the Crop tool ratio buttons to drop a centred crop selection
+   *  computed in Rust. Optional — omit to disable ratio buttons. */
+  onSetCropSelection?: (
+    sel: { x: number; y: number; width: number; height: number } | null,
+  ) => void;
+  /** Locked aspect ratio for crop drags. `null` = Free (no constraint). */
+  cropRatio?: [number, number] | null;
+  onCropRatioChange?: (lock: [number, number] | null) => void;
   toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
   recentTexts: TextMemory[];
@@ -125,6 +133,9 @@ export function ToolsSidebar({
   isCompressing,
   compressProgress,
   onApplyCrop,
+  onSetCropSelection,
+  cropRatio,
+  onCropRatioChange,
   toolSettings,
   onToolSettingsChange,
   recentTexts,
@@ -164,7 +175,16 @@ export function ToolsSidebar({
       }}
     >
       <div className="p-4 border-b border-border">
-        <ToolGrid activeTool={activeTool} onToolChange={onToolChange} />
+        <ToolGrid
+          activeTool={activeTool}
+          onToolChange={onToolChange}
+          disabledTools={{
+            emoji:
+              photos.length <= 1
+                ? "Upload another image to run a batch edit"
+                : false,
+          }}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
@@ -193,6 +213,11 @@ export function ToolsSidebar({
             onFlipV={onFlipV}
             onRotate90Cw={onRotate90Cw}
             onApplyCrop={onApplyCrop}
+            imageWidth={imageWidth}
+            imageHeight={imageHeight}
+            onSetCropSelection={onSetCropSelection}
+            cropRatio={cropRatio ?? null}
+            onCropRatioChange={onCropRatioChange ?? (() => {})}
           />
         )}
 

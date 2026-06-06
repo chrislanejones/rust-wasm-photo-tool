@@ -26,10 +26,6 @@ impl ImageBuffer {
         }
     }
 
-    pub fn get_data(&self) -> &[u8] {
-        &self.data
-    }
-
     /// Bilinear sample at fractional coordinates. Clamps to edges.
     pub fn sample_bilinear(&self, fx: f64, fy: f64) -> [u8; 4] {
         if self.width == 0 || self.height == 0 {
