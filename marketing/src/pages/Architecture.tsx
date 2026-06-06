@@ -413,9 +413,9 @@ export default function Architecture() {
         <Label color="violet">Authentication (Clerk)</Label>
         <div className="grid grid-cols-4 gap-4 mb-4 mt-2">
           <Node title="Clerk Auth" color="violet" />
-          <Node title="Demo Mode" subtitle="Anonymous Session" color="zinc" />
-          <Node title="Free Tier" subtitle="5 images/day" color="zinc" />
-          <Node title="Paid Tier" subtitle="Unlimited" color="violet" highlighted />
+          <Node title="Demo Mode" subtitle="12 images" color="zinc" />
+          <Node title="Free Tier" subtitle="24 images" color="zinc" />
+          <Node title="Paid Tier" subtitle="100 images" color="violet" highlighted />
         </div>
         <ArrowDown />
 

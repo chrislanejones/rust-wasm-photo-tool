@@ -179,7 +179,7 @@ export default function Pricing() {
           <TierRow feature="Export (PNG/JPEG/WebP/AVIF)" demo="yes" free="yes" pro="yes" />
 
           <TierCategory label="Gallery & storage" />
-          <TierRow feature="Gallery" sub="photos loaded in session" demo="12 images" free="24 images" pro="100 (soon)" />
+          <TierRow feature="Gallery" sub="photos loaded in session" demo="12 images" free="24 images" pro="100 images" />
           <TierRow feature="Auto compress all" demo="yes" free="yes" pro="yes" />
           <TierRow feature="Image persistence" sub="saved across sessions" demo="—" free="UploadThing" pro="UploadThing" />
           <TierRow feature="File storage quota" demo="—" free="100 MB" pro="5 GB" />
