@@ -150,6 +150,14 @@ async function scaleLogoToWidth(
   return { pixels: clamped, width: w, height: h };
 }
 
+/** Parse a #rgb / #rrggbb hex string into [r, g, b] bytes. */
+function hexToRgb(hex: string): [number, number, number] {
+  let h = hex.replace("#", "").trim();
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const n = parseInt(h.slice(0, 6) || "ffffff", 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 export function BatchSettings({
   photos,
   activePhotoId,
@@ -172,6 +180,12 @@ export function BatchSettings({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [appliedCount, setAppliedCount] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Per-photo pre-logo baseline key. The first time a logo is applied to a
+  // photo we remember its original key here; every subsequent "Apply" composites
+  // onto that baseline instead of the already-logo'd result — so re-applying
+  // *replaces* the logo rather than stacking a second one on top.
+  const logoBaselineRef = useRef<Map<string, string>>(new Map());
 
   // Auto-dismiss the "Applied to N images" confirmation chip after 3s.
   useEffect(() => {
@@ -273,7 +287,13 @@ export function BatchSettings({
       const others = photos.filter((p) => p.id !== activePhotoId);
       for (const photo of others) {
         try {
-          const original = await getOriginal(photo.originalKey);
+          // Composite onto the pre-logo baseline so re-applying replaces the
+          // previous logo instead of stacking. First apply records the baseline.
+          if (!logoBaselineRef.current.has(photo.id)) {
+            logoBaselineRef.current.set(photo.id, photo.originalKey);
+          }
+          const baselineKey = logoBaselineRef.current.get(photo.id)!;
+          const original = await getOriginal(baselineKey);
           if (!original) {
             done++;
             setProgress({ done, total: photos.length });
@@ -399,6 +419,27 @@ export function BatchSettings({
         try {
           const tool = stampToolRef.current;
           if (tool) {
+            // Re-apply replaces: reset the live canvas to the pre-logo baseline
+            // before stamping. First apply keeps the current canvas (so any
+            // prior edits survive) and just records the baseline.
+            if (!logoBaselineRef.current.has(active.id)) {
+              logoBaselineRef.current.set(active.id, active.originalKey);
+            } else {
+              const baselineKey = logoBaselineRef.current.get(active.id)!;
+              const original = await getOriginal(baselineKey);
+              if (original) {
+                const file = new File([original.bytes], original.name, {
+                  type: original.mimeType,
+                });
+                const working = await makeWorkingCopy(file);
+                const baseBytes = new Uint8Array(
+                  working.pixels.buffer as ArrayBuffer,
+                  working.pixels.byteOffset,
+                  working.pixels.byteLength,
+                );
+                tool.load_image(baseBytes);
+              }
+            }
             // Use the current canvas dimensions so we composite onto exactly
             // what the user sees.
             const workW = tool.width();
@@ -475,7 +516,14 @@ export function BatchSettings({
         onChange={(id) => setMode(id as "logo" | "text")}
       />
       {mode === "text" ? (
-        <TextBatchPanel />
+        <TextBatchPanel
+          photos={photos}
+          activePhotoId={activePhotoId}
+          setPhotos={setPhotos}
+          stampToolRef={stampToolRef}
+          flushToCanvas={flushToCanvas}
+          syncState={syncState}
+        />
       ) : (
       <>
       <div>
@@ -627,18 +675,188 @@ const TEXT_POSITIONS: { id: TextPosition; label: string }[] = [
   { id: "bottom-right", label: "BR" },
 ];
 
-function TextBatchPanel() {
+function TextBatchPanel({
+  photos,
+  activePhotoId,
+  setPhotos,
+  stampToolRef,
+  flushToCanvas,
+  syncState,
+}: BatchSettingsProps) {
   const [text, setText] = useState("");
   const [fontSize, setFontSize] = useState(32);
-  const [fontFamily, setFontFamily] = useState("sans-serif");
   const [textColor, setTextColor] = useState("#ffffff");
   const [position, setPosition] = useState<TextPosition>("bottom-right");
   const [margin, setMargin] = useState(24);
-  const [opacity, setOpacity] = useState(100);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number }>({
+    done: 0,
+    total: 0,
+  });
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [appliedCount, setAppliedCount] = useState<number | null>(null);
 
-  const handleApply = useCallback(() => {
-    alert("Coming soon");
-  }, []);
+  useEffect(() => {
+    if (appliedCount === null) return;
+    const t = window.setTimeout(() => setAppliedCount(null), 3000);
+    return () => window.clearTimeout(t);
+  }, [appliedCount]);
+
+  const applyToAll = useCallback(async () => {
+    if (!text.trim() || photos.length === 0) return;
+    setRunning(true);
+    setErrorMsg(null);
+    setProgress({ done: 0, total: photos.length });
+
+    try {
+      const { default: init, ImageHorseTool, encode_png_pixels, resize_pixels } =
+        await import("stamp_tool");
+      await init();
+
+      const [r, g, b] = hexToRgb(textColor);
+      let done = 0;
+      let succeeded = 0;
+
+      // First pass: every non-active photo — render text in Rust, write to IDB.
+      const others = photos.filter((p) => p.id !== activePhotoId);
+      for (const photo of others) {
+        try {
+          const original = await getOriginal(photo.originalKey);
+          if (!original) {
+            done++;
+            setProgress({ done, total: photos.length });
+            continue;
+          }
+          const file = new File([original.bytes], original.name, {
+            type: original.mimeType,
+          });
+          const working = await makeWorkingCopy(file);
+          const targetBytes = new Uint8Array(
+            working.pixels.buffer as ArrayBuffer,
+            working.pixels.byteOffset,
+            working.pixels.byteLength,
+          );
+
+          const tool = new ImageHorseTool(working.width, working.height);
+          let composited: Uint8Array;
+          try {
+            tool.load_image(targetBytes);
+            // Measure in Rust so we can corner-align without knowing glyph metrics.
+            const m = tool.measure_text(text, fontSize, false);
+            const { dx, dy } = computeOffset(
+              position,
+              working.width,
+              working.height,
+              m[0],
+              m[1],
+              margin,
+            );
+            tool.commit_text(text, fontSize, r, g, b, false, dx, dy, 0);
+            composited = new Uint8Array(tool.get_image_data());
+          } finally {
+            tool.free();
+          }
+
+          const pngBytes = encode_png_pixels(
+            composited,
+            working.width,
+            working.height,
+          );
+          const pngBlob = new Blob([pngBytes.buffer as ArrayBuffer], {
+            type: "image/png",
+          });
+          const newName = photo.name.replace(/\.[^.]+$/, "") + ".png";
+          const newFile = new File([pngBlob], newName, { type: "image/png" });
+
+          const [newKey, newThumbCandidate] = await Promise.all([
+            putOriginal(newFile, working.origWidth, working.origHeight),
+            makeThumbnailFromPixels(
+              composited,
+              working.width,
+              working.height,
+              resize_pixels,
+            ),
+          ]);
+          let newThumb = newThumbCandidate;
+          if (newThumb.size < 200) {
+            try {
+              newThumb = await makeThumbnail(newFile);
+            } catch (fallbackErr) {
+              console.error("[batch-text] thumbnail fallback failed", fallbackErr);
+            }
+          }
+
+          setPhotos((prev) =>
+            prev.map((x) =>
+              x.id !== photo.id
+                ? x
+                : {
+                    ...x,
+                    mimeType: "image/png",
+                    byteSize: pngBlob.size,
+                    originalKey: newKey,
+                    thumbBlob: newThumb,
+                  },
+            ),
+          );
+          succeeded++;
+        } catch (err) {
+          console.error("Bulk-text: failed on photo", photo.id, err);
+        }
+        done++;
+        setProgress({ done, total: photos.length });
+      }
+
+      // Second pass: the active photo, via the live tool so it gets an undo entry.
+      const active = photos.find((p) => p.id === activePhotoId);
+      if (active) {
+        try {
+          const tool = stampToolRef.current;
+          if (tool) {
+            const workW = tool.width();
+            const workH = tool.height();
+            const m = tool.measure_text(text, fontSize, false);
+            const { dx, dy } = computeOffset(
+              position,
+              workW,
+              workH,
+              m[0],
+              m[1],
+              margin,
+            );
+            // commit_text pushes a "Text" snapshot, giving us undo support.
+            tool.commit_text(text, fontSize, r, g, b, false, dx, dy, 0);
+            flushToCanvas();
+            syncState();
+            succeeded++;
+          }
+        } catch (err) {
+          console.error("Bulk-text: failed on active photo", err);
+        }
+        done++;
+        setProgress({ done, total: photos.length });
+      }
+
+      setAppliedCount(succeeded);
+    } catch (err) {
+      console.error("Bulk-text: fatal error", err);
+      setErrorMsg("Something went wrong. Check the console.");
+    } finally {
+      setRunning(false);
+    }
+  }, [
+    text,
+    fontSize,
+    textColor,
+    position,
+    margin,
+    photos,
+    activePhotoId,
+    setPhotos,
+    stampToolRef,
+    flushToCanvas,
+    syncState,
+  ]);
 
   return (
     <div className="space-y-5">
@@ -653,6 +871,9 @@ function TextBatchPanel() {
           placeholder="Enter overlay text…"
           className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-[11px] text-theme-foreground placeholder:text-theme-muted-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
         />
+        <p className="mt-1 text-[10px] text-theme-muted-foreground">
+          Rendered in Rust with the embedded Liberation Sans font.
+        </p>
       </div>
 
       <SizeSlider
@@ -663,22 +884,6 @@ function TextBatchPanel() {
         max={96}
         unit="px"
       />
-
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
-          Font family
-        </p>
-        <select
-          value={fontFamily}
-          onChange={(e) => setFontFamily(e.target.value)}
-          className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-[11px] text-theme-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
-        >
-          <option value="sans-serif">sans-serif</option>
-          <option value="serif">serif</option>
-          <option value="monospace">monospace</option>
-          <option value="Liberation Sans">Liberation Sans</option>
-        </select>
-      </div>
 
       <ColorSwatchGrid
         colors={TEXT_COLORS}
@@ -713,25 +918,29 @@ function TextBatchPanel() {
         disabled={position === "center"}
       />
 
-      <SizeSlider
-        label="Opacity"
-        value={opacity}
-        onChange={setOpacity}
-        min={0}
-        max={100}
-        unit="%"
-      />
-
-      <button
-        type="button"
-        onClick={handleApply}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-theme-muted/30 px-3 py-2 text-[11px] font-medium text-theme-muted-foreground cursor-not-allowed"
+      <Button
+        onClick={applyToAll}
+        disabled={!text.trim() || running || photos.length === 0}
+        className="w-full"
       >
-        Apply Text to All Images
-        <span className="rounded-full bg-theme-muted/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-theme-foreground/70">
-          Coming Soon
-        </span>
-      </button>
+        {running
+          ? `Processing ${progress.done}/${progress.total}…`
+          : "Apply Text to All Images"}
+      </Button>
+
+      {appliedCount !== null && !running && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-300"
+        >
+          {`✓ Applied to ${appliedCount} image${appliedCount === 1 ? "" : "s"}`}
+        </div>
+      )}
+
+      {errorMsg && (
+        <p className="text-[11px] text-red-400 leading-relaxed">{errorMsg}</p>
+      )}
     </div>
   );
 }

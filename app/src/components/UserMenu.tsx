@@ -25,7 +25,7 @@ export function UserMenu() {
         <SignInButton mode="modal">
           <button
             title="Sign in to save your work"
-            className="h-8 w-8 rounded-full bg-bg-elevated border border-border text-text-muted hover:text-text-primary hover:ring-2 hover:ring-accent/50 transition-all flex items-center justify-center"
+            className="h-8 w-8 rounded-full bg-bg-elevated border border-white/15 text-text-primary hover:bg-accent/20 hover:border-accent/50 hover:ring-2 hover:ring-accent/50 transition-all flex items-center justify-center"
           >
             <User className="h-4 w-4" />
           </button>

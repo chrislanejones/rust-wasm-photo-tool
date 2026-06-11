@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
-import { Upload, FolderOpen, Clipboard, X } from "lucide-react";
+import { Upload, FolderOpen, Clipboard, X, Images, Loader2 } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
+import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
 const horseLogo = "/Image-Horse-Logo.svg";
 
 interface Props {
@@ -23,6 +24,7 @@ export function UploadDialog({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [loadingTest, setLoadingTest] = useState(false);
   const controls = useAnimation();
 
   const triggerShake = useCallback(async () => {
@@ -57,6 +59,23 @@ export function UploadDialog({
     setDragging(false);
     processFiles(Array.from(e.dataTransfer.files));
   };
+
+  // Pull a fixed set of large, royalty-free Unsplash photos from UploadThing
+  // (public URLs) and run them through the normal upload pipeline.
+  const handleTestImages = useCallback(async () => {
+    if (loadingTest) return;
+    setLoadingTest(true);
+    try {
+      const files = await fetchTestImages();
+      if (files.length) processFiles(files);
+      else triggerShake();
+    } catch (err) {
+      console.error("Test Free Images failed:", err);
+      triggerShake();
+    } finally {
+      setLoadingTest(false);
+    }
+  }, [loadingTest, processFiles, triggerShake]);
 
   const handlePasteClick = useCallback(async () => {
     try {
@@ -190,6 +209,20 @@ export function UploadDialog({
                     >
                       <Clipboard className="h-4 w-4" />
                       Paste (Ctrl+V)
+                    </button>
+                    <button
+                      onClick={handleTestImages}
+                      disabled={loadingTest}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all disabled:opacity-60 disabled:cursor-wait"
+                    >
+                      {loadingTest ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Images className="h-4 w-4" />
+                      )}
+                      {loadingTest
+                        ? `Loading ${TEST_IMAGE_COUNT}…`
+                        : "Test Free Images"}
                     </button>
                   </div>
 

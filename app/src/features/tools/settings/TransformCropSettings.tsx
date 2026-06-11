@@ -105,8 +105,10 @@ export function TransformCropSettings({
   return (
     <div className="space-y-6">
       {/* ── Geometry ────────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <span className="text-[11px] text-theme-muted-foreground">Transform</span>
+      <div className="flex flex-col gap-5 -mt-2">
+        <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
+          Transform
+        </span>
         <div className="grid grid-cols-2 gap-2">
           <ToolButton disabled={disabled} onClick={onFlipH}>
             <FlipHorizontal /> Flip H
@@ -133,7 +135,9 @@ export function TransformCropSettings({
       {/* ── Crop ───────────────────────────────────────────────────── */}
       {onApplyCrop && (
         <div className="space-y-3 pt-3 border-t border-theme-sidebar-border">
-          <span className="text-[11px] text-theme-muted-foreground">Crop</span>
+          <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
+            Crop
+          </span>
           <p className="text-xs text-theme-muted-foreground leading-relaxed">
             Pick a ratio or drag on the canvas to select an area, then apply.
           </p>

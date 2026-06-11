@@ -4,6 +4,7 @@
 // Item 4: Added PgUp/PgDn hint
 import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
+import { formatBytes } from "@/lib/format";
 
 const MARKETING_URL = "https://image-horse.vercel.app";
 
@@ -17,14 +18,6 @@ interface Props {
   maxPhotos?: number;
   /** Active photo's file size in bytes; shown as a human-readable size. */
   fileSize?: number;
-}
-
-/** Format a byte count as a compact human-readable size (e.g. "80 KB"). */
-function formatBytes(n?: number): string | null {
-  if (n == null || n <= 0) return null;
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const USER_MODE_LABEL: Record<UserMode, string> = {

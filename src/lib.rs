@@ -45,6 +45,102 @@ pub fn photo_limit(tier: &str) -> u32 {
     }
 }
 
+/// Web-performance indicators for the Resize &amp; Compress panel.
+///
+/// Returns `[lighthouse_score, web_performance_gain]`, both in `0..=100`:
+///
+/// - **Web Performance Gain** — how much smaller the delivered image will be
+///   vs. the *original upload* (`orig_bytes`), accounting for everything done so
+///   far plus the pending resize + quality: `1 - projected_bytes / orig_bytes`.
+///   A freshly uploaded, untouched photo reads `+0%`; resizing, lowering
+///   quality, or running Auto Compress (which shrinks `cur_bytes`) all push it
+///   up.
+/// - **Lighthouse Score** — a Google-Lighthouse-style score derived from the
+///   *projected delivered byte size*, mapped through a log-normal curve (the
+///   same curve family Lighthouse uses to score its metrics). A big, still
+///   uncompressed image scores low; resizing or lowering quality shrinks the
+///   projected bytes and pushes the score up — mirroring Lighthouse's
+///   "properly size images" and "efficiently encode images" audits.
+///
+/// `cur_bytes` is the current on-disk size of the active photo and `orig_bytes`
+/// the immutable size at upload. Passing `0` for either (size unknown) yields a
+/// `0` rather than a misleading perfect value.
+#[wasm_bindgen]
+pub fn web_perf_metrics(
+    cur_w: u32,
+    cur_h: u32,
+    cur_bytes: f64,
+    orig_bytes: f64,
+    new_w: u32,
+    new_h: u32,
+    quality: u32,
+) -> Vec<f64> {
+    let cur_area = (cur_w as f64) * (cur_h as f64);
+    let new_area = (new_w as f64) * (new_h as f64);
+    let area_ratio = if cur_area > 0.0 { new_area / cur_area } else { 1.0 };
+    let quality_ratio = (quality as f64 / 100.0).clamp(0.0, 1.0);
+
+    // Estimated delivered size after the pending resize + re-encode, on top of
+    // whatever the current file already is (e.g. after Auto Compress).
+    let projected_bytes = (cur_bytes * area_ratio * quality_ratio).max(0.0);
+
+    // Byte savings vs. the *original upload*, so progress accumulates across
+    // resize, quality and Auto Compress instead of resetting to the current file.
+    let savings = if orig_bytes > 0.0 {
+        ((1.0 - projected_bytes / orig_bytes) * 100.0).clamp(0.0, 100.0)
+    } else {
+        0.0
+    };
+
+    let score = if cur_bytes > 0.0 {
+        // Unknown source size → don't pretend the image is perfectly optimized.
+        lighthouse_score(projected_bytes)
+    } else {
+        0.0
+    };
+
+    vec![score, savings]
+}
+
+/// Map a projected transfer size (bytes) to a 0..=100 Lighthouse-style score
+/// using a log-normal curve, the way Lighthouse scores its metrics. `GOOD` is
+/// the size that earns ~90 and `MEDIAN` the size that earns 50; heavier images
+/// fall off smoothly toward 0.
+fn lighthouse_score(bytes: f64) -> f64 {
+    // Control points: a well-optimized web image vs. a heavy one.
+    const GOOD: f64 = 100_000.0; // ~100 KB → score ~90
+    const MEDIAN: f64 = 500_000.0; // ~500 KB → score 50
+    // erfc(-Z_P90)/2 = 0.9, i.e. Z_P90 = -erfc⁻¹(1.8); sigma is chosen so that
+    // score(GOOD) lands on 0.9 and score(MEDIAN) on 0.5.
+    const Z_P90: f64 = 0.906_193_802_436_823_2;
+
+    if bytes <= 0.0 {
+        return 100.0;
+    }
+    let sqrt2 = std::f64::consts::SQRT_2;
+    let sigma = (MEDIAN.ln() - GOOD.ln()) / (sqrt2 * Z_P90);
+    let z = (bytes.ln() - MEDIAN.ln()) / (sqrt2 * sigma);
+    (0.5 * erfc(z) * 100.0).clamp(0.0, 100.0)
+}
+
+/// Complementary error function via the Abramowitz &amp; Stegun 7.1.26
+/// rational approximation (|error| &lt; 1.5e-7) — enough for UI scoring.
+fn erfc(x: f64) -> f64 {
+    1.0 - erf(x)
+}
+
+fn erf(x: f64) -> f64 {
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+    let t = 1.0 / (1.0 + 0.327_591_1 * x);
+    let y = 1.0
+        - (((((1.061_405_429 * t - 1.453_152_027) * t) + 1.421_413_741) * t - 0.284_496_736) * t
+            + 0.254_829_592)
+            * t
+            * (-x * x).exp();
+    sign * y
+}
+
 /// A live (non-destructive) text annotation that sits in an overlay
 /// composited over the main pixel buffer on render. Annotations are
 /// re-editable until `flatten_text_annotations` burns them into pixels

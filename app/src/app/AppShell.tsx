@@ -306,6 +306,7 @@ export function AppShell() {
             name: f.name.replace(/\.[^.]+$/, ""),
             mimeType: f.type || "application/octet-stream",
             byteSize: f.size,
+            originalByteSize: f.size,
             origWidth: working.origWidth,
             origHeight: working.origHeight,
             workingWidth: working.width,
@@ -1097,6 +1098,8 @@ export function AppShell() {
             onResize={handleResize}
             imageWidth={stamp.state.width}
             imageHeight={stamp.state.height}
+            currentByteSize={activeEntry?.byteSize ?? 0}
+            originalByteSize={activeEntry?.originalByteSize ?? 0}
             activePhotoId={activePhotoId}
             quality={quality}
             onQualityChange={handleQualityChange}

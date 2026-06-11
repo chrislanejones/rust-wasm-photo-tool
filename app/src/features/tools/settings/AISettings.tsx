@@ -36,7 +36,7 @@ const FEATURES: AIFeature[] = [
 export function AISettings() {
   return (
     <div className="space-y-4">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
+      <h3 className="text-xs font-semibold font-mono text-text-muted">
         AI Tools
       </h3>
 

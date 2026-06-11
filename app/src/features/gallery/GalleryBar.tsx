@@ -2,12 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
 import { X, Image, Check, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatBytes } from "@/lib/format";
 
 export interface PhotoEntry {
   id: string;
   name: string;
   mimeType: string;
   byteSize: number;
+  /** Immutable size at upload (bytes). `byteSize` may shrink after compress. */
+  originalByteSize: number;
   origWidth: number;
   origHeight: number;
   workingWidth: number;
@@ -64,14 +68,21 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
   const hasSavings = savings != null && savings.savingsPercent > 0;
   const maybeTransparent = TRANSPARENT_TYPES.has(entry.mimeType);
 
+  const dims =
+    entry.origWidth && entry.origHeight
+      ? `${entry.origWidth}×${entry.origHeight}`
+      : null;
+  const meta = [formatBytes(entry.byteSize), dims].filter(Boolean).join(" · ");
+
   return (
-    <motion.div
-      data-id={entry.id}
-      className={`photo-thumb ${isActive ? "active" : ""} relative`}
-      onClick={onSelect}
-      title={entry.name}
-      {...thumbEnter(index)}
-    >
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <motion.div
+          data-id={entry.id}
+          className={`photo-thumb ${isActive ? "active" : ""} relative`}
+          onClick={onSelect}
+          {...thumbEnter(index)}
+        >
       {maybeTransparent && (
         <div className="absolute inset-0 checkerboard rounded-lg" />
       )}
@@ -160,8 +171,13 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       >
         <X className="h-2.5 w-2.5" />
       </button>
-      <span className="photo-thumb-label">{entry.name}</span>
-    </motion.div>
+        </motion.div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-xs leading-snug">
+        <p className="font-medium">{entry.name}</p>
+        {meta && <p className="text-text-muted">{meta}</p>}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

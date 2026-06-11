@@ -8,11 +8,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getWebPerfMetrics } from "@/lib/webPerf";
 
 interface ResizeSettingsProps {
   disabled: boolean;
   imageWidth: number;
   imageHeight: number;
+  /** Current on-disk size of the active photo, in bytes (Lighthouse score). */
+  currentByteSize: number;
+  /** Immutable size at upload, in bytes — the performance-gain baseline. */
+  originalByteSize: number;
   activePhotoId: string | null;
   quality: number;
   onQualityChange: (q: number) => void;
@@ -35,6 +40,8 @@ export function ResizeSettings({
   disabled,
   imageWidth,
   imageHeight,
+  currentByteSize,
+  originalByteSize,
   activePhotoId,
   quality,
   onQualityChange,
@@ -100,38 +107,55 @@ export function ResizeSettings({
     parseInt(height, 10) !== imageHeight ||
     qualityChanged;
 
-  // Lighthouse score calculation
-  const originalArea = imageWidth * imageHeight;
+  // Web-performance indicators come from Rust (`web_perf_metrics`). The
+  // Lighthouse score is byte-aware: a big, still-uncompressed photo scores low,
+  // and resizing or lowering quality (smaller projected delivery) raises it.
   const newW = parseInt(width, 10) || imageWidth;
   const newH = parseInt(height, 10) || imageHeight;
-  const newArea = newW * newH;
-  const areaRatio = originalArea > 0 ? newArea / originalArea : 1;
-  const qualityRatio = quality / 100;
-  const scoreBase = areaRatio * qualityRatio;
-  const lighthouseScore = Math.min(
-    100,
-    Math.max(0, Math.round(100 - scoreBase * 50)),
-  );
-  const savingsPercent = Math.max(
-    0,
-    Math.round((1 - areaRatio * qualityRatio) * 100),
-  );
+  const [lighthouseScore, setLighthouseScore] = useState(0);
+  const [savingsPercent, setSavingsPercent] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    void getWebPerfMetrics({
+      curW: imageWidth,
+      curH: imageHeight,
+      curBytes: currentByteSize,
+      origBytes: originalByteSize,
+      newW,
+      newH,
+      quality,
+    }).then((m) => {
+      if (!alive) return;
+      setLighthouseScore(m.lighthouseScore);
+      setSavingsPercent(m.performanceGain);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [
+    imageWidth,
+    imageHeight,
+    currentByteSize,
+    originalByteSize,
+    newW,
+    newH,
+    quality,
+  ]);
 
   return (
-    <div className="space-y-8 flex flex-col h-full">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted font-mono">
+    <div className="flex flex-col h-full">
+      <h3 className="text-xs font-semibold font-mono text-text-muted mb-3">
         Resize &amp; Compress
       </h3>
 
       {/* ── Content ── */}
       <div className="space-y-8 flex-1">
-        {/* ── Performance Gain ── */}
+        {/* ── Web Performance Gain ── */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
-              Performance Gain
-            </h4>
-            <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest tabular-nums">
+          <div className="flex items-center justify-between text-[11px]">
+            <h4 className="text-theme-muted-foreground">Web Performance Gain</h4>
+            <span className="text-theme-foreground tabular-nums">
               +{savingsPercent}%
             </span>
           </div>
@@ -145,11 +169,9 @@ export function ResizeSettings({
 
         {/* ── Lighthouse Score ── */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
-              Lighthouse Score
-            </h4>
-            <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest tabular-nums">
+          <div className="flex items-center justify-between text-[11px]">
+            <h4 className="text-theme-muted-foreground">Lighthouse Score</h4>
+            <span className="text-theme-foreground tabular-nums">
               {lighthouseScore}%
             </span>
           </div>
@@ -174,7 +196,7 @@ export function ResizeSettings({
         {/* ── Dimensions ── */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-black uppercase text-text-primary tracking-widest">
+            <h4 className="text-[11px] text-theme-muted-foreground">
               Dimensions
             </h4>
             <button
@@ -194,7 +216,7 @@ export function ResizeSettings({
                   }`}
                 />
               </span>
-              <span className="text-xs font-black uppercase text-theme-muted-foreground tracking-widest">
+              <span className="text-[11px] text-theme-muted-foreground">
                 Lock Aspect
               </span>
             </button>
@@ -260,7 +282,7 @@ export function ResizeSettings({
       </div>
 
       {/* ── Bottom Buttons ── */}
-      <div className="border-t border-theme-sidebar-border pt-4 space-y-2">
+      <div className="border-t border-theme-sidebar-border pt-4 mt-8 space-y-2">
         <Button
           onClick={handleApplyResize}
           disabled={disabled || !resizeChanged}

@@ -1,5 +1,6 @@
 // app/src/components/ConvexClerkProvider.tsx
 import { ClerkProvider, useAuth } from "@clerk/clerk-react";
+import { dark } from "@clerk/themes";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
 import type { ReactNode } from "react";
@@ -21,12 +22,15 @@ export function ConvexClerkProvider({ children }: { children: ReactNode }) {
     <ClerkProvider
       publishableKey={clerkKey}
       appearance={{
+        baseTheme: dark,
         variables: {
           colorPrimary: "#a855f7",
           colorBackground: "#18181b",
           colorText: "#fafafa",
+          colorTextSecondary: "#a1a1aa",
           colorInputBackground: "#27272a",
           colorInputText: "#fafafa",
+          colorNeutral: "#fafafa",
           borderRadius: "0.75rem",
         },
         elements: {

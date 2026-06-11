@@ -5,6 +5,22 @@ declare module "stamp_tool" {
   export function photo_limit(tier: string): number;
 
   /**
+   * Web-performance indicators for the Resize & Compress panel.
+   * Returns `[lighthouseScore, webPerformanceGain]`, both 0..100.
+   * The Lighthouse score is byte-aware (log-normal on the projected
+   * delivered size), so a big, uncompressed image scores low.
+   */
+  export function web_perf_metrics(
+    curW: number,
+    curH: number,
+    curBytes: number,
+    origBytes: number,
+    newW: number,
+    newH: number,
+    quality: number,
+  ): Float64Array;
+
+  /**
    * Stateless: composite `src` (RGBA, sw*sh*4 bytes) onto a copy of `target`
    * (RGBA, tw*th*4 bytes) at (dx, dy) with opacity in [0, 1]. Returns the new
    * buffer. Does not touch any ImageHorseTool state.

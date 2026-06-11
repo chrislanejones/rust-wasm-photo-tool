@@ -53,6 +53,8 @@ interface ToolsSidebarProps {
   onResize: (newW: number, newH: number) => void;
   imageWidth: number;
   imageHeight: number;
+  currentByteSize: number;
+  originalByteSize: number;
   activePhotoId: string | null;
   quality: number;
   onQualityChange: (q: number) => void;
@@ -123,6 +125,8 @@ export function ToolsSidebar({
   onResize,
   imageWidth,
   imageHeight,
+  currentByteSize,
+  originalByteSize,
   activePhotoId,
   quality,
   onQualityChange,
@@ -193,6 +197,8 @@ export function ToolsSidebar({
             disabled={!imageReady}
             imageWidth={imageWidth}
             imageHeight={imageHeight}
+            currentByteSize={currentByteSize}
+            originalByteSize={originalByteSize}
             activePhotoId={activePhotoId}
             quality={quality}
             onQualityChange={onQualityChange}

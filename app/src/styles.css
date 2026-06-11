@@ -977,9 +977,14 @@ input[type="range"].slider-overlay::-moz-range-thumb {
    SCROLLBAR UTILITY
    ═══════════════════════════════════════════════════════════════════════════ */
 
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
 .scrollbar-thin::-webkit-scrollbar {
-  height: 4px;
-  width: 4px;
+  height: 6px;
+  width: 6px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
@@ -987,8 +992,12 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .scrollbar-hide::-webkit-scrollbar {
