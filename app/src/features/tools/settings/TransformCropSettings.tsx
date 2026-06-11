@@ -4,7 +4,6 @@ import {
   FlipHorizontal,
   FlipVertical,
   Crop,
-  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToolButton } from "@/components/ui/tool-button";
@@ -151,10 +150,11 @@ export function TransformCropSettings({
           />
 
           {ratio !== "free" && (
-            <p className="flex items-center gap-1.5 text-[10px] text-theme-primary">
-              <Lock className="h-3 w-3" />
-              Locked to {ratio} — drags snap to this ratio
-            </p>
+            <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs large-badge-item type-current">
+              <span className="large-badge">
+                Locked to {ratio} — drags snap to this ratio
+              </span>
+            </div>
           )}
 
           <Button

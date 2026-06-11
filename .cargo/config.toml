@@ -1,0 +1,6 @@
+# WASM build tuning. Applies to every `wasm-pack build` (local + Netlify) without
+# touching build commands. SIMD128 lets the pixel loops (resize, blur,
+# brightness/contrast, composite, paint) auto-vectorize — typically 2–4× on
+# those ops. All current browsers support wasm SIMD.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]

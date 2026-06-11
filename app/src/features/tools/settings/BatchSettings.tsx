@@ -18,6 +18,7 @@ import {
 } from "@/lib/workingCopy";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
+import { toast } from "@/components/ui/sonner";
 
 const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
 
@@ -483,9 +484,13 @@ export function BatchSettings({
       }
 
       setAppliedCount(succeeded);
+      toast.success(
+        `Logo applied to ${succeeded} image${succeeded === 1 ? "" : "s"}`,
+      );
     } catch (err) {
       console.error("Bulk-logo: fatal error", err);
       setErrorMsg("Something went wrong. Check the console.");
+      toast.error("Couldn't apply the logo. Check the console.");
     } finally {
       setRunning(false);
     }
@@ -696,6 +701,12 @@ function TextBatchPanel({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [appliedCount, setAppliedCount] = useState<number | null>(null);
 
+  // Per-photo pre-text baseline key (same idea as the logo panel): the first
+  // "Apply" remembers a photo's original key; every later apply re-renders text
+  // onto that baseline, so re-applying *replaces* the previous text instead of
+  // stacking a second layer on top.
+  const textBaselineRef = useRef<Map<string, string>>(new Map());
+
   useEffect(() => {
     if (appliedCount === null) return;
     const t = window.setTimeout(() => setAppliedCount(null), 3000);
@@ -721,7 +732,13 @@ function TextBatchPanel({
       const others = photos.filter((p) => p.id !== activePhotoId);
       for (const photo of others) {
         try {
-          const original = await getOriginal(photo.originalKey);
+          // Render text onto the pre-text baseline so re-applying replaces the
+          // previous text rather than stacking. First apply records the baseline.
+          if (!textBaselineRef.current.has(photo.id)) {
+            textBaselineRef.current.set(photo.id, photo.originalKey);
+          }
+          const baselineKey = textBaselineRef.current.get(photo.id)!;
+          const original = await getOriginal(baselineKey);
           if (!original) {
             done++;
             setProgress({ done, total: photos.length });
@@ -813,6 +830,27 @@ function TextBatchPanel({
         try {
           const tool = stampToolRef.current;
           if (tool) {
+            // Re-apply replaces: reset the live canvas to the pre-text baseline
+            // before rendering. First apply keeps the current canvas (so prior
+            // edits survive) and just records the baseline.
+            if (!textBaselineRef.current.has(active.id)) {
+              textBaselineRef.current.set(active.id, active.originalKey);
+            } else {
+              const baselineKey = textBaselineRef.current.get(active.id)!;
+              const original = await getOriginal(baselineKey);
+              if (original) {
+                const file = new File([original.bytes], original.name, {
+                  type: original.mimeType,
+                });
+                const working = await makeWorkingCopy(file);
+                const baseBytes = new Uint8Array(
+                  working.pixels.buffer as ArrayBuffer,
+                  working.pixels.byteOffset,
+                  working.pixels.byteLength,
+                );
+                tool.load_image(baseBytes);
+              }
+            }
             const workW = tool.width();
             const workH = tool.height();
             const m = tool.measure_text(text, fontSize, false);
@@ -838,9 +876,13 @@ function TextBatchPanel({
       }
 
       setAppliedCount(succeeded);
+      toast.success(
+        `Text applied to ${succeeded} image${succeeded === 1 ? "" : "s"}`,
+      );
     } catch (err) {
       console.error("Bulk-text: fatal error", err);
       setErrorMsg("Something went wrong. Check the console.");
+      toast.error("Couldn't apply the text. Check the console.");
     } finally {
       setRunning(false);
     }
