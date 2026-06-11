@@ -847,12 +847,18 @@ export function AppShell() {
         })();
       },
     );
-    setHasBeenModified(true);
+    // NOTE: intentionally does NOT set `hasBeenModified` — Auto Compress is a
+    // batch op over stored files and must not light the active photo's modified
+    // dot. Its result is tracked separately via `imageSavings`.
   }, [photos, quality, exportFormat, compressAll]);
 
-  // Track per-photo modification state
+  // Track per-photo modification state. Any single-image edit marks the active
+  // photo with the "modified" dot immediately: canvas edits bump the WASM undo
+  // count, and resize/quality set `hasBeenModified`. Batch ops and Auto Compress
+  // touch stored files (not the live canvas / `hasBeenModified`), so they never
+  // light the dot here.
   useEffect(() => {
-    if (hasBeenModified && activePhotoId) {
+    if (activePhotoId && (hasBeenModified || stamp.state.undoCount > 0)) {
       setModifiedPhotos((prev) => {
         if (prev.has(activePhotoId)) return prev;
         const next = new Set(prev);
@@ -860,7 +866,7 @@ export function AppShell() {
         return next;
       });
     }
-  }, [hasBeenModified, activePhotoId]);
+  }, [hasBeenModified, activePhotoId, stamp.state.undoCount]);
 
   // Persist compression savings
   useEffect(() => {
@@ -1101,6 +1107,7 @@ export function AppShell() {
             currentByteSize={activeEntry?.byteSize ?? 0}
             originalByteSize={activeEntry?.originalByteSize ?? 0}
             activePhotoId={activePhotoId}
+            undoCount={stamp.state.undoCount}
             quality={quality}
             onQualityChange={handleQualityChange}
             hasBeenModified={hasBeenModified}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Pipette, Wand2, Flame, Cloud, Moon } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
@@ -19,6 +19,10 @@ interface EffectsSettingsProps {
   pickedColor?: string;
   activeMode?: EffectsMode;
   onModeChange?: (mode: EffectsMode) => void;
+  /** WASM undo count — changes (other than our own commits) re-sync the latches. */
+  undoCount?: number;
+  /** Active photo id — switching photos also re-syncs the latches. */
+  activePhotoId?: string | null;
 }
 
 export type EffectsMode = "levels" | "picker";
@@ -42,6 +46,8 @@ export function EffectsSettings({
   pickedColor,
   activeMode,
   onModeChange,
+  undoCount,
+  activePhotoId,
 }: EffectsSettingsProps) {
   const [internalMode, setInternalMode] = useState<EffectsMode>("levels");
   const mode = activeMode ?? internalMode;
@@ -58,6 +64,27 @@ export function EffectsSettings({
   // Blur resets after each apply (applying more blur is additive anyway).
   const [blur, setBlur] = useState(0);
 
+  // Set right before we apply our own brightness/contrast/blur so the history
+  // effect below can tell our own commit apart from an external change.
+  const selfEditRef = useRef(false);
+
+  // The latched sliders track *deltas* applied to the image. When the image's
+  // history moves underneath us — undo, redo, or a photo switch — those latches
+  // go stale (e.g. undo reverts the pixels but the slider stayed put). Re-sync
+  // them to neutral so the next drag applies a correct delta from the real
+  // current state, and so undo visibly returns the slider to its origin.
+  useEffect(() => {
+    if (selfEditRef.current) {
+      selfEditRef.current = false;
+      return;
+    }
+    setBrightness(0);
+    setBrightnessCommitted(0);
+    setContrast(100);
+    setContrastCommitted(100);
+    setBlur(0);
+  }, [undoCount, activePhotoId]);
+
   const handleModeChange = (id: string) => {
     const m = id as EffectsMode;
     setInternalMode(m);
@@ -68,6 +95,7 @@ export function EffectsSettings({
   const commitBrightness = (v: number) => {
     const delta = (v - brightnessCommitted) / 100;
     if (delta !== 0) {
+      selfEditRef.current = true;
       onBrightness(delta);
       setBrightnessCommitted(v);
     }
@@ -76,18 +104,21 @@ export function EffectsSettings({
   const commitContrast = (v: number) => {
     if (v === contrastCommitted) return;
     const factor = v / contrastCommitted;
+    selfEditRef.current = true;
     onContrast(factor);
     setContrastCommitted(v);
   };
 
   const commitBlur = (v: number) => {
     if (v > 0 && onGlobalBlur) {
+      selfEditRef.current = true;
       onGlobalBlur(v / 100);
       setBlur(0);
     }
   };
 
   const applyPreset = (brightness: number, contrast: number) => {
+    if (brightness !== 0 || contrast !== 1) selfEditRef.current = true;
     if (brightness !== 0) onBrightness(brightness);
     if (contrast !== 1) onContrast(contrast);
   };

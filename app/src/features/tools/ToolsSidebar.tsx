@@ -56,6 +56,8 @@ interface ToolsSidebarProps {
   currentByteSize: number;
   originalByteSize: number;
   activePhotoId: string | null;
+  /** WASM undo count of the active photo (used to re-sync Effects sliders). */
+  undoCount: number;
   quality: number;
   onQualityChange: (q: number) => void;
   hasBeenModified: boolean;
@@ -128,6 +130,7 @@ export function ToolsSidebar({
   currentByteSize,
   originalByteSize,
   activePhotoId,
+  undoCount,
   quality,
   onQualityChange,
   hasBeenModified,
@@ -254,6 +257,8 @@ export function ToolsSidebar({
             pickedColor={pickedColor}
             activeMode={effectsMode}
             onModeChange={onEffectsModeChange}
+            undoCount={undoCount}
+            activePhotoId={activePhotoId}
           />
         )}
 
