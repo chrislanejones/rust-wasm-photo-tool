@@ -37,6 +37,7 @@ import { useAutoCompress } from "@/hooks/useAutoCompress";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
 import { useRecentTexts } from "@/hooks/useRecentTexts";
 import { putOriginal, getOriginal, getOriginalAsBlobUrl } from "@/lib/originalsStore";
+import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
 import { makeWorkingCopy, makeThumbnail } from "@/lib/workingCopy";
 import {
   ContextMenu,
@@ -837,7 +838,9 @@ export function AppShell() {
           ]);
           setPhotos((p) =>
             p.map((x) =>
-              x.id !== id ? x : { ...x, originalKey: newKey, thumbBlob: newThumb },
+              x.id !== id
+                ? x
+                : { ...x, originalKey: newKey, thumbBlob: newThumb, byteSize: nf.size },
             ),
           );
         })();
@@ -873,26 +876,83 @@ export function AppShell() {
 
   const handleExportAll = useCallback(async () => {
     if (photos.length === 0) return;
+
+    // Persist the active photo's in-progress edits so every photo reads
+    // uniformly from the edit store below.
+    const activeChanged =
+      !!activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified);
+    if (activeChanged && activePhotoId && stamp.toolRef.current) {
+      await savePhotoEdit(activePhotoId, stamp.toolRef);
+    }
+
+    // A photo is "changed" if it was edited on the canvas (modifiedPhotos) or
+    // compressed/quality-changed (imageSavings), or is the active photo with
+    // pending edits. Changed photos export their processed result re-encoded at
+    // the chosen format/quality; untouched photos export the original verbatim.
+    const isChanged = (id: string) =>
+      modifiedPhotos.has(id) ||
+      imageSavings[id] != null ||
+      (id === activePhotoId && activeChanged);
+
     const { default: JSZip } = await import("jszip");
     const zip = new JSZip();
-    const ext = exportFormat === "jpeg" ? ".jpg" : `.${exportFormat}`;
+    const usedNames = new Set<string>();
+
     for (const photo of photos) {
-      const original = await getOriginal(photo.originalKey);
-      if (original) {
-        zip.file(
-          `${photo.name}${ext}`,
-          new Blob([original.bytes], { type: original.mimeType }),
-        );
+      let blob: Blob;
+      let ext: string;
+
+      if (isChanged(photo.id)) {
+        const edit = await loadPhotoEdit(photo.id);
+        if (edit) {
+          // Canvas edits (draw / text / crop / resize / transform) →
+          // composite via Rust + re-encode at the chosen format/quality.
+          const { pixels, w, h } = await compositeSavedEdit(edit);
+          blob = await encodeRgba(pixels, w, h, exportFormat, quality / 100);
+          ext = EXT[exportFormat];
+        } else {
+          // Compressed/quality-changed only (no canvas snapshot): the processed
+          // bytes already live at originalKey.
+          const orig = await getOriginal(photo.originalKey);
+          if (!orig) continue;
+          blob = new Blob([orig.bytes], { type: orig.mimeType });
+          ext = extFromMime(orig.mimeType);
+        }
+      } else {
+        // Untouched → original bytes, verbatim, in their original format.
+        const orig = await getOriginal(photo.originalKey);
+        if (!orig) continue;
+        blob = new Blob([orig.bytes], { type: orig.mimeType });
+        ext = extFromMime(orig.mimeType);
       }
+
+      // De-dupe filenames within the archive.
+      const base = photo.name || "image";
+      let name = `${base}${ext}`;
+      for (let n = 2; usedNames.has(name); n++) name = `${base}-${n}${ext}`;
+      usedNames.add(name);
+      zip.file(name, blob);
     }
-    const blob = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(blob);
+
+    const out = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(out);
     const a = document.createElement("a");
     a.href = url;
     a.download = "photos.zip";
     a.click();
     URL.revokeObjectURL(url);
-  }, [photos, exportFormat]);
+  }, [
+    photos,
+    activePhotoId,
+    hasBeenModified,
+    stamp,
+    exportFormat,
+    quality,
+    modifiedPhotos,
+    imageSavings,
+    loadPhotoEdit,
+    savePhotoEdit,
+  ]);
 
   useKeyboardShortcuts({
     onUndo: stamp.undo,
@@ -1342,6 +1402,7 @@ export function AppShell() {
           imageCount={photos.length}
           userMode={userMode}
           maxPhotos={maxPhotos}
+          fileSize={photos.find((p) => p.id === activePhotoId)?.byteSize}
         />
       )}
 

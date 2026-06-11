@@ -27,13 +27,6 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@clerk/shared",
-      "@swc/core",
-      "esbuild"
-    ]
-  },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.6",
     "@types/jszip": "^3.4.1",

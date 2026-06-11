@@ -15,6 +15,16 @@ interface Props {
   userMode?: UserMode;
   /** Per-tier gallery cap, shown as "count / max" when provided. */
   maxPhotos?: number;
+  /** Active photo's file size in bytes; shown as a human-readable size. */
+  fileSize?: number;
+}
+
+/** Format a byte count as a compact human-readable size (e.g. "80 KB"). */
+function formatBytes(n?: number): string | null {
+  if (n == null || n <= 0) return null;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const USER_MODE_LABEL: Record<UserMode, string> = {
@@ -23,7 +33,8 @@ const USER_MODE_LABEL: Record<UserMode, string> = {
   paid: "Paid user",
 };
 
-export function StatusBar({ state, imageCount, userMode = "demo", maxPhotos }: Props) {
+export function StatusBar({ state, imageCount, userMode = "demo", maxPhotos, fileSize }: Props) {
+  const sizeLabel = formatBytes(fileSize);
   return (
     <footer className="status-bar">
       <div className="status-section">
@@ -67,6 +78,12 @@ export function StatusBar({ state, imageCount, userMode = "demo", maxPhotos }: P
         <span className="status-zoom-label">
           {imageCount}{maxPhotos ? ` / ${maxPhotos}` : ""} img{imageCount !== 1 ? "s" : ""}
         </span>
+        {sizeLabel && (
+          <>
+            <span className="status-divider" />
+            <span className="status-zoom">{sizeLabel}</span>
+          </>
+        )}
         <span className="status-divider" />
         <span className="status-zoom">
           {state.width && state.height ? `${state.width}×${state.height}` : "—"}
