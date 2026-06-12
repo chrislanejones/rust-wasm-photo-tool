@@ -24,7 +24,7 @@ export function ToolButton({ tool, active, disabled = false, onClick }: Props) {
       }`}
     >
       <span
-        className={`flex items-center justify-center rounded-xl bg-gradient-to-br ${tool.gradient} shadow-lg transition-all duration-200 ${
+        className={`flex items-center justify-center rounded-xl bg-gradient-to-br ${tool.gradient} shadow-lg transition-all duration-200 max-[999px]:h-10 max-[999px]:w-10 ${
           disabled
             ? "h-12 w-12"
             : active
@@ -32,7 +32,7 @@ export function ToolButton({ tool, active, disabled = false, onClick }: Props) {
               : "h-12 w-12 hover:scale-105 hover:shadow-xl"
         }`}
       >
-        <Icon className="h-7 w-7 text-white drop-shadow-sm" />
+        <Icon className="h-7 w-7 max-[999px]:h-5 max-[999px]:w-5 text-white drop-shadow-sm" />
       </span>
     </button>
   );

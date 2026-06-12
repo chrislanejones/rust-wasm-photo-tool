@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { EDITOR_URL } from "../config";
 
 export default function CTA() {
@@ -24,12 +23,6 @@ export default function CTA() {
           >
             Beta Version →
           </a>
-          <Link
-            to="/architecture"
-            className="px-5 py-3 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-200 font-medium transition"
-          >
-            Inspect the stack
-          </Link>
         </div>
       </div>
     </section>

@@ -19,7 +19,7 @@ import type { TextMemory } from "@/features/tools/settings/TextSettings";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { TopBar } from "@/components/TopBar";
-import { StatusBar, type UserMode } from "@/components/StatusBar";
+import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
@@ -71,6 +71,20 @@ import {
 } from "lucide-react";
 
 export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
+
+/** Digit-key shortcut + label per tool (mirrors TOOL_BY_DIGIT in useKeyboardShortcuts). */
+const TOOL_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {
+  compress: { keys: "1", label: "compress" },
+  crop: { keys: "2", label: "crop" },
+  brush: { keys: "3", label: "brush" },
+  text: { keys: "4", label: "text" },
+  arrow: { keys: "5", label: "arrow" },
+  ai: { keys: "6", label: "AI" },
+  shapes: { keys: "7", label: "shapes" },
+  effects: { keys: "8", label: "effects" },
+  stamp: { keys: "9", label: "stamp" },
+  emoji: { keys: "0", label: "batch" },
+};
 
 const AUTH_ENABLED = !!(
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY &&
@@ -881,6 +895,42 @@ export function AppShell() {
     });
   }, [compressProgress.savings]);
 
+  // Surface Auto-Compress progress as a sonner toast (with a progress bar)
+  // instead of an inline bar in the toolbar.
+  const compressToastRef = useRef<string | number | null>(null);
+  const compressTotalRef = useRef(0);
+  useEffect(() => {
+    const { running, completed, total } = compressProgress;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    if (running) {
+      compressTotalRef.current = total;
+      const node = (
+        <div className="w-full min-w-[180px]">
+          <div className="mb-1.5 text-sm font-medium">
+            Compressing {completed}/{total}…
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-300"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      );
+      if (compressToastRef.current == null) {
+        compressToastRef.current = toast.loading(node, { duration: Infinity });
+      } else {
+        toast.loading(node, { id: compressToastRef.current, duration: Infinity });
+      }
+    } else if (compressToastRef.current != null) {
+      const n = compressTotalRef.current;
+      toast.success(`Compressed ${n} image${n === 1 ? "" : "s"}`, {
+        id: compressToastRef.current,
+      });
+      compressToastRef.current = null;
+    }
+  }, [compressProgress]);
+
   const handleExportAll = useCallback(async () => {
     if (photos.length === 0) return;
 
@@ -1070,12 +1120,10 @@ export function AppShell() {
             onToggleTools={() => setShowTools((v) => !v)}
             onToggleGallery={() => setShowGallery((v) => !v)}
             onToggleHistory={() => setShowHistory((v) => !v)}
-            imageCount={photos.length}
             exportFormat={exportFormat}
             onExportFormatChange={setExportFormat}
             onExport={handleExport}
             hasSelectedImage={hasImage}
-            onDeleteAll={handleDeleteAll}
           />
         )}
       </AnimatePresence>
@@ -1388,6 +1436,7 @@ export function AppShell() {
             compressionSavings={imageSavings}
             modifiedPhotos={modifiedPhotos}
             maxPhotos={maxPhotos}
+            onDeleteAll={handleDeleteAll}
           />
         )}
       </AnimatePresence>
@@ -1409,10 +1458,9 @@ export function AppShell() {
       {photos.length > 0 && (
         <StatusBar
           state={stamp.state}
-          imageCount={photos.length}
           userMode={userMode}
-          maxPhotos={maxPhotos}
           fileSize={photos.find((p) => p.id === activePhotoId)?.byteSize}
+          activeToolHint={TOOL_SHORTCUT[activeTool]}
         />
       )}
 

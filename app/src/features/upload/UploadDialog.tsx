@@ -1,7 +1,9 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
-import { Upload, FolderOpen, Clipboard, X, Images, Loader2 } from "lucide-react";
+import { Upload, FolderOpen, Clipboard, X, Images, Loader2, LogIn } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
+import { LargeButton } from "@/components/ui/large-button";
+import { TinyButton } from "@/components/ui/tiny-button";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
 const horseLogo = "/Image-Horse-Logo.svg";
 
@@ -153,12 +155,12 @@ export function UploadDialog({
             </div>
 
             {/* Close button */}
-            <button
-              className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
+            <TinyButton
+              className="absolute top-4 right-4"
               onClick={handleTryClose}
             >
               <X className="h-4 w-4" />
-            </button>
+            </TinyButton>
 
             {/* Loading bar */}
             {isLoading && (
@@ -195,35 +197,38 @@ export function UploadDialog({
                     <Upload className="h-7 w-7 text-text-muted" />
                   </div>
 
-                  <div className="flex gap-3 flex-wrap justify-center">
-                    <button
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    <LargeButton
                       onClick={() => inputRef.current?.click()}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm bg-accent text-text-primary hover:brightness-110 transition-all"
+                      className="w-full"
                     >
                       <FolderOpen className="h-4 w-4" />
                       Browse Files
-                    </button>
-                    <button
-                      onClick={handlePasteClick}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all"
-                    >
+                    </LargeButton>
+                    <LargeButton onClick={handlePasteClick} className="w-full">
                       <Clipboard className="h-4 w-4" />
                       Paste (Ctrl+V)
-                    </button>
-                    <button
+                    </LargeButton>
+                    <LargeButton
                       onClick={handleTestImages}
                       disabled={loadingTest}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all disabled:opacity-60 disabled:cursor-wait"
+                      className="w-full"
                     >
                       {loadingTest ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Images className="h-4 w-4" />
                       )}
-                      {loadingTest
-                        ? `Loading ${TEST_IMAGE_COUNT}…`
-                        : "Test Free Images"}
-                    </button>
+                      {loadingTest ? `Loading ${TEST_IMAGE_COUNT}…` : "Test Images"}
+                    </LargeButton>
+                    <LargeButton
+                      disabled
+                      title="View images from your last session (coming soon)"
+                      className="w-full"
+                    >
+                      <LogIn className="h-4 w-4" />
+                      Log In
+                    </LargeButton>
                   </div>
 
                   <p className="text-xs text-text-muted">

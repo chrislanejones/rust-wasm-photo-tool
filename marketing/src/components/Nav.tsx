@@ -24,14 +24,6 @@ export default function Nav() {
             </>
           )}
           <NavLink
-            to="/architecture"
-            className={({ isActive }) =>
-              isActive ? "text-orange-400" : "hover:text-zinc-100 transition"
-            }
-          >
-            Architecture
-          </NavLink>
-          <NavLink
             to="/shipped"
             className={({ isActive }) =>
               isActive ? "text-orange-400" : "hover:text-zinc-100 transition"

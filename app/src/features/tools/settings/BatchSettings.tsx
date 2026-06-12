@@ -4,7 +4,7 @@
 // photos are persisted to IDB irreversibly.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { LargeButton } from "@/components/ui/large-button";
 import { ToolButton } from "@/components/ui/tool-button";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
@@ -636,7 +636,7 @@ export function BatchSettings({
         disabled={position === "center"}
       />
 
-      <Button
+      <LargeButton
         onClick={applyToAll}
         disabled={!logo || running || photos.length === 0}
         className="w-full"
@@ -644,7 +644,7 @@ export function BatchSettings({
         {running
           ? `Processing ${progress.done}/${progress.total}…`
           : "Apply Logo to All Images"}
-      </Button>
+      </LargeButton>
 
       {appliedCount !== null && !running && (
         <div
@@ -960,7 +960,7 @@ function TextBatchPanel({
         disabled={position === "center"}
       />
 
-      <Button
+      <LargeButton
         onClick={applyToAll}
         disabled={!text.trim() || running || photos.length === 0}
         className="w-full"
@@ -968,7 +968,7 @@ function TextBatchPanel({
         {running
           ? `Processing ${progress.done}/${progress.total}…`
           : "Apply Text to All Images"}
-      </Button>
+      </LargeButton>
 
       {appliedCount !== null && !running && (
         <div

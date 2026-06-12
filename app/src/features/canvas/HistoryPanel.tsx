@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { History, RotateCcw, X } from "lucide-react";
 import { slideFromRight } from "@/lib/animations";
+import { TinyButton } from "@/components/ui/tiny-button";
 import type { HistoryEntry } from "@/hooks/useCloneStamp";
 
 interface Props {
@@ -32,21 +33,16 @@ export function HistoryPanel({
           History
         </h2>
         <span className="panel-count">{history.length}</span>
-        <button
-          className="btn-icon"
+        <TinyButton
           onClick={onClear}
           title="Clear history"
           disabled={history.length === 0}
         >
           <RotateCcw className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={onClose}
-          title="Close history"
-          className="ml-auto p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
-        >
+        </TinyButton>
+        <TinyButton onClick={onClose} title="Close history" className="ml-auto">
           <X className="h-4 w-4" />
-        </button>
+        </TinyButton>
       </div>
       <ul className="history-list">
         {history.length === 0 && (

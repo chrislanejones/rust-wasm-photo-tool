@@ -1,7 +1,7 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SlidersHorizontal, Zap } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { SlidersHorizontal, Zap, Scaling } from "lucide-react";
+import { LargeButton } from "@/components/ui/large-button";
 import { SizeSlider } from "@/components/SizeSlider";
 import {
   Tooltip,
@@ -51,7 +51,6 @@ export function ResizeSettings({
   hasBeenModified,
   onAutoCompress,
   isCompressing,
-  compressProgress,
 }: ResizeSettingsProps) {
   const [width, setWidth] = useState(String(imageWidth));
   const [height, setHeight] = useState(String(imageHeight));
@@ -283,37 +282,23 @@ export function ResizeSettings({
 
       {/* ── Bottom Buttons ── */}
       <div className="border-t border-theme-sidebar-border pt-4 mt-8 space-y-2">
-        <Button
+        <LargeButton
           onClick={handleApplyResize}
           disabled={disabled || !resizeChanged}
-          className="w-full gap-2"
+          className="w-full"
         >
+          <Scaling className="h-4 w-4" />
           Apply Resize and Quality
-        </Button>
-        <Button
+        </LargeButton>
+        {/* Compression progress is surfaced via a sonner toast, not inline. */}
+        <LargeButton
           onClick={onAutoCompress}
           disabled={disabled || isCompressing}
-          className="w-full gap-2 bg-accent text-text-primary hover:ring-2 hover:ring-theme-primary/50 hover:ring-offset-2 hover:ring-offset-theme-background"
+          className="w-full"
         >
           <Zap className="h-4 w-4" />
           {isCompressing ? "Compressing…" : "Auto Compress All Images"}
-        </Button>
-
-        {isCompressing && (
-          <div className="h-1.5 w-full bg-theme-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-300"
-              style={{
-                width: `${
-                  compressProgress.total > 0
-                    ? (compressProgress.completed / compressProgress.total) *
-                      100
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-        )}
+        </LargeButton>
       </div>
     </div>
   );

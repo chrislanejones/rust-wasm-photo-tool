@@ -13,7 +13,6 @@ import {
   Image,
   Wrench,
   History,
-  Trash2,
   ChevronDown,
   ZoomIn,
   ZoomOut,
@@ -45,12 +44,10 @@ interface TopBarProps {
   onToggleTools: () => void;
   onToggleGallery: () => void;
   onToggleHistory: () => void;
-  imageCount: number;
   exportFormat: ExportFormat;
   onExportFormatChange: (f: ExportFormat) => void;
   onExport: () => void;
   hasSelectedImage: boolean;
-  onDeleteAll: () => void;
 }
 
 export function TopBar({
@@ -69,12 +66,10 @@ export function TopBar({
   onToggleTools,
   onToggleGallery,
   onToggleHistory,
-  imageCount,
   exportFormat,
   onExportFormatChange,
   onExport: _onExport,
   hasSelectedImage: _hasSelectedImage,
-  onDeleteAll,
 }: TopBarProps) {
   const [formatOpen, setFormatOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -191,7 +186,7 @@ export function TopBar({
                   >
                     <ZoomOut className="h-4 w-4" />
                   </button>
-                  <span className="text-sm font-semibold font-mono w-12 text-center tabular-nums text-text-primary">
+                  <span className="hidden min-[1000px]:inline text-xs font-medium font-mono w-12 text-center tabular-nums text-text-primary">
                     {Math.round(zoom * 100)}%
                   </span>
                   <button
@@ -221,14 +216,14 @@ export function TopBar({
                       <TooltipTrigger asChild>
                         <button
                           onClick={toggle}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold font-mono transition-all ${
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-all ${
                             state
                               ? "bg-accent text-text-primary shadow-md"
                               : "text-text-muted hover:text-text-primary hover:bg-bg-elevated"
                           }`}
                         >
                           <Icon className="h-3.5 w-3.5" />
-                          <span className="hidden sm:inline">{label}</span>
+                          <span className="hidden min-[1000px]:inline">{label}</span>
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
@@ -285,27 +280,6 @@ export function TopBar({
                 <p className="text-muted-foreground text-xs">
                   Choose output format
                 </p>
-              </TooltipContent>
-            </Tooltip>
-
-            {/* Delete All */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onDeleteAll}
-                  disabled={imageCount === 0}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border text-text-muted hover:text-red-400 hover:border-border-active disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                  title="Delete all images"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs font-semibold font-mono">
-                    Delete All
-                  </span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p className="font-medium">Delete All Images</p>
-                <p className="text-muted-foreground text-xs">Alt + D</p>
               </TooltipContent>
             </Tooltip>
 

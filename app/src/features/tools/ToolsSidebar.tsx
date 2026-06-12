@@ -1,8 +1,10 @@
 // ===== FILE: app/src/features/tools/ToolsSidebar.tsx =====
 // Item 7: "effects" replaces "blur" — includes brightness, contrast, blur
 import { motion } from "framer-motion";
-import { Download } from "lucide-react";
+import { Download, Wrench, X } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
+import { LargeButton } from "@/components/ui/large-button";
+import { TinyButton } from "@/components/ui/tiny-button";
 import type {
   ToolType,
   StampSettings as StampSettingsType,
@@ -108,7 +110,7 @@ interface ToolsSidebarProps {
 }
 
 export function ToolsSidebar({
-  onClose: _onClose,
+  onClose,
   activeTool,
   onToolChange,
   stampSettings,
@@ -175,13 +177,23 @@ export function ToolsSidebar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="fixed left-3 top-3 bottom-[48px] z-40 w-[296px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
+      className="fixed left-3 top-3 bottom-[48px] z-40 w-[296px] max-[999px]:w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
       style={{
         boxShadow:
           "0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
       }}
     >
-      <div className="p-4 border-b border-border">
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <Wrench className="h-4 w-4" />
+          Toolbar
+        </h2>
+        <TinyButton onClick={onClose} title="Close toolbar">
+          <X className="h-4 w-4" />
+        </TinyButton>
+      </div>
+
+      <div className="px-4 pb-4 border-b border-border">
         <ToolGrid
           activeTool={activeTool}
           onToolChange={onToolChange}
@@ -311,20 +323,12 @@ export function ToolsSidebar({
       </div>
 
       <div className="p-4 border-t border-border flex gap-2">
-        <button
-          onClick={onExport}
-          disabled={!canExport}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-accent text-text-primary hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-        >
+        <LargeButton onClick={onExport} disabled={!canExport} className="flex-1">
           <Download className="h-4 w-4" /> Export {exportFormat.toUpperCase()}
-        </button>
-        <button
-          onClick={onExportAll}
-          disabled={!canExport}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-        >
+        </LargeButton>
+        <LargeButton onClick={onExportAll} disabled={!canExport} className="flex-1">
           <Download className="h-4 w-4" /> Export All
-        </button>
+        </LargeButton>
       </div>
     </motion.div>
   );

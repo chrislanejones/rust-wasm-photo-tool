@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
-import { X, Image, Check, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Image, Check, Zap, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { LargeButton } from "@/components/ui/large-button";
+import { TinyButton } from "@/components/ui/tiny-button";
 import { formatBytes } from "@/lib/format";
 
 export interface PhotoEntry {
@@ -35,6 +37,8 @@ interface Props {
   modifiedPhotos?: Set<string>;
   /** Per-tier gallery cap, shown next to the count (e.g. "3 / 12"). */
   maxPhotos?: number;
+  /** Remove every photo from the gallery. */
+  onDeleteAll?: () => void;
 }
 
 interface ThumbProps {
@@ -169,7 +173,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         title="Remove"
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
       >
-        <X className="h-2.5 w-2.5" />
+        <Trash2 className="h-3 w-3" />
       </button>
         </motion.div>
       </TooltipTrigger>
@@ -193,6 +197,7 @@ export function GalleryBar({
   compressionSavings,
   modifiedPhotos,
   maxPhotos,
+  onDeleteAll,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
 
@@ -257,12 +262,21 @@ export function GalleryBar({
                 ({photos.length}{maxPhotos ? ` / ${maxPhotos}` : ""})
               </span>
             </h2>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              {onDeleteAll && (
+                <LargeButton
+                  onClick={onDeleteAll}
+                  title="Delete all images"
+                  className="px-2.5 py-1.5 text-xs"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Delete All</span>
+                </LargeButton>
+              )}
+              <TinyButton onClick={onClose} title="Close gallery">
+                <X className="h-4 w-4" />
+              </TinyButton>
+            </div>
           </div>
 
           <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-center">

@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { EDITOR_URL } from "../config";
 
 function CityCanvas() {
@@ -418,9 +417,6 @@ export default function Hero() {
           <a href={EDITOR_URL} target="_blank" rel="noopener noreferrer" className="px-5 py-3 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 text-white font-medium hover:opacity-90 transition glow">
             Beta Version →
           </a>
-          <Link to="/architecture" className="px-5 py-3 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-200 font-medium transition">
-            See the architecture
-          </Link>
         </div>
         <div className="mt-10 flex items-center justify-center gap-6 text-xs text-zinc-500 flex-wrap">
           <span className="flex items-center gap-1.5"><span className="text-emerald-400">●</span> No upload for demo</span>

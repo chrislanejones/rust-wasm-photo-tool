@@ -5,7 +5,7 @@ import {
   FlipVertical,
   Crop,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { LargeButton } from "@/components/ui/large-button";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { CropSelection } from "@/hooks/useDrawingTools";
@@ -157,14 +157,13 @@ export function TransformCropSettings({
             </div>
           )}
 
-          <Button
-            variant="default"
-            className="w-full gap-2"
+          <LargeButton
+            className="w-full"
             disabled={disabled}
             onClick={onApplyCrop}
           >
             <Crop className="h-4 w-4" /> Apply Crop
-          </Button>
+          </LargeButton>
         </div>
       )}
     </div>

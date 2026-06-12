@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { EDITOR_URL } from "../config";
 
 type Tag = "feature" | "perf" | "fix" | "rust" | "ui" | "infra" | "mock";
@@ -26,6 +25,26 @@ interface Release {
 }
 
 const RELEASES: Release[] = [
+  {
+    version: "v0.9.8",
+    date: "2026-06",
+    headline: "Smart export, batch text, and a unified button system",
+    entries: [
+      { tag: "feature", text: "Smart Export All — each photo exports its processed result (edits, compression, or resize re-encoded at the chosen format + quality), or the untouched original when nothing changed." },
+      { tag: "feature", text: "Batch Text is live — type once and stamp text onto every photo in the gallery; rendered in Rust with the embedded font, and the active photo stays undoable." },
+      { tag: "feature", text: "Logo replace, not stack — re-applying the batch logo swaps the previous one instead of layering a second logo on top." },
+      { tag: "feature", text: "Test Free Images — load a set of 12 royalty-free sample photos straight into the editor to try things out." },
+      { tag: "feature", text: "Per-photo file size now shown in the status bar, beside the dimensions, and updates after Auto Compress." },
+      { tag: "rust",    text: "Byte-aware Lighthouse score — a Rust web-performance model (log-normal curve) powers the Resize panel's Web Performance Gain and Lighthouse readouts." },
+      { tag: "rust",    text: "Batch text and Export All compositing run through Rust (measure_text / commit_text and encode_png_pixels on a throwaway ImageHorseTool)." },
+      { tag: "ui",      text: "Unified button system — new LargeButton and TinyButton primitives give every action and icon button one consistent look (export, apply, compress, delete, close, user)." },
+      { tag: "ui",      text: "Status bar refresh — rotating shortcut hints with the active tool swapped in and Alt+/ pinned." },
+      { tag: "ui",      text: "Auto Compress progress now appears as a toast with a progress bar instead of an inline toolbar bar." },
+      { tag: "ui",      text: "Gallery polish — Delete All in the header, trash-can remove buttons, and a hover tooltip showing each photo's name, size, and dimensions." },
+      { tag: "ui",      text: "Responsive layout under 1000px — the top bar collapses to icons and the toolbar slims down with smaller tool icons." },
+      { tag: "ui",      text: "Clerk sign-in now uses a dark theme that matches the editor." },
+    ],
+  },
   {
     version: "v0.9.7",
     date: "2026-05",
@@ -196,12 +215,6 @@ export default function Shipped() {
             >
               Try the latest →
             </a>
-            <Link
-              to="/architecture"
-              className="px-4 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-200 text-sm font-medium transition"
-            >
-              See the architecture
-            </Link>
           </div>
         </div>
 

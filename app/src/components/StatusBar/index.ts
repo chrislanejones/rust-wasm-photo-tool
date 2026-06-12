@@ -1,1 +1,1 @@
-export { StatusBar, type UserMode } from "./StatusBar";
+export { StatusBar, type UserMode, type ShortcutHint } from "./StatusBar";
