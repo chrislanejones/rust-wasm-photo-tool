@@ -415,7 +415,7 @@ export default function Hero() {
         </p>
         <div className="mt-9 flex items-center justify-center gap-3 flex-wrap">
           <a href={EDITOR_URL} target="_blank" rel="noopener noreferrer" className="px-5 py-3 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 text-white font-medium hover:opacity-90 transition glow">
-            Beta Version →
+            Beta Version
           </a>
         </div>
         <div className="mt-10 flex items-center justify-center gap-6 text-xs text-zinc-500 flex-wrap">

@@ -42,14 +42,6 @@ export default function Nav() {
         </div>
         <div className="flex items-center gap-3">
           <a
-            href={EDITOR_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-zinc-400 hover:text-zinc-100 transition hidden sm:inline"
-          >
-            Sign in
-          </a>
-          <a
             href="https://github.com/chrislanejones/rust-wasm-photo-tool"
             target="_blank"
             rel="noopener noreferrer"
@@ -78,7 +70,7 @@ export default function Nav() {
             rel="noopener noreferrer"
             className="text-sm font-medium px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-900 hover:bg-white transition"
           >
-            Beta Version →
+            Beta Version
           </a>
         </div>
       </div>

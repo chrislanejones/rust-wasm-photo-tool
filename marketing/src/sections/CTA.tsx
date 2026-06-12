@@ -21,7 +21,7 @@ export default function CTA() {
             rel="noopener noreferrer"
             className="px-5 py-3 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 text-white font-medium hover:opacity-90 transition glow"
           >
-            Beta Version →
+            Beta Version
           </a>
         </div>
       </div>
