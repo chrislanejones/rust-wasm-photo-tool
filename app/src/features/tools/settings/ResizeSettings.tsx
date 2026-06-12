@@ -221,9 +221,9 @@ export function ResizeSettings({
 
       {/* ── Content ── */}
       <div className="space-y-8 flex-1">
-        {/* ── Width percent slider ── */}
+        {/* ── Scale slider — proportional percent of the original dimensions ── */}
         <SizeSlider
-          label="Width"
+          label="Scale"
           value={widthPercent}
           onChange={handlePercentChange}
           min={1}
