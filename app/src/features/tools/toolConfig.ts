@@ -16,6 +16,9 @@ import {
 export interface ToolDefinition {
   id: ToolType;
   label: string;
+  /** Optional tooltip-title override for when the visible tooltip should say
+   *  more than the short `label` (e.g. Resize → "Resize & Compress"). */
+  tooltipTitle?: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   gradient: string;
@@ -25,63 +28,64 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: "compress",
     label: "Resize",
-    description: "Resize & optimize images",
+    tooltipTitle: "Resize & Compress",
+    description: "Resize & compress images",
     icon: Shrink,
     gradient: "from-orange-500 to-red-500",
   },
   {
     id: "crop",
-    label: "Crop",
-    description: "Crop & trim images",
+    label: "Crop & Transform",
+    description: "Crop, flip & rotate images",
     icon: Crop,
     gradient: "from-cyan-500 to-blue-500",
   },
   {
     id: "brush",
     label: "Paint",
-    description: "Freehand drawing",
+    description: "Paint & blur brush",
     icon: Paintbrush,
     gradient: "from-blue-500 to-indigo-500",
   },
   {
     id: "text",
     label: "Text",
-    description: "Add text annotations",
+    description: "Text & speech bubbles",
     icon: Type,
     gradient: "from-amber-400 to-orange-500",
   },
   {
     id: "arrow",
-    label: "Arrows",
-    description: "Point & highlight areas",
+    label: "Coming Soon",
+    description: "New tool in development",
     icon: FileText,
     gradient: "from-emerald-500 to-teal-500",
   },
   {
     id: "ai",
     label: "AI",
-    description: "AI-powered tools",
+    description: "AI-powered tools (coming soon)",
     icon: Brain,
     gradient: "from-violet-500 to-purple-600",
   },
   {
     id: "shapes",
     label: "Shapes",
-    description: "Add geometric shapes",
+    description: "Shapes & arrows",
     icon: Shapes,
     gradient: "from-pink-500 to-rose-500",
   },
   {
     id: "effects",
     label: "Effects",
-    description: "Levels, color picker & blur (WASM)",
+    description: "Levels & color picker",
     icon: Sparkles,
     gradient: "from-indigo-400 to-violet-600",
   },
   {
     id: "stamp",
     label: "Clone Stamp",
-    description: "WASM-powered clone stamp",
+    description: "Clone stamp, red stamps & emojis",
     icon: Stamp,
     gradient: "from-rose-500 to-red-600",
   },

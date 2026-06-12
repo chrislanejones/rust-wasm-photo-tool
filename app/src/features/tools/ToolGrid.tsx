@@ -36,7 +36,7 @@ export function ToolGrid({ activeTool, onToolChange, disabledTools }: Props) {
               </div>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={8}>
-              <p className="font-medium">{tool.label}</p>
+              <p className="font-medium">{tool.tooltipTitle ?? tool.label}</p>
               <p className="text-muted-foreground text-xs">
                 {disabledReason ?? tool.description}
               </p>

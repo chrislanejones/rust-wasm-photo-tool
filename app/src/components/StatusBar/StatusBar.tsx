@@ -29,29 +29,19 @@ const CYCLE_MS = 5 * 60 * 1000; // rotate the two dynamic hints every 5 minutes
 
 const MARKETING_URL = "https://image-horse.vercel.app";
 
+/** Tier of the current user. Lives here historically; consumed by
+ *  `photoLimits` and AppShell even though the status bar no longer shows it. */
 export type UserMode = "demo" | "loggedIn" | "paid";
 
 interface Props {
   state: CloneStampState;
-  userMode?: UserMode;
   /** Active photo's file size in bytes; shown as a human-readable size. */
   fileSize?: number;
   /** Shortcut for the currently-active tool; swapped into a dynamic slot. */
   activeToolHint?: ShortcutHint;
 }
 
-const USER_MODE_LABEL: Record<UserMode, string> = {
-  demo: "Demo mode",
-  loggedIn: "Logged in",
-  paid: "Paid user",
-};
-
-export function StatusBar({
-  state,
-  userMode = "demo",
-  fileSize,
-  activeToolHint,
-}: Props) {
+export function StatusBar({ state, fileSize, activeToolHint }: Props) {
   const sizeLabel = formatBytes(fileSize);
 
   // Rotate the two dynamic hint slots every 5 minutes. The active tool's
@@ -83,8 +73,6 @@ export function StatusBar({
           <span>🐴 Image Horse</span>
           <ExternalLink size={12} aria-hidden="true" />
         </a>
-        <span className="status-divider" />
-        <span className="status-zoom-label">{USER_MODE_LABEL[userMode]}</span>
       </div>
 
       <div className="status-section status-center">

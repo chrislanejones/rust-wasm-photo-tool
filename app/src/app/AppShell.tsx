@@ -69,6 +69,7 @@ import {
   RotateCcw,
   Archive,
   ImagePlus,
+  Pipette,
 } from "lucide-react";
 
 /** Digit-key shortcut + label per tool (mirrors TOOL_BY_DIGIT in useKeyboardShortcuts). */
@@ -540,6 +541,9 @@ export function AppShell() {
 
   const prevPhotoCount = useRef(0);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Stable binding — `stamp` is a fresh object each render, but `stamp.reset`
+  // is a stable useCallback, so the effect below only re-fires on count change.
+  const stampReset = stamp.reset;
   useEffect(() => {
     const prev = prevPhotoCount.current;
     const curr = photos.length;
@@ -555,13 +559,18 @@ export function AppShell() {
     if (curr === 0) {
       revealTimers.current.forEach(clearTimeout);
       revealTimers.current = [];
+      // Catch-all for EVERY path that empties the gallery (Delete All, bulk
+      // multi-select delete, removing the last photo): blank the canvas and
+      // reset the WASM tool so the last image doesn't ghost behind the
+      // re-opened upload dialog. Runs in the same commit as setShowUpload.
+      if (prev > 0) stampReset();
       setShowUpload(true);
       setShowTopBar(false);
       setShowTools(false);
       setShowGallery(false);
       setShowHistory(false);
     }
-  }, [photos.length]);
+  }, [photos.length, stampReset]);
   useEffect(() => () => { revealTimers.current.forEach(clearTimeout); }, []);
 
   const handleTextFontSizeChange = useCallback((size: number) => {
@@ -583,23 +592,28 @@ export function AppShell() {
     clearAllEdits().catch(() => {});
     setImageSavings({});
     setModifiedPhotos(new Set());
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-      canvas.width = 0;
-      canvas.height = 0;
-    }
+    // Blank the canvas + drop the WASM tool immediately (the empty-gallery
+    // effect below also fires, but reset is idempotent).
+    stamp.reset();
     setActivePhotoId(null);
     setOriginalUrl(null);
     setHasBeenModified(false);
     setCompareActive(false);
     setPhotos([]);
-  }, [clearAllEdits]);
+  }, [clearAllEdits, stamp]);
 
   const handlePickColor = useCallback((hex: string) => {
     setToolSettings((prev) => ({ ...prev, brushColor: hex, textColor: hex }));
     setColorPickerActive(false);
+  }, []);
+
+  /** Context-menu shortcut: open the Effects panel on its Color Picker tab
+   *  with the eyedropper already armed. */
+  const handleActivateEyedropper = useCallback(() => {
+    setShowTools(true);
+    setActiveTool("effects");
+    setEffectsMode("picker");
+    setColorPickerActive(true);
   }, []);
 
   const colorPicker = useColorPicker({
@@ -1565,6 +1579,13 @@ export function AppShell() {
             <Archive className="h-4 w-4 mr-2" /> Export All (ZIP)
           </ContextMenuItem>
           <ContextMenuSeparator />
+          <ContextMenuItem
+            onClick={handleActivateEyedropper}
+            disabled={!hasImage}
+          >
+            <Pipette className="h-4 w-4 mr-2" /> Activate Eyedropper
+          </ContextMenuItem>
+          <ContextMenuSeparator />
           <ContextMenuItem onClick={handleZoomIn}>
             <ZoomIn className="h-4 w-4 mr-2" /> Zoom In
             <ContextMenuShortcut>Alt+=</ContextMenuShortcut>
@@ -1628,7 +1649,6 @@ export function AppShell() {
       {photos.length > 0 && (
         <StatusBar
           state={stamp.state}
-          userMode={userMode}
           fileSize={photos.find((p) => p.id === activePhotoId)?.byteSize}
           activeToolHint={TOOL_SHORTCUT[activeTool]}
         />

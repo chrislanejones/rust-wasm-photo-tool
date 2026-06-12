@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
-import { Upload, FolderOpen, Clipboard, X, Images, Loader2, LogIn } from "lucide-react";
+import { Upload, FolderOpen, Clipboard, X, Images, Loader2, LogIn, ExternalLink } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
 import { LargeButton } from "@/components/ui/large-button";
 import { TinyButton } from "@/components/ui/tiny-button";
@@ -254,15 +254,22 @@ export function UploadDialog({
               }}
             />
 
-            <div className="px-6 pb-4 text-center">
-              <a
-                href="https://image-horse.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] text-text-muted opacity-60 hover:opacity-100 hover:text-text-primary transition-opacity"
+            <div className="px-6 pb-4">
+              {/* LargeButton renders a <button>, so open the marketing site
+                  via window.open instead of an anchor href. */}
+              <LargeButton
+                onClick={() =>
+                  window.open(
+                    "https://image-horse.vercel.app/",
+                    "_blank",
+                    "noopener",
+                  )
+                }
+                className="w-full"
               >
-                image-horse.vercel.app ↗
-              </a>
+                image-horse.vercel.app
+                <ExternalLink className="h-4 w-4" />
+              </LargeButton>
             </div>
           </motion.div>
           </motion.div>
