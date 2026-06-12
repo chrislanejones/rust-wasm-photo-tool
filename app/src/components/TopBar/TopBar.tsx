@@ -1,5 +1,5 @@
 // app/src/components/TopBar/TopBar.tsx
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { slideFromTop, panelSpacingTransition } from "@/lib/animations";
 import {
@@ -13,7 +13,7 @@ import {
   Image,
   Wrench,
   History,
-  ChevronDown,
+  Download,
   ZoomIn,
   ZoomOut,
   Undo2,
@@ -44,8 +44,8 @@ interface TopBarProps {
   onToggleTools: () => void;
   onToggleGallery: () => void;
   onToggleHistory: () => void;
+  /** Current export format (set from the Resize panel); shown on the Export button. */
   exportFormat: ExportFormat;
-  onExportFormatChange: (f: ExportFormat) => void;
   onExport: () => void;
   hasSelectedImage: boolean;
 }
@@ -67,26 +67,9 @@ export function TopBar({
   onToggleGallery,
   onToggleHistory,
   exportFormat,
-  onExportFormatChange,
-  onExport: _onExport,
-  hasSelectedImage: _hasSelectedImage,
+  onExport,
+  hasSelectedImage,
 }: TopBarProps) {
-  const [formatOpen, setFormatOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!formatOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      )
-        setFormatOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [formatOpen]);
-
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under 1000px, and under 1200px when both side panels
   // (toolbar + history) are open and eating the horizontal room.
@@ -256,45 +239,23 @@ export function TopBar({
 
             <div className="w-px h-6 bg-border shrink-0" />
 
-            {/* Export format picker */}
+            {/* Export action (format is picked in the Resize panel) */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="relative" ref={dropdownRef}>
-                  <button
-                    onClick={() => setFormatOpen((v) => !v)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold font-mono bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all"
-                  >
-                    {FORMAT_LABELS[exportFormat]}
-                    <ChevronDown className="h-3 w-3 opacity-50" />
-                  </button>
-                  {formatOpen && (
-                    <div className="absolute top-full left-0 mt-1 bg-bg-secondary border border-border rounded-lg shadow-lg overflow-hidden z-50 min-w-[80px]">
-                      {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map(
-                        (fmt) => (
-                          <button
-                            key={fmt}
-                            onClick={() => {
-                              onExportFormatChange(fmt);
-                              setFormatOpen(false);
-                            }}
-                            className={`w-full px-3 py-1.5 text-left text-xs font-mono transition-colors ${
-                              fmt === exportFormat
-                                ? "bg-accent text-text-primary"
-                                : "text-text-secondary hover:bg-bg-elevated"
-                            }`}
-                          >
-                            {FORMAT_LABELS[fmt]}
-                          </button>
-                        ),
-                      )}
-                    </div>
-                  )}
-                </div>
+                <button
+                  onClick={onExport}
+                  disabled={!hasSelectedImage}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold font-mono bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {!compact && <span>Export</span>}
+                  {FORMAT_LABELS[exportFormat]}
+                </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p className="font-medium">Export Format</p>
+                <p className="font-medium">Export</p>
                 <p className="text-muted-foreground text-xs">
-                  Choose output format
+                  Alt+E · format set in the Resize panel
                 </p>
               </TooltipContent>
             </Tooltip>

@@ -891,17 +891,47 @@ impl ImageHorseTool {
     // ── Resize ───────────────────────────────────────────────────────────
 
     pub fn resize(&mut self, new_w: u32, new_h: u32) {
+        self.resize_with_filter(new_w, new_h, 1);
+    }
+
+    /// Resize with a selectable resampling filter.
+    /// 0 = nearest, 1 = bilinear, 2 = catmull-rom, 3 = lanczos3.
+    /// Unknown codes fall back to bilinear.
+    pub fn resize_with_filter(&mut self, new_w: u32, new_h: u32, filter: u8) {
         if new_w == 0 || new_h == 0 {
             return;
         }
         self.hist.push_snapshot("Resize", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
-        let resized = transform::resize_bilinear(
-            &self.buf.data,
-            self.buf.width,
-            self.buf.height,
-            new_w,
-            new_h,
-        );
+        let resized = match filter {
+            0 => transform::resize_nearest(
+                &self.buf.data,
+                self.buf.width,
+                self.buf.height,
+                new_w,
+                new_h,
+            ),
+            2 => transform::resize_catmull_rom(
+                &self.buf.data,
+                self.buf.width,
+                self.buf.height,
+                new_w,
+                new_h,
+            ),
+            3 => transform::resize_lanczos3(
+                &self.buf.data,
+                self.buf.width,
+                self.buf.height,
+                new_w,
+                new_h,
+            ),
+            _ => transform::resize_bilinear(
+                &self.buf.data,
+                self.buf.width,
+                self.buf.height,
+                new_w,
+                new_h,
+            ),
+        };
         self.buf.data = resized;
         self.buf.width = new_w;
         self.buf.height = new_h;

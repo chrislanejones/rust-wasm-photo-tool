@@ -36,10 +36,10 @@ import type { EffectsMode } from "@/features/tools/settings/EffectsSettings";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
 import { useRecentTexts } from "@/hooks/useRecentTexts";
-import { putOriginal, getOriginal, getOriginalAsBlobUrl } from "@/lib/originalsStore";
+import { putOriginal, getOriginal, getOriginalAsBlobUrl, deleteOriginal } from "@/lib/originalsStore";
 import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
-import { makeWorkingCopy, makeThumbnail } from "@/lib/workingCopy";
+import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels } from "@/lib/workingCopy";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -855,12 +855,22 @@ export function AppShell() {
     setCompareActive((v) => !v);
   }, []);
 
-  const handleResize = useCallback(
-    (w: number, h: number) => {
+  /**
+   * Apply Compression & Resize. Resamples the WASM canvas with the chosen
+   * filter, then re-encodes the (annotation-free) canvas buffer at the chosen
+   * format + quality and persists it as the photo's stored bytes — mirroring
+   * the Auto Compress pattern: putOriginal → deleteOriginal(old) → PhotoEntry
+   * update (byteSize / mimeType / dims / thumbnail). The StatusBar size label
+   * and the gallery tooltip both read from the entry, so they update on their
+   * own. Text annotations stay live overlays (not flattened), like
+   * Auto Compress.
+   */
+  const handleApplyCompression = useCallback(
+    async (w: number, h: number, filter: number) => {
       const origW = stamp.state.width;
       const origH = stamp.state.height;
       if (w !== origW || h !== origH) {
-        stamp.resize(w, h);
+        stamp.resizeWithFilter(w, h, filter);
       }
       setHasBeenModified(true);
       if (activePhotoId) {
@@ -868,6 +878,8 @@ export function AppShell() {
           prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
         );
       }
+      // Instant estimate so the gallery badge reacts immediately; replaced by
+      // the real measured savings once the re-encode below lands.
       if (activePhotoId) {
         const areaRatio = origW * origH > 0 ? (w * h) / (origW * origH) : 1;
         const qualityRatio = quality / 100;
@@ -882,8 +894,72 @@ export function AppShell() {
           }));
         }
       }
+
+      // ── Re-encode + persist (Auto Compress pattern) ──────────────────────
+      const entry = photos.find((p) => p.id === activePhotoId);
+      const tool = stamp.toolRef.current;
+      if (!entry || !tool) return;
+      try {
+        // Fresh copy of the (possibly just-resized) canvas buffer — live text
+        // annotations are intentionally NOT flattened.
+        const pixels = new Uint8Array(tool.get_image_data());
+        const tw = tool.width();
+        const th = tool.height();
+        const blob = await encodeRgba(pixels, tw, th, exportFormat, quality / 100);
+        // convertToBlob may fall back (e.g. AVIF → PNG on some browsers);
+        // trust the blob's actual MIME for the stored metadata.
+        const mime = blob.type || `image/${exportFormat}`;
+        const newFile = new File([blob], `${entry.name}${extFromMime(mime)}`, {
+          type: mime,
+        });
+
+        const mod = await import("stamp_tool");
+        await mod.default();
+        const oldKey = entry.originalKey;
+        const [newKey, newThumb] = await Promise.all([
+          putOriginal(newFile, tw, th),
+          makeThumbnailFromPixels(pixels, tw, th, mod.resize_pixels),
+        ]);
+        if (oldKey && oldKey !== newKey) {
+          deleteOriginal(oldKey).catch(() => {});
+        }
+
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id !== entry.id
+              ? p
+              : {
+                  ...p,
+                  originalKey: newKey,
+                  byteSize: blob.size,
+                  mimeType: mime,
+                  origWidth: tw,
+                  origHeight: th,
+                  workingWidth: tw,
+                  workingHeight: th,
+                  thumbBlob: newThumb,
+                },
+          ),
+        );
+
+        // Real savings vs. the immutable upload-size baseline.
+        const realSavings =
+          entry.originalByteSize > 0
+            ? Math.max(
+                0,
+                Math.round((1 - blob.size / entry.originalByteSize) * 100),
+              )
+            : 0;
+        setImageSavings((prev) => ({
+          ...prev,
+          [entry.id]: { savingsPercent: realSavings },
+        }));
+      } catch (err) {
+        console.error("Apply Compression & Resize failed:", err);
+        toast.error("Couldn't apply compression");
+      }
     },
-    [stamp, activePhotoId, quality],
+    [stamp, activePhotoId, photos, quality, exportFormat],
   );
 
   const handleAutoCompress = useCallback(async () => {
@@ -1211,7 +1287,6 @@ export function AppShell() {
             onToggleGallery={() => setShowGallery((v) => !v)}
             onToggleHistory={() => setShowHistory((v) => !v)}
             exportFormat={exportFormat}
-            onExportFormatChange={setExportFormat}
             onExport={handleExport}
             hasSelectedImage={hasImage}
           />
@@ -1239,7 +1314,7 @@ export function AppShell() {
             onContrast={stamp.adjustContrast}
             onGlobalBlur={stamp.applyGlobalBlur}
             imageReady={hasImage}
-            onResize={handleResize}
+            onResize={handleApplyCompression}
             imageWidth={stamp.state.width}
             imageHeight={stamp.state.height}
             currentByteSize={activeEntry?.byteSize ?? 0}

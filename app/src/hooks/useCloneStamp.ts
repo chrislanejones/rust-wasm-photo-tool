@@ -688,6 +688,19 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [flushToCanvas, syncState],
   );
 
+  /** Resize with a selectable resampling filter (0=nearest, 1=bilinear, 2=catmull-rom, 3=lanczos3). */
+  const resizeWithFilter = useCallback(
+    (newW: number, newH: number, filter: number) => {
+      const t = toolRef.current;
+      if (!t || newW < 1 || newH < 1) return;
+      t.resize_with_filter(newW, newH, filter);
+      sourcePosRef.current = null;
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
   // ── NEW: Pixel adjustments ────────────────────────────────────────────────
   /**
    * Adjusts brightness by `delta` (−1.0 to +1.0).
@@ -771,6 +784,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     rotate90Ccw,
     crop,
     resize,
+    resizeWithFilter,
     adjustBrightness,
     adjustContrast,
     applyGlobalBlur,

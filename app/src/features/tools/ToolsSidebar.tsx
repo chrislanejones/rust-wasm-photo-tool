@@ -52,7 +52,8 @@ interface ToolsSidebarProps {
   onBrightness: (delta: number) => void;
   onContrast: (factor: number) => void;
   imageReady: boolean;
-  onResize: (newW: number, newH: number) => void;
+  /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
+  onResize: (newW: number, newH: number, filter: number) => void;
   imageWidth: number;
   imageHeight: number;
   currentByteSize: number;
@@ -122,6 +123,7 @@ export function ToolsSidebar({
   onExportAll,
   canExport,
   exportFormat,
+  onExportFormatChange,
   onFlipH,
   onFlipV,
   onRotate90Cw,
@@ -221,6 +223,8 @@ export function ToolsSidebar({
             quality={quality}
             onQualityChange={onQualityChange}
             onResize={onResize}
+            exportFormat={exportFormat}
+            onExportFormatChange={onExportFormatChange ?? (() => {})}
             compareActive={compareActive}
             onToggleCompare={onToggleCompare}
             hasBeenModified={hasBeenModified}

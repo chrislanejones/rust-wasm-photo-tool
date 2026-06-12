@@ -146,6 +146,11 @@ declare module "stamp_tool" {
     rotate_90_ccw(): void;
     crop(x: number, y: number, w: number, h: number): void;
     resize(new_w: number, new_h: number): void;
+    /**
+     * Resize with a selectable resampling filter.
+     * 0 = nearest, 1 = bilinear, 2 = catmull-rom, 3 = lanczos3.
+     */
+    resize_with_filter(new_w: number, new_h: number, filter: number): void;
     adjust_brightness(delta: number): void;
     adjust_contrast(factor: number): void;
     blur_region(
