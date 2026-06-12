@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
+import Architecture from "./pages/Architecture";
 import Shipped from "./pages/Shipped";
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
@@ -11,6 +12,7 @@ export default function App() {
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/architecture" element={<Architecture />} />
           <Route path="/shipped" element={<Shipped />} />
         </Routes>
       </main>

@@ -9,6 +9,7 @@ export default function Footer() {
           <span>© {new Date().getFullYear()} Image Horse · Built with Rust + WASM</span>
         </div>
         <div className="flex items-center gap-5">
+          <Link to="/architecture" className="hover:text-zinc-300 transition">Architecture</Link>
           <Link to="/shipped" className="hover:text-zinc-300 transition">Shipped</Link>
           <Link to="/#pricing" className="hover:text-zinc-300 transition">Pricing</Link>
           <a
@@ -16,6 +17,12 @@ export default function Footer() {
             className="hover:text-zinc-300 transition"
           >
             GitHub
+          </a>
+          <a
+            href="https://codeberg.org/chrislanejones/rust-wasm-photo-tool"
+            className="hover:text-zinc-300 transition"
+          >
+            Codeberg
           </a>
         </div>
       </div>
