@@ -41,6 +41,8 @@ interface ResizeSettingsProps {
   imageHeight: number;
   /** Current on-disk size of the active photo, in bytes (PageSpeed score). */
   currentByteSize: number;
+  /** Current file's MIME type — feeds the PSI next-gen-format audit. */
+  currentMime?: string;
   /** Immutable size at upload, in bytes — the performance-gain baseline. */
   originalByteSize: number;
   activePhotoId: string | null;
@@ -72,6 +74,7 @@ export function ResizeSettings({
   imageWidth,
   imageHeight,
   currentByteSize,
+  currentMime,
   originalByteSize,
   activePhotoId,
   quality,
@@ -188,6 +191,8 @@ export function ResizeSettings({
       newW,
       newH,
       quality,
+      curMime: currentMime,
+      newFormat: exportFormat,
     }).then((m) => {
       if (!alive) return;
       setLighthouseScore(m.lighthouseScore);
@@ -200,10 +205,12 @@ export function ResizeSettings({
     imageWidth,
     imageHeight,
     currentByteSize,
+    currentMime,
     originalByteSize,
     newW,
     newH,
     quality,
+    exportFormat,
   ]);
 
   return (
@@ -214,6 +221,19 @@ export function ResizeSettings({
 
       {/* ── Content ── */}
       <div className="space-y-8 flex-1">
+        {/* ── Width percent slider ── */}
+        <SizeSlider
+          label="Width"
+          value={widthPercent}
+          onChange={handlePercentChange}
+          min={1}
+          max={100}
+          unit="%"
+          presets={WIDTH_PERCENT_PRESETS}
+          variant="numbers"
+          disabled={disabled}
+        />
+
         {/* ── Dimensions ── */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -268,29 +288,19 @@ export function ResizeSettings({
           </div>
         </div>
 
-        {/* ── Width percent slider ── */}
-        <SizeSlider
-          label="Width"
-          value={widthPercent}
-          onChange={handlePercentChange}
-          min={1}
-          max={100}
-          unit="%"
-          presets={WIDTH_PERCENT_PRESETS}
-          variant="numbers"
-          disabled={disabled}
-        />
+        <hr className="border-theme-sidebar-border" />
 
         {/* ── Compress ── */}
-        <h3 className="text-xs font-semibold font-mono text-text-muted">
-          Compress
-        </h3>
+        <div className="flex flex-col gap-5 -mt-2">
+          <h3 className="text-xs font-semibold font-mono text-text-muted">
+            Compress
+          </h3>
 
-        {/* ── Method ── */}
-        <div className="space-y-4">
-          <label className="text-[11px] text-theme-muted-foreground">
-            Method
-          </label>
+          {/* ── Method ── */}
+          <div className="space-y-4">
+            <label className="text-[11px] text-theme-muted-foreground">
+              Method
+            </label>
           <div className="relative">
             <select
               value={method}
@@ -308,27 +318,28 @@ export function ResizeSettings({
           </div>
         </div>
 
-        {/* ── Format ── */}
-        <div className="space-y-4">
-          <label className="text-[11px] text-theme-muted-foreground">
-            Format
-          </label>
-          <div className="relative">
-            <select
-              value={exportFormat}
-              onChange={(e) =>
-                onExportFormatChange(e.target.value as ExportFormat)
-              }
-              disabled={disabled}
-              className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
-            >
-              {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
-                <option key={f} value={f}>
-                  {FORMAT_LABELS[f]}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+          {/* ── Format ── */}
+          <div className="space-y-4">
+            <label className="text-[11px] text-theme-muted-foreground">
+              Format
+            </label>
+            <div className="relative">
+              <select
+                value={exportFormat}
+                onChange={(e) =>
+                  onExportFormatChange(e.target.value as ExportFormat)
+                }
+                disabled={disabled}
+                className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+              >
+                {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
+                  <option key={f} value={f}>
+                    {FORMAT_LABELS[f]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+            </div>
           </div>
         </div>
 
@@ -341,41 +352,6 @@ export function ResizeSettings({
           max={100}
           unit="%"
         />
-
-        <hr className="border-theme-sidebar-border" />
-
-        {/* ── A/B Compare ── */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <button
-                onClick={onToggleCompare}
-                disabled={compareDisabled}
-                className={[
-                  "flex items-center gap-3 w-full p-3 rounded-lg transition-all",
-                  "text-xs font-black uppercase tracking-widest",
-                  compareActive
-                    ? "bg-theme-primary/15 ring-1 ring-theme-primary/40 text-theme-primary"
-                    : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground",
-                  compareDisabled
-                    ? "opacity-40 cursor-not-allowed"
-                    : "cursor-pointer",
-                ].join(" ")}
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                {compareActive ? "Hide A/B Compare" : "Show A/B Compare"}
-              </button>
-            </div>
-          </TooltipTrigger>
-          {compareDisabled && (
-            <TooltipContent side="bottom" className="max-w-[220px] text-center">
-              <p className="text-xs">
-                Resize or adjust quality first, then use A/B compare to see the
-                difference vs. the original.
-              </p>
-            </TooltipContent>
-          )}
-        </Tooltip>
 
         <hr className="border-theme-sidebar-border" />
 
@@ -412,6 +388,39 @@ export function ResizeSettings({
             />
           </div>
         </div>
+
+        {/* ── A/B Compare ── */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <button
+                onClick={onToggleCompare}
+                disabled={compareDisabled}
+                className={[
+                  "flex items-center gap-3 w-full p-3 rounded-lg transition-all",
+                  "text-xs font-black uppercase tracking-widest",
+                  compareActive
+                    ? "bg-theme-primary/15 ring-1 ring-theme-primary/40 text-theme-primary"
+                    : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground",
+                  compareDisabled
+                    ? "opacity-40 cursor-not-allowed"
+                    : "cursor-pointer",
+                ].join(" ")}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                {compareActive ? "Hide A/B Compare" : "Show A/B Compare"}
+              </button>
+            </div>
+          </TooltipTrigger>
+          {compareDisabled && (
+            <TooltipContent side="bottom" className="max-w-[220px] text-center">
+              <p className="text-xs">
+                Resize or adjust quality first, then use A/B compare to see the
+                difference vs. the original.
+              </p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
 
       {/* ── Bottom Buttons ── */}

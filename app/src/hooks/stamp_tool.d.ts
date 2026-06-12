@@ -6,9 +6,11 @@ declare module "stamp_tool" {
 
   /**
    * Web-performance indicators for the Resize & Compress panel.
-   * Returns `[lighthouseScore, webPerformanceGain]`, both 0..100.
-   * The Lighthouse score is byte-aware (log-normal on the projected
-   * delivered size), so a big, uncompressed image scores low.
+   * Returns `[pageSpeedScore, webPerformanceGain]`, both 0..100.
+   * Byte-aware (log-normal on the projected delivered size) and
+   * PSI-audit-aware: format codes (0=png 1=jpeg 2=webp 3=avif, other=neutral)
+   * model the "next-gen formats" audit, and output wider than 1920px accrues
+   * a "properly size images" score penalty.
    */
   export function web_perf_metrics(
     curW: number,
@@ -18,6 +20,8 @@ declare module "stamp_tool" {
     newW: number,
     newH: number,
     quality: number,
+    curFormat: number,
+    newFormat: number,
   ): Float64Array;
 
   /**

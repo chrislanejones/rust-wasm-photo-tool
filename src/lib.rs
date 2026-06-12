@@ -55,12 +55,20 @@ pub fn photo_limit(tier: &str) -> u32 {
 ///   A freshly uploaded, untouched photo reads `+0%`; resizing, lowering
 ///   quality, or running Auto Compress (which shrinks `cur_bytes`) all push it
 ///   up.
-/// - **Lighthouse Score** — a Google-Lighthouse-style score derived from the
+/// - **PageSpeed Insights Score** — a Google-PSI-style score derived from the
 ///   *projected delivered byte size*, mapped through a log-normal curve (the
-///   same curve family Lighthouse uses to score its metrics). A big, still
-///   uncompressed image scores low; resizing or lowering quality shrinks the
-///   projected bytes and pushes the score up — mirroring Lighthouse's
-///   "properly size images" and "efficiently encode images" audits.
+///   same curve family Lighthouse uses to score its metrics), then adjusted
+///   for the three image audits PSI actually runs:
+///   - "Efficiently encode images" — the byte projection scales with quality.
+///   - "Serve images in next-gen formats" — `cur_format`/`new_format` fold the
+///     typical compression ratio of the target codec into the projection
+///     (PNG photos ≈ 2.6× JPEG, WebP ≈ 0.8×, AVIF ≈ 0.6×), so switching the
+///     Format dropdown to WebP/AVIF raises the score like PSI's audit would.
+///   - "Properly size images" — output wider than 1920 px (the widest common
+///     desktop display) accrues a linear penalty: those pixels can't be seen
+///     and PSI flags them as pure waste.
+///
+/// Format codes: 0 = PNG, 1 = JPEG, 2 = WebP, 3 = AVIF, other = unknown (1.0).
 ///
 /// `cur_bytes` is the current on-disk size of the active photo and `orig_bytes`
 /// the immutable size at upload. Passing `0` for either (size unknown) yields a
@@ -74,15 +82,43 @@ pub fn web_perf_metrics(
     new_w: u32,
     new_h: u32,
     quality: u32,
+    cur_format: u8,
+    new_format: u8,
 ) -> Vec<f64> {
     let cur_area = (cur_w as f64) * (cur_h as f64);
     let new_area = (new_w as f64) * (new_h as f64);
     let area_ratio = if cur_area > 0.0 { new_area / cur_area } else { 1.0 };
     let quality_ratio = (quality as f64 / 100.0).clamp(0.0, 1.0);
 
+    // Typical photographic bytes-per-pixel relative to JPEG at equal visual
+    // quality. Grounded in Lighthouse's "next-gen formats" savings estimates
+    // (WebP ~25-34% smaller than JPEG, AVIF ~40-50%) and PNG's 2-4× cost for
+    // photos.
+    fn format_weight(code: u8) -> f64 {
+        match code {
+            0 => 2.6,  // PNG
+            1 => 1.0,  // JPEG
+            2 => 0.8,  // WebP
+            3 => 0.6,  // AVIF
+            _ => 1.0,  // unknown
+        }
+    }
+    let format_ratio = format_weight(new_format) / format_weight(cur_format);
+
     // Estimated delivered size after the pending resize + re-encode, on top of
     // whatever the current file already is (e.g. after Auto Compress).
-    let projected_bytes = (cur_bytes * area_ratio * quality_ratio).max(0.0);
+    let projected_bytes =
+        (cur_bytes * area_ratio * quality_ratio * format_ratio).max(0.0);
+
+    // "Properly size images": pixels beyond a 1920px-wide display are waste.
+    // Score-only penalty (the bytes still ship, so savings stays honest).
+    // Linear (not quadratic) so 4K originals are nudged, not cliffed.
+    const MAX_USEFUL_WIDTH: f64 = 1920.0;
+    let scored_bytes = if (new_w as f64) > MAX_USEFUL_WIDTH {
+        projected_bytes * (new_w as f64 / MAX_USEFUL_WIDTH)
+    } else {
+        projected_bytes
+    };
 
     // Byte savings vs. the *original upload*, so progress accumulates across
     // resize, quality and Auto Compress instead of resetting to the current file.
@@ -94,7 +130,7 @@ pub fn web_perf_metrics(
 
     let score = if cur_bytes > 0.0 {
         // Unknown source size → don't pretend the image is perfectly optimized.
-        lighthouse_score(projected_bytes)
+        lighthouse_score(scored_bytes)
     } else {
         0.0
     };

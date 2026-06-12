@@ -1318,6 +1318,7 @@ export function AppShell() {
             imageWidth={stamp.state.width}
             imageHeight={stamp.state.height}
             currentByteSize={activeEntry?.byteSize ?? 0}
+            currentMime={activeEntry?.mimeType}
             originalByteSize={activeEntry?.originalByteSize ?? 0}
             activePhotoId={activePhotoId}
             undoCount={stamp.state.undoCount}

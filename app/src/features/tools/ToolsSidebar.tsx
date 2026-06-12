@@ -57,6 +57,7 @@ interface ToolsSidebarProps {
   imageWidth: number;
   imageHeight: number;
   currentByteSize: number;
+  currentMime?: string;
   originalByteSize: number;
   activePhotoId: string | null;
   /** WASM undo count of the active photo (used to re-sync Effects sliders). */
@@ -134,6 +135,7 @@ export function ToolsSidebar({
   imageWidth,
   imageHeight,
   currentByteSize,
+  currentMime,
   originalByteSize,
   activePhotoId,
   undoCount,
@@ -218,6 +220,7 @@ export function ToolsSidebar({
             imageWidth={imageWidth}
             imageHeight={imageHeight}
             currentByteSize={currentByteSize}
+            currentMime={currentMime}
             originalByteSize={originalByteSize}
             activePhotoId={activePhotoId}
             quality={quality}
