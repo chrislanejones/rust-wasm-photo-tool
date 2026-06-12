@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { History, RotateCcw, X } from "lucide-react";
 import { slideFromRight } from "@/lib/animations";
 import { TinyButton } from "@/components/ui/tiny-button";
+import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import type { HistoryEntry } from "@/hooks/useCloneStamp";
 
 interface Props {
@@ -28,11 +29,11 @@ export function HistoryPanel({
       className="history-panel"
     >
       <div className="panel-header">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <History className="h-4 w-4" />
+        <h2 className="flex items-center gap-2 text-xs font-semibold">
+          <History className="h-3.5 w-3.5" />
           History
         </h2>
-        <span className="panel-count">{history.length}</span>
+        <TinyNumberBox>{history.length}</TinyNumberBox>
         <TinyButton
           onClick={onClear}
           title="Clear history"

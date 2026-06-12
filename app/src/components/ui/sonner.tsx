@@ -5,9 +5,12 @@ export function Toaster(props: React.ComponentProps<typeof SonnerToaster>) {
     <SonnerToaster
       theme="dark"
       position="top-center"
+      offset={80}
       closeButton
+      duration={4000}
       toastOptions={{
         unstyled: true,
+        duration: 4000,
         classNames: {
           // High-contrast surface so toasts pop off the near-black canvas:
           // a lighter elevated background, a bright hairline border, and a

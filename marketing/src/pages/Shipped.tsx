@@ -26,6 +26,23 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.9",
+    date: "2026-07",
+    headline: "Non-destructive text + speech bubbles + AI panel",
+    entries: [
+      { tag: "feature", text: "Live text annotations — text never commits to canvas pixels until export. Click an existing text on the canvas to re-open the input box with its content, font, color, and rotation; submit updates in place." },
+      { tag: "feature", text: "Text Background tab — add a rounded rectangle behind any text, or wrap it in a speech bubble with a tail (5 directions). Background color, padding, corner radius, and opacity sliders." },
+      { tag: "rust",    text: "Eight new wasm-bindgen exports drive the annotation system: add / update / remove / hit-test / count / get-json / render-with / flatten — display always blits through render_with_annotations when count > 0." },
+      { tag: "rust",    text: "drawing::fill_rounded_rect — anti-aliased rounded fill via per-pixel distance test; drawing::fill_triangle_public renders speech-bubble tails. The whole bubble rotates together (not just the text)." },
+      { tag: "ui",      text: "Line-and-dot handles — stem + filled circle for both move (native cursor) and rotate (custom data-URI SVG cursor with stacked black-outer + white-inner strokes for visibility on any background)." },
+      { tag: "ui",      text: "Sticky text input — the editing box no longer closes when you click a color swatch or font dropdown. Document-level pointerdown listener only commits on clicks truly outside the editing surface." },
+      { tag: "feature", text: "Text Extract removed and repositioned — Tesseract.js dependency dropped, Rust extract_region_png removed. The feature now lives in a new AI tool panel as a Coming Soon card alongside Background Removal, 4× Upscale, and Object Removal." },
+      { tag: "ui",      text: "Unified ColorSwatchGrid — Paint, Shapes, Arrows, and Text Background tabs all share the same palette and custom-colors list (localStorage-persisted via useUserColors, parsed by Rust parse_color)." },
+      { tag: "infra",   text: "Annotation persistence v2 — IDB SavedEdit gained an annotations field, and the Convex binary archive bumped to v2 with trailing JSON (v1 still decodes for back-compat)." },
+      { tag: "feature", text: "Gallery multi-select — checkboxes appear on hover and stay visible once at least one is selected; a Delete N selected action surfaces in the gallery header." },
+    ],
+  },
+  {
     version: "v0.9.8",
     date: "2026-06",
     headline: "Smart export, batch text, and a unified button system",

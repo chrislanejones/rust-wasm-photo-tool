@@ -87,6 +87,20 @@ export function TopBar({
     return () => document.removeEventListener("mousedown", handler);
   }, [formatOpen]);
 
+  // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
+  // is tight: always under 1000px, and under 1200px when both side panels
+  // (toolbar + history) are open and eating the horizontal room.
+  const [winWidth, setWinWidth] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth : 1280,
+  );
+  useEffect(() => {
+    const onResize = () => setWinWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const compact =
+    winWidth < 1000 || (winWidth < 1200 && showTools && showHistory);
+
   const toggleButtons = [
     {
       key: "U",
@@ -186,9 +200,11 @@ export function TopBar({
                   >
                     <ZoomOut className="h-4 w-4" />
                   </button>
-                  <span className="hidden min-[1000px]:inline text-xs font-medium font-mono w-12 text-center tabular-nums text-text-primary">
-                    {Math.round(zoom * 100)}%
-                  </span>
+                  {!compact && (
+                    <span className="text-xs font-medium font-mono w-12 text-center tabular-nums text-text-primary">
+                      {Math.round(zoom * 100)}%
+                    </span>
+                  )}
                   <button
                     onClick={onZoomIn}
                     disabled={zoom >= 4}
@@ -223,7 +239,7 @@ export function TopBar({
                           }`}
                         >
                           <Icon className="h-3.5 w-3.5" />
-                          <span className="hidden min-[1000px]:inline">{label}</span>
+                          {!compact && <span>{label}</span>}
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">

@@ -28,6 +28,8 @@ interface ResizeSettingsProps {
   onAutoCompress: () => void;
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
+  /** Number of selected gallery photos; >0 switches to "Compress Selected". */
+  selectedCount: number;
 }
 
 function trafficColor(score: number) {
@@ -51,6 +53,7 @@ export function ResizeSettings({
   hasBeenModified,
   onAutoCompress,
   isCompressing,
+  selectedCount,
 }: ResizeSettingsProps) {
   const [width, setWidth] = useState(String(imageWidth));
   const [height, setHeight] = useState(String(imageHeight));
@@ -297,7 +300,11 @@ export function ResizeSettings({
           className="w-full"
         >
           <Zap className="h-4 w-4" />
-          {isCompressing ? "Compressing…" : "Auto Compress All Images"}
+          {isCompressing
+            ? "Compressing…"
+            : selectedCount > 0
+              ? "Auto Compress Selected Images"
+              : "Auto Compress All Images"}
         </LargeButton>
       </div>
     </div>

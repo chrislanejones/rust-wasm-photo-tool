@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
-import { X, Image, Check, Zap, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { X, Image, Check, Zap, ChevronLeft, ChevronRight, Trash2, Download } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LargeButton } from "@/components/ui/large-button";
 import { TinyButton } from "@/components/ui/tiny-button";
+import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { formatBytes } from "@/lib/format";
 
 export interface PhotoEntry {
@@ -39,6 +40,14 @@ interface Props {
   maxPhotos?: number;
   /** Remove every photo from the gallery. */
   onDeleteAll?: () => void;
+  /** Remove the currently-selected photos. */
+  onDeleteSelected?: () => void;
+  /** Export the currently-selected photos as a ZIP. */
+  onExportSelected?: () => void;
+  /** Currently-selected photo ids (lifted to the parent). */
+  selectedIds: Set<string>;
+  /** Toggle a photo's selection. */
+  onToggleSelect: (id: string) => void;
 }
 
 interface ThumbProps {
@@ -50,11 +59,17 @@ interface ThumbProps {
   progress?: number;
   savings?: { savingsPercent: number };
   isModified?: boolean;
+  /** Whether this thumb is checked in the multi-select. */
+  selected: boolean;
+  /** True once at least one photo is selected — keeps checkboxes always visible. */
+  selectionActive: boolean;
+  /** Toggle this thumb's checkbox. */
+  onToggleSelect: () => void;
 }
 
 const TRANSPARENT_TYPES = new Set(["image/png", "image/webp", "image/svg+xml"]);
 
-function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified }: ThumbProps) {
+function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect }: ThumbProps) {
   const [loading, setLoading] = useState(true);
   const [thumbUrl, setThumbUrl] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
@@ -83,7 +98,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       <TooltipTrigger asChild>
         <motion.div
           data-id={entry.id}
-          className={`photo-thumb ${isActive ? "active" : ""} relative`}
+          className={`photo-thumb group ${isActive ? "active" : ""} ${selected ? "selected" : ""} relative`}
           onClick={onSelect}
           {...thumbEnter(index)}
         >
@@ -124,7 +139,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
               className="absolute inset-0 bg-emerald-500/20 transition-all duration-300 ease-out"
               style={{ clipPath: `inset(0 0 ${100 - (progress ?? 0)}% 0)` }}
             />
-            <span className="relative z-20 text-white text-xs font-bold font-mono drop-shadow-lg tabular-nums">
+            <span className="relative z-20 text-white text-lg font-bold font-mono drop-shadow-lg tabular-nums">
               {progress}%
             </span>
           </motion.div>
@@ -168,12 +183,28 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         <div className="photo-thumb-modified" />
       )}
 
+      {/* Remove — bottom-left, same rounded-square shape as the checkbox, red.
+          Shown on hover only. */}
       <button
-        className="photo-thumb-remove"
-        title="Remove"
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        title="Remove"
+        className="absolute bottom-1 left-1 z-30 flex h-5 w-5 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition-all"
       >
         <Trash2 className="h-3 w-3" />
+      </button>
+
+      {/* Multi-select checkbox — bottom-right; shows on hover, and stays
+          visible for every thumb once a selection has started. */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+        title={selected ? "Deselect" : "Select"}
+        className={`absolute bottom-1 right-1 z-30 flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
+          selected
+            ? "bg-accent border-accent text-white opacity-100"
+            : "bg-black/50 border-white/70 text-transparent"
+        } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+      >
+        <Check className="h-3 w-3" />
       </button>
         </motion.div>
       </TooltipTrigger>
@@ -198,8 +229,13 @@ export function GalleryBar({
   modifiedPhotos,
   maxPhotos,
   onDeleteAll,
+  onDeleteSelected,
+  onExportSelected,
+  selectedIds,
+  onToggleSelect,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
+  const selectionActive = selectedIds.size > 0;
 
   // Overflow-aware arrow state. Each arrow is enabled only when the strip can
   // actually scroll that way. When all thumbs fit (e.g. desktop, ≤12 photos)
@@ -255,14 +291,46 @@ export function GalleryBar({
       >
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="flex items-center gap-2 text-base font-semibold">
-              <Image className="h-4 w-4" />
+            <h2 className="flex items-center gap-2 text-xs font-semibold">
+              <Image className="h-3.5 w-3.5" />
               Gallery
-              <span className="text-xs text-text-muted">
-                ({photos.length}{maxPhotos ? ` / ${maxPhotos}` : ""})
+              <span className="flex items-center gap-1 text-xs font-normal text-text-muted">
+                {selectionActive && (
+                  <>
+                    <TinyNumberBox>{selectedIds.size}</TinyNumberBox>
+                    <span>of</span>
+                  </>
+                )}
+                <TinyNumberBox>{photos.length}</TinyNumberBox>
+                {maxPhotos != null && (
+                  <>
+                    <span>/</span>
+                    <TinyNumberBox>{maxPhotos}</TinyNumberBox>
+                  </>
+                )}
               </span>
             </h2>
             <div className="flex items-center gap-1">
+              {selectionActive && onExportSelected && (
+                <LargeButton
+                  onClick={onExportSelected}
+                  title="Export selected images"
+                  className="px-2.5 py-1.5 text-xs"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Export Selected</span>
+                </LargeButton>
+              )}
+              {selectionActive && onDeleteSelected && (
+                <LargeButton
+                  onClick={onDeleteSelected}
+                  title="Delete selected images"
+                  className="px-2.5 py-1.5 text-xs"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Delete Selected</span>
+                </LargeButton>
+              )}
               {onDeleteAll && (
                 <LargeButton
                   onClick={onDeleteAll}
@@ -305,6 +373,9 @@ export function GalleryBar({
                   progress={compressionProgress?.[entry.id]}
                   savings={compressionSavings?.[entry.id]}
                   isModified={modifiedPhotos?.has(entry.id)}
+                  selected={selectedIds.has(entry.id)}
+                  selectionActive={selectionActive}
+                  onToggleSelect={() => onToggleSelect(entry.id)}
                 />
               ))}
             </div>

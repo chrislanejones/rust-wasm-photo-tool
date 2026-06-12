@@ -439,6 +439,66 @@ export function AppShell() {
     [activePhotoId, loadPhotoFromEntry, deletePhotoEdit],
   );
 
+  // Bulk delete from the gallery multi-select.
+  // ── Gallery multi-select (lifted here so Compress/Export can use it) ────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelectPhoto = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  // Drop selections for photos that no longer exist.
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const ids = new Set(photos.map((p) => p.id));
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((id) => (ids.has(id) ? next.add(id) : (changed = true)));
+      return changed ? next : prev;
+    });
+  }, [photos]);
+
+  const handleDeleteSelected = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    ids.forEach((id) => {
+      deletePhotoEdit(id).catch(() => {});
+    });
+    setImageSavings((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => delete next[id]);
+      return next;
+    });
+    setModifiedPhotos((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+    setPhotos((prev) => {
+      const next = prev.filter((p) => !idSet.has(p.id));
+      if (activePhotoId && idSet.has(activePhotoId)) {
+        if (next.length > 0) {
+          const na = next[0]!;
+          void loadPhotoFromEntry(na);
+          setActivePhotoId(na.id);
+        } else {
+          setActivePhotoId(null);
+        }
+        setHasBeenModified(false);
+        setCompareActive(false);
+      }
+      return next;
+    });
+    clearSelection();
+  }, [selectedIds, activePhotoId, loadPhotoFromEntry, deletePhotoEdit, clearSelection]);
+
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
   const [showTools, setShowTools] = useState(false);
@@ -805,6 +865,11 @@ export function AppShell() {
       }
       setHasBeenModified(true);
       if (activePhotoId) {
+        setModifiedPhotos((prev) =>
+          prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
+        );
+      }
+      if (activePhotoId) {
         const areaRatio = origW * origH > 0 ? (w * h) / (origW * origH) : 1;
         const qualityRatio = quality / 100;
         const savingsPercent = Math.max(
@@ -823,10 +888,15 @@ export function AppShell() {
   );
 
   const handleAutoCompress = useCallback(async () => {
+    // Compress the selected images when there's a selection, otherwise all.
+    const targets =
+      selectedIds.size > 0
+        ? photos.filter((p) => selectedIds.has(p.id))
+        : photos;
     // Load originals from IndexedDB to build File objects for the compress hook
     const photosForCompress = (
       await Promise.all(
-        photos.map(async (p) => {
+        targets.map(async (p) => {
           const orig = await getOriginal(p.originalKey);
           if (!orig) return null;
           return { id: p.id, file: new File([orig.bytes], orig.name, { type: orig.mimeType }) };
@@ -864,7 +934,7 @@ export function AppShell() {
     // NOTE: intentionally does NOT set `hasBeenModified` — Auto Compress is a
     // batch op over stored files and must not light the active photo's modified
     // dot. Its result is tracked separately via `imageSavings`.
-  }, [photos, quality, exportFormat, compressAll]);
+  }, [photos, selectedIds, quality, exportFormat, compressAll]);
 
   // Track per-photo modification state. Any single-image edit marks the active
   // photo with the "modified" dot immediately: canvas edits bump the WASM undo
@@ -872,7 +942,10 @@ export function AppShell() {
   // touch stored files (not the live canvas / `hasBeenModified`), so they never
   // light the dot here.
   useEffect(() => {
-    if (activePhotoId && (hasBeenModified || stamp.state.undoCount > 0)) {
+    // Only light the "altered" dot for *applied* canvas edits (which bump the
+    // WASM undo count) — not for transient control changes like dragging the
+    // quality slider (which only sets `hasBeenModified` pending an apply).
+    if (activePhotoId && stamp.state.undoCount > 0) {
       setModifiedPhotos((prev) => {
         if (prev.has(activePhotoId)) return prev;
         const next = new Set(prev);
@@ -880,7 +953,7 @@ export function AppShell() {
         return next;
       });
     }
-  }, [hasBeenModified, activePhotoId, stamp.state.undoCount]);
+  }, [activePhotoId, stamp.state.undoCount]);
 
   // Persist compression savings
   useEffect(() => {
@@ -905,13 +978,13 @@ export function AppShell() {
     if (running) {
       compressTotalRef.current = total;
       const node = (
-        <div className="w-full min-w-[180px]">
-          <div className="mb-1.5 text-sm font-medium">
-            Compressing {completed}/{total}…
+        <div className="flex w-full min-w-[200px] flex-col gap-1.5">
+          <div className="text-center text-sm font-medium">
+            Compressing {completed} / {total}…
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/15">
             <div
-              className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-300"
+              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-[width] duration-300 ease-out"
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -924,15 +997,20 @@ export function AppShell() {
       }
     } else if (compressToastRef.current != null) {
       const n = compressTotalRef.current;
+      // Dismiss the infinite-duration loading toast and raise a fresh success
+      // toast so it gets its own auto-dismiss timer (updating the loading toast
+      // in place keeps its Infinity duration and never expires).
+      toast.dismiss(compressToastRef.current);
       toast.success(`Compressed ${n} image${n === 1 ? "" : "s"}`, {
-        id: compressToastRef.current,
+        duration: 3000,
       });
       compressToastRef.current = null;
     }
   }, [compressProgress]);
 
-  const handleExportAll = useCallback(async () => {
-    if (photos.length === 0) return;
+  const exportPhotosToZip = useCallback(
+    async (list: PhotoEntry[], filename: string) => {
+    if (list.length === 0) return;
 
     // Persist the active photo's in-progress edits so every photo reads
     // uniformly from the edit store below.
@@ -955,7 +1033,7 @@ export function AppShell() {
     const zip = new JSZip();
     const usedNames = new Set<string>();
 
-    for (const photo of photos) {
+    for (const photo of list) {
       let blob: Blob;
       let ext: string;
 
@@ -995,21 +1073,34 @@ export function AppShell() {
     const url = URL.createObjectURL(out);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "photos.zip";
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-  }, [
-    photos,
-    activePhotoId,
-    hasBeenModified,
-    stamp,
-    exportFormat,
-    quality,
-    modifiedPhotos,
-    imageSavings,
-    loadPhotoEdit,
-    savePhotoEdit,
-  ]);
+    },
+    [
+      activePhotoId,
+      hasBeenModified,
+      stamp,
+      exportFormat,
+      quality,
+      modifiedPhotos,
+      imageSavings,
+      loadPhotoEdit,
+      savePhotoEdit,
+    ],
+  );
+
+  const handleExportAll = useCallback(
+    () => exportPhotosToZip(photos, "photos.zip"),
+    [exportPhotosToZip, photos],
+  );
+
+  const handleExportSelected = useCallback(() => {
+    void exportPhotosToZip(
+      photos.filter((p) => selectedIds.has(p.id)),
+      "selected-photos.zip",
+    );
+  }, [exportPhotosToZip, photos, selectedIds]);
 
   useKeyboardShortcuts({
     onUndo: stamp.undo,
@@ -1164,6 +1255,7 @@ export function AppShell() {
             onAutoCompress={handleAutoCompress}
             isCompressing={compressProgress.running}
             compressProgress={compressProgress}
+            selectedCount={selectedIds.size}
             onApplyCrop={drawingTools.applyCrop}
             onSetCropSelection={drawingTools.setCropSelection}
             cropRatio={cropRatio}
@@ -1437,6 +1529,10 @@ export function AppShell() {
             modifiedPhotos={modifiedPhotos}
             maxPhotos={maxPhotos}
             onDeleteAll={handleDeleteAll}
+            onDeleteSelected={handleDeleteSelected}
+            onExportSelected={handleExportSelected}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelectPhoto}
           />
         )}
       </AnimatePresence>

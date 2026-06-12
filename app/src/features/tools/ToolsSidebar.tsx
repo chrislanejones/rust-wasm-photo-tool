@@ -68,6 +68,8 @@ interface ToolsSidebarProps {
   onAutoCompress: () => void;
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
+  /** Number of gallery photos currently selected (drives "Compress Selected"). */
+  selectedCount: number;
   onApplyCrop?: () => void;
   /** Allows the Crop tool ratio buttons to drop a centred crop selection
    *  computed in Rust. Optional — omit to disable ratio buttons. */
@@ -141,6 +143,7 @@ export function ToolsSidebar({
   onAutoCompress,
   isCompressing,
   compressProgress,
+  selectedCount,
   onApplyCrop,
   onSetCropSelection,
   cropRatio,
@@ -184,8 +187,8 @@ export function ToolsSidebar({
       }}
     >
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Wrench className="h-4 w-4" />
+        <h2 className="flex items-center gap-2 text-xs font-semibold">
+          <Wrench className="h-3.5 w-3.5" />
           Toolbar
         </h2>
         <TinyButton onClick={onClose} title="Close toolbar">
@@ -224,6 +227,7 @@ export function ToolsSidebar({
             onAutoCompress={onAutoCompress}
             isCompressing={isCompressing}
             compressProgress={compressProgress}
+            selectedCount={selectedCount}
           />
         )}
 
