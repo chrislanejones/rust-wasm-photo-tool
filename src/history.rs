@@ -11,6 +11,8 @@
 /// whatever text boxes are currently active, and undoing an "Add Text" step
 /// must remove the annotation that step introduced.
 
+use std::collections::VecDeque;
+
 use crate::TextAnnotation;
 
 pub const MAX_HISTORY: usize = 50;
@@ -24,14 +26,14 @@ pub struct Snapshot {
 }
 
 pub struct History {
-    pub undo_stack: Vec<Snapshot>,
+    pub undo_stack: VecDeque<Snapshot>,
     pub redo_stack: Vec<Snapshot>,
 }
 
 impl History {
     pub fn new() -> Self {
         Self {
-            undo_stack: Vec::new(),
+            undo_stack: VecDeque::new(),
             redo_stack: Vec::new(),
         }
     }
@@ -46,7 +48,7 @@ impl History {
         height: u32,
         annotations: Vec<TextAnnotation>,
     ) {
-        self.undo_stack.push(Snapshot {
+        self.undo_stack.push_back(Snapshot {
             label: label.to_string(),
             data: current_data.to_vec(),
             width,
@@ -54,7 +56,7 @@ impl History {
             annotations,
         });
         if self.undo_stack.len() > MAX_HISTORY {
-            self.undo_stack.remove(0);
+            self.undo_stack.pop_front();
         }
         self.redo_stack.clear();
     }
@@ -68,7 +70,7 @@ impl History {
         current_h: u32,
         current_annotations: Vec<TextAnnotation>,
     ) -> Option<(Vec<u8>, u32, u32, Vec<TextAnnotation>)> {
-        if let Some(snap) = self.undo_stack.pop() {
+        if let Some(snap) = self.undo_stack.pop_back() {
             self.redo_stack.push(Snapshot {
                 label: snap.label.clone(),
                 data: current_data.to_vec(),
@@ -92,7 +94,7 @@ impl History {
         current_annotations: Vec<TextAnnotation>,
     ) -> Option<(Vec<u8>, u32, u32, Vec<TextAnnotation>)> {
         if let Some(snap) = self.redo_stack.pop() {
-            self.undo_stack.push(Snapshot {
+            self.undo_stack.push_back(Snapshot {
                 label: snap.label.clone(),
                 data: current_data.to_vec(),
                 width: current_w,

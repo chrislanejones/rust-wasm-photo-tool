@@ -22,15 +22,15 @@ pub fn adjust_contrast(data: &mut [u8], factor: f64) {
 
 /// Build a 1D Gaussian kernel of the given radius.
 /// Kernel size = 2*radius + 1.
-fn build_gaussian_kernel(radius: u32) -> Vec<f64> {
+pub fn build_gaussian_kernel(radius: u32) -> Vec<f32> {
     let r = radius as i32;
-    let sigma = (radius as f64).max(1.0) / 2.0;
+    let sigma = (radius as f32).max(1.0) / 2.0;
     let two_sigma_sq = 2.0 * sigma * sigma;
     let mut kernel = Vec::with_capacity((2 * r + 1) as usize);
-    let mut sum = 0.0;
+    let mut sum = 0.0_f32;
 
     for i in -r..=r {
-        let val = (-(i * i) as f64 / two_sigma_sq).exp();
+        let val = (-(i * i) as f32 / two_sigma_sq).exp();
         kernel.push(val);
         sum += val;
     }
@@ -60,11 +60,11 @@ pub fn gaussian_blur_region(
     intensity: u32,
     scratch_a: &mut Vec<u8>,
     scratch_b: &mut Vec<u8>,
+    kernel: &[f32],
 ) {
     let w = width as i32;
     let h = height as i32;
     let kr = intensity.clamp(1, 30) as i32;
-    let kernel = build_gaussian_kernel(intensity.clamp(1, 30));
 
     // Bounding box of the brush circle
     let min_x = ((cx - brush_radius).floor() as i32).max(0);
@@ -98,19 +98,19 @@ pub fn gaussian_blur_region(
     let h_pass = &mut scratch_b[..needed];
     for ry in 0..bh {
         for rx in 0..bw {
-            let mut r = 0.0f64;
-            let mut g = 0.0f64;
-            let mut b = 0.0f64;
-            let mut a = 0.0f64;
+            let mut r = 0.0f32;
+            let mut g = 0.0f32;
+            let mut b = 0.0f32;
+            let mut a = 0.0f32;
 
             for ki in -kr..=kr {
                 let sx = (rx as i32 + ki).clamp(0, bw as i32 - 1) as usize;
                 let si = (ry * bw + sx) * 4;
                 let weight = kernel[(ki + kr) as usize];
-                r += region[si]     as f64 * weight;
-                g += region[si + 1] as f64 * weight;
-                b += region[si + 2] as f64 * weight;
-                a += region[si + 3] as f64 * weight;
+                r += region[si]     as f32 * weight;
+                g += region[si + 1] as f32 * weight;
+                b += region[si + 2] as f32 * weight;
+                a += region[si + 3] as f32 * weight;
             }
 
             let di = (ry * bw + rx) * 4;
@@ -124,19 +124,19 @@ pub fn gaussian_blur_region(
     // Pass 2: Vertical blur from h_pass into region
     for ry in 0..bh {
         for rx in 0..bw {
-            let mut r = 0.0f64;
-            let mut g = 0.0f64;
-            let mut b = 0.0f64;
-            let mut a = 0.0f64;
+            let mut r = 0.0f32;
+            let mut g = 0.0f32;
+            let mut b = 0.0f32;
+            let mut a = 0.0f32;
 
             for ki in -kr..=kr {
                 let sy = (ry as i32 + ki).clamp(0, bh as i32 - 1) as usize;
                 let si = (sy * bw + rx) * 4;
                 let weight = kernel[(ki + kr) as usize];
-                r += h_pass[si]     as f64 * weight;
-                g += h_pass[si + 1] as f64 * weight;
-                b += h_pass[si + 2] as f64 * weight;
-                a += h_pass[si + 3] as f64 * weight;
+                r += h_pass[si]     as f32 * weight;
+                g += h_pass[si + 1] as f32 * weight;
+                b += h_pass[si + 2] as f32 * weight;
+                a += h_pass[si + 3] as f32 * weight;
             }
 
             let di = (ry * bw + rx) * 4;

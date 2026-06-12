@@ -159,7 +159,9 @@ pub struct TextAnnotation {
     pub bold: bool,
     pub rotation_deg: f64,
     // cached pre-rendered tile (rotated): updated whenever the annotation changes.
-    pub tile_pixels: Vec<u8>,
+    // Arc so history snapshots can clone the annotation list cheaply (the tile
+    // bytes are shared, not deep-copied per snapshot).
+    pub tile_pixels: std::sync::Arc<Vec<u8>>,
     pub tile_w: u32,
     pub tile_h: u32,
     pub tile_offset_x: i32,  // offset of tile origin from (x,y) due to rotation expanding bounds
@@ -181,6 +183,10 @@ pub struct ImageHorseTool {
     // Scratch buffers reused across blur_region calls to avoid per-stroke allocation.
     blur_scratch_a: Vec<u8>,
     blur_scratch_b: Vec<u8>,
+    // Cached Gaussian kernel keyed on intensity — blur strokes call into us
+    // many times per second with the same intensity, so rebuilding the kernel
+    // on every dab is wasted work.
+    blur_kernel_cache: Option<(u32, Vec<f32>)>,
     text_annotations: Vec<TextAnnotation>,
     next_text_id: u32,
 }
@@ -240,7 +246,7 @@ fn build_text_annotation(
         r, g, b,
         bold,
         rotation_deg,
-        tile_pixels,
+        tile_pixels: std::sync::Arc::new(tile_pixels),
         tile_w, tile_h,
         tile_offset_x, tile_offset_y,
         background_kind,
@@ -422,6 +428,7 @@ impl ImageHorseTool {
             zoom: 1.0,
             blur_scratch_a: Vec::new(),
             blur_scratch_b: Vec::new(),
+            blur_kernel_cache: None,
             text_annotations: Vec::new(),
             next_text_id: 1,
         }
@@ -643,7 +650,7 @@ impl ImageHorseTool {
     /// session). Annotations start empty — the JS side adds them one by one
     /// with `push_annotation_to_undo_snapshot` after this returns.
     pub fn inject_undo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
-        self.hist.undo_stack.push(Snapshot {
+        self.hist.undo_stack.push_back(Snapshot {
             label: label.to_string(),
             data: data.to_vec(),
             width: w,
@@ -925,6 +932,18 @@ impl ImageHorseTool {
         brush_radius: f64,
         intensity: u32,
     ) {
+        let clamped = intensity.clamp(1, 30);
+        // Cache the Gaussian kernel keyed on intensity — a single blur stroke
+        // hits this many times per second with the same intensity.
+        let needs_rebuild = match &self.blur_kernel_cache {
+            Some((cached_i, _)) => *cached_i != clamped,
+            None => true,
+        };
+        if needs_rebuild {
+            self.blur_kernel_cache =
+                Some((clamped, filters::build_gaussian_kernel(clamped)));
+        }
+        let kernel = &self.blur_kernel_cache.as_ref().unwrap().1;
         filters::gaussian_blur_region(
             &mut self.buf.data,
             self.buf.width,
@@ -935,6 +954,7 @@ impl ImageHorseTool {
             intensity,
             &mut self.blur_scratch_a,
             &mut self.blur_scratch_b,
+            kernel,
         );
     }
  
@@ -1163,22 +1183,36 @@ impl ImageHorseTool {
         let w = self.buf.width as i32;
         let h = self.buf.height as i32;
         let data = &mut self.buf.data;
-        let brush_alpha = opacity.clamp(0.0, 1.0);
-        let r_sq = radius * radius;
+        let brush_alpha = opacity.clamp(0.0, 1.0) as f32;
+        let r_f32 = radius as f32;
+        let r_sq = r_f32 * r_f32;
         let min_x = ((cx - radius).floor() as i32).max(0);
         let max_x = ((cx + radius).ceil() as i32).min(w - 1);
         let min_y = ((cy - radius).floor() as i32).max(0);
         let max_y = ((cy + radius).ceil() as i32).min(h - 1);
 
+        // Hoisted invariants: hardened-zone radius² (no sqrt/falloff inside)
+        // and channel locals for the source brush colour.
+        let inv_radius = if r_f32 > 0.0 { 1.0_f32 / r_f32 } else { 1.0 };
+        let hard_r = r_f32 * 0.7;
+        let hard_r_sq = hard_r * hard_r;
+        let sr = r as f32 / 255.0;
+        let sg = g as f32 / 255.0;
+        let sb = b as f32 / 255.0;
+        let cx_f32 = cx as f32;
+        let cy_f32 = cy as f32;
+
         for py in min_y..=max_y {
             for px in min_x..=max_x {
-                let dx = px as f64 - cx;
-                let dy = py as f64 - cy;
+                let dx = px as f32 - cx_f32;
+                let dy = py as f32 - cy_f32;
                 let dist_sq = dx * dx + dy * dy;
                 if dist_sq > r_sq { continue; }
-                let edge = if radius > 1.0 {
-                    let norm = dist_sq.sqrt() / radius;
-                    if norm < 0.7 { 1.0 } else {
+                let edge = if r_f32 > 1.0 {
+                    if dist_sq <= hard_r_sq {
+                        1.0
+                    } else {
+                        let norm = dist_sq.sqrt() * inv_radius;
                         let t = (norm - 0.7) / 0.3;
                         (1.0 - t * t).max(0.0)
                     }
@@ -1187,14 +1221,14 @@ impl ImageHorseTool {
                 let idx = ((py * w + px) * 4) as usize;
                 if idx + 3 >= data.len() { continue; }
                 // Porter-Duff source-over
-                let da = data[idx + 3] as f64 / 255.0;
+                let da = data[idx + 3] as f32 / 255.0;
                 let out_a = sa + da * (1.0 - sa);
                 data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
                 if out_a > 1e-6 {
+                    let src_rgb = [sr, sg, sb];
                     for c in 0..3usize {
-                        let sv = [r, g, b][c] as f64 / 255.0;
-                        let dv = data[idx + c] as f64 / 255.0;
-                        let ov = (sv * sa + dv * da * (1.0 - sa)) / out_a;
+                        let dv = data[idx + c] as f32 / 255.0;
+                        let ov = (src_rgb[c] * sa + dv * da * (1.0 - sa)) / out_a;
                         data[idx + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
                     }
                 }
@@ -1342,7 +1376,7 @@ impl ImageHorseTool {
         a.bold = bold;
         a.x = x; a.y = y;
         a.rotation_deg = rotation_deg;
-        a.tile_pixels = tile_pixels;
+        a.tile_pixels = std::sync::Arc::new(tile_pixels);
         a.tile_w = tile_w;
         a.tile_h = tile_h;
         a.tile_offset_x = tile_offset_x;
@@ -1409,7 +1443,7 @@ impl ImageHorseTool {
             transform::paste_region(
                 &mut out,
                 w, h,
-                &a.tile_pixels,
+                a.tile_pixels.as_ref(),
                 a.tile_w, a.tile_h,
                 a.x + a.tile_offset_x,
                 a.y + a.tile_offset_y,
@@ -1432,7 +1466,7 @@ impl ImageHorseTool {
             transform::paste_region(
                 &mut self.buf.data,
                 w, h,
-                &a.tile_pixels,
+                a.tile_pixels.as_ref(),
                 a.tile_w, a.tile_h,
                 a.x + a.tile_offset_x,
                 a.y + a.tile_offset_y,

@@ -4,27 +4,41 @@
 /// calls happen in the lib.rs glue layer before calling these.
 
 /// Flip the image horizontally (mirror left↔right) in-place.
+/// Swaps a 4-byte RGBA pixel as a single 32-bit unit rather than four
+/// independent u8 swaps to cut the bounds-check + writeback overhead.
 pub fn flip_horizontal(data: &mut [u8], w: usize, h: usize) {
     for y in 0..h {
+        let row_start = y * w * 4;
+        let row = &mut data[row_start..row_start + w * 4];
         for x in 0..w / 2 {
-            let a = (y * w + x) * 4;
-            let b = (y * w + (w - 1 - x)) * 4;
-            for c in 0..4 {
-                data.swap(a + c, b + c);
-            }
+            let a = x * 4;
+            let b = (w - 1 - x) * 4;
+            let tmp: [u8; 4] = row[a..a + 4].try_into().unwrap();
+            let other: [u8; 4] = row[b..b + 4].try_into().unwrap();
+            row[a..a + 4].copy_from_slice(&other);
+            row[b..b + 4].copy_from_slice(&tmp);
         }
     }
 }
 
 /// Flip the image vertically (mirror top↔bottom) in-place.
+/// Swaps whole rows via two non-overlapping mutable slices and a 4-byte
+/// pixel swap; faster than per-channel byte swaps.
 pub fn flip_vertical(data: &mut [u8], w: usize, h: usize) {
+    let row_bytes = w * 4;
     for y in 0..h / 2 {
+        let top = y * row_bytes;
+        let bot = (h - 1 - y) * row_bytes;
+        // Use split_at_mut to obtain two disjoint mutable slices.
+        let (lo, hi) = data.split_at_mut(bot);
+        let top_row = &mut lo[top..top + row_bytes];
+        let bot_row = &mut hi[..row_bytes];
         for x in 0..w {
-            let a = (y * w + x) * 4;
-            let b = ((h - 1 - y) * w + x) * 4;
-            for c in 0..4 {
-                data.swap(a + c, b + c);
-            }
+            let off = x * 4;
+            let tmp: [u8; 4] = top_row[off..off + 4].try_into().unwrap();
+            let other: [u8; 4] = bot_row[off..off + 4].try_into().unwrap();
+            top_row[off..off + 4].copy_from_slice(&other);
+            bot_row[off..off + 4].copy_from_slice(&tmp);
         }
     }
 }
@@ -124,13 +138,20 @@ pub fn paste_region(
             }
             let si = ((sy * src_w as i32 + sx) * 4) as usize;
             let di = ((dy * img_w + dx) * 4) as usize;
-            let sa = pixels[si + 3] as f64 / 255.0;
-            let da = data[di + 3] as f64 / 255.0;
+            // Opaque-source fast path: skip per-channel blending when src
+            // alpha is 255 — a memcpy of the four bytes is enough.
+            let src_alpha = pixels[si + 3];
+            if src_alpha == 255 {
+                data[di..di + 4].copy_from_slice(&pixels[si..si + 4]);
+                continue;
+            }
+            let sa = src_alpha as f32 / 255.0;
+            let da = data[di + 3] as f32 / 255.0;
             let out_a = sa + da * (1.0 - sa);
             if out_a > 1e-6 {
                 for c in 0..3 {
-                    let sv = pixels[si + c] as f64 / 255.0;
-                    let dv = data[di + c] as f64 / 255.0;
+                    let sv = pixels[si + c] as f32 / 255.0;
+                    let dv = data[di + c] as f32 / 255.0;
                     let ov = (sv * sa + dv * da * (1.0 - sa)) / out_a;
                     data[di + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
                 }
@@ -146,28 +167,28 @@ pub fn resize_bilinear(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u
     let nw = new_w.max(1);
     let nh = new_h.max(1);
     let mut out = vec![0u8; (nw * nh * 4) as usize];
-    let sx = old_w as f64 / nw as f64;
-    let sy = old_h as f64 / nh as f64;
+    let sx = old_w as f32 / nw as f32;
+    let sy = old_h as f32 / nh as f32;
 
     for ty in 0..nh {
         for tx in 0..nw {
-            let fx = (tx as f64 + 0.5) * sx - 0.5;
-            let fy = (ty as f64 + 0.5) * sy - 0.5;
+            let fx = (tx as f32 + 0.5) * sx - 0.5;
+            let fy = (ty as f32 + 0.5) * sy - 0.5;
 
             let x0 = fx.floor() as i32;
             let y0 = fy.floor() as i32;
             let frac_x = fx - fx.floor();
             let frac_y = fy - fy.floor();
 
-            let sample = |xi: i32, yi: i32| -> [f64; 4] {
+            let sample = |xi: i32, yi: i32| -> [f32; 4] {
                 let xi = xi.clamp(0, old_w as i32 - 1) as usize;
                 let yi = yi.clamp(0, old_h as i32 - 1) as usize;
                 let idx = (yi * old_w as usize + xi) * 4;
                 [
-                    data[idx] as f64,
-                    data[idx + 1] as f64,
-                    data[idx + 2] as f64,
-                    data[idx + 3] as f64,
+                    data[idx] as f32,
+                    data[idx + 1] as f32,
+                    data[idx + 2] as f32,
+                    data[idx + 3] as f32,
                 ]
             };
 
