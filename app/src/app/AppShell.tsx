@@ -38,6 +38,7 @@ import { useEditPersistence } from "@/hooks/useEditPersistence";
 import { useRecentTexts } from "@/hooks/useRecentTexts";
 import { putOriginal, getOriginal, getOriginalAsBlobUrl } from "@/lib/originalsStore";
 import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
+import type { ExportFormat } from "@/lib/exportImage";
 import { makeWorkingCopy, makeThumbnail } from "@/lib/workingCopy";
 import {
   ContextMenu,
@@ -69,8 +70,6 @@ import {
   Archive,
   ImagePlus,
 } from "lucide-react";
-
-export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
 
 /** Digit-key shortcut + label per tool (mirrors TOOL_BY_DIGIT in useKeyboardShortcuts). */
 const TOOL_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {

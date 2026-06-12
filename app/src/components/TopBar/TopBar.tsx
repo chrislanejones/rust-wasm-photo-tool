@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { ExportFormat } from "@/app/AppShell";
+import type { ExportFormat } from "@/lib/exportImage";
 import {
   Upload,
   Image,

@@ -10,7 +10,7 @@ import type {
   StampSettings as StampSettingsType,
   ToolSettings,
 } from "@/lib/types";
-import type { ExportFormat } from "@/app/AppShell";
+import type { ExportFormat } from "@/lib/exportImage";
 import type { TextMemory } from "./settings/TextSettings";
 import type { EffectsMode } from "./settings/EffectsSettings";
 import type { StampMode } from "./settings/StampSettings";
