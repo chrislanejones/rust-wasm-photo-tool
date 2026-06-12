@@ -42,6 +42,12 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const toolRef = useRef<ImageHorseTool | null>(null);
   const isDrawingRef = useRef(false);
   const sourcePosRef = useRef<{ x: number; y: number } | null>(null);
+  // WASM linear memory captured from the `init()` return so flushToCanvas can
+  // view the pixel buffer in-place (zero-copy) instead of going through
+  // get_image_data() which allocates a fresh Vec<u8> each frame. The view
+  // must be reconstructed every flush because WASM memory can grow and
+  // invalidate any previously-created view.
+  const wasmMemoryRef = useRef<WebAssembly.Memory | null>(null);
 
   const [state, setState] = useState<CloneStampState>({
     ready: false,
@@ -88,20 +94,41 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     const t = toolRef.current;
     const canvas = canvasRef.current;
     if (!t || !canvas) return;
+    const w = t.width();
+    const h = t.height();
     // Resize canvas if dimensions changed (e.g. after rotate_90_cw)
-    if (canvas.width !== t.width() || canvas.height !== t.height()) {
-      canvas.width = t.width();
-      canvas.height = t.height();
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
     }
-    const ctx = canvas.getContext("2d")!;
-    // If any live text annotations exist, render them composited on top so
-    // the display canvas matches what export would produce.
-    const pixels =
-      t.text_annotation_count() > 0
-        ? t.render_with_annotations()
-        : t.get_image_data();
+    const ctx = canvas.getContext("2d", { desynchronized: true })!;
+    // Fast path: when no live annotations, view WASM linear memory directly
+    // — no copy. The view MUST be reconstructed every call because the
+    // backing ArrayBuffer is replaced if WASM memory grows.
+    const wasmMem = wasmMemoryRef.current;
+    if (t.text_annotation_count() === 0 && wasmMem) {
+      const ptr = t.data_ptr();
+      const len = t.data_len();
+      const view = new Uint8ClampedArray(
+        wasmMem.buffer as ArrayBuffer,
+        ptr,
+        len,
+      );
+      // ImageData expects Uint8ClampedArray<ArrayBuffer>; the WASM view is
+      // typed as Uint8ClampedArray<ArrayBufferLike>. Coerce — runtime is
+      // identical, only TS narrowing differs.
+      ctx.putImageData(
+        new ImageData(view as Uint8ClampedArray<ArrayBuffer>, w, h),
+        0,
+        0,
+      );
+      return;
+    }
+    // Annotation overlay path still has to allocate (Rust composites
+    // into a fresh buffer that's then transferred to JS).
+    const composed = t.render_with_annotations();
     ctx.putImageData(
-      new ImageData(new Uint8ClampedArray(pixels), t.width(), t.height()),
+      new ImageData(new Uint8ClampedArray(composed), w, h),
       0,
       0,
     );
@@ -125,7 +152,10 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     async (file: File) => {
       const { default: init, ImageHorseTool: Tool } =
         await import("stamp_tool");
-      await init();
+      const wasmExports = (await init()) as unknown as {
+        memory: WebAssembly.Memory;
+      };
+      wasmMemoryRef.current = wasmExports.memory;
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
@@ -133,7 +163,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
         if (!canvas) return;
         canvas.width = img.width;
         canvas.height = img.height;
-        const ctx = canvas.getContext("2d")!;
+        const ctx = canvas.getContext("2d", { desynchronized: true })!;
         ctx.drawImage(img, 0, 0);
         const imageData = ctx.getImageData(0, 0, img.width, img.height);
         const tool = new Tool(img.width, img.height);
@@ -152,12 +182,15 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const loadImageFromPixels = useCallback(
     async (pixels: Uint8ClampedArray, width: number, height: number) => {
       const { default: init, ImageHorseTool: Tool } = await import("stamp_tool");
-      await init();
+      const wasmExports = (await init()) as unknown as {
+        memory: WebAssembly.Memory;
+      };
+      wasmMemoryRef.current = wasmExports.memory;
       const canvas = canvasRef.current;
       if (!canvas) return;
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext("2d")!;
+      const ctx = canvas.getContext("2d", { desynchronized: true })!;
       const clamped = new Uint8ClampedArray(pixels.buffer as ArrayBuffer);
       ctx.putImageData(new ImageData(clamped, width, height), 0, 0);
       const tool = new Tool(width, height);
@@ -177,7 +210,10 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const loadFromSaved = useCallback(
     async (saved: SavedEdit) => {
       const { default: init, ImageHorseTool: Tool } = await import("stamp_tool");
-      await init();
+      const wasmExports = (await init()) as unknown as {
+        memory: WebAssembly.Memory;
+      };
+      wasmMemoryRef.current = wasmExports.memory;
 
       // Decode current canvas PNG → raw RGBA
       const { rgba: canvasRgba } = await decodePngToRgba(saved.canvasPng);
@@ -652,6 +688,19 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [flushToCanvas, syncState],
   );
 
+  /** Resize with a selectable resampling filter (0=nearest, 1=bilinear, 2=catmull-rom, 3=lanczos3). */
+  const resizeWithFilter = useCallback(
+    (newW: number, newH: number, filter: number) => {
+      const t = toolRef.current;
+      if (!t || newW < 1 || newH < 1) return;
+      t.resize_with_filter(newW, newH, filter);
+      sourcePosRef.current = null;
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
   // ── NEW: Pixel adjustments ────────────────────────────────────────────────
   /**
    * Adjusts brightness by `delta` (−1.0 to +1.0).
@@ -735,6 +784,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     rotate90Ccw,
     crop,
     resize,
+    resizeWithFilter,
     adjustBrightness,
     adjustContrast,
     applyGlobalBlur,

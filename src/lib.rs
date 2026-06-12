@@ -55,12 +55,20 @@ pub fn photo_limit(tier: &str) -> u32 {
 ///   A freshly uploaded, untouched photo reads `+0%`; resizing, lowering
 ///   quality, or running Auto Compress (which shrinks `cur_bytes`) all push it
 ///   up.
-/// - **Lighthouse Score** — a Google-Lighthouse-style score derived from the
+/// - **PageSpeed Insights Score** — a Google-PSI-style score derived from the
 ///   *projected delivered byte size*, mapped through a log-normal curve (the
-///   same curve family Lighthouse uses to score its metrics). A big, still
-///   uncompressed image scores low; resizing or lowering quality shrinks the
-///   projected bytes and pushes the score up — mirroring Lighthouse's
-///   "properly size images" and "efficiently encode images" audits.
+///   same curve family Lighthouse uses to score its metrics), then adjusted
+///   for the three image audits PSI actually runs:
+///   - "Efficiently encode images" — the byte projection scales with quality.
+///   - "Serve images in next-gen formats" — `cur_format`/`new_format` fold the
+///     typical compression ratio of the target codec into the projection
+///     (PNG photos ≈ 2.6× JPEG, WebP ≈ 0.8×, AVIF ≈ 0.6×), so switching the
+///     Format dropdown to WebP/AVIF raises the score like PSI's audit would.
+///   - "Properly size images" — output wider than 1920 px (the widest common
+///     desktop display) accrues a linear penalty: those pixels can't be seen
+///     and PSI flags them as pure waste.
+///
+/// Format codes: 0 = PNG, 1 = JPEG, 2 = WebP, 3 = AVIF, other = unknown (1.0).
 ///
 /// `cur_bytes` is the current on-disk size of the active photo and `orig_bytes`
 /// the immutable size at upload. Passing `0` for either (size unknown) yields a
@@ -74,15 +82,43 @@ pub fn web_perf_metrics(
     new_w: u32,
     new_h: u32,
     quality: u32,
+    cur_format: u8,
+    new_format: u8,
 ) -> Vec<f64> {
     let cur_area = (cur_w as f64) * (cur_h as f64);
     let new_area = (new_w as f64) * (new_h as f64);
     let area_ratio = if cur_area > 0.0 { new_area / cur_area } else { 1.0 };
     let quality_ratio = (quality as f64 / 100.0).clamp(0.0, 1.0);
 
+    // Typical photographic bytes-per-pixel relative to JPEG at equal visual
+    // quality. Grounded in Lighthouse's "next-gen formats" savings estimates
+    // (WebP ~25-34% smaller than JPEG, AVIF ~40-50%) and PNG's 2-4× cost for
+    // photos.
+    fn format_weight(code: u8) -> f64 {
+        match code {
+            0 => 2.6,  // PNG
+            1 => 1.0,  // JPEG
+            2 => 0.8,  // WebP
+            3 => 0.6,  // AVIF
+            _ => 1.0,  // unknown
+        }
+    }
+    let format_ratio = format_weight(new_format) / format_weight(cur_format);
+
     // Estimated delivered size after the pending resize + re-encode, on top of
     // whatever the current file already is (e.g. after Auto Compress).
-    let projected_bytes = (cur_bytes * area_ratio * quality_ratio).max(0.0);
+    let projected_bytes =
+        (cur_bytes * area_ratio * quality_ratio * format_ratio).max(0.0);
+
+    // "Properly size images": pixels beyond a 1920px-wide display are waste.
+    // Score-only penalty (the bytes still ship, so savings stays honest).
+    // Linear (not quadratic) so 4K originals are nudged, not cliffed.
+    const MAX_USEFUL_WIDTH: f64 = 1920.0;
+    let scored_bytes = if (new_w as f64) > MAX_USEFUL_WIDTH {
+        projected_bytes * (new_w as f64 / MAX_USEFUL_WIDTH)
+    } else {
+        projected_bytes
+    };
 
     // Byte savings vs. the *original upload*, so progress accumulates across
     // resize, quality and Auto Compress instead of resetting to the current file.
@@ -94,7 +130,7 @@ pub fn web_perf_metrics(
 
     let score = if cur_bytes > 0.0 {
         // Unknown source size → don't pretend the image is perfectly optimized.
-        lighthouse_score(projected_bytes)
+        lighthouse_score(scored_bytes)
     } else {
         0.0
     };
@@ -159,7 +195,9 @@ pub struct TextAnnotation {
     pub bold: bool,
     pub rotation_deg: f64,
     // cached pre-rendered tile (rotated): updated whenever the annotation changes.
-    pub tile_pixels: Vec<u8>,
+    // Arc so history snapshots can clone the annotation list cheaply (the tile
+    // bytes are shared, not deep-copied per snapshot).
+    pub tile_pixels: std::sync::Arc<Vec<u8>>,
     pub tile_w: u32,
     pub tile_h: u32,
     pub tile_offset_x: i32,  // offset of tile origin from (x,y) due to rotation expanding bounds
@@ -181,6 +219,10 @@ pub struct ImageHorseTool {
     // Scratch buffers reused across blur_region calls to avoid per-stroke allocation.
     blur_scratch_a: Vec<u8>,
     blur_scratch_b: Vec<u8>,
+    // Cached Gaussian kernel keyed on intensity — blur strokes call into us
+    // many times per second with the same intensity, so rebuilding the kernel
+    // on every dab is wasted work.
+    blur_kernel_cache: Option<(u32, Vec<f32>)>,
     text_annotations: Vec<TextAnnotation>,
     next_text_id: u32,
 }
@@ -240,7 +282,7 @@ fn build_text_annotation(
         r, g, b,
         bold,
         rotation_deg,
-        tile_pixels,
+        tile_pixels: std::sync::Arc::new(tile_pixels),
         tile_w, tile_h,
         tile_offset_x, tile_offset_y,
         background_kind,
@@ -422,6 +464,7 @@ impl ImageHorseTool {
             zoom: 1.0,
             blur_scratch_a: Vec::new(),
             blur_scratch_b: Vec::new(),
+            blur_kernel_cache: None,
             text_annotations: Vec::new(),
             next_text_id: 1,
         }
@@ -643,7 +686,7 @@ impl ImageHorseTool {
     /// session). Annotations start empty — the JS side adds them one by one
     /// with `push_annotation_to_undo_snapshot` after this returns.
     pub fn inject_undo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
-        self.hist.undo_stack.push(Snapshot {
+        self.hist.undo_stack.push_back(Snapshot {
             label: label.to_string(),
             data: data.to_vec(),
             width: w,
@@ -884,17 +927,47 @@ impl ImageHorseTool {
     // ── Resize ───────────────────────────────────────────────────────────
 
     pub fn resize(&mut self, new_w: u32, new_h: u32) {
+        self.resize_with_filter(new_w, new_h, 1);
+    }
+
+    /// Resize with a selectable resampling filter.
+    /// 0 = nearest, 1 = bilinear, 2 = catmull-rom, 3 = lanczos3.
+    /// Unknown codes fall back to bilinear.
+    pub fn resize_with_filter(&mut self, new_w: u32, new_h: u32, filter: u8) {
         if new_w == 0 || new_h == 0 {
             return;
         }
         self.hist.push_snapshot("Resize", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
-        let resized = transform::resize_bilinear(
-            &self.buf.data,
-            self.buf.width,
-            self.buf.height,
-            new_w,
-            new_h,
-        );
+        let resized = match filter {
+            0 => transform::resize_nearest(
+                &self.buf.data,
+                self.buf.width,
+                self.buf.height,
+                new_w,
+                new_h,
+            ),
+            2 => transform::resize_catmull_rom(
+                &self.buf.data,
+                self.buf.width,
+                self.buf.height,
+                new_w,
+                new_h,
+            ),
+            3 => transform::resize_lanczos3(
+                &self.buf.data,
+                self.buf.width,
+                self.buf.height,
+                new_w,
+                new_h,
+            ),
+            _ => transform::resize_bilinear(
+                &self.buf.data,
+                self.buf.width,
+                self.buf.height,
+                new_w,
+                new_h,
+            ),
+        };
         self.buf.data = resized;
         self.buf.width = new_w;
         self.buf.height = new_h;
@@ -925,6 +998,18 @@ impl ImageHorseTool {
         brush_radius: f64,
         intensity: u32,
     ) {
+        let clamped = intensity.clamp(1, 30);
+        // Cache the Gaussian kernel keyed on intensity — a single blur stroke
+        // hits this many times per second with the same intensity.
+        let needs_rebuild = match &self.blur_kernel_cache {
+            Some((cached_i, _)) => *cached_i != clamped,
+            None => true,
+        };
+        if needs_rebuild {
+            self.blur_kernel_cache =
+                Some((clamped, filters::build_gaussian_kernel(clamped)));
+        }
+        let kernel = &self.blur_kernel_cache.as_ref().unwrap().1;
         filters::gaussian_blur_region(
             &mut self.buf.data,
             self.buf.width,
@@ -935,6 +1020,7 @@ impl ImageHorseTool {
             intensity,
             &mut self.blur_scratch_a,
             &mut self.blur_scratch_b,
+            kernel,
         );
     }
  
@@ -1163,22 +1249,36 @@ impl ImageHorseTool {
         let w = self.buf.width as i32;
         let h = self.buf.height as i32;
         let data = &mut self.buf.data;
-        let brush_alpha = opacity.clamp(0.0, 1.0);
-        let r_sq = radius * radius;
+        let brush_alpha = opacity.clamp(0.0, 1.0) as f32;
+        let r_f32 = radius as f32;
+        let r_sq = r_f32 * r_f32;
         let min_x = ((cx - radius).floor() as i32).max(0);
         let max_x = ((cx + radius).ceil() as i32).min(w - 1);
         let min_y = ((cy - radius).floor() as i32).max(0);
         let max_y = ((cy + radius).ceil() as i32).min(h - 1);
 
+        // Hoisted invariants: hardened-zone radius² (no sqrt/falloff inside)
+        // and channel locals for the source brush colour.
+        let inv_radius = if r_f32 > 0.0 { 1.0_f32 / r_f32 } else { 1.0 };
+        let hard_r = r_f32 * 0.7;
+        let hard_r_sq = hard_r * hard_r;
+        let sr = r as f32 / 255.0;
+        let sg = g as f32 / 255.0;
+        let sb = b as f32 / 255.0;
+        let cx_f32 = cx as f32;
+        let cy_f32 = cy as f32;
+
         for py in min_y..=max_y {
             for px in min_x..=max_x {
-                let dx = px as f64 - cx;
-                let dy = py as f64 - cy;
+                let dx = px as f32 - cx_f32;
+                let dy = py as f32 - cy_f32;
                 let dist_sq = dx * dx + dy * dy;
                 if dist_sq > r_sq { continue; }
-                let edge = if radius > 1.0 {
-                    let norm = dist_sq.sqrt() / radius;
-                    if norm < 0.7 { 1.0 } else {
+                let edge = if r_f32 > 1.0 {
+                    if dist_sq <= hard_r_sq {
+                        1.0
+                    } else {
+                        let norm = dist_sq.sqrt() * inv_radius;
                         let t = (norm - 0.7) / 0.3;
                         (1.0 - t * t).max(0.0)
                     }
@@ -1187,14 +1287,14 @@ impl ImageHorseTool {
                 let idx = ((py * w + px) * 4) as usize;
                 if idx + 3 >= data.len() { continue; }
                 // Porter-Duff source-over
-                let da = data[idx + 3] as f64 / 255.0;
+                let da = data[idx + 3] as f32 / 255.0;
                 let out_a = sa + da * (1.0 - sa);
                 data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
                 if out_a > 1e-6 {
+                    let src_rgb = [sr, sg, sb];
                     for c in 0..3usize {
-                        let sv = [r, g, b][c] as f64 / 255.0;
-                        let dv = data[idx + c] as f64 / 255.0;
-                        let ov = (sv * sa + dv * da * (1.0 - sa)) / out_a;
+                        let dv = data[idx + c] as f32 / 255.0;
+                        let ov = (src_rgb[c] * sa + dv * da * (1.0 - sa)) / out_a;
                         data[idx + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
                     }
                 }
@@ -1342,7 +1442,7 @@ impl ImageHorseTool {
         a.bold = bold;
         a.x = x; a.y = y;
         a.rotation_deg = rotation_deg;
-        a.tile_pixels = tile_pixels;
+        a.tile_pixels = std::sync::Arc::new(tile_pixels);
         a.tile_w = tile_w;
         a.tile_h = tile_h;
         a.tile_offset_x = tile_offset_x;
@@ -1409,7 +1509,7 @@ impl ImageHorseTool {
             transform::paste_region(
                 &mut out,
                 w, h,
-                &a.tile_pixels,
+                a.tile_pixels.as_ref(),
                 a.tile_w, a.tile_h,
                 a.x + a.tile_offset_x,
                 a.y + a.tile_offset_y,
@@ -1432,7 +1532,7 @@ impl ImageHorseTool {
             transform::paste_region(
                 &mut self.buf.data,
                 w, h,
-                &a.tile_pixels,
+                a.tile_pixels.as_ref(),
                 a.tile_w, a.tile_h,
                 a.x + a.tile_offset_x,
                 a.y + a.tile_offset_y,

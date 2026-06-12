@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 
@@ -29,6 +29,14 @@ export function usePaintTool({
   const painting = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
 
+  // Memoize the parsed brush colour: every paint dab + stroke segment
+  // re-reads it, so we want to skip the parseInt-x3 cost per mouse event
+  // (only re-parse when the hex actually changes).
+  const brushRgb = useMemo(
+    () => parseHex(settings.brushColor),
+    [settings.brushColor],
+  );
+
   const coords = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const c = canvasRef.current;
@@ -49,7 +57,7 @@ export function usePaintTool({
       painting.current = true;
       const { x, y } = coords(e);
       last.current = { x, y };
-      const { r, g, b } = parseHex(settings.brushColor);
+      const { r, g, b } = brushRgb;
       t.paint_begin();
       t.paint_dab(
         x,
@@ -65,7 +73,7 @@ export function usePaintTool({
     [
       toolRef,
       coords,
-      settings.brushColor,
+      brushRgb,
       settings.brushSize,
       settings.brushOpacity,
       flushToCanvas,
@@ -79,7 +87,7 @@ export function usePaintTool({
       if (!t) return;
       const { x, y } = coords(e);
       const p = last.current;
-      const { r, g, b } = parseHex(settings.brushColor);
+      const { r, g, b } = brushRgb;
       t.paint_stroke_to(
         p.x,
         p.y,
@@ -97,7 +105,7 @@ export function usePaintTool({
     [
       toolRef,
       coords,
-      settings.brushColor,
+      brushRgb,
       settings.brushSize,
       settings.brushOpacity,
       flushToCanvas,

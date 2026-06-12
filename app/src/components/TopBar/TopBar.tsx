@@ -1,5 +1,5 @@
 // app/src/components/TopBar/TopBar.tsx
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { slideFromTop, panelSpacingTransition } from "@/lib/animations";
 import {
@@ -7,26 +7,17 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { ExportFormat } from "@/app/AppShell";
 import {
   Upload,
   Image,
   Wrench,
   History,
-  ChevronDown,
   ZoomIn,
   ZoomOut,
   Undo2,
   Redo2,
 } from "lucide-react";
 import { UserMenu } from "@/components/UserMenu";
-
-const FORMAT_LABELS: Record<ExportFormat, string> = {
-  png: "PNG",
-  jpeg: "JPEG",
-  webp: "WebP",
-  avif: "AVIF",
-};
 
 interface TopBarProps {
   zoom: number;
@@ -44,10 +35,6 @@ interface TopBarProps {
   onToggleTools: () => void;
   onToggleGallery: () => void;
   onToggleHistory: () => void;
-  exportFormat: ExportFormat;
-  onExportFormatChange: (f: ExportFormat) => void;
-  onExport: () => void;
-  hasSelectedImage: boolean;
 }
 
 export function TopBar({
@@ -66,27 +53,7 @@ export function TopBar({
   onToggleTools,
   onToggleGallery,
   onToggleHistory,
-  exportFormat,
-  onExportFormatChange,
-  onExport: _onExport,
-  hasSelectedImage: _hasSelectedImage,
 }: TopBarProps) {
-  const [formatOpen, setFormatOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!formatOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      )
-        setFormatOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [formatOpen]);
-
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under 1000px, and under 1200px when both side panels
   // (toolbar + history) are open and eating the horizontal room.
@@ -253,51 +220,6 @@ export function TopBar({
                 )}
               </div>
             </div>
-
-            <div className="w-px h-6 bg-border shrink-0" />
-
-            {/* Export format picker */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="relative" ref={dropdownRef}>
-                  <button
-                    onClick={() => setFormatOpen((v) => !v)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold font-mono bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all"
-                  >
-                    {FORMAT_LABELS[exportFormat]}
-                    <ChevronDown className="h-3 w-3 opacity-50" />
-                  </button>
-                  {formatOpen && (
-                    <div className="absolute top-full left-0 mt-1 bg-bg-secondary border border-border rounded-lg shadow-lg overflow-hidden z-50 min-w-[80px]">
-                      {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map(
-                        (fmt) => (
-                          <button
-                            key={fmt}
-                            onClick={() => {
-                              onExportFormatChange(fmt);
-                              setFormatOpen(false);
-                            }}
-                            className={`w-full px-3 py-1.5 text-left text-xs font-mono transition-colors ${
-                              fmt === exportFormat
-                                ? "bg-accent text-text-primary"
-                                : "text-text-secondary hover:bg-bg-elevated"
-                            }`}
-                          >
-                            {FORMAT_LABELS[fmt]}
-                          </button>
-                        ),
-                      )}
-                    </div>
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p className="font-medium">Export Format</p>
-                <p className="text-muted-foreground text-xs">
-                  Choose output format
-                </p>
-              </TooltipContent>
-            </Tooltip>
 
             {/* Clerk User */}
             <div className="w-px h-6 bg-border shrink-0" />

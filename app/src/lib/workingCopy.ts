@@ -1,7 +1,7 @@
 // Downscale uploads to a working resolution and produce a small gallery thumbnail.
 
-export const WORKING_MAX_EDGE = 2048;
-export const THUMB_MAX_EDGE = 256;
+const WORKING_MAX_EDGE = 2048;
+const THUMB_MAX_EDGE = 256;
 
 export interface WorkingCopy {
   pixels: Uint8ClampedArray;

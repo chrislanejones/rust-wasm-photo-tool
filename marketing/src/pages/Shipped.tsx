@@ -26,6 +26,24 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.10",
+    date: "2026-07",
+    headline: "June optimization pass — faster Rust, smaller WASM, Squoosh-style resize",
+    entries: [
+      { tag: "perf",    text: "WASM binary down 60% — 1.10 MB to 443 KB — by subsetting the embedded Liberation Sans fonts to Latin-1 + Extended-A, plus a sweep of Rust hot-loop optimizations (f32 math, opaque-source fast paths, cached blur kernels, VecDeque undo stack)." },
+      { tag: "perf",    text: "Zero-copy canvas painting — the display blit reads WASM linear memory directly instead of cloning the full pixel buffer every frame, eliminating ~1 GB/s of allocator churn during brush strokes." },
+      { tag: "rust",    text: "Three resampling filters join bilinear: Lanczos3 (default), Catmull-Rom, and Nearest — separable two-pass with minification-aware kernels, selectable from the new Method dropdown." },
+      { tag: "feature", text: "Squoosh-style Resize panel — Scale % slider, Dimensions with aspect lock, then a Compress section grouping Method, Format (moved out of the top bar), and Quality." },
+      { tag: "feature", text: "Apply Compression & Resize re-encodes at the chosen format and quality, swaps the stored file, and updates the status-bar size, dimensions, and gallery tooltip in place." },
+      { tag: "feature", text: "PageSpeed Insights score (renamed from Lighthouse) now models Google's real image audits: next-gen format ratios (WebP/AVIF score higher) and an oversize penalty past 1920px." },
+      { tag: "fix",     text: "A/B Compare overhauled — unlocks on any pending panel change, always compares against the immutable upload original, and the overlay now tracks zoom and pan transforms instead of drifting." },
+      { tag: "ui",      text: "Architecture page returns — the full backend diagram (client → WASM → auth → API → storage/Convex/AI) rebuilt and re-linked in the nav and footer; pricing details stay on the Pricing section." },
+      { tag: "ui",      text: "GitHub and Codeberg buttons in the nav beside Beta Version — the source lives on both forges." },
+      { tag: "infra",   text: "UploadThing now also hosts the demo's Test Images set — the royalty-free photos behind the upload dialog's Test Images button." },
+      { tag: "infra",   text: "Dead code removed per fallow: five unused modules, stale exports, and the unused autoprefixer dependency." },
+    ],
+  },
+  {
     version: "v0.9.9",
     date: "2026-07",
     headline: "Non-destructive text + speech bubbles + AI panel",
@@ -170,9 +188,11 @@ function TagPill({ tag }: { tag: Tag }) {
 function ReleaseCard({ release, isLatest }: { release: Release; isLatest: boolean }) {
   return (
     <article className="relative">
-      {/* timeline dot */}
+      {/* timeline dot — centered on the rail: the parent has a 2px border +
+          24px padding, so the article's edge sits 26px right of the line;
+          -33px puts the 16px dot's center on the border's center. */}
       <div
-        className={`absolute -left-[9px] top-2 w-4 h-4 rounded-full border-2 ${
+        className={`absolute -left-[33px] top-2 w-4 h-4 rounded-full border-2 ${
           isLatest
             ? "border-orange-400 bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.6)]"
             : "border-zinc-700 bg-zinc-900"

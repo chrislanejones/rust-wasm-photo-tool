@@ -10,7 +10,7 @@ import type {
   StampSettings as StampSettingsType,
   ToolSettings,
 } from "@/lib/types";
-import type { ExportFormat } from "@/app/AppShell";
+import type { ExportFormat } from "@/lib/exportImage";
 import type { TextMemory } from "./settings/TextSettings";
 import type { EffectsMode } from "./settings/EffectsSettings";
 import type { StampMode } from "./settings/StampSettings";
@@ -52,10 +52,12 @@ interface ToolsSidebarProps {
   onBrightness: (delta: number) => void;
   onContrast: (factor: number) => void;
   imageReady: boolean;
-  onResize: (newW: number, newH: number) => void;
+  /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
+  onResize: (newW: number, newH: number, filter: number) => void;
   imageWidth: number;
   imageHeight: number;
   currentByteSize: number;
+  currentMime?: string;
   originalByteSize: number;
   activePhotoId: string | null;
   /** WASM undo count of the active photo (used to re-sync Effects sliders). */
@@ -122,6 +124,7 @@ export function ToolsSidebar({
   onExportAll,
   canExport,
   exportFormat,
+  onExportFormatChange,
   onFlipH,
   onFlipV,
   onRotate90Cw,
@@ -132,6 +135,7 @@ export function ToolsSidebar({
   imageWidth,
   imageHeight,
   currentByteSize,
+  currentMime,
   originalByteSize,
   activePhotoId,
   undoCount,
@@ -216,11 +220,14 @@ export function ToolsSidebar({
             imageWidth={imageWidth}
             imageHeight={imageHeight}
             currentByteSize={currentByteSize}
+            currentMime={currentMime}
             originalByteSize={originalByteSize}
             activePhotoId={activePhotoId}
             quality={quality}
             onQualityChange={onQualityChange}
             onResize={onResize}
+            exportFormat={exportFormat}
+            onExportFormatChange={onExportFormatChange ?? (() => {})}
             compareActive={compareActive}
             onToggleCompare={onToggleCompare}
             hasBeenModified={hasBeenModified}
@@ -328,10 +335,11 @@ export function ToolsSidebar({
 
       <div className="p-4 border-t border-border flex gap-2">
         <LargeButton onClick={onExport} disabled={!canExport} className="flex-1">
-          <Download className="h-4 w-4" /> Export {exportFormat.toUpperCase()}
+          <Download className="h-4 w-4 hidden min-[1000px]:block" /> Export{" "}
+          {exportFormat.toUpperCase()}
         </LargeButton>
         <LargeButton onClick={onExportAll} disabled={!canExport} className="flex-1">
-          <Download className="h-4 w-4" /> Export All
+          <Download className="h-4 w-4 hidden min-[1000px]:block" /> Export All
         </LargeButton>
       </div>
     </motion.div>

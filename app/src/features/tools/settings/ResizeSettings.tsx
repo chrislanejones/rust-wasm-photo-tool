@@ -1,6 +1,6 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SlidersHorizontal, Zap, Scaling } from "lucide-react";
+import { SlidersHorizontal, Zap, Scaling, ChevronDown } from "lucide-react";
 import { LargeButton } from "@/components/ui/large-button";
 import { SizeSlider } from "@/components/SizeSlider";
 import {
@@ -9,19 +9,48 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getWebPerfMetrics } from "@/lib/webPerf";
+import type { ExportFormat } from "@/lib/exportImage";
+
+/** Resampling method → Rust filter code (see `resize_with_filter`). */
+const FILTER_CODE = {
+  lanczos3: 3,
+  "catmull-rom": 2,
+  nearest: 0,
+} as const;
+
+type ResampleMethod = keyof typeof FILTER_CODE;
+
+const METHOD_LABELS: Record<ResampleMethod, string> = {
+  lanczos3: "Lanczos3",
+  "catmull-rom": "Catmull-Rom",
+  nearest: "Nearest",
+};
+
+const FORMAT_LABELS: Record<ExportFormat, string> = {
+  png: "PNG",
+  jpeg: "JPEG",
+  webp: "WebP",
+  avif: "AVIF",
+};
 
 interface ResizeSettingsProps {
   disabled: boolean;
   imageWidth: number;
   imageHeight: number;
-  /** Current on-disk size of the active photo, in bytes (Lighthouse score). */
+  /** Current on-disk size of the active photo, in bytes (PageSpeed score). */
   currentByteSize: number;
+  /** Current file's MIME type — feeds the PSI next-gen-format audit. */
+  currentMime?: string;
   /** Immutable size at upload, in bytes — the performance-gain baseline. */
   originalByteSize: number;
   activePhotoId: string | null;
   quality: number;
   onQualityChange: (q: number) => void;
-  onResize: (w: number, h: number) => void;
+  /** Apply Compression & Resize: resample to w×h with the given Rust filter
+   *  code, then re-encode at the panel's format + quality. */
+  onResize: (w: number, h: number, filter: number) => void;
+  exportFormat: ExportFormat;
+  onExportFormatChange: (f: ExportFormat) => void;
   compareActive: boolean;
   onToggleCompare: () => void;
   hasBeenModified: boolean;
@@ -43,11 +72,14 @@ export function ResizeSettings({
   imageWidth,
   imageHeight,
   currentByteSize,
+  currentMime,
   originalByteSize,
   activePhotoId,
   quality,
   onQualityChange,
   onResize,
+  exportFormat,
+  onExportFormatChange,
   compareActive,
   onToggleCompare,
   hasBeenModified,
@@ -58,13 +90,18 @@ export function ResizeSettings({
   const [width, setWidth] = useState(String(imageWidth));
   const [height, setHeight] = useState(String(imageHeight));
   const [lockAspect, setLockAspect] = useState(true);
+  const [method, setMethod] = useState<ResampleMethod>("lanczos3");
   const baseQualityRef = useRef(quality);
+  const baseFormatRef = useRef(exportFormat);
+  const baseMethodRef = useRef(method);
 
   useEffect(() => {
     setWidth(String(imageWidth));
     setHeight(String(imageHeight));
     // eslint-disable-next-line react-hooks/exhaustive-deps
     baseQualityRef.current = quality;
+    baseFormatRef.current = exportFormat;
+    baseMethodRef.current = method;
   }, [imageWidth, imageHeight, activePhotoId]);
 
   const handleWidthChange = useCallback(
@@ -86,15 +123,35 @@ export function ResizeSettings({
         setWidth(String(Math.round((h / imageHeight) * imageWidth)));
       }
     },
-    [lockAspect, imageWidth, imageHeight],
+    [lockAspect, imageHeight, imageWidth],
+  );
+
+  // ── Width percent slider ──
+  // Derived from the width field (typing a width moves the slider). Dragging
+  // sets BOTH width and height proportionally from the panel-open dimensions
+  // — percent is inherently proportional (like Squoosh presets), regardless
+  // of the Lock Aspect toggle.
+  const widthPercent =
+    imageWidth > 0 && parseInt(width, 10) > 0
+      ? Math.round((parseInt(width, 10) / imageWidth) * 100)
+      : 100;
+
+  const handlePercentChange = useCallback(
+    (pct: number) => {
+      setWidth(String(Math.max(1, Math.round((imageWidth * pct) / 100))));
+      setHeight(String(Math.max(1, Math.round((imageHeight * pct) / 100))));
+    },
+    [imageWidth, imageHeight],
   );
 
   const handleApplyResize = () => {
     const w = parseInt(width, 10);
     const h = parseInt(height, 10);
     if (w > 0 && h > 0) {
-      onResize(w, h);
+      onResize(w, h, FILTER_CODE[method]);
       baseQualityRef.current = quality;
+      baseFormatRef.current = exportFormat;
+      baseMethodRef.current = method;
     }
   };
 
@@ -102,16 +159,23 @@ export function ResizeSettings({
     onQualityChange(val);
   };
 
-  const compareDisabled = !hasBeenModified;
   const qualityChanged = quality < baseQualityRef.current;
+  const formatChanged = exportFormat !== baseFormatRef.current;
+  const methodChanged = method !== baseMethodRef.current;
   const resizeChanged =
     parseInt(width, 10) !== imageWidth ||
     parseInt(height, 10) !== imageHeight ||
-    qualityChanged;
+    qualityChanged ||
+    formatChanged ||
+    methodChanged;
+  // A/B compare unlocks as soon as anything in the panel changes (pending or
+  // applied) — not only after an applied edit.
+  const compareDisabled = !(hasBeenModified || resizeChanged);
 
   // Web-performance indicators come from Rust (`web_perf_metrics`). The
-  // Lighthouse score is byte-aware: a big, still-uncompressed photo scores low,
-  // and resizing or lowering quality (smaller projected delivery) raises it.
+  // PageSpeed Insights score is byte-aware: a big, still-uncompressed photo
+  // scores low, and resizing or lowering quality (smaller projected delivery)
+  // raises it.
   const newW = parseInt(width, 10) || imageWidth;
   const newH = parseInt(height, 10) || imageHeight;
   const [lighthouseScore, setLighthouseScore] = useState(0);
@@ -127,6 +191,8 @@ export function ResizeSettings({
       newW,
       newH,
       quality,
+      curMime: currentMime,
+      newFormat: exportFormat,
     }).then((m) => {
       if (!alive) return;
       setLighthouseScore(m.lighthouseScore);
@@ -139,60 +205,31 @@ export function ResizeSettings({
     imageWidth,
     imageHeight,
     currentByteSize,
+    currentMime,
     originalByteSize,
     newW,
     newH,
     quality,
+    exportFormat,
   ]);
 
   return (
     <div className="flex flex-col h-full">
       <h3 className="text-xs font-semibold font-mono text-text-muted mb-3">
-        Resize &amp; Compress
+        Resize
       </h3>
 
       {/* ── Content ── */}
       <div className="space-y-8 flex-1">
-        {/* ── Web Performance Gain ── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-[11px]">
-            <h4 className="text-theme-muted-foreground">Web Performance Gain</h4>
-            <span className="text-theme-foreground tabular-nums">
-              +{savingsPercent}%
-            </span>
-          </div>
-          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-700 ease-out ${trafficColor(savingsPercent)}`}
-              style={{ width: `${savingsPercent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* ── Lighthouse Score ── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-[11px]">
-            <h4 className="text-theme-muted-foreground">Lighthouse Score</h4>
-            <span className="text-theme-foreground tabular-nums">
-              {lighthouseScore}%
-            </span>
-          </div>
-          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-700 ease-out ${trafficColor(lighthouseScore)}`}
-              style={{ width: `${lighthouseScore}%` }}
-            />
-          </div>
-        </div>
-
-        {/* ── Quality ── */}
+        {/* ── Scale slider — proportional percent of the original dimensions ── */}
         <SizeSlider
-          label="Quality"
-          value={quality}
-          onChange={handleQualityChange}
-          min={10}
+          label="Scale"
+          value={widthPercent}
+          onChange={handlePercentChange}
+          min={1}
           max={100}
           unit="%"
+          disabled={disabled}
         />
 
         {/* ── Dimensions ── */}
@@ -249,6 +286,107 @@ export function ResizeSettings({
           </div>
         </div>
 
+        <hr className="border-theme-sidebar-border" />
+
+        {/* ── Compress ── */}
+        <div className="flex flex-col gap-5 -mt-2">
+          <h3 className="text-xs font-semibold font-mono text-text-muted">
+            Compress
+          </h3>
+
+          {/* ── Method ── */}
+          <div className="space-y-4">
+            <label className="text-[11px] text-theme-muted-foreground">
+              Method
+            </label>
+          <div className="relative">
+            <select
+              value={method}
+              onChange={(e) => setMethod(e.target.value as ResampleMethod)}
+              disabled={disabled}
+              className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+            >
+              {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
+                <option key={m} value={m}>
+                  {METHOD_LABELS[m]}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+          </div>
+        </div>
+
+          {/* ── Format ── */}
+          <div className="space-y-4">
+            <label className="text-[11px] text-theme-muted-foreground">
+              Format
+            </label>
+            <div className="relative">
+              <select
+                value={exportFormat}
+                onChange={(e) =>
+                  onExportFormatChange(e.target.value as ExportFormat)
+                }
+                disabled={disabled}
+                className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+              >
+                {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
+                  <option key={f} value={f}>
+                    {FORMAT_LABELS[f]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Quality ── */}
+        <SizeSlider
+          label="Quality"
+          value={quality}
+          onChange={handleQualityChange}
+          min={10}
+          max={100}
+          unit="%"
+        />
+
+        <hr className="border-theme-sidebar-border" />
+
+        {/* ── Web Performance Gain ── */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-[11px]">
+            <h4 className="text-theme-muted-foreground">Web Performance Gain</h4>
+            <span className="text-theme-foreground tabular-nums">
+              +{savingsPercent}%
+            </span>
+          </div>
+          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-700 ease-out ${trafficColor(savingsPercent)}`}
+              style={{ width: `${savingsPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* ── PageSpeed Insights Score ── */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-[11px]">
+            <h4 className="text-theme-muted-foreground">
+              PageSpeed Insights Score
+            </h4>
+            <span className="text-theme-foreground tabular-nums">
+              {lighthouseScore}%
+            </span>
+          </div>
+          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-700 ease-out ${trafficColor(lighthouseScore)}`}
+              style={{ width: `${lighthouseScore}%` }}
+            />
+          </div>
+        </div>
+
         {/* ── A/B Compare ── */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -291,7 +429,7 @@ export function ResizeSettings({
           className="w-full"
         >
           <Scaling className="h-4 w-4" />
-          Apply Resize and Quality
+          Apply Compression &amp; Resize
         </LargeButton>
         {/* Compression progress is surfaced via a sonner toast, not inline. */}
         <LargeButton

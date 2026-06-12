@@ -117,15 +117,19 @@ impl StampState {
         self.stroke_to(data, w, h, dest_x, dest_y);
     }
 
-    pub fn end_stroke(&mut self, undo_stack: &mut Vec<Snapshot>, max_history: usize) {
+    pub fn end_stroke(
+        &mut self,
+        undo_stack: &mut std::collections::VecDeque<Snapshot>,
+        max_history: usize,
+    ) {
         if !self.stroke_active {
             return;
         }
         self.stroke_active = false;
         if let Some(snap) = self.stroke_pre_snapshot.take() {
-            undo_stack.push(snap);
+            undo_stack.push_back(snap);
             if undo_stack.len() > max_history {
-                undo_stack.remove(0);
+                undo_stack.pop_front();
             }
         }
         self.stroke_src_data.clear();
@@ -184,37 +188,45 @@ fn apply_dab(
     brush_size: u32, hardness: f64, opacity: f64,
     cx: f64, cy: f64, src_cx: f64, src_cy: f64,
 ) {
-    let r = brush_size as f64;
+    let r = brush_size as f32;
     let r_sq = r * r;
-    let min_x = ((cx - r).floor() as i32).max(0);
-    let max_x = ((cx + r).ceil() as i32).min(w - 1);
-    let min_y = ((cy - r).floor() as i32).max(0);
-    let max_y = ((cy + r).ceil() as i32).min(h - 1);
-    if (src_cx + r).ceil() as i32 <= 0
-        || (src_cx - r).floor() as i32 >= w
-        || (src_cy + r).ceil() as i32 <= 0
-        || (src_cy - r).floor() as i32 >= h
+    let min_x = ((cx - r as f64).floor() as i32).max(0);
+    let max_x = ((cx + r as f64).ceil() as i32).min(w - 1);
+    let min_y = ((cy - r as f64).floor() as i32).max(0);
+    let max_y = ((cy + r as f64).ceil() as i32).min(h - 1);
+    if (src_cx + r as f64).ceil() as i32 <= 0
+        || (src_cx - r as f64).floor() as i32 >= w
+        || (src_cy + r as f64).ceil() as i32 <= 0
+        || (src_cy - r as f64).floor() as i32 >= h
         || src.is_empty()
     {
         return;
     }
+    // Hoisted invariants
+    let hardness_f32 = hardness as f32;
+    let opacity_f32 = opacity as f32;
+    let inv_radius = if r > 0.0 { 1.0_f32 / r } else { 1.0 };
+    let hard_r = r * hardness_f32;
+    let hard_r_sq = hard_r * hard_r;
+    let cx_f32 = cx as f32;
+    let cy_f32 = cy as f32;
     for py in min_y..=max_y {
         for px in min_x..=max_x {
-            let dx = px as f64 - cx;
-            let dy = py as f64 - cy;
+            let dx = px as f32 - cx_f32;
+            let dy = py as f32 - cy_f32;
             let dist_sq = dx * dx + dy * dy;
             if dist_sq > r_sq {
                 continue;
             }
-            let norm = dist_sq.sqrt() / r;
-            let brush_alpha = if norm <= hardness {
-                1.0
+            let brush_alpha = if dist_sq <= hard_r_sq {
+                opacity_f32
             } else {
-                let t = (norm - hardness) / (1.0 - hardness + 1e-9);
-                (1.0 - t * t).max(0.0)
-            } * opacity;
-            let sx = (src_cx + dx).round() as i32;
-            let sy = (src_cy + dy).round() as i32;
+                let norm = dist_sq.sqrt() * inv_radius;
+                let t = (norm - hardness_f32) / (1.0 - hardness_f32 + 1e-9);
+                (1.0 - t * t).max(0.0) * opacity_f32
+            };
+            let sx = (src_cx + dx as f64).round() as i32;
+            let sy = (src_cy + dy as f64).round() as i32;
             if sx < 0 || sx >= w || sy < 0 || sy >= h {
                 continue;
             }
@@ -224,15 +236,19 @@ fn apply_dab(
                 continue;
             }
             // Porter-Duff source-over: src_a scaled by brush_alpha
-            let sa = src[si + 3] as f64 / 255.0 * brush_alpha;
-            let da = dst[di + 3] as f64 / 255.0;
+            let sa = src[si + 3] as f32 / 255.0 * brush_alpha;
+            let da = dst[di + 3] as f32 / 255.0;
             let out_a = sa + da * (1.0 - sa);
             dst[di + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
             if out_a > 1e-6 {
+                let src_rgb = [
+                    src[si] as f32 / 255.0,
+                    src[si + 1] as f32 / 255.0,
+                    src[si + 2] as f32 / 255.0,
+                ];
                 for c in 0..3 {
-                    let sv = src[si + c] as f64 / 255.0;
-                    let dv = dst[di + c] as f64 / 255.0;
-                    let ov = (sv * sa + dv * da * (1.0 - sa)) / out_a;
+                    let dv = dst[di + c] as f32 / 255.0;
+                    let ov = (src_rgb[c] * sa + dv * da * (1.0 - sa)) / out_a;
                     dst[di + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
                 }
             }
