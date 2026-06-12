@@ -10,7 +10,7 @@ import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { TEXT_COLORS } from "@/lib/colors";
-import { getOriginal, putOriginal } from "@/lib/originalsStore";
+import { getOriginal, putOriginal, deleteOriginal } from "@/lib/originalsStore";
 import {
   makeWorkingCopy,
   makeThumbnail,
@@ -360,6 +360,11 @@ export function BatchSettings({
           const newName = photo.name.replace(/\.[^.]+$/, "") + ".png";
           const newFile = new File([pngBlob], newName, { type: "image/png" });
 
+          // Capture the key we're about to replace so we can prune the
+          // stale IDB blob after the new one lands. Preserve the baseline
+          // (it's still needed for re-apply runs).
+          const oldKey = photo.originalKey;
+
           // Build the thumbnail directly from the composited RGBA buffer —
           // no need to re-decode the PNG we just encoded.
           const [newKey, newThumbCandidate] = await Promise.all([
@@ -406,6 +411,10 @@ export function BatchSettings({
                   },
             ),
           );
+          // Prune the now-orphaned IDB blob (skip the baseline — re-apply needs it).
+          if (oldKey && oldKey !== newKey && oldKey !== baselineKey) {
+            deleteOriginal(oldKey).catch(() => {});
+          }
           succeeded++;
         } catch (err) {
           console.error("Bulk-logo: failed on photo", photo.id, err);
@@ -785,6 +794,10 @@ function TextBatchPanel({
           const newName = photo.name.replace(/\.[^.]+$/, "") + ".png";
           const newFile = new File([pngBlob], newName, { type: "image/png" });
 
+          // Capture the key we're about to replace so we can prune the
+          // stale IDB blob. Skip the baseline — re-apply needs it.
+          const oldKey = photo.originalKey;
+
           const [newKey, newThumbCandidate] = await Promise.all([
             putOriginal(newFile, working.origWidth, working.origHeight),
             makeThumbnailFromPixels(
@@ -816,6 +829,9 @@ function TextBatchPanel({
                   },
             ),
           );
+          if (oldKey && oldKey !== newKey && oldKey !== baselineKey) {
+            deleteOriginal(oldKey).catch(() => {});
+          }
           succeeded++;
         } catch (err) {
           console.error("Bulk-text: failed on photo", photo.id, err);
