@@ -33,8 +33,6 @@ const FORMAT_LABELS: Record<ExportFormat, string> = {
   avif: "AVIF",
 };
 
-const WIDTH_PERCENT_PRESETS = [25, 50, 75, 100] as const;
-
 interface ResizeSettingsProps {
   disabled: boolean;
   imageWidth: number;
@@ -161,7 +159,6 @@ export function ResizeSettings({
     onQualityChange(val);
   };
 
-  const compareDisabled = !hasBeenModified;
   const qualityChanged = quality < baseQualityRef.current;
   const formatChanged = exportFormat !== baseFormatRef.current;
   const methodChanged = method !== baseMethodRef.current;
@@ -171,6 +168,9 @@ export function ResizeSettings({
     qualityChanged ||
     formatChanged ||
     methodChanged;
+  // A/B compare unlocks as soon as anything in the panel changes (pending or
+  // applied) — not only after an applied edit.
+  const compareDisabled = !(hasBeenModified || resizeChanged);
 
   // Web-performance indicators come from Rust (`web_perf_metrics`). The
   // PageSpeed Insights score is byte-aware: a big, still-uncompressed photo
@@ -229,8 +229,6 @@ export function ResizeSettings({
           min={1}
           max={100}
           unit="%"
-          presets={WIDTH_PERCENT_PRESETS}
-          variant="numbers"
           disabled={disabled}
         />
 

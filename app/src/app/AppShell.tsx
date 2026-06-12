@@ -255,7 +255,8 @@ export function AppShell() {
 
   // ── Compare: fetch original from IndexedDB when slider activates ───────────
   const activeEntry = photos.find((p) => p.id === activePhotoId) ?? null;
-  const activeOriginalKey = activeEntry?.originalKey ?? null;
+  const activeOriginalKey =
+    activeEntry?.uploadKey ?? activeEntry?.originalKey ?? null;
 
   useEffect(() => {
     if (!compareActive || !activeOriginalKey) {
@@ -326,6 +327,7 @@ export function AppShell() {
             workingHeight: working.height,
             thumbBlob,
             originalKey,
+            uploadKey: originalKey,
           };
 
           setPhotos((prev) => [...prev, entry]);
@@ -920,7 +922,7 @@ export function AppShell() {
           putOriginal(newFile, tw, th),
           makeThumbnailFromPixels(pixels, tw, th, mod.resize_pixels),
         ]);
-        if (oldKey && oldKey !== newKey) {
+        if (oldKey && oldKey !== newKey && oldKey !== entry.uploadKey) {
           deleteOriginal(oldKey).catch(() => {});
         }
 
@@ -1286,9 +1288,6 @@ export function AppShell() {
             onToggleTools={() => setShowTools((v) => !v)}
             onToggleGallery={() => setShowGallery((v) => !v)}
             onToggleHistory={() => setShowHistory((v) => !v)}
-            exportFormat={exportFormat}
-            onExport={handleExport}
-            hasSelectedImage={hasImage}
           />
         )}
       </AnimatePresence>

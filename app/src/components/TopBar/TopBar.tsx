@@ -7,26 +7,17 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { ExportFormat } from "@/lib/exportImage";
 import {
   Upload,
   Image,
   Wrench,
   History,
-  Download,
   ZoomIn,
   ZoomOut,
   Undo2,
   Redo2,
 } from "lucide-react";
 import { UserMenu } from "@/components/UserMenu";
-
-const FORMAT_LABELS: Record<ExportFormat, string> = {
-  png: "PNG",
-  jpeg: "JPEG",
-  webp: "WebP",
-  avif: "AVIF",
-};
 
 interface TopBarProps {
   zoom: number;
@@ -44,10 +35,6 @@ interface TopBarProps {
   onToggleTools: () => void;
   onToggleGallery: () => void;
   onToggleHistory: () => void;
-  /** Current export format (set from the Resize panel); shown on the Export button. */
-  exportFormat: ExportFormat;
-  onExport: () => void;
-  hasSelectedImage: boolean;
 }
 
 export function TopBar({
@@ -66,9 +53,6 @@ export function TopBar({
   onToggleTools,
   onToggleGallery,
   onToggleHistory,
-  exportFormat,
-  onExport,
-  hasSelectedImage,
 }: TopBarProps) {
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under 1000px, and under 1200px when both side panels
@@ -236,29 +220,6 @@ export function TopBar({
                 )}
               </div>
             </div>
-
-            <div className="w-px h-6 bg-border shrink-0" />
-
-            {/* Export action (format is picked in the Resize panel) */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onExport}
-                  disabled={!hasSelectedImage}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold font-mono bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border-active transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {!compact && <span>Export</span>}
-                  {FORMAT_LABELS[exportFormat]}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p className="font-medium">Export</p>
-                <p className="text-muted-foreground text-xs">
-                  Alt+E · format set in the Resize panel
-                </p>
-              </TooltipContent>
-            </Tooltip>
 
             {/* Clerk User */}
             <div className="w-px h-6 bg-border shrink-0" />

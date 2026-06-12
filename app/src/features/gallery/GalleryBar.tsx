@@ -23,6 +23,9 @@ export interface PhotoEntry {
   thumbBlob: Blob;
   /** SHA-256 hex key into IndexedDB for the untouched original bytes. */
   originalKey: string;
+  /** Immutable key of the *upload* original — A/B compare baseline. Never
+   *  replaced by Apply Compression or Auto Compress. */
+  uploadKey?: string;
 }
 
 interface Props {

@@ -335,10 +335,11 @@ export function ToolsSidebar({
 
       <div className="p-4 border-t border-border flex gap-2">
         <LargeButton onClick={onExport} disabled={!canExport} className="flex-1">
-          <Download className="h-4 w-4" /> Export {exportFormat.toUpperCase()}
+          <Download className="h-4 w-4 hidden min-[1000px]:block" /> Export{" "}
+          {exportFormat.toUpperCase()}
         </LargeButton>
         <LargeButton onClick={onExportAll} disabled={!canExport} className="flex-1">
-          <Download className="h-4 w-4" /> Export All
+          <Download className="h-4 w-4 hidden min-[1000px]:block" /> Export All
         </LargeButton>
       </div>
     </motion.div>
