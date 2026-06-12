@@ -188,9 +188,11 @@ function TagPill({ tag }: { tag: Tag }) {
 function ReleaseCard({ release, isLatest }: { release: Release; isLatest: boolean }) {
   return (
     <article className="relative">
-      {/* timeline dot */}
+      {/* timeline dot — centered on the rail: the parent has a 2px border +
+          24px padding, so the article's edge sits 26px right of the line;
+          -33px puts the 16px dot's center on the border's center. */}
       <div
-        className={`absolute -left-[9px] top-2 w-4 h-4 rounded-full border-2 ${
+        className={`absolute -left-[33px] top-2 w-4 h-4 rounded-full border-2 ${
           isLatest
             ? "border-orange-400 bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.6)]"
             : "border-zinc-700 bg-zinc-900"
