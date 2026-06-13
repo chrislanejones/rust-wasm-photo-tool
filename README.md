@@ -75,19 +75,31 @@ The `image` crate with all codec features adds ~800KB to the WASM binary. The br
 ```
 src/
 ├── lib.rs          #[wasm_bindgen] glue — ImageHorseTool struct (was CloneStampTool),
-│                   delegates to modules; get_pixel(x,y) and get_pixel_region(cx,cy,radius)
+│                   delegates to modules; get_pixel(x,y) and get_pixel_region(cx,cy,radius);
+│                   stateless free fns: composite_pixels, resize_pixels, encode_png_pixels,
+│                   resize_with_filter (Lanczos3 / Catmull-Rom / Nearest / bilinear),
+│                   web_perf_metrics (PSI-faithful score), push_compress_marker;
+│                   TextAnnotation + ShapeAnnotation overlays — non-destructive live
+│                   editing with hit-test, render-with-annotations, and flatten on export
 ├── core.rs         ImageBuffer — width, height, data, load, bilinear sampling;
 │                   zero-size guard: sample_bilinear returns [0,0,0,0] when buffer is empty
-├── history.rs      Snapshot (data + dimensions), undo/redo stacks, push, jump, delete, labels;
+├── history.rs      Snapshot (data + dimensions + text annotations + shape annotations);
+│                   VecDeque undo + redo stacks, push, jump, delete, labels;
 │                   pub const MAX_HISTORY = 50 (single source of truth)
 ├── stamp.rs        Clone stamp engine — source, offset, stroke lifecycle, dab kernel;
-│                   stroke_src_data frozen buffer prevents feedback artifacts
-├── transform.rs    Flip H/V, rotate 90° CW/CCW, resize (bilinear), copy_region, paste_region,
+│                   stroke_src_data frozen buffer prevents feedback artifacts;
+│                   apply_dab f32 hot loop with sqrt hoisted out of the hard zone
+├── transform.rs    Flip H/V (u32 swap), rotate 90° CW/CCW, resize (bilinear / Catmull-Rom /
+│                   Lanczos3 / nearest — separable two-pass, minification-aware kernels);
+│                   copy_region, paste_region (opaque-source memcpy fast path + f32 blend),
 │                   crop overlay compositing, dashed border drawing
-├── filters.rs      Brightness, contrast, Gaussian blur (separable 2-pass, bounding-box region)
+├── filters.rs      Brightness, contrast, Gaussian blur (separable 2-pass, bounding-box region;
+│                   cached kernel keyed on intensity + f32 accumulators)
 ├── drawing.rs      Arrow rendering (anti-aliased, arrowhead), geometric shapes (rect, circle, line,
-│                   hand-drawn circle)
-├── text.rs         Liberation Sans font embedded at compile time; renders text → pixel buffer
+│                   hand-drawn circle); fill_rounded_rect + fill_triangle_public for speech bubbles
+├── text.rs         Liberation Sans font embedded at compile time (subset to Latin-1 + Extended-A
+│                   for a 60% WASM size cut); renders text → pixel buffer; rotate_pixels for
+│                   annotation tiles
 └── codec.rs        PNG encoding, thumbnail generation with bilinear scaling;
                     history snapshot serialization (get/inject undo/redo PNG blobs)
 ```
@@ -107,20 +119,30 @@ app/src/
 │   │                                 loadImage(), loadImageFromPixels() (pre-decoded, 2048-capped),
 │   │                                 and loadFromSaved() for restoring per-photo IDB sessions
 │   ├── useBrushPreview.ts            Cursor preview overlay
-│   ├── useDrawingTools.ts            Arrow/shape drawing + crop selection (SVG overlay)
+│   ├── useDrawingTools.ts            Arrow + shape annotations (live, non-destructive) and the
+│   │                                 crop selection (SVG overlay). Shapes/arrows are committed
+│   │                                 as ShapeAnnotation records via add_shape_annotation; the
+│   │                                 same hook handles select-on-click (shape_annotation_at),
+│   │                                 drag-to-move, edge/corner resize handles, and
+│   │                                 click-to-delete from the Reselect panel
 │   ├── useEmojiTool.ts               Emoji stamp — OffscreenCanvas → WASM stamp_pixels
-│   ├── usePaintTool.ts               Freehand paint/brush — WASM paint_dab + paint_stroke_to
+│   ├── usePaintTool.ts               Freehand paint/brush — WASM paint_dab + paint_stroke_to;
+│   │                                 brushColor parsed once per stroke via useMemo + parse_color
 │   ├── useColorPicker.ts             Color picker eyedropper — WASM get_pixel / get_pixel_region;
 │   │                                 returns magnifier pixel grid + center hex color on mouse move
-│   ├── UseBlurTool.ts                Blur brush — WASM gaussian_blur_region per dab
-│   ├── useTextTool.ts                Text overlay — browser canvas renders font → WASM stamp_pixels;
-│   │                                 tracks last position for recent-text re-edit
-│   ├── useTextExtract.ts             Drag-to-OCR — Tesseract.js reads selected canvas region
+│   ├── useTextTool.ts                Live text annotations — Rust add/update/remove + hit-test;
+│   │                                 click an existing text to re-open the input pre-filled with
+│   │                                 its content, font, color, and rotation; sticky-input listener
+│   │                                 so the box survives color-swatch / font-dropdown clicks
 │   ├── useRedStampTool.ts            Red stamp presets — OffscreenCanvas renders label →
 │   │                                 WASM stamp_red (scales to brush size, "Red Stamp" history)
-│   ├── useStoreUser.ts               Syncs Clerk user into Convex users table on sign-in
-│   ├── useConvexHistory.ts           Convex history bridge (stub, ready for connection)
 │   ├── useAutoCompress.ts            Auto-compress hook for resize workflow
+│   ├── useEditPersistence.ts         Per-photo edit persistence — Convex (signed in) or IDB
+│   │                                 (anonymous). Archive v4 includes raw pixels + dims + text
+│   │                                 annotations + shape annotations so reopening a photo
+│   │                                 restores every live overlay
+│   ├── useUserColors.ts              localStorage-persisted custom palette shared by every
+│   │                                 ColorSwatchGrid; cross-component sync via custom events
 │   └── stamp_tool.d.ts               TypeScript declarations for WASM interface
 ├── components/
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
@@ -133,10 +155,18 @@ app/src/
 │   └── ShortcutModal.tsx             Alt+Shift+? keyboard reference overlay
 ├── features/
 │   ├── canvas/
-│   │   ├── CanvasArea.tsx            WASM canvas + brush cursor + SVG crop overlay with
-│   │   │                             rule-of-thirds guides and 8 draggable resize handles
-│   │   ├── CompareSlider.tsx         Squoosh-style A/B before/after comparison slider
-│   │   └── HistoryPanel.tsx          Animated right-side undo/redo timeline
+│   │   ├── CanvasArea.tsx            WASM canvas + brush cursor + SVG overlays — crop selection
+│   │   │                             (rule-of-thirds, 8 resize handles), text edit overlay with
+│   │   │                             line-and-dot move/rotate handles + corner squares that scale
+│   │   │                             fontSize, and shape/arrow edit overlay with corner squares,
+│   │   │                             move handle, endpoint circles for lines/arrows
+│   │   ├── CompareSlider.tsx         Squoosh-style A/B before/after slider; rAF-deduped box sync
+│   │   │                             driven by ResizeObserver + MutationObserver on canvas style
+│   │   │                             so the overlay tracks zoom and pan transforms
+│   │   └── HistoryPanel.tsx          Animated right-side undo/redo timeline + Reselect panel
+│   │                                 (replaces the old Recent Texts list): every committed text
+│   │                                 and shape annotation appears as a row you can click to
+│   │                                 re-select it on the canvas, or delete in place
 │   ├── gallery/
 │   │   ├── GalleryBar.tsx            Bottom photo strip with thumbnails
 │   │   └── PhotoThumb.tsx            Individual thumbnail component
@@ -464,6 +494,18 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 11 | **Marketing: Architecture page restored** — `marketing/src/pages/Architecture.tsx` rebuilt (typed) from the v2.0 backend diagram: client → single-binary WASM layer → Clerk auth tiers → API → UploadThing / Convex schema / Replicate → webhooks. The old Tier Strategy & Access Matrix section was intentionally left out — the live Pricing section is the canonical pricing sheet. Re-linked in Nav + Footer | Complete |
 | 12 | **Marketing: GitHub + Codeberg buttons** — icon buttons beside "Beta Version →" in the nav linking to both forges; Codeberg also added to the footer | Complete |
 | 13 | Dead code removed per fallow — `TransformSettings.tsx`, `Uploaddropzone.tsx`, `UseBlurTool.ts`, `useConvexHistory.ts`, `useStoreUser.ts`, stale exports (`PALETTE`, `ARROW_COLORS`, `PAINT_COLORS`, `buttonVariants`, unused dialog/context-menu re-exports), the `ExportFormat` duplicate export, and the unused `autoprefixer` devDependency | Complete |
+
+## v3.2 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **Live shape & arrow annotations** — every shape (rect, circle, hand-drawn circle, line) and both arrow styles now commit as a `ShapeAnnotation` instead of rasterizing immediately. A `Vec<ShapeAnnotation>` lives on `ImageHorseTool` alongside the existing text annotations; `render_with_annotations` composites both layers on display; export paths flatten both. New `#[wasm_bindgen]` exports: `add_shape_annotation`, `update_shape_annotation`, `remove_shape_annotation`, `restore_shape_annotation` (history restore path), `shape_annotation_at` (hit-test), `shape_annotation_count`, `set_editing_shape`, `get_shape_annotations` (JSON) | Complete |
+| 2 | **Reselect on click + move/resize/delete** — clicking a committed shape with the Shapes or Arrows tool active selects it (the SVG overlay re-renders around it); drag the body to move, drag corner squares to resize, drag endpoint circles to re-angle lines/arrows; clicking the trash button in the panel removes it. Commit lifecycle in `useDrawingTools.ts` includes select / remove / dirty-tracking and re-pushes the snapshot when the geometry changes | Complete |
+| 3 | **Reselect list in HistoryPanel** — the right-side panel grew a Reselect section that lists every live text and shape annotation as a clickable row; clicking jumps the canvas selection to it; the trash icon removes it. The old TextSettings "Recent texts" list moved here so all live overlays share one home. The Reselect list is sourced from `get_text_annotations` + `get_shape_annotations` and updates on every annotation change | Complete |
+| 4 | **History threads shape annotations through undo/redo** — `Snapshot` in `src/history.rs` now carries `(data, width, height, text_annotations, shape_annotations)`. `undo()` and `redo()` take the current shape vec, swap it with the snapshot's, and return the restored one; every annotation-mutating call site in `lib.rs` pushes a snapshot with the current shape vec attached. A committed shape is undoable / redoable as one entry; reselecting and editing it pushes a new snapshot too | Complete |
+| 5 | **Persistence v4** — `editPersistence.SavedEdit` and the Convex binary archive bumped to v4: the schema now serializes the shape annotation vec alongside the existing text annotations + raw pixels. `loadFromSaved` re-creates both lists via the Rust `restore_shape_annotation` + `add_text_annotation` paths so reopening a photo restores every live overlay. v1–v3 still decode for back-compat | Complete |
+| 6 | **Fix: text rotate handle** — the rotate handle's drag math used a stale center reference when the text box was already rotated, drifting the angle on each adjustment. Recomputed from the current rotated transform every drag so dragging the rotate dot now produces a smooth rotation that holds | Complete |
+| 7 | **Stamp dab f32 polish** — small follow-up in `src/stamp.rs` extending the June f32 / hoisted-sqrt pass to the dab kernel's edge case, removing a residual `f64 → f32` cast in the inner loop | Complete |
 
 ## License
 

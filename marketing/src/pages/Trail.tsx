@@ -26,6 +26,20 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.11",
+    date: "2026-06-13",
+    headline: "Shapes & arrows go live — reselect, move, resize, delete",
+    entries: [
+      { tag: "feature", text: "Every shape (rect, circle, hand-drawn circle, line) and both arrow styles now commit as a live ShapeAnnotation instead of rasterizing immediately — same non-destructive overlay treatment text already had. Click a committed shape to re-select it on the canvas; drag the body to move; drag corner squares to resize; drag endpoint circles to re-angle lines and arrows." },
+      { tag: "feature", text: "Reselect panel — the right-side History panel grew a Reselect list of every live text and shape annotation. Click a row to jump the canvas selection to it; trash icon removes it. The old TextSettings Recent texts list moved here so all live overlays share one home." },
+      { tag: "rust",    text: "Eight new wasm-bindgen exports drive the shape system: add / update / remove / restore / hit-test / count / set_editing_shape / get_shape_annotations — the same shape as the text annotation surface." },
+      { tag: "rust",    text: "History snapshots now carry shape annotations alongside text annotations — undo/redo swap both lists in lockstep so reselect-and-edit is a normal undo entry." },
+      { tag: "infra",   text: "Persistence v4 — the IDB SavedEdit and the Convex binary archive both serialize the shape annotation vec; reopening a photo restores every live overlay. v1–v3 still decode for back-compat." },
+      { tag: "fix",     text: "Text rotate handle — the drag math used a stale center reference when the box was already rotated, drifting the angle on each adjustment. Smooth rotation now holds." },
+      { tag: "rust",    text: "Stamp dab f32 polish — extends the June hot-loop pass to the dab kernel's edge case, removing a residual f64 cast in the inner loop." },
+    ],
+  },
+  {
     version: "v0.9.10",
     date: "2026-06-12",
     headline: "June optimization pass — faster Rust, smaller WASM, Squoosh-style resize, shape edit boxes",
@@ -288,7 +302,7 @@ function ReleaseCard({ release, isLatest }: { release: Release; isLatest: boolea
   );
 }
 
-export default function Shipped() {
+export default function Trail() {
   return (
     <section className="relative">
       <div className="absolute inset-x-0 top-0 h-[400px] bg-gradient-to-b from-orange-500/10 via-pink-500/5 to-transparent pointer-events-none" />
@@ -296,7 +310,7 @@ export default function Shipped() {
       <div className="relative max-w-4xl mx-auto px-6 pt-20 pb-24">
         <div className="mb-12">
           <div className="text-xs uppercase tracking-wider text-orange-400 font-medium mb-2">
-            Shipped
+            Trail
           </div>
           <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.1]">
             What's new in <span className="gradient-text">Image Horse</span>

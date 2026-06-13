@@ -1,7 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Architecture from "./pages/Architecture";
-import Shipped from "./pages/Shipped";
+import Trail from "./pages/Trail";
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
 
@@ -13,7 +13,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/architecture" element={<Architecture />} />
-          <Route path="/shipped" element={<Shipped />} />
+          <Route path="/trail" element={<Trail />} />
         </Routes>
       </main>
       <Footer />
