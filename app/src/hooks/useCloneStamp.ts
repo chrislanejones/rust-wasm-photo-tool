@@ -38,6 +38,19 @@ export interface CloneStampState {
   hasTransparency: boolean;
 }
 
+const INITIAL_STATE: CloneStampState = {
+  ready: false,
+  hasSource: false,
+  sourcePos: null,
+  undoCount: 0,
+  redoCount: 0,
+  history: [],
+  zoom: 1,
+  width: 0,
+  height: 0,
+  hasTransparency: false,
+};
+
 export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const toolRef = useRef<ImageHorseTool | null>(null);
   const isDrawingRef = useRef(false);
@@ -49,18 +62,27 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   // invalidate any previously-created view.
   const wasmMemoryRef = useRef<WebAssembly.Memory | null>(null);
 
-  const [state, setState] = useState<CloneStampState>({
-    ready: false,
-    hasSource: false,
-    sourcePos: null,
-    undoCount: 0,
-    redoCount: 0,
-    history: [],
-    zoom: 1,
-    width: 0,
-    height: 0,
-    hasTransparency: false,
-  });
+  const [state, setState] = useState<CloneStampState>(INITIAL_STATE);
+
+  /**
+   * Drop the loaded image entirely: blank the <canvas>, release the WASM tool
+   * instance, and return the hook state to its initial not-ready shape.
+   * Called whenever the gallery empties (Delete All, bulk delete, removing the
+   * last photo) so no ghost frame lingers behind the upload dialog.
+   */
+  const reset = useCallback(() => {
+    toolRef.current = null;
+    sourcePosRef.current = null;
+    isDrawingRef.current = false;
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      ctx?.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+    setState(INITIAL_STATE);
+  }, [canvasRef]);
 
   const syncState = useCallback(() => {
     const t = toolRef.current;
@@ -732,15 +754,24 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [flushToCanvas, syncState],
   );
 
+  /**
+   * Blurs the whole image. `intensity` is the Effects panel's Blur slider as
+   * a 0..1 fraction. Rust's `blur_region` takes an *integer* Gaussian kernel
+   * radius (u32, clamped 1..30) — passing the raw fraction got truncated to 0
+   * by the wasm-bindgen ABI and clamped up to a radius-1 kernel, i.e. a
+   * visually imperceptible blur. Map the fraction onto the 1..30 radius range
+   * before crossing into WASM. One "Blur" history snapshot per call.
+   */
   const applyGlobalBlur = useCallback(
     (intensity: number) => {
       const t = toolRef.current;
       if (!t) return;
+      const kernelRadius = Math.max(1, Math.round(intensity * 30));
       const cx = t.width() / 2;
       const cy = t.height() / 2;
       const r = Math.max(t.width(), t.height());
       t.begin_blur_stroke();
-      t.blur_region(cx, cy, r, intensity);
+      t.blur_region(cx, cy, r, kernelRadius);
       flushToCanvas();
       syncState();
     },
@@ -756,6 +787,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     loadImageFromPixels,
     loadFromSaved,
     flushToCanvas,
+    reset,
     setBrushSize,
     setHardness,
     setOpacity,

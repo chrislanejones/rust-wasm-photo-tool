@@ -101,8 +101,18 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       <TooltipTrigger asChild>
         <motion.div
           data-id={entry.id}
+          role="button"
+          tabIndex={0}
+          aria-label={`Select photo ${entry.name}`}
+          aria-pressed={isActive}
           className={`photo-thumb group ${isActive ? "active" : ""} ${selected ? "selected" : ""} relative`}
           onClick={onSelect}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect();
+            }
+          }}
           {...thumbEnter(index)}
         >
       {maybeTransparent && (

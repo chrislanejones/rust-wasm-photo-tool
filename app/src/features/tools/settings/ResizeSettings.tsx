@@ -286,10 +286,15 @@ export function ResizeSettings({
           </div>
         </div>
 
-        <hr className="border-theme-sidebar-border" />
+        {/* Tighten Dimensions ↔ Compress to ~20px/side (the Text panel's
+            section rhythm). The `!` suffix is required: Tailwind v4's
+            `space-y-8` rule re-declares both block margins on every non-last
+            child *later* in the stylesheet, so plain negative margins here
+            would lose the cascade and stay at 32px/side. */}
+        <hr className="border-theme-sidebar-border -mt-3! mb-5!" />
 
         {/* ── Compress ── */}
-        <div className="flex flex-col gap-5 -mt-2">
+        <div className="flex flex-col gap-3">
           <h3 className="text-xs font-semibold font-mono text-text-muted">
             Compress
           </h3>
@@ -350,8 +355,6 @@ export function ResizeSettings({
           max={100}
           unit="%"
         />
-
-        <hr className="border-theme-sidebar-border" />
 
         {/* ── Web Performance Gain ── */}
         <div className="space-y-4">

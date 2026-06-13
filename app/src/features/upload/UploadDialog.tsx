@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
-import { Upload, FolderOpen, Clipboard, X, Images, Loader2, LogIn } from "lucide-react";
+import { Upload, FolderOpen, Clipboard, X, Images, Loader2, LogIn, ExternalLink } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
 import { LargeButton } from "@/components/ui/large-button";
 import { TinyButton } from "@/components/ui/tiny-button";
@@ -119,6 +119,22 @@ export function UploadDialog({
     return () => window.removeEventListener("paste", handler);
   }, [open, processFiles]);
 
+  // Keyboard support: focus the first action when the dialog opens, and let
+  // Escape close it (shake when closing is blocked, same as the ✕ button).
+  const firstButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => firstButtonRef.current?.focus(), 50);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleTryClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, handleTryClose]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -199,6 +215,7 @@ export function UploadDialog({
 
                   <div className="grid grid-cols-2 gap-3 w-full">
                     <LargeButton
+                      ref={firstButtonRef}
                       onClick={() => inputRef.current?.click()}
                       className="w-full"
                     >
@@ -254,15 +271,22 @@ export function UploadDialog({
               }}
             />
 
-            <div className="px-6 pb-4 text-center">
-              <a
-                href="https://image-horse.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] text-text-muted opacity-60 hover:opacity-100 hover:text-text-primary transition-opacity"
+            <div className="px-6 pb-4">
+              {/* LargeButton renders a <button>, so open the marketing site
+                  via window.open instead of an anchor href. */}
+              <LargeButton
+                onClick={() =>
+                  window.open(
+                    "https://image-horse.vercel.app/",
+                    "_blank",
+                    "noopener",
+                  )
+                }
+                className="w-full"
               >
-                image-horse.vercel.app ↗
-              </a>
+                image-horse.vercel.app
+                <ExternalLink className="h-4 w-4" />
+              </LargeButton>
             </div>
           </motion.div>
           </motion.div>
