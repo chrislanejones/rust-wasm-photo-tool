@@ -119,6 +119,22 @@ export function UploadDialog({
     return () => window.removeEventListener("paste", handler);
   }, [open, processFiles]);
 
+  // Keyboard support: focus the first action when the dialog opens, and let
+  // Escape close it (shake when closing is blocked, same as the ✕ button).
+  const firstButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => firstButtonRef.current?.focus(), 50);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleTryClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, handleTryClose]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -199,6 +215,7 @@ export function UploadDialog({
 
                   <div className="grid grid-cols-2 gap-3 w-full">
                     <LargeButton
+                      ref={firstButtonRef}
                       onClick={() => inputRef.current?.click()}
                       className="w-full"
                     >

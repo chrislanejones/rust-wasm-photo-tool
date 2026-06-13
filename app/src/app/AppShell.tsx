@@ -899,6 +899,11 @@ export function AppShell() {
       const origH = stamp.state.height;
       if (w !== origW || h !== origH) {
         stamp.resizeWithFilter(w, h, filter);
+      } else {
+        // Quality/format-only apply: pixels are unchanged but the stored file
+        // is re-encoded — record a "Compress" entry so History reflects it.
+        stamp.toolRef.current?.push_compress_marker();
+        stamp.syncState();
       }
       setHasBeenModified(true);
       if (activePhotoId) {
@@ -1330,6 +1335,14 @@ export function AppShell() {
             onExport={handleExport}
             onExportAll={handleExportAll}
             canExport={hasImage}
+            photoCount={photos.length}
+            modifiedCount={modifiedPhotos.size}
+            activeModified={
+              activePhotoId != null &&
+              (modifiedPhotos.has(activePhotoId) ||
+                hasBeenModified ||
+                stamp.state.undoCount > 0)
+            }
             exportFormat={exportFormat}
             onExportFormatChange={setExportFormat}
             onFlipH={stamp.flipHorizontal}
@@ -1491,6 +1504,14 @@ export function AppShell() {
                           cropSelection={drawingTools.cropSelection}
                           onCropChange={(sel) => drawingTools.setCropSelection(sel)}
                           colorPickerActive={colorPickerActive}
+                          drawEditState={drawingTools.editState}
+                          onDrawEditChange={drawingTools.updateEditGeometry}
+                          drawSettings={{
+                            strokeColor: toolSettings.strokeColor,
+                            strokeWidth: toolSettings.strokeWidth,
+                            arrowStyle: toolSettings.arrowStyle,
+                            shape: toolSettings.shape ?? "rect",
+                          }}
                         />
                       </div>
                       {(!activePhotoId || photos.length === 0) && (
@@ -1556,6 +1577,14 @@ export function AppShell() {
                       cropSelection={drawingTools.cropSelection}
                       onCropChange={(sel) => drawingTools.setCropSelection(sel)}
                       colorPickerActive={colorPickerActive}
+                      drawEditState={drawingTools.editState}
+                      onDrawEditChange={drawingTools.updateEditGeometry}
+                      drawSettings={{
+                        strokeColor: toolSettings.strokeColor,
+                        strokeWidth: toolSettings.strokeWidth,
+                        arrowStyle: toolSettings.arrowStyle,
+                        shape: toolSettings.shape ?? "rect",
+                      }}
                     />
                   </div>
                 </div>
@@ -1662,7 +1691,11 @@ export function AppShell() {
         <StatusBar
           state={stamp.state}
           fileSize={photos.find((p) => p.id === activePhotoId)?.byteSize}
-          activeToolHint={TOOL_SHORTCUT[activeTool]}
+          activeToolHint={
+            drawingTools.editState
+              ? { keys: "Enter/Esc", label: "place / cancel" }
+              : TOOL_SHORTCUT[activeTool]
+          }
         />
       )}
 

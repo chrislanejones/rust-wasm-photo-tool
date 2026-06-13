@@ -57,7 +57,18 @@ export function HistoryPanel({
           <li
             key={`${entry.type}-${entry.index}-${listIdx}`}
             className={`large-badge-item type-${entry.type}`}
+            role="button"
+            tabIndex={0}
             onClick={() => onJump(entry.index)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onJump(entry.index);
+              } else if (e.key === "Delete" && entry.type === "undo") {
+                e.preventDefault();
+                onDelete(entry.index);
+              }
+            }}
             title={
               entry.type === "current"
                 ? "Current state"

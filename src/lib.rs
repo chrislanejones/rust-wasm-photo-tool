@@ -975,6 +975,15 @@ impl ImageHorseTool {
         self.stamp.source_y = None;
     }
 
+    /// Record a "Compress" entry in the history without changing pixels.
+    /// Used when Apply Compression & Resize re-encodes at a new quality or
+    /// format but the dimensions are unchanged — the stored file changed, so
+    /// the action should appear in the History panel even though undoing it
+    /// is a visual no-op.
+    pub fn push_compress_marker(&mut self) {
+        self.hist.push_snapshot("Compress", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+    }
+
     // ── Filters ─────────────────────────────────────────────────────────
 
     pub fn adjust_brightness(&mut self, delta: f64) {

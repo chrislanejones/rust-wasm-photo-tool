@@ -546,7 +546,16 @@ export function BatchSettings({
         </p>
         {!logo ? (
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Pick a logo image"
             onClick={onPickClick}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onPickClick();
+              }
+            }}
             onDragOver={(e) => {
               e.preventDefault();
               setIsDragOver(true);

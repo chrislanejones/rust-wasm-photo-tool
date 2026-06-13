@@ -277,13 +277,26 @@ body {
   transform: translate(-50%, -50%);
 }
 
-/* Preset button focus states - remove default focus outlines */
-button:focus {
+/* Focus styles — invisible for mouse clicks (:focus), but keyboard
+   navigation (:focus-visible) gets a clear accent ring so the whole UI is
+   operable without a mouse. */
+button:focus,
+[role="button"]:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
   outline: none;
 }
 
-button:focus-visible {
-  outline: none;
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .source-marker::before,

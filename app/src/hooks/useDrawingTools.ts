@@ -1,8 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
 
-interface Point {
+export interface Point {
   x: number;
   y: number;
 }
@@ -12,6 +12,22 @@ export interface CropSelection {
   y: number;
   width: number;
   height: number;
+}
+
+/**
+ * Pending (uncommitted) shape/arrow being edited via the Figma-style
+ * overlay. Geometry lives in canvas pixels; `start`/`end` are the original
+ * drag endpoints (opposite bbox corners for rect/circle, the actual segment
+ * endpoints for line/arrow). Stroke color/width, the shape type, and the
+ * arrow style are intentionally NOT snapshotted here — they're read live
+ * from ToolSettings at render and at commit, so panel tweaks made while the
+ * overlay is open apply to the pending shape (mirroring how the text tool
+ * live-updates its open input).
+ */
+export interface DrawEditState {
+  kind: "shape" | "arrow";
+  start: Point;
+  end: Point;
 }
 
 interface UseDrawingToolsOptions {
@@ -111,6 +127,130 @@ export function useDrawingTools({
     null,
   );
 
+  // ── Shape/arrow edit overlay state ─────────────────────────────────
+  const [editState, setEditState] = useState<DrawEditState | null>(null);
+  const editStateRef = useRef<DrawEditState | null>(null);
+  editStateRef.current = editState;
+  // Fresh settings for commit-time reads from stable callbacks.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
+  /**
+   * Rasterize the pending shape/arrow into the WASM buffer via the SAME
+   * Rust entry points the old instant-commit path used — one history
+   * snapshot per shape, all pixel work stays in Rust. No-op when nothing
+   * is pending, so every trigger can call it unconditionally.
+   */
+  const commitEdit = useCallback(() => {
+    const es = editStateRef.current;
+    if (!es) return;
+    editStateRef.current = null;
+    setEditState(null);
+    const tool = toolRef.current;
+    if (!tool) return;
+    const s = settingsRef.current;
+    if (es.kind === "arrow") {
+      tool.begin_draw_stroke("Arrow");
+      tool.draw_arrow(
+        es.start.x,
+        es.start.y,
+        es.end.x,
+        es.end.y,
+        s.strokeColor,
+        s.strokeWidth,
+        s.arrowStyle === "double" ? 1 : 0,
+      );
+    } else {
+      const shapeMap: Record<string, number> = {
+        rect: 0,
+        circle: 1,
+        handCircle: 3,
+        line: 2,
+      };
+      tool.begin_draw_stroke("Shape");
+      tool.draw_shape(
+        es.start.x,
+        es.start.y,
+        es.end.x,
+        es.end.y,
+        shapeMap[s.shape ?? "rect"] ?? 0,
+        s.strokeColor,
+        s.strokeWidth,
+      );
+    }
+    flushToCanvas();
+    syncState();
+  }, [toolRef, flushToCanvas, syncState]);
+
+  /** Escape: drop the pending shape without touching the image or history. */
+  const cancelEdit = useCallback(() => {
+    editStateRef.current = null;
+    setEditState(null);
+  }, []);
+
+  /** Overlay handle drags push new geometry here (canvas coords). */
+  const updateEditGeometry = useCallback((start: Point, end: Point) => {
+    setEditState((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, start, end };
+      editStateRef.current = next;
+      return next;
+    });
+  }, []);
+
+  // Commit triggers — listeners exist only while an edit is pending.
+  // Enter commits, Escape cancels.
+  useEffect(() => {
+    if (!editState) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commitEdit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancelEdit();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editState, commitEdit, cancelEdit]);
+
+  // Pointerdown anywhere outside the overlay commits, except:
+  //   • the overlay itself (handles/body — `[data-draw-overlay]`),
+  //   • the shapes/arrows settings panel (`[data-draw-panel]`) so stroke and
+  //     color tweaks can live-update the pending shape (text-tool pattern),
+  //   • the canvas — onMouseDown owns that path (commit, then start the
+  //     next rubber-band drag) and pan mode must not commit.
+  useEffect(() => {
+    if (!editState) return;
+    const onDown = (e: PointerEvent) => {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (target === canvasRef.current) return;
+      if (target.closest("[data-draw-overlay]")) return;
+      if (target.closest("[data-draw-panel]")) return;
+      commitEdit();
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [editState, commitEdit, canvasRef]);
+
+  // Switching tools commits the pending edit. This also covers the
+  // Shapes ⇄ Arrows tab, which flips the effective tool passed in here.
+  const prevToolRef = useRef(activeTool);
+  useEffect(() => {
+    if (prevToolRef.current !== activeTool) {
+      prevToolRef.current = activeTool;
+      commitEdit(); // no-op when nothing is pending
+    }
+  }, [activeTool, commitEdit]);
+
   const getCoords = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>): Point => {
       const canvas = canvasRef.current;
@@ -131,6 +271,10 @@ export function useDrawingTools({
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext("2d");
       if (!canvas || !ctx) return;
+      // Starting a new drag on empty canvas commits the pending edit first.
+      // commitEdit flushes WASM→canvas synchronously, so the snapshot below
+      // includes the just-committed pixels.
+      if (editStateRef.current) commitEdit();
       const p = getCoords(e);
       isDrawing.current = true;
       startPoint.current = p;
@@ -138,7 +282,7 @@ export function useDrawingTools({
       preSnapshot.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
       if (activeTool === "crop") setCropSelection(null);
     },
-    [activeTool, canvasRef, getCoords],
+    [activeTool, canvasRef, getCoords, commitEdit],
   );
 
   const onMouseMove = useCallback(
@@ -195,7 +339,6 @@ export function useDrawingTools({
   const onMouseUp = useCallback(() => {
     if (!isDrawing.current || !startPoint.current) return;
     isDrawing.current = false;
-    const tool = toolRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     const start = startPoint.current;
@@ -217,44 +360,29 @@ export function useDrawingTools({
           height: Math.round(h),
         });
       }
-    } else if (tool && (activeTool === "arrow" || activeTool === "shapes")) {
-      if (activeTool === "arrow") {
-        tool.begin_draw_stroke("Arrow");
-        tool.draw_arrow(
-          start.x,
-          start.y,
-          end.x,
-          end.y,
-          settings.strokeColor,
-          settings.strokeWidth,
-          settings.arrowStyle === "double" ? 1 : 0,
-        );
-      } else {
-        const shapeMap: Record<string, number> = {
-          rect: 0,
-          circle: 1,
-          handCircle: 3,
-          line: 2,
-        };
-        tool.begin_draw_stroke("Shape");
-        tool.draw_shape(
-          start.x,
-          start.y,
-          end.x,
-          end.y,
-          shapeMap[settings.shape ?? "rect"] ?? 0,
-          settings.strokeColor,
-          settings.strokeWidth,
-        );
+    } else if (activeTool === "arrow" || activeTool === "shapes") {
+      // Edit-overlay flow: erase the rubber-band preview from the 2D canvas
+      // and hand the geometry to the SVG overlay instead of committing.
+      // Rust rasterization happens once, in commitEdit.
+      if (preSnapshot.current && ctx) {
+        ctx.putImageData(preSnapshot.current, 0, 0);
       }
-      flushToCanvas();
-      // FIX: sync React state so history/undo counters update after draw strokes
-      syncState();
+      // Ignore stray clicks / sub-3px drags — they'd produce invisible
+      // geometry (and, previously, an empty history snapshot).
+      if (Math.hypot(end.x - start.x, end.y - start.y) > 3) {
+        const next: DrawEditState = {
+          kind: activeTool === "arrow" ? "arrow" : "shape",
+          start,
+          end,
+        };
+        editStateRef.current = next;
+        setEditState(next);
+      }
     }
     startPoint.current = null;
     lastPoint.current = null;
     preSnapshot.current = null;
-  }, [activeTool, toolRef, canvasRef, settings, flushToCanvas, syncState, constrainDrag]);
+  }, [activeTool, canvasRef, constrainDrag]);
 
   const applyCrop = useCallback(() => {
     const tool = toolRef.current;
@@ -277,6 +405,10 @@ export function useDrawingTools({
     setCropSelection,
     applyCrop,
     clearCropSelection: () => setCropSelection(null),
+    editState,
+    updateEditGeometry,
+    commitEdit,
+    cancelEdit,
   };
 }
 

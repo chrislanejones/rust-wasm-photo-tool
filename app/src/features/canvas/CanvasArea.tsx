@@ -3,7 +3,7 @@
 // Item 3: Alt+Scroll zoom fix (zoom transform now uses panOffset)
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
-import type { CropSelection } from "@/hooks/useDrawingTools";
+import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTools";
 import { CompareSlider } from "./CompareSlider";
 
 // Data-URI SVG cursor for the rotate handle — there's no standard CSS
@@ -89,6 +89,119 @@ interface Props {
   isPanning?: boolean;
   cropSelection?: CropSelection | null;
   onCropChange?: (sel: CropSelection) => void;
+  /** Pending shape/arrow being edited via the Figma-style overlay. */
+  drawEditState?: DrawEditState | null;
+  /** Overlay handle drags push new geometry (canvas coords) up through this. */
+  onDrawEditChange?: (start: Point, end: Point) => void;
+  /** Live stroke/shape settings — read at render so panel tweaks update the
+   *  pending shape immediately (same values commitEdit reads at commit). */
+  drawSettings?: {
+    strokeColor: string;
+    strokeWidth: number;
+    arrowStyle: "single" | "double";
+    shape: "rect" | "circle" | "handCircle" | "line";
+  };
+}
+
+/**
+ * Arrow geometry in canvas coords — shaft endpoints plus head triangle(s).
+ * Mirrors the math in `drawArrowPreview` (useDrawingTools) and Rust's
+ * `drawing::draw_arrow`, so the SVG overlay matches the committed pixels.
+ */
+function arrowGeometry(
+  from: Point,
+  to: Point,
+  strokeWidth: number,
+  double: boolean,
+): { shaftStart: Point; shaftEnd: Point; heads: Point[][] } {
+  const headLength = Math.max(20, strokeWidth * 3);
+  const headWidth = Math.PI / 5;
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  const shaftEnd = {
+    x: to.x - headLength * 0.5 * Math.cos(angle),
+    y: to.y - headLength * 0.5 * Math.sin(angle),
+  };
+  const shaftStart = double
+    ? {
+        x: from.x + headLength * 0.5 * Math.cos(angle),
+        y: from.y + headLength * 0.5 * Math.sin(angle),
+      }
+    : { x: from.x, y: from.y };
+  const head = (tip: Point, a: number): Point[] => [
+    tip,
+    {
+      x: tip.x - headLength * Math.cos(a - headWidth),
+      y: tip.y - headLength * Math.sin(a - headWidth),
+    },
+    {
+      x: tip.x - headLength * Math.cos(a + headWidth),
+      y: tip.y - headLength * Math.sin(a + headWidth),
+    },
+  ];
+  return {
+    shaftStart,
+    shaftEnd,
+    heads: double ? [head(to, angle), head(from, angle + Math.PI)] : [head(to, angle)],
+  };
+}
+
+/**
+ * SVG path for the hand-drawn circle preview — a straight port of the
+ * `handCircle` case in `drawShapePreview` (wobbly ellipse with a lead-in
+ * tail, deterministic from the bbox coords). `toSX`/`toSY` map canvas
+ * coords to screen so the path tracks zoom/pan exactly.
+ */
+function handCirclePath(
+  from: Point,
+  to: Point,
+  toSX: (x: number) => number,
+  toSY: (y: number) => number,
+): string {
+  const x = Math.min(from.x, to.x);
+  const y = Math.min(from.y, to.y);
+  const w = Math.abs(to.x - from.x);
+  const h = Math.abs(to.y - from.y);
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const rx = w / 2;
+  const ry = h / 2;
+  const points = 60;
+
+  const startOffset = (from.x * 31.17 + from.y * 47.53) % (Math.PI * 2);
+  const mainArc = Math.PI * 2 - Math.PI * 0.15;
+  const seed = from.x * 31.17 + from.y * 47.53 + to.x * 13.91 + to.y * 67.37;
+
+  const getNoise = (angle: number) =>
+    Math.sin(angle * 2.3 + seed) * 3 +
+    Math.sin(angle * 1.1 + seed * 0.7) * 2 +
+    Math.cos(angle * 3.7 + seed * 1.3) * 1.5;
+
+  const tilt = (((seed * 1000) % 1000) / 1000 - 0.5) * 0.15;
+
+  const d: string[] = [];
+  // Tail
+  const tailLength = Math.PI * 0.3;
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    const angle = startOffset - tailLength * (1 - t);
+    const noise = getNoise(angle) * t;
+    const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
+    const inward = (1 - t) * (rx * 0.15);
+    const px = cx + (rx * squeeze - inward + noise) * Math.cos(angle + tilt);
+    const py = cy + (ry / squeeze - inward + noise) * Math.sin(angle + tilt);
+    d.push(`${i === 0 ? "M" : "L"}${toSX(px).toFixed(2)} ${toSY(py).toFixed(2)}`);
+  }
+  // Main circle
+  for (let i = 0; i <= points; i++) {
+    const t = i / points;
+    const angle = startOffset + t * mainArc;
+    const noise = getNoise(angle);
+    const squeeze = 1 + Math.sin(angle * 2 + seed) * 0.03;
+    const px = cx + (rx * squeeze + noise) * Math.cos(angle + tilt);
+    const py = cy + (ry / squeeze + noise) * Math.sin(angle + tilt);
+    d.push(`L${toSX(px).toFixed(2)} ${toSY(py).toFixed(2)}`);
+  }
+  return d.join(" ");
 }
 
 function getCursorForTool(tool?: string, isPanning?: boolean, colorPickerActive?: boolean): string | undefined {
@@ -136,6 +249,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       cropSelection,
       onCropChange,
       colorPickerActive,
+      drawEditState,
+      onDrawEditChange,
+      drawSettings,
     },
     ref,
   ) => {
@@ -291,6 +407,117 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       [cropSelection, canvasRef],
     );
 
+    // ── Shape/arrow edit-overlay drag ──────────────────────────────────
+    // Same window-listener pattern as the crop handles. Geometry math is
+    // plain JS (trivial); Rust does all pixel rendering at commit.
+    const drawDragRef = useRef<{
+      mode: "resize" | "move" | "endpoint";
+      /** resize: nw|n|ne|e|se|s|sw|w · endpoint: start|end · move: body */
+      handle: string;
+      startX: number;
+      startY: number;
+      startGeom: { sx: number; sy: number; ex: number; ey: number };
+      scaleX: number;
+      scaleY: number;
+    } | null>(null);
+
+    const onDrawEditChangeRef = useRef(onDrawEditChange);
+    useEffect(() => { onDrawEditChangeRef.current = onDrawEditChange; });
+
+    useEffect(() => {
+      const onMove = (e: PointerEvent) => {
+        const drag = drawDragRef.current;
+        const cb = onDrawEditChangeRef.current;
+        if (!drag || !cb) return;
+        const dx = (e.clientX - drag.startX) / drag.scaleX;
+        const dy = (e.clientY - drag.startY) / drag.scaleY;
+        const g = drag.startGeom;
+        if (drag.mode === "move") {
+          // Translate the whole geometry.
+          cb({ x: g.sx + dx, y: g.sy + dy }, { x: g.ex + dx, y: g.ey + dy });
+          return;
+        }
+        if (drag.mode === "endpoint") {
+          // Re-angle a line/arrow by dragging one endpoint freely.
+          if (drag.handle === "start") {
+            cb({ x: g.sx + dx, y: g.sy + dy }, { x: g.ex, y: g.ey });
+          } else {
+            cb({ x: g.sx, y: g.sy }, { x: g.ex + dx, y: g.ey + dy });
+          }
+          return;
+        }
+        // Resize: scale both endpoints about the bbox side(s) opposite the
+        // dragged handle. Corner handles scale both axes, edge handles one.
+        // Degenerate axes (perfectly horizontal/vertical segments) keep
+        // scale 1 — the endpoint circles re-angle those instead.
+        const x0 = Math.min(g.sx, g.ex);
+        const y0 = Math.min(g.sy, g.ey);
+        const x1 = Math.max(g.sx, g.ex);
+        const y1 = Math.max(g.sy, g.ey);
+        const MIN = 2; // canvas px — don't let the bbox collapse or flip
+        const h = drag.handle;
+        let kx = 1;
+        let ax = x0;
+        if (h.includes("w")) {
+          ax = x1;
+          if (x1 - x0 > 0.5) kx = Math.max(MIN, x1 - (x0 + dx)) / (x1 - x0);
+        } else if (h.includes("e")) {
+          ax = x0;
+          if (x1 - x0 > 0.5) kx = Math.max(MIN, x1 + dx - x0) / (x1 - x0);
+        }
+        let ky = 1;
+        let ay = y0;
+        if (h.includes("n")) {
+          ay = y1;
+          if (y1 - y0 > 0.5) ky = Math.max(MIN, y1 - (y0 + dy)) / (y1 - y0);
+        } else if (h.includes("s")) {
+          ay = y0;
+          if (y1 - y0 > 0.5) ky = Math.max(MIN, y1 + dy - y0) / (y1 - y0);
+        }
+        cb(
+          { x: ax + (g.sx - ax) * kx, y: ay + (g.sy - ay) * ky },
+          { x: ax + (g.ex - ax) * kx, y: ay + (g.ey - ay) * ky },
+        );
+      };
+      const onUp = () => { drawDragRef.current = null; };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      return () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+    }, []);
+
+    const handleDrawPointerDown = useCallback(
+      (
+        e: React.PointerEvent<SVGElement>,
+        mode: "resize" | "move" | "endpoint",
+        handle: string,
+      ) => {
+        if (!drawEditState || !canvasRef.current) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        drawDragRef.current = {
+          mode,
+          handle,
+          startX: e.clientX,
+          startY: e.clientY,
+          startGeom: {
+            sx: drawEditState.start.x,
+            sy: drawEditState.start.y,
+            ex: drawEditState.end.x,
+            ey: drawEditState.end.y,
+          },
+          scaleX: rect.width / canvas.width,
+          scaleY: rect.height / canvas.height,
+        };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      },
+      [drawEditState, canvasRef],
+    );
+
     let markerStyle: React.CSSProperties | null = null;
     if (state.sourcePos && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -426,6 +653,249 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   onPointerDown={(e) => handleCropPointerDown(e, h.id)}
                 />
               ))}
+            </svg>
+          );
+        })()}
+
+        {/* ── Shape/arrow edit overlay: SVG preview + dashed bbox + handles ──
+            Rendered while a drawn shape/arrow is pending (Figma-style edit
+            box). All sizes for grab targets are in SCREEN px so handles stay
+            grabbable at any zoom; geometry maps through the canvas rect like
+            the crop/text overlays. The preview is clipped to the canvas box
+            to match Rust's raster clipping at commit. */}
+        {drawEditState && drawSettings && canvasRef.current && (() => {
+          const canvas = canvasRef.current!;
+          const r = canvas.getBoundingClientRect();
+          const sx = r.width / canvas.width;
+          const sy = r.height / canvas.height;
+          const toSX = (x: number) => r.left + x * sx;
+          const toSY = (y: number) => r.top + y * sy;
+
+          const { start, end, kind } = drawEditState;
+          const shape = kind === "arrow" ? "line" : drawSettings.shape;
+          const isSegment = kind === "arrow" || shape === "line";
+
+          // Bounding box (canvas coords → viewport coords)
+          const bx0 = Math.min(start.x, end.x);
+          const by0 = Math.min(start.y, end.y);
+          const bx1 = Math.max(start.x, end.x);
+          const by1 = Math.max(start.y, end.y);
+          const vx = toSX(bx0);
+          const vy = toSY(by0);
+          const vw = (bx1 - bx0) * sx;
+          const vh = (by1 - by0) * sy;
+
+          const HS = 9;   // resize-square size — screen px, zoom-independent
+          const EP_R = 6; // endpoint-circle radius — screen px
+          const strokeW = Math.max(1, drawSettings.strokeWidth * sx);
+          const color = drawSettings.strokeColor;
+
+          // Move handle (line + dot above the box) — same geometry as the
+          // text overlay's "balloon string".
+          const STEM_GAP = 4;
+          const STEM_LEN = 18;
+          const DOT_OFFSET = 4;
+          const DOT_R = 5;
+
+          const handles = [
+            { id: "nw", hx: vx,          hy: vy,          cursor: "nw-resize" },
+            { id: "n",  hx: vx + vw / 2, hy: vy,          cursor: "n-resize"  },
+            { id: "ne", hx: vx + vw,     hy: vy,          cursor: "ne-resize" },
+            { id: "e",  hx: vx + vw,     hy: vy + vh / 2, cursor: "e-resize"  },
+            { id: "se", hx: vx + vw,     hy: vy + vh,     cursor: "se-resize" },
+            { id: "s",  hx: vx + vw / 2, hy: vy + vh,     cursor: "s-resize"  },
+            { id: "sw", hx: vx,          hy: vy + vh,     cursor: "sw-resize" },
+            { id: "w",  hx: vx,          hy: vy + vh / 2, cursor: "w-resize"  },
+          ];
+
+          // Geometry preview + invisible body hit-area (drag body = move).
+          const bodyProps = {
+            style: { cursor: "move", pointerEvents: "all" } as React.CSSProperties,
+            onPointerDown: (e: React.PointerEvent<SVGElement>) =>
+              handleDrawPointerDown(e, "move", "body"),
+          };
+          let preview: React.ReactNode = null;
+          let bodyHit: React.ReactNode = null;
+
+          if (kind === "arrow") {
+            const g = arrowGeometry(
+              start,
+              end,
+              drawSettings.strokeWidth,
+              drawSettings.arrowStyle === "double",
+            );
+            preview = (
+              <>
+                <line
+                  x1={toSX(g.shaftStart.x)} y1={toSY(g.shaftStart.y)}
+                  x2={toSX(g.shaftEnd.x)}   y2={toSY(g.shaftEnd.y)}
+                  stroke={color} strokeWidth={strokeW} strokeLinecap="round"
+                />
+                {g.heads.map((head, i) => (
+                  <polygon
+                    key={i}
+                    points={head.map((p) => `${toSX(p.x)},${toSY(p.y)}`).join(" ")}
+                    fill={color}
+                  />
+                ))}
+              </>
+            );
+            bodyHit = (
+              <line
+                x1={toSX(start.x)} y1={toSY(start.y)}
+                x2={toSX(end.x)}   y2={toSY(end.y)}
+                stroke="transparent" strokeWidth={Math.max(strokeW, 14)}
+                {...bodyProps}
+              />
+            );
+          } else if (shape === "line") {
+            preview = (
+              <line
+                x1={toSX(start.x)} y1={toSY(start.y)}
+                x2={toSX(end.x)}   y2={toSY(end.y)}
+                stroke={color} strokeWidth={strokeW} strokeLinecap="round"
+              />
+            );
+            bodyHit = (
+              <line
+                x1={toSX(start.x)} y1={toSY(start.y)}
+                x2={toSX(end.x)}   y2={toSY(end.y)}
+                stroke="transparent" strokeWidth={Math.max(strokeW, 14)}
+                {...bodyProps}
+              />
+            );
+          } else if (shape === "circle") {
+            // Rust parity: radius = half the SHORTER bbox dimension.
+            const cr = (Math.min(bx1 - bx0, by1 - by0) / 2) * sx;
+            const ccx = vx + vw / 2;
+            const ccy = vy + vh / 2;
+            preview = (
+              <circle cx={ccx} cy={ccy} r={cr} fill="none" stroke={color} strokeWidth={strokeW} />
+            );
+            bodyHit = (
+              <circle cx={ccx} cy={ccy} r={Math.max(cr, 8)} fill="transparent" {...bodyProps} />
+            );
+          } else if (shape === "handCircle") {
+            preview = (
+              <path
+                d={handCirclePath(start, end, toSX, toSY)}
+                fill="none" stroke={color} strokeWidth={strokeW}
+                strokeLinecap="round" strokeLinejoin="round"
+              />
+            );
+            bodyHit = (
+              <ellipse
+                cx={vx + vw / 2} cy={vy + vh / 2}
+                rx={Math.max(vw / 2, 8)} ry={Math.max(vh / 2, 8)}
+                fill="transparent" {...bodyProps}
+              />
+            );
+          } else {
+            // rect
+            preview = (
+              <rect
+                x={vx} y={vy} width={vw} height={vh}
+                fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
+              />
+            );
+            bodyHit = (
+              <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
+            );
+          }
+
+          return (
+            <svg
+              data-draw-overlay
+              style={{
+                position: "fixed",
+                inset: 0,
+                width: "100vw",
+                height: "100vh",
+                pointerEvents: "none",
+                zIndex: 45,
+                overflow: "hidden",
+              }}
+            >
+              <defs>
+                <clipPath id="draw-edit-clip">
+                  <rect x={r.left} y={r.top} width={r.width} height={r.height} />
+                </clipPath>
+              </defs>
+              {/* Live preview, clipped to the canvas box */}
+              <g clipPath="url(#draw-edit-clip)">{preview}</g>
+
+              {/* Dashed bounding box */}
+              <rect
+                x={vx} y={vy} width={vw} height={vh}
+                fill="none"
+                stroke="rgba(255,255,255,0.85)"
+                strokeWidth={1.5}
+                strokeDasharray="5 4"
+              />
+
+              {/* Body hit-area — drag anywhere on the shape to move it */}
+              {bodyHit}
+
+              {/* Move handle: vertical line + dot above the box (same markup
+                  as the text overlay's move handle) */}
+              {(() => {
+                const cx = vx + vw / 2;
+                const stemTop = vy - STEM_GAP;
+                const stemBot = stemTop - STEM_LEN;
+                const dotCy = stemBot - DOT_OFFSET;
+                const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                return (
+                  <g
+                    style={{ cursor: "move", pointerEvents: "all", filter }}
+                    onPointerDown={(e) => handleDrawPointerDown(e, "move", "body")}
+                  >
+                    {/* Invisible fat hit target for easier grabbing */}
+                    <rect
+                      x={cx - 8}
+                      y={dotCy - DOT_R - 2}
+                      width={16}
+                      height={vy - (dotCy - DOT_R - 2)}
+                      fill="transparent"
+                    />
+                    <line x1={cx} y1={stemTop} x2={cx} y2={stemBot} stroke="white" strokeWidth={2} />
+                    <circle cx={cx} cy={dotCy} r={DOT_R} fill="white" stroke="rgba(0,0,0,0.5)" strokeWidth={1} />
+                  </g>
+                );
+              })()}
+
+              {/* Resize squares — corners scale both axes, edges one axis */}
+              {handles.map((h) => (
+                <rect
+                  key={h.id}
+                  x={h.hx - HS / 2} y={h.hy - HS / 2}
+                  width={HS} height={HS}
+                  fill="white"
+                  stroke="rgba(0,0,0,0.4)"
+                  strokeWidth={1}
+                  rx={1}
+                  style={{ cursor: h.cursor, pointerEvents: "all" }}
+                  onPointerDown={(e) => handleDrawPointerDown(e, "resize", h.id)}
+                />
+              ))}
+
+              {/* Endpoint circles — line/arrow only: drag to re-angle the
+                  segment (the natural "rotate" for segments) */}
+              {isSegment && (
+                <>
+                  <circle
+                    cx={toSX(start.x)} cy={toSY(start.y)} r={EP_R}
+                    fill="white" stroke="rgba(0,0,0,0.5)" strokeWidth={1.5}
+                    style={{ cursor: "crosshair", pointerEvents: "all" }}
+                    onPointerDown={(e) => handleDrawPointerDown(e, "endpoint", "start")}
+                  />
+                  <circle
+                    cx={toSX(end.x)} cy={toSY(end.y)} r={EP_R}
+                    fill="white" stroke="rgba(0,0,0,0.5)" strokeWidth={1.5}
+                    style={{ cursor: "crosshair", pointerEvents: "all" }}
+                    onPointerDown={(e) => handleDrawPointerDown(e, "endpoint", "end")}
+                  />
+                </>
+              )}
             </svg>
           );
         })()}
