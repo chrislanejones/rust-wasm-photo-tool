@@ -395,5 +395,54 @@ declare module "stamp_tool" {
     text_annotation_at(x: number, y: number): number;
     render_with_annotations(): Uint8Array;
     flatten_text_annotations(): void;
+
+    // ── Live shape/arrow annotations (non-destructive, re-selectable) ──
+    // kind: 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow.
+    // arrow_style (arrows only): 0=single, 1=double.
+    shape_annotation_count(): number;
+    /** Add a live shape/arrow. Pushes an "Add Shape"/"Add Arrow" history step. Returns the new id. */
+    add_shape_annotation(
+      kind: number,
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color_hex: string,
+      stroke_width: number,
+      arrow_style: number,
+    ): number;
+    /** Restore a persisted shape WITHOUT pushing history (load path). Colour is raw r,g,b. */
+    restore_shape_annotation(
+      kind: number,
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      r: number,
+      g: number,
+      b: number,
+      stroke_width: number,
+      arrow_style: number,
+    ): number;
+    /** Update a shape in full (geometry + style). Pushes an "Edit Shape" history step. */
+    update_shape_annotation(
+      id: number,
+      kind: number,
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color_hex: string,
+      stroke_width: number,
+      arrow_style: number,
+    ): boolean;
+    /** Remove a shape. Pushes a "Delete Shape" history step. */
+    remove_shape_annotation(id: number): boolean;
+    /** Suppress one shape from render while its JS overlay preview is shown. Pass -1 to clear. */
+    set_editing_shape(id: number): void;
+    /** JSON array of all live shapes (id, kind, x0,y0,x1,y1, r,g,b, stroke_width, arrow_style). */
+    get_shape_annotations(): string;
+    /** Returns the matching shape id, or -1 if no hit. */
+    shape_annotation_at(x: number, y: number): number;
   }
 }

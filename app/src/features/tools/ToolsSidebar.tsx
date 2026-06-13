@@ -16,7 +16,6 @@ import type {
   ToolSettings,
 } from "@/lib/types";
 import type { ExportFormat } from "@/lib/exportImage";
-import type { TextMemory } from "./settings/TextSettings";
 import type { EffectsMode } from "./settings/EffectsSettings";
 import type { StampMode } from "./settings/StampSettings";
 import type { ShapesMode } from "./settings/ShapeSettings";
@@ -94,8 +93,6 @@ interface ToolsSidebarProps {
   onCropRatioChange?: (lock: [number, number] | null) => void;
   toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
-  recentTexts: TextMemory[];
-  onSelectRecentText: (m: TextMemory) => void;
   // Paint sub-mode (paint vs blur brush)
   brushMode?: "paint" | "blur";
   onBrushModeChange?: (mode: "paint" | "blur") => void;
@@ -168,8 +165,6 @@ export function ToolsSidebar({
   onCropRatioChange,
   toolSettings,
   onToolSettingsChange,
-  recentTexts,
-  onSelectRecentText,
   brushMode,
   onBrushModeChange,
   effectsMode,
@@ -339,8 +334,6 @@ export function ToolsSidebar({
           <TextSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}
-            recentTexts={recentTexts}
-            onSelectRecentText={onSelectRecentText}
           />
         )}
 

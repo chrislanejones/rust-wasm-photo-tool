@@ -13,7 +13,7 @@
 
 use std::collections::VecDeque;
 
-use crate::TextAnnotation;
+use crate::{ShapeAnnotation, TextAnnotation};
 
 pub const MAX_HISTORY: usize = 50;
 
@@ -23,6 +23,9 @@ pub struct Snapshot {
     pub width: u32,
     pub height: u32,
     pub annotations: Vec<TextAnnotation>,
+    /// Live shape/arrow annotations at the time of the snapshot — same
+    /// non-destructive overlay treatment as text annotations.
+    pub shapes: Vec<ShapeAnnotation>,
 }
 
 pub struct History {
@@ -47,6 +50,7 @@ impl History {
         width: u32,
         height: u32,
         annotations: Vec<TextAnnotation>,
+        shapes: Vec<ShapeAnnotation>,
     ) {
         self.undo_stack.push_back(Snapshot {
             label: label.to_string(),
@@ -54,6 +58,7 @@ impl History {
             width,
             height,
             annotations,
+            shapes,
         });
         if self.undo_stack.len() > MAX_HISTORY {
             self.undo_stack.pop_front();
@@ -62,14 +67,15 @@ impl History {
     }
 
     /// Undo: pops from undo stack, pushes current state to redo stack.
-    /// Returns (pixel_data, width, height, annotations) to restore, or None.
+    /// Returns (pixel_data, width, height, annotations, shapes) to restore, or None.
     pub fn undo(
         &mut self,
         current_data: &[u8],
         current_w: u32,
         current_h: u32,
         current_annotations: Vec<TextAnnotation>,
-    ) -> Option<(Vec<u8>, u32, u32, Vec<TextAnnotation>)> {
+        current_shapes: Vec<ShapeAnnotation>,
+    ) -> Option<(Vec<u8>, u32, u32, Vec<TextAnnotation>, Vec<ShapeAnnotation>)> {
         if let Some(snap) = self.undo_stack.pop_back() {
             self.redo_stack.push(Snapshot {
                 label: snap.label.clone(),
@@ -77,22 +83,24 @@ impl History {
                 width: current_w,
                 height: current_h,
                 annotations: current_annotations,
+                shapes: current_shapes,
             });
-            Some((snap.data, snap.width, snap.height, snap.annotations))
+            Some((snap.data, snap.width, snap.height, snap.annotations, snap.shapes))
         } else {
             None
         }
     }
 
     /// Redo: pops from redo stack, pushes current state to undo stack.
-    /// Returns (pixel_data, width, height, annotations) to restore, or None.
+    /// Returns (pixel_data, width, height, annotations, shapes) to restore, or None.
     pub fn redo(
         &mut self,
         current_data: &[u8],
         current_w: u32,
         current_h: u32,
         current_annotations: Vec<TextAnnotation>,
-    ) -> Option<(Vec<u8>, u32, u32, Vec<TextAnnotation>)> {
+        current_shapes: Vec<ShapeAnnotation>,
+    ) -> Option<(Vec<u8>, u32, u32, Vec<TextAnnotation>, Vec<ShapeAnnotation>)> {
         if let Some(snap) = self.redo_stack.pop() {
             self.undo_stack.push_back(Snapshot {
                 label: snap.label.clone(),
@@ -100,8 +108,9 @@ impl History {
                 width: current_w,
                 height: current_h,
                 annotations: current_annotations,
+                shapes: current_shapes,
             });
-            Some((snap.data, snap.width, snap.height, snap.annotations))
+            Some((snap.data, snap.width, snap.height, snap.annotations, snap.shapes))
         } else {
             None
         }
@@ -137,6 +146,7 @@ impl History {
         current_w: &mut u32,
         current_h: &mut u32,
         current_annotations: &mut Vec<TextAnnotation>,
+        current_shapes: &mut Vec<ShapeAnnotation>,
     ) -> bool {
         let current = self.undo_stack.len();
         if target_index == current {
@@ -145,13 +155,15 @@ impl History {
         if target_index < current {
             for _ in 0..(current - target_index) {
                 let anns = std::mem::take(current_annotations);
-                if let Some((data, w, h, restored_anns)) =
-                    self.undo(current_data, *current_w, *current_h, anns)
+                let shapes = std::mem::take(current_shapes);
+                if let Some((data, w, h, restored_anns, restored_shapes)) =
+                    self.undo(current_data, *current_w, *current_h, anns, shapes)
                 {
                     *current_data = data;
                     *current_w = w;
                     *current_h = h;
                     *current_annotations = restored_anns;
+                    *current_shapes = restored_shapes;
                 } else {
                     break;
                 }
@@ -159,13 +171,15 @@ impl History {
         } else {
             for _ in 0..(target_index - current) {
                 let anns = std::mem::take(current_annotations);
-                if let Some((data, w, h, restored_anns)) =
-                    self.redo(current_data, *current_w, *current_h, anns)
+                let shapes = std::mem::take(current_shapes);
+                if let Some((data, w, h, restored_anns, restored_shapes)) =
+                    self.redo(current_data, *current_w, *current_h, anns, shapes)
                 {
                     *current_data = data;
                     *current_w = w;
                     *current_h = h;
                     *current_annotations = restored_anns;
+                    *current_shapes = restored_shapes;
                 } else {
                     break;
                 }

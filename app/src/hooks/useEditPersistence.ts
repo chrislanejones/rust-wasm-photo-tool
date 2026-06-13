@@ -9,8 +9,14 @@ import {
   deletePhotoEdit as idbDelete,
   clearAllEdits as idbClear,
   parseSnapshotAnnotations,
+  parseShapes,
 } from "@/lib/editPersistence";
-import type { SavedEdit, SnapEntry, PersistedAnnotation } from "@/lib/editPersistence";
+import type {
+  SavedEdit,
+  SnapEntry,
+  PersistedAnnotation,
+  PersistedShape,
+} from "@/lib/editPersistence";
 
 // ── Archive encoding ───────────────────────────────────────────────────────
 // Packs canvas + full undo/redo history into a single binary blob so one
@@ -24,9 +30,10 @@ import type { SavedEdit, SnapEntry, PersistedAnnotation } from "@/lib/editPersis
 
 const MAGIC = 0x49485354; // "IHST"
 /** v3 appends a per-snapshot annotations JSON blob after each PNG so
- *  per-step text overlays survive cross-session reload. v2 archives are
- *  still loadable; their snapshots come back with empty overlays. */
-const VERSION = 3;
+ *  per-step text overlays survive cross-session reload. v4 appends a
+ *  trailing current-state shapes JSON blob (live shape/arrow overlay).
+ *  Older archives are still loadable; their shapes come back empty. */
+const VERSION = 4;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -37,9 +44,11 @@ function encodeArchive(
   undoStack: SnapEntry[],
   redoStack: SnapEntry[],
   annotationsJson: string,
+  shapesJson: string,
 ): Uint8Array {
   const labelBytes = (s: string) => enc.encode(s);
   const annBytes = enc.encode(annotationsJson);
+  const shapesBytes = enc.encode(shapesJson);
   // Pre-encode per-snapshot annotation JSON to avoid double work.
   const undoAnnBytes = undoStack.map((s) =>
     enc.encode(s.annotations ? JSON.stringify(s.annotations) : "[]"),
@@ -56,6 +65,7 @@ function encodeArchive(
     size += 4 + labelBytes(redoStack[i].label).length + 4 + redoStack[i].png.length + 4 + redoAnnBytes[i].length;
   }
   size += 4 + annBytes.length; // trailing current-state annotations JSON
+  size += 4 + shapesBytes.length; // trailing current-state shapes JSON (v4)
 
   const buf = new ArrayBuffer(size);
   const view = new DataView(buf);
@@ -84,6 +94,7 @@ function encodeArchive(
   }
 
   w32(annBytes.length); wb(annBytes);
+  w32(shapesBytes.length); wb(shapesBytes);
 
   return u8;
 }
@@ -98,7 +109,7 @@ function decodeArchive(data: Uint8Array): SavedEdit {
 
   if (r32() !== MAGIC) throw new Error("Invalid archive");
   const version = r32();
-  if (version !== 1 && version !== 2 && version !== 3) {
+  if (version < 1 || version > 4) {
     throw new Error("Unknown archive version");
   }
 
@@ -140,7 +151,16 @@ function decodeArchive(data: Uint8Array): SavedEdit {
     }
   }
 
-  return { canvasW, canvasH, canvasPng, undoStack, redoStack, annotations };
+  let shapes: PersistedShape[] = [];
+  if (version >= 4 && pos < data.length) {
+    try {
+      shapes = parseShapes(rstr());
+    } catch {
+      shapes = [];
+    }
+  }
+
+  return { canvasW, canvasH, canvasPng, undoStack, redoStack, annotations, shapes };
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────
@@ -222,7 +242,15 @@ export function useEditPersistence() {
             annotationsJson = "[]";
           }
 
-          const archive = encodeArchive(canvasW, canvasH, canvasPng, undoStack, redoStack, annotationsJson);
+          // Live shape annotations (re-editable overlay) — current state only.
+          let shapesJson = "[]";
+          try {
+            shapesJson = tool.get_shape_annotations() || "[]";
+          } catch {
+            shapesJson = "[]";
+          }
+
+          const archive = encodeArchive(canvasW, canvasH, canvasPng, undoStack, redoStack, annotationsJson, shapesJson);
           const uploadUrl = await generateUploadUrl();
           const resp = await fetch(uploadUrl, {
             method: "POST",

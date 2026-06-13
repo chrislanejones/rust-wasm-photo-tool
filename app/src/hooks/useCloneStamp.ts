@@ -124,11 +124,15 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       canvas.height = h;
     }
     const ctx = canvas.getContext("2d", { desynchronized: true })!;
-    // Fast path: when no live annotations, view WASM linear memory directly
-    // — no copy. The view MUST be reconstructed every call because the
-    // backing ArrayBuffer is replaced if WASM memory grows.
+    // Fast path: when no live overlays (text OR shapes), view WASM linear
+    // memory directly — no copy. The view MUST be reconstructed every call
+    // because the backing ArrayBuffer is replaced if WASM memory grows.
     const wasmMem = wasmMemoryRef.current;
-    if (t.text_annotation_count() === 0 && wasmMem) {
+    if (
+      t.text_annotation_count() === 0 &&
+      t.shape_annotation_count() === 0 &&
+      wasmMem
+    ) {
       const ptr = t.data_ptr();
       const len = t.data_len();
       const view = new Uint8ClampedArray(
@@ -343,6 +347,21 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
         }
       }
 
+      // Re-create live shape annotations (non-destructive overlay layer).
+      // restore_shape_annotation does NOT push history (the undo/redo stacks
+      // were injected above).
+      if (saved.shapes && saved.shapes.length > 0) {
+        for (const s of saved.shapes) {
+          tool.restore_shape_annotation(
+            s.kind,
+            s.x0, s.y0, s.x1, s.y1,
+            s.r, s.g, s.b,
+            s.stroke_width,
+            s.arrow_style,
+          );
+        }
+      }
+
       flushToCanvas();
       syncState();
     },
@@ -430,10 +449,10 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const exportPng = useCallback((sourceName = "image") => {
     const t = toolRef.current;
     if (!t) return;
-    // Burn any live text annotations into pixels first so the export
+    // Burn any live overlays (text + shapes) into pixels first so the export
     // includes them (with one history snapshot so undo restores the
     // live-overlay state).
-    if (t.text_annotation_count() > 0) {
+    if (t.text_annotation_count() > 0 || t.shape_annotation_count() > 0) {
       t.flatten_text_annotations();
       flushToCanvas();
       syncState();
@@ -457,9 +476,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       const canvas = canvasRef.current;
       if (!canvas) return;
       // Non-PNG export reads the canvas pixels via toBlob, so make sure
-      // annotations are burned into the buffer (and the canvas) first.
+      // overlays (text + shapes) are burned into the buffer (and the canvas) first.
       const t = toolRef.current;
-      if (t && t.text_annotation_count() > 0) {
+      if (t && (t.text_annotation_count() > 0 || t.shape_annotation_count() > 0)) {
         t.flatten_text_annotations();
         flushToCanvas();
         syncState();

@@ -1,9 +1,20 @@
 import { motion } from "framer-motion";
-import { History, RotateCcw, X } from "lucide-react";
+import { History, MousePointerSquareDashed, RotateCcw, X } from "lucide-react";
 import { slideFromRight } from "@/lib/animations";
 import { TinyButton } from "@/components/ui/tiny-button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import type { HistoryEntry } from "@/hooks/useCloneStamp";
+
+/** One placed object shown in the Reselect list (text or shape annotation). */
+export interface ReselectObject {
+  /** Stable React key, e.g. `t12` / `s7`. */
+  key: string;
+  type: "text" | "shape";
+  /** Annotation id within its own (text vs shape) id-space. */
+  id: number;
+  /** Display name, e.g. "Text #1", "Square #1", "Line #2". */
+  label: string;
+}
 
 interface Props {
   history: HistoryEntry[];
@@ -11,7 +22,19 @@ interface Props {
   onDelete: (index: number) => void;
   onClear: () => void;
   onClose: () => void;
+  /** Live placed objects (text + shapes) for the Reselect list. */
+  objects: ReselectObject[];
+  /** Click an object → load it into the canvas edit overlay to move/resize. */
+  onSelectObject: (o: ReselectObject) => void;
+  /** Hover-X → delete that object. */
+  onDeleteObject: (o: ReselectObject) => void;
 }
+
+const DeleteGlyph = () => (
+  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M2 2l8 8M10 2l-8 8" />
+  </svg>
+);
 
 export function HistoryPanel({
   history,
@@ -19,6 +42,9 @@ export function HistoryPanel({
   onDelete,
   onClear,
   onClose,
+  objects,
+  onSelectObject,
+  onDeleteObject,
 }: Props) {
   return (
     <motion.aside
@@ -87,19 +113,63 @@ export function HistoryPanel({
                   onDelete(entry.index);
                 }}
               >
-                <svg
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path d="M2 2l8 8M10 2l-8 8" />
-                </svg>
+                <DeleteGlyph />
               </button>
             )}
           </li>
         ))}
       </ul>
+
+      {/* ── Reselect: live placed objects (text + shapes) ───────────────
+          Bottom half of the panel. Click a row to load it back into the
+          canvas edit overlay (move / resize / re-angle); hover the X to
+          delete it. Replaces the old Recent Texts list. */}
+      <div className="reselect-section">
+        <div className="reselect-header">
+          <MousePointerSquareDashed className="h-3.5 w-3.5" />
+          <span>Reselect</span>
+          <TinyNumberBox className="ml-auto">{objects.length}</TinyNumberBox>
+        </div>
+        <ul className="history-list reselect-list">
+          {objects.length === 0 && (
+            <li className="history-empty">
+              <span className="large-badge">Add text or a shape to reselect it</span>
+            </li>
+          )}
+          {objects.map((o) => (
+            <li
+              key={o.key}
+              className="large-badge-item type-redo"
+              role="button"
+              tabIndex={0}
+              onClick={() => onSelectObject(o)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectObject(o);
+                } else if (e.key === "Delete" || e.key === "Backspace") {
+                  e.preventDefault();
+                  onDeleteObject(o);
+                }
+              }}
+              title={`Reselect ${o.label}`}
+            >
+              <span className="history-dot" />
+              <span className="large-badge">{o.label}</span>
+              <button
+                className="history-delete"
+                title={`Delete ${o.label}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteObject(o);
+                }}
+              >
+                <DeleteGlyph />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </motion.aside>
   );
 }

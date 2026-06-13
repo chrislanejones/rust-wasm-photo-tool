@@ -210,6 +210,29 @@ pub struct TextAnnotation {
     pub bg_tail: u8,           // 0 none, 1 Left, 2 Right, 3 TopLeft, 4 BottomRight, 5 BottomLeft
 }
 
+/// A live (non-destructive) shape/arrow annotation. Mirrors `TextAnnotation`:
+/// shapes sit in an overlay and are re-selectable / movable until
+/// `flatten_text_annotations` (which also flattens shapes) burns them into the
+/// pixel buffer at export. Geometry is stored as the two drag endpoints in
+/// canvas coords — exactly what `draw_shape` / `draw_arrow` consume — so the
+/// committed pixels match the live preview without a tile cache (shape
+/// rasterisation is cheap, unlike text).
+///
+/// `Clone` is derived so each history snapshot carries an independent copy
+/// (undo/redo restores the overlay too).
+#[derive(Clone)]
+pub struct ShapeAnnotation {
+    pub id: u32,
+    /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow.
+    pub kind: u8,
+    pub x0: f64, pub y0: f64,   // start point (canvas coords)
+    pub x1: f64, pub y1: f64,   // end point
+    pub r: u8, pub g: u8, pub b: u8,
+    pub stroke_width: f64,
+    /// Arrows only: 0=single-headed, 1=double-headed. Ignored for shapes.
+    pub arrow_style: u8,
+}
+
 #[wasm_bindgen]
 pub struct ImageHorseTool {
     buf: ImageBuffer,
@@ -225,6 +248,14 @@ pub struct ImageHorseTool {
     blur_kernel_cache: Option<(u32, Vec<f32>)>,
     text_annotations: Vec<TextAnnotation>,
     next_text_id: u32,
+    /// Live shape/arrow overlay — non-destructive, re-selectable. See
+    /// `ShapeAnnotation`.
+    shape_annotations: Vec<ShapeAnnotation>,
+    next_shape_id: u32,
+    /// When a shape is being edited via the JS Figma-style overlay, it is
+    /// suppressed from `render_with_annotations` so the live preview doesn't
+    /// double up with the committed pixels. `None` when nothing is editing.
+    editing_shape_id: Option<u32>,
 }
 
 /// Escape a string as a JSON string body (without surrounding quotes).
@@ -318,6 +349,77 @@ fn annotations_to_json(anns: &[TextAnnotation]) -> String {
     }
     out.push(']');
     out
+}
+
+/// Serialize a list of shape annotations to JSON for the JS overlay /
+/// Reselect list. Geometry is the raw endpoint pair; the JS side derives
+/// bounding boxes the same way Rust's `draw_shape` does.
+fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
+    let mut out = String::from("[");
+    for (i, s) in shapes.iter().enumerate() {
+        if i > 0 { out.push(','); }
+        out.push_str(&format!(
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{}}}",
+            s.id, s.kind,
+            s.x0, s.y0, s.x1, s.y1,
+            s.r, s.g, s.b,
+            s.stroke_width,
+            s.arrow_style,
+        ));
+    }
+    out.push(']');
+    out
+}
+
+/// Euclidean distance from point (px,py) to the segment (ax,ay)-(bx,by).
+/// Used for hit-testing line/arrow annotations.
+fn point_segment_distance(px: f64, py: f64, ax: f64, ay: f64, bx: f64, by: f64) -> f64 {
+    let dx = bx - ax;
+    let dy = by - ay;
+    let len_sq = dx * dx + dy * dy;
+    if len_sq < 1e-6 {
+        return ((px - ax).powi(2) + (py - ay).powi(2)).sqrt();
+    }
+    let t = (((px - ax) * dx + (py - ay) * dy) / len_sq).clamp(0.0, 1.0);
+    let cx = ax + t * dx;
+    let cy = ay + t * dy;
+    ((px - cx).powi(2) + (py - cy).powi(2)).sqrt()
+}
+
+/// Composite one shape annotation directly into `data` (RGBA, w×h) using the
+/// same drawing primitives as the instant-commit path, so the live overlay and
+/// the flattened pixels are identical.
+fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
+    let color = [s.r, s.g, s.b, 255];
+    if s.kind == 4 {
+        crate::drawing::draw_arrow(
+            data, w, h,
+            s.x0, s.y0, s.x1, s.y1,
+            color, s.stroke_width, s.arrow_style as u32,
+        );
+    } else {
+        crate::drawing::draw_shape(
+            data, w, h,
+            s.x0, s.y0, s.x1, s.y1,
+            s.kind as u32, color, s.stroke_width,
+        );
+    }
+}
+
+impl ImageHorseTool {
+    /// Push a history snapshot of the current buffer + both overlay layers
+    /// (text + shapes). Replaces the long inline `push_snapshot(...)` calls so
+    /// every history-creating action records the shape overlay too.
+    fn snap(&mut self, label: &str) {
+        self.hist.push_snapshot(
+            label,
+            &self.buf.data,
+            self.buf.width,
+            self.buf.height,
+            self.text_annotations.clone(),
+            self.shape_annotations.clone(),
+        );
+    }
 }
 
 /// Build the cached tile (rotated if needed) for an annotation's current
@@ -467,6 +569,9 @@ impl ImageHorseTool {
             blur_kernel_cache: None,
             text_annotations: Vec::new(),
             next_text_id: 1,
+            shape_annotations: Vec::new(),
+            next_shape_id: 1,
+            editing_shape_id: None,
         }
     }
 
@@ -488,6 +593,9 @@ impl ImageHorseTool {
             self.stamp.source_y = None;
             self.text_annotations.clear();
             self.next_text_id = 1;
+            self.shape_annotations.clear();
+            self.next_shape_id = 1;
+            self.editing_shape_id = None;
         }
     }
 
@@ -559,6 +667,7 @@ impl ImageHorseTool {
         let w = self.buf.width as i32;
         let h = self.buf.height as i32;
         let anns = self.text_annotations.clone();
+        let shapes = self.shape_annotations.clone();
         self.stamp.begin_stroke(
             &mut self.buf.data,
             w,
@@ -567,6 +676,7 @@ impl ImageHorseTool {
             dest_x,
             dest_y,
             anns,
+            shapes,
         );
     }
 
@@ -586,13 +696,15 @@ impl ImageHorseTool {
 
     pub fn undo(&mut self) -> bool {
         let anns = std::mem::take(&mut self.text_annotations);
-        if let Some((data, w, h, restored_anns)) =
-            self.hist.undo(&self.buf.data, self.buf.width, self.buf.height, anns)
+        let shapes = std::mem::take(&mut self.shape_annotations);
+        if let Some((data, w, h, restored_anns, restored_shapes)) =
+            self.hist.undo(&self.buf.data, self.buf.width, self.buf.height, anns, shapes)
         {
             self.buf.data = data;
             self.buf.width = w;
             self.buf.height = h;
             self.text_annotations = restored_anns;
+            self.shape_annotations = restored_shapes;
             true
         } else {
             false
@@ -601,13 +713,15 @@ impl ImageHorseTool {
 
     pub fn redo(&mut self) -> bool {
         let anns = std::mem::take(&mut self.text_annotations);
-        if let Some((data, w, h, restored_anns)) =
-            self.hist.redo(&self.buf.data, self.buf.width, self.buf.height, anns)
+        let shapes = std::mem::take(&mut self.shape_annotations);
+        if let Some((data, w, h, restored_anns, restored_shapes)) =
+            self.hist.redo(&self.buf.data, self.buf.width, self.buf.height, anns, shapes)
         {
             self.buf.data = data;
             self.buf.width = w;
             self.buf.height = h;
             self.text_annotations = restored_anns;
+            self.shape_annotations = restored_shapes;
             true
         } else {
             false
@@ -633,6 +747,7 @@ impl ImageHorseTool {
             &mut self.buf.width,
             &mut self.buf.height,
             &mut self.text_annotations,
+            &mut self.shape_annotations,
         )
     }
 
@@ -692,6 +807,7 @@ impl ImageHorseTool {
             width: w,
             height: h,
             annotations: Vec::new(),
+            shapes: Vec::new(),
         });
     }
 
@@ -703,6 +819,7 @@ impl ImageHorseTool {
             width: w,
             height: h,
             annotations: Vec::new(),
+            shapes: Vec::new(),
         });
     }
 
@@ -805,7 +922,7 @@ impl ImageHorseTool {
     // ── Transforms ──────────────────────────────────────────────────────
 
     pub fn flip_horizontal(&mut self) {
-        self.hist.push_snapshot("Flip H", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Flip H");
         let w = self.buf.width as usize;
         let h = self.buf.height as usize;
         transform::flip_horizontal(&mut self.buf.data, w, h);
@@ -815,7 +932,7 @@ impl ImageHorseTool {
     }
 
     pub fn flip_vertical(&mut self) {
-        self.hist.push_snapshot("Flip V", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Flip V");
         let w = self.buf.width as usize;
         let h = self.buf.height as usize;
         transform::flip_vertical(&mut self.buf.data, w, h);
@@ -825,7 +942,7 @@ impl ImageHorseTool {
     }
 
     pub fn rotate_90_cw(&mut self) {
-        self.hist.push_snapshot("Rotate 90° CW", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Rotate 90° CW");
         let (new_data, new_w, new_h) =
             transform::rotate_90_cw(&self.buf.data, self.buf.width as usize, self.buf.height as usize);
         self.buf.data = new_data;
@@ -836,7 +953,7 @@ impl ImageHorseTool {
     }
 
     pub fn rotate_90_ccw(&mut self) {
-        self.hist.push_snapshot("Rotate 90° CCW", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Rotate 90° CCW");
         let (new_data, new_w, new_h) =
             transform::rotate_90_ccw(&self.buf.data, self.buf.width as usize, self.buf.height as usize);
         self.buf.data = new_data;
@@ -847,7 +964,7 @@ impl ImageHorseTool {
     }
 
     pub fn crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        self.hist.push_snapshot("Crop", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Crop");
         let (new_data, new_w, new_h) =
             transform::crop(&self.buf.data, self.buf.width, self.buf.height, x, y, w, h);
         self.buf.data = new_data;
@@ -861,7 +978,7 @@ impl ImageHorseTool {
     /// Saves a snapshot, applies darkening overlay + dashed border.
     /// Call cancel_crop_preview() or apply_crop_from_preview() when done.
     pub fn preview_crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        self.hist.push_snapshot("Crop Preview", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Crop Preview");
         transform::apply_crop_overlay(
             &mut self.buf.data,
             self.buf.width,
@@ -888,13 +1005,15 @@ impl ImageHorseTool {
     /// Apply crop after preview: undo preview first, then crop for real.
     pub fn apply_crop_from_preview(&mut self, x: u32, y: u32, w: u32, h: u32) {
         let anns = std::mem::take(&mut self.text_annotations);
-        if let Some((data, bw, bh, restored_anns)) =
-            self.hist.undo(&self.buf.data, self.buf.width, self.buf.height, anns)
+        let shapes = std::mem::take(&mut self.shape_annotations);
+        if let Some((data, bw, bh, restored_anns, restored_shapes)) =
+            self.hist.undo(&self.buf.data, self.buf.width, self.buf.height, anns, shapes)
         {
             self.buf.data = data;
             self.buf.width = bw;
             self.buf.height = bh;
             self.text_annotations = restored_anns;
+            self.shape_annotations = restored_shapes;
         }
         self.crop(x, y, w, h);
     }
@@ -911,7 +1030,7 @@ impl ImageHorseTool {
         dest_x: i32,
         dest_y: i32,
     ) {
-        self.hist.push_snapshot("Paste", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Paste");
         transform::paste_region(
             &mut self.buf.data,
             self.buf.width as i32,
@@ -937,7 +1056,7 @@ impl ImageHorseTool {
         if new_w == 0 || new_h == 0 {
             return;
         }
-        self.hist.push_snapshot("Resize", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Resize");
         let resized = match filter {
             0 => transform::resize_nearest(
                 &self.buf.data,
@@ -981,18 +1100,18 @@ impl ImageHorseTool {
     /// the action should appear in the History panel even though undoing it
     /// is a visual no-op.
     pub fn push_compress_marker(&mut self) {
-        self.hist.push_snapshot("Compress", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Compress");
     }
 
     // ── Filters ─────────────────────────────────────────────────────────
 
     pub fn adjust_brightness(&mut self, delta: f64) {
-        self.hist.push_snapshot("Brightness", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Brightness");
         filters::adjust_brightness(&mut self.buf.data, delta);
     }
 
     pub fn adjust_contrast(&mut self, factor: f64) {
-        self.hist.push_snapshot("Contrast", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Contrast");
         filters::adjust_contrast(&mut self.buf.data, factor);
     }
 
@@ -1035,7 +1154,7 @@ impl ImageHorseTool {
  
     /// Begin a blur stroke — saves undo snapshot once
     pub fn begin_blur_stroke(&mut self) {
-        self.hist.push_snapshot("Blur", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Blur");
     }
  
     // Note: No end_blur_stroke needed — the snapshot is already saved.
@@ -1045,13 +1164,7 @@ impl ImageHorseTool {
     /// Save undo snapshot before drawing an arrow/shape.
     /// Call once on mousedown, then draw_arrow/draw_shape on mouseup.
     pub fn begin_draw_stroke(&mut self, label: &str) {
-        self.hist.push_snapshot(
-            label,
-            &self.buf.data,
-            self.buf.width,
-            self.buf.height,
-            self.text_annotations.clone(),
-        );
+        self.snap(label);
     }
  
     /// Draw an arrow onto the image buffer.
@@ -1094,6 +1207,142 @@ impl ImageHorseTool {
             shape, color, stroke_width,
         );
     }
+
+    // ── Live shape/arrow annotations (non-destructive, re-selectable) ────
+    // These replace the instant-bake draw_shape/draw_arrow path. Shapes live
+    // as an overlay (like text) so they can be reselected, moved, restyled,
+    // and deleted via the Reselect list until flattened at export.
+
+    pub fn shape_annotation_count(&self) -> usize {
+        self.shape_annotations.len()
+    }
+
+    /// Add a new shape/arrow annotation. `kind`: 0=rect,1=circle,2=line,
+    /// 3=handCircle,4=arrow. Pushes an "Add Shape"/"Add Arrow" snapshot so
+    /// undo removes it. Returns the new id.
+    pub fn add_shape_annotation(
+        &mut self,
+        kind: u8,
+        x0: f64, y0: f64,
+        x1: f64, y1: f64,
+        color_hex: &str,
+        stroke_width: f64,
+        arrow_style: u8,
+    ) -> u32 {
+        self.snap(if kind == 4 { "Add Arrow" } else { "Add Shape" });
+        let c = drawing::parse_hex_color(color_hex);
+        let id = self.next_shape_id;
+        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
+        self.shape_annotations.push(ShapeAnnotation {
+            id,
+            kind,
+            x0, y0, x1, y1,
+            r: c[0], g: c[1], b: c[2],
+            stroke_width,
+            arrow_style,
+        });
+        id
+    }
+
+    /// Restore a persisted shape annotation WITHOUT pushing history (used by
+    /// the load path — the undo/redo stacks are injected separately). Colour is
+    /// passed as raw r,g,b (the persisted JSON stores bytes, not hex). Returns
+    /// the new id.
+    pub fn restore_shape_annotation(
+        &mut self,
+        kind: u8,
+        x0: f64, y0: f64,
+        x1: f64, y1: f64,
+        r: u8, g: u8, b: u8,
+        stroke_width: f64,
+        arrow_style: u8,
+    ) -> u32 {
+        let id = self.next_shape_id;
+        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
+        self.shape_annotations.push(ShapeAnnotation {
+            id, kind, x0, y0, x1, y1, r, g, b, stroke_width, arrow_style,
+        });
+        id
+    }
+
+    /// Update an existing shape annotation in full (geometry + style). Pushes
+    /// an "Edit Shape" snapshot so undo restores the prior values. Used when a
+    /// drag/resize or panel restyle of a selected shape is committed.
+    pub fn update_shape_annotation(
+        &mut self,
+        id: u32,
+        kind: u8,
+        x0: f64, y0: f64,
+        x1: f64, y1: f64,
+        color_hex: &str,
+        stroke_width: f64,
+        arrow_style: u8,
+    ) -> bool {
+        if !self.shape_annotations.iter().any(|s| s.id == id) {
+            return false;
+        }
+        self.snap("Edit Shape");
+        let c = drawing::parse_hex_color(color_hex);
+        if let Some(s) = self.shape_annotations.iter_mut().find(|s| s.id == id) {
+            s.kind = kind;
+            s.x0 = x0; s.y0 = y0; s.x1 = x1; s.y1 = y1;
+            s.r = c[0]; s.g = c[1]; s.b = c[2];
+            s.stroke_width = stroke_width;
+            s.arrow_style = arrow_style;
+        }
+        true
+    }
+
+    /// Remove a shape annotation. Pushes a "Delete Shape" snapshot so undo
+    /// restores it. Returns true if found.
+    pub fn remove_shape_annotation(&mut self, id: u32) -> bool {
+        if !self.shape_annotations.iter().any(|s| s.id == id) {
+            return false;
+        }
+        self.snap("Delete Shape");
+        self.shape_annotations.retain(|s| s.id != id);
+        if self.editing_shape_id == Some(id) {
+            self.editing_shape_id = None;
+        }
+        true
+    }
+
+    /// Mark a shape as being edited (suppressed from render so the JS overlay
+    /// preview is the only thing drawn). Pass -1 to clear. No history.
+    pub fn set_editing_shape(&mut self, id: i32) {
+        self.editing_shape_id = if id < 0 { None } else { Some(id as u32) };
+    }
+
+    /// JSON dump of all shape annotations (metadata only). Used by the JS
+    /// overlay for hit-testing and by the Reselect list.
+    pub fn get_shape_annotations(&self) -> String {
+        shapes_to_json(&self.shape_annotations)
+    }
+
+    /// Hit-test shape annotations against a canvas-space point. Iterates
+    /// newest-first (last-added wins). Returns the id, or -1. Lines/arrows use
+    /// distance-to-segment; closed shapes use a padded bounding box.
+    pub fn shape_annotation_at(&self, x: f64, y: f64) -> i32 {
+        for s in self.shape_annotations.iter().rev() {
+            let pad = (s.stroke_width * 0.5).max(6.0);
+            let hit = if s.kind == 2 || s.kind == 4 {
+                // line / arrow → distance to the segment
+                point_segment_distance(x, y, s.x0, s.y0, s.x1, s.y1) <= pad + 4.0
+            } else {
+                // rect / circle / handCircle → padded bounding box
+                let minx = s.x0.min(s.x1) - pad;
+                let maxx = s.x0.max(s.x1) + pad;
+                let miny = s.y0.min(s.y1) - pad;
+                let maxy = s.y0.max(s.y1) + pad;
+                x >= minx && x <= maxx && y >= miny && y <= maxy
+            };
+            if hit {
+                return s.id as i32;
+            }
+        }
+        -1
+    }
+
     /// Stamp raw RGBA emoji pixels onto the image buffer at (dest_x, dest_y).
     /// The JS side renders the emoji to an OffscreenCanvas, extracts the pixels,
     /// and passes them here for alpha-compositing onto the WASM buffer.
@@ -1107,7 +1356,7 @@ impl ImageHorseTool {
         dest_x: i32,
         dest_y: i32,
     ) {
-        self.hist.push_snapshot("Emoji", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Emoji");
         transform::paste_region(
             &mut self.buf.data,
             self.buf.width as i32,
@@ -1131,7 +1380,7 @@ impl ImageHorseTool {
         dest_y: i32,
         target_size: u32,
     ) {
-        self.hist.push_snapshot("Red Stamp", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Red Stamp");
         // Scale stamp to target_size preserving aspect ratio
         let scale = target_size as f64 / src_w.max(src_h) as f64;
         let new_w = ((src_w as f64 * scale).round() as u32).max(1);
@@ -1172,7 +1421,7 @@ impl ImageHorseTool {
         angle_deg: f32,
     ) {
         let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
-        self.hist.push_snapshot("Text", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Text");
 
         if angle_deg.abs() < 0.5 {
             transform::paste_region(
@@ -1231,7 +1480,7 @@ impl ImageHorseTool {
         let new_w = ((rendered.width as f64 * scale).round() as u32).max(1);
         let new_h = ((rendered.height as f64 * scale).round() as u32).max(1);
         let scaled = transform::resize_bilinear(&rendered.pixels, rendered.width, rendered.height, new_w, new_h);
-        self.hist.push_snapshot("Red Stamp", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Red Stamp");
         transform::paste_region(
             &mut self.buf.data,
             self.buf.width as i32,
@@ -1247,7 +1496,7 @@ impl ImageHorseTool {
     // ── Paint / Brush Tool ──────────────────────────────────────
 
     pub fn paint_begin(&mut self) {
-        self.hist.push_snapshot("Paint", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        self.snap("Paint");
     }
 
     pub fn paint_dab(
@@ -1391,13 +1640,7 @@ impl ImageHorseTool {
         bg_corner_radius: u32,
         bg_tail: u8,
     ) -> u32 {
-        self.hist.push_snapshot(
-            "Add Text",
-            &self.buf.data,
-            self.buf.width,
-            self.buf.height,
-            self.text_annotations.clone(),
-        );
+        self.snap("Add Text");
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
         let ann = build_text_annotation(
@@ -1430,13 +1673,7 @@ impl ImageHorseTool {
         let Some(idx) = self.text_annotations.iter().position(|a| a.id == id) else {
             return false;
         };
-        self.hist.push_snapshot(
-            "Edit Text",
-            &self.buf.data,
-            self.buf.width,
-            self.buf.height,
-            self.text_annotations.clone(),
-        );
+        self.snap("Edit Text");
         let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
             build_annotation_tile(
                 text, font_size, r, g, b, bold, rotation_deg,
@@ -1470,13 +1707,7 @@ impl ImageHorseTool {
         if !self.text_annotations.iter().any(|a| a.id == id) {
             return false;
         }
-        self.hist.push_snapshot(
-            "Delete Text",
-            &self.buf.data,
-            self.buf.width,
-            self.buf.height,
-            self.text_annotations.clone(),
-        );
+        self.snap("Delete Text");
         self.text_annotations.retain(|a| a.id != id);
         true
     }
@@ -1505,15 +1736,23 @@ impl ImageHorseTool {
         -1
     }
 
-    /// Returns the main buffer with all annotation tiles composited on top.
-    /// Used by the display canvas blit so on-screen matches export.
+    /// Returns the main buffer with all annotation overlays composited on top:
+    /// shapes/arrows first, then text tiles. The shape currently being edited
+    /// (if any) is skipped so the JS overlay preview is the only thing drawn
+    /// for it. Used by the display canvas blit so on-screen matches export.
     pub fn render_with_annotations(&self) -> Vec<u8> {
-        if self.text_annotations.is_empty() {
+        if self.text_annotations.is_empty() && self.shape_annotations.is_empty() {
             return self.buf.data.clone();
         }
         let mut out = self.buf.data.clone();
         let w = self.buf.width as i32;
         let h = self.buf.height as i32;
+        // Shapes underneath.
+        for s in &self.shape_annotations {
+            if self.editing_shape_id == Some(s.id) { continue; }
+            render_shape_into(&mut out, self.buf.width, self.buf.height, s);
+        }
+        // Text on top.
         for a in &self.text_annotations {
             transform::paste_region(
                 &mut out,
@@ -1527,14 +1766,21 @@ impl ImageHorseTool {
         out
     }
 
-    /// Burn all annotations into the main buffer with a single history
-    /// snapshot, then clear the annotation list. Used at export time and
-    /// when the user explicitly wants to flatten.
+    /// Burn all overlays (shapes + text) into the main buffer with a single
+    /// history snapshot, then clear both overlay lists. Used at export time
+    /// and when the user explicitly wants to flatten.
     pub fn flatten_text_annotations(&mut self) {
-        if self.text_annotations.is_empty() { return; }
-        self.hist.push_snapshot("Flatten text", &self.buf.data, self.buf.width, self.buf.height, self.text_annotations.clone());
+        if self.text_annotations.is_empty() && self.shape_annotations.is_empty() {
+            return;
+        }
+        self.snap("Flatten");
         let w = self.buf.width as i32;
         let h = self.buf.height as i32;
+        // Shapes first (underneath the text), then text tiles on top.
+        let shapes = std::mem::take(&mut self.shape_annotations);
+        for s in &shapes {
+            render_shape_into(&mut self.buf.data, self.buf.width, self.buf.height, s);
+        }
         // Drain so we move tile pixels rather than cloning per annotation.
         let anns = std::mem::take(&mut self.text_annotations);
         for a in &anns {
@@ -1547,6 +1793,7 @@ impl ImageHorseTool {
                 a.y + a.tile_offset_y,
             );
         }
+        self.editing_shape_id = None;
     }
 }
 

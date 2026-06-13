@@ -307,6 +307,24 @@ export function useTextTool({
     [canvasRef, containerRef],
   );
 
+  /** Open an existing text annotation for editing by id (Reselect list).
+   *  Reads a fresh annotation list so geometry is current. */
+  const selectAnnotation = useCallback(
+    (id: number) => {
+      const tool = toolRef.current;
+      if (!tool) return;
+      let list: AnnotationMeta[] = [];
+      try {
+        list = JSON.parse(tool.get_text_annotations());
+      } catch {
+        list = [];
+      }
+      const ann = list.find((a) => a.id === id);
+      if (ann) editAnnotation(ann);
+    },
+    [toolRef, editAnnotation],
+  );
+
   const onCanvasClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!active) return;
@@ -586,6 +604,7 @@ export function useTextTool({
     setTextFontWeight,
     annotations,
     refreshAnnotations,
+    selectAnnotation,
     hoveredAnnotationId,
     editingAnnotationId: editingAnnotationId.current,
   };

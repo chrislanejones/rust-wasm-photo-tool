@@ -4,7 +4,7 @@
 //   Item 4: PgUp/PgDn gallery cycling
 //   Item 7: blur → effects rename, brightness/contrast in effects panel
 //   All other existing functionality preserved
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
@@ -15,7 +15,6 @@ import { usePaintTool } from "@/hooks/usePaintTool";
 import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
-import type { TextMemory } from "@/features/tools/settings/TextSettings";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { TopBar } from "@/components/TopBar";
@@ -26,6 +25,7 @@ import { ToolsSidebar } from "@/features/tools";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
 import { HistoryPanel } from "@/features/canvas/HistoryPanel";
+import type { ReselectObject } from "@/features/canvas/HistoryPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { getPhotoLimit, DEFAULT_PHOTO_LIMIT } from "@/lib/photoLimits";
@@ -116,7 +116,7 @@ export function AppShell() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stamp = useCloneStamp(canvasRef);
   const { savePhotoEdit, loadPhotoEdit, deletePhotoEdit, clearAllEdits } = useEditPersistence();
-  const { recentTexts, addRecentText } = useRecentTexts();
+  const { addRecentText } = useRecentTexts();
 
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     brushSize: 20,
@@ -199,19 +199,6 @@ export function AppShell() {
     return () =>
       window.removeEventListener("text-committed", handler as EventListener);
   }, [handleTextCommit]);
-
-  const reopenWithRef = useRef<((text: string) => void) | null>(null);
-
-  const handleSelectRecentText = useCallback((m: TextMemory) => {
-    setToolSettings((prev) => ({
-      ...prev,
-      fontSize: m.fontSize,
-      fontFamily: m.fontFamily ?? "sans-serif",
-      fontWeight: m.fontWeight,
-      textColor: m.textColor,
-    }));
-    reopenWithRef.current?.(m.text);
-  }, []);
 
   // ── Pixel-based loading (downscaled working copy) ──────────────────────────
   const loadImageFromPixels = useCallback(
@@ -710,7 +697,6 @@ export function AppShell() {
     syncState: stamp.syncState,
     active: activeTool === "text",
   });
-  reopenWithRef.current = textTool.reopenWith;
 
   /**
    * Canvas resize-handle drags land here. The open text input renders from
@@ -761,6 +747,69 @@ export function AppShell() {
     tile_w: a.tile_w,
     tile_h: a.tile_h,
   }));
+
+  // ── Reselect list: live placed objects (text + shapes) ─────────────────
+  // Names are per-kind ordinals computed in list order: Text #1, Square #1,
+  // Line #2, etc. The id is stable within its own (text vs shape) id-space.
+  const reselectObjects = useMemo<ReselectObject[]>(() => {
+    const items: ReselectObject[] = [];
+    textTool.annotations.forEach((a, i) => {
+      items.push({ key: `t${a.id}`, type: "text", id: a.id, label: `Text #${i + 1}` });
+    });
+    const KIND_LABEL: Record<number, string> = {
+      0: "Square",
+      1: "Circle",
+      2: "Line",
+      3: "Hand-drawn",
+      4: "Arrow",
+    };
+    const counters: Record<number, number> = {};
+    drawingTools.shapes.forEach((s) => {
+      counters[s.kind] = (counters[s.kind] ?? 0) + 1;
+      items.push({
+        key: `s${s.id}`,
+        type: "shape",
+        id: s.id,
+        label: `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`,
+      });
+    });
+    return items;
+  }, [textTool.annotations, drawingTools.shapes]);
+
+  // Keep the Reselect list fresh after any history mutation or photo switch
+  // (undo/redo/jump/load all change the live overlays under the hood).
+  useEffect(() => {
+    drawingTools.refreshShapes();
+    textTool.refreshAnnotations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stamp.state.history, activePhotoId]);
+
+  const handleSelectObject = useCallback(
+    (o: ReselectObject) => {
+      if (o.type === "text") {
+        setActiveTool("text");
+        textTool.selectAnnotation(o.id);
+      } else {
+        drawingTools.selectShape(o.id);
+      }
+    },
+    [textTool, drawingTools],
+  );
+
+  const handleDeleteObject = useCallback(
+    (o: ReselectObject) => {
+      if (o.type === "text") {
+        stamp.toolRef.current?.remove_text_annotation(o.id);
+        stamp.flushToCanvas();
+        stamp.syncState();
+        textTool.refreshAnnotations();
+        window.dispatchEvent(new Event("text-annotations-changed"));
+      } else {
+        drawingTools.removeShape(o.id);
+      }
+    },
+    [stamp, textTool, drawingTools],
+  );
 
   const redStampTool = useRedStampTool({
     toolRef: stamp.toolRef,
@@ -1375,8 +1424,6 @@ export function AppShell() {
             onCropRatioChange={setCropRatio}
             toolSettings={toolSettings}
             onToolSettingsChange={handleToolSettingsChange}
-            recentTexts={recentTexts}
-            onSelectRecentText={handleSelectRecentText}
             shapesMode={shapesMode}
             onShapesModeChange={setShapesMode}
             brushMode={brushMode}
@@ -1681,6 +1728,9 @@ export function AppShell() {
             onDelete={stamp.deleteHistoryEntry}
             onClear={stamp.clearHistory}
             onClose={() => setShowHistory(false)}
+            objects={reselectObjects}
+            onSelectObject={handleSelectObject}
+            onDeleteObject={handleDeleteObject}
           />
         )}
       </AnimatePresence>

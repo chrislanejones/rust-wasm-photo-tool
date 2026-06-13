@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Type, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
@@ -54,21 +54,11 @@ type TextMode = "text" | "background";
 interface TextSettingsProps {
   settings: ToolSettings;
   onChange: (s: ToolSettings) => void;
-  recentTexts: TextMemory[];
-  onSelectRecentText: (memory: TextMemory) => void;
-}
-
-function truncate(text: string, max = 16): string {
-  if (!text) return "Empty";
-  const line = text.split("\n")[0] ?? "";
-  return line.length <= max ? line || "Empty" : line.slice(0, max) + "…";
 }
 
 export function TextSettings({
   settings,
   onChange,
-  recentTexts,
-  onSelectRecentText,
 }: TextSettingsProps) {
   const [mode, setMode] = useState<TextMode>("text");
 
@@ -148,34 +138,6 @@ export function TextSettings({
               value={settings.textColor}
               onChange={(color) => onChange({ ...settings, textColor: color })}
             />
-
-            {/* Recent Texts */}
-            <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-                Recent Texts
-              </label>
-              {recentTexts.length === 0 ? (
-                <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs large-badge-item type-current">
-                  <span className="large-badge">Add Text to See Text History</span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {recentTexts.slice(0, 6).map((memory) => (
-                    <button
-                      key={memory.id}
-                      onClick={() => onSelectRecentText(memory)}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/20 text-text-primary hover:ring-2 hover:ring-accent/50 transition-all min-w-0"
-                      title="Click to reopen this text for editing"
-                    >
-                      <Type className="h-4 w-4 shrink-0" />
-                      <span className="text-sm font-medium truncate">
-                        {truncate(memory.text)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
           </motion.div>
         )}
 

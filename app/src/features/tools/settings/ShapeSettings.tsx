@@ -32,7 +32,9 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
   const currentShape = (settings.shape ?? "rect") as ShapeType;
 
   return (
-    <div className="space-y-6">
+    // data-draw-panel: clicking inside this panel must NOT commit a pending
+    // shape edit, so stroke/colour/shape tweaks live-update the overlay.
+    <div className="space-y-6" data-draw-panel>
       <TabGroup
         tabs={[
           { id: "shapes", label: "Shapes" },

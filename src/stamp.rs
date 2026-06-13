@@ -77,6 +77,7 @@ impl StampState {
         dest_x: f64,
         dest_y: f64,
         annotations: Vec<crate::TextAnnotation>,
+        shapes: Vec<crate::ShapeAnnotation>,
     ) {
         let (sx, sy) = match (self.source_x, self.source_y) {
             (Some(x), Some(y)) => (x as f64, y as f64),
@@ -98,6 +99,7 @@ impl StampState {
             width: w as u32,
             height: h as u32,
             annotations,
+            shapes,
         });
         redo_stack.clear();
         self.stamp_at(data, w, h, dest_x, dest_y);

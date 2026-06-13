@@ -28,6 +28,55 @@ export interface DrawEditState {
   kind: "shape" | "arrow";
   start: Point;
   end: Point;
+  /** When set, we're editing an EXISTING live shape annotation (this id)
+   *  rather than creating a new one. Commit calls update_shape_annotation. */
+  editId?: number;
+  /** Snapshot of the shape's own kind + style, used when re-selecting an
+   *  existing shape so the overlay preview renders with the shape's real
+   *  style rather than the current toolbar settings. New shapes leave this
+   *  undefined and read settings live. */
+  style?: {
+    shape: "rect" | "circle" | "handCircle" | "line";
+    strokeColor: string;
+    strokeWidth: number;
+    arrowStyle: "single" | "double";
+  };
+}
+
+/** One entry from `tool.get_shape_annotations()`. */
+export interface ShapeMeta {
+  id: number;
+  kind: number; // 0=rect,1=circle,2=line,3=handCircle,4=arrow
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  r: number;
+  g: number;
+  b: number;
+  stroke_width: number;
+  arrow_style: number;
+}
+
+/** Rust shape `kind` byte → ToolSettings shape name (non-arrow kinds). */
+const SHAPE_KIND_NAME: Record<number, "rect" | "circle" | "handCircle" | "line"> = {
+  0: "rect",
+  1: "circle",
+  2: "line",
+  3: "handCircle",
+};
+
+/** ToolSettings shape name → Rust `kind` byte. */
+const SHAPE_NAME_KIND: Record<string, number> = {
+  rect: 0,
+  circle: 1,
+  line: 2,
+  handCircle: 3,
+};
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const h = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`;
 }
 
 interface UseDrawingToolsOptions {
@@ -135,11 +184,32 @@ export function useDrawingTools({
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
+  // True once the user actually drags an existing-shape selection — lets
+  // commitEdit skip a no-op "Edit Shape" history entry when a selection is
+  // committed without being moved.
+  const editDirtyRef = useRef(false);
+
+  // Live shape annotations (for the Reselect list + canvas hit-test).
+  const [shapes, setShapes] = useState<ShapeMeta[]>([]);
+  const refreshShapes = useCallback(() => {
+    const tool = toolRef.current;
+    if (!tool) {
+      setShapes([]);
+      return;
+    }
+    try {
+      setShapes(JSON.parse(tool.get_shape_annotations()) as ShapeMeta[]);
+    } catch {
+      setShapes([]);
+    }
+  }, [toolRef]);
+
   /**
-   * Rasterize the pending shape/arrow into the WASM buffer via the SAME
-   * Rust entry points the old instant-commit path used — one history
-   * snapshot per shape, all pixel work stays in Rust. No-op when nothing
-   * is pending, so every trigger can call it unconditionally.
+   * Commit the pending shape/arrow as a live (non-destructive) annotation:
+   * `add_shape_annotation` for a freshly drawn shape, or
+   * `update_shape_annotation` when re-editing an existing one. All pixel work
+   * stays in Rust; the shape remains re-selectable. No-op when nothing is
+   * pending, so every trigger can call it unconditionally.
    */
   const commitEdit = useCallback(() => {
     const es = editStateRef.current;
@@ -149,47 +219,148 @@ export function useDrawingTools({
     const tool = toolRef.current;
     if (!tool) return;
     const s = settingsRef.current;
-    if (es.kind === "arrow") {
-      tool.begin_draw_stroke("Arrow");
-      tool.draw_arrow(
+    // Existing-shape edits keep the shape's own style; new shapes read the
+    // current toolbar settings live.
+    const shapeName = es.style?.shape ?? s.shape ?? "rect";
+    const strokeColor = es.style?.strokeColor ?? s.strokeColor;
+    const strokeWidth = es.style?.strokeWidth ?? s.strokeWidth;
+    const arrowStyle = es.style?.arrowStyle ?? s.arrowStyle;
+    const kind = es.kind === "arrow" ? 4 : (SHAPE_NAME_KIND[shapeName] ?? 0);
+    const arrowByte = arrowStyle === "double" ? 1 : 0;
+    if (es.editId != null) {
+      // Re-selection committed without a drag → just un-hide it, no history.
+      if (!editDirtyRef.current) {
+        tool.set_editing_shape(-1);
+        flushToCanvas();
+        refreshShapes();
+        return;
+      }
+      tool.update_shape_annotation(
+        es.editId,
+        kind,
         es.start.x,
         es.start.y,
         es.end.x,
         es.end.y,
-        s.strokeColor,
-        s.strokeWidth,
-        s.arrowStyle === "double" ? 1 : 0,
+        strokeColor,
+        strokeWidth,
+        arrowByte,
       );
+      tool.set_editing_shape(-1);
     } else {
-      const shapeMap: Record<string, number> = {
-        rect: 0,
-        circle: 1,
-        handCircle: 3,
-        line: 2,
-      };
-      tool.begin_draw_stroke("Shape");
-      tool.draw_shape(
+      tool.add_shape_annotation(
+        kind,
         es.start.x,
         es.start.y,
         es.end.x,
         es.end.y,
-        shapeMap[s.shape ?? "rect"] ?? 0,
-        s.strokeColor,
-        s.strokeWidth,
+        strokeColor,
+        strokeWidth,
+        arrowByte,
       );
     }
     flushToCanvas();
     syncState();
-  }, [toolRef, flushToCanvas, syncState]);
+    refreshShapes();
+  }, [toolRef, flushToCanvas, syncState, refreshShapes]);
 
-  /** Escape: drop the pending shape without touching the image or history. */
+  /** Escape: drop the pending edit. For an existing-shape edit this also
+   *  un-hides the committed shape (clears the Rust editing flag) and repaints. */
   const cancelEdit = useCallback(() => {
+    const es = editStateRef.current;
     editStateRef.current = null;
     setEditState(null);
-  }, []);
+    if (es?.editId != null) {
+      toolRef.current?.set_editing_shape(-1);
+      flushToCanvas();
+    }
+  }, [toolRef, flushToCanvas]);
+
+  /** Load an existing live shape into the edit overlay so it can be moved,
+   *  resized, or re-angled. The committed shape is suppressed from the Rust
+   *  render while editing (the overlay preview stands in for it). */
+  const selectShape = useCallback(
+    (id: number) => {
+      const tool = toolRef.current;
+      if (!tool) return;
+      if (editStateRef.current) commitEdit();
+      let list: ShapeMeta[] = [];
+      try {
+        list = JSON.parse(tool.get_shape_annotations()) as ShapeMeta[];
+      } catch {
+        list = [];
+      }
+      const sh = list.find((s) => s.id === id);
+      if (!sh) return;
+      const next: DrawEditState = {
+        kind: sh.kind === 4 ? "arrow" : "shape",
+        start: { x: sh.x0, y: sh.y0 },
+        end: { x: sh.x1, y: sh.y1 },
+        editId: id,
+        style: {
+          shape: sh.kind === 4 ? "line" : (SHAPE_KIND_NAME[sh.kind] ?? "rect"),
+          strokeColor: rgbToHex(sh.r, sh.g, sh.b),
+          strokeWidth: sh.stroke_width,
+          arrowStyle: sh.arrow_style === 1 ? "double" : "single",
+        },
+      };
+      tool.set_editing_shape(id);
+      flushToCanvas();
+      editDirtyRef.current = false;
+      editStateRef.current = next;
+      setEditState(next);
+    },
+    [toolRef, commitEdit, flushToCanvas],
+  );
+
+  /** Delete a live shape (from the Reselect list X). One history step. */
+  const removeShape = useCallback(
+    (id: number) => {
+      const tool = toolRef.current;
+      if (!tool) return;
+      if (editStateRef.current?.editId === id) {
+        editStateRef.current = null;
+        setEditState(null);
+        tool.set_editing_shape(-1);
+      }
+      tool.remove_shape_annotation(id);
+      flushToCanvas();
+      syncState();
+      refreshShapes();
+    },
+    [toolRef, flushToCanvas, syncState, refreshShapes],
+  );
+
+  // Refresh the shape list after any external history change (undo/redo/jump
+  // restore a different shape overlay). Same event the text tool listens to.
+  // If the shape currently being edited vanished (undone away), drop the
+  // overlay so we don't leave a hidden shape with no preview.
+  useEffect(() => {
+    const handler = () => {
+      refreshShapes();
+      const editId = editStateRef.current?.editId;
+      if (editId == null) return;
+      const tool = toolRef.current;
+      let stillThere = false;
+      try {
+        stillThere = (JSON.parse(tool?.get_shape_annotations() ?? "[]") as ShapeMeta[])
+          .some((s) => s.id === editId);
+      } catch {
+        stillThere = false;
+      }
+      if (!stillThere) {
+        editStateRef.current = null;
+        setEditState(null);
+        tool?.set_editing_shape(-1);
+      }
+    };
+    window.addEventListener("text-annotations-changed", handler);
+    return () => window.removeEventListener("text-annotations-changed", handler);
+  }, [refreshShapes, toolRef]);
 
   /** Overlay handle drags push new geometry here (canvas coords). */
   const updateEditGeometry = useCallback((start: Point, end: Point) => {
+    editDirtyRef.current = true;
     setEditState((prev) => {
       if (!prev) return prev;
       const next = { ...prev, start, end };
@@ -276,13 +447,22 @@ export function useDrawingTools({
       // includes the just-committed pixels.
       if (editStateRef.current) commitEdit();
       const p = getCoords(e);
+      // Shape/arrow tools: clicking an existing live shape re-selects it for
+      // editing instead of starting a brand-new rubber-band drag.
+      if (activeTool === "arrow" || activeTool === "shapes") {
+        const hit = toolRef.current?.shape_annotation_at(p.x, p.y) ?? -1;
+        if (hit >= 0) {
+          selectShape(hit);
+          return;
+        }
+      }
       isDrawing.current = true;
       startPoint.current = p;
       lastPoint.current = p;
       preSnapshot.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
       if (activeTool === "crop") setCropSelection(null);
     },
-    [activeTool, canvasRef, getCoords, commitEdit],
+    [activeTool, canvasRef, getCoords, commitEdit, toolRef, selectShape],
   );
 
   const onMouseMove = useCallback(
@@ -409,13 +589,19 @@ export function useDrawingTools({
     updateEditGeometry,
     commitEdit,
     cancelEdit,
+    // Live shape annotations (Reselect list + selection)
+    shapes,
+    refreshShapes,
+    selectShape,
+    removeShape,
   };
 }
 
 /* ------------------------------------------------------------------ */
-/* JS preview functions (used during drag only, not committed)         */
-/* These run on Canvas2D for real-time feedback. The Rust commit        */
-/* happens in onMouseUp above via tool.draw_arrow / tool.draw_shape.   */
+/* JS preview functions (used during the initial rubber-band drag only).*/
+/* These run on Canvas2D for real-time feedback. On mouseup the geometry */
+/* becomes a DrawEditState (Figma-style overlay); the Rust commit happens */
+/* in commitEdit via tool.add_shape_annotation / update_shape_annotation. */
 /* ------------------------------------------------------------------ */
 
 function drawArrowPreview(

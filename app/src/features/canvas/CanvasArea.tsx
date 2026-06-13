@@ -672,7 +672,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const toSY = (y: number) => r.top + y * sy;
 
           const { start, end, kind } = drawEditState;
-          const shape = kind === "arrow" ? "line" : drawSettings.shape;
+          // When re-editing an existing shape, render with its own captured
+          // style rather than the live toolbar settings (a new shape has no
+          // `style` and reads the toolbar).
+          const eff = drawEditState.style ?? drawSettings;
+          const shape = kind === "arrow" ? "line" : eff.shape;
           const isSegment = kind === "arrow" || shape === "line";
 
           // Bounding box (canvas coords → viewport coords)
@@ -687,8 +691,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
           const HS = 9;   // resize-square size — screen px, zoom-independent
           const EP_R = 6; // endpoint-circle radius — screen px
-          const strokeW = Math.max(1, drawSettings.strokeWidth * sx);
-          const color = drawSettings.strokeColor;
+          const strokeW = Math.max(1, eff.strokeWidth * sx);
+          const color = eff.strokeColor;
 
           // Move handle (line + dot above the box) — same geometry as the
           // text overlay's "balloon string".
@@ -721,8 +725,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             const g = arrowGeometry(
               start,
               end,
-              drawSettings.strokeWidth,
-              drawSettings.arrowStyle === "double",
+              eff.strokeWidth,
+              eff.arrowStyle === "double",
             );
             preview = (
               <>
@@ -1087,17 +1091,28 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             window.addEventListener("pointerup", onUp);
           };
 
-          // Rotate drag — angle from box centre to mouse, 0° = handle pointing up
+          // Rotate drag — orbit the handle around the box centre. We track the
+          // ANGULAR DELTA from where the user grabbed (not the absolute mouse
+          // angle): the handle rests below the box, so reading the absolute
+          // angle snapped the text ~180° the instant it was grabbed. Starting
+          // from the current rotation and adding the delta keeps the grab
+          // point stationary and rotation continuous.
           const handleRotatePointerDown = (e: React.PointerEvent<SVGElement>) => {
             e.stopPropagation();
             e.preventDefault();
             e.currentTarget.setPointerCapture(e.pointerId);
+            const startRotation = textInput.rotation ?? 0;
+            const grabAngle =
+              Math.atan2(e.clientX - bcx, -(e.clientY - bcy)) * (180 / Math.PI);
 
             const onMove = (me: PointerEvent) => {
-              const dx = me.clientX - bcx;
-              const dy = me.clientY - bcy;
-              const angle = Math.atan2(dx, -dy) * (180 / Math.PI);
-              onTextRotationChange?.(Math.round(angle));
+              const a =
+                Math.atan2(me.clientX - bcx, -(me.clientY - bcy)) * (180 / Math.PI);
+              let next = startRotation + (a - grabAngle);
+              // Normalise to (-180, 180] so the committed value stays small.
+              while (next > 180) next -= 360;
+              while (next <= -180) next += 360;
+              onTextRotationChange?.(Math.round(next));
             };
             const onUp = () => {
               window.removeEventListener("pointermove", onMove);

@@ -9,7 +9,7 @@ interface ArrowSettingsProps {
 
 export function ArrowSettings(_props: ArrowSettingsProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-draw-panel>
       <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-theme-muted/50 bg-theme-muted/20 px-4 py-10 text-center">
         <FileText className="h-8 w-8 text-theme-muted-foreground" />
         <div className="space-y-1">

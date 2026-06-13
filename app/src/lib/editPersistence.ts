@@ -99,6 +99,32 @@ export interface PersistedAnnotation {
   bg_tail?: number;
 }
 
+/** One live (non-destructive) shape/arrow annotation, as emitted by Rust's
+ *  `get_shape_annotations`. The `id` is regenerated on restore. */
+export interface PersistedShape {
+  id?: number;
+  kind: number; // 0=rect,1=circle,2=line,3=handCircle,4=arrow
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  r: number;
+  g: number;
+  b: number;
+  stroke_width: number;
+  arrow_style: number;
+}
+
+/** Parse the JSON emitted by `get_shape_annotations`. */
+export function parseShapes(raw: string): PersistedShape[] {
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as PersistedShape[];
+  } catch {
+    return [];
+  }
+}
+
 export interface SavedEdit {
   canvasW: number;
   canvasH: number;
@@ -111,6 +137,9 @@ export interface SavedEdit {
   /** Live text annotations (re-editable overlay layer). Optional for
    *  backwards-compat with older persisted entries. */
   annotations?: PersistedAnnotation[];
+  /** Live shape/arrow annotations (re-editable overlay layer). Optional for
+   *  backwards-compat with older persisted entries. */
+  shapes?: PersistedShape[];
 }
 
 /** Parse the JSON emitted by `get_*_snapshot_annotations`. Drops tile_*
@@ -216,6 +245,9 @@ export async function savePhotoEdit(
     annotations = [];
   }
 
+  // Live (non-destructive) shape annotations.
+  const shapes = parseShapes(t.get_shape_annotations());
+
   await idbSet<SavedEdit>(`edit-${photoId}`, {
     canvasW,
     canvasH,
@@ -223,6 +255,7 @@ export async function savePhotoEdit(
     undoStack,
     redoStack,
     annotations,
+    shapes,
   });
 }
 

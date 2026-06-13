@@ -27,8 +27,8 @@ interface Release {
 const RELEASES: Release[] = [
   {
     version: "v0.9.10",
-    date: "2026-07",
-    headline: "June optimization pass — faster Rust, smaller WASM, Squoosh-style resize",
+    date: "2026-06-12",
+    headline: "June optimization pass — faster Rust, smaller WASM, Squoosh-style resize, shape edit boxes",
     entries: [
       { tag: "perf",    text: "WASM binary down 60% — 1.10 MB to 443 KB — by subsetting the embedded Liberation Sans fonts to Latin-1 + Extended-A, plus a sweep of Rust hot-loop optimizations (f32 math, opaque-source fast paths, cached blur kernels, VecDeque undo stack)." },
       { tag: "perf",    text: "Zero-copy canvas painting — the display blit reads WASM linear memory directly instead of cloning the full pixel buffer every frame, eliminating ~1 GB/s of allocator churn during brush strokes." },
@@ -36,7 +36,12 @@ const RELEASES: Release[] = [
       { tag: "feature", text: "Squoosh-style Resize panel — Scale % slider, Dimensions with aspect lock, then a Compress section grouping Method, Format (moved out of the top bar), and Quality." },
       { tag: "feature", text: "Apply Compression & Resize re-encodes at the chosen format and quality, swaps the stored file, and updates the status-bar size, dimensions, and gallery tooltip in place." },
       { tag: "feature", text: "PageSpeed Insights score (renamed from Lighthouse) now models Google's real image audits: next-gen format ratios (WebP/AVIF score higher) and an oversize penalty past 1920px." },
+      { tag: "feature", text: "Shape & Arrow edit boxes — all four shapes and both arrow styles drop into a Figma-style overlay with resize squares, a move handle, and per-endpoint circles for lines/arrows. Commit still rasterizes in Rust, one history snapshot per shape." },
+      { tag: "feature", text: "Export gating — single Export disabled until the active photo has edits; Export All needs two or more photos with at least one edited, each with a tooltip explaining why." },
       { tag: "fix",     text: "A/B Compare overhauled — unlocks on any pending panel change, always compares against the immutable upload original, and the overlay now tracks zoom and pan transforms instead of drifting." },
+      { tag: "fix",     text: "Levels blur slider — JS was sending a 0–1 fraction into Rust's u32 intensity (truncated to 0 → invisible blur); now mapped to the 1–30 kernel range." },
+      { tag: "fix",     text: "Many small fixes — eyedropper added to the right-click menu, Delete-All canvas ghost cleared, sidebar tooltip copy refreshed, upload-dialog link styled as a LargeButton." },
+      { tag: "ui",      text: "Keyboard accessibility pass — focus-visible accent ring (was globally suppressed), tabbable gallery thumbs and history entries, upload dialog focuses Browse Files on open and closes on Escape." },
       { tag: "ui",      text: "Architecture page returns — the full backend diagram (client → WASM → auth → API → storage/Convex/AI) rebuilt and re-linked in the nav and footer; pricing details stay on the Pricing section." },
       { tag: "ui",      text: "GitHub and Codeberg buttons in the nav beside Beta Version — the source lives on both forges." },
       { tag: "infra",   text: "UploadThing now also hosts the demo's Test Images set — the royalty-free photos behind the upload dialog's Test Images button." },
@@ -45,7 +50,7 @@ const RELEASES: Release[] = [
   },
   {
     version: "v0.9.9",
-    date: "2026-07",
+    date: "2026-06-12",
     headline: "Non-destructive text + speech bubbles + AI panel",
     entries: [
       { tag: "feature", text: "Live text annotations — text never commits to canvas pixels until export. Click an existing text on the canvas to re-open the input box with its content, font, color, and rotation; submit updates in place." },
@@ -62,7 +67,7 @@ const RELEASES: Release[] = [
   },
   {
     version: "v0.9.8",
-    date: "2026-06",
+    date: "2026-06-12",
     headline: "Smart export, batch text, and a unified button system",
     entries: [
       { tag: "feature", text: "Smart Export All — each photo exports its processed result (edits, compression, or resize re-encoded at the chosen format + quality), or the untouched original when nothing changed." },
@@ -82,7 +87,7 @@ const RELEASES: Release[] = [
   },
   {
     version: "v0.9.7",
-    date: "2026-05",
+    date: "2026-05-27",
     headline: "Batch Image Editor + grid mosaic",
     entries: [
       { tag: "feature", text: "Batch Image Editor — tool renamed from \"Images\"; real panel with Logo / Text tab toggle and a grid mosaic of the gallery." },
@@ -101,7 +106,7 @@ const RELEASES: Release[] = [
   },
   {
     version: "v0.9.6",
-    date: "2026-04",
+    date: "2026-05-15",
     headline: "Image Horse rename + originals store",
     entries: [
       { tag: "feature", text: "App renamed Image Horse — was Clone Stamp App; WASM struct renamed CloneStampTool → ImageHorseTool." },
@@ -114,7 +119,7 @@ const RELEASES: Release[] = [
   },
   {
     version: "v0.9.5",
-    date: "2026-03",
+    date: "2026-05-14",
     headline: "Text rotation + Convex archive format",
     entries: [
       { tag: "feature", text: "Text rotate handle — SVG rotate circle above the text box; drag to rotate before committing." },
@@ -126,7 +131,7 @@ const RELEASES: Release[] = [
   },
   {
     version: "v0.9.4",
-    date: "2026-02",
+    date: "2026-05-13",
     headline: "Tabbed tool panels",
     entries: [
       { tag: "ui",      text: "Stamp tool — 3-tab panel (Clone / Stamps / Emojis); emojis tab houses the full @emoji-mart picker." },
@@ -137,7 +142,7 @@ const RELEASES: Release[] = [
   },
   {
     version: "v0.9.3",
-    date: "2026-01",
+    date: "2026-04-23",
     headline: "Color picker + font family",
     entries: [
       { tag: "feature", text: "Brush tool split into Paint / Blur Brush tabs; canvas mouse routing controlled by sub-mode." },
@@ -149,7 +154,7 @@ const RELEASES: Release[] = [
   },
   {
     version: "v0.9.2",
-    date: "2025-12",
+    date: "2026-04-22",
     headline: "Per-photo persistence + Netlify fix",
     entries: [
       { tag: "feature", text: "Per-photo edit persistence — full WASM canvas + undo/redo stack saved to IndexedDB (PNG-encoded per snapshot) when switching photos. Switching back restores the exact session." },
@@ -162,7 +167,7 @@ const RELEASES: Release[] = [
   },
   {
     version: "v0.9.1",
-    date: "2025-11",
+    date: "2026-04-11",
     headline: "Convex schema + pan/zoom polish",
     entries: [
       { tag: "infra",   text: "Convex DB + auth schema — userProfiles, projects, images, layers, annotations, history, ai_jobs, subscriptions tables defined." },
@@ -171,6 +176,63 @@ const RELEASES: Release[] = [
       { tag: "feature", text: "PgUp / PgDn — cycle through gallery photos." },
       { tag: "ui",      text: "Blur Brush moved into the Effects panel alongside brightness + contrast." },
       { tag: "feature", text: "Crop SVG overlay — rule-of-thirds guides and 8 draggable resize handles." },
+    ],
+  },
+  {
+    version: "v0.5.0",
+    date: "2026-03-20",
+    headline: "Image Horse identity + Convex foundation + brightness in Rust",
+    entries: [
+      { tag: "ui",      text: "App branded Image Horse — new horse logo SVG and product name across the editor and the README." },
+      { tag: "infra",   text: "Convex database integration begins — initial schema and auth wiring for projects, images, and user profiles." },
+      { tag: "rust",    text: "Brightness and contrast moved into Rust for instant, allocation-free adjustments." },
+      { tag: "feature", text: "Red stamp tool — REJECTED / APPROVED / DRAFT / CONFIDENTIAL presets rendered as bordered, slightly-rotated labels." },
+      { tag: "ui",      text: "Gallery polish — photo strip with smooth loading effects and tighter thumbnail layout." },
+    ],
+  },
+  {
+    version: "v0.4.0",
+    date: "2026-03-18",
+    headline: "Rust migration of drawing tools",
+    entries: [
+      { tag: "rust",    text: "Blur moved to Rust — Gaussian separable two-pass with brush-radius region masking." },
+      { tag: "rust",    text: "Arrows and shapes drawn entirely in WASM — anti-aliased lines, rendered arrowheads, rectangles and circles in pixel space." },
+      { tag: "rust",    text: "Paint and emoji tools composite through Rust pixel pipelines instead of canvas drawImage." },
+      { tag: "rust",    text: "Text rendering in Rust with the embedded Liberation Sans font — no browser font round-trip." },
+      { tag: "rust",    text: "Resize migrated to a Rust bilinear pass, replacing canvas-based scaling." },
+      { tag: "infra",   text: "Architecture.md added — documents the WASM + React + Convex layers and why one binary shares one pixel buffer." },
+    ],
+  },
+  {
+    version: "v0.3.0",
+    date: "2026-03-16",
+    headline: "Crop, resize, A/B compare arrive",
+    entries: [
+      { tag: "feature", text: "Crop tool with an interactive selection rectangle." },
+      { tag: "feature", text: "Resize & Compress controls — first version of the panel with width / height / quality." },
+      { tag: "feature", text: "A/B Resize Bar — Squoosh-style before/after divider lets you eyeball compression damage." },
+      { tag: "ui",      text: "Animations layered over panel transitions via Framer Motion springs." },
+      { tag: "ui",      text: "Styling polish across the editor — consistent spacing, hover states, and dark surface palette." },
+    ],
+  },
+  {
+    version: "v0.2.0",
+    date: "2026-03-15",
+    headline: "Layout merge + foundation cleanup",
+    entries: [
+      { tag: "infra",   text: "Repo merge brings in the Yet Another Photo App layout — proper top bar, sidebar, status bar, and gallery placeholder." },
+      { tag: "infra",   text: ".gitignore added for node_modules and dist; package resolution errors resolved." },
+      { tag: "ui",      text: "First real multi-panel layout — the structure all later tools dock into." },
+    ],
+  },
+  {
+    version: "v0.1.0",
+    date: "2026-02-25",
+    headline: "Initial React conversion",
+    entries: [
+      { tag: "feature", text: "HTML / JS prototype converted to a React + Vite + TypeScript project — the scaffold the rest of the app grows on." },
+      { tag: "ui",      text: "Status bar added at the bottom of the editor — first version, before it learned to rotate shortcut hints." },
+      { tag: "fix",     text: "Zoom controls fixed and working through the new React layout." },
     ],
   },
 ];
