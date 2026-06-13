@@ -573,10 +573,6 @@ export function AppShell() {
   }, [photos.length, stampReset]);
   useEffect(() => () => { revealTimers.current.forEach(clearTimeout); }, []);
 
-  const handleTextFontSizeChange = useCallback((size: number) => {
-    setToolSettings((prev) => ({ ...prev, fontSize: size }));
-  }, []);
-
   const handleExport = useCallback(() => {
     const activeName =
       photos.find((p) => p.id === activePhotoId)?.name ?? "image";
@@ -715,6 +711,22 @@ export function AppShell() {
     active: activeTool === "text",
   });
   reopenWithRef.current = textTool.reopenWith;
+
+  /**
+   * Canvas resize-handle drags land here. The open text input renders from
+   * its OWN style snapshot (`textInput.fontSize` — see effFontSize in
+   * CanvasArea), so updating `toolSettings.fontSize` alone moved the panel
+   * slider but never resized the text (the original "broken squares" bug).
+   * Forward to setTextFontSize so the live input grows AND keep ToolSettings
+   * in sync so the slider tracks the drag and commitText agrees with both.
+   */
+  const handleTextFontSizeChange = useCallback(
+    (size: number) => {
+      setToolSettings((prev) => ({ ...prev, fontSize: size }));
+      textTool.setTextFontSize(size);
+    },
+    [textTool.setTextFontSize],
+  );
 
   /**
    * Wrap setToolSettings so that when the text-input overlay is open, any
