@@ -28,6 +28,7 @@ interface KeyboardShortcutOptions {
   setShowGallery: React.Dispatch<React.SetStateAction<boolean>>;
   setShowHistory: React.Dispatch<React.SetStateAction<boolean>>;
   setShowShortcutModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowDiagnostics?: React.Dispatch<React.SetStateAction<boolean>>;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset?: () => void;
@@ -59,6 +60,7 @@ export function useKeyboardShortcuts({
   setShowGallery,
   setShowHistory,
   setShowShortcutModal,
+  setShowDiagnostics,
   onZoomIn,
   onZoomOut,
   onZoomReset,
@@ -128,6 +130,13 @@ export function useKeyboardShortcuts({
         if (e.code === "Slash") {
           e.preventDefault();
           setShowShortcutModal((v) => !v);
+          return;
+        }
+
+        // Alt+Delete -> diagnostics log overlay
+        if (e.code === "Delete") {
+          e.preventDefault();
+          setShowDiagnostics?.((v) => !v);
           return;
         }
         if (e.shiftKey) {
@@ -202,7 +211,7 @@ export function useKeyboardShortcuts({
   }, [
     onUndo, onRedo, onExport, onExportAll, onDeleteAll, onBrushSizeChange,
     setBrushSizeOnTool, setShowUpload, setShowTools, setShowGallery,
-    setShowHistory, setShowShortcutModal, onZoomIn,
+    setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
     onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
     onToggleDevTier,

@@ -41,7 +41,9 @@ import { useRecentTexts } from "@/hooks/useRecentTexts";
 import { putOriginal, getOriginal, getOriginalAsBlobUrl, deleteOriginal } from "@/lib/originalsStore";
 import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
-import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels } from "@/lib/workingCopy";
+import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels, ImageTooLargeError } from "@/lib/workingCopy";
+import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
+import { logDiagnostic, installConsoleCapture } from "@/lib/diagnosticsLog";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -317,7 +319,13 @@ export function AppShell() {
       let firstLoaded = false;
       for (const f of accepted) {
         try {
+          const t0 = performance.now();
           const working = await makeWorkingCopy(f);
+          logDiagnostic(
+            "UI_THREAD",
+            `decode ${f.name} → ${working.width}×${working.height}`,
+            performance.now() - t0,
+          );
           const [originalKey, thumbBlob] = await Promise.all([
             putOriginal(f, working.origWidth, working.origHeight),
             makeThumbnail(f),
@@ -348,6 +356,11 @@ export function AppShell() {
           }
         } catch (err) {
           console.error("Failed to add photo:", f.name, err);
+          toast.error(
+            err instanceof ImageTooLargeError
+              ? `${f.name}: ${err.message}`
+              : `Couldn't open ${f.name}.`,
+          );
         }
       }
     },
@@ -517,6 +530,10 @@ export function AppShell() {
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  useEffect(() => {
+    installConsoleCapture();
+  }, []);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
@@ -1310,6 +1327,7 @@ export function AppShell() {
     setShowGallery,
     setShowHistory,
     setShowShortcutModal,
+    setShowDiagnostics,
     onZoomIn: handleZoomIn,
     onZoomOut: handleZoomOut,
     onZoomReset: handleZoomReset,
@@ -1369,6 +1387,11 @@ export function AppShell() {
       <ShortcutModal
         open={showShortcutModal}
         onClose={() => setShowShortcutModal(false)}
+      />
+
+      <DiagnosticLogOverlay
+        open={showDiagnostics}
+        onClose={() => setShowDiagnostics(false)}
       />
 
       {import.meta.env.DEV && (

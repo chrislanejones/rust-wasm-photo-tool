@@ -3,6 +3,38 @@
 const WORKING_MAX_EDGE = 2048;
 const THUMB_MAX_EDGE = 256;
 
+/**
+ * Hard ceiling on source resolution. A decompression bomb or a genuinely huge
+ * image can OOM the tab during the full-res `createImageBitmap` decode below,
+ * before any downscale applies. We can't size-limit the decode without parsing
+ * headers, so we reject just after the probe -- turning a silent crash into a
+ * catchable error the caller can surface as a toast.
+ *
+ * 100 MP (~12000x8333) clears every consumer camera (<=50 MP today) with
+ * headroom while still blocking pathological inputs.
+ */
+const MAX_SOURCE_MEGAPIXELS = 100;
+
+export class ImageTooLargeError extends Error {
+  constructor(width: number, height: number) {
+    super(
+      `Image is too large to open (${width}x${height}, ` +
+        `${Math.round((width * height) / 1_000_000)} MP). ` +
+        `The limit is ${MAX_SOURCE_MEGAPIXELS} MP.`,
+    );
+    this.name = "ImageTooLargeError";
+  }
+}
+
+/** Throw if `bitmap` exceeds the source-pixel ceiling. Closes it on rejection. */
+function assertWithinPixelBudget(bitmap: ImageBitmap): void {
+  if (bitmap.width * bitmap.height > MAX_SOURCE_MEGAPIXELS * 1_000_000) {
+    const { width, height } = bitmap;
+    bitmap.close();
+    throw new ImageTooLargeError(width, height);
+  }
+}
+
 export interface WorkingCopy {
   pixels: Uint8ClampedArray;
   width: number;
@@ -21,6 +53,7 @@ export async function makeWorkingCopy(
   maxEdge = WORKING_MAX_EDGE,
 ): Promise<WorkingCopy> {
   const probe = await createImageBitmap(file);
+  assertWithinPixelBudget(probe);
   const origWidth = probe.width;
   const origHeight = probe.height;
   const longEdge = Math.max(origWidth, origHeight);
@@ -65,6 +98,7 @@ export async function makeThumbnail(
   maxEdge = THUMB_MAX_EDGE,
 ): Promise<Blob> {
   const probe = await createImageBitmap(file);
+  assertWithinPixelBudget(probe);
   const longEdge = Math.max(probe.width, probe.height);
   let tw = probe.width;
   let th = probe.height;
