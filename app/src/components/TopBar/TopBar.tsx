@@ -8,6 +8,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  ToggleButtonGroup,
+  type ToggleGroupItem,
+} from "@/components/ui/toggle-button-group";
+import {
   Upload,
   Image,
   Wrench,
@@ -68,38 +72,38 @@ export function TopBar({
   const compact =
     winWidth < 1000 || (winWidth < 1200 && showTools && showHistory);
 
-  const toggleButtons = [
+  const toggleButtons: ToggleGroupItem[] = [
     {
       key: "U",
       icon: Upload,
       label: "Upload",
-      state: showUpload,
-      toggle: onToggleUpload,
-      shortcut: "Alt + U",
+      active: showUpload,
+      onToggle: onToggleUpload,
+      tooltip: { label: "Upload", shortcut: "Alt + U" },
     },
     {
       key: "S",
       icon: Wrench,
       label: "Tools",
-      state: showTools,
-      toggle: onToggleTools,
-      shortcut: "Alt + S",
+      active: showTools,
+      onToggle: onToggleTools,
+      tooltip: { label: "Tools", shortcut: "Alt + S" },
     },
     {
       key: "I",
       icon: Image,
       label: "Gallery",
-      state: showGallery,
-      toggle: onToggleGallery,
-      shortcut: "Alt + G",
+      active: showGallery,
+      onToggle: onToggleGallery,
+      tooltip: { label: "Gallery", shortcut: "Alt + G" },
     },
     {
       key: "H",
       icon: History,
-      label: "History",
-      state: showHistory,
-      toggle: onToggleHistory,
-      shortcut: "Alt + H",
+      label: "Review",
+      active: showHistory,
+      onToggle: onToggleHistory,
+      tooltip: { label: "Review", shortcut: "Alt + H" },
     },
   ];
 
@@ -192,33 +196,7 @@ export function TopBar({
             <div className="w-px h-6 bg-border shrink-0" />
 
             <div className="flex-1 flex justify-center">
-              <div className="flex gap-1 p-1 rounded-lg bg-bg-tertiary">
-                {toggleButtons.map(
-                  ({ key, icon: Icon, label, state, toggle, shortcut }) => (
-                    <Tooltip key={key}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={toggle}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-all ${
-                            state
-                              ? "bg-accent text-text-primary shadow-md"
-                              : "text-text-muted hover:text-text-primary hover:bg-bg-elevated"
-                          }`}
-                        >
-                          <Icon className="h-3.5 w-3.5" />
-                          {!compact && <span>{label}</span>}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        <p className="font-medium">{label}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {shortcut}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ),
-                )}
-              </div>
+              <ToggleButtonGroup items={toggleButtons} compact={compact} />
             </div>
 
             {/* Clerk User */}

@@ -54,5 +54,13 @@ export interface ToolSettings extends StampSettings {
   bgOpacity: number;        // 0-100
   bgPadding: number;        // 0-40 px
   bgCornerRadius: number;   // 0-32 px (rect only)
-  bgTail: "left" | "right" | "topleft" | "bottomright" | "bottomleft";
+  /** Speech-bubble tail angle in degrees (0-359), sweeping the tail around
+   *  the bubble. Only meaningful when bgKind === "bubble". */
+  bgTail: number;
+
+  // Pens (Shapes tool → Pens tab)
+  /** Pins drop auto-numbered callout circles; Freehand draws polyline strokes. */
+  penMode: "pins" | "freehand";
+  /** Diameter (px) of a dropped numbered pin. */
+  pinSize: number;
 }

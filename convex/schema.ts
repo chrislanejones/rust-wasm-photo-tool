@@ -181,13 +181,17 @@ export default defineSchema({
   }).index("by_userId_photoKey", ["userId", "photoKey"]),
 
   // ── AI Jobs ─────────────────────────────────────────────
+  // Keyed by photoKey (the editor's string id, same as photo_edits) rather
+  // than the unused `images` table. Input/output frames live in Convex file
+  // storage; Replicate is driven by a Convex action + completion webhook.
   ai_jobs: defineTable({
     userId: v.id("users"),
-    imageId: v.id("images"),
+    photoKey: v.string(),
     type: v.union(
       v.literal("rembg"),
       v.literal("upscale"),
       v.literal("inpaint"),
+      v.literal("ocr"),
       v.literal("alt"),
     ),
     status: v.union(
@@ -197,7 +201,11 @@ export default defineSchema({
       v.literal("failed"),
     ),
     replicateId: v.optional(v.string()),
-    input: v.any(),
+    /** Source frame handed to the model (current canvas PNG). */
+    inputStorageId: v.optional(v.id("_storage")),
+    /** Result frame written back by the webhook (image models). */
+    outputStorageId: v.optional(v.id("_storage")),
+    /** Non-image output (e.g. OCR text / alt text). */
     output: v.optional(v.any()),
     error: v.optional(v.string()),
     startedAt: v.optional(v.number()),
@@ -205,7 +213,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_userId", ["userId"])
-    .index("by_imageId", ["imageId"])
+    .index("by_userId_photoKey", ["userId", "photoKey"])
     .index("by_replicateId", ["replicateId"])
     .index("by_status", ["status"]),
 

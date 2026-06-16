@@ -103,7 +103,7 @@ export interface PersistedAnnotation {
  *  `get_shape_annotations`. The `id` is regenerated on restore. */
 export interface PersistedShape {
   id?: number;
-  kind: number; // 0=rect,1=circle,2=line,3=handCircle,4=arrow
+  kind: number; // 0=rect,1=circle,2=line,3=handCircle,4=arrow,5=pin,6=polyline
   x0: number;
   y0: number;
   x1: number;
@@ -113,6 +113,10 @@ export interface PersistedShape {
   b: number;
   stroke_width: number;
   arrow_style: number;
+  /** Pin label (kind 5). */
+  number?: number;
+  /** Polyline vertices (kind 6) as [[x,y],…]. */
+  points?: number[][];
 }
 
 /** Parse the JSON emitted by `get_shape_annotations`. */

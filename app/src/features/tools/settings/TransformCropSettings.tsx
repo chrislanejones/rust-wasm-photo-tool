@@ -104,7 +104,7 @@ export function TransformCropSettings({
   return (
     <div className="space-y-6">
       {/* ── Geometry ────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-5 -mt-2">
+      <div className="flex flex-col gap-2 -mt-2">
         <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
           Transform
         </span>

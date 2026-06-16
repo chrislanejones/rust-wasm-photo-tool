@@ -142,7 +142,7 @@ export default function Pricing() {
           />
           <PlanCard
             tier="Free" tag="logged in" price="$0" sub="per month" color="emerald" cta="Create account"
-            features={["Persistence", "24 images", "3 projects", "100 MB", "5 AI runs / day"]}
+            features={["Persistence", "24 images", "3 projects", "100 MB", "3 layers / image"]}
           />
           <PlanCard
             tier="Pro" tag="best value" price="$10" sub="per month" color="violet" highlight cta="Start Pro"
@@ -192,8 +192,8 @@ export default function Pricing() {
           <TierRow feature="Share links" sub="public project URLs" demo="—" free="1 active" pro="unlimited" />
 
           <TierCategory label="AI features (Replicate — costs us money)" />
-          <TierRow feature="Background removal" sub="rembg" demo="—" free="5/day" pro="unlimited" />
-          <TierRow feature="Auto alt text" sub="BLIP captioning" demo="—" free="5/day" pro="unlimited" />
+          <TierRow feature="Background removal" sub="rembg" demo="—" free="—" pro="unlimited" />
+          <TierRow feature="Auto alt text" sub="BLIP captioning" demo="—" free="—" pro="unlimited" />
           <TierRow feature="4× upscale" sub="Real-ESRGAN" demo="—" free="—" pro="unlimited" />
           <TierRow feature="Object removal" sub="SD Inpaint" demo="—" free="—" pro="unlimited" />
           <TierRow feature="Smart crop" demo="—" free="—" pro="unlimited" />

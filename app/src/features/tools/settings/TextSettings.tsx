@@ -32,13 +32,23 @@ const BG_KIND_OPTIONS = [
   { id: "bubble", label: "Bubble" },
 ] as const;
 
-const BG_TAIL_OPTIONS = [
-  { id: "left", label: "Left" },
-  { id: "right", label: "Right" },
-  { id: "topleft", label: "TopLeft" },
-  { id: "bottomright", label: "BotRight" },
-  { id: "bottomleft", label: "BotLeft" },
+// Corner style as three presets instead of a free slider. Discrete radii keep
+// the bubble-tail geometry simple/flush (see Rust `build_annotation_tile`):
+// Square = sharp, Rounded = fixed radius, Circle = pill (Rust/CSS clamp the
+// large value to half the shorter side).
+type CornerId = "circle" | "rounded" | "square";
+const BG_CORNER_OPTIONS = [
+  { id: "circle", label: "Circle" },
+  { id: "rounded", label: "Rounded" },
+  { id: "square", label: "Square" },
 ] as const;
+const CORNER_RADIUS: Record<CornerId, number> = {
+  square: 0,
+  rounded: 16,
+  circle: 999, // pill sentinel — clamped to min(w,h)/2 when rendered
+};
+const cornerIdFromRadius = (r: number): CornerId =>
+  r <= 0 ? "square" : r >= 200 ? "circle" : "rounded";
 
 export interface TextMemory {
   id: number;
@@ -67,7 +77,7 @@ export function TextSettings({
       <TabGroup
         tabs={[
           { id: "text", label: "Text" },
-          { id: "background", label: "Text Background" },
+          { id: "background", label: "Background" },
         ]}
         active={mode}
         onChange={(id) => setMode(id as TextMode)}
@@ -178,26 +188,27 @@ export function TextSettings({
                   onChange={(v) => onChange({ ...settings, bgPadding: v })}
                 />
 
-                {/* Corner Radius — rect only */}
-                {settings.bgKind === "rect" && (
-                  <SizeSlider
-                    label="Corner Radius"
-                    value={settings.bgCornerRadius}
-                    min={0}
-                    max={32}
-                    unit="px"
-                    onChange={(v) => onChange({ ...settings, bgCornerRadius: v })}
-                  />
-                )}
+                {/* Corner style — three presets, for both Text BG and Bubble. */}
+                <ToolButtonGroup
+                  label="Corners"
+                  options={BG_CORNER_OPTIONS}
+                  value={cornerIdFromRadius(settings.bgCornerRadius)}
+                  onChange={(id) =>
+                    onChange({ ...settings, bgCornerRadius: CORNER_RADIUS[id] })
+                  }
+                  columns={3}
+                />
 
-                {/* Tail direction — bubble only */}
+                {/* Tail direction — bubble only. Angle in degrees (0-359):
+                    the slider sweeps the tail all the way around the bubble. */}
                 {settings.bgKind === "bubble" && (
-                  <ToolButtonGroup
+                  <SizeSlider
                     label="Tail Direction"
-                    options={BG_TAIL_OPTIONS}
                     value={settings.bgTail}
-                    onChange={(id) => onChange({ ...settings, bgTail: id })}
-                    columns={3}
+                    min={0}
+                    max={359}
+                    unit="°"
+                    onChange={(v) => onChange({ ...settings, bgTail: v })}
                   />
                 )}
 

@@ -96,7 +96,7 @@ export function ResizeSettings({
   const [height, setHeight] = useState(String(imageHeight));
   const [lockAspect, setLockAspect] = useState(true);
   const [method, setMethod] = useState<ResampleMethod>("lanczos3");
-  const [tab, setTab] = useState<ResizeTab>("resize");
+  const [tab, setTab] = useState<ResizeTab>("compress");
   // A/B Compare stays locked until the user actually applies an edit —
   // either "Apply Compression & Resize" or "Auto Compress" — in this photo.
   // Pending (unapplied) changes no longer unlock it; there's nothing to
@@ -237,8 +237,8 @@ export function ResizeSettings({
       {/* Resize ↔ Compress toggle (mirrors Paint's Paint | Blur Brush tabs) */}
       <TabGroup
         tabs={[
-          { id: "resize", label: "Resize" },
           { id: "compress", label: "Compress" },
+          { id: "resize", label: "Resize" },
         ]}
         active={tab}
         onChange={(id) => setTab(id as ResizeTab)}

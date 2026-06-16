@@ -13,7 +13,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/architecture" element={<Architecture />} />
-          <Route path="/trail" element={<Trail />} />
+          <Route path="/trail-log" element={<Trail />} />
         </Routes>
       </main>
       <Footer />

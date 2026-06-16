@@ -26,6 +26,28 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.12",
+    date: "2026-06-16",
+    headline: "Review panel, 360° bubble tails, dev tier switcher",
+    entries: [
+      { tag: "feature", text: "AI Tools: Background Removal is live. One click hands the canvas PNG to a real Convex → Replicate pipeline (rembg model), with a phase-state button (Uploading… / Removing background…) and a reactive Convex subscription on the job row. When the webhook completes, the result image streams back, decodes to RGBA, and replaces the working image — the photo is marked modified so the change persists. Gated to the Paid tier; non-Paid users see an inline Lock notice. Other AI models (OCR, 4× Upscale, Object Removal, Alt Text) remain Coming Soon placeholders awaiting the same plumbing." },
+      { tag: "feature", text: "New Pens tab in the Shapes tool — sits between Shapes and Arrows. Pins mode drops auto-numbered callout discs (1, 2, 3…) on click with a Pin Size slider; click an existing pin to move it. Freehand mode draws a thick, round-capped polyline pen stroke on drag with its own Stroke Width slider. Both share the colour swatch." },
+      { tag: "rust",    text: "Pens are real Rust shapes — two new kinds (5 = pin, 6 = polyline) added to ShapeAnnotation, with add_pin_annotation / add_polyline_annotation APIs, render_pin (filled AA disc + centred ab_glyph number), drawing::draw_polyline (round-capped segment loop), and drawing::fill_circle. ShapeAnnotation gained number (pin label) and points (polyline vertices); get_shape_annotations JSON, PersistedShape, and the restore path round-trip both. Polyline hit-testing uses per-segment distance; pins reuse the padded-bbox path. The live freehand preview is drawn in JS during the drag and committed to Rust on mouseup." },
+      { tag: "feature", text: "History panel rebuilt as a Review panel — one collapsible panel hosting three independent sections: History (undo timeline), Reselect (live text and shape annotations), and Layers (placeholder). Open any combination; the body splits evenly between open sections — 1 full, 2 halves, 3 thirds — each with its own scroll area and header." },
+      { tag: "ui",      text: "Shared ToggleButtonGroup component drives the top bar's Upload / Tools / Gallery / Review cluster and the Review panel's History / Reselect / Layers cluster. Multi-select (each button independent), compact icon mode, label-only mode for narrow panels, evenly-spread fill option." },
+      { tag: "rust",    text: "Speech-bubble tail is now a 360° angle, not five discrete directions. Drag the Tail Direction slider and the tail sweeps continuously around the bubble. Rust builds the tile with a uniform margin on all sides and projects a ray from the bubble center onto the rect edge to place the tail base; live preview uses identical math." },
+      { tag: "ui",      text: "Compress is the first tab in the Resize tool — the panel now opens on Compress (the more common starting point), and the toolbar tooltip reads Compress & Resize." },
+      { tag: "ui",      text: "Text panel's second tab renamed Background (was Text Background); the Background Color / Padding / etc. labels carry the rest of the context. Corner Radius simplified to three presets — Square / Rounded / Circle — so the bubble tail stays flush at any radius." },
+      { tag: "infra",   text: "Centralized tier config — new lib/tiers.ts is the one place per-tier capabilities live (gallery cap, storage quota, layers per image, AI runs per day), keyed by tier. Components read from TIERS[mode] instead of hardcoding numbers. Mirrors the public Pricing matrix." },
+      { tag: "feature", text: "Dev tier switcher — Alt+L opens a small dialog to flip between No Login / Free / Paid tier modes for testing, shown only in dev builds." },
+      { tag: "feature", text: "Gallery Unselect button — when one or more photos are selected, a new Unselect button appears in the gallery header alongside Export Selected, Delete Selected, and Delete All. One click clears every checkbox." },
+      { tag: "fix",     text: "Modified-dot race — clicking an unedited photo no longer briefly flashes the white modified-edit dot on it. The dot effect was attributing the outgoing photo's lingering undo count to the incoming selection; now it gates on the loading flag, which is set before any await." },
+      { tag: "ui",      text: "Crop tool spacing — the Transform heading sits tighter against the Flip H / Flip V / Rotate buttons, matching the rhythm Ratio uses for its ratio buttons in the same panel." },
+      { tag: "rust",    text: "drawing::rounded_rect_coverage, triangle_coverage, and blend_coverage — three public coverage helpers in src/drawing.rs that produce per-pixel α for AA rounded rects and triangles, with Porter-Duff source-over compositing. Foundation for further shape-edge AA work and the bubble-tail flushness fix." },
+      { tag: "ui",      text: "Trail page renamed Trail Log — the URL is /trail-log, the nav and footer labels and the page eyebrow all read Trail Log." },
+    ],
+  },
+  {
     version: "v0.9.11",
     date: "2026-06-13",
     headline: "Shapes & arrows go live — reselect, move, resize, delete",
@@ -310,7 +332,7 @@ export default function Trail() {
       <div className="relative max-w-4xl mx-auto px-6 pt-20 pb-24">
         <div className="mb-12">
           <div className="text-xs uppercase tracking-wider text-orange-400 font-medium mb-2">
-            Trail
+            Trail Log
           </div>
           <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.1]">
             What's new in <span className="gradient-text">Image Horse</span>

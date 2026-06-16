@@ -20,15 +20,17 @@ import { panelSpacingTransition, imageLoadBarFade, imageLoadBarProgress } from "
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
+import { DevTierDialog } from "@/components/DevTierDialog";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
-import { HistoryPanel } from "@/features/canvas/HistoryPanel";
-import type { ReselectObject } from "@/features/canvas/HistoryPanel";
+import { ReviewPanel } from "@/features/canvas/ReviewPanel";
+import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
 import { getPhotoLimit, DEFAULT_PHOTO_LIMIT } from "@/lib/photoLimits";
+import { hasReplicateAI } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
@@ -156,12 +158,19 @@ export function AppShell() {
   const [effectsMode, setEffectsMode] = useState<EffectsMode>("levels");
   const [colorPickerActive, setColorPickerActive] = useState(false);
   const [stampSubMode, setStampSubMode] = useState<"clone" | "red" | "emojis">("clone");
-  const [shapesMode, setShapesMode] = useState<"shapes" | "arrows">("shapes");
+  const [shapesMode, setShapesMode] = useState<"shapes" | "pens" | "arrows">("shapes");
   /** Active Crop-tool aspect ratio. `null` ≡ "Free" (no constraint).
    *  Drags in useDrawingTools snap to this ratio via Rust when set. */
   const [cropRatio, setCropRatio] = useState<[number, number] | null>(null);
   const [userMode, setUserMode] = useState<UserMode>("demo");
   const handleAuthMode = useCallback((m: UserMode) => setUserMode(m), []);
+
+  // Dev-only tier override (Alt+L). When set, it wins over the Clerk-derived
+  // mode so the No Login / Logged In / Paid versions can be tested without
+  // real auth. Gated to dev builds at the render/shortcut sites.
+  const [showDevTier, setShowDevTier] = useState(false);
+  const [devTierOverride, setDevTierOverride] = useState<UserMode | null>(null);
+  const effectiveUserMode = devTierOverride ?? userMode;
 
   // Gallery photo cap for the current tier. Resolved from Rust (`photo_limit`)
   // so the WASM layer is the single source of truth. Starts at the most
@@ -169,13 +178,13 @@ export function AppShell() {
   const [maxPhotos, setMaxPhotos] = useState(DEFAULT_PHOTO_LIMIT);
   useEffect(() => {
     let alive = true;
-    void getPhotoLimit(userMode).then((n) => {
+    void getPhotoLimit(effectiveUserMode).then((n) => {
       if (alive) setMaxPhotos(n);
     });
     return () => {
       alive = false;
     };
-  }, [userMode]);
+  }, [effectiveUserMode]);
 
   const handleTextCommit = useCallback(
     (text: string) => {
@@ -212,6 +221,16 @@ export function AppShell() {
       void stamp.loadImageFromPixels(pixels, width, height);
     },
     [stamp],
+  );
+
+  /** Apply a finished AI image result (decoded RGBA) back to the canvas as the
+   *  new working image, and mark the photo modified so it persists. */
+  const handleAIResult = useCallback(
+    (r: { pixels: Uint8ClampedArray; width: number; height: number }) => {
+      loadImageFromPixels(r.pixels, r.width, r.height);
+      setHasBeenModified(true);
+    },
+    [loadImageFromPixels],
   );
 
   /** Load a photo entry from IndexedDB → downscale → hand to the tool. */
@@ -275,12 +294,12 @@ export function AppShell() {
       // as many as fit, then notify if the batch was trimmed or already full.
       const remaining = Math.max(0, maxPhotos - photos.length);
       if (remaining <= 0) {
-        toast.error(capMessage(userMode, maxPhotos));
+        toast.error(capMessage(effectiveUserMode, maxPhotos));
         return;
       }
       const accepted = files.length > remaining ? files.slice(0, remaining) : files;
       if (files.length > remaining) {
-        toast.error(capMessage(userMode, maxPhotos));
+        toast.error(capMessage(effectiveUserMode, maxPhotos));
       }
 
       if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
@@ -332,7 +351,7 @@ export function AppShell() {
         }
       }
     },
-    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, userMode],
+    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode],
   );
 
   // ── Select photo ───────────────────────────────────────────────────────────
@@ -356,10 +375,14 @@ export function AppShell() {
       setHasBeenModified(false);
       setActivePhotoId(entry.id);
       setCompareActive(false);
+      // Flag loading synchronously, before any await: switching photos briefly
+      // leaves the *outgoing* photo's undo count > 0 while activePhotoId already
+      // points at the incoming one. The modified-dot effect gates on this so it
+      // doesn't falsely dot the newly-selected photo during the transition.
+      setIsImageLoading(true);
 
       const saved = await loadPhotoEdit(entry.id);
       if (saved) {
-        setIsImageLoading(true);
         setLoadProgress(20);
         await stamp.loadFromSaved(saved);
         setLoadProgress(100);
@@ -667,6 +690,10 @@ export function AppShell() {
     settings: toolSettings,
     flushToCanvas: flushAndSync,
     syncState: stamp.syncState,
+    penMode:
+      activeTool === "shapes" && shapesMode === "pens"
+        ? (toolSettings.penMode ?? "pins")
+        : null,
     cropRatio,
     imageWidth: stamp.state.width,
     imageHeight: stamp.state.height,
@@ -762,16 +789,18 @@ export function AppShell() {
       2: "Line",
       3: "Hand-drawn",
       4: "Arrow",
+      5: "Pin",
+      6: "Pen",
     };
     const counters: Record<number, number> = {};
     drawingTools.shapes.forEach((s) => {
       counters[s.kind] = (counters[s.kind] ?? 0) + 1;
-      items.push({
-        key: `s${s.id}`,
-        type: "shape",
-        id: s.id,
-        label: `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`,
-      });
+      // Pins show their own callout number; everything else gets an ordinal.
+      const label =
+        s.kind === 5
+          ? `Pin ${s.number}`
+          : `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`;
+      items.push({ key: `s${s.id}`, type: "shape", id: s.id, label });
     });
     return items;
   }, [textTool.annotations, drawingTools.shapes]);
@@ -810,12 +839,6 @@ export function AppShell() {
     },
     [stamp, textTool, drawingTools],
   );
-
-  // Trash icon in the Reselect header: delete every live object. Snapshot the
-  // list first since each delete mutates the underlying overlays.
-  const handleClearObjects = useCallback(() => {
-    reselectObjects.forEach((o) => handleDeleteObject(o));
-  }, [reselectObjects, handleDeleteObject]);
 
   const redStampTool = useRedStampTool({
     toolRef: stamp.toolRef,
@@ -1105,6 +1128,11 @@ export function AppShell() {
   // touch stored files (not the live canvas / `hasBeenModified`), so they never
   // light the dot here.
   useEffect(() => {
+    // Skip while a photo is loading: switching to an unedited photo briefly
+    // leaves the previous photo's undoCount > 0, which would otherwise dot the
+    // newly-selected one. Wait until the load settles and undoCount reflects the
+    // photo that's actually on the canvas.
+    if (isImageLoading) return;
     // Only light the "altered" dot for *applied* canvas edits (which bump the
     // WASM undo count) — not for transient control changes like dragging the
     // quality slider (which only sets `hasBeenModified` pending an apply).
@@ -1116,7 +1144,7 @@ export function AppShell() {
         return next;
       });
     }
-  }, [activePhotoId, stamp.state.undoCount]);
+  }, [activePhotoId, stamp.state.undoCount, isImageLoading]);
 
   // Persist compression savings
   useEffect(() => {
@@ -1295,6 +1323,10 @@ export function AppShell() {
     onPrevPhoto: handlePrevPhoto,
     onSpaceDown: () => setIsPanning(true),
     onSpaceUp: () => setIsPanning(false),
+    // Alt+L tier switcher — dev builds only (never reaches production).
+    onToggleDevTier: import.meta.env.DEV
+      ? () => setShowDevTier((v) => !v)
+      : undefined,
   });
 
   const hasImage = stamp.state.ready;
@@ -1334,6 +1366,17 @@ export function AppShell() {
         open={showShortcutModal}
         onClose={() => setShowShortcutModal(false)}
       />
+
+      {import.meta.env.DEV && (
+        <DevTierDialog
+          open={showDevTier}
+          onOpenChange={setShowDevTier}
+          mode={effectiveUserMode}
+          overridden={devTierOverride !== null}
+          onSelect={(m) => setDevTierOverride(m)}
+          onReset={() => setDevTierOverride(null)}
+        />
+      )}
 
       <Toaster />
 
@@ -1450,6 +1493,8 @@ export function AppShell() {
             stampToolRef={stamp.toolRef}
             flushToCanvas={stamp.flushToCanvas}
             syncState={stamp.syncState}
+            aiEnabled={hasReplicateAI(effectiveUserMode)}
+            onAIResult={handleAIResult}
           />
         )}
       </AnimatePresence>
@@ -1722,22 +1767,24 @@ export function AppShell() {
             onExportSelected={handleExportSelected}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelectPhoto}
+            onClearSelection={clearSelection}
           />
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showHistory && (
-          <HistoryPanel
+          <ReviewPanel
             history={stamp.state.history}
             onJump={stamp.jumpToHistory}
             onDelete={stamp.deleteHistoryEntry}
-            onClear={stamp.clearHistory}
             onClose={() => setShowHistory(false)}
+            onUndo={stamp.undo}
+            canUndo={canUndo}
             objects={reselectObjects}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
-            onClearObjects={handleClearObjects}
+            userMode={effectiveUserMode}
           />
         )}
       </AnimatePresence>

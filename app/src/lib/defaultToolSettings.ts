@@ -25,5 +25,7 @@ export const defaultToolSettings: ToolSettings = {
   bgOpacity: 100,
   bgPadding: 8,
   bgCornerRadius: 8,
-  bgTail: "bottomleft",
+  bgTail: 135, // degrees — points down-left (the classic speech-bubble default)
+  penMode: "pins",
+  pinSize: 32,
 };

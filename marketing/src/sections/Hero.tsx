@@ -387,7 +387,11 @@ function AppMockup() {
           </div>
         </aside>
         <div className="col-span-7 relative bg-[#161618]">
-          <CityCanvas />
+          <img
+            src="/Rust-Wasm-Photo-Tool-App-July.webp"
+            alt="Image Horse — Rust + WASM photo editor in the browser"
+            className="w-full h-full object-cover block"
+          />
         </div>
         <ResizePanel />
       </div>

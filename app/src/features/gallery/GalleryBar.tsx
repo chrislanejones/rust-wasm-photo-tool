@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
-import { X, Image, Check, Zap, ChevronLeft, ChevronRight, Trash2, Download } from "lucide-react";
+import { X, Image, Check, Zap, ChevronLeft, ChevronRight, Trash2, Download, SquareX } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LargeButton } from "@/components/ui/large-button";
 import { TinyButton } from "@/components/ui/tiny-button";
@@ -51,6 +51,8 @@ interface Props {
   selectedIds: Set<string>;
   /** Toggle a photo's selection. */
   onToggleSelect: (id: string) => void;
+  /** Clear the entire selection (the "Unselect" action). */
+  onClearSelection?: () => void;
 }
 
 interface ThumbProps {
@@ -246,6 +248,7 @@ export function GalleryBar({
   onExportSelected,
   selectedIds,
   onToggleSelect,
+  onClearSelection,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
   const selectionActive = selectedIds.size > 0;
@@ -352,6 +355,16 @@ export function GalleryBar({
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Delete All</span>
+                </LargeButton>
+              )}
+              {selectionActive && onClearSelection && (
+                <LargeButton
+                  onClick={onClearSelection}
+                  title="Clear selection"
+                  className="px-2.5 py-1.5 text-xs"
+                >
+                  <SquareX className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Unselect</span>
                 </LargeButton>
               )}
               <TinyButton onClick={onClose} title="Close gallery">

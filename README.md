@@ -1,6 +1,6 @@
 Image Horse
 
-![Image Horse](public/Rust-WASM-Photo-App.jpg)
+![Image Horse](public/Rust-Wasm-Photo-Tool-App-July.webp)
 
 **Live:** [rust-wasm-photo-tool.netlify.app](https://rust-wasm-photo-tool.netlify.app/) &nbsp;·&nbsp; [Architecture](Architecture.md)
 
@@ -163,10 +163,15 @@ app/src/
 │   │   ├── CompareSlider.tsx         Squoosh-style A/B before/after slider; rAF-deduped box sync
 │   │   │                             driven by ResizeObserver + MutationObserver on canvas style
 │   │   │                             so the overlay tracks zoom and pan transforms
-│   │   └── HistoryPanel.tsx          Animated right-side undo/redo timeline + Reselect panel
-│   │                                 (replaces the old Recent Texts list): every committed text
-│   │                                 and shape annotation appears as a row you can click to
-│   │                                 re-select it on the canvas, or delete in place
+│   │   └── ReviewPanel.tsx          Animated right-side "Review" panel (was HistoryPanel).
+│   │                                 Header toggle group opens up to three stacked sections —
+│   │                                 History, Reselect, Layers — that split the body evenly
+│   │                                 (1 full / 2 halves / 3 thirds), each with its own header,
+│   │                                 count box, and scroll area. History = undo/redo timeline
+│   │                                 with an inline Undo button; Reselect = every live text +
+│   │                                 shape annotation as a click-to-select / delete row;
+│   │                                 Layers = "Coming soon" placeholder (count 0, disabled
+│   │                                 add/delete buttons)
 │   ├── gallery/
 │   │   ├── GalleryBar.tsx            Bottom photo strip with thumbnails
 │   │   └── PhotoThumb.tsx            Individual thumbnail component
@@ -221,7 +226,7 @@ app/src/
 | `Alt + U`             | Toggle Upload                       |
 | `Alt + S`             | Toggle Tools                        |
 | `Alt + G`             | Toggle Gallery                      |
-| `Alt + H`             | Toggle History                      |
+| `Alt + H`             | Toggle Review panel                 |
 | `Alt + Shift + ?`     | Toggle Shortcut Modal               |
 | `Ctrl + Z`            | Undo                                |
 | `Ctrl + Shift + Z`    | Redo                                |
@@ -272,7 +277,10 @@ app/src/
 - **Spacebar Pan** — Hold Space for grab-to-pan; all tool handlers bypassed during pan
 - **A/B Compare Slider** — Squoosh-style draggable divider; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned
 - **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch; PgUp/PgDn cycling; originals preserved in IndexedDB at full resolution regardless of working-copy downscale
-- **History Timeline** — Right-side panel with clickable undo/redo entries
+- **Review Panel** — Right-side panel (Alt+H) with a header toggle group that opens up to three stacked sections sharing the body height (1 full / 2 halves / 3 thirds, each scrollable):
+  - **History** — clickable undo/redo timeline with an inline Undo button and a live step count
+  - **Reselect** — every committed text and shape annotation as a row; click to re-select it on the canvas, hover the ✕ to delete
+  - **Layers** — **Coming soon** (count pinned to 0; add/delete buttons present but disabled)
 - **Upload** — Drag-and-drop modal with file browser and paste-from-clipboard (Ctrl+V / paste button)
 - **Export Dropdown** — PNG, JPEG, WebP, AVIF format selector in the top bar
 - **Keyboard Shortcut Modal** — Alt+Shift+? opens a full reference overlay grouped by category
@@ -506,6 +514,34 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 5 | **Persistence v4** — `editPersistence.SavedEdit` and the Convex binary archive bumped to v4: the schema now serializes the shape annotation vec alongside the existing text annotations + raw pixels. `loadFromSaved` re-creates both lists via the Rust `restore_shape_annotation` + `add_text_annotation` paths so reopening a photo restores every live overlay. v1–v3 still decode for back-compat | Complete |
 | 6 | **Fix: text rotate handle** — the rotate handle's drag math used a stale center reference when the text box was already rotated, drifting the angle on each adjustment. Recomputed from the current rotated transform every drag so dragging the rotate dot now produces a smooth rotation that holds | Complete |
 | 7 | **Stamp dab f32 polish** — small follow-up in `src/stamp.rs` extending the June f32 / hoisted-sqrt pass to the dab kernel's edge case, removing a residual `f64 → f32` cast in the inner loop | Complete |
+
+## v3.3 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **History panel → Review panel** — `HistoryPanel.tsx` renamed to `ReviewPanel.tsx`; the top-bar toggle (and Alt+H) now reads **Review**. The panel header is `Review` (left) + ✕ close (right), then a toggle group, then the body | Complete |
+| 2 | **Three toggleable sections** — a header toggle group opens **History**, **Reselect**, and **Layers** independently. The body splits its height evenly among the open sections — 1 open = full, 2 = halves, 3 = thirds — each with its own top divider, header (name left; count box + controls right), and scroll area. All three open on load | Complete |
+| 3 | **History section** — the undo/redo timeline, with an inline **Undo** button plus the step-count box in its header (no clear-all; ✕ on the other sections closes them instead) | Complete |
+| 4 | **Reselect section** — the live text + shape annotation list (unchanged behavior): click a row to re-select on canvas, hover the ✕ to delete | Complete |
+| 5 | **Layers section** — **Coming soon** placeholder, centered. Count box pinned to `0`; disabled **+** (add) and **trash** (delete) buttons sit beside it as a preview of the future layer controls | Complete |
+| 6 | **Shared `ToggleButtonGroup`** — new `app/src/components/ui/toggle-button-group.tsx` multi-select button group (independent on/off per button). The top bar's Upload / Tools / Gallery / Review cluster and the Review panel's History / Reselect / Layers cluster both render through it. Props: `compact` (icon-only), `noIcons` (label-only — used in the narrow panel so "Layers" isn't clipped), `fill` (stretch evenly), optional per-item tooltip. The active state uses the neutral `bg-accent` (`#2b2b2b`), not the cream `--accent` highlight | Complete |
+
+## v3.4 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **Compress is the first tab in the Resize tool** — the panel's `TabGroup` order flipped from `Resize \| Compress` to `Compress \| Resize`, and the default tab on open is now `compress`. Toolbar hover tooltip + description renamed `Resize & Compress` → `Compress & Resize` to match. The label under the icon stays "Resize" (short label) | Complete |
+| 2 | **360° speech-bubble tail** — `bg_tail` upgraded from a `u8` enum (0–5 discrete directions) to a `u32` **angle in degrees** (0–359) across the whole stack. `build_annotation_tile` reserves a uniform tail margin on all four sides and projects a ray from the bubble center onto the rect's edge (`t = min(hw/\|cos\|, hh/\|sin\|)`), placing the tail base at that exit point with the apex `TAIL_LEN` further along; perpendicular `TAIL_HALF` spread for the base. Updated everywhere: `TextAnnotation` field, `build_text_annotation`, the two history-push helpers, `add`/`update_text_annotation`, plus `CanvasArea.tsx` live preview using identical math so preview and committed pixels match. `ToolButtonGroup` swapped for a `SizeSlider`; default 135° (down-left) | Complete |
+| 3 | **Background tab rename** — TextSettings second tab labeled `Background` (was `Text Background`); the "Background Color" / "Padding" / etc. labels carry the rest of the context. Corner Radius hardened into 3 presets (`Square` / `Rounded` / `Circle`) so the bubble tail geometry stays flush at any radius | Complete |
+| 4 | **Centralized tier config** — new `app/src/lib/tiers.ts` is the one place per-tier capabilities live (`galleryLimit`, `storageQuotaBytes`, `layersPerImage`, `aiDailyRuns`, etc.), keyed by `UserMode`. Mirrors the public Pricing matrix on the marketing site; the Rust `photo_limit` export is kept in sync as the WASM-layer source of truth. Components now read from `TIERS[userMode]` instead of hardcoding numbers | Complete |
+| 5 | **Dev tier switcher (Alt+L)** — new `DevTierDialog.tsx` lets the developer flip between `No Login` / `Free` / `Paid` tier modes for testing. Triggered by **Alt+L** (added as `onToggleDevTier` in `useKeyboardShortcuts`), shown only in dev builds. Includes UX iteration on the trigger — previously discussed Alt+P was changed to Alt+L to avoid conflict with the existing print shortcut | Complete |
+| 6 | **Gallery Unselect button** — when any photos are selected, a new `Unselect` button (SquareX icon) appears in the gallery header after Delete All, alongside Export Selected / Delete Selected. Threads new optional prop `onClearSelection` through to AppShell's existing `clearSelection` callback. Selection state lives in React (`selectedIds` set in AppShell) — selection is pure UI, no Rust round-trip | Complete |
+| 7 | **Modified-dot race fix** — clicking an unedited photo no longer briefly flashes the white "modified" dot on it. Root cause: `setActivePhotoId(new)` ran synchronously before the awaited `loadPhotoEdit`, leaving the *outgoing* photo's `undoCount > 0` while `activePhotoId` already pointed at the *incoming* one — the dot-marking effect attributed that count to the new photo. Fix: `setIsImageLoading(true)` moved *before* the first await in `handleSelectPhoto`, and the dot effect bails with `if (isImageLoading) return;` (with `isImageLoading` added to its deps) | Complete |
+| 8 | **Transform spacing fix** — the "Transform" heading in the Crop tool's panel moved closer to its Flip H / Flip V / Rotate buttons (`gap-5` → `gap-2`), so the label-to-buttons spacing matches the "Ratio" → ratio-button rhythm used elsewhere in the same panel | Complete |
+| 9 | **Marketing: Trail → Trail Log** — the changelog page (formerly Shipped, then Trail) now reads **Trail Log**. Route `/trail` → `/trail-log`; Nav and Footer labels + page eyebrow all updated. Component/file internally still `Trail` (purely internal — the public URL and labels are what change) | Complete |
+| 10 | **Drawing coverage helpers** — `src/drawing.rs` gains three public coverage helpers: `rounded_rect_coverage` (per-pixel α for an AA rounded rect), `triangle_coverage` (per-pixel α for an AA triangle), and `blend_coverage` (Porter-Duff source-over given coverage). Foundation work for the bubble-tail flushness fix and future shape-edge AA improvements | Complete |
+| 11 | **New Pens tab — Pins + Freehand** — the Shapes tool grew a third tab between `Shapes` and `Arrows`. **Pins** mode drops auto-numbered callout discs (1, 2, 3…) on click, with a `Pin Size` slider (16–72 px) and a click-to-move on existing pins. **Freehand** mode draws a thick, round-capped polyline pen stroke on drag, with a `Stroke Width` slider. Both share the colour swatch. Rust gains two new shape kinds (`5 = pin`, `6 = polyline`) with `add_pin_annotation` / `restore_pin_annotation` and `add_polyline_annotation` / `restore_polyline_annotation` APIs, plus `render_pin` (filled disc + centred ab_glyph number) and `drawing::draw_polyline` (round-capped segment loop) / `drawing::fill_circle`. `ShapeAnnotation` extended with `number: u32` (pin label) and `points: Vec<(f64, f64)>` (polyline vertices); `get_shape_annotations` JSON, `PersistedShape`, and the persistence restore path all extended to round-trip them. The live freehand preview is drawn in JS during the drag and committed to Rust on mouseup. Hit-testing extended: polylines test against each segment; pins fall under the existing padded-bbox path. Pins reselect as a circle handle but keep their `kind=5` on commit via a new `kindByte` override in `DrawEditState.style`; polylines are delete-only (no bbox handle) via the Reselect panel | Complete |
+| 12 | **AI Tools: Background Removal goes live (Replicate + Convex pipeline)** — the AI panel's first model is no longer a placeholder. New `useAIJob` hook drives a single end-to-end job: export current canvas to PNG → `generateUploadUrl` → POST to Convex storage with `Content-Type: image/png` → call `api.ai.dispatch({ photoKey, type: "rembg", inputStorageId })` → subscribe to `api.aiJobs.getJob(jobId)` via `useQuery` → when the webhook flips status to `done`, fetch `outputUrl`, decode via `createImageBitmap` → 2D canvas → ImageData, and hand RGBA pixels back. AppShell's new `handleAIResult` calls `loadImageFromPixels` to swap the working image and marks the photo modified. Phase state machine (`idle` / `uploading` / `running` / `done` / `error`) drives button copy ("Uploading…" / "Removing background…" / "Remove Background"). A `consumedRef` guard prevents a re-render from decoding the same finished job twice. Gating: the panel is gated by `hasReplicateAI(effectiveUserMode)` from `lib/tiers.ts` — non-Paid users see a Lock notice ("AI tools run on Replicate and are a Paid feature"); the button is disabled when `!aiEnabled` or no active photo. ToolsSidebar threads a new `aiEnabled` prop through to `<AISettings>`. The remaining models (Text Extract / 4× Upscale / Object Removal / Alt Text) keep their `COMING_SOON` placeholder cards until the same plumbing is cloned for each | Complete |
 
 ## License
 

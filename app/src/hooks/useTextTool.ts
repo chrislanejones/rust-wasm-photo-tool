@@ -73,13 +73,6 @@ function hexToRgb(input: string): [number, number, number] {
 }
 
 const BG_KIND_MAP = { none: 0, rect: 1, bubble: 2 } as const;
-const BG_TAIL_MAP = {
-  left: 1,
-  right: 2,
-  topleft: 3,
-  bottomright: 4,
-  bottomleft: 5,
-} as const;
 
 export function useTextTool({
   toolRef,
@@ -214,7 +207,8 @@ export function useTextTool({
     );
     const bgPadding = Math.max(0, Math.round(s.bgPadding));
     const bgCornerRadius = Math.max(0, Math.round(s.bgCornerRadius));
-    const bgTail = BG_TAIL_MAP[s.bgTail];
+    // Tail angle in degrees, normalized to 0-359 for the Rust u32 param.
+    const bgTail = ((Math.round(s.bgTail) % 360) + 360) % 360;
 
     if (editingId !== null) {
       tool.update_text_annotation(

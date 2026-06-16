@@ -352,13 +352,23 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       // were injected above).
       if (saved.shapes && saved.shapes.length > 0) {
         for (const s of saved.shapes) {
-          tool.restore_shape_annotation(
-            s.kind,
-            s.x0, s.y0, s.x1, s.y1,
-            s.r, s.g, s.b,
-            s.stroke_width,
-            s.arrow_style,
-          );
+          if (s.kind === 5) {
+            tool.restore_pin_annotation(
+              s.x0, s.y0, s.x1, s.y1,
+              s.number ?? 0, s.r, s.g, s.b,
+            );
+          } else if (s.kind === 6) {
+            const flat = new Float64Array((s.points ?? []).flat());
+            tool.restore_polyline_annotation(flat, s.r, s.g, s.b, s.stroke_width);
+          } else {
+            tool.restore_shape_annotation(
+              s.kind,
+              s.x0, s.y0, s.x1, s.y1,
+              s.r, s.g, s.b,
+              s.stroke_width,
+              s.arrow_style,
+            );
+          }
         }
       }
 

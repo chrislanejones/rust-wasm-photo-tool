@@ -41,13 +41,13 @@ export default function Nav() {
         Architecture
       </NavLink>
       <NavLink
-        to="/trail"
+        to="/trail-log"
         onClick={onClick}
         className={({ isActive }) =>
           `${isActive ? "text-orange-400" : "hover:text-zinc-100 transition"} ${itemClass}`
         }
       >
-        Trail
+        Trail Log
       </NavLink>
     </>
   );

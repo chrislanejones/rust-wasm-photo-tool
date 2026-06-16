@@ -32,6 +32,7 @@ import type { ImageHorseTool } from "stamp_tool";
 import { PaintSettings } from "./settings/PaintSettings";
 import { TextSettings } from "./settings/TextSettings";
 import { AISettings } from "./settings/AISettings";
+import type { AIResultPixels } from "@/hooks/useAIJob";
 
 const StampSettingsPanel =
   (StampSettingsModule as any).StampSettingsPanel ??
@@ -119,6 +120,10 @@ interface ToolsSidebarProps {
   stampToolRef: React.MutableRefObject<ImageHorseTool | null>;
   flushToCanvas: () => void;
   syncState: () => void;
+  /** Whether the current tier may use Replicate AI (Paid only). */
+  aiEnabled?: boolean;
+  /** Apply a finished AI image result (decoded RGBA) back to the canvas. */
+  onAIResult: (r: AIResultPixels) => void;
 }
 
 export function ToolsSidebar({
@@ -186,6 +191,8 @@ export function ToolsSidebar({
   stampToolRef,
   flushToCanvas,
   syncState,
+  aiEnabled = false,
+  onAIResult,
 }: ToolsSidebarProps) {
   return (
     <motion.div
@@ -337,7 +344,14 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "ai" && <AISettings />}
+        {activeTool === "ai" && (
+          <AISettings
+            aiEnabled={aiEnabled}
+            activePhotoId={activePhotoId}
+            stampToolRef={stampToolRef}
+            onAIResult={onAIResult}
+          />
+        )}
       </div>
 
       <div className="p-4 border-t border-border flex gap-2">

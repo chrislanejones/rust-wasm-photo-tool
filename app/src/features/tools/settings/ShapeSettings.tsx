@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Square, Circle, PenLine, Minus } from "lucide-react";
+import { Square, Circle, PenLine, Minus, MapPin, Spline } from "lucide-react";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { TabGroup } from "@/components/TabGroup";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
@@ -14,10 +14,15 @@ const SHAPES = [
   { id: "line",       label: "Line",      icon: Minus   },
 ] as const;
 
+const PEN_MODES = [
+  { id: "pins",     label: "Pins",     icon: MapPin },
+  { id: "freehand", label: "Freehand", icon: Spline },
+] as const;
+
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
 
 type ShapeType = (typeof SHAPES)[number]["id"];
-export type ShapesMode = "shapes" | "arrows";
+export type ShapesMode = "shapes" | "pens" | "arrows";
 
 interface ShapesSettingsProps {
   settings: ToolSettings;
@@ -38,6 +43,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
       <TabGroup
         tabs={[
           { id: "shapes", label: "Shapes" },
+          { id: "pens", label: "Pens" },
           { id: "arrows", label: "Arrows" },
         ]}
         active={mode}
@@ -75,6 +81,64 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
           />
 
           {/* Color */}
+          <ColorSwatchGrid
+            colors={TEXT_COLORS}
+            value={settings.strokeColor}
+            onChange={(color) => onChange({ ...settings, strokeColor: color })}
+          />
+        </div>
+      )}
+
+      {/* ── Pens tab ── */}
+      {mode === "pens" && (
+        <div className="space-y-6">
+          {/* Pins (numbered callouts) vs Freehand polyline */}
+          <ToolButtonGroup
+            options={PEN_MODES}
+            value={settings.penMode ?? "pins"}
+            onChange={(id) =>
+              onChange({ ...settings, penMode: id as "pins" | "freehand" })
+            }
+          />
+
+          {(settings.penMode ?? "pins") === "pins" ? (
+            <>
+              <p className="text-[11px] leading-relaxed text-theme-muted-foreground">
+                Click the image to drop auto-numbered callout pins (1, 2, 3…).
+                Click an existing pin to move it.
+              </p>
+              <SizeSlider
+                label="Pin Size"
+                value={settings.pinSize ?? 32}
+                min={16}
+                max={72}
+                unit="px"
+                onChange={(v) => onChange({ ...settings, pinSize: v })}
+              />
+            </>
+          ) : (
+            <>
+              <p className="text-[11px] leading-relaxed text-theme-muted-foreground">
+                Drag on the image to draw a freehand pen stroke.
+              </p>
+              <SizeSlider
+                label="Stroke Width"
+                value={settings.strokeWidth}
+                min={1}
+                max={10}
+                onChange={(v) => onChange({ ...settings, strokeWidth: v })}
+                presets={STROKE_WIDTH_PRESETS}
+                renderPreset={(preset) => (
+                  <span
+                    className="rounded-full bg-theme-foreground"
+                    style={{ width: preset * 2, height: preset * 2 }}
+                  />
+                )}
+              />
+            </>
+          )}
+
+          {/* Color (shared: pin fill / pen stroke) */}
           <ColorSwatchGrid
             colors={TEXT_COLORS}
             value={settings.strokeColor}

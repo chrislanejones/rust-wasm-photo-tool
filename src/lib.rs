@@ -207,7 +207,7 @@ pub struct TextAnnotation {
     pub bg_r: u8, pub bg_g: u8, pub bg_b: u8, pub bg_a: u8,
     pub bg_padding: u32,
     pub bg_corner_radius: u32,
-    pub bg_tail: u8,           // 0 none, 1 Left, 2 Right, 3 TopLeft, 4 BottomRight, 5 BottomLeft
+    pub bg_tail: u32,          // speech-bubble tail angle in degrees (0-359, CW from +x / east); only used when background_kind == 2
 }
 
 /// A live (non-destructive) shape/arrow annotation. Mirrors `TextAnnotation`:
@@ -223,14 +223,19 @@ pub struct TextAnnotation {
 #[derive(Clone)]
 pub struct ShapeAnnotation {
     pub id: u32,
-    /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow.
+    /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline.
     pub kind: u8,
-    pub x0: f64, pub y0: f64,   // start point (canvas coords)
-    pub x1: f64, pub y1: f64,   // end point
+    pub x0: f64, pub y0: f64,   // start point / bbox corner (canvas coords)
+    pub x1: f64, pub y1: f64,   // end point / opposite bbox corner
     pub r: u8, pub g: u8, pub b: u8,
     pub stroke_width: f64,
     /// Arrows only: 0=single-headed, 1=double-headed. Ignored for shapes.
     pub arrow_style: u8,
+    /// Numbered callout pins (kind 5): the label drawn in the circle. 0 otherwise.
+    pub number: u32,
+    /// Freehand/polyline pens (kind 6): the vertex list. Empty otherwise. The
+    /// bbox (x0,y0,x1,y1) is derived from these for hit-test / Reselect.
+    pub points: Vec<(f64, f64)>,
 }
 
 #[wasm_bindgen]
@@ -296,7 +301,7 @@ fn build_text_annotation(
     bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
     bg_padding: u32,
     bg_corner_radius: u32,
-    bg_tail: u8,
+    bg_tail: u32,
 ) -> TextAnnotation {
     let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
         build_annotation_tile(
@@ -358,17 +363,44 @@ fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
     let mut out = String::from("[");
     for (i, s) in shapes.iter().enumerate() {
         if i > 0 { out.push(','); }
+        let mut pts = String::from("[");
+        for (j, (x, y)) in s.points.iter().enumerate() {
+            if j > 0 { pts.push(','); }
+            pts.push_str(&format!("[{},{}]", x, y));
+        }
+        pts.push(']');
         out.push_str(&format!(
-            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"points\":{}}}",
             s.id, s.kind,
             s.x0, s.y0, s.x1, s.y1,
             s.r, s.g, s.b,
             s.stroke_width,
             s.arrow_style,
+            s.number,
+            pts,
         ));
     }
     out.push(']');
     out
+}
+
+/// Flat [x0,y0,x1,y1,…] → Vec<(x,y)>.
+fn flat_to_points(flat: &[f64]) -> Vec<(f64, f64)> {
+    flat.chunks_exact(2).map(|c| (c[0], c[1])).collect()
+}
+
+/// Axis-aligned bounding box of a point list as (minx,miny,maxx,maxy).
+fn points_bbox(pts: &[(f64, f64)]) -> (f64, f64, f64, f64) {
+    if pts.is_empty() {
+        return (0.0, 0.0, 0.0, 0.0);
+    }
+    let (mut minx, mut miny) = pts[0];
+    let (mut maxx, mut maxy) = pts[0];
+    for &(x, y) in pts {
+        minx = minx.min(x); maxx = maxx.max(x);
+        miny = miny.min(y); maxy = maxy.max(y);
+    }
+    (minx, miny, maxx, maxy)
 }
 
 /// Euclidean distance from point (px,py) to the segment (ax,ay)-(bx,by).
@@ -391,19 +423,44 @@ fn point_segment_distance(px: f64, py: f64, ax: f64, ay: f64, bx: f64, by: f64) 
 /// the flattened pixels are identical.
 fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let color = [s.r, s.g, s.b, 255];
-    if s.kind == 4 {
-        crate::drawing::draw_arrow(
+    match s.kind {
+        4 => crate::drawing::draw_arrow(
             data, w, h,
             s.x0, s.y0, s.x1, s.y1,
             color, s.stroke_width, s.arrow_style as u32,
-        );
-    } else {
-        crate::drawing::draw_shape(
+        ),
+        5 => render_pin(data, w, h, s),
+        6 => crate::drawing::draw_polyline(data, w, h, &s.points, color, s.stroke_width),
+        _ => crate::drawing::draw_shape(
             data, w, h,
             s.x0, s.y0, s.x1, s.y1,
             s.kind as u32, color, s.stroke_width,
-        );
+        ),
     }
+}
+
+/// Render a numbered callout pin: a filled disc (from the bbox) with the
+/// number centred on it in a contrasting colour.
+fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
+    let cx = (s.x0 + s.x1) * 0.5;
+    let cy = (s.y0 + s.y1) * 0.5;
+    let radius = (s.x1 - s.x0).abs().min((s.y1 - s.y0).abs()) * 0.5;
+    if radius < 1.0 { return; }
+    crate::drawing::fill_circle(data, w, h, cx, cy, radius, [s.r, s.g, s.b, 255]);
+
+    // Black or white number depending on fill luminance.
+    let lum = 0.299 * s.r as f64 + 0.587 * s.g as f64 + 0.114 * s.b as f64;
+    let (nr, ng, nb) = if lum > 140.0 { (20u8, 20u8, 20u8) } else { (255u8, 255u8, 255u8) };
+    let label = s.number.to_string();
+    let font_size = (radius * 1.2).max(10.0) as f32;
+    let rendered = crate::text::render_text(&label, font_size, nr, ng, nb, true);
+    let dx = (cx - rendered.width as f64 * 0.5).round() as i32;
+    let dy = (cy - rendered.height as f64 * 0.5).round() as i32;
+    crate::transform::paste_region(
+        data, w as i32, h as i32,
+        &rendered.pixels, rendered.width, rendered.height,
+        dx, dy,
+    );
 }
 
 impl ImageHorseTool {
@@ -441,7 +498,7 @@ fn build_annotation_tile(
     bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
     bg_padding: u32,
     bg_corner_radius: u32,
-    bg_tail: u8,
+    bg_tail: u32,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
     let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
     let raw_w = rendered.width;
@@ -465,71 +522,101 @@ fn build_annotation_tile(
         return (rotated.pixels, rotated.width, rotated.height, off_x, off_y);
     }
 
-    // Background path: expand the tile by `bg_padding` on all sides, and
-    // by ~TAIL_EXTENT (16 px on the tail axis, 12 px on the perpendicular)
-    // when there's a speech-bubble tail.
-    const TAIL_LEN: u32 = 32;     // how far the tail sticks out
-    const TAIL_HALF: u32 = 16;    // half-width of the tail base
-    let (tail_l, tail_r, tail_t, tail_b) = if background_kind == 2 {
-        match bg_tail {
-            1 => (TAIL_LEN, 0, 0, 0),                          // Left
-            2 => (0, TAIL_LEN, 0, 0),                          // Right
-            3 => (0, 0, TAIL_LEN, 0),                          // TopLeft (extends up)
-            4 => (0, TAIL_LEN, 0, TAIL_LEN),                   // BottomRight
-            5 => (TAIL_LEN, 0, 0, TAIL_LEN),                   // BottomLeft
-            _ => (0, 0, 0, 0),
-        }
+    // Background path: expand the tile by `bg_padding` on all sides. A
+    // speech-bubble tail can point in any direction (`bg_tail` is an angle in
+    // degrees), so reserve a uniform `TAIL_MARGIN` on every side — the tail
+    // apex lands inside that margin no matter the angle.
+    const TAIL_LEN: f64 = 46.0;    // how far the apex sticks out past the rect edge
+    const TAIL_HALF: f64 = 16.0;   // half-width of the tail base
+    let tail_margin: u32 = if background_kind == 2 {
+        (TAIL_LEN.ceil() as u32) + (TAIL_HALF.ceil() as u32)
     } else {
-        (0, 0, 0, 0)
+        0
     };
     let pad = bg_padding;
-    let tile_w = raw_w + pad * 2 + tail_l + tail_r;
-    let tile_h = raw_h + pad * 2 + tail_t + tail_b;
+    let tile_w = raw_w + pad * 2 + tail_margin * 2;
+    let tile_h = raw_h + pad * 2 + tail_margin * 2;
     let mut tile = vec![0u8; (tile_w * tile_h * 4) as usize];
 
-    // Background rect occupies the padded text area inside the tile.
-    let rect_x0 = tail_l as i32;
-    let rect_y0 = tail_t as i32;
-    let rect_x1 = (tail_l + raw_w + pad * 2) as i32;
-    let rect_y1 = (tail_t + raw_h + pad * 2) as i32;
+    // Background rect occupies the padded text area, inset by the tail margin.
+    let rect_x0 = tail_margin as i32;
+    let rect_y0 = tail_margin as i32;
+    let rect_x1 = (tail_margin + raw_w + pad * 2) as i32;
+    let rect_y1 = (tail_margin + raw_h + pad * 2) as i32;
 
-    crate::drawing::fill_rounded_rect(
-        &mut tile, tile_w, tile_h,
+    // Build the bubble as a single coverage mask (rect ∪ tail), then composite
+    // the colour ONCE. This keeps the tail flush with the body — no AA seam at
+    // the join, and translucent fills don't double up where the two overlap.
+    let mut cov = vec![0f32; (tile_w * tile_h) as usize];
+    crate::drawing::rounded_rect_coverage(
+        &mut cov, tile_w, tile_h,
         rect_x0, rect_y0, rect_x1, rect_y1,
         bg_corner_radius,
-        bg_r, bg_g, bg_b, bg_a,
     );
 
-    // Optional speech-bubble tail. The tail attaches to the rect's edge
-    // and extends outward; size ~ TAIL_LEN x (TAIL_HALF*2).
-    if background_kind == 2 && bg_tail != 0 {
-        let rx0 = rect_x0 as f64;
-        let ry0 = rect_y0 as f64;
-        let rx1 = rect_x1 as f64;
-        let ry1 = rect_y1 as f64;
-        let _mid_x = (rx0 + rx1) * 0.5;
-        let mid_y = (ry0 + ry1) * 0.5;
-        let hf = TAIL_HALF as f64;
-        let tl = TAIL_LEN as f64;
-        let (p1, p2, p3) = match bg_tail {
-            1 => ((rx0, mid_y - hf), (rx0, mid_y + hf), (rx0 - tl, mid_y)),
-            2 => ((rx1, mid_y - hf), (rx1, mid_y + hf), (rx1 + tl, mid_y)),
-            3 => ((rx0 + hf, ry0), (rx0 + hf * 3.0, ry0), (rx0, ry0 - tl)),
-            4 => ((rx1 - hf, ry1), (rx1 - hf * 3.0, ry1), (rx1, ry1 + tl)),
-            5 => ((rx0 + hf, ry1), (rx0 + hf * 3.0, ry1), (rx0, ry1 + tl)),
-            _ => ((0.0, 0.0), (0.0, 0.0), (0.0, 0.0)),
-        };
-        crate::drawing::fill_triangle_public(
-            &mut tile, tile_w, tile_h,
-            p1, p2, p3,
-            bg_r, bg_g, bg_b, bg_a,
+    // Speech-bubble tail at `bg_tail` degrees. Project a ray from the rect
+    // centre (CW from +x, screen coords with y down) onto the bounding edge;
+    // the exit point picks WHICH edge the tail leaves from. The base runs
+    // straight ALONG that edge (not perpendicular to the ray) so it's always
+    // flush — both base corners sit on the body. The base is clamped to the
+    // straight part of the edge (off the rounded corners) and sunk
+    // TAIL_OVERLAP into the body so it fuses with the rect in the mask. The
+    // apex sits TAIL_LEN out, offset toward the chosen angle.
+    if background_kind == 2 {
+        const TAIL_OVERLAP: f64 = 4.0;
+        let cx = (rect_x0 + rect_x1) as f64 * 0.5;
+        let cy = (rect_y0 + rect_y1) as f64 * 0.5;
+        let hw = (rect_x1 - rect_x0) as f64 * 0.5;
+        let hh = (rect_y1 - rect_y0) as f64 * 0.5;
+
+        let theta = (bg_tail as f64).to_radians();
+        let dx = theta.cos();
+        let dy = theta.sin();
+
+        let tx = if dx.abs() > 1e-6 { hw / dx.abs() } else { f64::INFINITY };
+        let ty = if dy.abs() > 1e-6 { hh / dy.abs() } else { f64::INFINITY };
+        let t = tx.min(ty);
+        let ex = cx + dx * t;
+        let ey = cy + dy * t;
+
+        let max_r = hw.min(hh);
+        let rad_eff = (bg_corner_radius as f64).min(max_r);
+
+        let (b1, b2, apex);
+        if tx <= ty {
+            // Left/right edge — vertical base running along the edge.
+            let lo = rect_y0 as f64 + rad_eff + TAIL_HALF;
+            let hi = rect_y1 as f64 - rad_eff - TAIL_HALF;
+            let yc = if lo <= hi { ey.clamp(lo, hi) } else { cy };
+            let inward = if dx >= 0.0 { -TAIL_OVERLAP } else { TAIL_OVERLAP };
+            let bx = ex + inward;
+            b1 = (bx, yc - TAIL_HALF);
+            b2 = (bx, yc + TAIL_HALF);
+            apex = (ex + dx * TAIL_LEN, yc + dy * TAIL_LEN);
+        } else {
+            // Top/bottom edge — horizontal base running along the edge.
+            let lo = rect_x0 as f64 + rad_eff + TAIL_HALF;
+            let hi = rect_x1 as f64 - rad_eff - TAIL_HALF;
+            let xc = if lo <= hi { ex.clamp(lo, hi) } else { cx };
+            let inward = if dy >= 0.0 { -TAIL_OVERLAP } else { TAIL_OVERLAP };
+            let by = ey + inward;
+            b1 = (xc - TAIL_HALF, by);
+            b2 = (xc + TAIL_HALF, by);
+            apex = (xc + dx * TAIL_LEN, ey + dy * TAIL_LEN);
+        }
+
+        crate::drawing::triangle_coverage(
+            &mut cov, tile_w as i32, tile_h as i32,
+            b1, b2, apex,
         );
     }
 
+    crate::drawing::blend_coverage(&mut tile, &cov, bg_r, bg_g, bg_b, bg_a);
+
     // Composite the text on top of the background. The text sits inside
     // the rect with `pad` margin.
-    let text_dx = (tail_l + pad) as i32;
-    let text_dy = (tail_t + pad) as i32;
+    let text_dx = (tail_margin + pad) as i32;
+    let text_dy = (tail_margin + pad) as i32;
     crate::transform::paste_region(
         &mut tile,
         tile_w as i32,
@@ -857,7 +944,7 @@ impl ImageHorseTool {
         bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
         bg_padding: u32,
         bg_corner_radius: u32,
-        bg_tail: u8,
+        bg_tail: u32,
     ) -> bool {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
@@ -886,7 +973,7 @@ impl ImageHorseTool {
         bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
         bg_padding: u32,
         bg_corner_radius: u32,
-        bg_tail: u8,
+        bg_tail: u32,
     ) -> bool {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
@@ -1240,6 +1327,8 @@ impl ImageHorseTool {
             r: c[0], g: c[1], b: c[2],
             stroke_width,
             arrow_style,
+            number: 0,
+            points: Vec::new(),
         });
         id
     }
@@ -1261,6 +1350,87 @@ impl ImageHorseTool {
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
         self.shape_annotations.push(ShapeAnnotation {
             id, kind, x0, y0, x1, y1, r, g, b, stroke_width, arrow_style,
+            number: 0, points: Vec::new(),
+        });
+        id
+    }
+
+    /// Add a numbered callout pin (kind 5): a filled circle + centred number,
+    /// stored as a circle-style bbox plus its label. Pushes "Add Pin".
+    pub fn add_pin_annotation(
+        &mut self,
+        x0: f64, y0: f64, x1: f64, y1: f64,
+        number: u32,
+        color_hex: &str,
+    ) -> u32 {
+        self.snap("Add Pin");
+        let c = drawing::parse_hex_color(color_hex);
+        let id = self.next_shape_id;
+        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
+        self.shape_annotations.push(ShapeAnnotation {
+            id, kind: 5, x0, y0, x1, y1,
+            r: c[0], g: c[1], b: c[2],
+            stroke_width: 0.0, arrow_style: 0,
+            number, points: Vec::new(),
+        });
+        id
+    }
+
+    /// Restore a persisted pin WITHOUT pushing history. Colour is raw r,g,b.
+    pub fn restore_pin_annotation(
+        &mut self,
+        x0: f64, y0: f64, x1: f64, y1: f64,
+        number: u32, r: u8, g: u8, b: u8,
+    ) -> u32 {
+        let id = self.next_shape_id;
+        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
+        self.shape_annotations.push(ShapeAnnotation {
+            id, kind: 5, x0, y0, x1, y1, r, g, b,
+            stroke_width: 0.0, arrow_style: 0,
+            number, points: Vec::new(),
+        });
+        id
+    }
+
+    /// Add a freehand/polyline pen stroke (kind 6). `points` is a flat
+    /// [x0,y0,x1,y1,…] array of vertices; the bbox is derived from it.
+    /// Pushes "Add Pen".
+    pub fn add_polyline_annotation(
+        &mut self,
+        points: &[f64],
+        color_hex: &str,
+        stroke_width: f64,
+    ) -> u32 {
+        self.snap("Add Pen");
+        let c = drawing::parse_hex_color(color_hex);
+        let pts = flat_to_points(points);
+        let (x0, y0, x1, y1) = points_bbox(&pts);
+        let id = self.next_shape_id;
+        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
+        self.shape_annotations.push(ShapeAnnotation {
+            id, kind: 6, x0, y0, x1, y1,
+            r: c[0], g: c[1], b: c[2],
+            stroke_width, arrow_style: 0,
+            number: 0, points: pts,
+        });
+        id
+    }
+
+    /// Restore a persisted polyline WITHOUT pushing history. Colour is raw r,g,b.
+    pub fn restore_polyline_annotation(
+        &mut self,
+        points: &[f64],
+        r: u8, g: u8, b: u8,
+        stroke_width: f64,
+    ) -> u32 {
+        let pts = flat_to_points(points);
+        let (x0, y0, x1, y1) = points_bbox(&pts);
+        let id = self.next_shape_id;
+        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
+        self.shape_annotations.push(ShapeAnnotation {
+            id, kind: 6, x0, y0, x1, y1, r, g, b,
+            stroke_width, arrow_style: 0,
+            number: 0, points: pts,
         });
         id
     }
@@ -1328,8 +1498,13 @@ impl ImageHorseTool {
             let hit = if s.kind == 2 || s.kind == 4 {
                 // line / arrow → distance to the segment
                 point_segment_distance(x, y, s.x0, s.y0, s.x1, s.y1) <= pad + 4.0
+            } else if s.kind == 6 {
+                // polyline → distance to any segment
+                s.points.windows(2).any(|p| {
+                    point_segment_distance(x, y, p[0].0, p[0].1, p[1].0, p[1].1) <= pad + 4.0
+                })
             } else {
-                // rect / circle / handCircle → padded bounding box
+                // rect / circle / handCircle / pin → padded bounding box
                 let minx = s.x0.min(s.x1) - pad;
                 let maxx = s.x0.max(s.x1) + pad;
                 let miny = s.y0.min(s.y1) - pad;
@@ -1638,7 +1813,7 @@ impl ImageHorseTool {
         bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
         bg_padding: u32,
         bg_corner_radius: u32,
-        bg_tail: u8,
+        bg_tail: u32,
     ) -> u32 {
         self.snap("Add Text");
         let id = self.next_text_id;
@@ -1668,7 +1843,7 @@ impl ImageHorseTool {
         bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
         bg_padding: u32,
         bg_corner_radius: u32,
-        bg_tail: u8,
+        bg_tail: u32,
     ) -> bool {
         let Some(idx) = self.text_annotations.iter().position(|a| a.id == id) else {
             return false;

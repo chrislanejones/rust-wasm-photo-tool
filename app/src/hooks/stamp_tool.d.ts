@@ -397,9 +397,32 @@ declare module "stamp_tool" {
     flatten_text_annotations(): void;
 
     // ── Live shape/arrow annotations (non-destructive, re-selectable) ──
-    // kind: 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow.
+    // kind: 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline.
     // arrow_style (arrows only): 0=single, 1=double.
     shape_annotation_count(): number;
+    /** Add a numbered callout pin (kind 5): circle bbox + label. Pushes "Add Pin". */
+    add_pin_annotation(
+      x0: number, y0: number, x1: number, y1: number,
+      number: number,
+      color_hex: string,
+    ): number;
+    /** Restore a persisted pin WITHOUT pushing history. Colour is raw r,g,b. */
+    restore_pin_annotation(
+      x0: number, y0: number, x1: number, y1: number,
+      number: number, r: number, g: number, b: number,
+    ): number;
+    /** Add a freehand/polyline pen (kind 6). `points` is a flat [x0,y0,x1,y1,…] array. Pushes "Add Pen". */
+    add_polyline_annotation(
+      points: Float64Array,
+      color_hex: string,
+      stroke_width: number,
+    ): number;
+    /** Restore a persisted polyline WITHOUT pushing history. Colour is raw r,g,b. */
+    restore_polyline_annotation(
+      points: Float64Array,
+      r: number, g: number, b: number,
+      stroke_width: number,
+    ): number;
     /** Add a live shape/arrow. Pushes an "Add Shape"/"Add Arrow" history step. Returns the new id. */
     add_shape_annotation(
       kind: number,
@@ -440,7 +463,7 @@ declare module "stamp_tool" {
     remove_shape_annotation(id: number): boolean;
     /** Suppress one shape from render while its JS overlay preview is shown. Pass -1 to clear. */
     set_editing_shape(id: number): void;
-    /** JSON array of all live shapes (id, kind, x0,y0,x1,y1, r,g,b, stroke_width, arrow_style). */
+    /** JSON array of all live shapes (id, kind, x0,y0,x1,y1, r,g,b, stroke_width, arrow_style, number, points). */
     get_shape_annotations(): string;
     /** Returns the matching shape id, or -1 if no hit. */
     shape_annotation_at(x: number, y: number): number;

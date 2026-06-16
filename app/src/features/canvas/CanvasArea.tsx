@@ -70,7 +70,8 @@ interface Props {
     bgOpacity?: number;
     bgPadding?: number;
     bgCornerRadius?: number;
-    bgTail?: "left" | "right" | "topleft" | "bottomright" | "bottomleft";
+    /** Speech-bubble tail angle in degrees (0-359). */
+    bgTail?: number;
   };
   colorPickerActive?: boolean;
   containerRef?: React.RefObject<HTMLDivElement | null>;
@@ -1132,63 +1133,74 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const bgOpacity01 =
             Math.max(0, Math.min(100, textSettings.bgOpacity ?? 100)) / 100;
           const bgColorRaw = textSettings.bgColor ?? "#ffffff";
-          const tailLen = 32 * scaleX;
+          const tailLen = 46 * scaleX;
           const tailHalf = 16 * scaleX;
           // Render the BG only when the toolbar has a non-"none" choice AND
           // the textarea has actual dimensions to wrap.
           const showBg = bgKind !== "none" && boxW > 0 && boxH > 0;
 
-          const tail = bgKind === "bubble" ? (textSettings.bgTail ?? "right") : null;
-          const padL = bgPad + (tail === "left" ? tailLen : 0);
-          const padR = bgPad + (tail === "right" || tail === "bottomright" ? tailLen : 0);
-          const padT = bgPad + (tail === "topleft" ? tailLen : 0);
-          const padB =
-            bgPad + (tail === "bottomright" || tail === "bottomleft" ? tailLen : 0);
+          // Tail angle in degrees (0-359), or null for rect / no background.
+          const tailAngle =
+            bgKind === "bubble" ? (textSettings.bgTail ?? 135) : null;
+          // Uniform margin on all sides so the tail fits at any angle — mirrors
+          // the Rust `build_annotation_tile` tail_margin.
+          const tailMargin = tailAngle !== null ? tailLen + tailHalf : 0;
+          const padL = bgPad + tailMargin;
+          const padR = bgPad + tailMargin;
+          const padT = bgPad + tailMargin;
+          const padB = bgPad + tailMargin;
 
           const bgLeft = sx - padL;
           const bgTop = sy - padT;
           const bgW = boxW + padL + padR;
           const bgH = boxH + padT + padB;
 
-          // Triangle tail rendered as an SVG inside the rotated wrapper so
-          // it tracks the textarea's orientation. Anchor at the rect edge
-          // closest to the requested direction.
+          // Triangle tail rendered as an SVG inside the rotated wrapper so it
+          // tracks the textarea's orientation. Geometry matches the Rust path:
+          // project a ray from the rect centre at `tailAngle`° onto the rect's
+          // bounding edge; that exit point is the base, apex sits tailLen past.
           const tailSvg = (() => {
-            if (!tail) return null;
-            const rectX0 = tail === "left" ? tailLen : 0;
-            const rectY0 = tail === "topleft" ? tailLen : 0;
+            if (tailAngle === null) return null;
+            const rectX0 = tailMargin;
+            const rectY0 = tailMargin;
             const rectX1 = rectX0 + boxW + bgPad * 2;
             const rectY1 = rectY0 + boxH + bgPad * 2;
-            const midY = (rectY0 + rectY1) / 2;
+            const cx = (rectX0 + rectX1) / 2;
+            const cy = (rectY0 + rectY1) / 2;
+            const hw = (rectX1 - rectX0) / 2;
+            const hh = (rectY1 - rectY0) / 2;
+            const theta = (tailAngle * Math.PI) / 180;
+            const dx = Math.cos(theta);
+            const dy = Math.sin(theta);
+            const tx = Math.abs(dx) > 1e-6 ? hw / Math.abs(dx) : Infinity;
+            const ty = Math.abs(dy) > 1e-6 ? hh / Math.abs(dy) : Infinity;
+            const t = Math.min(tx, ty);
+            const ex = cx + dx * t;
+            const ey = cy + dy * t;
+            // Base runs ALONG the exit edge (not perpendicular to the ray) so
+            // both corners stay flush; clamped off the rounded corners and sunk
+            // into the body. Mirrors the Rust tail geometry exactly.
+            const overlap = 4 * scaleX;
+            const radEff = Math.min(bgRadius, Math.min(hw, hh));
             let p1: [number, number];
             let p2: [number, number];
             let p3: [number, number];
-            switch (tail) {
-              case "left":
-                p1 = [rectX0, midY - tailHalf];
-                p2 = [rectX0, midY + tailHalf];
-                p3 = [rectX0 - tailLen, midY];
-                break;
-              case "right":
-                p1 = [rectX1, midY - tailHalf];
-                p2 = [rectX1, midY + tailHalf];
-                p3 = [rectX1 + tailLen, midY];
-                break;
-              case "topleft":
-                p1 = [rectX0 + tailHalf, rectY0];
-                p2 = [rectX0 + tailHalf * 3, rectY0];
-                p3 = [rectX0, rectY0 - tailLen];
-                break;
-              case "bottomright":
-                p1 = [rectX1 - tailHalf, rectY1];
-                p2 = [rectX1 - tailHalf * 3, rectY1];
-                p3 = [rectX1, rectY1 + tailLen];
-                break;
-              case "bottomleft":
-                p1 = [rectX0 + tailHalf, rectY1];
-                p2 = [rectX0 + tailHalf * 3, rectY1];
-                p3 = [rectX0, rectY1 + tailLen];
-                break;
+            if (tx <= ty) {
+              const lo = rectY0 + radEff + tailHalf;
+              const hi = rectY1 - radEff - tailHalf;
+              const yc = lo <= hi ? Math.max(lo, Math.min(hi, ey)) : cy;
+              const bx = ex + (dx >= 0 ? -overlap : overlap);
+              p1 = [bx, yc - tailHalf];
+              p2 = [bx, yc + tailHalf];
+              p3 = [ex + dx * tailLen, yc + dy * tailLen];
+            } else {
+              const lo = rectX0 + radEff + tailHalf;
+              const hi = rectX1 - radEff - tailHalf;
+              const xc = lo <= hi ? Math.max(lo, Math.min(hi, ex)) : cx;
+              const by = ey + (dy >= 0 ? -overlap : overlap);
+              p1 = [xc - tailHalf, by];
+              p2 = [xc + tailHalf, by];
+              p3 = [xc + dx * tailLen, ey + dy * tailLen];
             }
             return (
               <svg
@@ -1199,7 +1211,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 <polygon
                   points={`${p1[0]},${p1[1]} ${p2[0]},${p2[1]} ${p3[0]},${p3[1]}`}
                   fill={bgColorRaw}
-                  opacity={bgOpacity01}
                 />
               </svg>
             );
@@ -1219,21 +1230,26 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     height: bgH,
                     pointerEvents: "none",
                     zIndex: 49,
+                    // Opacity on the wrapper (not the children) so the tail can
+                    // overlap the body without the join darkening — mirrors the
+                    // single composite of the Rust coverage mask.
+                    opacity: bgOpacity01,
                     transform: `rotate(${rotation}deg)`,
                     transformOrigin: "center center",
                   }}
                 >
-                  {/* The rounded rect itself */}
+                  {/* The rounded rect itself — inset by the uniform tail margin.
+                      Corner radius applies to both Text BG and Bubble; a large
+                      "circle" value is clamped to a pill by the browser. */}
                   <div
                     style={{
                       position: "absolute",
-                      left: tail === "left" ? tailLen : 0,
-                      top: tail === "topleft" ? tailLen : 0,
+                      left: tailMargin,
+                      top: tailMargin,
                       width: boxW + bgPad * 2,
                       height: boxH + bgPad * 2,
                       backgroundColor: bgColorRaw,
-                      opacity: bgOpacity01,
-                      borderRadius: bgKind === "rect" ? bgRadius : 12 * scaleX,
+                      borderRadius: bgRadius,
                     }}
                   />
                   {tailSvg}

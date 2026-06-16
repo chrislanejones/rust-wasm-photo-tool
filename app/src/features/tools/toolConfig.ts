@@ -17,7 +17,7 @@ export interface ToolDefinition {
   id: ToolType;
   label: string;
   /** Optional tooltip-title override for when the visible tooltip should say
-   *  more than the short `label` (e.g. Resize → "Resize & Compress"). */
+   *  more than the short `label` (e.g. Resize → "Compress & Resize"). */
   tooltipTitle?: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -28,8 +28,8 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: "compress",
     label: "Resize",
-    tooltipTitle: "Resize & Compress",
-    description: "Resize & compress images",
+    tooltipTitle: "Compress & Resize",
+    description: "Compress & resize images",
     icon: Shrink,
     gradient: "from-orange-500 to-red-500",
   },

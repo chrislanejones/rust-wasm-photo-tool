@@ -38,6 +38,61 @@ fn draw_line_thick(
     }
 }
 
+/// Anti-aliased filled disc (Porter-Duff source-over). Used for numbered
+/// callout pins.
+pub fn fill_circle(
+    data: &mut [u8],
+    w: u32, h: u32,
+    cx: f64, cy: f64,
+    radius: f64,
+    color: [u8; 4],
+) {
+    let wi = w as i32;
+    let hi = h as i32;
+    let r = radius.max(0.0);
+    let min_x = ((cx - r - 1.0).floor() as i32).max(0);
+    let max_x = ((cx + r + 1.0).ceil() as i32).min(wi - 1);
+    let min_y = ((cy - r - 1.0).floor() as i32).max(0);
+    let max_y = ((cy + r + 1.0).ceil() as i32).min(hi - 1);
+    for py in min_y..=max_y {
+        for px in min_x..=max_x {
+            let dx = px as f64 + 0.5 - cx;
+            let dy = py as f64 + 0.5 - cy;
+            let dist = (dx * dx + dy * dy).sqrt();
+            let cov = if dist <= r - 0.5 { 1.0 }
+                      else if dist >= r + 0.5 { 0.0 }
+                      else { (r + 0.5 - dist).clamp(0.0, 1.0) };
+            if cov <= 0.0 { continue; }
+            let idx = ((py * wi + px) * 4) as usize;
+            if idx + 3 >= data.len() { continue; }
+            let mut c = color;
+            c[3] = (color[3] as f64 * cov).round().clamp(0.0, 255.0) as u8;
+            blend_pixel(data, idx, c);
+        }
+    }
+}
+
+/// Freehand/polyline pen: thick round-capped segments between consecutive
+/// vertices. A single point renders as a dot.
+pub fn draw_polyline(
+    data: &mut [u8],
+    w: u32, h: u32,
+    points: &[(f64, f64)],
+    color: [u8; 4],
+    width: f64,
+) {
+    if points.is_empty() { return; }
+    if points.len() == 1 {
+        fill_circle(data, w, h, points[0].0, points[0].1, (width / 2.0).max(0.5), color);
+        return;
+    }
+    let wi = w as i32;
+    let hi = h as i32;
+    for p in points.windows(2) {
+        draw_line_thick(data, wi, hi, p[0].0, p[0].1, p[1].0, p[1].1, color, width);
+    }
+}
+
 /// Public filled rounded-rect helper. Renders into an RGBA buffer of size
 /// (w*h*4) with Porter-Duff source-over blending. Approximates rounded
 /// corners by composing a centre rectangle, two edge strips, plus four
@@ -46,6 +101,7 @@ fn draw_line_thick(
 ///
 /// Coordinates are inclusive of `x0,y0` and exclusive of `x1,y1`
 /// (i.e. rect width = x1-x0, height = y1-y0).
+#[allow(dead_code)]
 pub fn fill_rounded_rect(
     out: &mut [u8],
     w: u32, h: u32,
@@ -102,8 +158,106 @@ pub fn fill_rounded_rect(
     }
 }
 
+/// Accumulate anti-aliased rounded-rect coverage into a single-channel mask
+/// (`cov[i]` in 0..=1), taking the max with any existing coverage. Used to
+/// build the union of the bubble body + tail so the fill is composited ONCE —
+/// no seam where the shapes meet, and translucent fills don't double up in the
+/// overlap. Mirrors the AA math in `fill_rounded_rect`.
+pub fn rounded_rect_coverage(
+    cov: &mut [f32],
+    w: u32, h: u32,
+    x0: i32, y0: i32,
+    x1: i32, y1: i32,
+    radius: u32,
+) {
+    let wi = w as i32;
+    let hi = h as i32;
+    let x0c = x0.max(0);
+    let y0c = y0.max(0);
+    let x1c = x1.min(wi);
+    let y1c = y1.min(hi);
+    if x0c >= x1c || y0c >= y1c { return; }
+
+    let rw = (x1 - x0).max(0) as u32;
+    let rh = (y1 - y0).max(0) as u32;
+    let max_r = rw.min(rh) / 2;
+    let rad = radius.min(max_r);
+    let radf = rad as f64;
+
+    let lx = (x0 + rad as i32) as f64;
+    let rx = (x1 - rad as i32 - 1) as f64;
+    let ty = (y0 + rad as i32) as f64;
+    let by = (y1 - rad as i32 - 1) as f64;
+
+    for py in y0c..y1c {
+        for px in x0c..x1c {
+            let dx = if (px as f64) < lx { (px as f64) - lx }
+                     else if (px as f64) > rx { (px as f64) - rx }
+                     else { 0.0 };
+            let dy = if (py as f64) < ty { (py as f64) - ty }
+                     else if (py as f64) > by { (py as f64) - by }
+                     else { 0.0 };
+            let dist = (dx * dx + dy * dy).sqrt();
+            let c = if rad == 0 {
+                1.0
+            } else if dist <= radf - 0.5 {
+                1.0
+            } else if dist >= radf + 0.5 {
+                0.0
+            } else {
+                (radf + 0.5 - dist).clamp(0.0, 1.0)
+            };
+            if c <= 0.0 { continue; }
+            let cf = c as f32;
+            let i = (py * wi + px) as usize;
+            if i < cov.len() && cf > cov[i] { cov[i] = cf; }
+        }
+    }
+}
+
+/// Accumulate a (hard-edged) filled triangle into a coverage mask. Used for the
+/// speech-bubble tail so it unions with the body before a single composite.
+pub fn triangle_coverage(
+    cov: &mut [f32],
+    w: i32, h: i32,
+    p0: (f64, f64),
+    p1: (f64, f64),
+    p2: (f64, f64),
+) {
+    let min_x = (p0.0.min(p1.0).min(p2.0).floor() as i32).max(0);
+    let max_x = (p0.0.max(p1.0).max(p2.0).ceil() as i32).min(w - 1);
+    let min_y = (p0.1.min(p1.1).min(p2.1).floor() as i32).max(0);
+    let max_y = (p0.1.max(p1.1).max(p2.1).ceil() as i32).min(h - 1);
+    for py in min_y..=max_y {
+        for px in min_x..=max_x {
+            let p = (px as f64 + 0.5, py as f64 + 0.5);
+            if point_in_triangle(p, p0, p1, p2) {
+                let i = (py * w + px) as usize;
+                if i < cov.len() { cov[i] = 1.0; }
+            }
+        }
+    }
+}
+
+/// Composite a flat color into `out` using a coverage mask, once per pixel.
+pub fn blend_coverage(
+    out: &mut [u8],
+    cov: &[f32],
+    r: u8, g: u8, b: u8, a: u8,
+) {
+    for (i, &c) in cov.iter().enumerate() {
+        let c = c.clamp(0.0, 1.0);
+        if c <= 0.0 { continue; }
+        let idx = i * 4;
+        if idx + 3 >= out.len() { continue; }
+        let col = [r, g, b, (a as f32 * c).round().clamp(0.0, 255.0) as u8];
+        blend_pixel(out, idx, col);
+    }
+}
+
 /// Public filled triangle helper (Porter-Duff source-over blend) for the
 /// speech-bubble tail.
+#[allow(dead_code)]
 pub fn fill_triangle_public(
     out: &mut [u8],
     w: u32, h: u32,

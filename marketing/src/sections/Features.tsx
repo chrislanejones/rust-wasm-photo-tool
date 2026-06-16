@@ -14,13 +14,13 @@ function Feature({ color, title, body, tags }: {
 }) {
   const c = FEATURE_COLORS[color];
   return (
-    <article className={`rounded-xl border ${c.border} ${c.bg} p-5`}>
+    <article className={`flex flex-col h-full rounded-xl border ${c.border} ${c.bg} p-5`}>
       <div className="flex items-center gap-2 mb-3">
         <span className={`w-2 h-2 rounded-full bg-current ${c.text}`} />
         <h3 className="font-medium text-zinc-100">{title}</h3>
       </div>
       <p className="text-sm text-zinc-400 leading-relaxed">{body}</p>
-      <div className={`mt-3 text-[11px] mono ${c.text}`}>{tags}</div>
+      <div className={`mt-auto pt-3 text-[11px] mono ${c.text}`}>{tags}</div>
     </article>
   );
 }
@@ -42,10 +42,10 @@ export default function Features() {
 
         <div className="grid md:grid-cols-3 gap-4">
           <Feature color="orange"  title="WASM-powered editor"   body="Rust-compiled filters, transforms, and rasterization run at near-native speed on the visitor's CPU." tags="Brightness · Contrast · Blur · Crop · Resize" />
-          <Feature color="pink"    title="Layered annotations"   body="Rectangles, ellipses, arrows, paths, text, and emoji — organized in real-layer stacks with locking and blend modes." tags="Rect · Ellipse · Path · Text · Arrow" />
+          <Feature color="pink"    title="Layered annotations"   body="Rectangles, ellipses, arrows, numbered callout pins, freehand pen strokes, text, and emoji — organized in real-layer stacks with locking and blend modes." tags="Rect · Ellipse · Arrow · Pin · Pen · Text" />
           <Feature color="emerald" title="Format conversion"     body="Encode and decode PNG, JPEG, WebP, and AVIF. Resize and re-compress in a single round-trip." tags="PNG · JPEG · WebP · AVIF" />
           <Feature color="amber"   title="Batch Image Editor"    body="Stamp a logo onto every photo in one pass, or browse the gallery as a 5×3 grid mosaic with the active photo as the hero tile. Compositing, scaling, and PNG encoding all run in Rust — zero canvas round-trips." tags="Bulk logo · Grid view · SVG logos · Rust composite" />
-          <Feature color="violet"  title="AI enhancements"       body="Background removal, 4× upscaling, object removal, and alt-text generation, on-demand via Replicate." tags="rembg · Real-ESRGAN · SD Inpaint · BLIP" />
+          <Feature color="violet"  title="AI enhancements"       body="Background removal is live via a Convex → Replicate pipeline; 4× upscaling, object removal, and alt-text generation are queued up next." tags="rembg (live) · Real-ESRGAN · SD Inpaint · BLIP" />
           <Feature color="blue"    title="Privacy by default"    body="Demo mode never uploads. Even on the paid tier, processing stays local — uploads exist for sharing, not computation." tags="No server processing" />
         </div>
       </div>
