@@ -1073,11 +1073,15 @@ export function AppShell() {
     [stamp, activePhotoId, photos, quality, exportFormat],
   );
 
-  const handleAutoCompress = useCallback(async () => {
-    // Compress the selected images when there's a selection, otherwise all.
+  const handleAutoCompress = useCallback(
+    async (scope: "selected" | "all" = "all") => {
+    // "selected" compresses the gallery multi-selection, or — when nothing is
+    // multi-selected — just the active photo in the ring. "all" does everything.
     const targets =
-      selectedIds.size > 0
-        ? photos.filter((p) => selectedIds.has(p.id))
+      scope === "selected"
+        ? selectedIds.size > 0
+          ? photos.filter((p) => selectedIds.has(p.id))
+          : photos.filter((p) => p.id === activePhotoId)
         : photos;
     // Load originals from IndexedDB to build File objects for the compress hook
     const photosForCompress = (
@@ -1120,7 +1124,7 @@ export function AppShell() {
     // NOTE: intentionally does NOT set `hasBeenModified` — Auto Compress is a
     // batch op over stored files and must not light the active photo's modified
     // dot. Its result is tracked separately via `imageSavings`.
-  }, [photos, selectedIds, quality, exportFormat, compressAll]);
+  }, [photos, selectedIds, activePhotoId, quality, exportFormat, compressAll]);
 
   // Track per-photo modification state. Any single-image edit marks the active
   // photo with the "modified" dot immediately: canvas edits bump the WASM undo

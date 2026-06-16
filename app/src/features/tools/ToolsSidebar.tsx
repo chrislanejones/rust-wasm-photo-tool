@@ -78,7 +78,7 @@ interface ToolsSidebarProps {
   hasBeenModified: boolean;
   compareActive: boolean;
   onToggleCompare: () => void;
-  onAutoCompress: () => void;
+  onAutoCompress: (scope: "selected" | "all") => void;
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
   /** Number of gallery photos currently selected (drives "Compress Selected"). */

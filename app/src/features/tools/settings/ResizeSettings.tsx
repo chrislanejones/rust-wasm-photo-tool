@@ -59,7 +59,8 @@ interface ResizeSettingsProps {
   compareActive: boolean;
   onToggleCompare: () => void;
   hasBeenModified: boolean;
-  onAutoCompress: () => void;
+  /** Run Auto Compress over the current selection, or over the whole gallery. */
+  onAutoCompress: (scope: "selected" | "all") => void;
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
   /** Number of selected gallery photos; >0 switches to "Compress Selected". */
@@ -168,8 +169,8 @@ export function ResizeSettings({
     }
   };
 
-  const handleAutoCompress = () => {
-    onAutoCompress();
+  const handleAutoCompress = (scope: "selected" | "all") => {
+    onAutoCompress(scope);
     setAppliedHere(true);
   };
 
@@ -419,6 +420,37 @@ export function ResizeSettings({
 
       {/* ── Bottom Buttons ── */}
       <div className="border-t border-theme-sidebar-border pt-4 mt-8 space-y-2">
+        {/* ── Auto Compress: labelled section with explicit scope buttons ── */}
+        <div className="flex items-center justify-center gap-1.5 text-xs font-semibold font-mono text-theme-muted-foreground">
+          <Zap className="h-3.5 w-3.5" />
+          Auto Compress
+        </div>
+        {/* Compression progress is surfaced via a sonner toast, not inline.
+            "Selected Image" compresses whatever is in the ring — enabled as long
+            as a photo is active (disabled handles the empty-gallery case). */}
+        <div className="grid grid-cols-2 gap-2">
+          <LargeButton
+            onClick={() => handleAutoCompress("selected")}
+            disabled={disabled || isCompressing}
+            className="w-full"
+          >
+            {isCompressing
+              ? "Compressing…"
+              : selectedCount > 1
+                ? "Selected Images"
+                : "Selected Image"}
+          </LargeButton>
+          <LargeButton
+            onClick={() => handleAutoCompress("all")}
+            disabled={disabled || isCompressing}
+            className="w-full"
+          >
+            {isCompressing ? "Compressing…" : "All Images"}
+          </LargeButton>
+        </div>
+
+        <hr className="border-theme-sidebar-border" />
+
         <LargeButton
           onClick={handleApplyResize}
           disabled={disabled || !resizeChanged}
@@ -426,19 +458,6 @@ export function ResizeSettings({
         >
           <Scaling className="h-4 w-4" />
           Apply Compression &amp; Resize
-        </LargeButton>
-        {/* Compression progress is surfaced via a sonner toast, not inline. */}
-        <LargeButton
-          onClick={handleAutoCompress}
-          disabled={disabled || isCompressing}
-          className="w-full"
-        >
-          <Zap className="h-4 w-4" />
-          {isCompressing
-            ? "Compressing…"
-            : selectedCount > 0
-              ? "Auto Compress Selected Images"
-              : "Auto Compress All Images"}
         </LargeButton>
 
         {/* A/B Compare — same LargeButton, locked until an edit is applied via
