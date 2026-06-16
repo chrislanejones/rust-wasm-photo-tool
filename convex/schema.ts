@@ -225,5 +225,7 @@ export default defineSchema({
     canvasW: v.number(),
     canvasH: v.number(),
     updatedAt: v.number(),
-  }).index("by_sessionId_photoKey", ["sessionId", "photoKey"]),
+  })
+    .index("by_sessionId_photoKey", ["sessionId", "photoKey"])
+    .index("by_updatedAt", ["updatedAt"]),
 });

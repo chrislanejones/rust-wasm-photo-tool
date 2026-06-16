@@ -190,10 +190,14 @@ export const expireSessionEdits = internalMutation({
   args: {},
   handler: async (ctx) => {
     const cutoff = Date.now() - THREE_DAYS_MS;
+    // Indexed range scan over updatedAt -- reads only the stale rows, not
+    // the whole table, so this cron keeps working as the table grows.
+    // Bounded per run; any backlog beyond the bound drains on the next
+    // daily run (the rows are already expired, so the delay is harmless).
     const stale = await ctx.db
       .query("session_edits")
-      .filter((q) => q.lt(q.field("updatedAt"), cutoff))
-      .collect();
+      .withIndex("by_updatedAt", (q) => q.lt("updatedAt", cutoff))
+      .take(2000);
     for (const edit of stale) {
       await ctx.storage.delete(edit.storageId);
       await ctx.db.delete(edit._id);
