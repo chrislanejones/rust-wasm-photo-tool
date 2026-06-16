@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { History, MousePointerSquareDashed, RotateCcw, X } from "lucide-react";
+import { History, MousePointerSquareDashed, Trash2, X } from "lucide-react";
 import { slideFromRight } from "@/lib/animations";
 import { TinyButton } from "@/components/ui/tiny-button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
@@ -28,6 +28,8 @@ interface Props {
   onSelectObject: (o: ReselectObject) => void;
   /** Hover-X → delete that object. */
   onDeleteObject: (o: ReselectObject) => void;
+  /** Trash → delete every live object in the Reselect list. */
+  onClearObjects: () => void;
 }
 
 const DeleteGlyph = () => (
@@ -45,6 +47,7 @@ export function HistoryPanel({
   objects,
   onSelectObject,
   onDeleteObject,
+  onClearObjects,
 }: Props) {
   return (
     <motion.aside
@@ -65,7 +68,7 @@ export function HistoryPanel({
           title="Clear history"
           disabled={history.length === 0}
         >
-          <RotateCcw className="h-3.5 w-3.5" />
+          <Trash2 className="h-3.5 w-3.5" />
         </TinyButton>
         <TinyButton onClick={onClose} title="Close history" className="ml-auto">
           <X className="h-4 w-4" />
@@ -129,6 +132,13 @@ export function HistoryPanel({
           <MousePointerSquareDashed className="h-3.5 w-3.5" />
           <span>Reselect</span>
           <TinyNumberBox className="ml-auto">{objects.length}</TinyNumberBox>
+          <TinyButton
+            onClick={onClearObjects}
+            title="Clear reselect"
+            disabled={objects.length === 0}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </TinyButton>
         </div>
         <ul className="history-list reselect-list">
           {objects.length === 0 && (

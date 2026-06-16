@@ -811,6 +811,12 @@ export function AppShell() {
     [stamp, textTool, drawingTools],
   );
 
+  // Trash icon in the Reselect header: delete every live object. Snapshot the
+  // list first since each delete mutates the underlying overlays.
+  const handleClearObjects = useCallback(() => {
+    reselectObjects.forEach((o) => handleDeleteObject(o));
+  }, [reselectObjects, handleDeleteObject]);
+
   const redStampTool = useRedStampTool({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -1731,6 +1737,7 @@ export function AppShell() {
             objects={reselectObjects}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
+            onClearObjects={handleClearObjects}
           />
         )}
       </AnimatePresence>

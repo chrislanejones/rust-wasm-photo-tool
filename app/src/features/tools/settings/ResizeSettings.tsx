@@ -1,15 +1,20 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SlidersHorizontal, Zap, Scaling, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { SlidersHorizontal, Zap, Scaling, ChevronDown, Lock, Unlock } from "lucide-react";
 import { LargeButton } from "@/components/ui/large-button";
 import { SizeSlider } from "@/components/SizeSlider";
+import { TabGroup } from "@/components/TabGroup";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getWebPerfMetrics } from "@/lib/webPerf";
+import { quickSpring } from "@/lib/animations";
 import type { ExportFormat } from "@/lib/exportImage";
+
+type ResizeTab = "resize" | "compress";
 
 /** Resampling method → Rust filter code (see `resize_with_filter`). */
 const FILTER_CODE = {
@@ -91,6 +96,12 @@ export function ResizeSettings({
   const [height, setHeight] = useState(String(imageHeight));
   const [lockAspect, setLockAspect] = useState(true);
   const [method, setMethod] = useState<ResampleMethod>("lanczos3");
+  const [tab, setTab] = useState<ResizeTab>("resize");
+  // A/B Compare stays locked until the user actually applies an edit —
+  // either "Apply Compression & Resize" or "Auto Compress" — in this photo.
+  // Pending (unapplied) changes no longer unlock it; there's nothing to
+  // compare against until something is committed. Reset per photo below.
+  const [appliedHere, setAppliedHere] = useState(false);
   const baseQualityRef = useRef(quality);
   const baseFormatRef = useRef(exportFormat);
   const baseMethodRef = useRef(method);
@@ -102,6 +113,7 @@ export function ResizeSettings({
     baseQualityRef.current = quality;
     baseFormatRef.current = exportFormat;
     baseMethodRef.current = method;
+    setAppliedHere(false);
   }, [imageWidth, imageHeight, activePhotoId]);
 
   const handleWidthChange = useCallback(
@@ -152,7 +164,13 @@ export function ResizeSettings({
       baseQualityRef.current = quality;
       baseFormatRef.current = exportFormat;
       baseMethodRef.current = method;
+      setAppliedHere(true);
     }
+  };
+
+  const handleAutoCompress = () => {
+    onAutoCompress();
+    setAppliedHere(true);
   };
 
   const handleQualityChange = (val: number) => {
@@ -168,9 +186,10 @@ export function ResizeSettings({
     qualityChanged ||
     formatChanged ||
     methodChanged;
-  // A/B compare unlocks as soon as anything in the panel changes (pending or
-  // applied) — not only after an applied edit.
-  const compareDisabled = !(hasBeenModified || resizeChanged);
+  // A/B compare unlocks only after an edit is *applied* in this photo —
+  // Apply Compression & Resize or Auto Compress (`appliedHere`), or an edit
+  // already on the photo (`hasBeenModified`). Pending changes don't count.
+  const compareDisabled = disabled || !(hasBeenModified || appliedHere);
 
   // Web-performance indicators come from Rust (`web_perf_metrics`). The
   // PageSpeed Insights score is byte-aware: a big, still-uncompressed photo
@@ -215,213 +234,187 @@ export function ResizeSettings({
 
   return (
     <div className="flex flex-col h-full">
-      <h3 className="text-xs font-semibold font-mono text-text-muted mb-3">
-        Resize
-      </h3>
+      {/* Resize ↔ Compress toggle (mirrors Paint's Paint | Blur Brush tabs) */}
+      <TabGroup
+        tabs={[
+          { id: "resize", label: "Resize" },
+          { id: "compress", label: "Compress" },
+        ]}
+        active={tab}
+        onChange={(id) => setTab(id as ResizeTab)}
+      />
 
       {/* ── Content ── */}
-      <div className="space-y-8 flex-1">
-        {/* ── Scale slider — proportional percent of the original dimensions ── */}
-        <SizeSlider
-          label="Scale"
-          value={widthPercent}
-          onChange={handlePercentChange}
-          min={1}
-          max={100}
-          unit="%"
-          disabled={disabled}
-        />
-
-        {/* ── Dimensions ── */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[11px] text-theme-muted-foreground">
-              Dimensions
-            </h4>
-            <button
-              onClick={() => setLockAspect((v) => !v)}
-              className="flex items-center gap-2 rounded-lg bg-theme-muted/20 hover:bg-theme-muted/30 transition-colors px-2 py-1"
+      <div className="space-y-8 flex-1 mt-5">
+        <AnimatePresence mode="wait">
+          {tab === "resize" && (
+            <motion.div
+              key="resize"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0, transition: quickSpring }}
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+              className="space-y-3"
             >
-              <span
-                className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${
-                  lockAspect ? "bg-theme-primary" : "bg-theme-muted"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-4 w-4 rounded-full transition-all duration-200 ${
+              {/* ── Scale slider — proportional percent of the original dimensions ── */}
+              <SizeSlider
+                label="Scale"
+                value={widthPercent}
+                onChange={handlePercentChange}
+                min={1}
+                max={100}
+                unit="%"
+                disabled={disabled}
+              />
+
+              {/* ── Dimensions: width / height / lock-aspect on one row ── */}
+              <div className="flex items-end gap-2">
+                <div className="flex flex-1 flex-col gap-0.5">
+                  <span className="text-xs text-text-secondary">width</span>
+                  <input
+                    type="number"
+                    value={width}
+                    onChange={(e) => handleWidthChange(e.target.value)}
+                    min={1}
+                    disabled={disabled}
+                    className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-0.5">
+                  <span className="text-xs text-text-secondary">height</span>
+                  <input
+                    type="number"
+                    value={height}
+                    onChange={(e) => handleHeightChange(e.target.value)}
+                    min={1}
+                    disabled={disabled}
+                    className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+                  />
+                </div>
+                <button
+                  onClick={() => setLockAspect((v) => !v)}
+                  title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
+                  aria-pressed={lockAspect}
+                  className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border transition-colors ${
                     lockAspect
-                      ? "left-4 bg-theme-primary-foreground"
-                      : "left-0.5 bg-theme-foreground"
+                      ? "bg-theme-primary text-theme-primary-foreground border-theme-primary"
+                      : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground border-theme-border"
                   }`}
-                />
-              </span>
-              <span className="text-[11px] text-theme-muted-foreground">
-                Lock Aspect
-              </span>
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-text-secondary">width</span>
-              <input
-                type="number"
-                value={width}
-                onChange={(e) => handleWidthChange(e.target.value)}
-                min={1}
-                disabled={disabled}
-                className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-text-secondary">height</span>
-              <input
-                type="number"
-                value={height}
-                onChange={(e) => handleHeightChange(e.target.value)}
-                min={1}
-                disabled={disabled}
-                className="w-full px-3 py-2 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Tighten Dimensions ↔ Compress to ~20px/side (the Text panel's
-            section rhythm). The `!` suffix is required: Tailwind v4's
-            `space-y-8` rule re-declares both block margins on every non-last
-            child *later* in the stylesheet, so plain negative margins here
-            would lose the cascade and stay at 32px/side. */}
-        <hr className="border-theme-sidebar-border -mt-3! mb-5!" />
-
-        {/* ── Compress ── */}
-        <div className="flex flex-col gap-3">
-          <h3 className="text-xs font-semibold font-mono text-text-muted">
-            Compress
-          </h3>
-
-          {/* ── Method ── */}
-          <div className="space-y-4">
-            <label className="text-[11px] text-theme-muted-foreground">
-              Method
-            </label>
-          <div className="relative">
-            <select
-              value={method}
-              onChange={(e) => setMethod(e.target.value as ResampleMethod)}
-              disabled={disabled}
-              className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
-            >
-              {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
-                <option key={m} value={m}>
-                  {METHOD_LABELS[m]}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-          </div>
-        </div>
-
-          {/* ── Format ── */}
-          <div className="space-y-4">
-            <label className="text-[11px] text-theme-muted-foreground">
-              Format
-            </label>
-            <div className="relative">
-              <select
-                value={exportFormat}
-                onChange={(e) =>
-                  onExportFormatChange(e.target.value as ExportFormat)
-                }
-                disabled={disabled}
-                className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
-              >
-                {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
-                  <option key={f} value={f}>
-                    {FORMAT_LABELS[f]}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-            </div>
-          </div>
-        </div>
-
-        {/* ── Quality ── */}
-        <SizeSlider
-          label="Quality"
-          value={quality}
-          onChange={handleQualityChange}
-          min={10}
-          max={100}
-          unit="%"
-        />
-
-        {/* ── Web Performance Gain ── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-[11px]">
-            <h4 className="text-theme-muted-foreground">Web Performance Gain</h4>
-            <span className="text-theme-foreground tabular-nums">
-              +{savingsPercent}%
-            </span>
-          </div>
-          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-700 ease-out ${trafficColor(savingsPercent)}`}
-              style={{ width: `${savingsPercent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* ── PageSpeed Insights Score ── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-[11px]">
-            <h4 className="text-theme-muted-foreground">
-              PageSpeed Insights Score
-            </h4>
-            <span className="text-theme-foreground tabular-nums">
-              {lighthouseScore}%
-            </span>
-          </div>
-          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-700 ease-out ${trafficColor(lighthouseScore)}`}
-              style={{ width: `${lighthouseScore}%` }}
-            />
-          </div>
-        </div>
-
-        {/* ── A/B Compare ── */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <button
-                onClick={onToggleCompare}
-                disabled={compareDisabled}
-                className={[
-                  "flex items-center gap-3 w-full p-3 rounded-lg transition-all",
-                  "text-xs font-black uppercase tracking-widest",
-                  compareActive
-                    ? "bg-theme-primary/15 ring-1 ring-theme-primary/40 text-theme-primary"
-                    : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground",
-                  compareDisabled
-                    ? "opacity-40 cursor-not-allowed"
-                    : "cursor-pointer",
-                ].join(" ")}
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                {compareActive ? "Hide A/B Compare" : "Show A/B Compare"}
-              </button>
-            </div>
-          </TooltipTrigger>
-          {compareDisabled && (
-            <TooltipContent side="bottom" className="max-w-[220px] text-center">
-              <p className="text-xs">
-                Resize or adjust quality first, then use A/B compare to see the
-                difference vs. the original.
-              </p>
-            </TooltipContent>
+                >
+                  {lockAspect ? (
+                    <Lock className="h-4 w-4" />
+                  ) : (
+                    <Unlock className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </motion.div>
           )}
-        </Tooltip>
+
+          {tab === "compress" && (
+            <motion.div
+              key="compress"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0, transition: quickSpring }}
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+              className="space-y-8"
+            >
+              {/* ── Method / Format side by side to save vertical space ── */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* ── Method ── */}
+                <div className="space-y-4">
+                  <label className="text-[11px] text-theme-muted-foreground">
+                    Method
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={method}
+                      onChange={(e) => setMethod(e.target.value as ResampleMethod)}
+                      disabled={disabled}
+                      className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+                    >
+                      {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
+                        <option key={m} value={m}>
+                          {METHOD_LABELS[m]}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+                  </div>
+                </div>
+
+                {/* ── Format ── */}
+                <div className="space-y-4">
+                  <label className="text-[11px] text-theme-muted-foreground">
+                    Format
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={exportFormat}
+                      onChange={(e) =>
+                        onExportFormatChange(e.target.value as ExportFormat)
+                      }
+                      disabled={disabled}
+                      className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+                    >
+                      {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
+                        <option key={f} value={f}>
+                          {FORMAT_LABELS[f]}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Quality ── */}
+              <SizeSlider
+                label="Quality"
+                value={quality}
+                onChange={handleQualityChange}
+                min={10}
+                max={100}
+                unit="%"
+              />
+
+              {/* ── Web Performance Gain ── */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-[11px]">
+                  <h4 className="text-theme-muted-foreground">
+                    Web Performance Gain
+                  </h4>
+                  <span className="text-theme-foreground tabular-nums">
+                    +{savingsPercent}%
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-700 ease-out ${trafficColor(savingsPercent)}`}
+                    style={{ width: `${savingsPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* ── PageSpeed Insights Score ── */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-[11px]">
+                  <h4 className="text-theme-muted-foreground">
+                    PageSpeed Insights Score
+                  </h4>
+                  <span className="text-theme-foreground tabular-nums">
+                    {lighthouseScore}%
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-700 ease-out ${trafficColor(lighthouseScore)}`}
+                    style={{ width: `${lighthouseScore}%` }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Bottom Buttons ── */}
@@ -436,7 +429,7 @@ export function ResizeSettings({
         </LargeButton>
         {/* Compression progress is surfaced via a sonner toast, not inline. */}
         <LargeButton
-          onClick={onAutoCompress}
+          onClick={handleAutoCompress}
           disabled={disabled || isCompressing}
           className="w-full"
         >
@@ -447,6 +440,37 @@ export function ResizeSettings({
               ? "Auto Compress Selected Images"
               : "Auto Compress All Images"}
         </LargeButton>
+
+        {/* A/B Compare — same LargeButton, locked until an edit is applied via
+            Apply Compression & Resize or Auto Compress. Shows the active ring
+            when the compare overlay is on. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <LargeButton
+                onClick={onToggleCompare}
+                disabled={compareDisabled}
+                aria-pressed={compareActive}
+                className={
+                  compareActive
+                    ? "w-full bg-theme-primary/15 border-theme-primary/40 text-theme-primary"
+                    : "w-full"
+                }
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                {compareActive ? "Hide A/B Compare" : "Show A/B Compare"}
+              </LargeButton>
+            </div>
+          </TooltipTrigger>
+          {compareDisabled && (
+            <TooltipContent side="bottom" className="max-w-[220px] text-center">
+              <p className="text-xs">
+                Apply Compression &amp; Resize or Auto Compress first, then use
+                A/B compare to see the difference vs. the original.
+              </p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
     </div>
   );

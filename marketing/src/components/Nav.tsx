@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import Logo from "./Logo";
 import { EDITOR_URL } from "../config";
@@ -5,40 +6,58 @@ import { EDITOR_URL } from "../config";
 export default function Nav() {
   const loc = useLocation();
   const onHome = loc.pathname === "/";
+  const [open, setOpen] = useState(false);
+
+  // Close the mobile menu whenever the route changes (link tap, back button).
+  useEffect(() => {
+    setOpen(false);
+  }, [loc.pathname]);
+
+  // Shared link set so the desktop bar and mobile dropdown never drift. On the
+  // home page the section links are in-page anchors; elsewhere they route home
+  // first (/#section).
+  const navItems = (onClick?: () => void, itemClass = "") => (
+    <>
+      {onHome ? (
+        <>
+          <a href="#features" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>Features</a>
+          <a href="#how" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>How it works</a>
+          <a href="#pricing" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>Pricing</a>
+        </>
+      ) : (
+        <>
+          <Link to="/#features" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>Features</Link>
+          <Link to="/#how" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>How it works</Link>
+          <Link to="/#pricing" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>Pricing</Link>
+        </>
+      )}
+      <NavLink
+        to="/architecture"
+        onClick={onClick}
+        className={({ isActive }) =>
+          `${isActive ? "text-orange-400" : "hover:text-zinc-100 transition"} ${itemClass}`
+        }
+      >
+        Architecture
+      </NavLink>
+      <NavLink
+        to="/trail"
+        onClick={onClick}
+        className={({ isActive }) =>
+          `${isActive ? "text-orange-400" : "hover:text-zinc-100 transition"} ${itemClass}`
+        }
+      >
+        Trail
+      </NavLink>
+    </>
+  );
+
   return (
     <nav className="sticky top-0 z-50 backdrop-blur bg-zinc-950/70 border-b border-zinc-900">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
         <Logo />
         <div className="hidden md:flex items-center gap-7 text-sm text-zinc-400">
-          {onHome ? (
-            <>
-              <a href="#features" className="hover:text-zinc-100 transition">Features</a>
-              <a href="#how" className="hover:text-zinc-100 transition">How it works</a>
-              <a href="#pricing" className="hover:text-zinc-100 transition">Pricing</a>
-            </>
-          ) : (
-            <>
-              <Link to="/#features" className="hover:text-zinc-100 transition">Features</Link>
-              <Link to="/#how" className="hover:text-zinc-100 transition">How it works</Link>
-              <Link to="/#pricing" className="hover:text-zinc-100 transition">Pricing</Link>
-            </>
-          )}
-          <NavLink
-            to="/architecture"
-            className={({ isActive }) =>
-              isActive ? "text-orange-400" : "hover:text-zinc-100 transition"
-            }
-          >
-            Architecture
-          </NavLink>
-          <NavLink
-            to="/trail"
-            className={({ isActive }) =>
-              isActive ? "text-orange-400" : "hover:text-zinc-100 transition"
-            }
-          >
-            Trail
-          </NavLink>
+          {navItems()}
         </div>
         <div className="flex items-center gap-3">
           <a
@@ -72,8 +91,49 @@ export default function Nav() {
           >
             Beta Version
           </a>
+          {/* Mobile hamburger — toggles the dropdown below; hidden on md+ */}
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-label="Toggle menu"
+            aria-expanded={open}
+            className="md:hidden p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition"
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              {open ? (
+                <>
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <line x1="6" y1="18" x2="18" y2="6" />
+                </>
+              ) : (
+                <>
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </>
+              )}
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* Mobile dropdown panel */}
+      {open && (
+        <div className="md:hidden border-t border-zinc-900 bg-zinc-950/95 backdrop-blur">
+          <div className="max-w-7xl mx-auto px-6 py-3 flex flex-col text-sm text-zinc-300">
+            {navItems(() => setOpen(false), "block py-2.5 border-b border-zinc-900/70 last:border-b-0")}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
