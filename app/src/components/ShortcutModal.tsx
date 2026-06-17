@@ -38,6 +38,7 @@ const SHORTCUT_GROUPS = [
       { keys: ["Alt", "S"], action: "Toggle Tools" },
       { keys: ["Alt", "G"], action: "Toggle Gallery" },
       { keys: ["Alt", "H"], action: "Toggle History" },
+      { keys: ["Alt", "Delete"], action: "Toggle Diagnostics Log" },
       { keys: ["Alt", "/"], action: "Toggle This Modal" },
     ],
   },

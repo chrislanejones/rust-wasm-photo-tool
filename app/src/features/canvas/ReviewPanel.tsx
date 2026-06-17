@@ -305,9 +305,12 @@ export function ReviewPanel({
               <Layers className="h-3.5 w-3.5" />
               <span className="review-section-name">Layers</span>
               <div className="ml-auto flex items-center gap-1.5">
-                {/* Per-tier layer allowance (— / 3 / ∞) from the tier config. */}
-                <TinyNumberBox title={`Layers per image: ${TIERS[userMode].layersLabel}`}>
-                  {TIERS[userMode].layersShort}
+                {/* Actual layer count (consistent with History/Reselect counts);
+                    the per-tier allowance lives in the tooltip. */}
+                <TinyNumberBox
+                  title={`${layers.length} layer${layers.length === 1 ? "" : "s"} · limit ${TIERS[userMode].layersLabel}`}
+                >
+                  {layers.length}
                 </TinyNumberBox>
                 <TinyButton
                   onClick={onAddLayer}
@@ -368,20 +371,18 @@ export function ReviewPanel({
                       }}
                       title={`Select ${layer.name}`}
                     >
-                      <button
-                        className="layer-eye"
+                      <TinyButton
+                        size="xs"
                         title={layer.visible ? "Hide layer" : "Show layer"}
                         onClick={(e) => {
                           e.stopPropagation();
                           onToggleLayerVisible(layer.id, !layer.visible);
                         }}
                       >
-                        {layer.visible ? (
-                          <Eye className="h-3.5 w-3.5" />
-                        ) : (
-                          <EyeOff className="h-3.5 w-3.5 opacity-40" />
-                        )}
-                      </button>
+                        {/* Icon swap stays here (out of the button component) so
+                            it isn't baked in as a one-off variant. */}
+                        {layer.visible ? <Eye /> : <EyeOff className="opacity-40" />}
+                      </TinyButton>
 
                       {renamingId === layer.id ? (
                         <input
@@ -412,8 +413,8 @@ export function ReviewPanel({
                       )}
 
                       <div className="layer-row-actions">
-                        <button
-                          className="history-delete"
+                        <TinyButton
+                          size="xs"
                           title="Move up"
                           disabled={isTop}
                           onClick={(e) => {
@@ -421,10 +422,10 @@ export function ReviewPanel({
                             onMoveLayer(layer.id, idx + 1);
                           }}
                         >
-                          <ChevronUp className="h-3 w-3" />
-                        </button>
-                        <button
-                          className="history-delete"
+                          <ChevronUp />
+                        </TinyButton>
+                        <TinyButton
+                          size="xs"
                           title="Move down"
                           disabled={isBottom}
                           onClick={(e) => {
@@ -432,10 +433,10 @@ export function ReviewPanel({
                             onMoveLayer(layer.id, idx - 1);
                           }}
                         >
-                          <ChevronDown className="h-3 w-3" />
-                        </button>
-                        <button
-                          className="history-delete"
+                          <ChevronDown />
+                        </TinyButton>
+                        <TinyButton
+                          size="xs"
                           title="Merge down"
                           disabled={isBottom}
                           onClick={(e) => {
@@ -443,20 +444,20 @@ export function ReviewPanel({
                             onMergeDown(layer.id);
                           }}
                         >
-                          <Layers2 className="h-3 w-3" />
-                        </button>
-                        <button
-                          className="history-delete"
+                          <Layers2 />
+                        </TinyButton>
+                        <TinyButton
+                          size="xs"
                           title="Duplicate layer"
                           onClick={(e) => {
                             e.stopPropagation();
                             onDuplicateLayer(layer.id);
                           }}
                         >
-                          <Copy className="h-3 w-3" />
-                        </button>
-                        <button
-                          className="history-delete"
+                          <Copy />
+                        </TinyButton>
+                        <TinyButton
+                          size="xs"
                           title="Delete layer"
                           disabled={layers.length <= 1}
                           onClick={(e) => {
@@ -465,7 +466,7 @@ export function ReviewPanel({
                           }}
                         >
                           <DeleteGlyph />
-                        </button>
+                        </TinyButton>
                       </div>
 
                       {/* Opacity slider for the active layer. */}

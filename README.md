@@ -54,6 +54,12 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### Layers & compositing
+
+As of v3.5 the WASM core is no longer a single pixel buffer — `ImageHorseTool` holds a **stack of layers** (`Vec<Layer>`) plus an active-layer index. Each `Layer` owns its own RGBA buffer **and** its own live text + shape annotations, so every canvas tool (paint, clone stamp, blur, brightness/contrast, text, shapes, emoji, paste) edits the **active layer**. The on-screen canvas is the **composite** of all visible layers, blended bottom→top source-over and scaled by each layer's opacity (normal blending; v3.5 is opacity + visibility only).
+
+A reusable `composite_cache` is rebuilt by `recomposite()` and exposed through `data_ptr()/data_len()` for the zero-copy blit; a fast path copies straight through when there's a single fully-opaque layer with no overlays (so simple single-layer edits stay allocation-free). `export_png`, `get_image_data`, and the thumbnail path all composite the full stack, so export always matches what's on screen. History snapshots capture the **entire stack** (layers + active index + dimensions), making add / delete / reorder / merge undoable alongside pixel edits.
+
 ### Why one WASM binary?
 
 Separate `.wasm` modules (image-core.wasm, filters.wasm, etc.) would require copying the full pixel buffer across WASM memory boundaries on every operation — a 3.2MB copy for a 896×896 image, per handoff. A single binary with Rust modules shares one `Vec<u8>` in linear memory. Zero-copy, zero overhead.
@@ -74,19 +80,28 @@ The `image` crate with all codec features adds ~800KB to the WASM binary. The br
 
 ```
 src/
-├── lib.rs          #[wasm_bindgen] glue — ImageHorseTool struct (was CloneStampTool),
-│                   delegates to modules; get_pixel(x,y) and get_pixel_region(cx,cy,radius);
-│                   stateless free fns: composite_pixels, resize_pixels, encode_png_pixels,
+├── lib.rs          #[wasm_bindgen] glue — ImageHorseTool struct (was CloneStampTool);
+│                   Layer stack (Vec<Layer> + active index): each Layer owns its RGBA buffer
+│                   plus its own TextAnnotation + ShapeAnnotation overlays. Layer API:
+│                   add / duplicate / remove / set_active / move / merge_down / flatten_all /
+│                   set_layer_visible / set_layer_opacity / rename / get_layers / recomposite;
+│                   composite_layers(_into) blends visible layers source-over by opacity into a
+│                   reusable cache (single-opaque-layer fast path); export/thumbnail composite
+│                   the whole stack. Layer persistence: get_layer_png / get_layer_*_annotations
+│                   (serialize) and begin/push_restored_layer/restore_text_annotation/finish (restore).
+│                   set_editing_shape + set_editing_text suppress the in-edit overlay so the JS
+│                   preview isn't doubled. Also: get_pixel(x,y) / get_pixel_region(cx,cy,radius);
+│                   stateless free fns composite_pixels, resize_pixels, encode_png_pixels;
 │                   resize_with_filter (Lanczos3 / Catmull-Rom / Nearest / bilinear),
-│                   web_perf_metrics (PSI-faithful score), push_compress_marker;
-│                   TextAnnotation + ShapeAnnotation overlays — non-destructive live
-│                   editing with hit-test, render-with-annotations, and flatten on export
-├── core.rs         ImageBuffer — width, height, data, load, bilinear sampling;
-│                   zero-size guard: sample_bilinear returns [0,0,0,0] when buffer is empty
-├── history.rs      Snapshot (data + dimensions + text annotations + shape annotations);
-│                   VecDeque undo + redo stacks, push, jump, delete, labels;
-│                   pub const MAX_HISTORY = 50 (single source of truth)
+│                   web_perf_metrics (PSI-faithful score), push_compress_marker
+├── core.rs         ImageBuffer — width, height, data, load, bilinear sampling (now #[derive(Clone)]
+│                   so layers + history snapshots clone cheaply); zero-size guard returns [0,0,0,0]
+├── history.rs      Snapshot now captures the FULL layer stack (Vec<Layer> + active index + dims),
+│                   so add/delete/reorder/merge undo alongside pixel edits; VecDeque undo + redo,
+│                   push / undo / redo / delete / labels; pub const MAX_HISTORY = 50 (jump_to is
+│                   driven from lib.rs as a undo/redo loop)
 ├── stamp.rs        Clone stamp engine — source, offset, stroke lifecycle, dab kernel;
+│                   begin_stroke takes a pre-built full-stack Snapshot (held until end_stroke);
 │                   stroke_src_data frozen buffer prevents feedback artifacts;
 │                   apply_dab f32 hot loop with sqrt hoisted out of the hard zone
 ├── transform.rs    Flip H/V (u32 swap), rotate 90° CW/CCW, resize (bilinear / Catmull-Rom /
@@ -112,12 +127,20 @@ app/src/
 ├── styles.css                        Design tokens + component styles
 ├── app/
 │   ├── App.tsx                       Root
-│   ├── AppShell.tsx                  Master orchestrator — state, panels, WASM bridge
-│   └── useKeyboardShortcuts.ts       Centralized keyboard handler
+│   ├── AppShell.tsx                  Master orchestrator — state, panels, WASM bridge; layer-panel
+│   │                                 handlers; Ctrl/Cmd+V pastes a clipboard image into the active
+│   │                                 layer (guarded against the upload dialog's paste path)
+│   └── useKeyboardShortcuts.ts       Centralized keyboard handler — defers Space/Enter to a
+│                                     focused button/link/ARIA widget so Tab-then-Space activates it
 ├── hooks/
 │   ├── useCloneStamp.ts              React hook wrapping the WASM ImageHorseTool; includes
 │   │                                 loadImage(), loadImageFromPixels() (pre-decoded, 2048-capped),
-│   │                                 and loadFromSaved() for restoring per-photo IDB sessions
+│   │                                 and loadFromSaved() (rebuilds the layer stack before injecting
+│   │                                 history). Flush calls recomposite() then a zero-copy blit of
+│   │                                 the composite cache. Mirrors get_layers() into hook state and
+│   │                                 exposes layer wrappers: addLayer / duplicateLayer / removeLayer /
+│   │                                 setActiveLayer / setLayerVisible / setLayerOpacity / renameLayer /
+│   │                                 moveLayer / mergeDown / flattenAll
 │   ├── useBrushPreview.ts            Cursor preview overlay
 │   ├── useDrawingTools.ts            Arrow + shape annotations (live, non-destructive) and the
 │   │                                 crop selection (SVG overlay). Shapes/arrows are committed
@@ -138,9 +161,11 @@ app/src/
 │   │                                 WASM stamp_red (scales to brush size, "Red Stamp" history)
 │   ├── useAutoCompress.ts            Auto-compress hook for resize workflow
 │   ├── useEditPersistence.ts         Per-photo edit persistence — Convex (signed in) or IDB
-│   │                                 (anonymous). Archive v4 includes raw pixels + dims + text
-│   │                                 annotations + shape annotations so reopening a photo
-│   │                                 restores every live overlay
+│   │                                 (anonymous). Archive v5 serializes the full layer stack
+│   │                                 (per layer: pixel PNG, name, visibility, opacity, and its own
+│   │                                 text + shape overlays) plus the active layer id; reopening a
+│   │                                 photo rebuilds the stack. v1–v4 archives still decode and
+│   │                                 collapse to a single layer for back-compat
 │   ├── useUserColors.ts              localStorage-persisted custom palette shared by every
 │   │                                 ColorSwatchGrid; cross-component sync via custom events
 │   └── stamp_tool.d.ts               TypeScript declarations for WASM interface
@@ -152,14 +177,17 @@ app/src/
 │   │                                 pixel grid sourced from WASM get_pixel_region, center hex shown
 │   ├── UserMenu.tsx                  Convex/Clerk user menu
 │   ├── ConvexClerkProvider.tsx       Auth provider wrapper
-│   └── ShortcutModal.tsx             Alt+Shift+? keyboard reference overlay
+│   └── ShortcutModal.tsx             Alt+/ keyboard reference overlay — groups laid out two
+│                                     columns per header; lists Alt+Delete (Diagnostics Log)
 ├── features/
 │   ├── canvas/
 │   │   ├── CanvasArea.tsx            WASM canvas + brush cursor + SVG overlays — crop selection
 │   │   │                             (rule-of-thirds, 8 resize handles), text edit overlay with
 │   │   │                             line-and-dot move/rotate handles + corner squares that scale
 │   │   │                             fontSize, and shape/arrow edit overlay with corner squares,
-│   │   │                             move handle, endpoint circles for lines/arrows
+│   │   │                             move handle, endpoint circles for lines/arrows. The text
+│   │   │                             overlay rotates around the Rust tile's pivot (via measure_text)
+│   │   │                             so committed text matches the preview
 │   │   ├── CompareSlider.tsx         Squoosh-style A/B before/after slider; rAF-deduped box sync
 │   │   │                             driven by ResizeObserver + MutationObserver on canvas style
 │   │   │                             so the overlay tracks zoom and pan transforms
@@ -170,8 +198,11 @@ app/src/
 │   │                                 count box, and scroll area. History = undo/redo timeline
 │   │                                 with an inline Undo button; Reselect = every live text +
 │   │                                 shape annotation as a click-to-select / delete row;
-│   │                                 Layers = "Coming soon" placeholder (count 0, disabled
-│   │                                 add/delete buttons)
+│   │                                 Layers = working stack list (top→bottom): visibility toggle,
+│   │                                 inline rename, reorder, duplicate, merge-down, delete, and a
+│   │                                 per-layer opacity slider — tier-gated (locked for demo). Count
+│   │                                 box shows the live layer count; the per-tier limit is in its
+│   │                                 tooltip. Row controls use the xs TinyButton variant
 │   ├── gallery/
 │   │   ├── GalleryBar.tsx            Bottom photo strip with thumbnails
 │   │   └── PhotoThumb.tsx            Individual thumbnail component
@@ -206,9 +237,10 @@ app/src/
     ├── animations.ts                 Framer Motion spring variants
     ├── defaultToolSettings.ts        Default tool settings
     ├── colors.ts                     Color utility helpers
-    ├── editPersistence.ts            Per-photo edit persistence via IndexedDB — saves full
-    │                                 canvas state + undo/redo history (PNG-encoded) so switching
-    │                                 between photos preserves all edits and history steps
+    ├── editPersistence.ts            Per-photo edit persistence via IndexedDB — saves full canvas
+    │                                 state + undo/redo history (PNG-encoded) plus the layer stack
+    │                                 (collectLayers reads pixels + per-layer overlays out of WASM;
+    │                                 SavedEdit gained layers[] + activeLayerId)
     ├── originalsStore.ts             Content-addressed IndexedDB store for original photo bytes;
     │                                 keyed by SHA-256 hex via crypto.subtle; putOriginal /
     │                                 getOriginal / getOriginalAsBlobUrl / deleteOriginal
@@ -227,9 +259,11 @@ app/src/
 | `Alt + S`             | Toggle Tools                        |
 | `Alt + G`             | Toggle Gallery                      |
 | `Alt + H`             | Toggle Review panel                 |
-| `Alt + Shift + ?`     | Toggle Shortcut Modal               |
+| `Alt + Delete`        | Toggle Diagnostics Log              |
+| `Alt + /`             | Toggle Shortcut Modal               |
 | `Ctrl + Z`            | Undo                                |
 | `Ctrl + Shift + Z`    | Redo                                |
+| `Ctrl + V`            | Paste image into active layer       |
 | `Alt + E`             | Export current image                |
 | `Alt + Shift + E`     | Export all images (ZIP)             |
 | `Alt + D`             | Delete All Images                   |
@@ -543,6 +577,23 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 11 | **New Pens tab — Pins + Freehand** — the Shapes tool grew a third tab between `Shapes` and `Arrows`. **Pins** mode drops auto-numbered callout discs (1, 2, 3…) on click, with a `Pin Size` slider (16–72 px) and a click-to-move on existing pins. **Freehand** mode draws a thick, round-capped polyline pen stroke on drag, with a `Stroke Width` slider. Both share the colour swatch. Rust gains two new shape kinds (`5 = pin`, `6 = polyline`) with `add_pin_annotation` / `restore_pin_annotation` and `add_polyline_annotation` / `restore_polyline_annotation` APIs, plus `render_pin` (filled disc + centred ab_glyph number) and `drawing::draw_polyline` (round-capped segment loop) / `drawing::fill_circle`. `ShapeAnnotation` extended with `number: u32` (pin label) and `points: Vec<(f64, f64)>` (polyline vertices); `get_shape_annotations` JSON, `PersistedShape`, and the persistence restore path all extended to round-trip them. The live freehand preview is drawn in JS during the drag and committed to Rust on mouseup. Hit-testing extended: polylines test against each segment; pins fall under the existing padded-bbox path. Pins reselect as a circle handle but keep their `kind=5` on commit via a new `kindByte` override in `DrawEditState.style`; polylines are delete-only (no bbox handle) via the Reselect panel | Complete |
 | 12 | **AI Tools: Background Removal goes live (Replicate + Convex pipeline)** — the AI panel's first model is no longer a placeholder. New `useAIJob` hook drives a single end-to-end job: export current canvas to PNG → `generateUploadUrl` → POST to Convex storage with `Content-Type: image/png` → call `api.ai.dispatch({ photoKey, type: "rembg", inputStorageId })` → subscribe to `api.aiJobs.getJob(jobId)` via `useQuery` → when the webhook flips status to `done`, fetch `outputUrl`, decode via `createImageBitmap` → 2D canvas → ImageData, and hand RGBA pixels back. AppShell's new `handleAIResult` calls `loadImageFromPixels` to swap the working image and marks the photo modified. Phase state machine (`idle` / `uploading` / `running` / `done` / `error`) drives button copy ("Uploading…" / "Removing background…" / "Remove Background"). A `consumedRef` guard prevents a re-render from decoding the same finished job twice. Gating: the panel is gated by `hasReplicateAI(effectiveUserMode)` from `lib/tiers.ts` — non-Paid users see a Lock notice ("AI tools run on Replicate and are a Paid feature"); the button is disabled when `!aiEnabled` or no active photo. ToolsSidebar threads a new `aiEnabled` prop through to `<AISettings>`. The remaining models (Text Extract / 4× Upscale / Object Removal / Alt Text) keep their `COMING_SOON` placeholder cards until the same plumbing is cloned for each | Complete |
 | 13 | **Auto Compress split into Selected / All buttons** — the Resize panel's bottom section was reorganised: a centred `⚡ Auto Compress` label sits over a 2-button grid (`Selected Image` / `All Images`), then an `<hr>`, then `Apply Compression & Resize` and `Show A/B Compare` below. The `onAutoCompress` callback gained a `scope: "selected" \| "all"` arg threaded through `ResizeSettings` → `ToolsSidebar` → `AppShell`. `AppShell.handleAutoCompress(scope)` resolves the target set as: `scope === "all"` → every photo; `scope === "selected"` → the checkbox multi-selection when one exists, otherwise just the active photo in the ring (so "Selected Image" is meaningful even with zero checkboxes). Button label pluralises to `Selected Images` when `selectedCount > 1`. `Selected Image` only disables on `isCompressing` / `disabled`, not on `selectedCount === 0`. `activePhotoId` added to the `useCallback` deps so the ring-fallback path stays current | Complete |
+
+## v3.5 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **Photoshop-style layers** — `ImageHorseTool` now holds a `Vec<Layer>` stack + active index instead of a single buffer. Each `Layer` (`id, name, visible, opacity, buf, text_annotations, shape_annotations`) owns its pixels **and** its own live overlays, so every canvas tool (paint, clone stamp, blur, brightness/contrast, text, shapes, emoji, paste) edits the active layer. The canvas shows the composite of all visible layers, blended bottom→top source-over by opacity. v3.5 ships opacity + visibility only (normal blend) | Complete |
+| 2 | **Layer-management API** — `add_layer` / `duplicate_layer` / `remove_layer` / `set_active_layer` / `move_layer` / `merge_down` / `flatten_all` / `set_layer_visible` / `set_layer_opacity` / `rename_layer` / `get_layers` / `layer_count` / `active_layer_id`, plus `composite_layers(_into)` + `recomposite()` (reused cache + single-opaque-layer fast path) and a `set_editing_text` suppressor mirroring `set_editing_shape`. `export_png` / `get_image_data` / thumbnails composite the whole stack so export == screen | Complete |
+| 3 | **Full-stack undo/redo** — `history.rs` `Snapshot` now stores the entire layer stack (`layers` + `active` + dims), making add / delete / reorder / merge undoable alongside pixel edits. `jump_to` reimplemented in `lib.rs` as an undo/redo loop; the clone-stamp engine takes a pre-built snapshot. `ImageBuffer` is now `#[derive(Clone)]` | Complete |
+| 4 | **Layers panel** — the Review sidebar's "Coming soon" Layers placeholder is now a working stack list (top→bottom): visibility eye, inline rename (double-click), reorder, duplicate, merge-down, delete, and a per-layer opacity slider; tier-gated via `TIERS[userMode].layersPerImage` (locked for demo). `useCloneStamp` mirrors `get_layers()` into hook state and exposes layer wrappers | Complete |
+| 5 | **Paste into the active layer** — `Ctrl/Cmd+V` reads a clipboard image, decodes it to RGBA, and composites it into the active layer (centered) as one undoable "Paste". Guarded against the UploadDialog's paste-as-new-photo path (and against text inputs) | Complete |
+| 6 | **Persistence v5** — `SavedEdit` gained `layers[] + activeLayerId`; `collectLayers()` reads the stack out of WASM for both the IDB and Convex paths. The Convex binary archive bumped v4→v5 (per-layer block: id, name, visible, opacity, pixel PNG, text+shape JSON, + active id). Rust serialize (`get_layer_png` / `get_layer_*_annotations`) + history-free restore (`begin_layer_restore` → `push_restored_layer` → `restore_text_annotation`/`restore_shape*` → `finish_layer_restore`). v1–v4 archives still decode, collapsing to a single layer. Known limitation: history snapshots persist composited single-layer, so undoing past a reload shows the flattened image | Complete |
+| 7 | **Extra-small button variant** — `TinyButton` gained `size="xs"` (`.btn-icon-xs`, 20×20 / 12px icon) reusing all `.btn-icon` surface/hover/disabled rules. Drives the dense layer-row controls (always-visible bg, hover ring, light icon); the eye keeps its open/closed icon swap in the panel rather than as a button variant | Complete |
+| 8 | **Layer count fix** — the Layers header number box showed the tier *limit* (`layersShort`, e.g. "3") regardless of how many layers existed; it now shows the live `layers.length` (consistent with the History/Reselect counts), with the per-tier allowance moved into the tooltip | Complete |
+| 9 | **Keyboard activation (a11y)** — Tab-focusing a button and pressing **Space/Enter** now activates it. The global spacebar-pan handler was `preventDefault`-ing Space for every focused element; it now bails for buttons, links, and ARIA widgets (`isActivatable`), and only consumes Space on keyup if pan actually started. Also covers `contentEditable` | Complete |
+| 10 | **Text edit double-box fix** — selecting/reselecting a text annotation no longer shows a doubled copy of the baked tile under the textarea overlay. New `editing_text_id` + `set_editing_text` suppress the in-edit annotation from the composite (mirroring `editing_shape_id`); wired through `useTextTool` on edit-open / commit / Escape-cancel / stale-drop | Complete |
+| 11 | **Text rotation fix** — two bugs: (a) the overlay rotated around the JS box center while Rust baked around the text center → the editing box now rotates around the Rust tile's pivot (measured via `measure_text`; uniform BG padding keeps the padded-tile center coincident with the text center); (b) `build_annotation_tile` negated the angle into `rotate_pixels`, which is actually clockwise in screen coords like the CSS preview — so a +90° rotate baked as −90°. Removed the negation. Committed text now matches the preview in direction and position | Complete |
+| 12 | **Shortcut modal** — the `Alt+/` reference now lays each section out in **two columns** under its header (modal widened 520→760px) and lists **Alt+Delete → Toggle Diagnostics Log** | Complete |
 
 ## License
 

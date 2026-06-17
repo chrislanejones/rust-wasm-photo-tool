@@ -300,6 +300,10 @@ pub struct ImageHorseTool {
     /// suppressed from the composite so the live preview doesn't double up with
     /// the committed pixels. `None` when nothing is editing.
     editing_shape_id: Option<u32>,
+    /// Same idea for text: while a text annotation is open in the JS textarea
+    /// overlay, suppress its baked tile from the composite so the user sees only
+    /// the live overlay (not a doubled copy underneath). `None` when idle.
+    editing_text_id: Option<u32>,
 }
 
 /// Escape a string as a JSON string body (without surrounding quotes).
@@ -537,7 +541,13 @@ impl ImageHorseTool {
 /// Render one layer (its pixels with shapes + text overlays composited on top)
 /// into a fresh RGBA buffer of `w×h`. The shape being edited (if any) is
 /// skipped so the JS overlay preview is the only thing drawn for it.
-fn render_layer(layer: &Layer, w: u32, h: u32, editing_shape_id: Option<u32>) -> Vec<u8> {
+fn render_layer(
+    layer: &Layer,
+    w: u32,
+    h: u32,
+    editing_shape_id: Option<u32>,
+    editing_text_id: Option<u32>,
+) -> Vec<u8> {
     let mut out = layer.buf.data.clone();
     let wi = w as i32;
     let hi = h as i32;
@@ -550,6 +560,9 @@ fn render_layer(layer: &Layer, w: u32, h: u32, editing_shape_id: Option<u32>) ->
     }
     // Text on top.
     for a in &layer.text_annotations {
+        if editing_text_id == Some(a.id) {
+            continue;
+        }
         crate::transform::paste_region(
             &mut out,
             wi,
@@ -608,6 +621,7 @@ fn composite_layers_into(
     w: u32,
     h: u32,
     editing_shape_id: Option<u32>,
+    editing_text_id: Option<u32>,
 ) {
     let n = (w as usize) * (h as usize) * 4;
     if out.len() != n {
@@ -631,7 +645,7 @@ fn composite_layers_into(
         if !layer.visible {
             continue;
         }
-        let rendered = render_layer(layer, w, h, editing_shape_id);
+        let rendered = render_layer(layer, w, h, editing_shape_id, editing_text_id);
         blend_over(out, &rendered, layer.opacity);
     }
 }
@@ -643,9 +657,10 @@ fn composite_layers(
     w: u32,
     h: u32,
     editing_shape_id: Option<u32>,
+    editing_text_id: Option<u32>,
 ) -> Vec<u8> {
     let mut out = Vec::new();
-    composite_layers_into(&mut out, layers, w, h, editing_shape_id);
+    composite_layers_into(&mut out, layers, w, h, editing_shape_id, editing_text_id);
     out
 }
 
@@ -679,11 +694,14 @@ fn build_annotation_tile(
         if rotation_deg.abs() < 0.5 {
             return (rendered.pixels, raw_w, raw_h, 0, 0);
         }
+        // `rotate_pixels(+θ)` rotates clockwise in screen coords — the same
+        // direction as the CSS `rotate(${rotation_deg}deg)` preview — so pass
+        // the angle as-is (no negation) or the baked tile spins the wrong way.
         let rotated = crate::text::rotate_pixels(
             &rendered.pixels,
             raw_w,
             raw_h,
-            -(rotation_deg as f32),
+            rotation_deg as f32,
         );
         let cx = raw_w as i32 / 2;
         let cy = raw_h as i32 / 2;
@@ -801,8 +819,9 @@ fn build_annotation_tile(
     if rotation_deg.abs() < 0.5 {
         return (tile, tile_w, tile_h, 0, 0);
     }
-    // Rotate the composed tile (background + text together).
-    let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, -(rotation_deg as f32));
+    // Rotate the composed tile (background + text together). Pass the angle
+    // as-is: rotate_pixels(+θ) is clockwise, matching the CSS preview.
+    let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, rotation_deg as f32);
     let cx = tile_w as i32 / 2;
     let cy = tile_h as i32 / 2;
     let off_x = cx - rotated.width as i32 / 2;
@@ -833,6 +852,7 @@ impl ImageHorseTool {
             next_text_id: 1,
             next_shape_id: 1,
             editing_shape_id: None,
+            editing_text_id: None,
         }
     }
 
@@ -863,11 +883,18 @@ impl ImageHorseTool {
         self.next_text_id = 1;
         self.next_shape_id = 1;
         self.editing_shape_id = None;
+        self.editing_text_id = None;
     }
 
     /// Flattened composite of all visible layers (RGBA).
     pub fn get_image_data(&self) -> Vec<u8> {
-        composite_layers(&self.layers, self.width, self.height, self.editing_shape_id)
+        composite_layers(
+            &self.layers,
+            self.width,
+            self.height,
+            self.editing_shape_id,
+            self.editing_text_id,
+        )
     }
 
     /// Returns true if the flattened composite has any pixel with alpha < 255.
@@ -888,6 +915,7 @@ impl ImageHorseTool {
             self.width,
             self.height,
             self.editing_shape_id,
+            self.editing_text_id,
         );
         self.composite_cache = cache;
     }
@@ -1053,7 +1081,7 @@ impl ImageHorseTool {
         match self.hist.undo_stack.get(index) {
             None => Vec::new(),
             Some(snap) => {
-                let data = composite_layers(&snap.layers, snap.width, snap.height, None);
+                let data = composite_layers(&snap.layers, snap.width, snap.height, None, None);
                 let tmp = ImageBuffer { width: snap.width, height: snap.height, data };
                 codec::export_png(&tmp)
             }
@@ -1068,7 +1096,7 @@ impl ImageHorseTool {
         match self.hist.redo_stack.get(index) {
             None => Vec::new(),
             Some(snap) => {
-                let data = composite_layers(&snap.layers, snap.width, snap.height, None);
+                let data = composite_layers(&snap.layers, snap.width, snap.height, None, None);
                 let tmp = ImageBuffer { width: snap.width, height: snap.height, data };
                 codec::export_png(&tmp)
             }
@@ -1708,6 +1736,13 @@ impl ImageHorseTool {
         self.editing_shape_id = if id < 0 { None } else { Some(id as u32) };
     }
 
+    /// Mark a text annotation as being edited in the JS textarea overlay: its
+    /// baked tile is suppressed from the composite so the user sees only the
+    /// live overlay (no doubled copy underneath). Pass -1 to clear. No history.
+    pub fn set_editing_text(&mut self, id: i32) {
+        self.editing_text_id = if id < 0 { None } else { Some(id as u32) };
+    }
+
     /// JSON dump of all shape annotations (metadata only). Used by the JS
     /// overlay for hit-testing and by the Reselect list.
     pub fn get_shape_annotations(&self) -> String {
@@ -1835,11 +1870,11 @@ impl ImageHorseTool {
                 dest_y,
             );
         } else {
-            // Rotate around the text centre.  CSS rotate() is CW, rotate_pixels is CCW,
-            // so negate the angle.
+            // Rotate around the text centre. rotate_pixels(+θ) is clockwise,
+            // matching the CSS `rotate(${angle}deg)` preview, so pass as-is.
             let cx = dest_x + rendered.width as i32 / 2;
             let cy = dest_y + rendered.height as i32 / 2;
-            let rotated = crate::text::rotate_pixels(&rendered.pixels, rendered.width, rendered.height, -angle_deg);
+            let rotated = crate::text::rotate_pixels(&rendered.pixels, rendered.width, rendered.height, angle_deg);
             let paste_x = cx - rotated.width as i32 / 2;
             let paste_y = cy - rotated.height as i32 / 2;
             transform::paste_region(
@@ -2335,7 +2370,7 @@ impl ImageHorseTool {
         let h = self.height;
         // Render the upper layer (with its overlays) and blend over the lower
         // layer's flattened pixels.
-        let upper = render_layer(&self.layers[idx], w, h, None);
+        let upper = render_layer(&self.layers[idx], w, h, None, None);
         let upper_opacity = self.layers[idx].opacity;
         {
             let lower = &mut self.layers[idx - 1];
@@ -2378,7 +2413,7 @@ impl ImageHorseTool {
             return;
         }
         self.snap("Flatten Image");
-        let data = composite_layers(&self.layers, self.width, self.height, None);
+        let data = composite_layers(&self.layers, self.width, self.height, None, None);
         let id = self.layers[0].id;
         let mut base = Layer::new(id, "Background".to_string(), self.width, self.height);
         base.buf.data = data;
@@ -2425,6 +2460,7 @@ impl ImageHorseTool {
         self.layers.clear();
         self.hist.clear();
         self.editing_shape_id = None;
+        self.editing_text_id = None;
         self.next_text_id = 1;
         self.next_shape_id = 1;
         self.next_layer_id = 1;

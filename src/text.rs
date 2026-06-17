@@ -220,7 +220,9 @@ pub fn measure(text: &str, font_size: f32, bold: bool) -> (u32, u32) {
     )
 }
 
-/// Rotate an RGBA pixel buffer by `angle_deg` degrees (positive = CCW).
+/// Rotate an RGBA pixel buffer by `angle_deg` degrees. Positive is CLOCKWISE
+/// in screen coords (y-down) — the same direction as CSS `rotate(+deg)`, so
+/// callers pass the angle as-is to match the live preview (no negation).
 /// The output is sized to the bounding box of the rotated image.
 pub(crate) fn rotate_pixels(data: &[u8], w: u32, h: u32, angle_deg: f32) -> RenderedText {
     let angle = angle_deg * std::f32::consts::PI / 180.0;

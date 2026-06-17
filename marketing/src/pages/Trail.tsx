@@ -26,6 +26,25 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.13",
+    date: "2026-06-17",
+    headline: "Photoshop-style layers — per-layer tools, compositing, clipboard paste",
+    entries: [
+      { tag: "feature", text: "Layers are live. Add, duplicate, reorder, show/hide, set per-layer opacity, merge down, and flatten — every canvas tool (paint, clone stamp, blur, brightness/contrast, text, shapes, emoji, paste) now edits the active layer, and the canvas shows all visible layers composited bottom-to-top. v1 ships opacity + visibility (normal blending). Gated to logged-in / paid tiers." },
+      { tag: "rust",    text: "The WASM core is no longer a single pixel buffer — ImageHorseTool holds a Vec<Layer> stack plus an active-layer index, and each layer owns its own pixels and its own text/shape overlays. New layer API (add / duplicate / remove / set_active / move / merge_down / flatten_all / visibility / opacity / get_layers) plus a source-over compositor with a reused cache and a single-opaque-layer fast path. Export and thumbnails composite the whole stack, so the saved image always matches the screen." },
+      { tag: "rust",    text: "Undo/redo now snapshots the entire layer stack, so adding, deleting, reordering, and merging layers are all undoable alongside ordinary pixel edits. Jump-to-history became an undo/redo loop and the clone-stamp engine takes a pre-built snapshot." },
+      { tag: "feature", text: "Paste an image straight from the clipboard (Ctrl/Cmd+V) into the active layer, centered, as one undoable step — guarded so it doesn't collide with the upload dialog's paste-as-new-photo." },
+      { tag: "infra",   text: "Persistence v5 — the IndexedDB save and the Convex binary archive now serialize the full layer stack (per layer: pixels, name, visibility, opacity, and its own text/shape overlays) plus the active layer id. Reopening a photo rebuilds the stack; v1–v4 archives still load and collapse to a single layer. (Undo history past a reload still restores as the flattened image — a follow-up.)" },
+      { tag: "ui",      text: "Layers panel in the Review sidebar — the old Coming Soon placeholder is now a working stack list (top→bottom) with a visibility eye, inline rename, reorder, duplicate, merge-down, delete, and a per-layer opacity slider. Tier-gated, with a lock state for the demo tier." },
+      { tag: "ui",      text: "New extra-small icon-button variant powers the dense layer-row controls — always-visible background, hover ring, light icon — while the eye keeps its own open/closed swap. Less variant sprawl, consistent feel." },
+      { tag: "fix",     text: "The layer-count badge showed the tier limit instead of the actual number of layers; it now shows the real count, with the limit in the tooltip." },
+      { tag: "fix",     text: "Keyboard accessibility — Tab to a button and press Space or Enter and it now activates. The global spacebar-pan handler was swallowing Space for any focused control; it now defers to buttons, links, and ARIA widgets." },
+      { tag: "fix",     text: "Editing a text box no longer shows a ghosted second copy underneath the editor — the baked tile is suppressed while the textarea overlay is open, mirroring how shapes already behave." },
+      { tag: "fix",     text: "Text rotation lands true. The editing overlay now rotates around the same pivot the Rust tile bakes to, and the baked tile's rotation direction was flipped to match the clockwise preview — a +90° rotate was previously coming out as −90°." },
+      { tag: "ui",      text: "The keyboard-shortcuts reference (Alt+/) now lays each section out in two columns, and lists Alt+Delete to toggle the Diagnostics Log." },
+    ],
+  },
+  {
     version: "v0.9.12",
     date: "2026-06-16",
     headline: "Review panel, 360° bubble tails, dev tier switcher",
@@ -274,6 +293,16 @@ const RELEASES: Release[] = [
   },
 ];
 
+/** Group order within a release — one pill per tag, Rust first, then Feature. */
+const TAG_ORDER: Tag[] = ["rust", "feature", "perf", "ui", "fix", "infra", "mock"];
+
+function groupByTag(entries: Entry[]): { tag: Tag; items: Entry[] }[] {
+  return TAG_ORDER.map((tag) => ({
+    tag,
+    items: entries.filter((e) => e.tag === tag),
+  })).filter((g) => g.items.length > 0);
+}
+
 function TagPill({ tag }: { tag: Tag }) {
   return (
     <span
@@ -312,14 +341,26 @@ function ReleaseCard({ release, isLatest }: { release: Release; isLatest: boolea
         </div>
         <p className="text-sm text-zinc-400 mb-5">{release.headline}</p>
 
-        <ul className="space-y-2.5">
-          {release.entries.map((e, i) => (
-            <li key={i} className="flex items-start gap-3">
-              <TagPill tag={e.tag} />
-              <span className="text-[13px] text-zinc-300 leading-relaxed flex-1">{e.text}</span>
-            </li>
+        {/* Entries grouped by tag — one pill per tag, then its bullets. Every
+            bullet shares the same left edge, so paragraph text lines up the
+            same distance from the card edge across all groups. */}
+        <div className="space-y-5">
+          {groupByTag(release.entries).map((group) => (
+            <div key={group.tag}>
+              <TagPill tag={group.tag} />
+              <ul className="mt-2 space-y-2">
+                {group.items.map((e, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600" />
+                    <span className="text-[13px] text-zinc-300 leading-relaxed flex-1">
+                      {e.text}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       </div>
     </article>
   );

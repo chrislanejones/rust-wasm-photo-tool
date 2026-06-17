@@ -999,9 +999,30 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
           const rotation = textInput.rotation ?? 0;
 
-          // Box centre in viewport coords (SVG is fixed)
-          const bcx = ctr.left + sx + boxW / 2;
-          const bcy = ctr.top + sy + boxH / 2;
+          // Rotation pivot. Rust bakes the tile rotating around the centre of
+          // the (unrotated) text — and because its background padding is
+          // uniform, the padded-tile centre coincides with the text centre too.
+          // The overlay must rotate around that SAME point or committed text
+          // lands off-axis from the preview. Measure the Rust tile so the pivot
+          // matches exactly; fall back to the JS-measured box centre.
+          let pivotLocalX = boxW / 2;
+          let pivotLocalY = boxH / 2;
+          const measured = hookResult.toolRef.current?.measure_text(
+            textInput.text || " ",
+            effFontSize,
+            effFontWeight === "bold",
+          );
+          if (measured && measured.length >= 2 && measured[0] > 0) {
+            pivotLocalX = (measured[0] * scaleX) / 2;
+            pivotLocalY = (measured[1] * scaleY) / 2;
+          }
+          // Transform-origin for the box body + textarea (relative to their
+          // shared top-left at sx,sy).
+          const boxTransformOrigin = `${pivotLocalX}px ${pivotLocalY}px`;
+          // Pivot in viewport coords — the fixed SVG handle group rotates around
+          // this, and the rotate/resize drags orbit/scale around it.
+          const bcx = ctr.left + sx + pivotLocalX;
+          const bcy = ctr.top + sy + pivotLocalY;
 
           const HS = 9; // resize handle size px
           // Line+dot handle geometry (screen px, unrotated frame). The handle
@@ -1235,7 +1256,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     // single composite of the Rust coverage mask.
                     opacity: bgOpacity01,
                     transform: `rotate(${rotation}deg)`,
-                    transformOrigin: "center center",
+                    // Same pivot as the text, expressed relative to the BG
+                    // wrapper's own top-left (which sits padL/padT up-left of sx,sy).
+                    transformOrigin: `${pivotLocalX + padL}px ${pivotLocalY + padT}px`,
                   }}
                 >
                   {/* The rounded rect itself — inset by the uniform tail margin.
@@ -1267,7 +1290,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   cursor: "move",
                   zIndex: 50,
                   transform: `rotate(${rotation}deg)`,
-                  transformOrigin: "center center",
+                  transformOrigin: boxTransformOrigin,
                 }}
                 onPointerDown={handleBoxPointerDown}
               />
@@ -1300,7 +1323,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   zIndex: 51,
                   cursor: "text",
                   transform: `rotate(${rotation}deg)`,
-                  transformOrigin: "center center",
+                  transformOrigin: boxTransformOrigin,
                 }}
                 autoFocus
               />

@@ -457,17 +457,6 @@ textarea:focus-visible {
   outline-offset: -1px;
 }
 
-.layer-eye {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  padding: 0;
-}
-
 .layer-name {
   flex: 1;
   min-width: 0;
@@ -818,6 +807,20 @@ kbd {
 .btn-icon svg {
   width: 14px;
   height: 14px;
+}
+
+/* Extra-small icon button — same surface/border/hover/disabled treatment as
+   .btn-icon (always-visible bg, border activates on hover, icon stays light),
+   just sized down for dense rows like the Layers list. */
+.btn-icon-xs {
+  width: 20px;
+  height: 20px;
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.btn-icon-xs svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1231,7 +1234,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .shortcut-modal {
   width: 100%;
-  max-width: 520px;
+  max-width: 760px;
   max-height: 80vh;
   margin: 16px;
   background: var(--bg-secondary);
@@ -1319,9 +1322,10 @@ input[type="range"]:focus::-webkit-slider-thumb {
 }
 
 .shortcut-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  /* Two columns of shortcuts under each group header. */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 24px;
 }
 
 .shortcut-row {

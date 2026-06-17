@@ -523,6 +523,9 @@ declare module "stamp_tool" {
     remove_shape_annotation(id: number): boolean;
     /** Suppress one shape from render while its JS overlay preview is shown. Pass -1 to clear. */
     set_editing_shape(id: number): void;
+    /** Suppress an in-edit text annotation's baked tile from the composite
+     *  (so the JS textarea overlay isn't doubled). Pass -1 to clear. */
+    set_editing_text(id: number): void;
     /** JSON array of all live shapes (id, kind, x0,y0,x1,y1, r,g,b, stroke_width, arrow_style, number, points). */
     get_shape_annotations(): string;
     /** Returns the matching shape id, or -1 if no hit. */

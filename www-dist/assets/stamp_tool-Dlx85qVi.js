@@ -1,7 +1,7 @@
-class I {
+class E {
   __destroy_into_raw() {
     const t = this.__wbg_ptr;
-    return this.__wbg_ptr = 0, L.unregister(this), t;
+    return this.__wbg_ptr = 0, D.unregister(this), t;
   }
   free() {
     const t = this.__destroy_into_raw();
@@ -19,7 +19,7 @@ class I {
     return e.imagehorsetool_add_pin_annotation(this.__wbg_ptr, t, _, r, n, i, a, l) >>> 0;
   }
   add_polyline_annotation(t, _, r) {
-    const n = B(t, e.__wbindgen_malloc), i = g, s = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), a = g;
+    const n = L(t, e.__wbindgen_malloc), i = g, s = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), a = g;
     return e.imagehorsetool_add_polyline_annotation(this.__wbg_ptr, n, i, s, a, r) >>> 0;
   }
   add_shape_annotation(t, _, r, n, i, s, a, l) {
@@ -292,7 +292,7 @@ class I {
   }
   constructor(t, _) {
     const r = e.imagehorsetool_new(t, _);
-    return this.__wbg_ptr = r >>> 0, L.register(this, this.__wbg_ptr, this), this;
+    return this.__wbg_ptr = r >>> 0, D.register(this, this.__wbg_ptr, this), this;
   }
   paint_begin() {
     e.imagehorsetool_paint_begin(this.__wbg_ptr);
@@ -365,7 +365,7 @@ class I {
     return e.imagehorsetool_restore_pin_annotation(this.__wbg_ptr, t, _, r, n, i, s, a, l) >>> 0;
   }
   restore_polyline_annotation(t, _, r, n, i) {
-    const s = B(t, e.__wbindgen_malloc), a = g;
+    const s = L(t, e.__wbindgen_malloc), a = g;
     return e.imagehorsetool_restore_polyline_annotation(this.__wbg_ptr, s, a, _, r, n, i) >>> 0;
   }
   restore_shape_annotation(t, _, r, n, i, s, a, l, c, h) {
@@ -389,6 +389,9 @@ class I {
   }
   set_editing_shape(t) {
     e.imagehorsetool_set_editing_shape(this.__wbg_ptr, t);
+  }
+  set_editing_text(t) {
+    e.imagehorsetool_set_editing_text(this.__wbg_ptr, t);
   }
   set_hardness(t) {
     e.imagehorsetool_set_hardness(this.__wbg_ptr, t);
@@ -463,18 +466,18 @@ class I {
     return e.imagehorsetool_width(this.__wbg_ptr) >>> 0;
   }
 }
-Symbol.dispose && (I.prototype[Symbol.dispose] = I.prototype.free);
-function Y(o, t, _, r, n, i, s, a, l) {
+Symbol.dispose && (E.prototype[Symbol.dispose] = E.prototype.free);
+function V(o, t, _, r, n, i, s, a, l) {
   const c = y(o, e.__wbindgen_malloc), h = g, b = y(r, e.__wbindgen_malloc), m = g, w = e.composite_pixels(c, h, t, _, b, m, n, i, s, a, l);
   var u = d(w[0], w[1]).slice();
   return e.__wbindgen_free(w[0], w[1] * 1, 1), u;
 }
-function G(o, t, _, r) {
+function X(o, t, _, r) {
   const n = e.compute_aspect_crop(o, t, _, r);
   var i = U(n[0], n[1]).slice();
   return e.__wbindgen_free(n[0], n[1] * 4, 4), i;
 }
-function J(o, t, _, r, n, i, s, a) {
+function Y(o, t, _, r, n, i, s, a) {
   const l = e.constrain_crop_to_ratio(o, t, _, r, n, i, s, a);
   var c = U(l[0], l[1]).slice();
   return e.__wbindgen_free(l[0], l[1] * 4, 4), c;
@@ -500,10 +503,10 @@ function $(o, t, _, r, n) {
 }
 function tt(o, t, _, r, n, i, s, a, l) {
   const c = e.web_perf_metrics(o, t, _, r, n, i, s, a, l);
-  var h = q(c[0], c[1]).slice();
+  var h = H(c[0], c[1]).slice();
   return e.__wbindgen_free(c[0], c[1] * 8, 8), h;
 }
-function D() {
+function B() {
   return { __proto__: null, "./stamp_tool_bg.js": { __proto__: null, __wbg___wbindgen_throw_be289d5034ed271b: function(t, _) {
     throw new Error(f(t, _));
   }, __wbindgen_init_externref_table: function() {
@@ -511,14 +514,14 @@ function D() {
     t.set(0, void 0), t.set(_ + 0, void 0), t.set(_ + 1, null), t.set(_ + 2, true), t.set(_ + 3, false);
   } } };
 }
-const L = typeof FinalizationRegistry > "u" ? { register: () => {
+const D = typeof FinalizationRegistry > "u" ? { register: () => {
 }, unregister: () => {
 } } : new FinalizationRegistry((o) => e.__wbg_imagehorsetool_free(o >>> 0, 1));
-function q(o, t) {
+function H(o, t) {
   return o = o >>> 0, C().subarray(o / 8, o / 8 + t);
 }
 function U(o, t) {
-  return o = o >>> 0, H().subarray(o / 4, o / 4 + t);
+  return o = o >>> 0, N().subarray(o / 4, o / 4 + t);
 }
 function d(o, t) {
   return o = o >>> 0, k().subarray(o / 1, o / 1 + t);
@@ -528,10 +531,10 @@ function C() {
   return (F === null || F.byteLength === 0) && (F = new Float64Array(e.memory.buffer)), F;
 }
 function f(o, t) {
-  return o = o >>> 0, N(o, t);
+  return o = o >>> 0, G(o, t);
 }
 let T = null;
-function H() {
+function N() {
   return (T === null || T.byteLength === 0) && (T = new Uint32Array(e.memory.buffer)), T;
 }
 let M = null;
@@ -542,7 +545,7 @@ function y(o, t) {
   const _ = t(o.length * 1, 1) >>> 0;
   return k().set(o, _ / 1), g = o.length, _;
 }
-function B(o, t) {
+function L(o, t) {
   const _ = t(o.length * 8, 8) >>> 0;
   return C().set(o, _ / 8), g = o.length, _;
 }
@@ -570,7 +573,7 @@ let S = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
 S.decode();
 const P = 2146435072;
 let O = 0;
-function N(o, t) {
+function G(o, t) {
   return O += t, O >= P && (S = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), S.decode(), O = t), S.decode(k().subarray(o, o + t));
 }
 const R = new TextEncoder();
@@ -579,10 +582,10 @@ const R = new TextEncoder();
   return t.set(_), { read: o.length, written: _.length };
 });
 let g = 0, e;
-function V(o, t) {
+function q(o, t) {
   return e = o.exports, F = null, T = null, M = null, e.__wbindgen_start(), e;
 }
-async function X(o, t) {
+async function J(o, t) {
   if (typeof Response == "function" && o instanceof Response) {
     if (typeof WebAssembly.instantiateStreaming == "function") try {
       return await WebAssembly.instantiateStreaming(o, t);
@@ -609,24 +612,24 @@ async function X(o, t) {
 function et(o) {
   if (e !== void 0) return e;
   o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module: o } = o : console.warn("using deprecated parameters for `initSync()`; pass a single object instead"));
-  const t = D();
+  const t = B();
   o instanceof WebAssembly.Module || (o = new WebAssembly.Module(o));
   const _ = new WebAssembly.Instance(o, t);
-  return V(_);
+  return q(_);
 }
 async function _t(o) {
   if (e !== void 0) return e;
-  o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module_or_path: o } = o : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), o === void 0 && (o = new URL("/assets/stamp_tool_bg-BVhpIEVV.wasm", import.meta.url));
-  const t = D();
+  o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module_or_path: o } = o : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), o === void 0 && (o = new URL("/assets/stamp_tool_bg-DJ9GN7Iy.wasm", import.meta.url));
+  const t = B();
   (typeof o == "string" || typeof Request == "function" && o instanceof Request || typeof URL == "function" && o instanceof URL) && (o = fetch(o));
-  const { instance: _, module: r } = await X(await o, t);
-  return V(_);
+  const { instance: _, module: r } = await J(await o, t);
+  return q(_);
 }
 export {
-  I as ImageHorseTool,
-  Y as composite_pixels,
-  G as compute_aspect_crop,
-  J as constrain_crop_to_ratio,
+  E as ImageHorseTool,
+  V as composite_pixels,
+  X as compute_aspect_crop,
+  Y as constrain_crop_to_ratio,
   _t as default,
   K as encode_png_pixels,
   et as initSync,

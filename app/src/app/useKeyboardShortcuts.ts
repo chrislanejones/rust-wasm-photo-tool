@@ -15,6 +15,25 @@ const TOOL_BY_DIGIT: Record<string, ToolType> = {
   Digit0: "emoji",
 };
 
+/**
+ * True if `el` (the focused element) is a control that natively responds to
+ * Space/Enter activation — a real button, link, select, summary, or anything
+ * with an ARIA widget role that handles its own keys. Used so the global
+ * shortcut handler doesn't swallow Space (pan mode) or Enter when the user has
+ * Tab-focused such a control: the browser must be allowed to fire the click.
+ */
+function isActivatable(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const node = el.closest(
+    'button, a[href], select, summary, [role="button"], [role="link"], ' +
+      '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], ' +
+      '[role="tab"], [role="checkbox"], [role="switch"], [role="radio"], [role="option"]',
+  );
+  if (!node) return false;
+  // A disabled control won't activate, so don't block the shortcut for it.
+  return !(node as HTMLButtonElement).disabled;
+}
+
 interface KeyboardShortcutOptions {
   onUndo: () => void;
   onRedo: () => void;
@@ -81,7 +100,19 @@ export function useKeyboardShortcuts({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      ) {
+        return;
+      }
+
+      // ─── Keyboard activation of focused controls ────────
+      // When the user has Tab-focused a button/link/etc., let the browser
+      // handle Space/Enter so the control actually activates. Without this the
+      // Space-pan branch below would preventDefault and swallow the click.
+      if (
+        (e.code === "Space" || e.key === " " || e.key === "Enter") &&
+        isActivatable(e.target)
       ) {
         return;
       }
@@ -195,7 +226,11 @@ export function useKeyboardShortcuts({
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
+      // Only end pan mode if it actually started on keydown. If a button was
+      // focused we deliberately let the keydown through, so spaceHeldRef stays
+      // false — and we must NOT preventDefault here, or we'd cancel the
+      // button's native Space-keyup click.
+      if (e.code === "Space" && spaceHeldRef.current) {
         e.preventDefault();
         spaceHeldRef.current = false;
         onSpaceUp?.();

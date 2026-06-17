@@ -158,6 +158,7 @@ export function useTextTool({
           editingAnnotationId.current = null;
           textInputRef.current = null;
           setTextInput(null);
+          tool.set_editing_text(-1);
         }
       }
       // Drop stale hover.
@@ -178,6 +179,9 @@ export function useTextTool({
     setTextInput(null);
     const tool = toolRef.current;
     if (!tool) return;
+
+    // Stop suppressing the baked tile — the committed annotation should render.
+    tool.set_editing_text(-1);
 
     if (!ti.text.trim()) {
       // Empty text — if we were editing an existing annotation, remove it.
@@ -296,9 +300,13 @@ export function useTextTool({
       editingAnnotationId.current = ann.id;
       textInputRef.current = next;
       setTextInput(next);
+      // Suppress this annotation's baked tile while the textarea overlay is
+      // open, so the user doesn't see a doubled copy underneath the editor.
+      toolRef.current?.set_editing_text(ann.id);
+      flushToCanvas();
       setTimeout(() => textareaRef.current?.focus(), 10);
     },
-    [canvasRef, containerRef],
+    [canvasRef, containerRef, toolRef, flushToCanvas],
   );
 
   /** Open an existing text annotation for editing by id (Reselect list).
@@ -510,12 +518,15 @@ export function useTextTool({
         textInputRef.current = null;
         editingAnnotationId.current = null;
         setTextInput(null);
+        // Cancelling an edit must un-suppress the (unchanged) baked tile.
+        toolRef.current?.set_editing_text(-1);
+        flushToCanvas();
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         commitText();
       }
     },
-    [commitText],
+    [commitText, toolRef, flushToCanvas],
   );
 
   const onTextChange = useCallback(
