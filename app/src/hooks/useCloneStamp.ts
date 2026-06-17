@@ -23,6 +23,15 @@ export interface HistoryEntry {
   index: number;
 }
 
+/** A single layer in the stack, as reported by the Rust `get_layers()` JSON. */
+export interface LayerInfo {
+  id: number;
+  name: string;
+  visible: boolean;
+  opacity: number; // 0..1
+  active: boolean;
+}
+
 export interface CloneStampState {
   ready: boolean;
   hasSource: boolean;
@@ -36,6 +45,10 @@ export interface CloneStampState {
   height: number;
   /** True if the loaded image contains any transparent pixels (from Rust alpha scan). */
   hasTransparency: boolean;
+  /** Layer stack, bottom → top, mirrored from Rust. */
+  layers: LayerInfo[];
+  /** Id of the active layer (receives all tool edits). */
+  activeLayerId: number;
 }
 
 const INITIAL_STATE: CloneStampState = {
@@ -49,6 +62,8 @@ const INITIAL_STATE: CloneStampState = {
   width: 0,
   height: 0,
   hasTransparency: false,
+  layers: [],
+  activeLayerId: 0,
 };
 
 export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
@@ -98,6 +113,14 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
           index: i,
         };
       });
+    let layers: LayerInfo[] = [];
+    let activeLayerId = 0;
+    try {
+      layers = JSON.parse(t.get_layers()) as LayerInfo[];
+      activeLayerId = t.active_layer_id();
+    } catch {
+      layers = [];
+    }
     setState({
       ready: true,
       hasSource: t.has_source(),
@@ -109,6 +132,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       width: t.width(),
       height: t.height(),
       hasTransparency: t.has_transparency(),
+      layers,
+      activeLayerId,
     });
   }, []);
 
@@ -124,15 +149,13 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       canvas.height = h;
     }
     const ctx = canvas.getContext("2d", { desynchronized: true })!;
-    // Fast path: when no live overlays (text OR shapes), view WASM linear
-    // memory directly — no copy. The view MUST be reconstructed every call
+    // Rebuild the Rust-side composite of all visible layers (pixels + overlays
+    // + opacity) into its cache, then blit it. The zero-copy path views WASM
+    // linear memory directly — the view MUST be reconstructed every call
     // because the backing ArrayBuffer is replaced if WASM memory grows.
+    t.recomposite();
     const wasmMem = wasmMemoryRef.current;
-    if (
-      t.text_annotation_count() === 0 &&
-      t.shape_annotation_count() === 0 &&
-      wasmMem
-    ) {
+    if (wasmMem) {
       const ptr = t.data_ptr();
       const len = t.data_len();
       const view = new Uint8ClampedArray(
@@ -150,9 +173,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       );
       return;
     }
-    // Annotation overlay path still has to allocate (Rust composites
-    // into a fresh buffer that's then transferred to JS).
-    const composed = t.render_with_annotations();
+    // Fallback (no WASM memory handle): copy the composite out of Rust.
+    const composed = t.get_image_data();
     ctx.putImageData(
       new ImageData(new Uint8ClampedArray(composed), w, h),
       0,
@@ -459,14 +481,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const exportPng = useCallback((sourceName = "image") => {
     const t = toolRef.current;
     if (!t) return;
-    // Burn any live overlays (text + shapes) into pixels first so the export
-    // includes them (with one history snapshot so undo restores the
-    // live-overlay state).
-    if (t.text_annotation_count() > 0 || t.shape_annotation_count() > 0) {
-      t.flatten_text_annotations();
-      flushToCanvas();
-      syncState();
-    }
+    // export_png composites every visible layer (pixels + live overlays +
+    // opacity) — no destructive flatten needed.
     const png = t.export_png();
     const blob = new Blob([new Uint8Array(png)], { type: "image/png" });
     const url = URL.createObjectURL(blob);
@@ -485,14 +501,10 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       }
       const canvas = canvasRef.current;
       if (!canvas) return;
-      // Non-PNG export reads the canvas pixels via toBlob, so make sure
-      // overlays (text + shapes) are burned into the buffer (and the canvas) first.
-      const t = toolRef.current;
-      if (t && (t.text_annotation_count() > 0 || t.shape_annotation_count() > 0)) {
-        t.flatten_text_annotations();
-        flushToCanvas();
-        syncState();
-      }
+      // Non-PNG export reads the canvas pixels via toBlob. flushToCanvas paints
+      // the full composite (all visible layers + overlays), so just ensure the
+      // canvas is current — no destructive flatten needed.
+      flushToCanvas();
       const mimeMap: Record<string, string> = {
         jpeg: "image/jpeg",
         webp: "image/webp",
@@ -807,6 +819,127 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [flushToCanvas, syncState],
   );
 
+  // ── Layers ────────────────────────────────────────────────────────────────
+  // Each mutates the Rust layer stack, then repaints the composite and re-syncs
+  // the mirrored layer list into React state.
+  const addLayer = useCallback(
+    (name = ""): number => {
+      const t = toolRef.current;
+      if (!t) return 0;
+      const id = t.add_layer(name);
+      flushToCanvas();
+      syncState();
+      return id;
+    },
+    [flushToCanvas, syncState],
+  );
+
+  const removeLayer = useCallback(
+    (id: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      if (t.remove_layer(id)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [flushToCanvas, syncState],
+  );
+
+  const duplicateLayer = useCallback(
+    (id: number): number => {
+      const t = toolRef.current;
+      if (!t) return 0;
+      const newId = t.duplicate_layer(id);
+      flushToCanvas();
+      syncState();
+      return newId;
+    },
+    [flushToCanvas, syncState],
+  );
+
+  const setActiveLayer = useCallback(
+    (id: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      if (t.set_active_layer(id)) {
+        flushToCanvas();
+        syncState();
+        broadcastAnnotationsChanged();
+      }
+    },
+    [flushToCanvas, syncState, broadcastAnnotationsChanged],
+  );
+
+  const setLayerVisible = useCallback(
+    (id: number, visible: boolean) => {
+      const t = toolRef.current;
+      if (!t) return;
+      if (t.set_layer_visible(id, visible)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [flushToCanvas, syncState],
+  );
+
+  const setLayerOpacity = useCallback(
+    (id: number, opacity: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      if (t.set_layer_opacity(id, opacity)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [flushToCanvas, syncState],
+  );
+
+  const renameLayer = useCallback(
+    (id: number, name: string) => {
+      const t = toolRef.current;
+      if (!t) return;
+      if (t.rename_layer(id, name)) {
+        syncState();
+      }
+    },
+    [syncState],
+  );
+
+  const moveLayer = useCallback(
+    (id: number, newIndex: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      if (t.move_layer(id, newIndex)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [flushToCanvas, syncState],
+  );
+
+  const mergeDown = useCallback(
+    (id: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      if (t.merge_down(id)) {
+        flushToCanvas();
+        syncState();
+        broadcastAnnotationsChanged();
+      }
+    },
+    [flushToCanvas, syncState, broadcastAnnotationsChanged],
+  );
+
+  const flattenAll = useCallback(() => {
+    const t = toolRef.current;
+    if (!t) return;
+    t.flatten_all();
+    flushToCanvas();
+    syncState();
+    broadcastAnnotationsChanged();
+  }, [flushToCanvas, syncState, broadcastAnnotationsChanged]);
+
   return {
     state,
     toolRef,
@@ -849,5 +982,16 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     adjustBrightness,
     adjustContrast,
     applyGlobalBlur,
+    // Layers
+    addLayer,
+    removeLayer,
+    duplicateLayer,
+    setActiveLayer,
+    setLayerVisible,
+    setLayerOpacity,
+    renameLayer,
+    moveLayer,
+    mergeDown,
+    flattenAll,
   };
 }

@@ -2,6 +2,7 @@
 ///
 /// RGBA, row-major, 4 bytes per pixel.
 
+#[derive(Clone)]
 pub struct ImageBuffer {
     pub width: u32,
     pub height: u32,

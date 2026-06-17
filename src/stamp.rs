@@ -68,6 +68,11 @@ impl StampState {
 
     // ── Stroke lifecycle ────────────────────────────────────────────────────
 
+    /// Begin a clone-stamp stroke. `pre_snapshot` is a full layer-stack snapshot
+    /// of the state before the stroke, built by the caller; it is held until
+    /// `end_stroke` pushes it onto the undo stack (so a stroke that is started
+    /// and immediately cancelled leaves no history). Returns `true` if the
+    /// stroke actually began (a source point was set).
     pub fn begin_stroke(
         &mut self,
         data: &mut [u8],
@@ -76,15 +81,14 @@ impl StampState {
         redo_stack: &mut Vec<Snapshot>,
         dest_x: f64,
         dest_y: f64,
-        annotations: Vec<crate::TextAnnotation>,
-        shapes: Vec<crate::ShapeAnnotation>,
-    ) {
+        pre_snapshot: Snapshot,
+    ) -> bool {
         let (sx, sy) = match (self.source_x, self.source_y) {
             (Some(x), Some(y)) => (x as f64, y as f64),
-            _ => return,
+            _ => return false,
         };
         if self.stroke_active {
-            return;
+            return false;
         }
         self.offset_x = dest_x - sx;
         self.offset_y = dest_y - sy;
@@ -93,16 +97,10 @@ impl StampState {
         self.last_stamp_y = None;
         self.stroke_counter += 1;
         self.stroke_src_data = data.to_vec();
-        self.stroke_pre_snapshot = Some(Snapshot {
-            label: format!("Stamp {}", self.stroke_counter),
-            data: self.stroke_src_data.clone(),
-            width: w as u32,
-            height: h as u32,
-            annotations,
-            shapes,
-        });
+        self.stroke_pre_snapshot = Some(pre_snapshot);
         redo_stack.clear();
         self.stamp_at(data, w, h, dest_x, dest_y);
+        true
     }
 
     pub fn continue_stroke(

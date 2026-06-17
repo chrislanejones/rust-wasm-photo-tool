@@ -396,6 +396,31 @@ declare module "stamp_tool" {
     render_with_annotations(): Uint8Array;
     flatten_text_annotations(): void;
 
+    // ── Layers (Photoshop-style stack) ──
+    /** Recompute the cached composite of all visible layers (call before reading data_ptr). */
+    recomposite(): void;
+    layer_count(): number;
+    /** JSON array bottom→top: [{id,name,visible,opacity,active}]. */
+    get_layers(): string;
+    /** Id of the active layer (receives all tool edits). */
+    active_layer_id(): number;
+    /** Add a transparent layer above the active one; it becomes active. Returns its id. */
+    add_layer(name: string): number;
+    /** Duplicate a layer (pixels + annotations) above it. Returns the new id (0 if not found). */
+    duplicate_layer(id: number): number;
+    /** Remove a layer (refuses the last one). Returns true if removed. */
+    remove_layer(id: number): boolean;
+    set_active_layer(id: number): boolean;
+    set_layer_visible(id: number, visible: boolean): boolean;
+    set_layer_opacity(id: number, opacity: number): boolean;
+    rename_layer(id: number, name: string): boolean;
+    /** Move a layer to a new stack index (0 = bottom). Returns true if moved. */
+    move_layer(id: number, new_index: number): boolean;
+    /** Merge a layer down onto the one below it. Returns true if merged. */
+    merge_down(id: number): boolean;
+    /** Flatten the whole stack into a single Background layer. */
+    flatten_all(): void;
+
     // ── Live shape/arrow annotations (non-destructive, re-selectable) ──
     // kind: 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline.
     // arrow_style (arrows only): 0=single, 1=double.

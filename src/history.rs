@@ -1,31 +1,29 @@
 /// Undo / redo history system.
 ///
-/// Each snapshot stores a full copy of the pixel buffer + dimensions + the
-/// list of live text annotations at the time of the snapshot + a label.
-/// Storing dimensions is necessary because some operations (crop, resize,
-/// rotate) change the canvas size — without restoring width/height, undo
-/// would put the wrong dimensions back and corrupt the display.
+/// Each snapshot stores a full copy of the **layer stack** (every layer's pixel
+/// buffer + annotations), the active layer index, the canvas dimensions, and a
+/// label. Storing the whole stack — not just one buffer — is what makes layer
+/// structural operations (add / delete / reorder / merge) undoable alongside
+/// ordinary per-layer pixel edits.
 ///
-/// Storing annotations is necessary because text annotations are a
-/// non-destructive overlay; undoing a "Brightness" step shouldn't lose
-/// whatever text boxes are currently active, and undoing an "Add Text" step
-/// must remove the annotation that step introduced.
+/// Storing dimensions is necessary because some operations (crop, resize,
+/// rotate) change the canvas size — without restoring width/height, undo would
+/// put the wrong dimensions back and corrupt the display.
 
 use std::collections::VecDeque;
 
-use crate::{ShapeAnnotation, TextAnnotation};
+use crate::Layer;
 
 pub const MAX_HISTORY: usize = 50;
 
 pub struct Snapshot {
     pub label: String,
-    pub data: Vec<u8>,
+    /// Full layer stack at the time of the snapshot, bottom → top.
+    pub layers: Vec<Layer>,
+    /// Active layer index within `layers`.
+    pub active: usize,
     pub width: u32,
     pub height: u32,
-    pub annotations: Vec<TextAnnotation>,
-    /// Live shape/arrow annotations at the time of the snapshot — same
-    /// non-destructive overlay treatment as text annotations.
-    pub shapes: Vec<ShapeAnnotation>,
 }
 
 pub struct History {
@@ -41,76 +39,38 @@ impl History {
         }
     }
 
-    /// Push current pixel data + dimensions + annotation list as an undo
-    /// snapshot. Clears redo stack.
-    pub fn push_snapshot(
-        &mut self,
-        label: &str,
-        current_data: &[u8],
-        width: u32,
-        height: u32,
-        annotations: Vec<TextAnnotation>,
-        shapes: Vec<ShapeAnnotation>,
-    ) {
-        self.undo_stack.push_back(Snapshot {
-            label: label.to_string(),
-            data: current_data.to_vec(),
-            width,
-            height,
-            annotations,
-            shapes,
-        });
+    /// Push a pre-built snapshot onto the undo stack. Clears the redo stack.
+    pub fn push(&mut self, snap: Snapshot) {
+        self.undo_stack.push_back(snap);
         if self.undo_stack.len() > MAX_HISTORY {
             self.undo_stack.pop_front();
         }
         self.redo_stack.clear();
     }
 
-    /// Undo: pops from undo stack, pushes current state to redo stack.
-    /// Returns (pixel_data, width, height, annotations, shapes) to restore, or None.
-    pub fn undo(
-        &mut self,
-        current_data: &[u8],
-        current_w: u32,
-        current_h: u32,
-        current_annotations: Vec<TextAnnotation>,
-        current_shapes: Vec<ShapeAnnotation>,
-    ) -> Option<(Vec<u8>, u32, u32, Vec<TextAnnotation>, Vec<ShapeAnnotation>)> {
+    /// Undo: pops the most recent undo snapshot and returns it for the caller
+    /// to restore. `current` is the live state; it is pushed onto the redo
+    /// stack (re-labelled with the popped snapshot's label so the History panel
+    /// reads naturally). Returns `None` when there is nothing to undo.
+    pub fn undo(&mut self, current: Snapshot) -> Option<Snapshot> {
         if let Some(snap) = self.undo_stack.pop_back() {
-            self.redo_stack.push(Snapshot {
-                label: snap.label.clone(),
-                data: current_data.to_vec(),
-                width: current_w,
-                height: current_h,
-                annotations: current_annotations,
-                shapes: current_shapes,
-            });
-            Some((snap.data, snap.width, snap.height, snap.annotations, snap.shapes))
+            let mut cur = current;
+            cur.label = snap.label.clone();
+            self.redo_stack.push(cur);
+            Some(snap)
         } else {
             None
         }
     }
 
-    /// Redo: pops from redo stack, pushes current state to undo stack.
-    /// Returns (pixel_data, width, height, annotations, shapes) to restore, or None.
-    pub fn redo(
-        &mut self,
-        current_data: &[u8],
-        current_w: u32,
-        current_h: u32,
-        current_annotations: Vec<TextAnnotation>,
-        current_shapes: Vec<ShapeAnnotation>,
-    ) -> Option<(Vec<u8>, u32, u32, Vec<TextAnnotation>, Vec<ShapeAnnotation>)> {
+    /// Redo: pops the most recent redo snapshot and returns it for restore.
+    /// `current` is pushed back onto the undo stack.
+    pub fn redo(&mut self, current: Snapshot) -> Option<Snapshot> {
         if let Some(snap) = self.redo_stack.pop() {
-            self.undo_stack.push_back(Snapshot {
-                label: snap.label.clone(),
-                data: current_data.to_vec(),
-                width: current_w,
-                height: current_h,
-                annotations: current_annotations,
-                shapes: current_shapes,
-            });
-            Some((snap.data, snap.width, snap.height, snap.annotations, snap.shapes))
+            let mut cur = current;
+            cur.label = snap.label.clone();
+            self.undo_stack.push_back(cur);
+            Some(snap)
         } else {
             None
         }
@@ -135,57 +95,6 @@ impl History {
             parts.push(format!("redo:{}", s.label));
         }
         parts.join("|")
-    }
-
-    /// Jump to a specific history index by repeatedly undoing or redoing.
-    /// Returns true if the state changed.
-    pub fn jump_to(
-        &mut self,
-        target_index: usize,
-        current_data: &mut Vec<u8>,
-        current_w: &mut u32,
-        current_h: &mut u32,
-        current_annotations: &mut Vec<TextAnnotation>,
-        current_shapes: &mut Vec<ShapeAnnotation>,
-    ) -> bool {
-        let current = self.undo_stack.len();
-        if target_index == current {
-            return false;
-        }
-        if target_index < current {
-            for _ in 0..(current - target_index) {
-                let anns = std::mem::take(current_annotations);
-                let shapes = std::mem::take(current_shapes);
-                if let Some((data, w, h, restored_anns, restored_shapes)) =
-                    self.undo(current_data, *current_w, *current_h, anns, shapes)
-                {
-                    *current_data = data;
-                    *current_w = w;
-                    *current_h = h;
-                    *current_annotations = restored_anns;
-                    *current_shapes = restored_shapes;
-                } else {
-                    break;
-                }
-            }
-        } else {
-            for _ in 0..(target_index - current) {
-                let anns = std::mem::take(current_annotations);
-                let shapes = std::mem::take(current_shapes);
-                if let Some((data, w, h, restored_anns, restored_shapes)) =
-                    self.redo(current_data, *current_w, *current_h, anns, shapes)
-                {
-                    *current_data = data;
-                    *current_w = w;
-                    *current_h = h;
-                    *current_annotations = restored_anns;
-                    *current_shapes = restored_shapes;
-                } else {
-                    break;
-                }
-            }
-        }
-        true
     }
 
     /// Delete a history entry by index without restoring canvas state.

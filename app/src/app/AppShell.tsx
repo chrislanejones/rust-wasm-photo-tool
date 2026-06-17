@@ -974,6 +974,98 @@ export function AppShell() {
     }
   }, [stamp]);
 
+  /**
+   * Paste a bitmap from the clipboard into the **active layer**, centred on the
+   * canvas. Accepts either the `clipboardData.items` from a native paste event
+   * or, when called without them, falls back to the async Clipboard API (for an
+   * explicit button/menu invocation). Decodes the image to RGBA and composites
+   * it via the active-layer `paste_region` (one "Paste" history entry in Rust).
+   */
+  const handlePasteFromClipboard = useCallback(
+    async (items?: DataTransferItemList | null) => {
+      const tool = stamp.toolRef.current;
+      if (!tool || !activePhotoId) return;
+      let source: Blob | null = null;
+      if (items) {
+        for (const it of Array.from(items)) {
+          if (it.kind === "file" && it.type.startsWith("image/")) {
+            source = it.getAsFile();
+            break;
+          }
+        }
+      }
+      if (!source) {
+        try {
+          const read = await navigator.clipboard.read();
+          for (const clip of read) {
+            const t = clip.types.find((x) => x.startsWith("image/"));
+            if (t) {
+              source = await clip.getType(t);
+              break;
+            }
+          }
+        } catch {
+          /* clipboard API unavailable / denied — nothing to paste */
+        }
+      }
+      if (!source) return;
+      try {
+        const bitmap = await createImageBitmap(source);
+        const w = bitmap.width;
+        const h = bitmap.height;
+        const oc = new OffscreenCanvas(w, h);
+        const ctx = oc.getContext("2d")!;
+        ctx.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        const rgba = ctx.getImageData(0, 0, w, h).data;
+        const cw = stamp.state.width || w;
+        const ch = stamp.state.height || h;
+        const destX = Math.round((cw - w) / 2);
+        const destY = Math.round((ch - h) / 2);
+        stamp.pasteRegion(
+          new Uint8ClampedArray(rgba.buffer as ArrayBuffer),
+          w,
+          h,
+          destX,
+          destY,
+        );
+        toast.success("Pasted into active layer");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        toast.error(`Couldn't paste image: ${msg}`);
+      }
+    },
+    [stamp, activePhotoId],
+  );
+
+  // Native Ctrl/Cmd+V paste → drop the clipboard image into the active layer.
+  // Skipped while the upload dialog is open (it imports pastes as new photos)
+  // or when focus is in a text field (text tool, layer rename, etc.).
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      if (showUpload) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const hasImage = Array.from(items).some(
+        (it) => it.kind === "file" && it.type.startsWith("image/"),
+      );
+      if (!hasImage) return;
+      e.preventDefault();
+      void handlePasteFromClipboard(items);
+    };
+    window.addEventListener("paste", handler);
+    return () => window.removeEventListener("paste", handler);
+  }, [showUpload, handlePasteFromClipboard]);
+
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
   }, []);
@@ -1812,6 +1904,17 @@ export function AppShell() {
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
             userMode={effectiveUserMode}
+            layers={stamp.state.layers}
+            onAddLayer={() => stamp.addLayer()}
+            onDuplicateLayer={stamp.duplicateLayer}
+            onDeleteLayer={stamp.removeLayer}
+            onSelectLayer={stamp.setActiveLayer}
+            onToggleLayerVisible={stamp.setLayerVisible}
+            onSetLayerOpacity={stamp.setLayerOpacity}
+            onRenameLayer={stamp.renameLayer}
+            onMoveLayer={stamp.moveLayer}
+            onMergeDown={stamp.mergeDown}
+            onFlattenAll={stamp.flattenAll}
           />
         )}
       </AnimatePresence>

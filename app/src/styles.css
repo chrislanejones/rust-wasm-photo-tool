@@ -440,6 +440,86 @@ textarea:focus-visible {
   padding-top: 0;
 }
 
+/* ── Layers list ─────────────────────────────────────────────────────── */
+.layers-list {
+  padding-top: 0;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.layer-active {
+  outline: 1px solid var(--accent, #6366f1);
+  outline-offset: -1px;
+}
+
+.layer-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  padding: 0;
+}
+
+.layer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.layer-rename-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 1px 4px;
+  border: 1px solid var(--accent, #6366f1);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+}
+
+.layer-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.layer-row-actions button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.layer-opacity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-basis: 100%;
+  padding: 2px 2px 0;
+}
+
+.layer-opacity input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.layer-opacity-val {
+  font-size: 10px;
+  opacity: 0.7;
+  min-width: 30px;
+  text-align: right;
+}
+
 .history-list::-webkit-scrollbar {
   width: 4px;
 }

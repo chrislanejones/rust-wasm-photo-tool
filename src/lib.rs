@@ -238,9 +238,52 @@ pub struct ShapeAnnotation {
     pub points: Vec<(f64, f64)>,
 }
 
+/// A single Photoshop-style layer: an independent RGBA pixel buffer plus its
+/// own live (non-destructive) text and shape annotations. Layers share the
+/// canvas dimensions held on `ImageHorseTool`. The display canvas is the
+/// composite of every visible layer, bottom → top, each blended source-over
+/// scaled by `opacity`.
+///
+/// `Clone` is derived so each history snapshot can carry an independent copy of
+/// the whole stack (undo/redo restores layer structure, pixels and overlays).
+#[derive(Clone)]
+pub struct Layer {
+    pub id: u32,
+    pub name: String,
+    pub visible: bool,
+    pub opacity: f64, // 0.0..=1.0
+    pub buf: ImageBuffer,
+    pub text_annotations: Vec<TextAnnotation>,
+    pub shape_annotations: Vec<ShapeAnnotation>,
+}
+
+impl Layer {
+    fn new(id: u32, name: String, width: u32, height: u32) -> Self {
+        Layer {
+            id,
+            name,
+            visible: true,
+            opacity: 1.0,
+            buf: ImageBuffer::new(width, height),
+            text_annotations: Vec::new(),
+            shape_annotations: Vec::new(),
+        }
+    }
+}
+
 #[wasm_bindgen]
 pub struct ImageHorseTool {
-    buf: ImageBuffer,
+    /// Layer stack, bottom (index 0) → top (last). Always non-empty.
+    layers: Vec<Layer>,
+    /// Index of the active layer in `layers` — receives all tool edits.
+    active: usize,
+    next_layer_id: u32,
+    /// Canvas dimensions, shared by every layer.
+    width: u32,
+    height: u32,
+    /// Cached composite of all visible layers; `data_ptr`/`data_len` expose
+    /// this to JS for a zero-copy blit. Rebuilt by `recomposite()`.
+    composite_cache: Vec<u8>,
     hist: History,
     stamp: StampState,
     zoom: f64,
@@ -251,15 +294,11 @@ pub struct ImageHorseTool {
     // many times per second with the same intensity, so rebuilding the kernel
     // on every dab is wasted work.
     blur_kernel_cache: Option<(u32, Vec<f32>)>,
-    text_annotations: Vec<TextAnnotation>,
     next_text_id: u32,
-    /// Live shape/arrow overlay — non-destructive, re-selectable. See
-    /// `ShapeAnnotation`.
-    shape_annotations: Vec<ShapeAnnotation>,
     next_shape_id: u32,
     /// When a shape is being edited via the JS Figma-style overlay, it is
-    /// suppressed from `render_with_annotations` so the live preview doesn't
-    /// double up with the committed pixels. `None` when nothing is editing.
+    /// suppressed from the composite so the live preview doesn't double up with
+    /// the committed pixels. `None` when nothing is editing.
     editing_shape_id: Option<u32>,
 }
 
@@ -464,19 +503,150 @@ fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
 }
 
 impl ImageHorseTool {
-    /// Push a history snapshot of the current buffer + both overlay layers
-    /// (text + shapes). Replaces the long inline `push_snapshot(...)` calls so
-    /// every history-creating action records the shape overlay too.
+    /// Build a history snapshot of the entire current layer stack.
+    fn make_snapshot(&self, label: &str) -> Snapshot {
+        Snapshot {
+            label: label.to_string(),
+            layers: self.layers.clone(),
+            active: self.active,
+            width: self.width,
+            height: self.height,
+        }
+    }
+
+    /// Push a full-stack history snapshot. Every history-creating action
+    /// (pixel edits, annotation CRUD, transforms, layer structural ops) records
+    /// the whole stack so undo/redo restores layers, pixels and overlays.
     fn snap(&mut self, label: &str) {
-        self.hist.push_snapshot(
-            label,
-            &self.buf.data,
-            self.buf.width,
-            self.buf.height,
-            self.text_annotations.clone(),
-            self.shape_annotations.clone(),
+        let s = self.make_snapshot(label);
+        self.hist.push(s);
+    }
+
+    /// Replace the live state with a snapshot's layer stack (used by undo/redo).
+    fn restore_snapshot(&mut self, snap: Snapshot) {
+        self.layers = snap.layers;
+        self.active = snap.active.min(self.layers.len().saturating_sub(1));
+        self.width = snap.width;
+        self.height = snap.height;
+        // Source point may now reference out-of-bounds pixels.
+        self.stamp.source_x = None;
+        self.stamp.source_y = None;
+    }
+}
+
+/// Render one layer (its pixels with shapes + text overlays composited on top)
+/// into a fresh RGBA buffer of `w×h`. The shape being edited (if any) is
+/// skipped so the JS overlay preview is the only thing drawn for it.
+fn render_layer(layer: &Layer, w: u32, h: u32, editing_shape_id: Option<u32>) -> Vec<u8> {
+    let mut out = layer.buf.data.clone();
+    let wi = w as i32;
+    let hi = h as i32;
+    // Shapes underneath.
+    for s in &layer.shape_annotations {
+        if editing_shape_id == Some(s.id) {
+            continue;
+        }
+        render_shape_into(&mut out, w, h, s);
+    }
+    // Text on top.
+    for a in &layer.text_annotations {
+        crate::transform::paste_region(
+            &mut out,
+            wi,
+            hi,
+            a.tile_pixels.as_ref(),
+            a.tile_w,
+            a.tile_h,
+            a.x + a.tile_offset_x,
+            a.y + a.tile_offset_y,
         );
     }
+    out
+}
+
+/// Blend `src` (RGBA, same `w×h` as `dst`) over `dst` source-over, with the
+/// source alpha pre-scaled by `opacity` (0.0..=1.0).
+fn blend_over(dst: &mut [u8], src: &[u8], opacity: f64) {
+    let op = opacity.clamp(0.0, 1.0) as f32;
+    if op <= 0.0 {
+        return;
+    }
+    let n = dst.len().min(src.len());
+    let mut i = 0;
+    while i + 3 < n {
+        let sa = src[i + 3] as f32 / 255.0 * op;
+        if sa > 0.0 {
+            let da = dst[i + 3] as f32 / 255.0;
+            let out_a = sa + da * (1.0 - sa);
+            if out_a > 1e-6 {
+                for c in 0..3 {
+                    let sv = src[i + c] as f32 / 255.0;
+                    let dv = dst[i + c] as f32 / 255.0;
+                    let ov = (sv * sa + dv * da * (1.0 - sa)) / out_a;
+                    dst[i + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
+                }
+            }
+            dst[i + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+        }
+        i += 4;
+    }
+}
+
+/// True if `layer` has no live overlays (so its composite is just its pixels).
+fn layer_has_no_overlays(layer: &Layer) -> bool {
+    layer.text_annotations.is_empty() && layer.shape_annotations.is_empty()
+}
+
+/// Composite an entire layer stack into `out` (reused across frames to avoid a
+/// per-flush allocation), bottom → top. Hidden layers are skipped; each visible
+/// layer is blended source-over scaled by its opacity. Includes a fast path for
+/// the common single-visible-opaque-layer-with-no-overlays case (a straight
+/// copy — what the old zero-copy blit did).
+fn composite_layers_into(
+    out: &mut Vec<u8>,
+    layers: &[Layer],
+    w: u32,
+    h: u32,
+    editing_shape_id: Option<u32>,
+) {
+    let n = (w as usize) * (h as usize) * 4;
+    if out.len() != n {
+        out.clear();
+        out.resize(n, 0);
+    }
+
+    // Fast path: exactly one visible, fully-opaque layer with no overlays →
+    // copy its pixels straight in. Avoids the zero-fill + per-pixel blend that
+    // would otherwise run on every paint/stamp dab.
+    let mut visible = layers.iter().filter(|l| l.visible);
+    if let (Some(only), None) = (visible.next(), visible.next()) {
+        if only.opacity >= 0.999 && layer_has_no_overlays(only) && only.buf.data.len() == n {
+            out.copy_from_slice(&only.buf.data);
+            return;
+        }
+    }
+
+    out.iter_mut().for_each(|b| *b = 0);
+    for layer in layers {
+        if !layer.visible {
+            continue;
+        }
+        let rendered = render_layer(layer, w, h, editing_shape_id);
+        blend_over(out, &rendered, layer.opacity);
+    }
+}
+
+/// Allocating variant — composite a stack into a fresh buffer. Used by export /
+/// thumbnail / snapshot-PNG paths that aren't on the per-frame hot path.
+fn composite_layers(
+    layers: &[Layer],
+    w: u32,
+    h: u32,
+    editing_shape_id: Option<u32>,
+) -> Vec<u8> {
+    let mut out = Vec::new();
+    composite_layers_into(&mut out, layers, w, h, editing_shape_id);
+    out
 }
 
 /// Build the cached tile (rotated if needed) for an annotation's current
@@ -646,61 +816,88 @@ impl ImageHorseTool {
 
     #[wasm_bindgen(constructor)]
     pub fn new(width: u32, height: u32) -> ImageHorseTool {
+        let base = Layer::new(1, "Background".to_string(), width, height);
         ImageHorseTool {
-            buf: ImageBuffer::new(width, height),
+            layers: vec![base],
+            active: 0,
+            next_layer_id: 2,
+            width,
+            height,
+            composite_cache: Vec::new(),
             hist: History::new(),
             stamp: StampState::new(),
             zoom: 1.0,
             blur_scratch_a: Vec::new(),
             blur_scratch_b: Vec::new(),
             blur_kernel_cache: None,
-            text_annotations: Vec::new(),
             next_text_id: 1,
-            shape_annotations: Vec::new(),
             next_shape_id: 1,
             editing_shape_id: None,
         }
     }
 
     pub fn width(&self) -> u32 {
-        self.buf.width
+        self.width
     }
 
     pub fn height(&self) -> u32 {
-        self.buf.height
+        self.height
     }
 
     // ── Image loading ───────────────────────────────────────────────────
 
+    /// Load a fresh image into a single Background layer, discarding any
+    /// existing layer stack, history and overlays.
     pub fn load_image(&mut self, pixels: &[u8]) {
-        if self.buf.load(pixels) {
-            self.hist.clear();
-            self.stamp.stroke_counter = 0;
-            self.stamp.source_x = None;
-            self.stamp.source_y = None;
-            self.text_annotations.clear();
-            self.next_text_id = 1;
-            self.shape_annotations.clear();
-            self.next_shape_id = 1;
-            self.editing_shape_id = None;
+        let mut base = Layer::new(1, "Background".to_string(), self.width, self.height);
+        if !base.buf.load(pixels) {
+            return;
         }
+        self.layers = vec![base];
+        self.active = 0;
+        self.next_layer_id = 2;
+        self.hist.clear();
+        self.stamp.stroke_counter = 0;
+        self.stamp.source_x = None;
+        self.stamp.source_y = None;
+        self.next_text_id = 1;
+        self.next_shape_id = 1;
+        self.editing_shape_id = None;
     }
 
+    /// Flattened composite of all visible layers (RGBA).
     pub fn get_image_data(&self) -> Vec<u8> {
-        self.buf.data.clone()
+        composite_layers(&self.layers, self.width, self.height, self.editing_shape_id)
     }
 
-    /// Returns true if any pixel in the current buffer has alpha < 255.
+    /// Returns true if the flattened composite has any pixel with alpha < 255.
     pub fn has_transparency(&self) -> bool {
-        self.buf.data.chunks_exact(4).any(|px| px[3] < 255)
+        self.get_image_data().chunks_exact(4).any(|px| px[3] < 255)
+    }
+
+    /// Recompute the cached composite that `data_ptr`/`data_len` expose. JS
+    /// calls this before each zero-copy blit so the canvas reflects the full
+    /// visible layer stack (pixels + overlays + opacity).
+    pub fn recomposite(&mut self) {
+        // Reuse the cache allocation across frames; take it out so we can pass
+        // it as `&mut` alongside the immutable layer borrow.
+        let mut cache = std::mem::take(&mut self.composite_cache);
+        composite_layers_into(
+            &mut cache,
+            &self.layers,
+            self.width,
+            self.height,
+            self.editing_shape_id,
+        );
+        self.composite_cache = cache;
     }
 
     pub fn data_ptr(&self) -> *const u8 {
-        self.buf.data.as_ptr()
+        self.composite_cache.as_ptr()
     }
 
     pub fn data_len(&self) -> usize {
-        self.buf.data.len()
+        self.composite_cache.len()
     }
 
     // ── Zoom ────────────────────────────────────────────────────────────
@@ -751,27 +948,27 @@ impl ImageHorseTool {
     // ── Stroke lifecycle ────────────────────────────────────────────────
 
     pub fn begin_stroke(&mut self, dest_x: f64, dest_y: f64) {
-        let w = self.buf.width as i32;
-        let h = self.buf.height as i32;
-        let anns = self.text_annotations.clone();
-        let shapes = self.shape_annotations.clone();
+        let w = self.width as i32;
+        let h = self.height as i32;
+        let snap = self.make_snapshot(&format!("Stamp {}", self.stamp.stroke_counter + 1));
+        let active = self.active;
+        let layer = &mut self.layers[active];
         self.stamp.begin_stroke(
-            &mut self.buf.data,
+            &mut layer.buf.data,
             w,
             h,
             &mut self.hist.redo_stack,
             dest_x,
             dest_y,
-            anns,
-            shapes,
+            snap,
         );
     }
 
     pub fn continue_stroke(&mut self, dest_x: f64, dest_y: f64) {
-        let w = self.buf.width as i32;
-        let h = self.buf.height as i32;
+        let w = self.width as i32;
+        let h = self.height as i32;
         self.stamp
-            .continue_stroke(&mut self.buf.data, w, h, dest_x, dest_y);
+            .continue_stroke(&mut self.layers[self.active].buf.data, w, h, dest_x, dest_y);
     }
 
     pub fn end_stroke(&mut self) {
@@ -782,16 +979,9 @@ impl ImageHorseTool {
     // ── History ─────────────────────────────────────────────────────────
 
     pub fn undo(&mut self) -> bool {
-        let anns = std::mem::take(&mut self.text_annotations);
-        let shapes = std::mem::take(&mut self.shape_annotations);
-        if let Some((data, w, h, restored_anns, restored_shapes)) =
-            self.hist.undo(&self.buf.data, self.buf.width, self.buf.height, anns, shapes)
-        {
-            self.buf.data = data;
-            self.buf.width = w;
-            self.buf.height = h;
-            self.text_annotations = restored_anns;
-            self.shape_annotations = restored_shapes;
+        let current = self.make_snapshot("Current State");
+        if let Some(snap) = self.hist.undo(current) {
+            self.restore_snapshot(snap);
             true
         } else {
             false
@@ -799,16 +989,9 @@ impl ImageHorseTool {
     }
 
     pub fn redo(&mut self) -> bool {
-        let anns = std::mem::take(&mut self.text_annotations);
-        let shapes = std::mem::take(&mut self.shape_annotations);
-        if let Some((data, w, h, restored_anns, restored_shapes)) =
-            self.hist.redo(&self.buf.data, self.buf.width, self.buf.height, anns, shapes)
-        {
-            self.buf.data = data;
-            self.buf.width = w;
-            self.buf.height = h;
-            self.text_annotations = restored_anns;
-            self.shape_annotations = restored_shapes;
+        let current = self.make_snapshot("Current State");
+        if let Some(snap) = self.hist.redo(current) {
+            self.restore_snapshot(snap);
             true
         } else {
             false
@@ -828,14 +1011,24 @@ impl ImageHorseTool {
     }
 
     pub fn jump_to_history(&mut self, target_index: usize) -> bool {
-        self.hist.jump_to(
-            target_index,
-            &mut self.buf.data,
-            &mut self.buf.width,
-            &mut self.buf.height,
-            &mut self.text_annotations,
-            &mut self.shape_annotations,
-        )
+        let current = self.hist.undo_count();
+        if target_index == current {
+            return false;
+        }
+        if target_index < current {
+            for _ in 0..(current - target_index) {
+                if !self.undo() {
+                    break;
+                }
+            }
+        } else {
+            for _ in 0..(target_index - current) {
+                if !self.redo() {
+                    break;
+                }
+            }
+        }
+        true
     }
 
     pub fn delete_history_entry(&mut self, index: usize) -> bool {
@@ -860,7 +1053,8 @@ impl ImageHorseTool {
         match self.hist.undo_stack.get(index) {
             None => Vec::new(),
             Some(snap) => {
-                let tmp = ImageBuffer { width: snap.width, height: snap.height, data: snap.data.clone() };
+                let data = composite_layers(&snap.layers, snap.width, snap.height, None);
+                let tmp = ImageBuffer { width: snap.width, height: snap.height, data };
                 codec::export_png(&tmp)
             }
         }
@@ -874,7 +1068,8 @@ impl ImageHorseTool {
         match self.hist.redo_stack.get(index) {
             None => Vec::new(),
             Some(snap) => {
-                let tmp = ImageBuffer { width: snap.width, height: snap.height, data: snap.data.clone() };
+                let data = composite_layers(&snap.layers, snap.width, snap.height, None);
+                let tmp = ImageBuffer { width: snap.width, height: snap.height, data };
                 codec::export_png(&tmp)
             }
         }
@@ -885,45 +1080,63 @@ impl ImageHorseTool {
     }
 
     /// Append a raw-RGBA snapshot to the undo stack (used when restoring a
-    /// session). Annotations start empty — the JS side adds them one by one
-    /// with `push_annotation_to_undo_snapshot` after this returns.
+    /// session). The snapshot is reconstructed as a single Background layer;
+    /// annotations start empty — the JS side adds them one by one with
+    /// `push_annotation_to_undo_snapshot` after this returns. (Multi-layer
+    /// history is not yet persisted; restored snapshots are single-layer.)
     pub fn inject_undo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
+        let layer = Layer {
+            id: 1,
+            name: "Background".to_string(),
+            visible: true,
+            opacity: 1.0,
+            buf: ImageBuffer { width: w, height: h, data: data.to_vec() },
+            text_annotations: Vec::new(),
+            shape_annotations: Vec::new(),
+        };
         self.hist.undo_stack.push_back(Snapshot {
             label: label.to_string(),
-            data: data.to_vec(),
+            layers: vec![layer],
+            active: 0,
             width: w,
             height: h,
-            annotations: Vec::new(),
-            shapes: Vec::new(),
         });
     }
 
     /// Append a raw-RGBA snapshot to the redo stack (used when restoring a session).
     pub fn inject_redo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
+        let layer = Layer {
+            id: 1,
+            name: "Background".to_string(),
+            visible: true,
+            opacity: 1.0,
+            buf: ImageBuffer { width: w, height: h, data: data.to_vec() },
+            text_annotations: Vec::new(),
+            shape_annotations: Vec::new(),
+        };
         self.hist.redo_stack.push(Snapshot {
             label: label.to_string(),
-            data: data.to_vec(),
+            layers: vec![layer],
+            active: 0,
             width: w,
             height: h,
-            annotations: Vec::new(),
-            shapes: Vec::new(),
         });
     }
 
-    /// Per-snapshot annotation state as JSON. Mirrors `get_text_annotations`
-    /// so JS can read snapshot overlays with the same parser. Used by the
-    /// persistence layer for round-trip saves.
+    /// Per-snapshot annotation state as JSON (active layer's text annotations).
+    /// Mirrors `get_text_annotations` so JS can read snapshot overlays with the
+    /// same parser. Used by the persistence layer for round-trip saves.
     pub fn get_undo_snapshot_annotations(&self, index: usize) -> String {
-        match self.hist.undo_stack.get(index) {
+        match self.hist.undo_stack.get(index).and_then(|s| s.layers.get(s.active)) {
             None => String::from("[]"),
-            Some(snap) => annotations_to_json(&snap.annotations),
+            Some(layer) => annotations_to_json(&layer.text_annotations),
         }
     }
 
     pub fn get_redo_snapshot_annotations(&self, index: usize) -> String {
-        match self.hist.redo_stack.get(index) {
+        match self.hist.redo_stack.get(index).and_then(|s| s.layers.get(s.active)) {
             None => String::from("[]"),
-            Some(snap) => annotations_to_json(&snap.annotations),
+            Some(layer) => annotations_to_json(&layer.text_annotations),
         }
     }
 
@@ -955,7 +1168,13 @@ impl ImageHorseTool {
         );
         match self.hist.undo_stack.get_mut(snap_idx) {
             None => false,
-            Some(snap) => { snap.annotations.push(ann); true }
+            Some(snap) => {
+                let a = snap.active;
+                match snap.layers.get_mut(a) {
+                    Some(layer) => { layer.text_annotations.push(ann); true }
+                    None => false,
+                }
+            }
         }
     }
 
@@ -984,79 +1203,113 @@ impl ImageHorseTool {
         );
         match self.hist.redo_stack.get_mut(snap_idx) {
             None => false,
-            Some(snap) => { snap.annotations.push(ann); true }
+            Some(snap) => {
+                let a = snap.active;
+                match snap.layers.get_mut(a) {
+                    Some(layer) => { layer.text_annotations.push(ann); true }
+                    None => false,
+                }
+            }
         }
     }
 
     // ── Codec ───────────────────────────────────────────────────────────
 
     pub fn export_png(&self) -> Vec<u8> {
-        codec::export_png(&self.buf)
+        let tmp = ImageBuffer {
+            width: self.width,
+            height: self.height,
+            data: self.get_image_data(),
+        };
+        codec::export_png(&tmp)
     }
 
     pub fn thumbnail_width(&self, max_px: u32) -> u32 {
-        codec::thumb_dims(self.buf.width, self.buf.height, max_px).0
+        codec::thumb_dims(self.width, self.height, max_px).0
     }
 
     pub fn thumbnail_height(&self, max_px: u32) -> u32 {
-        codec::thumb_dims(self.buf.width, self.buf.height, max_px).1
+        codec::thumb_dims(self.width, self.height, max_px).1
     }
 
     pub fn thumbnail_data(&self, max_px: u32) -> Vec<u8> {
-        codec::thumbnail_data(&self.buf, max_px).0
+        let tmp = ImageBuffer {
+            width: self.width,
+            height: self.height,
+            data: self.get_image_data(),
+        };
+        codec::thumbnail_data(&tmp, max_px).0
     }
 
     // ── Transforms ──────────────────────────────────────────────────────
 
     pub fn flip_horizontal(&mut self) {
         self.snap("Flip H");
-        let w = self.buf.width as usize;
-        let h = self.buf.height as usize;
-        transform::flip_horizontal(&mut self.buf.data, w, h);
+        let w = self.width as usize;
+        let h = self.height as usize;
+        for layer in &mut self.layers {
+            transform::flip_horizontal(&mut layer.buf.data, w, h);
+        }
         if let Some(sx) = self.stamp.source_x {
-            self.stamp.source_x = Some(self.buf.width as i32 - 1 - sx);
+            self.stamp.source_x = Some(self.width as i32 - 1 - sx);
         }
     }
 
     pub fn flip_vertical(&mut self) {
         self.snap("Flip V");
-        let w = self.buf.width as usize;
-        let h = self.buf.height as usize;
-        transform::flip_vertical(&mut self.buf.data, w, h);
+        let w = self.width as usize;
+        let h = self.height as usize;
+        for layer in &mut self.layers {
+            transform::flip_vertical(&mut layer.buf.data, w, h);
+        }
         if let Some(sy) = self.stamp.source_y {
-            self.stamp.source_y = Some(self.buf.height as i32 - 1 - sy);
+            self.stamp.source_y = Some(self.height as i32 - 1 - sy);
         }
     }
 
     pub fn rotate_90_cw(&mut self) {
         self.snap("Rotate 90° CW");
-        let (new_data, new_w, new_h) =
-            transform::rotate_90_cw(&self.buf.data, self.buf.width as usize, self.buf.height as usize);
-        self.buf.data = new_data;
-        self.buf.width = new_w;
-        self.buf.height = new_h;
+        let (ow, oh) = (self.width as usize, self.height as usize);
+        for layer in &mut self.layers {
+            let (new_data, new_w, new_h) = transform::rotate_90_cw(&layer.buf.data, ow, oh);
+            layer.buf.data = new_data;
+            layer.buf.width = new_w;
+            layer.buf.height = new_h;
+        }
+        std::mem::swap(&mut self.width, &mut self.height);
         self.stamp.source_x = None;
         self.stamp.source_y = None;
     }
 
     pub fn rotate_90_ccw(&mut self) {
         self.snap("Rotate 90° CCW");
-        let (new_data, new_w, new_h) =
-            transform::rotate_90_ccw(&self.buf.data, self.buf.width as usize, self.buf.height as usize);
-        self.buf.data = new_data;
-        self.buf.width = new_w;
-        self.buf.height = new_h;
+        let (ow, oh) = (self.width as usize, self.height as usize);
+        for layer in &mut self.layers {
+            let (new_data, new_w, new_h) = transform::rotate_90_ccw(&layer.buf.data, ow, oh);
+            layer.buf.data = new_data;
+            layer.buf.width = new_w;
+            layer.buf.height = new_h;
+        }
+        std::mem::swap(&mut self.width, &mut self.height);
         self.stamp.source_x = None;
         self.stamp.source_y = None;
     }
 
     pub fn crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
         self.snap("Crop");
-        let (new_data, new_w, new_h) =
-            transform::crop(&self.buf.data, self.buf.width, self.buf.height, x, y, w, h);
-        self.buf.data = new_data;
-        self.buf.width = new_w;
-        self.buf.height = new_h;
+        let (ow, oh) = (self.width, self.height);
+        let mut nw = self.width;
+        let mut nh = self.height;
+        for layer in &mut self.layers {
+            let (new_data, cw, ch) = transform::crop(&layer.buf.data, ow, oh, x, y, w, h);
+            layer.buf.data = new_data;
+            layer.buf.width = cw;
+            layer.buf.height = ch;
+            nw = cw;
+            nh = ch;
+        }
+        self.width = nw;
+        self.height = nh;
         self.stamp.source_x = None;
         self.stamp.source_y = None;
     }
@@ -1067,16 +1320,16 @@ impl ImageHorseTool {
     pub fn preview_crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
         self.snap("Crop Preview");
         transform::apply_crop_overlay(
-            &mut self.buf.data,
-            self.buf.width,
-            self.buf.height,
+            &mut self.layers[self.active].buf.data,
+            self.width,
+            self.height,
             x, y, w, h,
             0.5,
         );
         transform::draw_crop_border(
-            &mut self.buf.data,
-            self.buf.width,
-            self.buf.height,
+            &mut self.layers[self.active].buf.data,
+            self.width,
+            self.height,
             x, y, w, h,
             [255, 255, 255, 200],
             5,
@@ -1091,22 +1344,13 @@ impl ImageHorseTool {
 
     /// Apply crop after preview: undo preview first, then crop for real.
     pub fn apply_crop_from_preview(&mut self, x: u32, y: u32, w: u32, h: u32) {
-        let anns = std::mem::take(&mut self.text_annotations);
-        let shapes = std::mem::take(&mut self.shape_annotations);
-        if let Some((data, bw, bh, restored_anns, restored_shapes)) =
-            self.hist.undo(&self.buf.data, self.buf.width, self.buf.height, anns, shapes)
-        {
-            self.buf.data = data;
-            self.buf.width = bw;
-            self.buf.height = bh;
-            self.text_annotations = restored_anns;
-            self.shape_annotations = restored_shapes;
-        }
+        // Drop the preview snapshot/overlay, then crop the real pixels.
+        self.undo();
         self.crop(x, y, w, h);
     }
 
     pub fn copy_region(&self, x: i32, y: i32, w: u32, h: u32) -> Vec<u8> {
-        transform::copy_region(&self.buf.data, self.buf.width as i32, self.buf.height as i32, x, y, w, h)
+        transform::copy_region(&self.layers[self.active].buf.data, self.width as i32, self.height as i32, x, y, w, h)
     }
 
     pub fn paste_region(
@@ -1119,9 +1363,9 @@ impl ImageHorseTool {
     ) {
         self.snap("Paste");
         transform::paste_region(
-            &mut self.buf.data,
-            self.buf.width as i32,
-            self.buf.height as i32,
+            &mut self.layers[self.active].buf.data,
+            self.width as i32,
+            self.height as i32,
             pixels,
             src_w,
             src_h,
@@ -1144,39 +1388,20 @@ impl ImageHorseTool {
             return;
         }
         self.snap("Resize");
-        let resized = match filter {
-            0 => transform::resize_nearest(
-                &self.buf.data,
-                self.buf.width,
-                self.buf.height,
-                new_w,
-                new_h,
-            ),
-            2 => transform::resize_catmull_rom(
-                &self.buf.data,
-                self.buf.width,
-                self.buf.height,
-                new_w,
-                new_h,
-            ),
-            3 => transform::resize_lanczos3(
-                &self.buf.data,
-                self.buf.width,
-                self.buf.height,
-                new_w,
-                new_h,
-            ),
-            _ => transform::resize_bilinear(
-                &self.buf.data,
-                self.buf.width,
-                self.buf.height,
-                new_w,
-                new_h,
-            ),
-        };
-        self.buf.data = resized;
-        self.buf.width = new_w;
-        self.buf.height = new_h;
+        let (ow, oh) = (self.width, self.height);
+        for layer in &mut self.layers {
+            let resized = match filter {
+                0 => transform::resize_nearest(&layer.buf.data, ow, oh, new_w, new_h),
+                2 => transform::resize_catmull_rom(&layer.buf.data, ow, oh, new_w, new_h),
+                3 => transform::resize_lanczos3(&layer.buf.data, ow, oh, new_w, new_h),
+                _ => transform::resize_bilinear(&layer.buf.data, ow, oh, new_w, new_h),
+            };
+            layer.buf.data = resized;
+            layer.buf.width = new_w;
+            layer.buf.height = new_h;
+        }
+        self.width = new_w;
+        self.height = new_h;
         self.stamp.source_x = None;
         self.stamp.source_y = None;
     }
@@ -1194,12 +1419,12 @@ impl ImageHorseTool {
 
     pub fn adjust_brightness(&mut self, delta: f64) {
         self.snap("Brightness");
-        filters::adjust_brightness(&mut self.buf.data, delta);
+        filters::adjust_brightness(&mut self.layers[self.active].buf.data, delta);
     }
 
     pub fn adjust_contrast(&mut self, factor: f64) {
         self.snap("Contrast");
-        filters::adjust_contrast(&mut self.buf.data, factor);
+        filters::adjust_contrast(&mut self.layers[self.active].buf.data, factor);
     }
 
     // ── Gaussian Blur (WASM) ──────────────────────────────────────
@@ -1226,9 +1451,9 @@ impl ImageHorseTool {
         }
         let kernel = &self.blur_kernel_cache.as_ref().unwrap().1;
         filters::gaussian_blur_region(
-            &mut self.buf.data,
-            self.buf.width,
-            self.buf.height,
+            &mut self.layers[self.active].buf.data,
+            self.width,
+            self.height,
             cx,
             cy,
             brush_radius,
@@ -1267,8 +1492,8 @@ impl ImageHorseTool {
     ) {
         let color = drawing::parse_hex_color(color_hex);
         drawing::draw_arrow(
-            &mut self.buf.data,
-            self.buf.width, self.buf.height,
+            &mut self.layers[self.active].buf.data,
+            self.width, self.height,
             from_x, from_y, to_x, to_y,
             color, stroke_width, style,
         );
@@ -1288,8 +1513,8 @@ impl ImageHorseTool {
     ) {
         let color = drawing::parse_hex_color(color_hex);
         drawing::draw_shape(
-            &mut self.buf.data,
-            self.buf.width, self.buf.height,
+            &mut self.layers[self.active].buf.data,
+            self.width, self.height,
             from_x, from_y, to_x, to_y,
             shape, color, stroke_width,
         );
@@ -1301,7 +1526,7 @@ impl ImageHorseTool {
     // and deleted via the Reselect list until flattened at export.
 
     pub fn shape_annotation_count(&self) -> usize {
-        self.shape_annotations.len()
+        self.layers[self.active].shape_annotations.len()
     }
 
     /// Add a new shape/arrow annotation. `kind`: 0=rect,1=circle,2=line,
@@ -1320,7 +1545,7 @@ impl ImageHorseTool {
         let c = drawing::parse_hex_color(color_hex);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.shape_annotations.push(ShapeAnnotation {
+        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
             id,
             kind,
             x0, y0, x1, y1,
@@ -1348,7 +1573,7 @@ impl ImageHorseTool {
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.shape_annotations.push(ShapeAnnotation {
+        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
             id, kind, x0, y0, x1, y1, r, g, b, stroke_width, arrow_style,
             number: 0, points: Vec::new(),
         });
@@ -1367,7 +1592,7 @@ impl ImageHorseTool {
         let c = drawing::parse_hex_color(color_hex);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.shape_annotations.push(ShapeAnnotation {
+        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
             id, kind: 5, x0, y0, x1, y1,
             r: c[0], g: c[1], b: c[2],
             stroke_width: 0.0, arrow_style: 0,
@@ -1384,7 +1609,7 @@ impl ImageHorseTool {
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.shape_annotations.push(ShapeAnnotation {
+        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
             id, kind: 5, x0, y0, x1, y1, r, g, b,
             stroke_width: 0.0, arrow_style: 0,
             number, points: Vec::new(),
@@ -1407,7 +1632,7 @@ impl ImageHorseTool {
         let (x0, y0, x1, y1) = points_bbox(&pts);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.shape_annotations.push(ShapeAnnotation {
+        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
             id, kind: 6, x0, y0, x1, y1,
             r: c[0], g: c[1], b: c[2],
             stroke_width, arrow_style: 0,
@@ -1427,7 +1652,7 @@ impl ImageHorseTool {
         let (x0, y0, x1, y1) = points_bbox(&pts);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.shape_annotations.push(ShapeAnnotation {
+        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
             id, kind: 6, x0, y0, x1, y1, r, g, b,
             stroke_width, arrow_style: 0,
             number: 0, points: pts,
@@ -1448,12 +1673,12 @@ impl ImageHorseTool {
         stroke_width: f64,
         arrow_style: u8,
     ) -> bool {
-        if !self.shape_annotations.iter().any(|s| s.id == id) {
+        if !self.layers[self.active].shape_annotations.iter().any(|s| s.id == id) {
             return false;
         }
         self.snap("Edit Shape");
         let c = drawing::parse_hex_color(color_hex);
-        if let Some(s) = self.shape_annotations.iter_mut().find(|s| s.id == id) {
+        if let Some(s) = self.layers[self.active].shape_annotations.iter_mut().find(|s| s.id == id) {
             s.kind = kind;
             s.x0 = x0; s.y0 = y0; s.x1 = x1; s.y1 = y1;
             s.r = c[0]; s.g = c[1]; s.b = c[2];
@@ -1466,11 +1691,11 @@ impl ImageHorseTool {
     /// Remove a shape annotation. Pushes a "Delete Shape" snapshot so undo
     /// restores it. Returns true if found.
     pub fn remove_shape_annotation(&mut self, id: u32) -> bool {
-        if !self.shape_annotations.iter().any(|s| s.id == id) {
+        if !self.layers[self.active].shape_annotations.iter().any(|s| s.id == id) {
             return false;
         }
         self.snap("Delete Shape");
-        self.shape_annotations.retain(|s| s.id != id);
+        self.layers[self.active].shape_annotations.retain(|s| s.id != id);
         if self.editing_shape_id == Some(id) {
             self.editing_shape_id = None;
         }
@@ -1486,14 +1711,14 @@ impl ImageHorseTool {
     /// JSON dump of all shape annotations (metadata only). Used by the JS
     /// overlay for hit-testing and by the Reselect list.
     pub fn get_shape_annotations(&self) -> String {
-        shapes_to_json(&self.shape_annotations)
+        shapes_to_json(&self.layers[self.active].shape_annotations)
     }
 
     /// Hit-test shape annotations against a canvas-space point. Iterates
     /// newest-first (last-added wins). Returns the id, or -1. Lines/arrows use
     /// distance-to-segment; closed shapes use a padded bounding box.
     pub fn shape_annotation_at(&self, x: f64, y: f64) -> i32 {
-        for s in self.shape_annotations.iter().rev() {
+        for s in self.layers[self.active].shape_annotations.iter().rev() {
             let pad = (s.stroke_width * 0.5).max(6.0);
             let hit = if s.kind == 2 || s.kind == 4 {
                 // line / arrow → distance to the segment
@@ -1533,9 +1758,9 @@ impl ImageHorseTool {
     ) {
         self.snap("Emoji");
         transform::paste_region(
-            &mut self.buf.data,
-            self.buf.width as i32,
-            self.buf.height as i32,
+            &mut self.layers[self.active].buf.data,
+            self.width as i32,
+            self.height as i32,
             pixels,
             src_w,
             src_h,
@@ -1565,9 +1790,9 @@ impl ImageHorseTool {
         let cx = dest_x - (new_w as i32 / 2);
         let cy = dest_y - (new_h as i32 / 2);
         transform::paste_region(
-            &mut self.buf.data,
-            self.buf.width as i32,
-            self.buf.height as i32,
+            &mut self.layers[self.active].buf.data,
+            self.width as i32,
+            self.height as i32,
             &scaled,
             new_w,
             new_h,
@@ -1600,9 +1825,9 @@ impl ImageHorseTool {
 
         if angle_deg.abs() < 0.5 {
             transform::paste_region(
-                &mut self.buf.data,
-                self.buf.width as i32,
-                self.buf.height as i32,
+                &mut self.layers[self.active].buf.data,
+                self.width as i32,
+                self.height as i32,
                 &rendered.pixels,
                 rendered.width,
                 rendered.height,
@@ -1618,9 +1843,9 @@ impl ImageHorseTool {
             let paste_x = cx - rotated.width as i32 / 2;
             let paste_y = cy - rotated.height as i32 / 2;
             transform::paste_region(
-                &mut self.buf.data,
-                self.buf.width as i32,
-                self.buf.height as i32,
+                &mut self.layers[self.active].buf.data,
+                self.width as i32,
+                self.height as i32,
                 &rotated.pixels,
                 rotated.width,
                 rotated.height,
@@ -1657,9 +1882,9 @@ impl ImageHorseTool {
         let scaled = transform::resize_bilinear(&rendered.pixels, rendered.width, rendered.height, new_w, new_h);
         self.snap("Red Stamp");
         transform::paste_region(
-            &mut self.buf.data,
-            self.buf.width as i32,
-            self.buf.height as i32,
+            &mut self.layers[self.active].buf.data,
+            self.width as i32,
+            self.height as i32,
             &scaled,
             new_w,
             new_h,
@@ -1679,9 +1904,9 @@ impl ImageHorseTool {
         cx: f64, cy: f64, radius: f64,
         r: u8, g: u8, b: u8, opacity: f64,
     ) {
-        let w = self.buf.width as i32;
-        let h = self.buf.height as i32;
-        let data = &mut self.buf.data;
+        let w = self.width as i32;
+        let h = self.height as i32;
+        let data = &mut self.layers[self.active].buf.data;
         let brush_alpha = opacity.clamp(0.0, 1.0) as f32;
         let r_f32 = radius as f32;
         let r_sq = r_f32 * r_f32;
@@ -1755,13 +1980,13 @@ impl ImageHorseTool {
 
     /// Returns [r, g, b, a] for the pixel at (x, y), clamped to image bounds.
     pub fn get_pixel(&self, x: i32, y: i32) -> Vec<u8> {
-        let w = self.buf.width as i32;
-        let h = self.buf.height as i32;
+        let w = self.width as i32;
+        let h = self.height as i32;
         if w == 0 || h == 0 || x < 0 || y < 0 || x >= w || y >= h {
             return vec![0, 0, 0, 255];
         }
-        let idx = (y as usize * self.buf.width as usize + x as usize) * 4;
-        self.buf.data[idx..idx + 4].to_vec()
+        let idx = (y as usize * self.width as usize + x as usize) * 4;
+        self.layers[self.active].buf.data[idx..idx + 4].to_vec()
     }
 
     /// Returns a flat RGBA grid of (2*radius+1)² pixels centred on (cx, cy).
@@ -1769,8 +1994,8 @@ impl ImageHorseTool {
     pub fn get_pixel_region(&self, cx: i32, cy: i32, radius: i32) -> Vec<u8> {
         let side = 2 * radius + 1;
         let mut out = Vec::with_capacity((side * side * 4) as usize);
-        let w = self.buf.width as i32;
-        let h = self.buf.height as i32;
+        let w = self.width as i32;
+        let h = self.height as i32;
         for row in 0..side {
             for col in 0..side {
                 let px = cx - radius + col;
@@ -1778,8 +2003,8 @@ impl ImageHorseTool {
                 if w == 0 || h == 0 || px < 0 || py < 0 || px >= w || py >= h {
                     out.extend_from_slice(&[0, 0, 0, 255]);
                 } else {
-                    let idx = (py as usize * self.buf.width as usize + px as usize) * 4;
-                    out.extend_from_slice(&self.buf.data[idx..idx + 4]);
+                    let idx = (py as usize * self.width as usize + px as usize) * 4;
+                    out.extend_from_slice(&self.layers[self.active].buf.data[idx..idx + 4]);
                 }
             }
         }
@@ -1794,7 +2019,7 @@ impl ImageHorseTool {
     /// Number of live (uncommitted) text annotations. Cheap getter so JS
     /// can decide whether to do the overlay-aware flush.
     pub fn text_annotation_count(&self) -> usize {
-        self.text_annotations.len()
+        self.layers[self.active].text_annotations.len()
     }
 
     /// Add a new text annotation. Pre-renders the rotated tile, stores it,
@@ -1823,7 +2048,7 @@ impl ImageHorseTool {
             background_kind, bg_r, bg_g, bg_b, bg_a,
             bg_padding, bg_corner_radius, bg_tail,
         );
-        self.text_annotations.push(ann);
+        self.layers[self.active].text_annotations.push(ann);
         id
     }
 
@@ -1845,7 +2070,7 @@ impl ImageHorseTool {
         bg_corner_radius: u32,
         bg_tail: u32,
     ) -> bool {
-        let Some(idx) = self.text_annotations.iter().position(|a| a.id == id) else {
+        let Some(idx) = self.layers[self.active].text_annotations.iter().position(|a| a.id == id) else {
             return false;
         };
         self.snap("Edit Text");
@@ -1856,7 +2081,7 @@ impl ImageHorseTool {
                 bg_r, bg_g, bg_b, bg_a,
                 bg_padding, bg_corner_radius, bg_tail,
             );
-        let a = &mut self.text_annotations[idx];
+        let a = &mut self.layers[self.active].text_annotations[idx];
         a.text = text.to_string();
         a.font_size = font_size;
         a.r = r; a.g = g; a.b = b;
@@ -1879,11 +2104,11 @@ impl ImageHorseTool {
     /// Remove an annotation. Returns true if found. Pushes a "Delete Text"
     /// history snapshot so undo restores the removed annotation.
     pub fn remove_text_annotation(&mut self, id: u32) -> bool {
-        if !self.text_annotations.iter().any(|a| a.id == id) {
+        if !self.layers[self.active].text_annotations.iter().any(|a| a.id == id) {
             return false;
         }
         self.snap("Delete Text");
-        self.text_annotations.retain(|a| a.id != id);
+        self.layers[self.active].text_annotations.retain(|a| a.id != id);
         true
     }
 
@@ -1891,14 +2116,14 @@ impl ImageHorseTool {
     /// Rust). Used by the JS overlay for hit-testing bounds and by
     /// editPersistence for round-tripping across photo switches.
     pub fn get_text_annotations(&self) -> String {
-        annotations_to_json(&self.text_annotations)
+        annotations_to_json(&self.layers[self.active].text_annotations)
     }
 
     /// Hit-test annotations against a canvas-space point. Iterates
     /// newest-first (last-added wins on overlap). Returns the id, or -1.
     /// (Sentinel -1 is used because wasm-bindgen Option support is uneven.)
     pub fn text_annotation_at(&self, x: i32, y: i32) -> i32 {
-        for a in self.text_annotations.iter().rev() {
+        for a in self.layers[self.active].text_annotations.iter().rev() {
             let tx = a.x + a.tile_offset_x;
             let ty = a.y + a.tile_offset_y;
             if x >= tx && y >= ty
@@ -1916,58 +2141,249 @@ impl ImageHorseTool {
     /// (if any) is skipped so the JS overlay preview is the only thing drawn
     /// for it. Used by the display canvas blit so on-screen matches export.
     pub fn render_with_annotations(&self) -> Vec<u8> {
-        if self.text_annotations.is_empty() && self.shape_annotations.is_empty() {
-            return self.buf.data.clone();
-        }
-        let mut out = self.buf.data.clone();
-        let w = self.buf.width as i32;
-        let h = self.buf.height as i32;
-        // Shapes underneath.
-        for s in &self.shape_annotations {
-            if self.editing_shape_id == Some(s.id) { continue; }
-            render_shape_into(&mut out, self.buf.width, self.buf.height, s);
-        }
-        // Text on top.
-        for a in &self.text_annotations {
-            transform::paste_region(
-                &mut out,
-                w, h,
-                a.tile_pixels.as_ref(),
-                a.tile_w, a.tile_h,
-                a.x + a.tile_offset_x,
-                a.y + a.tile_offset_y,
-            );
-        }
-        out
+        self.get_image_data()
     }
 
-    /// Burn all overlays (shapes + text) into the main buffer with a single
-    /// history snapshot, then clear both overlay lists. Used at export time
-    /// and when the user explicitly wants to flatten.
+    /// Burn the active layer's overlays (shapes + text) into its pixel buffer
+    /// with a single history snapshot, then clear that layer's overlay lists.
     pub fn flatten_text_annotations(&mut self) {
-        if self.text_annotations.is_empty() && self.shape_annotations.is_empty() {
+        let active = self.active;
+        if self.layers[active].text_annotations.is_empty()
+            && self.layers[active].shape_annotations.is_empty()
+        {
             return;
         }
         self.snap("Flatten");
-        let w = self.buf.width as i32;
-        let h = self.buf.height as i32;
+        let w = self.width;
+        let h = self.height;
+        let layer = &mut self.layers[active];
         // Shapes first (underneath the text), then text tiles on top.
-        let shapes = std::mem::take(&mut self.shape_annotations);
+        let shapes = std::mem::take(&mut layer.shape_annotations);
         for s in &shapes {
-            render_shape_into(&mut self.buf.data, self.buf.width, self.buf.height, s);
+            render_shape_into(&mut layer.buf.data, w, h, s);
         }
-        // Drain so we move tile pixels rather than cloning per annotation.
-        let anns = std::mem::take(&mut self.text_annotations);
+        let anns = std::mem::take(&mut layer.text_annotations);
         for a in &anns {
             transform::paste_region(
-                &mut self.buf.data,
-                w, h,
+                &mut layer.buf.data,
+                w as i32,
+                h as i32,
                 a.tile_pixels.as_ref(),
-                a.tile_w, a.tile_h,
+                a.tile_w,
+                a.tile_h,
                 a.x + a.tile_offset_x,
                 a.y + a.tile_offset_y,
             );
         }
+        self.editing_shape_id = None;
+    }
+
+    // ── Layers ───────────────────────────────────────────────────────────
+
+    pub fn layer_count(&self) -> usize {
+        self.layers.len()
+    }
+
+    /// JSON array of the layer stack, bottom → top:
+    /// `[{id,name,visible,opacity,active}]`.
+    pub fn get_layers(&self) -> String {
+        let mut out = String::from("[");
+        for (i, l) in self.layers.iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            out.push_str(&format!(
+                "{{\"id\":{},\"name\":\"{}\",\"visible\":{},\"opacity\":{},\"active\":{}}}",
+                l.id,
+                json_escape(&l.name),
+                l.visible,
+                l.opacity,
+                i == self.active,
+            ));
+        }
+        out.push(']');
+        out
+    }
+
+    /// Add a new transparent layer directly above the active layer; it becomes
+    /// the active layer. Returns its id. Pushes "Add Layer".
+    pub fn add_layer(&mut self, name: &str) -> u32 {
+        self.snap("Add Layer");
+        let id = self.next_layer_id;
+        self.next_layer_id = self.next_layer_id.wrapping_add(1).max(1);
+        let display = if name.is_empty() {
+            format!("Layer {}", id)
+        } else {
+            name.to_string()
+        };
+        let layer = Layer::new(id, display, self.width, self.height);
+        let insert_at = self.active + 1;
+        self.layers.insert(insert_at, layer);
+        self.active = insert_at;
+        id
+    }
+
+    /// Duplicate the layer with `id` (pixels + annotations), inserting the copy
+    /// directly above it and making it active. Returns the new id (0 if not found).
+    pub fn duplicate_layer(&mut self, id: u32) -> u32 {
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return 0;
+        };
+        self.snap("Duplicate Layer");
+        let new_id = self.next_layer_id;
+        self.next_layer_id = self.next_layer_id.wrapping_add(1).max(1);
+        let mut copy = self.layers[idx].clone();
+        copy.id = new_id;
+        copy.name = format!("{} copy", self.layers[idx].name);
+        self.layers.insert(idx + 1, copy);
+        self.active = idx + 1;
+        new_id
+    }
+
+    /// Remove the layer with `id`. Refuses to remove the last remaining layer.
+    /// Pushes "Delete Layer". Returns true if removed.
+    pub fn remove_layer(&mut self, id: u32) -> bool {
+        if self.layers.len() <= 1 {
+            return false;
+        }
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        self.snap("Delete Layer");
+        self.layers.remove(idx);
+        if self.active >= self.layers.len() {
+            self.active = self.layers.len() - 1;
+        } else if self.active > idx {
+            self.active -= 1;
+        }
+        true
+    }
+
+    /// Make the layer with `id` active. Returns true if found.
+    pub fn set_active_layer(&mut self, id: u32) -> bool {
+        if let Some(idx) = self.layers.iter().position(|l| l.id == id) {
+            self.active = idx;
+            self.editing_shape_id = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Id of the active layer (0 if the stack is somehow empty).
+    pub fn active_layer_id(&self) -> u32 {
+        self.layers.get(self.active).map(|l| l.id).unwrap_or(0)
+    }
+
+    pub fn set_layer_visible(&mut self, id: u32, visible: bool) -> bool {
+        if let Some(l) = self.layers.iter_mut().find(|l| l.id == id) {
+            l.visible = visible;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn set_layer_opacity(&mut self, id: u32, opacity: f64) -> bool {
+        if let Some(l) = self.layers.iter_mut().find(|l| l.id == id) {
+            l.opacity = opacity.clamp(0.0, 1.0);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn rename_layer(&mut self, id: u32, name: &str) -> bool {
+        if let Some(l) = self.layers.iter_mut().find(|l| l.id == id) {
+            l.name = name.to_string();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Move the layer with `id` to a new stack index (clamped). Bottom → top,
+    /// so index 0 is the bottom of the stack. Pushes "Reorder Layer".
+    pub fn move_layer(&mut self, id: u32, new_index: usize) -> bool {
+        let Some(from) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        let to = new_index.min(self.layers.len() - 1);
+        if from == to {
+            return false;
+        }
+        self.snap("Reorder Layer");
+        let layer = self.layers.remove(from);
+        self.layers.insert(to, layer);
+        // Keep the moved layer active so the UI selection follows it.
+        self.active = to;
+        true
+    }
+
+    /// Merge the layer with `id` down onto the layer directly below it (the
+    /// lower layer keeps its id; the merged layer's rendered pixels are blended
+    /// in with its opacity). Pushes "Merge Down". Returns true if merged.
+    pub fn merge_down(&mut self, id: u32) -> bool {
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        if idx == 0 {
+            return false; // nothing below to merge into
+        }
+        self.snap("Merge Down");
+        let w = self.width;
+        let h = self.height;
+        // Render the upper layer (with its overlays) and blend over the lower
+        // layer's flattened pixels.
+        let upper = render_layer(&self.layers[idx], w, h, None);
+        let upper_opacity = self.layers[idx].opacity;
+        {
+            let lower = &mut self.layers[idx - 1];
+            // Flatten the lower layer's own overlays first so the result is a
+            // single pixel buffer.
+            let lower_shapes = std::mem::take(&mut lower.shape_annotations);
+            for s in &lower_shapes {
+                render_shape_into(&mut lower.buf.data, w, h, s);
+            }
+            let lower_text = std::mem::take(&mut lower.text_annotations);
+            for a in &lower_text {
+                transform::paste_region(
+                    &mut lower.buf.data,
+                    w as i32,
+                    h as i32,
+                    a.tile_pixels.as_ref(),
+                    a.tile_w,
+                    a.tile_h,
+                    a.x + a.tile_offset_x,
+                    a.y + a.tile_offset_y,
+                );
+            }
+            blend_over(&mut lower.buf.data, &upper, upper_opacity);
+        }
+        self.layers.remove(idx);
+        if self.active >= idx {
+            self.active = self.active.saturating_sub(1);
+        }
+        self.editing_shape_id = None;
+        true
+    }
+
+    /// Flatten the entire stack into a single Background layer holding the
+    /// composited pixels. Pushes "Flatten Image".
+    pub fn flatten_all(&mut self) {
+        if self.layers.len() == 1
+            && self.layers[0].text_annotations.is_empty()
+            && self.layers[0].shape_annotations.is_empty()
+        {
+            return;
+        }
+        self.snap("Flatten Image");
+        let data = composite_layers(&self.layers, self.width, self.height, None);
+        let id = self.layers[0].id;
+        let mut base = Layer::new(id, "Background".to_string(), self.width, self.height);
+        base.buf.data = data;
+        self.layers = vec![base];
+        self.active = 0;
         self.editing_shape_id = None;
     }
 }
@@ -2290,4 +2706,148 @@ pub fn compute_aspect_crop(
     let x = (image_w - cw_u) / 2;
     let y = (image_h - ch_u) / 2;
     vec![x, y, cw_u, ch_u]
+}
+#[cfg(test)]
+mod layer_tests {
+    use super::*;
+
+    /// A solid WxH RGBA image filled with one colour.
+    fn solid(w: u32, h: u32, rgba: [u8; 4]) -> Vec<u8> {
+        let mut v = Vec::with_capacity((w * h * 4) as usize);
+        for _ in 0..(w * h) {
+            v.extend_from_slice(&rgba);
+        }
+        v
+    }
+
+    fn px(tool: &ImageHorseTool, x: u32, y: u32) -> [u8; 4] {
+        let data = tool.get_image_data();
+        let i = ((y * tool.width + x) * 4) as usize;
+        [data[i], data[i + 1], data[i + 2], data[i + 3]]
+    }
+
+    #[test]
+    fn starts_with_one_background_layer() {
+        let t = ImageHorseTool::new(4, 4);
+        assert_eq!(t.layer_count(), 1);
+        assert_eq!(t.active, 0);
+    }
+
+    #[test]
+    fn add_layer_inserts_above_and_activates() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [255, 0, 0, 255]));
+        let id = t.add_layer("Layer 2");
+        assert_eq!(t.layer_count(), 2);
+        assert_eq!(t.active_layer_id(), id);
+        assert_eq!(t.active, 1);
+        // New layer is transparent → composite still shows the red background.
+        assert_eq!(px(&t, 0, 0), [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn upper_opaque_layer_covers_lower() {
+        let mut t = ImageHorseTool::new(2, 2);
+        t.load_image(&solid(2, 2, [255, 0, 0, 255]));
+        t.add_layer("top");
+        // Paint the top (active) layer solid blue.
+        let top = t.active;
+        t.layers[top].buf.data = solid(2, 2, [0, 0, 255, 255]);
+        assert_eq!(px(&t, 0, 0), [0, 0, 255, 255]);
+    }
+
+    #[test]
+    fn visibility_toggle_hides_layer() {
+        let mut t = ImageHorseTool::new(2, 2);
+        t.load_image(&solid(2, 2, [255, 0, 0, 255]));
+        let top = t.add_layer("top");
+        let ti = t.active;
+        t.layers[ti].buf.data = solid(2, 2, [0, 0, 255, 255]);
+        assert_eq!(px(&t, 0, 0), [0, 0, 255, 255]);
+        t.set_layer_visible(top, false);
+        assert_eq!(px(&t, 0, 0), [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn opacity_blends_50_percent() {
+        let mut t = ImageHorseTool::new(2, 2);
+        t.load_image(&solid(2, 2, [0, 0, 0, 255]));
+        let top = t.add_layer("top");
+        let ti = t.active;
+        t.layers[ti].buf.data = solid(2, 2, [255, 255, 255, 255]);
+        t.set_layer_opacity(top, 0.5);
+        let p = px(&t, 0, 0);
+        // ~50% white over black ≈ 128 on each channel.
+        assert!((p[0] as i32 - 128).abs() <= 2, "got {:?}", p);
+        assert_eq!(p[3], 255);
+    }
+
+    #[test]
+    fn undo_removes_added_layer() {
+        let mut t = ImageHorseTool::new(2, 2);
+        t.load_image(&solid(2, 2, [9, 9, 9, 255]));
+        assert_eq!(t.layer_count(), 1);
+        t.add_layer("temp");
+        assert_eq!(t.layer_count(), 2);
+        assert!(t.undo());
+        assert_eq!(t.layer_count(), 1);
+        assert!(t.redo());
+        assert_eq!(t.layer_count(), 2);
+    }
+
+    #[test]
+    fn cannot_remove_last_layer() {
+        let mut t = ImageHorseTool::new(2, 2);
+        assert!(!t.remove_layer(t.active_layer_id()));
+        assert_eq!(t.layer_count(), 1);
+    }
+
+    #[test]
+    fn merge_down_combines_layers() {
+        let mut t = ImageHorseTool::new(2, 2);
+        t.load_image(&solid(2, 2, [255, 0, 0, 255]));
+        let top = t.add_layer("top");
+        let ti = t.active;
+        t.layers[ti].buf.data = solid(2, 2, [0, 0, 255, 255]);
+        assert!(t.merge_down(top));
+        assert_eq!(t.layer_count(), 1);
+        assert_eq!(px(&t, 0, 0), [0, 0, 255, 255]);
+    }
+
+    #[test]
+    fn flatten_all_collapses_stack() {
+        let mut t = ImageHorseTool::new(2, 2);
+        t.load_image(&solid(2, 2, [255, 0, 0, 255]));
+        t.add_layer("a");
+        t.add_layer("b");
+        assert_eq!(t.layer_count(), 3);
+        t.flatten_all();
+        assert_eq!(t.layer_count(), 1);
+        assert_eq!(px(&t, 0, 0), [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn move_layer_reorders() {
+        let mut t = ImageHorseTool::new(2, 2);
+        t.load_image(&solid(2, 2, [255, 0, 0, 255])); // bottom red
+        let top = t.add_layer("top");
+        let ti = t.active;
+        t.layers[ti].buf.data = solid(2, 2, [0, 255, 0, 255]); // green on top
+        assert_eq!(px(&t, 0, 0), [0, 255, 0, 255]);
+        // Move green to the bottom → red now on top.
+        t.move_layer(top, 0);
+        assert_eq!(px(&t, 0, 0), [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn paste_region_targets_active_layer() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [0, 0, 0, 255]));
+        t.add_layer("paste-target");
+        // Paste a 2x2 white block at (0,0) into the active (transparent) layer.
+        t.paste_region(&solid(2, 2, [255, 255, 255, 255]), 2, 2, 0, 0);
+        assert_eq!(px(&t, 0, 0), [255, 255, 255, 255]);
+        // Outside the paste, the black background shows through.
+        assert_eq!(px(&t, 3, 3), [0, 0, 0, 255]);
+    }
 }

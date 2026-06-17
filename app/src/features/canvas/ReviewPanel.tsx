@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Eye,
+  EyeOff,
   History,
   Layers,
+  Layers2,
   MousePointerSquareDashed,
   Plus,
-  Trash2,
   Undo2,
   X,
 } from "lucide-react";
@@ -15,7 +20,7 @@ import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { TIERS } from "@/lib/tiers";
 import type { UserMode } from "@/components/StatusBar";
-import type { HistoryEntry } from "@/hooks/useCloneStamp";
+import type { HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
 
 /** One placed object shown in the Reselect list (text or shape annotation). */
 export interface ReselectObject {
@@ -47,6 +52,20 @@ interface Props {
   onDeleteObject: (o: ReselectObject) => void;
   /** Current effective tier — drives the Layers section's allowance. */
   userMode: UserMode;
+  // ── Layers ──
+  /** Layer stack, bottom → top (rendered reversed so the top layer is first). */
+  layers: LayerInfo[];
+  onAddLayer: () => void;
+  onDuplicateLayer: (id: number) => void;
+  onDeleteLayer: (id: number) => void;
+  onSelectLayer: (id: number) => void;
+  onToggleLayerVisible: (id: number, visible: boolean) => void;
+  onSetLayerOpacity: (id: number, opacity: number) => void;
+  onRenameLayer: (id: number, name: string) => void;
+  /** Move a layer to a new stack index (0 = bottom). */
+  onMoveLayer: (id: number, newIndex: number) => void;
+  onMergeDown: (id: number) => void;
+  onFlattenAll: () => void;
 }
 
 const DeleteGlyph = () => (
@@ -72,6 +91,17 @@ export function ReviewPanel({
   onSelectObject,
   onDeleteObject,
   userMode,
+  layers,
+  onAddLayer,
+  onDuplicateLayer,
+  onDeleteLayer,
+  onSelectLayer,
+  onToggleLayerVisible,
+  onSetLayerOpacity,
+  onRenameLayer,
+  onMoveLayer,
+  onMergeDown,
+  onFlattenAll,
 }: Props) {
   // Which body sections are open. The body splits its height evenly among the
   // open sections (1 → full, 2 → halves, 3 → thirds), each with its own header
@@ -84,6 +114,23 @@ export function ReviewPanel({
   const toggle = (k: SectionKey) =>
     setOpen((prev) => ({ ...prev, [k]: !prev[k] }));
   const openCount = TOGGLES.filter((t) => open[t.key]).length;
+
+  // Inline-rename state for the Layers list (null = not renaming).
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+
+  // Per-tier layer allowance. 0 → feature locked (must log in / upgrade).
+  const layerLimit = TIERS[userMode].layersPerImage;
+  const layersUnlocked = layerLimit > 0;
+  const canAddLayer = layersUnlocked && layers.length < layerLimit;
+  // Render top → bottom (the array is bottom → top), the way every editor shows it.
+  const layersTopDown = [...layers].reverse();
+
+  const commitRename = (id: number) => {
+    const name = renameDraft.trim();
+    if (name) onRenameLayer(id, name);
+    setRenamingId(null);
+  };
 
   return (
     <motion.aside
@@ -251,7 +298,7 @@ export function ReviewPanel({
           </section>
         )}
 
-        {/* ── Layers: placeholder (always 0 for now). ─────────────────────── */}
+        {/* ── Layers: Photoshop-style stack (top → bottom). ───────────────── */}
         {open.layers && (
           <section className="review-section">
             <div className="review-section-head">
@@ -262,12 +309,25 @@ export function ReviewPanel({
                 <TinyNumberBox title={`Layers per image: ${TIERS[userMode].layersLabel}`}>
                   {TIERS[userMode].layersShort}
                 </TinyNumberBox>
-                {/* Add / delete layer — disabled until Layers ships. */}
-                <TinyButton disabled title="Add layer (coming soon)">
+                <TinyButton
+                  onClick={onAddLayer}
+                  disabled={!canAddLayer}
+                  title={
+                    !layersUnlocked
+                      ? "Layers require a logged-in or paid account"
+                      : canAddLayer
+                        ? "Add layer"
+                        : `Layer limit reached (${TIERS[userMode].layersLabel})`
+                  }
+                >
                   <Plus className="h-3.5 w-3.5" />
                 </TinyButton>
-                <TinyButton disabled title="Delete layer (coming soon)">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <TinyButton
+                  onClick={onFlattenAll}
+                  disabled={!layersUnlocked || layers.length < 2}
+                  title="Flatten all layers"
+                >
+                  <Layers2 className="h-3.5 w-3.5" />
                 </TinyButton>
                 <TinyButton
                   onClick={() => toggle("layers")}
@@ -277,9 +337,165 @@ export function ReviewPanel({
                 </TinyButton>
               </div>
             </div>
-            <div className="review-coming-soon">
-              <span className="large-badge">Coming soon</span>
-            </div>
+
+            {!layersUnlocked ? (
+              <div className="review-coming-soon">
+                <span className="large-badge">
+                  Log in to unlock layers
+                </span>
+              </div>
+            ) : (
+              <ul className="history-list layers-list">
+                {layersTopDown.map((layer) => {
+                  // Stack index in the bottom→top array (for reorder math).
+                  const idx = layers.findIndex((l) => l.id === layer.id);
+                  const isTop = idx === layers.length - 1;
+                  const isBottom = idx === 0;
+                  return (
+                    <li
+                      key={layer.id}
+                      className={`large-badge-item layer-row ${
+                        layer.active ? "layer-active" : ""
+                      }`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onSelectLayer(layer.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelectLayer(layer.id);
+                        }
+                      }}
+                      title={`Select ${layer.name}`}
+                    >
+                      <button
+                        className="layer-eye"
+                        title={layer.visible ? "Hide layer" : "Show layer"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleLayerVisible(layer.id, !layer.visible);
+                        }}
+                      >
+                        {layer.visible ? (
+                          <Eye className="h-3.5 w-3.5" />
+                        ) : (
+                          <EyeOff className="h-3.5 w-3.5 opacity-40" />
+                        )}
+                      </button>
+
+                      {renamingId === layer.id ? (
+                        <input
+                          className="layer-rename-input"
+                          autoFocus
+                          value={renameDraft}
+                          onChange={(e) => setRenameDraft(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onBlur={() => commitRename(layer.id)}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === "Enter") commitRename(layer.id);
+                            else if (e.key === "Escape") setRenamingId(null);
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className="large-badge layer-name"
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setRenameDraft(layer.name);
+                            setRenamingId(layer.id);
+                          }}
+                          title="Double-click to rename"
+                        >
+                          {layer.name}
+                        </span>
+                      )}
+
+                      <div className="layer-row-actions">
+                        <button
+                          className="history-delete"
+                          title="Move up"
+                          disabled={isTop}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMoveLayer(layer.id, idx + 1);
+                          }}
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          className="history-delete"
+                          title="Move down"
+                          disabled={isBottom}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMoveLayer(layer.id, idx - 1);
+                          }}
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                        <button
+                          className="history-delete"
+                          title="Merge down"
+                          disabled={isBottom}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMergeDown(layer.id);
+                          }}
+                        >
+                          <Layers2 className="h-3 w-3" />
+                        </button>
+                        <button
+                          className="history-delete"
+                          title="Duplicate layer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDuplicateLayer(layer.id);
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                        <button
+                          className="history-delete"
+                          title="Delete layer"
+                          disabled={layers.length <= 1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteLayer(layer.id);
+                          }}
+                        >
+                          <DeleteGlyph />
+                        </button>
+                      </div>
+
+                      {/* Opacity slider for the active layer. */}
+                      {layer.active && (
+                        <div
+                          className="layer-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={Math.round(layer.opacity * 100)}
+                            onChange={(e) =>
+                              onSetLayerOpacity(
+                                layer.id,
+                                Number(e.target.value) / 100,
+                              )
+                            }
+                          />
+                          <span className="layer-opacity-val">
+                            {Math.round(layer.opacity * 100)}%
+                          </span>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         )}
       </div>
