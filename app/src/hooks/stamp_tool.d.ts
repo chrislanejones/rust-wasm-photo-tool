@@ -421,6 +421,41 @@ declare module "stamp_tool" {
     /** Flatten the whole stack into a single Background layer. */
     flatten_all(): void;
 
+    // ── Layer persistence (serialize / restore) ──
+    /** PNG of one layer's raw pixels (no compositing, no overlays). */
+    get_layer_png(index: number): Uint8Array;
+    /** JSON of a specific layer's text annotations. */
+    get_layer_text_annotations(index: number): string;
+    /** JSON of a specific layer's shape annotations. */
+    get_layer_shape_annotations(index: number): string;
+    /** Begin rebuilding the stack from persisted data (empties stack + history). */
+    begin_layer_restore(): void;
+    /** Append a restored layer from raw RGBA; makes it active. Returns its id. */
+    push_restored_layer(
+      pixels: Uint8Array,
+      w: number,
+      h: number,
+      name: string,
+      visible: boolean,
+      opacity: number,
+    ): number;
+    /** Restore a text annotation onto the active layer (no history). */
+    restore_text_annotation(
+      text: string,
+      font_size: number,
+      r: number, g: number, b: number,
+      bold: boolean,
+      x: number, y: number,
+      rotation_deg: number,
+      background_kind: number,
+      bg_r: number, bg_g: number, bg_b: number, bg_a: number,
+      bg_padding: number,
+      bg_corner_radius: number,
+      bg_tail: number,
+    ): number;
+    /** Finish a layer-restore: set active index + recomposite. */
+    finish_layer_restore(active_index: number): void;
+
     // ── Live shape/arrow annotations (non-destructive, re-selectable) ──
     // kind: 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline.
     // arrow_style (arrows only): 0=single, 1=double.

@@ -129,6 +129,49 @@ export function parseShapes(raw: string): PersistedShape[] {
   }
 }
 
+/** One persisted layer: pixels (PNG) + metadata + its own overlays. */
+export interface PersistedLayer {
+  id: number;
+  name: string;
+  visible: boolean;
+  opacity: number; // 0..1
+  /** Layer pixels, PNG-encoded (raw layer buffer, not composited). */
+  png: Uint8Array;
+  annotations: PersistedAnnotation[];
+  shapes: PersistedShape[];
+}
+
+/** Metadata shape of one entry in `get_layers()` JSON. */
+interface LayerMeta {
+  id: number;
+  name: string;
+  visible: boolean;
+  opacity: number;
+  active: boolean;
+}
+
+/**
+ * Read the full layer stack (pixels + per-layer overlays) out of the WASM tool,
+ * bottom → top. Used by both the IDB and Convex save paths.
+ */
+export function collectLayers(t: ImageHorseTool): PersistedLayer[] {
+  let metas: LayerMeta[] = [];
+  try {
+    metas = JSON.parse(t.get_layers()) as LayerMeta[];
+  } catch {
+    return [];
+  }
+  return metas.map((m, i) => ({
+    id: m.id,
+    name: m.name,
+    visible: m.visible,
+    opacity: m.opacity,
+    png: new Uint8Array(t.get_layer_png(i)),
+    annotations: parseSnapshotAnnotations(t.get_layer_text_annotations(i)),
+    shapes: parseShapes(t.get_layer_shape_annotations(i)),
+  }));
+}
+
 export interface SavedEdit {
   canvasW: number;
   canvasH: number;
@@ -144,6 +187,11 @@ export interface SavedEdit {
   /** Live shape/arrow annotations (re-editable overlay layer). Optional for
    *  backwards-compat with older persisted entries. */
   shapes?: PersistedShape[];
+  /** Full layer stack, bottom → top (archive v5+). Absent ≡ legacy single
+   *  layer (rebuilt from canvasPng + annotations/shapes). */
+  layers?: PersistedLayer[];
+  /** Id of the active layer within `layers`. */
+  activeLayerId?: number;
 }
 
 /** Parse the JSON emitted by `get_*_snapshot_annotations`. Drops tile_*
@@ -252,6 +300,10 @@ export async function savePhotoEdit(
   // Live (non-destructive) shape annotations.
   const shapes = parseShapes(t.get_shape_annotations());
 
+  // Full layer stack (pixels + per-layer overlays).
+  const layers = collectLayers(t);
+  const activeLayerId = t.active_layer_id();
+
   await idbSet<SavedEdit>(`edit-${photoId}`, {
     canvasW,
     canvasH,
@@ -260,6 +312,8 @@ export async function savePhotoEdit(
     redoStack,
     annotations,
     shapes,
+    layers,
+    activeLayerId,
   });
 }
 

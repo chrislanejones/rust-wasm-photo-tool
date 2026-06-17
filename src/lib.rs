@@ -2386,6 +2386,134 @@ impl ImageHorseTool {
         self.active = 0;
         self.editing_shape_id = None;
     }
+
+    // ── Layer persistence (serialize / restore) ──────────────────────────
+    // These let the JS persistence layer round-trip the full layer stack
+    // (pixels + per-layer overlays) across reloads. Serialization reads each
+    // layer individually (not the active one); restore rebuilds the stack
+    // without polluting history.
+
+    /// PNG of a single layer's raw pixels (NOT composited, NOT including
+    /// overlays — those serialize separately). Empty vec if index out of range.
+    pub fn get_layer_png(&self, index: usize) -> Vec<u8> {
+        match self.layers.get(index) {
+            None => Vec::new(),
+            Some(l) => codec::export_png(&l.buf),
+        }
+    }
+
+    /// JSON of a specific layer's text annotations (mirrors `get_text_annotations`).
+    pub fn get_layer_text_annotations(&self, index: usize) -> String {
+        match self.layers.get(index) {
+            None => String::from("[]"),
+            Some(l) => annotations_to_json(&l.text_annotations),
+        }
+    }
+
+    /// JSON of a specific layer's shape annotations (mirrors `get_shape_annotations`).
+    pub fn get_layer_shape_annotations(&self, index: usize) -> String {
+        match self.layers.get(index) {
+            None => String::from("[]"),
+            Some(l) => shapes_to_json(&l.shape_annotations),
+        }
+    }
+
+    /// Begin rebuilding the layer stack from persisted data: empties the stack
+    /// and clears history + id counters. Must be followed by one or more
+    /// `push_restored_layer` calls and a `finish_layer_restore`.
+    pub fn begin_layer_restore(&mut self) {
+        self.layers.clear();
+        self.hist.clear();
+        self.editing_shape_id = None;
+        self.next_text_id = 1;
+        self.next_shape_id = 1;
+        self.next_layer_id = 1;
+    }
+
+    /// Append a restored layer (bottom → top order) from raw RGBA `pixels` and
+    /// make it active so subsequent `restore_text_annotation` /
+    /// `restore_shape_annotation` calls attach to it. The first restored layer
+    /// establishes the canvas dimensions. No history. Returns the layer id.
+    pub fn push_restored_layer(
+        &mut self,
+        pixels: &[u8],
+        w: u32,
+        h: u32,
+        name: &str,
+        visible: bool,
+        opacity: f64,
+    ) -> u32 {
+        if self.layers.is_empty() {
+            self.width = w;
+            self.height = h;
+        }
+        let id = self.next_layer_id;
+        self.next_layer_id = self.next_layer_id.wrapping_add(1).max(1);
+        let mut buf = ImageBuffer::new(self.width, self.height);
+        if pixels.len() == buf.data.len() {
+            buf.data.copy_from_slice(pixels);
+        }
+        self.layers.push(Layer {
+            id,
+            name: if name.is_empty() {
+                format!("Layer {}", id)
+            } else {
+                name.to_string()
+            },
+            visible,
+            opacity: opacity.clamp(0.0, 1.0),
+            buf,
+            text_annotations: Vec::new(),
+            shape_annotations: Vec::new(),
+        });
+        self.active = self.layers.len() - 1;
+        id
+    }
+
+    /// Restore a text annotation onto the active (just-pushed) layer WITHOUT
+    /// pushing history. Mirrors `restore_shape_annotation` for text. The tile is
+    /// rebuilt from config; a fresh id is assigned.
+    pub fn restore_text_annotation(
+        &mut self,
+        text: &str,
+        font_size: f32,
+        r: u8, g: u8, b: u8,
+        bold: bool,
+        x: i32,
+        y: i32,
+        rotation_deg: f64,
+        background_kind: u8,
+        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_padding: u32,
+        bg_corner_radius: u32,
+        bg_tail: u32,
+    ) -> u32 {
+        let id = self.next_text_id;
+        self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
+        let ann = build_text_annotation(
+            id, text, font_size, r, g, b, bold, x, y, rotation_deg,
+            background_kind, bg_r, bg_g, bg_b, bg_a,
+            bg_padding, bg_corner_radius, bg_tail,
+        );
+        let active = self.active;
+        if let Some(layer) = self.layers.get_mut(active) {
+            layer.text_annotations.push(ann);
+        }
+        id
+    }
+
+    /// Finish a layer-restore: clamp the active layer to `active_index`,
+    /// guarantee a non-empty stack, and rebuild the composite cache.
+    pub fn finish_layer_restore(&mut self, active_index: usize) {
+        if self.layers.is_empty() {
+            self.layers
+                .push(Layer::new(1, "Background".to_string(), self.width, self.height));
+            self.next_layer_id = 2;
+        }
+        self.active = active_index.min(self.layers.len() - 1);
+        self.editing_shape_id = None;
+        self.recomposite();
+    }
 }
 
 /// Stateless: composite `src` onto a copy of `target` at (dx, dy) with `opacity` (0.0..=1.0).
@@ -2849,5 +2977,70 @@ mod layer_tests {
         assert_eq!(px(&t, 0, 0), [255, 255, 255, 255]);
         // Outside the paste, the black background shows through.
         assert_eq!(px(&t, 3, 3), [0, 0, 0, 255]);
+    }
+}
+
+#[cfg(test)]
+mod layer_persistence_tests {
+    use super::*;
+
+    fn solid(w: u32, h: u32, rgba: [u8; 4]) -> Vec<u8> {
+        let mut v = Vec::with_capacity((w * h * 4) as usize);
+        for _ in 0..(w * h) {
+            v.extend_from_slice(&rgba);
+        }
+        v
+    }
+
+    fn px(tool: &ImageHorseTool, x: u32, y: u32) -> [u8; 4] {
+        let data = tool.get_image_data();
+        let i = ((y * tool.width + x) * 4) as usize;
+        [data[i], data[i + 1], data[i + 2], data[i + 3]]
+    }
+
+    #[test]
+    fn restore_rebuilds_stack_and_active() {
+        let mut t = ImageHorseTool::new(2, 2);
+        t.begin_layer_restore();
+        let id0 = t.push_restored_layer(&solid(2, 2, [10, 20, 30, 255]), 2, 2, "Background", true, 1.0);
+        let id1 = t.push_restored_layer(&solid(2, 2, [0, 0, 0, 0]), 2, 2, "Top", true, 0.5);
+        t.finish_layer_restore(1);
+        assert_eq!(t.layer_count(), 2);
+        assert_eq!(t.active, 1);
+        assert_ne!(id0, id1);
+        // Top layer transparent → bottom colour shows through.
+        assert_eq!(px(&t, 0, 0), [10, 20, 30, 255]);
+        // Per-layer PNG serialization is non-empty.
+        assert!(!t.get_layer_png(0).is_empty());
+        assert!(!t.get_layer_png(1).is_empty());
+    }
+
+    #[test]
+    fn per_layer_annotation_serialization_is_isolated() {
+        let mut t = ImageHorseTool::new(16, 16);
+        t.load_image(&solid(16, 16, [0, 0, 0, 255]));
+        // Shape on the base layer (active = 0).
+        t.add_shape_annotation(0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0);
+        // New empty top layer.
+        t.add_layer("top");
+        let s0 = t.get_layer_shape_annotations(0);
+        let s1 = t.get_layer_shape_annotations(1);
+        assert!(s0.contains("\"kind\":0"), "base layer should carry the shape: {s0}");
+        assert_eq!(s1, "[]", "top layer should have no shapes");
+    }
+
+    #[test]
+    fn restore_text_annotation_attaches_to_active_layer() {
+        let mut t = ImageHorseTool::new(32, 32);
+        t.begin_layer_restore();
+        t.push_restored_layer(&solid(32, 32, [255, 255, 255, 255]), 32, 32, "bg", true, 1.0);
+        t.restore_text_annotation(
+            "hi", 16.0, 0, 0, 0, false, 2, 2, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+        );
+        t.finish_layer_restore(0);
+        let json = t.get_layer_text_annotations(0);
+        assert!(json.contains("\"text\":\"hi\""), "got {json}");
+        // No history pushed by the restore path.
+        assert_eq!(t.undo_count(), 0);
     }
 }

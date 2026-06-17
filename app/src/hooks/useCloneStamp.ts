@@ -270,6 +270,68 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       const tool = new Tool(saved.canvasW, saved.canvasH);
       tool.load_image(new Uint8Array(canvasRgba.buffer as ArrayBuffer)); // clears history
 
+      // Rebuild the full layer stack (archive v5+) BEFORE injecting history —
+      // begin_layer_restore clears history, so it must run first. Each layer's
+      // own text/shape overlays are restored onto it (no history noise).
+      const usedLayers = !!(saved.layers && saved.layers.length > 0);
+      if (usedLayers) {
+        tool.begin_layer_restore();
+        for (const layer of saved.layers!) {
+          const { rgba, w, h } = await decodePngToRgba(layer.png);
+          tool.push_restored_layer(
+            new Uint8Array(rgba.buffer as ArrayBuffer),
+            w,
+            h,
+            layer.name,
+            layer.visible,
+            layer.opacity,
+          );
+          for (const a of layer.annotations ?? []) {
+            tool.restore_text_annotation(
+              a.text,
+              a.font_size,
+              a.r, a.g, a.b,
+              a.bold,
+              a.x, a.y,
+              a.rotation_deg,
+              a.background_kind ?? 0,
+              a.bg_r ?? 255,
+              a.bg_g ?? 255,
+              a.bg_b ?? 255,
+              a.bg_a ?? 255,
+              a.bg_padding ?? 8,
+              a.bg_corner_radius ?? 8,
+              a.bg_tail ?? 0,
+            );
+          }
+          for (const s of layer.shapes ?? []) {
+            if (s.kind === 5) {
+              tool.restore_pin_annotation(
+                s.x0, s.y0, s.x1, s.y1,
+                s.number ?? 0, s.r, s.g, s.b,
+              );
+            } else if (s.kind === 6) {
+              const flat = new Float64Array((s.points ?? []).flat());
+              tool.restore_polyline_annotation(flat, s.r, s.g, s.b, s.stroke_width);
+            } else {
+              tool.restore_shape_annotation(
+                s.kind,
+                s.x0, s.y0, s.x1, s.y1,
+                s.r, s.g, s.b,
+                s.stroke_width,
+                s.arrow_style,
+              );
+            }
+          }
+        }
+        const activeIdx = saved.layers!.findIndex(
+          (l) => l.id === saved.activeLayerId,
+        );
+        tool.finish_layer_restore(
+          activeIdx >= 0 ? activeIdx : saved.layers!.length - 1,
+        );
+      }
+
       // Re-inject undo snapshots (oldest first — preserves original order).
       // Each snapshot's annotations are pushed via per-annotation calls so
       // Rust rebuilds the tile cache (we don't store tile bytes on disk).
@@ -348,7 +410,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       }
 
       // Re-create live text annotations (non-destructive overlay layer).
-      if (saved.annotations && saved.annotations.length > 0) {
+      // Skipped when the layer stack was restored above (overlays already
+      // re-attached per-layer) to avoid duplicating them on the active layer.
+      if (!usedLayers && saved.annotations && saved.annotations.length > 0) {
         for (const a of saved.annotations) {
           tool.add_text_annotation(
             a.text,
@@ -372,7 +436,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       // Re-create live shape annotations (non-destructive overlay layer).
       // restore_shape_annotation does NOT push history (the undo/redo stacks
       // were injected above).
-      if (saved.shapes && saved.shapes.length > 0) {
+      if (!usedLayers && saved.shapes && saved.shapes.length > 0) {
         for (const s of saved.shapes) {
           if (s.kind === 5) {
             tool.restore_pin_annotation(
