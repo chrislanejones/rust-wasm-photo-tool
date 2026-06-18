@@ -90,7 +90,11 @@
   --color-text-muted: var(--text-muted);
   --color-accent-dim: var(--accent-dim);
   --color-accent-glow: var(--accent-glow);
-  --color-accent-foreground: var(--accent-foreground);
+  /* NOTE: --color-accent-foreground is intentionally NOT redefined here. It is
+     set above to --accent-ui-foreground (light) so `hover:text-accent-foreground`
+     stays readable on the dark `bg-accent` (outline/ghost buttons, e.g. the
+     Delete-All Cancel button). A prior duplicate pointed it at the dark
+     --accent-foreground, which made hovered text vanish. */
 
   /* theme-* aliases — used by tool settings panels */
   --color-theme-ring: var(--ring);

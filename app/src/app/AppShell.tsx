@@ -61,7 +61,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { LargeButton } from "@/components/ui/large-button";
 import {
   Undo,
   Redo,
@@ -119,7 +119,7 @@ export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stamp = useCloneStamp(canvasRef);
-  const { savePhotoEdit, loadPhotoEdit, deletePhotoEdit, clearAllEdits } = useEditPersistence();
+  const { savePhotoEdit, loadPhotoEdit, deletePhotoEdit, duplicatePhotoEdit, clearAllEdits } = useEditPersistence();
   const { addRecentText } = useRecentTexts();
 
   const [stampSettings, setStampSettings] = useState<StampSettings>({
@@ -336,9 +336,19 @@ export function AppShell() {
             `decode ${f.name} → ${working.width}×${working.height}`,
             performance.now() - t0,
           );
+          // Build the gallery thumbnail from the already-decoded working pixels
+          // (downscaled in Rust via resize_pixels) instead of decoding the
+          // source file a second time.
+          const mod = await import("stamp_tool");
+          await mod.default();
           const [originalKey, thumbBlob] = await Promise.all([
             putOriginal(f, working.origWidth, working.origHeight),
-            makeThumbnail(f),
+            makeThumbnailFromPixels(
+              working.pixels,
+              working.width,
+              working.height,
+              mod.resize_pixels,
+            ),
           ]);
           const entry: PhotoEntry = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -533,6 +543,64 @@ export function AppShell() {
     });
     clearSelection();
   }, [selectedIds, activePhotoId, loadPhotoFromEntry, deletePhotoEdit, clearSelection]);
+
+  // Duplicate the selected photos. Originals are content-addressed (SHA-256), so
+  // the copies reuse the same originalKey/thumbBlob — zero pixel copy. The
+  // source's persisted edit (Rust-rendered PNG archive) is cloned to the new id
+  // so the duplicate carries any edits. Each copy lands right after its source.
+  const handleDuplicateSelected = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    // Flush the active photo's in-progress edits first so a copy of it is current.
+    if (activePhotoId && selectedIds.has(activePhotoId) && stamp.toolRef.current) {
+      await savePhotoEdit(activePhotoId, stamp.toolRef);
+    }
+    const room = Math.max(0, maxPhotos - photos.length);
+    if (room <= 0) {
+      toast.error(capMessage(effectiveUserMode, maxPhotos));
+      return;
+    }
+    const sources = photos.filter((p) => selectedIds.has(p.id)).slice(0, room);
+    if (sources.length < selectedIds.size) {
+      toast.error(capMessage(effectiveUserMode, maxPhotos));
+    }
+    const dups = sources.map((src) => ({
+      srcId: src.id,
+      entry: {
+        ...src,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: `${src.name} copy`,
+        uploadKey: src.uploadKey ?? src.originalKey,
+      } as PhotoEntry,
+    }));
+    await Promise.all(
+      dups.map(({ srcId, entry }) =>
+        duplicatePhotoEdit(srcId, entry.id).catch(() => {}),
+      ),
+    );
+    setPhotos((prev) => {
+      const out: PhotoEntry[] = [];
+      for (const p of prev) {
+        out.push(p);
+        const dup = dups.find((d) => d.srcId === p.id);
+        if (dup) out.push(dup.entry);
+      }
+      return out;
+    });
+    clearSelection();
+    toast.success(
+      `Duplicated ${dups.length} image${dups.length === 1 ? "" : "s"}`,
+    );
+  }, [
+    selectedIds,
+    photos,
+    maxPhotos,
+    activePhotoId,
+    stamp,
+    savePhotoEdit,
+    duplicatePhotoEdit,
+    effectiveUserMode,
+    clearSelection,
+  ]);
 
   const [showUpload, setShowUpload] = useState(true);
   const [showTopBar, setShowTopBar] = useState(false);
@@ -1528,13 +1596,17 @@ export function AppShell() {
               This will remove all {photos.length} image{photos.length !== 1 ? "s" : ""} and their edit history. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:gap-2">
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <LargeButton className="flex-1">Cancel</LargeButton>
             </DialogClose>
-            <Button variant="destructive" onClick={confirmDeleteAll}>
+            <LargeButton
+              onClick={confirmDeleteAll}
+              className="flex-1 border-destructive/40 bg-destructive/15 text-destructive hover:border-destructive hover:bg-destructive/25 hover:brightness-100"
+            >
+              <Trash2 className="h-4 w-4" />
               Delete all
-            </Button>
+            </LargeButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1904,6 +1976,7 @@ export function AppShell() {
             maxPhotos={maxPhotos}
             onDeleteAll={handleDeleteAll}
             onDeleteSelected={handleDeleteSelected}
+            onDuplicateSelected={handleDuplicateSelected}
             onExportSelected={handleExportSelected}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelectPhoto}

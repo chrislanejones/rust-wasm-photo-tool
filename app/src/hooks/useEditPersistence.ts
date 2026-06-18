@@ -7,6 +7,7 @@ import {
   savePhotoEdit as idbSave,
   loadPhotoEdit as idbLoad,
   deletePhotoEdit as idbDelete,
+  copyPhotoEdit as idbCopy,
   clearAllEdits as idbClear,
   parseSnapshotAnnotations,
   parseShapes,
@@ -382,5 +383,15 @@ export function useEditPersistence() {
     await idbClear();
   }, [isAuthenticated, clearAllConvex]);
 
-  return { savePhotoEdit, loadPhotoEdit, deletePhotoEdit, clearAllEdits };
+  // Copy a source photo's persisted edit onto a duplicate's id (local IDB).
+  // loadPhotoEdit checks IDB first, so the duplicate reloads correctly even for
+  // authenticated users; if it's later edited it gets its own Convex record.
+  const duplicatePhotoEdit = useCallback(
+    async (srcId: string, destId: string) => {
+      await idbCopy(srcId, destId);
+    },
+    [],
+  );
+
+  return { savePhotoEdit, loadPhotoEdit, deletePhotoEdit, duplicatePhotoEdit, clearAllEdits };
 }

@@ -45,6 +45,26 @@ pub fn photo_limit(tier: &str) -> u32 {
     }
 }
 
+/// Build a solid-color RGBA image and return it PNG-encoded.
+///
+/// Backs the upload dialog's "Blank Canvas" action so the blank surface is
+/// produced entirely in Rust — no JS `<canvas>` allocation or `toBlob`
+/// encode/decode round-trip. `r`/`g`/`b`/`a` are all `0..=255`; pass `a = 0`
+/// for a fully transparent drawing surface, `a = 255` for an opaque fill.
+#[wasm_bindgen]
+pub fn blank_png(width: u32, height: u32, r: u8, g: u8, b: u8, a: u8) -> Vec<u8> {
+    let px = (width as usize).saturating_mul(height as usize);
+    let mut data = Vec::with_capacity(px.saturating_mul(4));
+    for _ in 0..px {
+        data.extend_from_slice(&[r, g, b, a]);
+    }
+    codec::export_png(&ImageBuffer {
+        width,
+        height,
+        data,
+    })
+}
+
 /// Web-performance indicators for the Resize &amp; Compress panel.
 ///
 /// Returns `[lighthouse_score, web_performance_gain]`, both in `0..=100`:

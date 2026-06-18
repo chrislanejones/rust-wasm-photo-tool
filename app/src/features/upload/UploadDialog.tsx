@@ -1,12 +1,39 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
-import { Upload, FolderOpen, Clipboard, X, Images, Loader2, SquarePen, ExternalLink } from "lucide-react";
-import { fadeIn, quickSpring } from "@/lib/animations";
+import { Upload, FolderOpen, Clipboard, X, Images, Loader2, SquarePen, ChevronLeft, Link, Github } from "lucide-react";
+import { fadeIn, quickSpring, panelSwap } from "@/lib/animations";
 import { LargeButton } from "@/components/ui/large-button";
 import { TinyButton } from "@/components/ui/tiny-button";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { UserMenu } from "@/components/UserMenu";
+import { parseColor } from "@/lib/colorParser";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
 const horseLogo = "/Image-Horse-Logo.svg";
+
+/** Common screen / photo / print sizes for the Blank Canvas panel (px; print
+ *  sizes assume ~300 DPI). Selecting one fills the width/height fields. */
+const PAGE_PRESETS: { id: string; label: string; w: number; h: number }[] = [
+  { id: "fhd", label: "FHD", w: 1920, h: 1080 },
+  { id: "square", label: "Square", w: 1080, h: 1080 },
+  { id: "story", label: "Story", w: 1080, h: 1920 },
+  { id: "4x6", label: "4×6", w: 1200, h: 1800 },
+  { id: "5x7", label: "5×7", w: 1500, h: 2100 },
+  { id: "8x10", label: "8×10", w: 2400, h: 3000 },
+];
+
+/** Quick background swatches; ColorSwatchGrid's "+" adds any hex (Rust-parsed). */
+const BG_COLORS: readonly string[] = ["#ffffff", "#000000"];
+
+/** Codeberg's mountain mark — lucide ships no brand icon for it, so inline the
+ *  simple-icons path. `.btn-icon svg` sizes it to 14px to match lucide icons. */
+function CodebergIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.14 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 16.553a12 12 0 0 0 5.137-4.213L12.42 6.957a.124.093 0 0 0-.09-.003z" />
+    </svg>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -28,6 +55,13 @@ export function UploadDialog({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [loadingTest, setLoadingTest] = useState(false);
+  // Blank Canvas setup panel (swaps out the upload buttons when active).
+  const [blankMode, setBlankMode] = useState(false);
+  const [blankW, setBlankW] = useState("1500");
+  const [blankH, setBlankH] = useState("1000");
+  const [bgColor, setBgColor] = useState("#ffffff");
+  const [transparent, setTransparent] = useState(false);
+  const [blankPreset, setBlankPreset] = useState("");
   const controls = useAnimation();
 
   const triggerShake = useCallback(async () => {
@@ -80,23 +114,38 @@ export function UploadDialog({
     }
   }, [loadingTest, processFiles, triggerShake]);
 
-  // Create a blank 2000×1000 black image as a fresh drawing surface and feed it
-  // through the normal upload pipeline.
-  const handleBlankCanvas = useCallback(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 2000;
-    canvas.height = 1000;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      processFiles([
-        new File([blob], "blank-canvas.png", { type: "image/png" }),
-      ]);
-    }, "image/png");
-  }, [processFiles]);
+  // Apply a page-size preset to the width/height fields.
+  const applyPreset = useCallback((id: string) => {
+    const p = PAGE_PRESETS.find((x) => x.id === id);
+    if (!p) return;
+    setBlankPreset(id);
+    setBlankW(String(p.w));
+    setBlankH(String(p.h));
+  }, []);
+
+  // Create the blank canvas at the chosen size + background color. The PNG is
+  // generated in Rust (`blank_png`) — no JS canvas or encode/decode round-trip —
+  // and the color is parsed in Rust (`parseColor`). Then it goes through the
+  // normal upload pipeline.
+  const createBlank = useCallback(async () => {
+    const w = Math.max(1, parseInt(blankW, 10) || 0);
+    const h = Math.max(1, parseInt(blankH, 10) || 0);
+    if (!w || !h) return;
+    // Transparent → alpha 0 (rgb irrelevant); otherwise the chosen color, opaque.
+    const a = transparent ? 0 : 255;
+    const parsed = transparent ? null : await parseColor(bgColor);
+    const r = parsed?.r ?? 0;
+    const g = parsed?.g ?? 0;
+    const b = parsed?.b ?? 0;
+    const mod = await import("stamp_tool");
+    await mod.default(); // idempotent: returns the existing wasm if loaded
+    const png = mod.blank_png(w, h, r, g, b, a);
+    processFiles([
+      new File([new Uint8Array(png)], "blank-canvas.png", {
+        type: "image/png",
+      }),
+    ]);
+  }, [blankW, blankH, bgColor, transparent, processFiles]);
 
   const handlePasteClick = useCallback(async () => {
     try {
@@ -119,6 +168,11 @@ export function UploadDialog({
       console.warn("Clipboard read failed — use Ctrl+V:", err);
     }
   }, [processFiles]);
+
+  // Return to the default upload view whenever the dialog is closed.
+  useEffect(() => {
+    if (!open) setBlankMode(false);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -226,13 +280,116 @@ export function UploadDialog({
                   setDragging(true);
                 }}
                 onDragLeave={() => setDragging(false)}
-                className={`border-2 border-dashed rounded-xl p-10 text-center transition-all ${
-                  dragging
-                    ? "border-accent bg-accent/10"
-                    : "border-border bg-bg-elevated/30"
-                }`}
+                // Stable min-height so the modal doesn't resize/recenter (and
+                // jerk) when swapping the upload actions ⇄ Blank Canvas panel.
+                className="rounded-xl min-h-[18rem]"
               >
-                <div className="flex flex-col items-center gap-4">
+                <AnimatePresence mode="wait" initial={false}>
+                {blankMode ? (
+                  <motion.div
+                    key="blank"
+                    variants={panelSwap}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                    className="flex flex-col gap-4"
+                  >
+                    {/* ── Blank Canvas setup (Photoshop-style "New Document") ── */}
+                    <div className="flex items-end gap-2">
+                      <div className="flex flex-1 flex-col gap-0.5">
+                        <span className="text-xs text-text-secondary">width</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={blankW}
+                          onChange={(e) => {
+                            setBlankW(e.target.value);
+                            setBlankPreset("");
+                          }}
+                          className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+                        />
+                      </div>
+                      <span className="pb-2 text-text-muted">×</span>
+                      <div className="flex flex-1 flex-col gap-0.5">
+                        <span className="text-xs text-text-secondary">height</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={blankH}
+                          onChange={(e) => {
+                            setBlankH(e.target.value);
+                            setBlankPreset("");
+                          }}
+                          className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+                        />
+                      </div>
+                    </div>
+
+                    <ToolButtonGroup
+                      label="Page size"
+                      options={PAGE_PRESETS}
+                      value={blankPreset}
+                      onChange={applyPreset}
+                      columns={3}
+                    />
+
+                    <div
+                      className={
+                        transparent ? "pointer-events-none opacity-40" : ""
+                      }
+                    >
+                      <ColorSwatchGrid
+                        colors={BG_COLORS}
+                        value={bgColor}
+                        onChange={setBgColor}
+                        label="Background"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setTransparent((t) => !t)}
+                      aria-pressed={transparent}
+                      className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                        transparent
+                          ? "bg-theme-primary text-theme-primary-foreground border-theme-primary"
+                          : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground border-theme-border"
+                      }`}
+                    >
+                      <span
+                        className="h-3.5 w-3.5 rounded-sm border border-border"
+                        style={{
+                          backgroundImage:
+                            "linear-gradient(45deg, rgba(255,255,255,0.3) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.3) 75%, transparent 75%)",
+                          backgroundSize: "6px 6px",
+                        }}
+                      />
+                      Transparent background
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <LargeButton
+                        onClick={() => setBlankMode(false)}
+                        className="w-full"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Back
+                      </LargeButton>
+                      <LargeButton onClick={createBlank} className="w-full">
+                        <SquarePen className="h-4 w-4" />
+                        Create Canvas
+                      </LargeButton>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="default"
+                    variants={panelSwap}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                    className="flex flex-col items-center gap-4"
+                  >
                   <div className="grid grid-cols-2 gap-3 w-full">
                     <LargeButton
                       ref={firstButtonRef}
@@ -256,11 +413,11 @@ export function UploadDialog({
                       ) : (
                         <Images className="h-4 w-4" />
                       )}
-                      {loadingTest ? `Loading ${TEST_IMAGE_COUNT}…` : "Test Images"}
+                      {loadingTest ? `Loading ${TEST_IMAGE_COUNT}…` : "Sample Images"}
                     </LargeButton>
                     <LargeButton
-                      onClick={handleBlankCanvas}
-                      title="Start with a blank 2000×1000 black canvas"
+                      onClick={() => setBlankMode(true)}
+                      title="Start with a blank canvas"
                       className="w-full"
                     >
                       <SquarePen className="h-4 w-4" />
@@ -268,16 +425,32 @@ export function UploadDialog({
                     </LargeButton>
                   </div>
 
-                  <p className="mt-2 text-xs text-text-muted">
-                    or drag and drop images here
-                  </p>
-                  <div className="w-14 h-14 rounded-full bg-bg-elevated flex items-center justify-center">
-                    <Upload className="h-7 w-7 text-text-muted" />
+                  {/* Dotted drop zone — highlights + nudges when an image is
+                      dragged over the dialog. */}
+                  <div
+                    className={`flex w-full flex-col items-center gap-4 rounded-xl border-2 border-dotted p-6 text-center transition-all duration-200 ${
+                      dragging
+                        ? "border-accent bg-accent/10 scale-[1.02]"
+                        : "border-border bg-bg-elevated/30"
+                    }`}
+                  >
+                    <p className="text-xs text-text-muted">
+                      or drag and drop images here
+                    </p>
+                    <div
+                      className={`w-14 h-14 rounded-full bg-bg-elevated flex items-center justify-center transition-transform ${
+                        dragging ? "scale-110" : ""
+                      }`}
+                    >
+                      <Upload className="h-7 w-7 text-text-muted" />
+                    </div>
+                    <p className="text-[10px] text-text-muted opacity-60">
+                      Supports PNG, JPG, GIF, WebP, AVIF
+                    </p>
                   </div>
-                  <p className="text-[10px] text-text-muted opacity-60">
-                    Supports PNG, JPG, GIF, WebP, AVIF
-                  </p>
-                </div>
+                </motion.div>
+                )}
+                </AnimatePresence>
               </div>
             </div>
 
@@ -294,23 +467,58 @@ export function UploadDialog({
               }}
             />
 
-            <div className="px-6 pb-4">
-              {/* LargeButton renders a <button>, so open the marketing site
-                  via window.open instead of an anchor href. */}
-              <LargeButton
-                onClick={() =>
-                  window.open(
-                    "https://image-horse.vercel.app/",
-                    "_blank",
-                    "noopener",
-                  )
-                }
-                className="w-full"
-              >
-                image-horse.vercel.app
-                <ExternalLink className="h-4 w-4" />
-              </LargeButton>
-            </div>
+            {/* Marketing link — only in the default upload view, not on the
+                Blank Canvas panel (keeps that panel uncluttered). */}
+            {!blankMode && (
+              <div className="flex items-center gap-2 px-6 pb-4">
+                {/* All three share the LargeButton UI. Each renders a <button>,
+                    so open its link via window.open instead of an anchor href.
+                    Widths are 1/2 : 1/4 : 1/4 via flex-grow 2 : 1 : 1. */}
+                <LargeButton
+                  onClick={() =>
+                    window.open(
+                      "https://image-horse.vercel.app/",
+                      "_blank",
+                      "noopener",
+                    )
+                  }
+                  className="flex-[2]"
+                >
+                  <Link className="h-4 w-4" />
+                  Image Horse Website
+                </LargeButton>
+                <LargeButton
+                  aria-label="View source on GitHub"
+                  title="GitHub"
+                  onClick={() =>
+                    window.open(
+                      "https://github.com/chrislanejones/rust-wasm-photo-tool",
+                      "_blank",
+                      "noopener",
+                    )
+                  }
+                  className="flex-1"
+                >
+                  <Github />
+                  GitHub
+                </LargeButton>
+                <LargeButton
+                  aria-label="View source on Codeberg"
+                  title="Codeberg"
+                  onClick={() =>
+                    window.open(
+                      "https://codeberg.org/chrislanejones/rust-wasm-photo-tool",
+                      "_blank",
+                      "noopener",
+                    )
+                  }
+                  className="flex-1"
+                >
+                  <CodebergIcon />
+                  Codeberg
+                </LargeButton>
+              </div>
+            )}
           </motion.div>
           </motion.div>
         </motion.div>

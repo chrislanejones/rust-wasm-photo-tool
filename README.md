@@ -17,7 +17,7 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │  React UI Shell (Framer Motion, Tailwind CSS)            │   │
 │  │                                                          │   │
-│  │  TopBar · ToolsSidebar · GalleryBar · HistoryPanel        │   │
+│  │  TopBar · ToolsSidebar · GalleryBar · ReviewPanel         │   │
 │  │  UploadDialog · StatusBar · ShortcutModal                │   │
 │  └────────────────────┬─────────────────────────────────────┘   │
 │                       │ useCloneStamp / useImageHorse hook      │
@@ -91,7 +91,9 @@ src/
 │                   (serialize) and begin/push_restored_layer/restore_text_annotation/finish (restore).
 │                   set_editing_shape + set_editing_text suppress the in-edit overlay so the JS
 │                   preview isn't doubled. Also: get_pixel(x,y) / get_pixel_region(cx,cy,radius);
-│                   stateless free fns composite_pixels, resize_pixels, encode_png_pixels;
+│                   stateless free fns composite_pixels, resize_pixels, encode_png_pixels,
+│                   blank_png (solid/transparent RGBA fill → PNG, backs the Blank Canvas),
+│                   parse_color, photo_limit;
 │                   resize_with_filter (Lanczos3 / Catmull-Rom / Nearest / bilinear),
 │                   web_perf_metrics (PSI-faithful score), push_compress_marker
 ├── core.rs         ImageBuffer — width, height, data, load, bilinear sampling (now #[derive(Clone)]
@@ -130,8 +132,12 @@ app/src/
 │   ├── AppShell.tsx                  Master orchestrator — state, panels, WASM bridge; layer-panel
 │   │                                 handlers; Ctrl/Cmd+V pastes a clipboard image into the active
 │   │                                 layer (guarded against the upload dialog's paste path)
-│   └── useKeyboardShortcuts.ts       Centralized keyboard handler — defers Space/Enter to a
-│                                     focused button/link/ARIA widget so Tab-then-Space activates it
+│   └── useKeyboardShortcuts.ts       Centralized keyboard handler — panel toggles (Alt+U Upload,
+│                                     Alt+T Tools, Alt+G Gallery, Alt+R Review), transforms (Alt+F/V
+│                                     flip, Alt+S rotate), zoom, export. Enter always activates a
+│                                     focused control; Space only defers to one when it's
+│                                     :focus-visible (keyboard focus) so a mouse-clicked tool button
+│                                     doesn't swallow Space-to-pan
 ├── hooks/
 │   ├── useCloneStamp.ts              React hook wrapping the WASM ImageHorseTool; includes
 │   │                                 loadImage(), loadImageFromPixels() (pre-decoded, 2048-capped),
@@ -165,20 +171,24 @@ app/src/
 │   │                                 (per layer: pixel PNG, name, visibility, opacity, and its own
 │   │                                 text + shape overlays) plus the active layer id; reopening a
 │   │                                 photo rebuilds the stack. v1–v4 archives still decode and
-│   │                                 collapse to a single layer for back-compat
+│   │                                 collapse to a single layer for back-compat. duplicatePhotoEdit
+│   │                                 copies a photo's archive onto a new id (gallery Duplicate)
 │   ├── useUserColors.ts              localStorage-persisted custom palette shared by every
 │   │                                 ColorSwatchGrid; cross-component sync via custom events
 │   └── stamp_tool.d.ts               TypeScript declarations for WASM interface
 ├── components/
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
-│   ├── StatusBar/                    Source status, shortcuts (incl. Ctrl+Shift+Z redo), dimensions, zoom %
+│   ├── StatusBar/                    Source status, rotating shortcut hints, dimensions, zoom %, and a
+│   │                                 blank TinyButton whose 3 clicks unlock the Dev Tools (diagnostics
+│   │                                 log + tier selector) in production builds
 │   ├── TabGroup.tsx                  Reusable tab switcher (Stamp, Effects, Brush, future panels)
 │   ├── MagnifierOverlay.tsx          Floating 11×11 pixel magnifier for color picker eyedropper;
 │   │                                 pixel grid sourced from WASM get_pixel_region, center hex shown
 │   ├── UserMenu.tsx                  Convex/Clerk user menu
 │   ├── ConvexClerkProvider.tsx       Auth provider wrapper
-│   └── ShortcutModal.tsx             Alt+/ keyboard reference overlay — groups laid out two
-│                                     columns per header; lists Alt+Delete (Diagnostics Log)
+│   └── ShortcutModal.tsx             Alt+/ keyboard reference overlay — two columns per header;
+│                                     Tools=Alt+T, Review=Alt+R, Rotate=Alt+S; appends a "Dev Tools"
+│                                     section (Diagnostics Log, user/tier selector) once unlocked
 ├── features/
 │   ├── canvas/
 │   │   ├── CanvasArea.tsx            WASM canvas + brush cursor + SVG overlays — crop selection
@@ -204,7 +214,10 @@ app/src/
 │   │                                 box shows the live layer count; the per-tier limit is in its
 │   │                                 tooltip. Row controls use the xs TinyButton variant
 │   ├── gallery/
-│   │   ├── GalleryBar.tsx            Bottom photo strip with thumbnails
+│   │   ├── GalleryBar.tsx            Bottom photo strip with thumbnails; selection row adds a
+│   │   │                             Duplicate button (content-addressed copy) beside Export /
+│   │   │                             Delete Selected; header count reads "N of N — cap max" /
+│   │   │                             "Selected: n of N" with an (i) tier-limit tooltip from TIERS
 │   │   └── PhotoThumb.tsx            Individual thumbnail component
 │   ├── tools/
 │   │   ├── ToolsSidebar.tsx          Animated left sidebar with tool grid
@@ -231,22 +244,31 @@ app/src/
 │   │                                 up to 8 recent texts (click to re-open canvas box at last
 │   │                                 position, restoring all settings including font)
 │   └── upload/
-│       └── UploadDialog.tsx          Drag-and-drop + paste-from-clipboard upload modal
+│       └── UploadDialog.tsx          Drag-and-drop + paste-from-clipboard upload modal. Actions:
+│                                     Browse / Paste / Sample Images / Blank Canvas, with a dotted
+│                                     drop zone that highlights on drag and a top-left sign-in icon.
+│                                     Blank Canvas swaps in a New Document panel (size fields, page-size
+│                                     presets, White/Black/hex/Transparent bg) → Rust blank_png;
+│                                     swap animated via the panelSwap variant
 └── lib/
     ├── types.ts                      Shared type definitions
-    ├── animations.ts                 Framer Motion spring variants
+    ├── animations.ts                 Framer Motion variants — springs, slides, fadeIn, and panelSwap
+    │                                 (the upload-actions ⇄ Blank Canvas cross-fade)
     ├── defaultToolSettings.ts        Default tool settings
     ├── colors.ts                     Color utility helpers
     ├── editPersistence.ts            Per-photo edit persistence via IndexedDB — saves full canvas
     │                                 state + undo/redo history (PNG-encoded) plus the layer stack
     │                                 (collectLayers reads pixels + per-layer overlays out of WASM;
-    │                                 SavedEdit gained layers[] + activeLayerId)
+    │                                 SavedEdit gained layers[] + activeLayerId); copyPhotoEdit clones
+    │                                 a photo's archive to a new id (gallery Duplicate)
     ├── originalsStore.ts             Content-addressed IndexedDB store for original photo bytes;
     │                                 keyed by SHA-256 hex via crypto.subtle; putOriginal /
     │                                 getOriginal / getOriginalAsBlobUrl / deleteOriginal
-    ├── workingCopy.ts                makeWorkingCopy() — decodes + downscales to ≤2048px long
-    │                                 edge via createImageBitmap (high-quality); makeThumbnail()
-    │                                 produces 256px WebP blobs for the gallery strip
+    ├── workingCopy.ts                makeWorkingCopy() — decodes + downscales to ≤2048px long edge
+    │                                 via createImageBitmap; makeThumbnailFromPixels() builds the
+    │                                 256px WebP thumb from those already-decoded pixels (Rust
+    │                                 resize_pixels) so uploads decode once, not twice. makeThumbnail()
+    │                                 (file → thumb) stays for the compress / batch paths
     └── utils.ts                      cn() utility
 ```
 
@@ -256,10 +278,11 @@ app/src/
 | --------------------- | ----------------------------------- |
 | `1` – `0`             | Switch tools (Resize→…→Clone→Emoji) |
 | `Alt + U`             | Toggle Upload                       |
-| `Alt + S`             | Toggle Tools                        |
+| `Alt + T`             | Toggle Tools                        |
 | `Alt + G`             | Toggle Gallery                      |
-| `Alt + H`             | Toggle Review panel                 |
-| `Alt + Delete`        | Toggle Diagnostics Log              |
+| `Alt + R`             | Toggle Review panel                 |
+| `Alt + Delete`        | Toggle Diagnostics Log (Dev Tools)  |
+| `Alt + L`             | User / tier selector (Dev Tools)    |
 | `Alt + /`             | Toggle Shortcut Modal               |
 | `Ctrl + Z`            | Undo                                |
 | `Ctrl + Shift + Z`    | Redo                                |
@@ -269,7 +292,7 @@ app/src/
 | `Alt + D`             | Delete All Images                   |
 | `Alt + F`             | Flip Horizontal                     |
 | `Alt + V`             | Flip Vertical                       |
-| `Alt + R`             | Rotate 90° CW                       |
+| `Alt + S`             | Rotate 90° CW                       |
 | `Alt + [`             | Decrease Brush Size                 |
 | `Alt + ]`             | Increase Brush Size                 |
 | `Alt + Click`         | Set Clone Source                    |
@@ -298,7 +321,8 @@ app/src/
 - **Text** — Click-to-place text with configurable font family (12 browser-safe options), size, weight, and color; up to 8 recent texts that re-open the canvas text box at the last used position, restoring all text settings
 - **Emoji Stamp** — Browser renders emoji to `OffscreenCanvas`, pixels sent to WASM `stamp_pixels()` for alpha compositing; emoji picker lives in the Stamp tool's Emojis tab
 - **Export** — Lossless PNG via Rust encoder, JPEG/WebP/AVIF via browser
-- **Thumbnails** — 256px WebP thumbnails generated from the original file via `createImageBitmap` on upload; working canvas stays at ≤2048px
+- **Blank Canvas** — start a new document from the upload dialog: dimensions + a page-size preset (FHD / Square / Story / 4×6 / 5×7 / 8×10) and a White / Black / hex / **Transparent** background; the fill is generated in Rust (`blank_png` → `codec::export_png`) with no canvas round-trip
+- **Thumbnails** — 256px WebP thumbnails built from the already-decoded working pixels via Rust `resize_pixels` (uploads decode once, not twice); working canvas stays at ≤2048px
 - **Copy/Paste Regions** — Cross-photo pixel compositing with alpha blending; paste from clipboard supported
 - **History** — 50-step undo/redo with labeled snapshots (including dimensions for crop/resize/rotate correctness), jump-to, delete entry
 - **Per-photo Edit Persistence** — Switching photos saves the full WASM canvas + undo/redo stack to IndexedDB (PNG-encoded per snapshot). Switching back restores the exact edit session — same canvas state, same undo history, all redo steps intact
@@ -310,14 +334,15 @@ app/src/
 - **Tab Switchers** — Stamp (Clone / Stamps / Emojis), Shapes (Shapes / Arrows), Paint (Paint / Blur Brush), Effects (Levels / Color Picker) via shared `TabGroup` component
 - **Spacebar Pan** — Hold Space for grab-to-pan; all tool handlers bypassed during pan
 - **A/B Compare Slider** — Squoosh-style draggable divider; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned
-- **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch; PgUp/PgDn cycling; originals preserved in IndexedDB at full resolution regardless of working-copy downscale
+- **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch/**duplicate** (content-addressed, zero-copy; carries edits); PgUp/PgDn cycling; multi-select with Export / Delete / Duplicate / Unselect; header count + per-tier limit `(i)` tooltip; originals preserved in IndexedDB at full resolution regardless of working-copy downscale
 - **Review Panel** — Right-side panel (Alt+H) with a header toggle group that opens up to three stacked sections sharing the body height (1 full / 2 halves / 3 thirds, each scrollable):
   - **History** — clickable undo/redo timeline with an inline Undo button and a live step count
   - **Reselect** — every committed text and shape annotation as a row; click to re-select it on the canvas, hover the ✕ to delete
   - **Layers** — **Coming soon** (count pinned to 0; add/delete buttons present but disabled)
 - **Upload** — Drag-and-drop modal with file browser and paste-from-clipboard (Ctrl+V / paste button)
 - **Export Dropdown** — PNG, JPEG, WebP, AVIF format selector in the top bar
-- **Keyboard Shortcut Modal** — Alt+Shift+? opens a full reference overlay grouped by category
+- **Keyboard Shortcut Modal** — Alt+/ opens a full reference overlay grouped by category (two columns per group)
+- **Hidden Dev Tools** — three clicks on a blank status-bar button unlock the Diagnostics Log (Alt+Delete) and the user/tier selector (Alt+L) in production, and append a Dev Tools section to the Alt+/ modal
 - **AI Panel** — Placeholder cards for: Remove Background (rembg), 4× Upscale (Real-ESRGAN), Object Removal (SD Inpaint), Auto Alt Text (BLIP), Smart Crop, Auto-Enhance — wired to Convex `ai_jobs` + Replicate when ready
 - **Dark Theme** — JetBrains Mono + DM Sans, dark palette with accent highlights
 
@@ -594,6 +619,22 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 10 | **Text edit double-box fix** — selecting/reselecting a text annotation no longer shows a doubled copy of the baked tile under the textarea overlay. New `editing_text_id` + `set_editing_text` suppress the in-edit annotation from the composite (mirroring `editing_shape_id`); wired through `useTextTool` on edit-open / commit / Escape-cancel / stale-drop | Complete |
 | 11 | **Text rotation fix** — two bugs: (a) the overlay rotated around the JS box center while Rust baked around the text center → the editing box now rotates around the Rust tile's pivot (measured via `measure_text`; uniform BG padding keeps the padded-tile center coincident with the text center); (b) `build_annotation_tile` negated the angle into `rotate_pixels`, which is actually clockwise in screen coords like the CSS preview — so a +90° rotate baked as −90°. Removed the negation. Committed text now matches the preview in direction and position | Complete |
 | 12 | **Shortcut modal** — the `Alt+/` reference now lays each section out in **two columns** under its header (modal widened 520→760px) and lists **Alt+Delete → Toggle Diagnostics Log** | Complete |
+
+## v3.6 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **Blank Canvas → Rust "New Document" panel** — clicking **Blank Canvas** in the upload dialog swaps the action buttons for a Photoshop-style setup panel (animated in via a new `panelSwap` variant under `<AnimatePresence mode="wait">`, with a stable modal `min-h` so the swap doesn't jerk): width/height fields (default 1500×1000), page-size presets (FHD / Square / Story / 4×6 / 5×7 / 8×10) through the shared `ToolButtonGroup`, and a background chooser — White / Black / any hex via `ColorSwatchGrid`, plus a **Transparent** toggle. The image is generated entirely in Rust: new `#[wasm_bindgen] blank_png(w, h, r, g, b, a)` fills a solid (or transparent, `a = 0`) RGBA buffer and PNG-encodes it via `codec::export_png` — no JS `<canvas>`/`toBlob` round-trip — and the color is parsed in Rust (`parse_color`) | Complete |
+| 2 | **Gallery: Duplicate selected** — when photos are selected, a **Duplicate** button (Copy icon) joins Export / Delete Selected. Originals are content-addressed (SHA-256), so the copies reuse the same `originalKey`/`thumbBlob` (zero pixel copy) and each lands right after its source. The source's persisted edit archive is cloned to the new photo id via new `copyPhotoEdit` (`editPersistence.ts`), exposed as `duplicatePhotoEdit` from `useEditPersistence`, so duplicates carry their edits; respects the tier cap | Complete |
+| 3 | **Shortcut remap** — **Tools → `Alt+T`** (was `Alt+S`), **Review panel → `Alt+R`** (was `Alt+H`), **Rotate 90° CW → `Alt+S`** (was `Alt+R`). The `Alt+/` modal and the TopBar hover tooltips were updated to match | Complete |
+| 4 | **Spacebar-pan fix (v3.5 keyboard-activation regression)** — clicking a tool button left it DOM-focused, and the new activation guard then swallowed Space (re-firing the tool) instead of panning. The guard now defers Space to a focused control only when it's `:focus-visible` (keyboard/Tab focus); a mouse click focuses a button but not focus-visible, so Space falls through to pan. Enter still always activates | Complete |
+| 5 | **Hidden Dev Tools unlock** — a blank, unlabeled `TinyButton` tucked into the status bar; three clicks unlock the **Diagnostics Log** (`Alt+Delete`) and the **user/tier selector** (`Alt+L`) in production builds (previously dev-only) and reveal a **Dev Tools** section at the bottom of the `Alt+/` modal. Gated via `devToolsEnabled = import.meta.env.DEV \|\| devToolsUnlocked` | Complete |
+| 6 | **Perf: one decode per upload** — `handleAddPhotos` built the gallery thumbnail with a second full-res `createImageBitmap(file)`. It now derives the thumbnail from the already-decoded working-copy pixels via `makeThumbnailFromPixels` + Rust `resize_pixels`, so every upload decodes once instead of twice and the downscale runs in Rust | Complete |
+| 7 | **Delete All dialog + theme fix** — the confirm dialog's buttons now use the app's `LargeButton` (dark elevated; destructive action red-tinted) instead of the shadcn primary. Root-caused the invisible-on-hover Cancel text: `--color-accent-foreground` was defined twice in `styles.css` and the later (dark `#3a3128`) value won, so `hover:text-accent-foreground` painted dark-on-dark on the dark `bg-accent`. Removed the duplicate — fixes every outline/ghost button hover | Complete |
+| 8 | **Gallery count + tier tooltip** — the header count reads `3 of 3 — 12 max` (idle) and `Selected: 2 of 3` (selecting) instead of the cluttered `1 of 2 / 12`. An `(i)` next to the cap shows the per-tier session limits (Logged out 12 · Logged in 24 · Paid 100), read live from `TIERS` | Complete |
+| 9 | **Sonner compress toast — full width** — the Auto-Compress progress toast's content shrank to ~70% because sonner's `[data-content]/[data-title]` wrappers size to content in `unstyled` mode. Added `content: flex-1 min-w-0` + `title: w-full` to the Toaster classNames so the node fills the toast; the bar bleeds edge-to-edge (`-mx-4` over the toast padding) and the count sits true space-between | Complete |
+| 10 | **Upload dialog redesign** — actions reordered (Browse / Paste, then Sample Images / Blank Canvas); the disabled "Log In" tile replaced by Blank Canvas and the sign-in icon moved to the top-left corner (mirroring the close ✕, via `UserMenu`); the drag hint, upload circle, and supported-formats line wrapped in a **dotted drop zone** that highlights + nudges on drag. **"Test Images" → "Sample Images."** The default view's bottom footer now holds three links — **Website / GitHub / Codeberg** (the latter two as `LargeButton`s, with an inline `CodebergIcon`) — hidden on the Blank Canvas panel | Complete |
+| 11 | **TopBar centering + Review header** — the four panel toggles are now truly centered on the bar via `grid-cols-[1fr_auto_1fr]` (the old `flex-1 justify-center` centered them only within leftover space, pushing them right). The Review panel header was restyled to match the Toolbar/Gallery headers (a `History` icon + the shared `text-xs font-semibold` heading) | Complete |
 
 ## License
 

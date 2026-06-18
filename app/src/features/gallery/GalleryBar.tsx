@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
-import { X, Image, Check, Zap, ChevronLeft, ChevronRight, Trash2, Download, SquareX } from "lucide-react";
+import { X, Image, Check, Zap, ChevronLeft, ChevronRight, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LargeButton } from "@/components/ui/large-button";
 import { TinyButton } from "@/components/ui/tiny-button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { formatBytes } from "@/lib/format";
+import { TIERS } from "@/lib/tiers";
 
 export interface PhotoEntry {
   id: string;
@@ -47,6 +48,8 @@ interface Props {
   onDeleteSelected?: () => void;
   /** Export the currently-selected photos as a ZIP. */
   onExportSelected?: () => void;
+  /** Duplicate the currently-selected photos. */
+  onDuplicateSelected?: () => void;
   /** Currently-selected photo ids (lifted to the parent). */
   selectedIds: Set<string>;
   /** Toggle a photo's selection. */
@@ -246,6 +249,7 @@ export function GalleryBar({
   onDeleteAll,
   onDeleteSelected,
   onExportSelected,
+  onDuplicateSelected,
   selectedIds,
   onToggleSelect,
   onClearSelection,
@@ -311,17 +315,64 @@ export function GalleryBar({
               <Image className="h-3.5 w-3.5" />
               Gallery
               <span className="flex items-center gap-1 text-xs font-normal text-text-muted">
-                {selectionActive && (
+                {selectionActive ? (
+                  // While selecting: "Selected: <selected> of <total>".
                   <>
+                    <span>Selected:</span>
                     <TinyNumberBox>{selectedIds.size}</TinyNumberBox>
                     <span>of</span>
+                    <TinyNumberBox>{photos.length}</TinyNumberBox>
                   </>
-                )}
-                <TinyNumberBox>{photos.length}</TinyNumberBox>
-                {maxPhotos != null && (
+                ) : (
+                  // Otherwise: "<total> of <total> — <cap> max  (i)" — mirrors
+                  // the "Selected: # of #" shape for visual consistency.
                   <>
-                    <span>/</span>
-                    <TinyNumberBox>{maxPhotos}</TinyNumberBox>
+                    <TinyNumberBox>{photos.length}</TinyNumberBox>
+                    <span>of</span>
+                    <TinyNumberBox>{photos.length}</TinyNumberBox>
+                    {maxPhotos != null && (
+                      <>
+                        <span>—</span>
+                        <TinyNumberBox>{maxPhotos}</TinyNumberBox>
+                        <span>max</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="Why this limit?"
+                              className="text-text-muted hover:text-text-primary transition-colors"
+                            >
+                              <Info className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            <p className="font-medium mb-1.5">
+                              Gallery photos per session
+                            </p>
+                            <ul className="space-y-1 text-xs">
+                              <li className="flex items-center justify-between gap-6">
+                                <span>Logged out</span>
+                                <span className="font-mono tabular-nums">
+                                  {TIERS.demo.galleryLimit}
+                                </span>
+                              </li>
+                              <li className="flex items-center justify-between gap-6">
+                                <span>Logged in</span>
+                                <span className="font-mono tabular-nums">
+                                  {TIERS.loggedIn.galleryLimit}
+                                </span>
+                              </li>
+                              <li className="flex items-center justify-between gap-6">
+                                <span>Paid · {TIERS.paid.tag}</span>
+                                <span className="font-mono tabular-nums">
+                                  {TIERS.paid.galleryLimit}
+                                </span>
+                              </li>
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      </>
+                    )}
                   </>
                 )}
               </span>
@@ -335,6 +386,16 @@ export function GalleryBar({
                 >
                   <Download className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Export Selected</span>
+                </LargeButton>
+              )}
+              {selectionActive && onDuplicateSelected && (
+                <LargeButton
+                  onClick={onDuplicateSelected}
+                  title="Duplicate selected images"
+                  className="px-2.5 py-1.5 text-xs"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Duplicate</span>
                 </LargeButton>
               )}
               {selectionActive && onDeleteSelected && (

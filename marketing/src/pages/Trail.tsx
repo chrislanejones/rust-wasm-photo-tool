@@ -26,6 +26,25 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.14",
+    date: "2026-06-18",
+    headline: "Blank Canvas, gallery duplicate, hidden dev tools, faster uploads",
+    entries: [
+      { tag: "feature", text: "Blank Canvas — start from scratch with a Photoshop-style New Document panel that slides in over the upload actions. Set width × height (default 1500 × 1000), pick a page-size preset (FHD, Square, Story, 4×6, 5×7, 8×10), and choose a background: white, black, any hex color, or fully transparent." },
+      { tag: "rust",    text: "The blank canvas is generated entirely in Rust — a new blank_png fill-and-encode path produces the solid (or transparent) PNG with no browser <canvas> or toBlob round-trip, and the background color is parsed in Rust too." },
+      { tag: "feature", text: "Duplicate photos — select one or more in the gallery and hit Duplicate; each copy lands right after its original and carries over its edits. Because originals are content-addressed, duplicating copies zero pixels." },
+      { tag: "perf",    text: "Uploads now decode once instead of twice — the gallery thumbnail is built from the already-decoded working image (downscaled in Rust) rather than decoding the source file a second time." },
+      { tag: "feature", text: "Hidden Dev Tools — three clicks on a tiny unlabeled spot in the status bar unlock the diagnostics log and the tier/user selector (and list them in the shortcuts sheet), now reachable in production builds, not just dev." },
+      { tag: "ui",      text: "Shortcuts reshuffled — Tools is now Alt+T, the Review panel is Alt+R, and Rotate 90° is Alt+S. The Alt+/ reference and the top-bar tooltips were updated to match." },
+      { tag: "fix",     text: "Spacebar pan works again after clicking a tool — last release's keyboard-activation change let a mouse-focused button swallow Space; it now only defers Space to keyboard-focused (Tab) controls, so hold-Space-to-pan is back." },
+      { tag: "ui",      text: "Gallery counter reads cleaner — \"3 of 3 — 12 max\" normally and \"Selected: 2 of 3\" while selecting, with an (i) that explains the per-tier photo limits (logged out 12, logged in 24, paid 100)." },
+      { tag: "fix",     text: "Delete All dialog — the buttons now match the rest of the app, and the Cancel button's text no longer disappears on hover (a duplicated theme token was painting dark-on-dark for every outline button)." },
+      { tag: "ui",      text: "Upload dialog refresh — actions reordered (Browse / Paste, then Sample Images / Blank Canvas), the sign-in icon moved to the top-left corner, and the drag-and-drop area is now a dotted drop zone that highlights and nudges when you drag an image over it. \"Test Images\" is now \"Sample Images\", and the footer links out to the live site, GitHub, and Codeberg." },
+      { tag: "ui",      text: "The Auto-Compress progress toast finally spans the full width — its text and progress bar now fill the toast edge-to-edge instead of bunching up in the left third." },
+      { tag: "ui",      text: "The four panel toggles in the top bar are now properly centered on the bar, and the Review panel header matches the Toolbar and Gallery headers (icon + same type)." },
+    ],
+  },
+  {
     version: "v0.9.13",
     date: "2026-06-17",
     headline: "Photoshop-style layers — per-layer tools, compositing, clipboard paste",

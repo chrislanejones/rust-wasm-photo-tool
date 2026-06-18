@@ -4,6 +4,17 @@ declare module "stamp_tool" {
   /** Gallery photo cap for an account tier ("demo" | "loggedIn" | "paid"). */
   export function photo_limit(tier: string): number;
 
+  /** Solid-color RGBA image, PNG-encoded (blank canvas). r/g/b/a are 0..=255
+   *  (a = 0 → fully transparent surface). */
+  export function blank_png(
+    width: number,
+    height: number,
+    r: number,
+    g: number,
+    b: number,
+    a: number,
+  ): Uint8Array;
+
   /**
    * Web-performance indicators for the Resize & Compress panel.
    * Returns `[pageSpeedScore, webPerformanceGain]`, both 0..100.

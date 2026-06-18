@@ -1,4 +1,4 @@
-class E {
+class I {
   __destroy_into_raw() {
     const t = this.__wbg_ptr;
     return this.__wbg_ptr = 0, D.unregister(this), t;
@@ -26,9 +26,9 @@ class E {
     const c = p(s, e.__wbindgen_malloc, e.__wbindgen_realloc), h = g;
     return e.imagehorsetool_add_shape_annotation(this.__wbg_ptr, t, _, r, n, i, c, h, a, l) >>> 0;
   }
-  add_text_annotation(t, _, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A) {
+  add_text_annotation(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A) {
     const z = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), j = g;
-    return e.imagehorsetool_add_text_annotation(this.__wbg_ptr, z, j, _, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A) >>> 0;
+    return e.imagehorsetool_add_text_annotation(this.__wbg_ptr, z, j, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A) >>> 0;
   }
   adjust_brightness(t) {
     e.imagehorsetool_adjust_brightness(this.__wbg_ptr, t);
@@ -77,7 +77,7 @@ class E {
   }
   copy_region(t, _, r, n) {
     const i = e.imagehorsetool_copy_region(this.__wbg_ptr, t, _, r, n);
-    var s = d(i[0], i[1]).slice();
+    var s = w(i[0], i[1]).slice();
     return e.__wbindgen_free(i[0], i[1] * 1, 1), s;
   }
   crop(t, _, r, n) {
@@ -108,7 +108,7 @@ class E {
   }
   export_png() {
     const t = e.imagehorsetool_export_png(this.__wbg_ptr);
-    var _ = d(t[0], t[1]).slice();
+    var _ = w(t[0], t[1]).slice();
     return e.__wbindgen_free(t[0], t[1] * 1, 1), _;
   }
   finish_layer_restore(t) {
@@ -131,12 +131,12 @@ class E {
   }
   get_image_data() {
     const t = e.imagehorsetool_get_image_data(this.__wbg_ptr);
-    var _ = d(t[0], t[1]).slice();
+    var _ = w(t[0], t[1]).slice();
     return e.__wbindgen_free(t[0], t[1] * 1, 1), _;
   }
   get_layer_png(t) {
     const _ = e.imagehorsetool_get_layer_png(this.__wbg_ptr, t);
-    var r = d(_[0], _[1]).slice();
+    var r = w(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), r;
   }
   get_layer_shape_annotations(t) {
@@ -168,12 +168,12 @@ class E {
   }
   get_pixel(t, _) {
     const r = e.imagehorsetool_get_pixel(this.__wbg_ptr, t, _);
-    var n = d(r[0], r[1]).slice();
+    var n = w(r[0], r[1]).slice();
     return e.__wbindgen_free(r[0], r[1] * 1, 1), n;
   }
   get_pixel_region(t, _, r) {
     const n = e.imagehorsetool_get_pixel_region(this.__wbg_ptr, t, _, r);
-    var i = d(n[0], n[1]).slice();
+    var i = w(n[0], n[1]).slice();
     return e.__wbindgen_free(n[0], n[1] * 1, 1), i;
   }
   get_redo_snapshot_annotations(t) {
@@ -196,7 +196,7 @@ class E {
   }
   get_redo_snapshot_png(t) {
     const _ = e.imagehorsetool_get_redo_snapshot_png(this.__wbg_ptr, t);
-    var r = d(_[0], _[1]).slice();
+    var r = w(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), r;
   }
   get_shape_annotations() {
@@ -237,7 +237,7 @@ class E {
   }
   get_undo_snapshot_png(t) {
     const _ = e.imagehorsetool_get_undo_snapshot_png(this.__wbg_ptr, t);
-    var r = d(_[0], _[1]).slice();
+    var r = w(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), r;
   }
   get_zoom() {
@@ -281,7 +281,7 @@ class E {
   }
   measure_text(t, _, r) {
     const n = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), i = g, s = e.imagehorsetool_measure_text(this.__wbg_ptr, n, i, _, r);
-    var a = U(s[0], s[1]).slice();
+    var a = O(s[0], s[1]).slice();
     return e.__wbindgen_free(s[0], s[1] * 4, 4), a;
   }
   merge_down(t) {
@@ -310,13 +310,13 @@ class E {
   preview_crop(t, _, r, n) {
     e.imagehorsetool_preview_crop(this.__wbg_ptr, t, _, r, n);
   }
-  push_annotation_to_redo_snapshot(t, _, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A, z) {
-    const j = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), W = g;
-    return e.imagehorsetool_push_annotation_to_redo_snapshot(this.__wbg_ptr, t, j, W, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A, z) !== 0;
+  push_annotation_to_redo_snapshot(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) {
+    const j = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), k = g;
+    return e.imagehorsetool_push_annotation_to_redo_snapshot(this.__wbg_ptr, t, j, k, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) !== 0;
   }
-  push_annotation_to_undo_snapshot(t, _, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A, z) {
-    const j = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), W = g;
-    return e.imagehorsetool_push_annotation_to_undo_snapshot(this.__wbg_ptr, t, j, W, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A, z) !== 0;
+  push_annotation_to_undo_snapshot(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) {
+    const j = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), k = g;
+    return e.imagehorsetool_push_annotation_to_undo_snapshot(this.__wbg_ptr, t, j, k, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) !== 0;
   }
   push_compress_marker() {
     e.imagehorsetool_push_compress_marker(this.__wbg_ptr);
@@ -352,7 +352,7 @@ class E {
   }
   render_with_annotations() {
     const t = e.imagehorsetool_render_with_annotations(this.__wbg_ptr);
-    var _ = d(t[0], t[1]).slice();
+    var _ = w(t[0], t[1]).slice();
     return e.__wbindgen_free(t[0], t[1] * 1, 1), _;
   }
   resize(t, _) {
@@ -371,9 +371,9 @@ class E {
   restore_shape_annotation(t, _, r, n, i, s, a, l, c, h) {
     return e.imagehorsetool_restore_shape_annotation(this.__wbg_ptr, t, _, r, n, i, s, a, l, c, h) >>> 0;
   }
-  restore_text_annotation(t, _, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A) {
+  restore_text_annotation(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A) {
     const z = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), j = g;
-    return e.imagehorsetool_restore_text_annotation(this.__wbg_ptr, z, j, _, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A) >>> 0;
+    return e.imagehorsetool_restore_text_annotation(this.__wbg_ptr, z, j, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A) >>> 0;
   }
   rotate_90_ccw() {
     e.imagehorsetool_rotate_90_ccw(this.__wbg_ptr);
@@ -436,7 +436,7 @@ class E {
   }
   thumbnail_data(t) {
     const _ = e.imagehorsetool_thumbnail_data(this.__wbg_ptr, t);
-    var r = d(_[0], _[1]).slice();
+    var r = w(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), r;
   }
   thumbnail_height(t) {
@@ -458,50 +458,55 @@ class E {
     const h = p(a, e.__wbindgen_malloc, e.__wbindgen_realloc), b = g;
     return e.imagehorsetool_update_shape_annotation(this.__wbg_ptr, t, _, r, n, i, s, h, b, l, c) !== 0;
   }
-  update_text_annotation(t, _, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A, z) {
-    const j = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), W = g;
-    return e.imagehorsetool_update_text_annotation(this.__wbg_ptr, t, j, W, r, n, i, s, a, l, c, h, b, m, w, u, v, x, A, z) !== 0;
+  update_text_annotation(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) {
+    const j = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), k = g;
+    return e.imagehorsetool_update_text_annotation(this.__wbg_ptr, t, j, k, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) !== 0;
   }
   width() {
     return e.imagehorsetool_width(this.__wbg_ptr) >>> 0;
   }
 }
-Symbol.dispose && (E.prototype[Symbol.dispose] = E.prototype.free);
-function V(o, t, _, r, n, i, s, a, l) {
-  const c = y(o, e.__wbindgen_malloc), h = g, b = y(r, e.__wbindgen_malloc), m = g, w = e.composite_pixels(c, h, t, _, b, m, n, i, s, a, l);
-  var u = d(w[0], w[1]).slice();
-  return e.__wbindgen_free(w[0], w[1] * 1, 1), u;
+Symbol.dispose && (I.prototype[Symbol.dispose] = I.prototype.free);
+function Y(o, t, _, r, n, i) {
+  const s = e.blank_png(o, t, _, r, n, i);
+  var a = w(s[0], s[1]).slice();
+  return e.__wbindgen_free(s[0], s[1] * 1, 1), a;
 }
-function X(o, t, _, r) {
+function G(o, t, _, r, n, i, s, a, l) {
+  const c = y(o, e.__wbindgen_malloc), h = g, b = y(r, e.__wbindgen_malloc), m = g, d = e.composite_pixels(c, h, t, _, b, m, n, i, s, a, l);
+  var u = w(d[0], d[1]).slice();
+  return e.__wbindgen_free(d[0], d[1] * 1, 1), u;
+}
+function J(o, t, _, r) {
   const n = e.compute_aspect_crop(o, t, _, r);
-  var i = U(n[0], n[1]).slice();
+  var i = O(n[0], n[1]).slice();
   return e.__wbindgen_free(n[0], n[1] * 4, 4), i;
 }
-function Y(o, t, _, r, n, i, s, a) {
+function K(o, t, _, r, n, i, s, a) {
   const l = e.constrain_crop_to_ratio(o, t, _, r, n, i, s, a);
-  var c = U(l[0], l[1]).slice();
+  var c = O(l[0], l[1]).slice();
   return e.__wbindgen_free(l[0], l[1] * 4, 4), c;
 }
-function K(o, t, _) {
+function Q(o, t, _) {
   const r = y(o, e.__wbindgen_malloc), n = g, i = e.encode_png_pixels(r, n, t, _);
-  var s = d(i[0], i[1]).slice();
+  var s = w(i[0], i[1]).slice();
   return e.__wbindgen_free(i[0], i[1] * 1, 1), s;
 }
-function Q(o) {
+function Z(o) {
   const t = p(o, e.__wbindgen_malloc, e.__wbindgen_realloc), _ = g, r = e.parse_color(t, _);
-  var n = d(r[0], r[1]).slice();
+  var n = w(r[0], r[1]).slice();
   return e.__wbindgen_free(r[0], r[1] * 1, 1), n;
 }
-function Z(o) {
+function $(o) {
   const t = p(o, e.__wbindgen_malloc, e.__wbindgen_realloc), _ = g;
   return e.photo_limit(t, _) >>> 0;
 }
-function $(o, t, _, r, n) {
+function tt(o, t, _, r, n) {
   const i = y(o, e.__wbindgen_malloc), s = g, a = e.resize_pixels(i, s, t, _, r, n);
-  var l = d(a[0], a[1]).slice();
+  var l = w(a[0], a[1]).slice();
   return e.__wbindgen_free(a[0], a[1] * 1, 1), l;
 }
-function tt(o, t, _, r, n, i, s, a, l) {
+function et(o, t, _, r, n, i, s, a, l) {
   const c = e.web_perf_metrics(o, t, _, r, n, i, s, a, l);
   var h = H(c[0], c[1]).slice();
   return e.__wbindgen_free(c[0], c[1] * 8, 8), h;
@@ -520,30 +525,30 @@ const D = typeof FinalizationRegistry > "u" ? { register: () => {
 function H(o, t) {
   return o = o >>> 0, C().subarray(o / 8, o / 8 + t);
 }
-function U(o, t) {
+function O(o, t) {
   return o = o >>> 0, N().subarray(o / 4, o / 4 + t);
 }
-function d(o, t) {
-  return o = o >>> 0, k().subarray(o / 1, o / 1 + t);
+function w(o, t) {
+  return o = o >>> 0, W().subarray(o / 1, o / 1 + t);
 }
 let F = null;
 function C() {
   return (F === null || F.byteLength === 0) && (F = new Float64Array(e.memory.buffer)), F;
 }
 function f(o, t) {
-  return o = o >>> 0, G(o, t);
+  return o = o >>> 0, V(o, t);
 }
 let T = null;
 function N() {
   return (T === null || T.byteLength === 0) && (T = new Uint32Array(e.memory.buffer)), T;
 }
 let M = null;
-function k() {
+function W() {
   return (M === null || M.byteLength === 0) && (M = new Uint8Array(e.memory.buffer)), M;
 }
 function y(o, t) {
   const _ = t(o.length * 1, 1) >>> 0;
-  return k().set(o, _ / 1), g = o.length, _;
+  return W().set(o, _ / 1), g = o.length, _;
 }
 function L(o, t) {
   const _ = t(o.length * 8, 8) >>> 0;
@@ -552,10 +557,10 @@ function L(o, t) {
 function p(o, t, _) {
   if (_ === void 0) {
     const a = R.encode(o), l = t(a.length, 1) >>> 0;
-    return k().subarray(l, l + a.length).set(a), g = a.length, l;
+    return W().subarray(l, l + a.length).set(a), g = a.length, l;
   }
   let r = o.length, n = t(r, 1) >>> 0;
-  const i = k();
+  const i = W();
   let s = 0;
   for (; s < r; s++) {
     const a = o.charCodeAt(s);
@@ -564,7 +569,7 @@ function p(o, t, _) {
   }
   if (s !== r) {
     s !== 0 && (o = o.slice(s)), n = _(n, r, r = s + o.length * 3, 1) >>> 0;
-    const a = k().subarray(n + s, n + r), l = R.encodeInto(o, a);
+    const a = W().subarray(n + s, n + r), l = R.encodeInto(o, a);
     s += l.written, n = _(n, r, s, 1) >>> 0;
   }
   return g = s, n;
@@ -572,9 +577,9 @@ function p(o, t, _) {
 let S = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
 S.decode();
 const P = 2146435072;
-let O = 0;
-function G(o, t) {
-  return O += t, O >= P && (S = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), S.decode(), O = t), S.decode(k().subarray(o, o + t));
+let U = 0;
+function V(o, t) {
+  return U += t, U >= P && (S = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), S.decode(), U = t), S.decode(W().subarray(o, o + t));
 }
 const R = new TextEncoder();
 "encodeInto" in R || (R.encodeInto = function(o, t) {
@@ -585,7 +590,7 @@ let g = 0, e;
 function q(o, t) {
   return e = o.exports, F = null, T = null, M = null, e.__wbindgen_start(), e;
 }
-async function J(o, t) {
+async function X(o, t) {
   if (typeof Response == "function" && o instanceof Response) {
     if (typeof WebAssembly.instantiateStreaming == "function") try {
       return await WebAssembly.instantiateStreaming(o, t);
@@ -609,7 +614,7 @@ async function J(o, t) {
     return false;
   }
 }
-function et(o) {
+function _t(o) {
   if (e !== void 0) return e;
   o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module: o } = o : console.warn("using deprecated parameters for `initSync()`; pass a single object instead"));
   const t = B();
@@ -617,24 +622,25 @@ function et(o) {
   const _ = new WebAssembly.Instance(o, t);
   return q(_);
 }
-async function _t(o) {
+async function rt(o) {
   if (e !== void 0) return e;
-  o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module_or_path: o } = o : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), o === void 0 && (o = new URL("/assets/stamp_tool_bg-DJ9GN7Iy.wasm", import.meta.url));
+  o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module_or_path: o } = o : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), o === void 0 && (o = new URL("/assets/stamp_tool_bg-BhDsNf1U.wasm", import.meta.url));
   const t = B();
   (typeof o == "string" || typeof Request == "function" && o instanceof Request || typeof URL == "function" && o instanceof URL) && (o = fetch(o));
-  const { instance: _, module: r } = await J(await o, t);
+  const { instance: _, module: r } = await X(await o, t);
   return q(_);
 }
 export {
-  E as ImageHorseTool,
-  V as composite_pixels,
-  X as compute_aspect_crop,
-  Y as constrain_crop_to_ratio,
-  _t as default,
-  K as encode_png_pixels,
-  et as initSync,
-  Q as parse_color,
-  Z as photo_limit,
-  $ as resize_pixels,
-  tt as web_perf_metrics
+  I as ImageHorseTool,
+  Y as blank_png,
+  G as composite_pixels,
+  J as compute_aspect_crop,
+  K as constrain_crop_to_ratio,
+  rt as default,
+  Q as encode_png_pixels,
+  _t as initSync,
+  Z as parse_color,
+  $ as photo_limit,
+  tt as resize_pixels,
+  et as web_perf_metrics
 };

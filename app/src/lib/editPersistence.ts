@@ -327,6 +327,15 @@ export async function deletePhotoEdit(photoId: string): Promise<void> {
   await idbDel(`edit-${photoId}`);
 }
 
+/** Copy a photo's persisted edit onto a new photo id (gallery Duplicate). The
+ *  stored archive — canvas + undo/redo snapshots produced by Rust's
+ *  `export_png` — is structure-cloned as-is, so no re-encode is needed. No-op
+ *  when the source has no saved edit (a pristine original). */
+export async function copyPhotoEdit(srcId: string, destId: string): Promise<void> {
+  const edit = await idbGet<SavedEdit>(`edit-${srcId}`);
+  if (edit) await idbSet<SavedEdit>(`edit-${destId}`, edit);
+}
+
 /** Wipe all persisted edits (e.g. Delete All). */
 export async function clearAllEdits(): Promise<void> {
   await idbClear();
