@@ -55,13 +55,26 @@ http.route({
     }
 
     if (payload.status === "succeeded") {
-      // rembg/upscale/inpaint return an image URL (string, or array of URLs).
+      // Text models (OCR / alt text) return the text itself, not an image
+      // URL. Persist it directly so the client surfaces it as textResult.
+      if (job.type === "ocr" || job.type === "alt") {
+        const text = Array.isArray(payload.output)
+          ? payload.output.join("\n")
+          : payload.output;
+        await ctx.runMutation(internal.aiJobs.completeJob, {
+          jobId: job._id,
+          output: text,
+        });
+        return new Response("ok", { status: 200 });
+      }
+
+      // Image models (rembg/upscale/inpaint) return an image URL (string,
+      // or array of URLs).
       const outputUrl = Array.isArray(payload.output)
         ? payload.output[0]
         : payload.output;
 
       if (typeof outputUrl !== "string") {
-        // Non-image output (OCR/alt text) — persist the raw value.
         await ctx.runMutation(internal.aiJobs.completeJob, {
           jobId: job._id,
           output: payload.output,

@@ -20,6 +20,11 @@ const MODELS: Partial<
       "fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003",
     buildInput: (imageUrl) => ({ image: imageUrl }),
   },
+  ocr: {
+    version:
+      "a524caeaa23495bc9edc805ab08ab5fe943afd3febed884a4f3747aa32e9cd61",
+    buildInput: (imageUrl) => ({ image: imageUrl }),
+  },
   // upscale / inpaint / ocr land here as the pattern is cloned (milestone 2+).
 };
 

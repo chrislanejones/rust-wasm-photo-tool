@@ -1,7 +1,8 @@
-// AI tool panel. Background Removal is wired to the Replicate + Convex
-// pipeline (useAIJob); the remaining models are still Coming Soon placeholders
-// until the same plumbing is cloned for them.
-import { Type, Scissors, Sparkles, Eraser, Lock, Loader2 } from "lucide-react";
+// AI tool panel. Background Removal and Text Extract (OCR) are wired to the
+// Replicate + Convex pipeline (useAIJob); the remaining models are still
+// Coming Soon placeholders until the same plumbing is cloned for them.
+import { useState } from "react";
+import { Type, Scissors, Sparkles, Eraser, Lock, Loader2, Copy } from "lucide-react";
 import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import { useAIJob, type AIResultPixels } from "@/hooks/useAIJob";
@@ -14,13 +15,7 @@ interface AIFeature {
 
 const COMING_SOON: AIFeature[] = [
   {
-    title: "Text Extract (OCR)",
-    description:
-      "Drag a region; Tesseract.js / Replicate reads the text back. Saved into the Recent Texts list for re-use.",
-    Icon: Type,
-  },
-  {
-    title: "4× Upscale",
+    title: "4x Upscale",
     description: "Enhance resolution with Real-ESRGAN.",
     Icon: Sparkles,
   },
@@ -39,22 +34,36 @@ interface AISettingsProps {
   onAIResult: (r: AIResultPixels) => void;
 }
 
-/** AI tools are Replicate-backed → Paid tier only (see lib/tiers.ts). */
+/** AI tools are Replicate-backed -> Paid tier only (see lib/tiers.ts). */
 export function AISettings({
   aiEnabled = false,
   activePhotoId,
   stampToolRef,
   onAIResult,
 }: AISettingsProps) {
-  const { run, phase, busy, error } = useAIJob(onAIResult);
+  const { run, phase, busy, error, textResult } = useAIJob(onAIResult);
+  const [lastType, setLastType] = useState<"rembg" | "ocr" | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const canRun = aiEnabled && !!activePhotoId && !!stampToolRef.current;
 
-  const runRembg = () => {
+  const runModel = (type: "rembg" | "ocr") => {
     const tool = stampToolRef.current;
     if (!tool || !activePhotoId) return;
     const png = new Uint8Array(tool.export_png());
-    void run("rembg", activePhotoId, png);
+    setCopied(false);
+    setLastType(type);
+    void run(type, activePhotoId, png);
+  };
+
+  const copyText = async () => {
+    if (!textResult) return;
+    try {
+      await navigator.clipboard.writeText(textResult);
+      setCopied(true);
+    } catch {
+      /* clipboard blocked - no-op */
+    }
   };
 
   return (
@@ -68,12 +77,12 @@ export function AISettings({
           <Lock className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
           <p className="text-[10px] text-amber-200/90 leading-relaxed">
             AI tools run on Replicate and are a <strong>Paid</strong> feature.
-            Upgrade to unlock background removal, upscaling, and more.
+            Upgrade to unlock background removal, text extraction, and more.
           </p>
         </div>
       )}
 
-      {/* ── Background Removal (live) ──────────────────────────────────── */}
+      {/* Background Removal (live) */}
       <div className="p-3 rounded-lg bg-bg-elevated/50 border border-border/50">
         <div className="flex items-start gap-3">
           <Scissors className="h-5 w-5 shrink-0 text-text-primary/80" />
@@ -88,28 +97,89 @@ export function AISettings({
         </div>
         <button
           type="button"
-          onClick={runRembg}
+          onClick={() => runModel("rembg")}
           disabled={!canRun || busy}
           className="mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {phase === "uploading"
-            ? "Uploading…"
-            : phase === "running"
-              ? "Removing background…"
+          {busy && lastType === "rembg" && (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          )}
+          {lastType === "rembg" && phase === "uploading"
+            ? "Uploading..."
+            : lastType === "rembg" && phase === "running"
+              ? "Removing background..."
               : "Remove Background"}
         </button>
-        {error && (
+        {lastType === "rembg" && error && (
           <p className="mt-2 text-[10px] text-red-400 leading-relaxed">{error}</p>
         )}
-        {phase === "done" && !error && (
+        {lastType === "rembg" && phase === "done" && !error && (
           <p className="mt-2 text-[10px] text-emerald-400">
-            Background removed — applied to canvas.
+            Background removed - applied to canvas.
           </p>
         )}
       </div>
 
-      {/* ── Still placeholders ─────────────────────────────────────────── */}
+      {/* Text Extract / OCR (live) */}
+      <div className="p-3 rounded-lg bg-bg-elevated/50 border border-border/50">
+        <div className="flex items-start gap-3">
+          <Type className="h-5 w-5 shrink-0 text-text-primary/80" />
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-semibold text-text-primary">
+              Text Extract (OCR)
+            </span>
+            <p className="text-[10px] text-text-muted mt-0.5 leading-relaxed">
+              Read the text out of the current image, via Replicate OCR.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => runModel("ocr")}
+          disabled={!canRun || busy}
+          className="mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy && lastType === "ocr" && (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          )}
+          {lastType === "ocr" && phase === "uploading"
+            ? "Uploading..."
+            : lastType === "ocr" && phase === "running"
+              ? "Reading text..."
+              : "Extract Text"}
+        </button>
+        {lastType === "ocr" && error && (
+          <p className="mt-2 text-[10px] text-red-400 leading-relaxed">{error}</p>
+        )}
+        {lastType === "ocr" && phase === "done" && !error && (
+          <div className="mt-2">
+            {textResult && textResult.trim() ? (
+              <>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-text-muted">
+                    Extracted text
+                  </span>
+                  <button
+                    type="button"
+                    onClick={copyText}
+                    className="flex items-center gap-1 text-[10px] text-text-muted hover:text-text-primary"
+                  >
+                    <Copy className="h-3 w-3" />
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-black/20 border border-border/50 p-2 text-[10px] text-text-primary leading-relaxed">
+                  {textResult}
+                </pre>
+              </>
+            ) : (
+              <p className="text-[10px] text-text-muted">No text detected.</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Still placeholders */}
       {COMING_SOON.map(({ title, description, Icon }) => (
         <div
           key={title}
