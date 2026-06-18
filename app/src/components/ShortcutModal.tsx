@@ -5,6 +5,9 @@ import { fadeIn, quickSpring } from "@/lib/animations";
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** When true, append the hidden "Dev Tools" section (unlocked via the
+   *  status-bar tiny button or dev builds). */
+  showDevTools?: boolean;
 }
 
 const SHORTCUT_GROUPS = [
@@ -35,10 +38,9 @@ const SHORTCUT_GROUPS = [
     title: "Panels",
     shortcuts: [
       { keys: ["Alt", "U"], action: "Toggle Upload" },
-      { keys: ["Alt", "S"], action: "Toggle Tools" },
+      { keys: ["Alt", "T"], action: "Toggle Tools" },
       { keys: ["Alt", "G"], action: "Toggle Gallery" },
-      { keys: ["Alt", "H"], action: "Toggle History" },
-      { keys: ["Alt", "Delete"], action: "Toggle Diagnostics Log" },
+      { keys: ["Alt", "R"], action: "Toggle Review" },
       { keys: ["Alt", "/"], action: "Toggle This Modal" },
     ],
   },
@@ -56,7 +58,7 @@ const SHORTCUT_GROUPS = [
     shortcuts: [
       { keys: ["Alt", "F"], action: "Flip Horizontal" },
       { keys: ["Alt", "V"], action: "Flip Vertical" },
-      { keys: ["Alt", "R"], action: "Rotate 90° CW" },
+      { keys: ["Alt", "S"], action: "Rotate 90° CW" },
     ],
   },
   {
@@ -85,7 +87,19 @@ const SHORTCUT_GROUPS = [
   },
 ];
 
-export function ShortcutModal({ open, onClose }: Props) {
+/** Hidden section, shown only once Dev Tools are unlocked. */
+const DEV_TOOLS_GROUP = {
+  title: "Dev Tools",
+  shortcuts: [
+    { keys: ["Alt", "Delete"], action: "Toggle Diagnostics Log" },
+    { keys: ["Alt", "L"], action: "User / Tier Selector" },
+  ],
+};
+
+export function ShortcutModal({ open, onClose, showDevTools }: Props) {
+  const groups = showDevTools
+    ? [...SHORTCUT_GROUPS, DEV_TOOLS_GROUP]
+    : SHORTCUT_GROUPS;
   return (
     <AnimatePresence>
       {open && (
@@ -116,7 +130,7 @@ export function ShortcutModal({ open, onClose }: Props) {
             </div>
 
             <div className="shortcut-modal-body">
-              {SHORTCUT_GROUPS.map((group) => (
+              {groups.map((group) => (
                 <div key={group.title} className="shortcut-group">
                   <h3 className="shortcut-group-title">{group.title}</h3>
                   <div className="shortcut-list">

@@ -174,6 +174,16 @@ export function AppShell() {
   const [devTierOverride, setDevTierOverride] = useState<UserMode | null>(null);
   const effectiveUserMode = devTierOverride ?? userMode;
 
+  // Hidden Dev Tools unlock: three clicks on the status-bar tiny button reveals
+  // the diagnostics log + tier selector (always on in dev builds).
+  const [devToolsUnlocked, setDevToolsUnlocked] = useState(false);
+  const devUnlockCountRef = useRef(0);
+  const devToolsEnabled = import.meta.env.DEV || devToolsUnlocked;
+  const handleDevUnlockClick = useCallback(() => {
+    devUnlockCountRef.current += 1;
+    if (devUnlockCountRef.current >= 3) setDevToolsUnlocked(true);
+  }, []);
+
   // Gallery photo cap for the current tier. Resolved from Rust (`photo_limit`)
   // so the WASM layer is the single source of truth. Starts at the most
   // restrictive limit until the wasm lookup resolves.
@@ -1282,22 +1292,29 @@ export function AppShell() {
     if (running) {
       compressTotalRef.current = total;
       const node = (
-        <div className="flex w-full min-w-[200px] flex-col gap-1.5">
-          <div className="text-center text-sm font-medium">
-            Compressing {completed} / {total}…
+        <div className="flex w-full min-w-[220px] flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-3 pr-6 text-sm font-medium">
+            <span>Compressing…</span>
+            <span className="font-mono text-xs tabular-nums text-theme-muted-foreground">
+              {completed}/{total} · {pct}%
+            </span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-white/15">
+          {/* -mx-4 cancels the toast's px-4 so the bar bleeds to both edges. */}
+          <div className="-mx-4 h-1.5 overflow-hidden bg-white/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-[width] duration-300 ease-out"
+              className="h-full bg-emerald-400 transition-[width] duration-300 ease-out"
               style={{ width: `${pct}%` }}
             />
           </div>
         </div>
       );
+      // Plain toast (not toast.loading) so there's no leading spinner eating the
+      // row — the node spans the full toast width, letting the text sit
+      // space-between and the progress bar run edge-to-edge.
       if (compressToastRef.current == null) {
-        compressToastRef.current = toast.loading(node, { duration: Infinity });
+        compressToastRef.current = toast(node, { duration: Infinity });
       } else {
-        toast.loading(node, { id: compressToastRef.current, duration: Infinity });
+        toast(node, { id: compressToastRef.current, duration: Infinity });
       }
     } else if (compressToastRef.current != null) {
       const n = compressTotalRef.current;
@@ -1419,7 +1436,8 @@ export function AppShell() {
     setShowGallery,
     setShowHistory,
     setShowShortcutModal,
-    setShowDiagnostics,
+    // Diagnostics log (Alt+Delete) is a Dev Tool — gated until unlocked.
+    setShowDiagnostics: devToolsEnabled ? setShowDiagnostics : undefined,
     onZoomIn: handleZoomIn,
     onZoomOut: handleZoomOut,
     onZoomReset: handleZoomReset,
@@ -1437,8 +1455,8 @@ export function AppShell() {
     onPrevPhoto: handlePrevPhoto,
     onSpaceDown: () => setIsPanning(true),
     onSpaceUp: () => setIsPanning(false),
-    // Alt+L tier switcher — dev builds only (never reaches production).
-    onToggleDevTier: import.meta.env.DEV
+    // Alt+L tier switcher — a Dev Tool, gated until unlocked (always on in dev).
+    onToggleDevTier: devToolsEnabled
       ? () => setShowDevTier((v) => !v)
       : undefined,
   });
@@ -1479,14 +1497,17 @@ export function AppShell() {
       <ShortcutModal
         open={showShortcutModal}
         onClose={() => setShowShortcutModal(false)}
+        showDevTools={devToolsEnabled}
       />
 
-      <DiagnosticLogOverlay
-        open={showDiagnostics}
-        onClose={() => setShowDiagnostics(false)}
-      />
+      {devToolsEnabled && (
+        <DiagnosticLogOverlay
+          open={showDiagnostics}
+          onClose={() => setShowDiagnostics(false)}
+        />
+      )}
 
-      {import.meta.env.DEV && (
+      {devToolsEnabled && (
         <DevTierDialog
           open={showDevTier}
           onOpenChange={setShowDevTier}
@@ -1930,6 +1951,7 @@ export function AppShell() {
               ? { keys: "Enter/Esc", label: "place / cancel" }
               : TOOL_SHORTCUT[activeTool]
           }
+          onUnlockClick={handleDevUnlockClick}
         />
       )}
 

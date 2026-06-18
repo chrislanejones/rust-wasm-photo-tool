@@ -6,6 +6,7 @@ import { Fragment, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 import { formatBytes } from "@/lib/format";
+import { TinyButton } from "@/components/ui/tiny-button";
 
 export interface ShortcutHint {
   keys: string;
@@ -39,9 +40,11 @@ interface Props {
   fileSize?: number;
   /** Shortcut for the currently-active tool; swapped into a dynamic slot. */
   activeToolHint?: ShortcutHint;
+  /** Click handler for the hidden Dev Tools unlock button (3 clicks). */
+  onUnlockClick?: () => void;
 }
 
-export function StatusBar({ state, fileSize, activeToolHint }: Props) {
+export function StatusBar({ state, fileSize, activeToolHint, onUnlockClick }: Props) {
   const sizeLabel = formatBytes(fileSize);
 
   // Rotate the two dynamic hint slots every 5 minutes. The active tool's
@@ -98,6 +101,9 @@ export function StatusBar({ state, fileSize, activeToolHint }: Props) {
         </span>
         <span className="status-divider" />
         <span className="status-zoom">{Math.round(state.zoom * 100)}%</span>
+        {onUnlockClick && (
+          <TinyButton size="xs" aria-label="Dev tools" onClick={onUnlockClick} />
+        )}
       </div>
     </footer>
   );

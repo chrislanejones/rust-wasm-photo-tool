@@ -82,12 +82,12 @@ export function TopBar({
       tooltip: { label: "Upload", shortcut: "Alt + U" },
     },
     {
-      key: "S",
+      key: "T",
       icon: Wrench,
       label: "Tools",
       active: showTools,
       onToggle: onToggleTools,
-      tooltip: { label: "Tools", shortcut: "Alt + S" },
+      tooltip: { label: "Tools", shortcut: "Alt + T" },
     },
     {
       key: "I",
@@ -98,12 +98,12 @@ export function TopBar({
       tooltip: { label: "Gallery", shortcut: "Alt + G" },
     },
     {
-      key: "H",
+      key: "R",
       icon: History,
       label: "Review",
       active: showHistory,
       onToggle: onToggleHistory,
-      tooltip: { label: "Review", shortcut: "Alt + H" },
+      tooltip: { label: "Review", shortcut: "Alt + R" },
     },
   ];
 
@@ -123,7 +123,9 @@ export function TopBar({
         transition={panelSpacingTransition}
       >
         <div className="pointer-events-auto">
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border">
+            {/* Left cluster: Undo/Redo + Zoom, anchored left */}
+            <div className="flex items-center gap-3 min-w-0">
             {/* Undo / Redo */}
             <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
               <Tooltip>
@@ -192,16 +194,20 @@ export function TopBar({
                 </p>
               </TooltipContent>
             </Tooltip>
-
-            <div className="w-px h-6 bg-border shrink-0" />
-
-            <div className="flex-1 flex justify-center">
-              <ToggleButtonGroup items={toggleButtons} compact={compact} />
             </div>
 
-            {/* Clerk User */}
-            <div className="w-px h-6 bg-border shrink-0" />
-            <UserMenu />
+            {/* Center cluster: the four panel toggles, flanked by dividers and
+                kept dead-centered on the bar by the grid's 1fr/auto/1fr cols. */}
+            <div className="flex items-center gap-3">
+              <div className="w-px h-6 bg-border shrink-0" />
+              <ToggleButtonGroup items={toggleButtons} compact={compact} />
+              <div className="w-px h-6 bg-border shrink-0" />
+            </div>
+
+            {/* Right cluster: Clerk user menu, anchored right */}
+            <div className="flex items-center justify-end min-w-0">
+              <UserMenu />
+            </div>
           </div>
         </div>
       </motion.div>

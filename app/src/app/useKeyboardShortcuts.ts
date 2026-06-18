@@ -110,9 +110,22 @@ export function useKeyboardShortcuts({
       // When the user has Tab-focused a button/link/etc., let the browser
       // handle Space/Enter so the control actually activates. Without this the
       // Space-pan branch below would preventDefault and swallow the click.
+      //
+      // Enter always activates a focused control. Space is special: it doubles
+      // as the pan hotkey, and a MOUSE click on a tool button leaves that
+      // button focused (but NOT :focus-visible). If we blocked Space for any
+      // focused control, space-to-pan would silently re-fire the last-clicked
+      // tool. So we only let Space activate when the control is keyboard-
+      // focused (:focus-visible) — preserving Tab+Space accessibility while
+      // letting mouse users pan after clicking a tool.
+      if (e.key === "Enter" && isActivatable(e.target)) {
+        return;
+      }
       if (
-        (e.code === "Space" || e.key === " " || e.key === "Enter") &&
-        isActivatable(e.target)
+        (e.code === "Space" || e.key === " ") &&
+        isActivatable(e.target) &&
+        e.target instanceof Element &&
+        e.target.matches(":focus-visible")
       ) {
         return;
       }
@@ -187,9 +200,9 @@ export function useKeyboardShortcuts({
 
         switch (e.code) {
           case "KeyU": e.preventDefault(); setShowUpload((v) => !v); break;
-          case "KeyS": e.preventDefault(); setShowTools((v) => !v); break;
+          case "KeyT": e.preventDefault(); setShowTools((v) => !v); break;
           case "KeyG": e.preventDefault(); setShowGallery((v) => !v); break;
-          case "KeyH": e.preventDefault(); setShowHistory((v) => !v); break;
+          case "KeyR": e.preventDefault(); setShowHistory((v) => !v); break;
           case "BracketLeft":
             e.preventDefault();
             onBrushSizeChange((prev) => {
@@ -211,7 +224,7 @@ export function useKeyboardShortcuts({
           case "Digit0": e.preventDefault(); onZoomReset?.(); break;
           case "KeyF": e.preventDefault(); onFlipH?.(); break;
           case "KeyV": e.preventDefault(); onFlipV?.(); break;
-          case "KeyR": e.preventDefault(); onRotateCw?.(); break;
+          case "KeyS": e.preventDefault(); onRotateCw?.(); break;
           case "KeyE": e.preventDefault(); onExport(); break;
           case "KeyD": e.preventDefault(); onDeleteAll(); break;
         }

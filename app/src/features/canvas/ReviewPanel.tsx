@@ -142,7 +142,10 @@ export function ReviewPanel({
     >
       {/* ── Panel header: title + close ─────────────────────────────────── */}
       <div className="review-head">
-        <span className="review-title">Review</span>
+        <h2 className="flex items-center gap-2 text-xs font-semibold">
+          <History className="h-3.5 w-3.5" />
+          Review
+        </h2>
         <TinyButton onClick={onClose} title="Close" className="ml-auto">
           <X className="h-4 w-4" />
         </TinyButton>

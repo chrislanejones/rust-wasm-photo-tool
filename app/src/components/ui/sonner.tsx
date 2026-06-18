@@ -18,7 +18,10 @@ export function Toaster(props: React.ComponentProps<typeof SonnerToaster>) {
           // visibility of the "Copied to clipboard" toast.
           toast:
             "group pointer-events-auto flex items-center gap-3 w-full rounded-xl border border-white/15 bg-theme-muted text-theme-foreground font-medium shadow-2xl ring-1 ring-black/50 px-4 py-3 text-sm",
-          title: "text-theme-foreground font-medium",
+          // Fill the toast width so custom content (e.g. the compress progress
+          // bar) spans edge-to-edge instead of shrinking to its text width.
+          content: "flex-1 min-w-0",
+          title: "w-full text-theme-foreground font-medium",
           description: "text-theme-muted-foreground text-xs",
           icon: "shrink-0",
           success: "border-theme-primary/70 text-theme-primary",

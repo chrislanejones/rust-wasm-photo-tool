@@ -350,15 +350,6 @@ textarea:focus-visible {
   gap: 8px;
 }
 
-.review-title {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-
 .review-rule {
   border: 0;
   border-top: 1px solid var(--border);

@@ -1,9 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
-import { Upload, FolderOpen, Clipboard, X, Images, Loader2, LogIn, ExternalLink } from "lucide-react";
+import { Upload, FolderOpen, Clipboard, X, Images, Loader2, SquarePen, ExternalLink } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
 import { LargeButton } from "@/components/ui/large-button";
 import { TinyButton } from "@/components/ui/tiny-button";
+import { UserMenu } from "@/components/UserMenu";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
 const horseLogo = "/Image-Horse-Logo.svg";
 
@@ -78,6 +79,24 @@ export function UploadDialog({
       setLoadingTest(false);
     }
   }, [loadingTest, processFiles, triggerShake]);
+
+  // Create a blank 2000×1000 black image as a fresh drawing surface and feed it
+  // through the normal upload pipeline.
+  const handleBlankCanvas = useCallback(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 2000;
+    canvas.height = 1000;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      processFiles([
+        new File([blob], "blank-canvas.png", { type: "image/png" }),
+      ]);
+    }, "image/png");
+  }, [processFiles]);
 
   const handlePasteClick = useCallback(async () => {
     try {
@@ -170,6 +189,11 @@ export function UploadDialog({
               </h1>
             </div>
 
+            {/* User / sign-in — top-left, mirroring the close button's spot */}
+            <div className="absolute top-4 left-4">
+              <UserMenu />
+            </div>
+
             {/* Close button */}
             <TinyButton
               className="absolute top-4 right-4"
@@ -209,10 +233,6 @@ export function UploadDialog({
                 }`}
               >
                 <div className="flex flex-col items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-bg-elevated flex items-center justify-center">
-                    <Upload className="h-7 w-7 text-text-muted" />
-                  </div>
-
                   <div className="grid grid-cols-2 gap-3 w-full">
                     <LargeButton
                       ref={firstButtonRef}
@@ -239,18 +259,21 @@ export function UploadDialog({
                       {loadingTest ? `Loading ${TEST_IMAGE_COUNT}…` : "Test Images"}
                     </LargeButton>
                     <LargeButton
-                      disabled
-                      title="View images from your last session (coming soon)"
+                      onClick={handleBlankCanvas}
+                      title="Start with a blank 2000×1000 black canvas"
                       className="w-full"
                     >
-                      <LogIn className="h-4 w-4" />
-                      Log In
+                      <SquarePen className="h-4 w-4" />
+                      Blank Canvas
                     </LargeButton>
                   </div>
 
-                  <p className="text-xs text-text-muted">
+                  <p className="mt-2 text-xs text-text-muted">
                     or drag and drop images here
                   </p>
+                  <div className="w-14 h-14 rounded-full bg-bg-elevated flex items-center justify-center">
+                    <Upload className="h-7 w-7 text-text-muted" />
+                  </div>
                   <p className="text-[10px] text-text-muted opacity-60">
                     Supports PNG, JPG, GIF, WebP, AVIF
                   </p>
