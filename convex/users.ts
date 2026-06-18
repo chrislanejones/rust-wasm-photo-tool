@@ -1,6 +1,6 @@
 // .convex/users.ts
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 
 // ── Helpers (import these in other Convex files) ──────────
@@ -120,5 +120,25 @@ export const incrementUsage = mutation({
       usageResetAt: shouldReset ? now : user.usageResetAt,
       updatedAt: now,
     });
+  },
+});
+
+/** DEV/ADMIN: set a user's tier by email. internalMutation -> NOT callable
+ *  from the client; only via `npx convex run users:devGrantTier`. */
+export const devGrantTier = internalMutation({
+  args: {
+    email: v.string(),
+    tier: v.union(v.literal("free"), v.literal("pro"), v.literal("team")),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+    if (!user) {
+      return { ok: false, message: `No user with email ${args.email} - sign in once first.` };
+    }
+    await ctx.db.patch(user._id, { tier: args.tier, updatedAt: Date.now() });
+    return { ok: true, message: `Set ${args.email} -> ${args.tier}` };
   },
 });

@@ -72,6 +72,7 @@ export const startJob = internalMutation({
       v.literal("alt"),
     ),
     inputStorageId: v.id("_storage"),
+    maskStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -98,17 +99,24 @@ export const startJob = internalMutation({
     const inputUrl = await ctx.storage.getUrl(args.inputStorageId);
     if (!inputUrl) throw new Error("Input image not found in storage");
 
+    let maskUrl: string | null = null;
+    if (args.maskStorageId) {
+      maskUrl = await ctx.storage.getUrl(args.maskStorageId);
+      if (!maskUrl) throw new Error("Mask image not found in storage");
+    }
+
     const jobId = await ctx.db.insert("ai_jobs", {
       userId: user._id,
       photoKey: args.photoKey,
       type: args.type,
       status: "running",
       inputStorageId: args.inputStorageId,
+      maskStorageId: args.maskStorageId,
       startedAt: now,
       createdAt: now,
     });
 
-    return { jobId, inputUrl };
+    return { jobId, inputUrl, maskUrl };
   },
 });
 

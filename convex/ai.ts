@@ -13,7 +13,10 @@ import type { Id } from "./_generated/dataModel";
 type ModelType = "rembg" | "upscale" | "inpaint" | "ocr" | "alt";
 
 const MODELS: Partial<
-  Record<ModelType, { version: string; buildInput: (imageUrl: string) => unknown }>
+  Record<
+    ModelType,
+    { version: string; buildInput: (imageUrl: string, maskUrl?: string) => unknown }
+  >
 > = {
   rembg: {
     version:
@@ -24,6 +27,11 @@ const MODELS: Partial<
     version:
       "a524caeaa23495bc9edc805ab08ab5fe943afd3febed884a4f3747aa32e9cd61",
     buildInput: (imageUrl) => ({ image: imageUrl }),
+  },
+  inpaint: {
+    version:
+      "0e3a841c913f597c1e4c321560aa69e2bc1f15c65f8c366caafc379240efd8ba",
+    buildInput: (imageUrl, maskUrl) => ({ image: imageUrl, mask: maskUrl }),
   },
   // upscale / inpaint / ocr land here as the pattern is cloned (milestone 2+).
 };
@@ -57,6 +65,7 @@ export const dispatch = action({
       v.literal("alt"),
     ),
     inputStorageId: v.id("_storage"),
+    maskStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args): Promise<{ jobId: Id<"ai_jobs"> }> => {
     const model = MODELS[args.type as ModelType];
@@ -69,11 +78,19 @@ export const dispatch = action({
       throw new Error("REPLICATE_API_TOKEN is not set on the Convex deployment");
     }
 
-    const { jobId, inputUrl } = await ctx.runMutation(internal.aiJobs.startJob, {
-      photoKey: args.photoKey,
-      type: args.type,
-      inputStorageId: args.inputStorageId,
-    });
+    if (args.type === "inpaint" && !args.maskStorageId) {
+      throw new Error("Object removal requires a mask");
+    }
+
+    const { jobId, inputUrl, maskUrl } = await ctx.runMutation(
+      internal.aiJobs.startJob,
+      {
+        photoKey: args.photoKey,
+        type: args.type,
+        inputStorageId: args.inputStorageId,
+        maskStorageId: args.maskStorageId,
+      },
+    );
 
     try {
       const webhookBase = process.env.CONVEX_SITE_URL;
@@ -85,7 +102,7 @@ export const dispatch = action({
         },
         body: JSON.stringify({
           version: model.version,
-          input: model.buildInput(inputUrl),
+          input: model.buildInput(inputUrl, maskUrl ?? undefined),
           webhook: webhookBase
             ? `${webhookBase}/replicate-webhook`
             : undefined,

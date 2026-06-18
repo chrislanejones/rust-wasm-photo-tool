@@ -30,11 +30,12 @@ async function urlToPixels(url: string): Promise<AIResultPixels> {
 
 /**
  * Drives a single AI job end-to-end:
- *   upload source PNG → dispatch action → Convex subscription on the job row →
- *   when the webhook marks it done, decode the result and hand pixels back.
+ *   upload source PNG (+ optional mask) -> dispatch action -> Convex
+ *   subscription on the job row -> when the webhook marks it done, decode the
+ *   result and hand pixels back.
  *
- * `onImageResult` receives decoded pixels for image models (rembg/upscale/…);
- * text models surface via the returned `textResult`.
+ * `onImageResult` receives decoded pixels for image models (rembg/upscale/
+ * inpaint); text models surface via the returned `textResult`.
  */
 export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
   const generateUploadUrl = useMutation(api.ai.generateUploadUrl);
@@ -81,24 +82,35 @@ export function useAIJob(onImageResult: (r: AIResultPixels) => void) {
   }, [job, jobId, onImageResult]);
 
   const run = useCallback(
-    async (type: AIJobType, photoKey: string, png: Uint8Array) => {
+    async (
+      type: AIJobType,
+      photoKey: string,
+      png: Uint8Array,
+      maskPng?: Uint8Array,
+    ) => {
       setError(null);
       setTextResult(null);
       setPhase("uploading");
       try {
-        const uploadUrl = await generateUploadUrl();
         // Tag as image/png so the stored blob's content-type is correct —
         // Replicate fetches this URL and some models reject octet-stream.
-        const resp = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": "image/png" },
-          body: png.buffer as ArrayBuffer,
-        });
-        const { storageId } = (await resp.json()) as { storageId: string };
+        const uploadPng = async (bytes: Uint8Array) => {
+          const uploadUrl = await generateUploadUrl();
+          const resp = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": "image/png" },
+            body: bytes.buffer as ArrayBuffer,
+          });
+          const { storageId } = (await resp.json()) as { storageId: string };
+          return storageId as Id<"_storage">;
+        };
+        const inputStorageId = await uploadPng(png);
+        const maskStorageId = maskPng ? await uploadPng(maskPng) : undefined;
         const { jobId: newJobId } = await dispatch({
           photoKey,
           type,
-          inputStorageId: storageId as Id<"_storage">,
+          inputStorageId,
+          maskStorageId,
         });
         consumedRef.current = null;
         setJobId(newJobId);

@@ -203,6 +203,8 @@ export default defineSchema({
     replicateId: v.optional(v.string()),
     /** Source frame handed to the model (current canvas PNG). */
     inputStorageId: v.optional(v.id("_storage")),
+    /** Mask frame for inpaint / object removal (white = region to erase). */
+    maskStorageId: v.optional(v.id("_storage")),
     /** Result frame written back by the webhook (image models). */
     outputStorageId: v.optional(v.id("_storage")),
     /** Non-image output (e.g. OCR text / alt text). */
