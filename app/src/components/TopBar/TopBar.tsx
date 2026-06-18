@@ -15,7 +15,7 @@ import {
   Upload,
   Image,
   Wrench,
-  History,
+  Search,
   ZoomIn,
   ZoomOut,
   Undo2,
@@ -100,7 +100,7 @@ export function TopBar({
     },
     {
       key: "R",
-      icon: History,
+      icon: Search,
       label: "Review",
       active: showHistory,
       onToggle: onToggleHistory,

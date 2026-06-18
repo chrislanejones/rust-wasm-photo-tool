@@ -699,9 +699,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const strokeW = Math.max(1, eff.strokeWidth * sx);
           const color = eff.strokeColor;
 
-          // Live interior-fill preview (new rect/circle only — existing-shape
-          // re-edits use the narrow captured style which carries no fill).
-          const fillCfg = drawEditState.style ? null : drawSettings;
+          // Live interior-fill preview. `eff` is the shape's captured style on
+          // reselect, or the live panel for a new shape — both carry fill, so
+          // reselected rect/circles preview their fill too.
+          const fillCfg = eff;
           let fillAttr = "none";
           let gradientDef: React.ReactNode = null;
           if (fillCfg && (shape === "rect" || shape === "circle")) {
