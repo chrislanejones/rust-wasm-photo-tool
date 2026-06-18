@@ -101,6 +101,10 @@ interface Props {
     strokeWidth: number;
     arrowStyle: "single" | "double";
     shape: "rect" | "circle" | "handCircle" | "line";
+    fillMode: "none" | "solid" | "gradient";
+    fillColor: string;
+    fillColor2: string;
+    gradientAngle: number;
   };
 }
 
@@ -695,6 +699,33 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const strokeW = Math.max(1, eff.strokeWidth * sx);
           const color = eff.strokeColor;
 
+          // Live interior-fill preview (new rect/circle only — existing-shape
+          // re-edits use the narrow captured style which carries no fill).
+          const fillCfg = drawEditState.style ? null : drawSettings;
+          let fillAttr = "none";
+          let gradientDef: React.ReactNode = null;
+          if (fillCfg && (shape === "rect" || shape === "circle")) {
+            if (fillCfg.fillMode === "solid") {
+              fillAttr = fillCfg.fillColor;
+            } else if (fillCfg.fillMode === "gradient") {
+              fillAttr = "url(#draw-fill-grad)";
+              const ang = ((fillCfg.gradientAngle ?? 0) * Math.PI) / 180;
+              const dx = 0.5 * Math.cos(ang);
+              const dy = 0.5 * Math.sin(ang);
+              gradientDef = (
+                <defs>
+                  <linearGradient
+                    id="draw-fill-grad"
+                    x1={0.5 - dx} y1={0.5 - dy} x2={0.5 + dx} y2={0.5 + dy}
+                  >
+                    <stop offset="0%" stopColor={fillCfg.fillColor} />
+                    <stop offset="100%" stopColor={fillCfg.fillColor2} />
+                  </linearGradient>
+                </defs>
+              );
+            }
+          }
+
           // Move handle (line + dot above the box) — same geometry as the
           // text overlay's "balloon string".
           const STEM_GAP = 4;
@@ -775,7 +806,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             const ccx = vx + vw / 2;
             const ccy = vy + vh / 2;
             preview = (
-              <circle cx={ccx} cy={ccy} r={cr} fill="none" stroke={color} strokeWidth={strokeW} />
+              <>
+                {gradientDef}
+                <circle cx={ccx} cy={ccy} r={cr} fill={fillAttr} stroke={color} strokeWidth={strokeW} />
+              </>
             );
             bodyHit = (
               <circle cx={ccx} cy={ccy} r={Math.max(cr, 8)} fill="transparent" {...bodyProps} />
@@ -798,10 +832,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           } else {
             // rect
             preview = (
-              <rect
-                x={vx} y={vy} width={vw} height={vh}
-                fill="none" stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
-              />
+              <>
+                {gradientDef}
+                <rect
+                  x={vx} y={vy} width={vw} height={vh}
+                  fill={fillAttr} stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
+                />
+              </>
             );
             bodyHit = (
               <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />

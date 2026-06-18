@@ -21,6 +21,21 @@ const PEN_MODES = [
 
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
 
+const FILL_MODES = [
+  { id: "none",     label: "None"     },
+  { id: "solid",    label: "Solid"    },
+  { id: "gradient", label: "Gradient" },
+] as const;
+
+// Gradient direction presets. `id` is the angle in degrees (string for the
+// button group), label is a glyph hinting the direction.
+const GRADIENT_DIRS = [
+  { id: "0",   label: "→" },
+  { id: "45",  label: "↘" },
+  { id: "90",  label: "↓" },
+  { id: "135", label: "↙" },
+] as const;
+
 type ShapeType = (typeof SHAPES)[number]["id"];
 export type ShapesMode = "shapes" | "pens" | "arrows";
 
@@ -80,12 +95,68 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
             )}
           />
 
-          {/* Color */}
+          {/* Stroke Color */}
           <ColorSwatchGrid
             colors={TEXT_COLORS}
             value={settings.strokeColor}
             onChange={(color) => onChange({ ...settings, strokeColor: color })}
           />
+
+          {/* Fill — rectangle + circle only (line/hand-drawn have no area) */}
+          {(currentShape === "rect" || currentShape === "circle") && (
+            <div className="space-y-4">
+              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+                Fill
+              </label>
+              <ToolButtonGroup
+                options={FILL_MODES}
+                value={settings.fillMode ?? "none"}
+                onChange={(id) =>
+                  onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
+                }
+              />
+
+              {settings.fillMode === "solid" && (
+                <ColorSwatchGrid
+                  colors={TEXT_COLORS}
+                  value={settings.fillColor}
+                  onChange={(color) => onChange({ ...settings, fillColor: color })}
+                />
+              )}
+
+              {settings.fillMode === "gradient" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <span className="text-[11px] text-theme-muted-foreground">From</span>
+                    <ColorSwatchGrid
+                      colors={TEXT_COLORS}
+                      value={settings.fillColor}
+                      onChange={(color) => onChange({ ...settings, fillColor: color })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-[11px] text-theme-muted-foreground">To</span>
+                    <ColorSwatchGrid
+                      colors={TEXT_COLORS}
+                      value={settings.fillColor2}
+                      onChange={(color) => onChange({ ...settings, fillColor2: color })}
+                    />
+                  </div>
+                  <ToolButtonGroup
+                    label="Direction"
+                    options={GRADIENT_DIRS}
+                    value={
+                      String(settings.gradientAngle ?? 0) as
+                        (typeof GRADIENT_DIRS)[number]["id"]
+                    }
+                    onChange={(id) =>
+                      onChange({ ...settings, gradientAngle: Number(id) })
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

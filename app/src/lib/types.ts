@@ -38,6 +38,13 @@ export interface ToolSettings extends StampSettings {
   textColor: string;
   shape?: "rect" | "circle" | "handCircle" | "line";
 
+  // Shape interior fill (rect + circle only). Painted under the stroke.
+  /** "none" = outline only, "solid" = fillColor, "gradient" = fillColor→fillColor2. */
+  fillMode: "none" | "solid" | "gradient";
+  fillColor: string;       // solid fill / gradient stop 0 (hex)
+  fillColor2: string;      // gradient stop 1 (hex)
+  gradientAngle: number;   // degrees: 0 →, 45 ↘, 90 ↓, 135 ↙
+
   // Effects (was Blur)
   blurSize: number;
   blurIntensity: number;

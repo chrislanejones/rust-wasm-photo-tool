@@ -504,8 +504,12 @@ declare module "stamp_tool" {
       color_hex: string,
       stroke_width: number,
       arrow_style: number,
+      fill_kind: number,
+      fill_hex: string,
+      fill2_hex: string,
+      fill_angle: number,
     ): number;
-    /** Restore a persisted shape WITHOUT pushing history (load path). Colour is raw r,g,b. */
+    /** Restore a persisted shape WITHOUT pushing history (load path). Colours are raw bytes. */
     restore_shape_annotation(
       kind: number,
       x0: number,
@@ -517,6 +521,16 @@ declare module "stamp_tool" {
       b: number,
       stroke_width: number,
       arrow_style: number,
+      fill_kind: number,
+      fill_r: number,
+      fill_g: number,
+      fill_b: number,
+      fill_a: number,
+      fill2_r: number,
+      fill2_g: number,
+      fill2_b: number,
+      fill2_a: number,
+      fill_angle: number,
     ): number;
     /** Update a shape in full (geometry + style). Pushes an "Edit Shape" history step. */
     update_shape_annotation(
@@ -529,6 +543,10 @@ declare module "stamp_tool" {
       color_hex: string,
       stroke_width: number,
       arrow_style: number,
+      fill_kind: number,
+      fill_hex: string,
+      fill2_hex: string,
+      fill_angle: number,
     ): boolean;
     /** Remove a shape. Pushes a "Delete Shape" history step. */
     remove_shape_annotation(id: number): boolean;
