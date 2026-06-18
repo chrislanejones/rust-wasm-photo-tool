@@ -2,6 +2,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 const http = httpRouter();
 
@@ -103,6 +104,113 @@ http.route({
     }
 
     // Other interim statuses (shouldn't arrive given webhook_events_filter).
+    return new Response("ok", { status: 200 });
+  }),
+});
+
+// ── Stripe billing webhook ─────────────────────────────────────────────────
+
+function mapStripeStatus(s: string): "active" | "canceled" | "past_due" {
+  if (s === "active" || s === "trialing") return "active";
+  if (s === "past_due" || s === "unpaid") return "past_due";
+  return "canceled";
+}
+
+/** Verify a Stripe-Signature header against the raw body (Web Crypto HMAC). */
+async function verifyStripeSig(
+  payload: string,
+  header: string | null,
+  secret: string,
+): Promise<boolean> {
+  if (!header) return false;
+  const parts = Object.fromEntries(
+    header.split(",").map((p) => {
+      const i = p.indexOf("=");
+      return [p.slice(0, i), p.slice(i + 1)];
+    }),
+  ) as Record<string, string>;
+  const t = parts["t"];
+  const v1 = parts["v1"];
+  if (!t || !v1) return false;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${t}.${payload}`));
+  const hex = [...new Uint8Array(sig)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hex === v1;
+}
+
+async function stripeGet(path: string): Promise<Record<string, unknown>> {
+  const key = process.env.STRIPE_SECRET_KEY!;
+  const resp = await fetch(`https://api.stripe.com/v1/${path}`, {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  return (await resp.json()) as Record<string, unknown>;
+}
+
+http.route({
+  path: "/stripe-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    const body = await req.text();
+    if (
+      !secret ||
+      !(await verifyStripeSig(body, req.headers.get("stripe-signature"), secret))
+    ) {
+      return new Response("bad signature", { status: 400 });
+    }
+
+    const event = JSON.parse(body) as {
+      type: string;
+      data: { object: Record<string, any> };
+    };
+    const obj = event.data.object;
+
+    if (event.type === "checkout.session.completed") {
+      const userId = obj.metadata?.userId as string | undefined;
+      const subId = obj.subscription as string | undefined;
+      if (userId && subId) {
+        const sub = await stripeGet(`subscriptions/${subId}`);
+        await ctx.runMutation(internal.subscriptions.fulfill, {
+          userId: userId as Id<"users">,
+          stripeCustomerId: String(obj.customer ?? ""),
+          stripeSubId: subId,
+          plan: "pro",
+          status: mapStripeStatus(String(sub.status ?? "")),
+          currentPeriodEnd: Number(sub.current_period_end ?? 0) * 1000,
+          cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
+        });
+      }
+    } else if (
+      event.type === "customer.subscription.updated" ||
+      event.type === "customer.subscription.deleted"
+    ) {
+      const userId = obj.metadata?.userId as string | undefined;
+      if (userId) {
+        const status =
+          event.type === "customer.subscription.deleted"
+            ? ("canceled" as const)
+            : mapStripeStatus(String(obj.status ?? ""));
+        await ctx.runMutation(internal.subscriptions.fulfill, {
+          userId: userId as Id<"users">,
+          stripeCustomerId: String(obj.customer ?? ""),
+          stripeSubId: String(obj.id ?? ""),
+          plan: "pro",
+          status,
+          currentPeriodEnd: Number(obj.current_period_end ?? 0) * 1000,
+          cancelAtPeriodEnd: Boolean(obj.cancel_at_period_end),
+        });
+      }
+    }
+
     return new Response("ok", { status: 200 });
   }),
 });

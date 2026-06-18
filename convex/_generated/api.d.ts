@@ -20,6 +20,7 @@ import type * as layers from "../layers.js";
 import type * as photoEdits from "../photoEdits.js";
 import type * as projects from "../projects.js";
 import type * as router from "../router.js";
+import type * as stripe from "../stripe.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as textHistory from "../textHistory.js";
 import type * as users from "../users.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   photoEdits: typeof photoEdits;
   projects: typeof projects;
   router: typeof router;
+  stripe: typeof stripe;
   subscriptions: typeof subscriptions;
   textHistory: typeof textHistory;
   users: typeof users;

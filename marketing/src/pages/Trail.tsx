@@ -26,6 +26,22 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.15",
+    date: "2026-06-18",
+    headline: "AI tools go live (Replicate) + Stripe billing",
+    entries: [
+      { tag: "feature", text: "Background Removal is live — one click runs rembg on Replicate and drops the cut-out straight back onto the canvas (paid tier)." },
+      { tag: "feature", text: "Text Extract (OCR) — pull the text out of any image via Replicate OCR, shown in a copy-to-clipboard panel." },
+      { tag: "feature", text: "Object Removal — brush over an object in a mask painter and LaMa inpainting erases it and fills the gap; your image and mask are uploaded together." },
+      { tag: "infra",   text: "AI pipeline: a Convex action dispatches each job to Replicate with a signed source frame and a completion webhook, pulls the result into Convex storage, and streams it back to the canvas. Text models persist their output as text." },
+      { tag: "feature", text: "Stripe billing — a Settings gear next to your avatar opens a Plan & Billing popup with the $10/mo Pro plan. Upgrade runs Stripe Checkout; subscribers get the Stripe Customer Portal to manage or cancel." },
+      { tag: "infra",   text: "Billing backend: Checkout and Portal run through Convex actions, and a signature-verified Stripe webhook flips your account tier and records the subscription." },
+      { tag: "fix",     text: "Signing in now creates your account record — a new hook upserts the Convex user row once you are authenticated, so tier, subscription, and AI access finally have something to read." },
+      { tag: "fix",     text: "Oversized uploads can no longer crash the tab — images past ~100 MP are rejected with a toast before the full-resolution decode can blow past the WASM memory limit." },
+      { tag: "perf",    text: "The anonymous-edit cleanup job now uses an indexed range scan instead of a full table scan, so it keeps reclaiming abandoned storage as data grows." },
+    ],
+  },
+  {
     version: "v0.9.14",
     date: "2026-06-18",
     headline: "Blank Canvas, gallery duplicate, hidden dev tools, faster uploads",

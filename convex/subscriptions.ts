@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { getUserId } from "./users";
 
 export const getByUser = query({
@@ -59,3 +59,36 @@ export const cancel = mutation({
   },
 });
 
+/** Webhook-side fulfillment: upsert the subscription row and flip the
+ *  user's tier. internalMutation -> only callable from the Stripe webhook
+ *  (no client auth on that request). */
+export const fulfill = internalMutation({
+  args: {
+    userId: v.id("users"),
+    stripeCustomerId: v.string(),
+    stripeSubId: v.string(),
+    plan: v.union(v.literal("pro"), v.literal("team")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("canceled"),
+      v.literal("past_due"),
+    ),
+    currentPeriodEnd: v.number(),
+    cancelAtPeriodEnd: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const { userId, ...sub } = args;
+    const existing = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, { userId, ...sub });
+    } else {
+      await ctx.db.insert("subscriptions", { userId, ...sub });
+    }
+    // Active subscription -> paid tier; anything else -> free.
+    const tier = sub.status === "active" ? sub.plan : "free";
+    await ctx.db.patch(userId, { tier, updatedAt: Date.now() });
+  },
+});

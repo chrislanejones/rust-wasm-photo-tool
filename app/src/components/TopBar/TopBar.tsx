@@ -22,6 +22,7 @@ import {
   Redo2,
 } from "lucide-react";
 import { UserMenu } from "@/components/UserMenu";
+import { SubscriptionButton } from "@/components/SubscriptionButton";
 
 interface TopBarProps {
   zoom: number;
@@ -205,7 +206,8 @@ export function TopBar({
             </div>
 
             {/* Right cluster: Clerk user menu, anchored right */}
-            <div className="flex items-center justify-end min-w-0">
+            <div className="flex items-center justify-end gap-1 min-w-0">
+              <SubscriptionButton />
               <UserMenu />
             </div>
           </div>

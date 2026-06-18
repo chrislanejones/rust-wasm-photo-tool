@@ -6,6 +6,7 @@
 //   All other existing functionality preserved
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
+import { useStoreUser } from "@/hooks/useStoreUser";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
@@ -106,6 +107,8 @@ function capMessage(mode: UserMode, max: number): string {
 
 function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
   const { isLoaded, isSignedIn } = useUser();
+  // Create/refresh the Convex users row on sign-in (tier lives there).
+  useStoreUser();
 
   useEffect(() => {
     if (!isLoaded) return;
