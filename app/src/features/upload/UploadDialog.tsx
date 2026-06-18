@@ -272,7 +272,7 @@ export function UploadDialog({
               </div>
             )}
 
-            <div className="p-6">
+            <div className="px-6 pt-6 pb-4">
               <div
                 onDrop={handleDrop}
                 onDragOver={(e) => {
@@ -282,7 +282,9 @@ export function UploadDialog({
                 onDragLeave={() => setDragging(false)}
                 // Stable min-height so the modal doesn't resize/recenter (and
                 // jerk) when swapping the upload actions ⇄ Blank Canvas panel.
-                className="rounded-xl min-h-[18rem]"
+                // flex-col so the active panel fills it (no dead space above the
+                // footer — keeps top and bottom spacing even).
+                className="rounded-xl min-h-[18rem] flex flex-col"
               >
                 <AnimatePresence mode="wait" initial={false}>
                 {blankMode ? (
@@ -388,7 +390,7 @@ export function UploadDialog({
                     initial="hidden"
                     animate="visible"
                     exit="exit"
-                    className="flex flex-col items-center gap-4"
+                    className="flex flex-1 flex-col items-center gap-4"
                   >
                   <div className="grid grid-cols-2 gap-3 w-full">
                     <LargeButton
@@ -428,13 +430,13 @@ export function UploadDialog({
                   {/* Dotted drop zone — highlights + nudges when an image is
                       dragged over the dialog. */}
                   <div
-                    className={`flex w-full flex-col items-center gap-4 rounded-xl border-2 border-dotted p-6 text-center transition-all duration-200 ${
+                    className={`flex w-full flex-1 flex-col items-center justify-center gap-4 rounded-xl border-2 border-dotted p-6 text-center transition-all duration-200 ${
                       dragging
                         ? "border-accent bg-accent/10 scale-[1.02]"
                         : "border-border bg-bg-elevated/30"
                     }`}
                   >
-                    <p className="text-xs text-text-muted">
+                    <p className="text-sm text-text-secondary">
                       or drag and drop images here
                     </p>
                     <div
@@ -444,7 +446,7 @@ export function UploadDialog({
                     >
                       <Upload className="h-7 w-7 text-text-muted" />
                     </div>
-                    <p className="text-[10px] text-text-muted opacity-60">
+                    <p className="text-xs text-text-secondary">
                       Supports PNG, JPG, GIF, WebP, AVIF
                     </p>
                   </div>
