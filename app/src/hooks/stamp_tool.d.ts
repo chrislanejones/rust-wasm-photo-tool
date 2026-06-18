@@ -85,20 +85,20 @@ declare module "stamp_tool" {
   /**
    * Compute the largest centred rectangle with the given aspect ratio
    * that fits inside an `image_w` × `image_h` image. Returns `[x, y, w, h]`
-   * as a Uint32Array, or an empty array if any input is 0.
+   * as a Uint32Array, or `undefined` if any input is 0.
    */
   export function compute_aspect_crop(
     image_w: number,
     image_h: number,
     ratio_w: number,
     ratio_h: number,
-  ): Uint32Array;
+  ): Uint32Array | undefined;
 
   /**
    * Snap a free drag to a locked aspect ratio. Anchored at (start_x, start_y),
    * extends toward (end_x, end_y), scaled so width/height match ratio_w/ratio_h,
-   * clipped to image bounds. Returns `[x, y, w, h]` as a Uint32Array, or empty
-   * on invalid input.
+   * clipped to image bounds. Returns `[x, y, w, h]` as a Uint32Array, or
+   * `undefined` on invalid input.
    */
   export function constrain_crop_to_ratio(
     start_x: number,
@@ -109,7 +109,7 @@ declare module "stamp_tool" {
     ratio_h: number,
     image_w: number,
     image_h: number,
-  ): Uint32Array;
+  ): Uint32Array | undefined;
 
   export class ImageHorseTool {
     constructor(width: number, height: number);
@@ -234,6 +234,7 @@ declare module "stamp_tool" {
       dest_x: number,
       dest_y: number,
       target_size: number,
+      angle_deg: number,
     ): void;
     paint_begin(): void;
     paint_dab(

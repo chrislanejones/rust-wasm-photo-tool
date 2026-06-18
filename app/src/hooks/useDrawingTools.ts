@@ -135,7 +135,7 @@ export function useDrawingTools({
     | ((
         sx: number, sy: number, ex: number, ey: number,
         rw: number, rh: number, iw: number, ih: number,
-      ) => Uint32Array)
+      ) => Uint32Array | undefined)
     | null
   >(null);
   if (!constrainRef.current) {
@@ -160,7 +160,7 @@ export function useDrawingTools({
           ratio[0], ratio[1],
           dims.w, dims.h,
         );
-        if (out.length === 4) {
+        if (out && out.length === 4) {
           return { x: out[0], y: out[1], w: out[2], h: out[3] };
         }
       }

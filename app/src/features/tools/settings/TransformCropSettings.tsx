@@ -96,7 +96,7 @@ export function TransformCropSettings({
     const mod = await import("stamp_tool");
     await mod.default();
     const out = mod.compute_aspect_crop(imageWidth, imageHeight, rw, rh);
-    if (out.length !== 4) return;
+    if (!out || out.length !== 4) return;
     const [x, y, w, h] = out;
     onSetCropSelection({ x, y, width: w, height: h });
   };

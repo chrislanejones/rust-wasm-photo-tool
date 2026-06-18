@@ -1927,9 +1927,10 @@ impl ImageHorseTool {
         dest_x: i32,
         dest_y: i32,
         target_size: u32,
+        angle_deg: f32,
     ) {
         let font_size = 48.0f32;
-        let rendered = crate::text::render_stamp_label(label, font_size, r, g, b);
+        let rendered = crate::text::render_stamp_label(label, font_size, r, g, b, angle_deg);
         // Scale to target_size preserving aspect ratio
         let scale = target_size as f64 / rendered.width.max(rendered.height) as f64;
         let new_w = ((rendered.width as f64 * scale).round() as u32).max(1);
@@ -2789,7 +2790,8 @@ fn parse_alpha(s: &str) -> Option<u8> {
 /// drag axis "leads" — the perpendicular axis is sized to match the ratio,
 /// so the box always reaches at least as far as the cursor in the leading
 /// direction. The result is clipped to the image bounds. Returns
-/// `[x, y, w, h]` as a `Uint32Array`, or an empty array on invalid input.
+/// `[x, y, w, h]` as a `Uint32Array`, or `undefined` (`None`) on invalid input
+/// so callers can't silently destructure an empty array.
 #[wasm_bindgen]
 pub fn constrain_crop_to_ratio(
     start_x: i32,
@@ -2800,9 +2802,9 @@ pub fn constrain_crop_to_ratio(
     ratio_h: u32,
     image_w: u32,
     image_h: u32,
-) -> Vec<u32> {
+) -> Option<Vec<u32>> {
     if ratio_w == 0 || ratio_h == 0 || image_w == 0 || image_h == 0 {
-        return Vec::new();
+        return None;
     }
     let r = ratio_w as f64 / ratio_h as f64;
     // Signed deltas tell us which quadrant the cursor's in.
@@ -2821,7 +2823,7 @@ pub fn constrain_crop_to_ratio(
         (ady * r, ady)
     };
     if w < 1.0 || h < 1.0 {
-        return vec![start_x.max(0) as u32, start_y.max(0) as u32, 1, 1];
+        return Some(vec![start_x.max(0) as u32, start_y.max(0) as u32, 1, 1]);
     }
 
     // Anchor at start, extend in cursor's direction.
@@ -2856,23 +2858,23 @@ pub fn constrain_crop_to_ratio(
     let y = y0.max(0.0).min(ih - 1.0);
     let w_u = w.floor().clamp(1.0, iw - x) as u32;
     let h_u = h.floor().clamp(1.0, ih - y) as u32;
-    vec![x as u32, y as u32, w_u, h_u]
+    Some(vec![x as u32, y as u32, w_u, h_u])
 }
 
 /// Compute the largest centred rectangle with the given aspect ratio that
 /// fits inside an `image_w` × `image_h` image. Used by the Crop tool's
 /// ratio buttons (1:1, 4:3, 16:9, …) so the JS side doesn't reinvent the
-/// math. Returns `[x, y, w, h]` as a `Uint32Array`. Any non-positive input
-/// returns an empty array.
+/// math. Returns `[x, y, w, h]` as a `Uint32Array`, or `undefined` (`None`)
+/// on any non-positive input so callers can't silently destructure empty.
 #[wasm_bindgen]
 pub fn compute_aspect_crop(
     image_w: u32,
     image_h: u32,
     ratio_w: u32,
     ratio_h: u32,
-) -> Vec<u32> {
+) -> Option<Vec<u32>> {
     if image_w == 0 || image_h == 0 || ratio_w == 0 || ratio_h == 0 {
-        return Vec::new();
+        return None;
     }
     let iw = image_w as f64;
     let ih = image_h as f64;
@@ -2889,7 +2891,7 @@ pub fn compute_aspect_crop(
     let ch_u = ch.floor().clamp(1.0, ih) as u32;
     let x = (image_w - cw_u) / 2;
     let y = (image_h - ch_u) / 2;
-    vec![x, y, cw_u, ch_u]
+    Some(vec![x, y, cw_u, ch_u])
 }
 #[cfg(test)]
 mod layer_tests {

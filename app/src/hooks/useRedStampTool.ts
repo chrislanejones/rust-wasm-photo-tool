@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 
+/** Default rubber-stamp tilt, in degrees (negative = counter-clockwise).
+ *  Threaded through to Rust so it can be made user-configurable later. */
+const STAMP_ANGLE_DEG = -5;
+
 interface PendingStamp {
   label: string;
   color: string;
@@ -57,10 +61,14 @@ export function useRedStampTool({
       const g = parseInt(hex.slice(2, 4), 16);
       const b = parseInt(hex.slice(4, 6), 16);
 
-      // Rust renders the label (bordered, -5° rotated), scales to brush size,
-      // composites centred on the click point, and pushes "Red Stamp" history.
+      // Rust renders the label (bordered, tilted by STAMP_ANGLE_DEG), scales to
+      // brush size, composites centred on the click point, and pushes history.
       const targetSize = Math.max(40, brushSizeRef.current * 4);
-      tool.commit_red_stamp(label, r, g, b, Math.round(cx), Math.round(cy), targetSize);
+      tool.commit_red_stamp(
+        label, r, g, b,
+        Math.round(cx), Math.round(cy),
+        targetSize, STAMP_ANGLE_DEG,
+      );
       flushToCanvas();
       syncState();
     },

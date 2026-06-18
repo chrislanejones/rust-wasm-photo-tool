@@ -140,6 +140,7 @@ pub fn render_stamp_label(
     label: &str,
     font_size: f32,
     r: u8, g: u8, b: u8,
+    angle_deg: f32,
 ) -> RenderedText {
     let font = FontRef::try_from_slice(FONT_BOLD).expect("embedded font is valid");
     let scale = PxScale::from(font_size);
@@ -182,8 +183,8 @@ pub fn render_stamp_label(
         &mut pixels,
     );
 
-    // Rotate -5 degrees
-    rotate_pixels(&pixels, canvas_w, canvas_h, -5.0)
+    // Rotate by the caller-supplied tilt (red stamps default to -5°).
+    rotate_pixels(&pixels, canvas_w, canvas_h, angle_deg)
 }
 
 /// Returns the (width, height) in pixels that `render_text` would produce,
