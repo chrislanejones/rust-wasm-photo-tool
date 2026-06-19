@@ -1,7 +1,7 @@
 class I {
   __destroy_into_raw() {
     const t = this.__wbg_ptr;
-    return this.__wbg_ptr = 0, D.unregister(this), t;
+    return this.__wbg_ptr = 0, L.unregister(this), t;
   }
   free() {
     const t = this.__destroy_into_raw();
@@ -11,24 +11,24 @@ class I {
     return e.imagehorsetool_active_layer_id(this.__wbg_ptr) >>> 0;
   }
   add_layer(t) {
-    const _ = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), r = g;
+    const _ = h(t, e.__wbindgen_malloc, e.__wbindgen_realloc), r = g;
     return e.imagehorsetool_add_layer(this.__wbg_ptr, _, r) >>> 0;
   }
   add_pin_annotation(t, _, r, n, i, s) {
-    const a = p(s, e.__wbindgen_malloc, e.__wbindgen_realloc), l = g;
+    const a = h(s, e.__wbindgen_malloc, e.__wbindgen_realloc), l = g;
     return e.imagehorsetool_add_pin_annotation(this.__wbg_ptr, t, _, r, n, i, a, l) >>> 0;
   }
   add_polyline_annotation(t, _, r) {
-    const n = L(t, e.__wbindgen_malloc), i = g, s = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), a = g;
+    const n = B(t, e.__wbindgen_malloc), i = g, s = h(_, e.__wbindgen_malloc, e.__wbindgen_realloc), a = g;
     return e.imagehorsetool_add_polyline_annotation(this.__wbg_ptr, n, i, s, a, r) >>> 0;
   }
-  add_shape_annotation(t, _, r, n, i, s, a, l) {
-    const c = p(s, e.__wbindgen_malloc, e.__wbindgen_realloc), h = g;
-    return e.imagehorsetool_add_shape_annotation(this.__wbg_ptr, t, _, r, n, i, c, h, a, l) >>> 0;
+  add_shape_annotation(t, _, r, n, i, s, a, l, c, p, b, d) {
+    const w = h(s, e.__wbindgen_malloc, e.__wbindgen_realloc), m = g, u = h(p, e.__wbindgen_malloc, e.__wbindgen_realloc), f = g, y = h(b, e.__wbindgen_malloc, e.__wbindgen_realloc), v = g;
+    return e.imagehorsetool_add_shape_annotation(this.__wbg_ptr, t, _, r, n, i, w, m, a, l, c, u, f, y, v, d) >>> 0;
   }
-  add_text_annotation(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A) {
-    const z = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), j = g;
-    return e.imagehorsetool_add_text_annotation(this.__wbg_ptr, z, j, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A) >>> 0;
+  add_text_annotation(t, _, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y) {
+    const v = h(t, e.__wbindgen_malloc, e.__wbindgen_realloc), A = g;
+    return e.imagehorsetool_add_text_annotation(this.__wbg_ptr, v, A, _, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y) >>> 0;
   }
   adjust_brightness(t) {
     e.imagehorsetool_adjust_brightness(this.__wbg_ptr, t);
@@ -46,7 +46,7 @@ class I {
     e.imagehorsetool_begin_blur_stroke(this.__wbg_ptr);
   }
   begin_draw_stroke(t) {
-    const _ = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), r = g;
+    const _ = h(t, e.__wbindgen_malloc, e.__wbindgen_realloc), r = g;
     e.imagehorsetool_begin_draw_stroke(this.__wbg_ptr, _, r);
   }
   begin_layer_restore() {
@@ -64,20 +64,20 @@ class I {
   clear_history() {
     e.imagehorsetool_clear_history(this.__wbg_ptr);
   }
-  commit_red_stamp(t, _, r, n, i, s, a) {
-    const l = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), c = g;
-    e.imagehorsetool_commit_red_stamp(this.__wbg_ptr, l, c, _, r, n, i, s, a);
+  commit_red_stamp(t, _, r, n, i, s, a, l) {
+    const c = h(t, e.__wbindgen_malloc, e.__wbindgen_realloc), p = g;
+    e.imagehorsetool_commit_red_stamp(this.__wbg_ptr, c, p, _, r, n, i, s, a, l);
   }
   commit_text(t, _, r, n, i, s, a, l, c) {
-    const h = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), b = g;
-    e.imagehorsetool_commit_text(this.__wbg_ptr, h, b, _, r, n, i, s, a, l, c);
+    const p = h(t, e.__wbindgen_malloc, e.__wbindgen_realloc), b = g;
+    e.imagehorsetool_commit_text(this.__wbg_ptr, p, b, _, r, n, i, s, a, l, c);
   }
   continue_stroke(t, _) {
     e.imagehorsetool_continue_stroke(this.__wbg_ptr, t, _);
   }
   copy_region(t, _, r, n) {
     const i = e.imagehorsetool_copy_region(this.__wbg_ptr, t, _, r, n);
-    var s = w(i[0], i[1]).slice();
+    var s = x(i[0], i[1]).slice();
     return e.__wbindgen_free(i[0], i[1] * 1, 1), s;
   }
   crop(t, _, r, n) {
@@ -93,11 +93,11 @@ class I {
     return e.imagehorsetool_delete_history_entry(this.__wbg_ptr, t) !== 0;
   }
   draw_arrow(t, _, r, n, i, s, a) {
-    const l = p(i, e.__wbindgen_malloc, e.__wbindgen_realloc), c = g;
+    const l = h(i, e.__wbindgen_malloc, e.__wbindgen_realloc), c = g;
     e.imagehorsetool_draw_arrow(this.__wbg_ptr, t, _, r, n, l, c, s, a);
   }
   draw_shape(t, _, r, n, i, s, a) {
-    const l = p(s, e.__wbindgen_malloc, e.__wbindgen_realloc), c = g;
+    const l = h(s, e.__wbindgen_malloc, e.__wbindgen_realloc), c = g;
     e.imagehorsetool_draw_shape(this.__wbg_ptr, t, _, r, n, i, l, c, a);
   }
   duplicate_layer(t) {
@@ -108,7 +108,7 @@ class I {
   }
   export_png() {
     const t = e.imagehorsetool_export_png(this.__wbg_ptr);
-    var _ = w(t[0], t[1]).slice();
+    var _ = x(t[0], t[1]).slice();
     return e.__wbindgen_free(t[0], t[1] * 1, 1), _;
   }
   finish_layer_restore(t) {
@@ -131,19 +131,19 @@ class I {
   }
   get_image_data() {
     const t = e.imagehorsetool_get_image_data(this.__wbg_ptr);
-    var _ = w(t[0], t[1]).slice();
+    var _ = x(t[0], t[1]).slice();
     return e.__wbindgen_free(t[0], t[1] * 1, 1), _;
   }
   get_layer_png(t) {
     const _ = e.imagehorsetool_get_layer_png(this.__wbg_ptr, t);
-    var r = w(_[0], _[1]).slice();
+    var r = x(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), r;
   }
   get_layer_shape_annotations(t) {
     let _, r;
     try {
       const n = e.imagehorsetool_get_layer_shape_annotations(this.__wbg_ptr, t);
-      return _ = n[0], r = n[1], f(n[0], n[1]);
+      return _ = n[0], r = n[1], z(n[0], n[1]);
     } finally {
       e.__wbindgen_free(_, r, 1);
     }
@@ -152,7 +152,7 @@ class I {
     let _, r;
     try {
       const n = e.imagehorsetool_get_layer_text_annotations(this.__wbg_ptr, t);
-      return _ = n[0], r = n[1], f(n[0], n[1]);
+      return _ = n[0], r = n[1], z(n[0], n[1]);
     } finally {
       e.__wbindgen_free(_, r, 1);
     }
@@ -161,26 +161,26 @@ class I {
     let t, _;
     try {
       const r = e.imagehorsetool_get_layers(this.__wbg_ptr);
-      return t = r[0], _ = r[1], f(r[0], r[1]);
+      return t = r[0], _ = r[1], z(r[0], r[1]);
     } finally {
       e.__wbindgen_free(t, _, 1);
     }
   }
   get_pixel(t, _) {
     const r = e.imagehorsetool_get_pixel(this.__wbg_ptr, t, _);
-    var n = w(r[0], r[1]).slice();
+    var n = x(r[0], r[1]).slice();
     return e.__wbindgen_free(r[0], r[1] * 1, 1), n;
   }
   get_pixel_region(t, _, r) {
     const n = e.imagehorsetool_get_pixel_region(this.__wbg_ptr, t, _, r);
-    var i = w(n[0], n[1]).slice();
+    var i = x(n[0], n[1]).slice();
     return e.__wbindgen_free(n[0], n[1] * 1, 1), i;
   }
   get_redo_snapshot_annotations(t) {
     let _, r;
     try {
       const n = e.imagehorsetool_get_redo_snapshot_annotations(this.__wbg_ptr, t);
-      return _ = n[0], r = n[1], f(n[0], n[1]);
+      return _ = n[0], r = n[1], z(n[0], n[1]);
     } finally {
       e.__wbindgen_free(_, r, 1);
     }
@@ -189,21 +189,21 @@ class I {
     let _, r;
     try {
       const n = e.imagehorsetool_get_redo_snapshot_label(this.__wbg_ptr, t);
-      return _ = n[0], r = n[1], f(n[0], n[1]);
+      return _ = n[0], r = n[1], z(n[0], n[1]);
     } finally {
       e.__wbindgen_free(_, r, 1);
     }
   }
   get_redo_snapshot_png(t) {
     const _ = e.imagehorsetool_get_redo_snapshot_png(this.__wbg_ptr, t);
-    var r = w(_[0], _[1]).slice();
+    var r = x(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), r;
   }
   get_shape_annotations() {
     let t, _;
     try {
       const r = e.imagehorsetool_get_shape_annotations(this.__wbg_ptr);
-      return t = r[0], _ = r[1], f(r[0], r[1]);
+      return t = r[0], _ = r[1], z(r[0], r[1]);
     } finally {
       e.__wbindgen_free(t, _, 1);
     }
@@ -212,7 +212,7 @@ class I {
     let t, _;
     try {
       const r = e.imagehorsetool_get_text_annotations(this.__wbg_ptr);
-      return t = r[0], _ = r[1], f(r[0], r[1]);
+      return t = r[0], _ = r[1], z(r[0], r[1]);
     } finally {
       e.__wbindgen_free(t, _, 1);
     }
@@ -221,7 +221,7 @@ class I {
     let _, r;
     try {
       const n = e.imagehorsetool_get_undo_snapshot_annotations(this.__wbg_ptr, t);
-      return _ = n[0], r = n[1], f(n[0], n[1]);
+      return _ = n[0], r = n[1], z(n[0], n[1]);
     } finally {
       e.__wbindgen_free(_, r, 1);
     }
@@ -230,14 +230,14 @@ class I {
     let _, r;
     try {
       const n = e.imagehorsetool_get_undo_snapshot_label(this.__wbg_ptr, t);
-      return _ = n[0], r = n[1], f(n[0], n[1]);
+      return _ = n[0], r = n[1], z(n[0], n[1]);
     } finally {
       e.__wbindgen_free(_, r, 1);
     }
   }
   get_undo_snapshot_png(t) {
     const _ = e.imagehorsetool_get_undo_snapshot_png(this.__wbg_ptr, t);
-    var r = w(_[0], _[1]).slice();
+    var r = x(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), r;
   }
   get_zoom() {
@@ -256,17 +256,17 @@ class I {
     let t, _;
     try {
       const r = e.imagehorsetool_history_labels(this.__wbg_ptr);
-      return t = r[0], _ = r[1], f(r[0], r[1]);
+      return t = r[0], _ = r[1], z(r[0], r[1]);
     } finally {
       e.__wbindgen_free(t, _, 1);
     }
   }
   inject_redo_snapshot(t, _, r, n) {
-    const i = y(t, e.__wbindgen_malloc), s = g, a = p(n, e.__wbindgen_malloc, e.__wbindgen_realloc), l = g;
+    const i = W(t, e.__wbindgen_malloc), s = g, a = h(n, e.__wbindgen_malloc, e.__wbindgen_realloc), l = g;
     e.imagehorsetool_inject_redo_snapshot(this.__wbg_ptr, i, s, _, r, a, l);
   }
   inject_undo_snapshot(t, _, r, n) {
-    const i = y(t, e.__wbindgen_malloc), s = g, a = p(n, e.__wbindgen_malloc, e.__wbindgen_realloc), l = g;
+    const i = W(t, e.__wbindgen_malloc), s = g, a = h(n, e.__wbindgen_malloc, e.__wbindgen_realloc), l = g;
     e.imagehorsetool_inject_undo_snapshot(this.__wbg_ptr, i, s, _, r, a, l);
   }
   jump_to_history(t) {
@@ -276,12 +276,12 @@ class I {
     return e.imagehorsetool_layer_count(this.__wbg_ptr) >>> 0;
   }
   load_image(t) {
-    const _ = y(t, e.__wbindgen_malloc), r = g;
+    const _ = W(t, e.__wbindgen_malloc), r = g;
     e.imagehorsetool_load_image(this.__wbg_ptr, _, r);
   }
   measure_text(t, _, r) {
-    const n = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), i = g, s = e.imagehorsetool_measure_text(this.__wbg_ptr, n, i, _, r);
-    var a = O(s[0], s[1]).slice();
+    const n = h(t, e.__wbindgen_malloc, e.__wbindgen_realloc), i = g, s = e.imagehorsetool_measure_text(this.__wbg_ptr, n, i, _, r);
+    var a = E(s[0], s[1]).slice();
     return e.__wbindgen_free(s[0], s[1] * 4, 4), a;
   }
   merge_down(t) {
@@ -292,7 +292,7 @@ class I {
   }
   constructor(t, _) {
     const r = e.imagehorsetool_new(t, _);
-    return this.__wbg_ptr = r >>> 0, D.register(this, this.__wbg_ptr, this), this;
+    return this.__wbg_ptr = r >>> 0, L.register(this, this.__wbg_ptr, this), this;
   }
   paint_begin() {
     e.imagehorsetool_paint_begin(this.__wbg_ptr);
@@ -304,26 +304,26 @@ class I {
     e.imagehorsetool_paint_stroke_to(this.__wbg_ptr, t, _, r, n, i, s, a, l, c);
   }
   paste_region(t, _, r, n, i) {
-    const s = y(t, e.__wbindgen_malloc), a = g;
+    const s = W(t, e.__wbindgen_malloc), a = g;
     e.imagehorsetool_paste_region(this.__wbg_ptr, s, a, _, r, n, i);
   }
   preview_crop(t, _, r, n) {
     e.imagehorsetool_preview_crop(this.__wbg_ptr, t, _, r, n);
   }
-  push_annotation_to_redo_snapshot(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) {
-    const j = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), k = g;
-    return e.imagehorsetool_push_annotation_to_redo_snapshot(this.__wbg_ptr, t, j, k, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) !== 0;
+  push_annotation_to_redo_snapshot(t, _, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y, v) {
+    const A = h(_, e.__wbindgen_malloc, e.__wbindgen_realloc), j = g;
+    return e.imagehorsetool_push_annotation_to_redo_snapshot(this.__wbg_ptr, t, A, j, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y, v) !== 0;
   }
-  push_annotation_to_undo_snapshot(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) {
-    const j = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), k = g;
-    return e.imagehorsetool_push_annotation_to_undo_snapshot(this.__wbg_ptr, t, j, k, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) !== 0;
+  push_annotation_to_undo_snapshot(t, _, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y, v) {
+    const A = h(_, e.__wbindgen_malloc, e.__wbindgen_realloc), j = g;
+    return e.imagehorsetool_push_annotation_to_undo_snapshot(this.__wbg_ptr, t, A, j, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y, v) !== 0;
   }
   push_compress_marker() {
     e.imagehorsetool_push_compress_marker(this.__wbg_ptr);
   }
   push_restored_layer(t, _, r, n, i, s) {
-    const a = y(t, e.__wbindgen_malloc), l = g, c = p(n, e.__wbindgen_malloc, e.__wbindgen_realloc), h = g;
-    return e.imagehorsetool_push_restored_layer(this.__wbg_ptr, a, l, _, r, c, h, i, s) >>> 0;
+    const a = W(t, e.__wbindgen_malloc), l = g, c = h(n, e.__wbindgen_malloc, e.__wbindgen_realloc), p = g;
+    return e.imagehorsetool_push_restored_layer(this.__wbg_ptr, a, l, _, r, c, p, i, s) >>> 0;
   }
   recomposite() {
     e.imagehorsetool_recomposite(this.__wbg_ptr);
@@ -347,12 +347,12 @@ class I {
     return e.imagehorsetool_remove_text_annotation(this.__wbg_ptr, t) !== 0;
   }
   rename_layer(t, _) {
-    const r = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), n = g;
+    const r = h(_, e.__wbindgen_malloc, e.__wbindgen_realloc), n = g;
     return e.imagehorsetool_rename_layer(this.__wbg_ptr, t, r, n) !== 0;
   }
   render_with_annotations() {
     const t = e.imagehorsetool_render_with_annotations(this.__wbg_ptr);
-    var _ = w(t[0], t[1]).slice();
+    var _ = x(t[0], t[1]).slice();
     return e.__wbindgen_free(t[0], t[1] * 1, 1), _;
   }
   resize(t, _) {
@@ -365,15 +365,15 @@ class I {
     return e.imagehorsetool_restore_pin_annotation(this.__wbg_ptr, t, _, r, n, i, s, a, l) >>> 0;
   }
   restore_polyline_annotation(t, _, r, n, i) {
-    const s = L(t, e.__wbindgen_malloc), a = g;
+    const s = B(t, e.__wbindgen_malloc), a = g;
     return e.imagehorsetool_restore_polyline_annotation(this.__wbg_ptr, s, a, _, r, n, i) >>> 0;
   }
-  restore_shape_annotation(t, _, r, n, i, s, a, l, c, h) {
-    return e.imagehorsetool_restore_shape_annotation(this.__wbg_ptr, t, _, r, n, i, s, a, l, c, h) >>> 0;
+  restore_shape_annotation(t, _, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y, v, A, j) {
+    return e.imagehorsetool_restore_shape_annotation(this.__wbg_ptr, t, _, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y, v, A, j) >>> 0;
   }
-  restore_text_annotation(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A) {
-    const z = p(t, e.__wbindgen_malloc, e.__wbindgen_realloc), j = g;
-    return e.imagehorsetool_restore_text_annotation(this.__wbg_ptr, z, j, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A) >>> 0;
+  restore_text_annotation(t, _, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y) {
+    const v = h(t, e.__wbindgen_malloc, e.__wbindgen_realloc), A = g;
+    return e.imagehorsetool_restore_text_annotation(this.__wbg_ptr, v, A, _, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y) >>> 0;
   }
   rotate_90_ccw() {
     e.imagehorsetool_rotate_90_ccw(this.__wbg_ptr);
@@ -421,11 +421,11 @@ class I {
     return e.imagehorsetool_shape_annotation_count(this.__wbg_ptr) >>> 0;
   }
   stamp_pixels(t, _, r, n, i) {
-    const s = y(t, e.__wbindgen_malloc), a = g;
+    const s = W(t, e.__wbindgen_malloc), a = g;
     e.imagehorsetool_stamp_pixels(this.__wbg_ptr, s, a, _, r, n, i);
   }
   stamp_red(t, _, r, n, i, s) {
-    const a = y(t, e.__wbindgen_malloc), l = g;
+    const a = W(t, e.__wbindgen_malloc), l = g;
     e.imagehorsetool_stamp_red(this.__wbg_ptr, a, l, _, r, n, i, s);
   }
   text_annotation_at(t, _) {
@@ -436,7 +436,7 @@ class I {
   }
   thumbnail_data(t) {
     const _ = e.imagehorsetool_thumbnail_data(this.__wbg_ptr, t);
-    var r = w(_[0], _[1]).slice();
+    var r = x(_[0], _[1]).slice();
     return e.__wbindgen_free(_[0], _[1] * 1, 1), r;
   }
   thumbnail_height(t) {
@@ -454,113 +454,113 @@ class I {
   undo_snapshot_count() {
     return e.imagehorsetool_undo_count(this.__wbg_ptr) >>> 0;
   }
-  update_shape_annotation(t, _, r, n, i, s, a, l, c) {
-    const h = p(a, e.__wbindgen_malloc, e.__wbindgen_realloc), b = g;
-    return e.imagehorsetool_update_shape_annotation(this.__wbg_ptr, t, _, r, n, i, s, h, b, l, c) !== 0;
+  update_shape_annotation(t, _, r, n, i, s, a, l, c, p, b, d, w) {
+    const m = h(a, e.__wbindgen_malloc, e.__wbindgen_realloc), u = g, f = h(b, e.__wbindgen_malloc, e.__wbindgen_realloc), y = g, v = h(d, e.__wbindgen_malloc, e.__wbindgen_realloc), A = g;
+    return e.imagehorsetool_update_shape_annotation(this.__wbg_ptr, t, _, r, n, i, s, m, u, l, c, p, f, y, v, A, w) !== 0;
   }
-  update_text_annotation(t, _, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) {
-    const j = p(_, e.__wbindgen_malloc, e.__wbindgen_realloc), k = g;
-    return e.imagehorsetool_update_text_annotation(this.__wbg_ptr, t, j, k, r, n, i, s, a, l, c, h, b, m, d, u, v, x, A, z) !== 0;
+  update_text_annotation(t, _, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y, v) {
+    const A = h(_, e.__wbindgen_malloc, e.__wbindgen_realloc), j = g;
+    return e.imagehorsetool_update_text_annotation(this.__wbg_ptr, t, A, j, r, n, i, s, a, l, c, p, b, d, w, m, u, f, y, v) !== 0;
   }
   width() {
     return e.imagehorsetool_width(this.__wbg_ptr) >>> 0;
   }
 }
 Symbol.dispose && (I.prototype[Symbol.dispose] = I.prototype.free);
-function Y(o, t, _, r, n, i) {
+function X(o, t, _, r, n, i) {
   const s = e.blank_png(o, t, _, r, n, i);
-  var a = w(s[0], s[1]).slice();
+  var a = x(s[0], s[1]).slice();
   return e.__wbindgen_free(s[0], s[1] * 1, 1), a;
 }
-function G(o, t, _, r, n, i, s, a, l) {
-  const c = y(o, e.__wbindgen_malloc), h = g, b = y(r, e.__wbindgen_malloc), m = g, d = e.composite_pixels(c, h, t, _, b, m, n, i, s, a, l);
-  var u = w(d[0], d[1]).slice();
-  return e.__wbindgen_free(d[0], d[1] * 1, 1), u;
+function Y(o, t, _, r, n, i, s, a, l) {
+  const c = W(o, e.__wbindgen_malloc), p = g, b = W(r, e.__wbindgen_malloc), d = g, w = e.composite_pixels(c, p, t, _, b, d, n, i, s, a, l);
+  var m = x(w[0], w[1]).slice();
+  return e.__wbindgen_free(w[0], w[1] * 1, 1), m;
 }
-function J(o, t, _, r) {
+function G(o, t, _, r) {
   const n = e.compute_aspect_crop(o, t, _, r);
-  var i = O(n[0], n[1]).slice();
-  return e.__wbindgen_free(n[0], n[1] * 4, 4), i;
+  let i;
+  return n[0] !== 0 && (i = E(n[0], n[1]).slice(), e.__wbindgen_free(n[0], n[1] * 4, 4)), i;
 }
 function K(o, t, _, r, n, i, s, a) {
   const l = e.constrain_crop_to_ratio(o, t, _, r, n, i, s, a);
-  var c = O(l[0], l[1]).slice();
-  return e.__wbindgen_free(l[0], l[1] * 4, 4), c;
+  let c;
+  return l[0] !== 0 && (c = E(l[0], l[1]).slice(), e.__wbindgen_free(l[0], l[1] * 4, 4)), c;
 }
 function Q(o, t, _) {
-  const r = y(o, e.__wbindgen_malloc), n = g, i = e.encode_png_pixels(r, n, t, _);
-  var s = w(i[0], i[1]).slice();
+  const r = W(o, e.__wbindgen_malloc), n = g, i = e.encode_png_pixels(r, n, t, _);
+  var s = x(i[0], i[1]).slice();
   return e.__wbindgen_free(i[0], i[1] * 1, 1), s;
 }
 function Z(o) {
-  const t = p(o, e.__wbindgen_malloc, e.__wbindgen_realloc), _ = g, r = e.parse_color(t, _);
-  var n = w(r[0], r[1]).slice();
+  const t = h(o, e.__wbindgen_malloc, e.__wbindgen_realloc), _ = g, r = e.parse_color(t, _);
+  var n = x(r[0], r[1]).slice();
   return e.__wbindgen_free(r[0], r[1] * 1, 1), n;
 }
 function $(o) {
-  const t = p(o, e.__wbindgen_malloc, e.__wbindgen_realloc), _ = g;
+  const t = h(o, e.__wbindgen_malloc, e.__wbindgen_realloc), _ = g;
   return e.photo_limit(t, _) >>> 0;
 }
 function tt(o, t, _, r, n) {
-  const i = y(o, e.__wbindgen_malloc), s = g, a = e.resize_pixels(i, s, t, _, r, n);
-  var l = w(a[0], a[1]).slice();
+  const i = W(o, e.__wbindgen_malloc), s = g, a = e.resize_pixels(i, s, t, _, r, n);
+  var l = x(a[0], a[1]).slice();
   return e.__wbindgen_free(a[0], a[1] * 1, 1), l;
 }
 function et(o, t, _, r, n, i, s, a, l) {
   const c = e.web_perf_metrics(o, t, _, r, n, i, s, a, l);
-  var h = H(c[0], c[1]).slice();
-  return e.__wbindgen_free(c[0], c[1] * 8, 8), h;
+  var p = H(c[0], c[1]).slice();
+  return e.__wbindgen_free(c[0], c[1] * 8, 8), p;
 }
-function B() {
+function D() {
   return { __proto__: null, "./stamp_tool_bg.js": { __proto__: null, __wbg___wbindgen_throw_be289d5034ed271b: function(t, _) {
-    throw new Error(f(t, _));
+    throw new Error(z(t, _));
   }, __wbindgen_init_externref_table: function() {
     const t = e.__wbindgen_externrefs, _ = t.grow(4);
     t.set(0, void 0), t.set(_ + 0, void 0), t.set(_ + 1, null), t.set(_ + 2, true), t.set(_ + 3, false);
   } } };
 }
-const D = typeof FinalizationRegistry > "u" ? { register: () => {
+const L = typeof FinalizationRegistry > "u" ? { register: () => {
 }, unregister: () => {
 } } : new FinalizationRegistry((o) => e.__wbg_imagehorsetool_free(o >>> 0, 1));
 function H(o, t) {
   return o = o >>> 0, C().subarray(o / 8, o / 8 + t);
 }
-function O(o, t) {
-  return o = o >>> 0, N().subarray(o / 4, o / 4 + t);
+function E(o, t) {
+  return o = o >>> 0, P().subarray(o / 4, o / 4 + t);
 }
-function w(o, t) {
-  return o = o >>> 0, W().subarray(o / 1, o / 1 + t);
+function x(o, t) {
+  return o = o >>> 0, k().subarray(o / 1, o / 1 + t);
 }
 let F = null;
 function C() {
   return (F === null || F.byteLength === 0) && (F = new Float64Array(e.memory.buffer)), F;
 }
-function f(o, t) {
-  return o = o >>> 0, V(o, t);
+function z(o, t) {
+  return o = o >>> 0, N(o, t);
 }
 let T = null;
-function N() {
+function P() {
   return (T === null || T.byteLength === 0) && (T = new Uint32Array(e.memory.buffer)), T;
 }
 let M = null;
-function W() {
+function k() {
   return (M === null || M.byteLength === 0) && (M = new Uint8Array(e.memory.buffer)), M;
 }
-function y(o, t) {
+function W(o, t) {
   const _ = t(o.length * 1, 1) >>> 0;
-  return W().set(o, _ / 1), g = o.length, _;
+  return k().set(o, _ / 1), g = o.length, _;
 }
-function L(o, t) {
+function B(o, t) {
   const _ = t(o.length * 8, 8) >>> 0;
   return C().set(o, _ / 8), g = o.length, _;
 }
-function p(o, t, _) {
+function h(o, t, _) {
   if (_ === void 0) {
     const a = R.encode(o), l = t(a.length, 1) >>> 0;
-    return W().subarray(l, l + a.length).set(a), g = a.length, l;
+    return k().subarray(l, l + a.length).set(a), g = a.length, l;
   }
   let r = o.length, n = t(r, 1) >>> 0;
-  const i = W();
+  const i = k();
   let s = 0;
   for (; s < r; s++) {
     const a = o.charCodeAt(s);
@@ -569,17 +569,17 @@ function p(o, t, _) {
   }
   if (s !== r) {
     s !== 0 && (o = o.slice(s)), n = _(n, r, r = s + o.length * 3, 1) >>> 0;
-    const a = W().subarray(n + s, n + r), l = R.encodeInto(o, a);
+    const a = k().subarray(n + s, n + r), l = R.encodeInto(o, a);
     s += l.written, n = _(n, r, s, 1) >>> 0;
   }
   return g = s, n;
 }
 let S = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
 S.decode();
-const P = 2146435072;
+const J = 2146435072;
 let U = 0;
-function V(o, t) {
-  return U += t, U >= P && (S = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), S.decode(), U = t), S.decode(W().subarray(o, o + t));
+function N(o, t) {
+  return U += t, U >= J && (S = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }), S.decode(), U = t), S.decode(k().subarray(o, o + t));
 }
 const R = new TextEncoder();
 "encodeInto" in R || (R.encodeInto = function(o, t) {
@@ -590,7 +590,7 @@ let g = 0, e;
 function q(o, t) {
   return e = o.exports, F = null, T = null, M = null, e.__wbindgen_start(), e;
 }
-async function X(o, t) {
+async function V(o, t) {
   if (typeof Response == "function" && o instanceof Response) {
     if (typeof WebAssembly.instantiateStreaming == "function") try {
       return await WebAssembly.instantiateStreaming(o, t);
@@ -617,24 +617,24 @@ async function X(o, t) {
 function _t(o) {
   if (e !== void 0) return e;
   o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module: o } = o : console.warn("using deprecated parameters for `initSync()`; pass a single object instead"));
-  const t = B();
+  const t = D();
   o instanceof WebAssembly.Module || (o = new WebAssembly.Module(o));
   const _ = new WebAssembly.Instance(o, t);
   return q(_);
 }
 async function rt(o) {
   if (e !== void 0) return e;
-  o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module_or_path: o } = o : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), o === void 0 && (o = new URL("/assets/stamp_tool_bg-BhDsNf1U.wasm", import.meta.url));
-  const t = B();
+  o !== void 0 && (Object.getPrototypeOf(o) === Object.prototype ? { module_or_path: o } = o : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), o === void 0 && (o = new URL("/assets/stamp_tool_bg-BgJ06yWA.wasm", import.meta.url));
+  const t = D();
   (typeof o == "string" || typeof Request == "function" && o instanceof Request || typeof URL == "function" && o instanceof URL) && (o = fetch(o));
-  const { instance: _, module: r } = await X(await o, t);
+  const { instance: _, module: r } = await V(await o, t);
   return q(_);
 }
 export {
   I as ImageHorseTool,
-  Y as blank_png,
-  G as composite_pixels,
-  J as compute_aspect_crop,
+  X as blank_png,
+  Y as composite_pixels,
+  G as compute_aspect_crop,
   K as constrain_crop_to_ratio,
   rt as default,
   Q as encode_png_pixels,

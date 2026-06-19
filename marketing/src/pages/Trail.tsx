@@ -26,6 +26,21 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.16",
+    date: "2026-06-18",
+    headline: "Shape fill & gradients, sharper thumbnails, configurable stamps",
+    entries: [
+      { tag: "feature", text: "Shapes can now be filled — give any rectangle or circle a solid background color or a two-color linear gradient, with From/To swatches and a direction picker (→ ↓ ↘ ↙). The outline draws on top, and the fill follows the shape when you reselect, move, or resize it." },
+      { tag: "rust",    text: "Fill rendering lives entirely in Rust — a new fill_shape routine paints the solid color or per-pixel gradient under the stroke, threaded through the shape add/update/restore paths and the saved-edit format so fills round-trip through save and undo/redo." },
+      { tag: "ui",      text: "The live drag preview shows the fill and gradient as you draw (via an SVG gradient), and the Fill controls reuse the app's existing swatch grid and button groups so they match the rest of the Shapes panel." },
+      { tag: "fix",     text: "Reselecting a filled shape no longer swaps its fill — moving or resizing it keeps the color or gradient it was drawn with instead of picking up the panel's current setting." },
+      { tag: "ui",      text: "The Review button now uses a magnifying-glass icon instead of the history clock, so it no longer looks identical to the History section." },
+      { tag: "rust",    text: "Thumbnails are sharper and cleaner — downscaling now samples in linear light with premultiplied alpha, so midtones no longer darken and transparent edges no longer fringe with stray color." },
+      { tag: "rust",    text: "The red rubber-stamp tilt is now a parameter (still −5° by default) instead of a hard-coded constant, ready to be made adjustable." },
+      { tag: "fix",     text: "The crop-ratio helpers return a clear empty result on bad input instead of a silently-empty array, so a malformed call can't quietly produce a zero-size crop." },
+    ],
+  },
+  {
     version: "v0.9.15",
     date: "2026-06-18",
     headline: "AI tools go live (Replicate) + Stripe billing",

@@ -647,6 +647,18 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 5 | **Oversized-upload guard** — `makeWorkingCopy` / `makeThumbnail` reject images above 100 MP (typed `ImageTooLargeError`) right after the `createImageBitmap` probe, before the full-res decode can OOM the tab; `handleAddPhotos` surfaces it as a toast | Complete |
 | 6 | **Anonymous-edit cleanup cron hardened** — `expireSessionEdits` switched from a non-indexed `.filter().collect()` (a full table scan that silently fails past Convex's per-mutation read limit) to an indexed `by_updatedAt` range scan bounded by `.take(2000)`, so it keeps reclaiming abandoned storage blobs as the table grows | Complete |
 
+## v3.8 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **Shape fill + linear gradient** — rect/circle shapes gain an interior fill in the Shapes panel: **None / Solid / Gradient**, reusing `ToolButtonGroup` + `ColorSwatchGrid`/`TEXT_COLORS` (one swatch for solid; From/To swatches + a →↓↘↙ direction picker for gradient). `ToolSettings` grew `fillMode`/`fillColor`/`fillColor2`/`gradientAngle`. Fill is committed only for rect (0) / circle (1). The live `CanvasArea` drag preview renders the fill / gradient via an SVG `<linearGradient>` | Complete |
+| 2 | **Fill rendering + persistence in Rust** — `ShapeAnnotation` gained `fill_kind` (0 none / 1 solid / 2 linear gradient), fill + stop-2 RGBA, and `fill_angle`; `render_shape_into` paints the fill **before** the stroke and new `drawing::fill_shape` does solid + per-pixel linear gradient (source-over). Threaded through `add_/update_/restore_shape_annotation`, the `get_shape_annotations` JSON, and `PersistedShape` (old saves restore as no-fill), so fills round-trip through save and undo/redo. +3 Rust unit tests (solid / none / gradient-across-axis) | Complete |
+| 3 | **Reselect preserves fill** — `selectShape` now captures a shape's fill into `DrawEditState.style` and `commitEdit` prefers it (`es.style?.fill… ?? settings`), exactly like `strokeColor`, so moving/resizing a reselected rect/circle no longer swaps its fill to the panel's current setting; the overlay previews a reselected shape's fill too | Complete |
+| 4 | **Distinct Review icon** — the TopBar **Review** toggle uses a magnifying-glass (`Search`) icon instead of `History`, removing the collision with the History section's icon | Complete |
+| 5 | **Thumbnail sampling: gamma + premultiplied alpha** — `ImageBuffer::sample_bilinear` now interpolates in linear light (sRGB transfer removed) with premultiplied alpha, then un-premultiplies and re-encodes, fixing midtone darkening on downscale and transparent-edge color fringing. Scoped to thumbnails (its only caller). +3 unit tests | Complete |
+| 6 | **Configurable red-stamp angle** — the `−5°` rubber-stamp tilt is now an `angle_deg` parameter threaded through `render_stamp_label` → `commit_red_stamp` (JS passes `STAMP_ANGLE_DEG`, unchanged default), ready for a future UI control | Complete |
+| 7 | **Safe crop returns** — `constrain_crop_to_ratio` / `compute_aspect_crop` now return `Option<Vec<u32>>` (→ `undefined` in JS) instead of a silent empty array on invalid input; both JS callers guard explicitly so a malformed call can't quietly destructure a zero-size crop | Complete |
+
 ## License
 
 MIT
