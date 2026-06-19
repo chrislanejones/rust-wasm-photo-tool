@@ -14,8 +14,13 @@ export const getByUser = query({
   },
 });
 
-export const upsert = mutation({
+/** Internal-only upsert. Switched from a public `mutation` to an
+ *  `internalMutation` so a signed-in client cannot fabricate their own
+ *  subscription row (Stripe IDs / plan / status). The verified Stripe webhook
+ *  writes subscriptions via `fulfill`; this is kept only for server-side use. */
+export const upsert = internalMutation({
   args: {
+    userId: v.id("users"),
     stripeCustomerId: v.string(),
     stripeSubId: v.string(),
     plan: v.union(v.literal("pro"), v.literal("team")),
@@ -27,9 +32,7 @@ export const upsert = mutation({
     currentPeriodEnd: v.number(),
     cancelAtPeriodEnd: v.boolean(),
   },
-  handler: async (ctx, args) => {
-    const userId = await getUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+  handler: async (ctx, { userId, ...args }) => {
     const existing = await ctx.db
       .query("subscriptions")
       .withIndex("by_userId", (q) => q.eq("userId", userId))

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { action, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { requireUser } from "./users";
 import type { Id } from "./_generated/dataModel";
 
 // ── Replicate model registry ───────────────────────────────────────────────
@@ -36,10 +37,13 @@ const MODELS: Partial<
   // upscale / inpaint / ocr land here as the pattern is cloned (milestone 2+).
 };
 
-/** Short-lived upload URL for the source frame (current canvas PNG). */
+/** Short-lived upload URL for the source frame (current canvas PNG).
+ *  Auth-gated: only signed-in users can mint upload URLs (prevents anonymous
+ *  clients from pushing orphaned blobs into storage). */
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireUser(ctx);
     return await ctx.storage.generateUploadUrl();
   },
 });

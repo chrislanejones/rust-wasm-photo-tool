@@ -218,16 +218,4 @@ export default defineSchema({
     .index("by_userId_photoKey", ["userId", "photoKey"])
     .index("by_replicateId", ["replicateId"])
     .index("by_status", ["status"]),
-
-  // ── Anonymous canvas edits (sessionId from localStorage, no login required) ─
-  session_edits: defineTable({
-    sessionId: v.string(),
-    photoKey: v.string(),
-    storageId: v.id("_storage"),
-    canvasW: v.number(),
-    canvasH: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_sessionId_photoKey", ["sessionId", "photoKey"])
-    .index("by_updatedAt", ["updatedAt"]),
 });

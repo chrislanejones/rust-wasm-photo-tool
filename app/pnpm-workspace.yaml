@@ -1,5 +1,10 @@
+overrides:
+  '@clerk/shared': '>=3.47.7'
+  js-cookie: '>=3.0.7'
+  ws: '>=8.21.0'
 onlyBuiltDependencies:
-  - '@clerk/shared'
   - '@swc/core'
   - esbuild
   - tesseract.js
+allowBuilds:
+  '@clerk/shared': false
