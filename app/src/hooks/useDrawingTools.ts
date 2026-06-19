@@ -43,6 +43,12 @@ export interface DrawEditState {
     /** The shape's real Rust `kind` byte, preserved across an edit so a pin
      *  (kind 5) re-rendered as a circle handle still commits as a pin. */
     kindByte?: number;
+    /** Interior fill, captured on reselect so it round-trips (rect/circle).
+     *  Treated exactly like strokeColor: preserved across move/resize. */
+    fillMode: "none" | "solid" | "gradient";
+    fillColor: string;
+    fillColor2: string;
+    gradientAngle: number;
   };
 }
 
@@ -61,6 +67,12 @@ export interface ShapeMeta {
   arrow_style: number;
   /** Pin label (kind 5). */
   number: number;
+  /** Interior fill (rect/circle): 0 none, 1 solid, 2 linear gradient. */
+  fill_kind: number;
+  fill_r: number; fill_g: number; fill_b: number; fill_a: number;
+  fill2_r: number; fill2_g: number; fill2_b: number; fill2_a: number;
+  /** Gradient direction in degrees. */
+  fill_angle: number;
   /** Polyline vertices (kind 6) as [[x,y],…]. */
   points: number[][];
 }
@@ -248,6 +260,21 @@ export function useDrawingTools({
       es.style?.kindByte ??
       (es.kind === "arrow" ? 4 : (SHAPE_NAME_KIND[shapeName] ?? 0));
     const arrowByte = arrowStyle === "double" ? 1 : 0;
+    // Interior fill — only rect (0) / circle (1) accept it; everything else
+    // commits with fill_kind 0. Existing-shape edits keep the shape's captured
+    // fill (so move/resize doesn't swap it to the panel's current fill); new
+    // shapes read the live panel settings — mirrors strokeColor above.
+    const fillMode = es.style?.fillMode ?? s.fillMode;
+    const fillColor = es.style?.fillColor ?? s.fillColor;
+    const fillColor2 = es.style?.fillColor2 ?? s.fillColor2;
+    const gradientAngle = es.style?.gradientAngle ?? s.gradientAngle;
+    const canFill = kind === 0 || kind === 1;
+    const fillKind = canFill
+      ? fillMode === "solid" ? 1 : fillMode === "gradient" ? 2 : 0
+      : 0;
+    const fillHex = fillColor ?? "#000000";
+    const fill2Hex = fillColor2 ?? "#000000";
+    const fillAngle = gradientAngle ?? 0;
     if (es.editId != null) {
       // Re-selection committed without a drag → just un-hide it, no history.
       if (!editDirtyRef.current) {
@@ -266,6 +293,10 @@ export function useDrawingTools({
         strokeColor,
         strokeWidth,
         arrowByte,
+        fillKind,
+        fillHex,
+        fill2Hex,
+        fillAngle,
       );
       tool.set_editing_shape(-1);
     } else {
@@ -278,6 +309,10 @@ export function useDrawingTools({
         strokeColor,
         strokeWidth,
         arrowByte,
+        fillKind,
+        fillHex,
+        fill2Hex,
+        fillAngle,
       );
     }
     flushToCanvas();
@@ -334,6 +369,11 @@ export function useDrawingTools({
           strokeWidth: sh.stroke_width,
           arrowStyle: sh.arrow_style === 1 ? "double" : "single",
           kindByte: sh.kind,
+          fillMode:
+            sh.fill_kind === 1 ? "solid" : sh.fill_kind === 2 ? "gradient" : "none",
+          fillColor: rgbToHex(sh.fill_r, sh.fill_g, sh.fill_b),
+          fillColor2: rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
+          gradientAngle: sh.fill_angle,
         },
       };
       tool.set_editing_shape(id);

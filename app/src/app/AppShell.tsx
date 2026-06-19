@@ -1824,6 +1824,10 @@ export function AppShell() {
                             strokeWidth: toolSettings.strokeWidth,
                             arrowStyle: toolSettings.arrowStyle,
                             shape: toolSettings.shape ?? "rect",
+                            fillMode: toolSettings.fillMode,
+                            fillColor: toolSettings.fillColor,
+                            fillColor2: toolSettings.fillColor2,
+                            gradientAngle: toolSettings.gradientAngle,
                           }}
                         />
                       </div>
@@ -1897,6 +1901,10 @@ export function AppShell() {
                         strokeWidth: toolSettings.strokeWidth,
                         arrowStyle: toolSettings.arrowStyle,
                         shape: toolSettings.shape ?? "rect",
+                        fillMode: toolSettings.fillMode,
+                        fillColor: toolSettings.fillColor,
+                        fillColor2: toolSettings.fillColor2,
+                        gradientAngle: toolSettings.gradientAngle,
                       }}
                     />
                   </div>

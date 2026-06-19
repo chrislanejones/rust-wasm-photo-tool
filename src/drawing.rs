@@ -380,6 +380,78 @@ pub fn draw_arrow(
     }
 }
 
+/// Per-channel linear interpolation of two straight-alpha RGBA colours.
+fn lerp_rgba(a: [u8; 4], b: [u8; 4], t: f64) -> [u8; 4] {
+    let l = |x: u8, y: u8| (x as f64 + (y as f64 - x as f64) * t).round().clamp(0.0, 255.0) as u8;
+    [l(a[0], b[0]), l(a[1], b[1]), l(a[2], b[2]), l(a[3], b[3])]
+}
+
+/// Fill the interior of a rectangle (`shape == 0`) or circle (`shape == 1`)
+/// defined by the bbox (x0,y0)-(x1,y1). `fill_kind`: 1 = solid `c0`, 2 = linear
+/// gradient `c0`→`c1` along `angle_deg` (0 = left→right, 90 = top→bottom).
+/// Composited source-over; the caller draws the stroke on top afterwards.
+pub fn fill_shape(
+    data: &mut [u8],
+    w: u32, h: u32,
+    shape: u8,
+    x0: f64, y0: f64, x1: f64, y1: f64,
+    fill_kind: u8,
+    c0: [u8; 4], c1: [u8; 4],
+    angle_deg: u16,
+) {
+    let wi = w as i32;
+    let hi = h as i32;
+    let minx = x0.min(x1);
+    let maxx = x0.max(x1);
+    let miny = y0.min(y1);
+    let maxy = y0.max(y1);
+    let cx = (minx + maxx) * 0.5;
+    let cy = (miny + maxy) * 0.5;
+    // Circle radius matches draw_shape's clean circle: min of the half-extents.
+    let radius = ((maxx - minx) * 0.5).min((maxy - miny) * 0.5);
+
+    let px0 = (minx.floor() as i32).max(0);
+    let py0 = (miny.floor() as i32).max(0);
+    let px1 = (maxx.ceil() as i32).min(wi - 1);
+    let py1 = (maxy.ceil() as i32).min(hi - 1);
+    if px0 > px1 || py0 > py1 { return; }
+
+    // Gradient axis: project pixel centres onto the unit direction and
+    // normalise against the bbox's projected span so t spans 0..1 edge-to-edge.
+    let ang = (angle_deg as f64) * PI / 180.0;
+    let (ax, ay) = (ang.cos(), ang.sin());
+    let proj = |x: f64, y: f64| x * ax + y * ay;
+    let corners = [(minx, miny), (maxx, miny), (minx, maxy), (maxx, maxy)];
+    let mut pmin = f64::INFINITY;
+    let mut pmax = f64::NEG_INFINITY;
+    for &(x, y) in &corners {
+        let p = proj(x, y);
+        pmin = pmin.min(p);
+        pmax = pmax.max(p);
+    }
+    let span = (pmax - pmin).max(1e-6);
+
+    for py in py0..=py1 {
+        for px in px0..=px1 {
+            let fx = px as f64 + 0.5;
+            let fy = py as f64 + 0.5;
+            if shape == 1 {
+                let dx = fx - cx;
+                let dy = fy - cy;
+                if (dx * dx + dy * dy).sqrt() > radius { continue; }
+            }
+            let col = if fill_kind == 2 {
+                let t = ((proj(fx, fy) - pmin) / span).clamp(0.0, 1.0);
+                lerp_rgba(c0, c1, t)
+            } else {
+                c0
+            };
+            let idx = ((py * wi + px) * 4) as usize;
+            blend_pixel(data, idx, col);
+        }
+    }
+}
+
 pub fn draw_shape(
     data: &mut [u8],
     w: u32, h: u32,

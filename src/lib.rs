@@ -240,7 +240,7 @@ pub struct TextAnnotation {
 ///
 /// `Clone` is derived so each history snapshot carries an independent copy
 /// (undo/redo restores the overlay too).
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ShapeAnnotation {
     pub id: u32,
     /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline.
@@ -256,6 +256,16 @@ pub struct ShapeAnnotation {
     /// Freehand/polyline pens (kind 6): the vertex list. Empty otherwise. The
     /// bbox (x0,y0,x1,y1) is derived from these for hit-test / Reselect.
     pub points: Vec<(f64, f64)>,
+    /// Interior fill: 0 = none, 1 = solid, 2 = linear gradient. Honoured only
+    /// for rect (0) and circle (1); ignored for line/arrow/pin/polyline. The
+    /// fill is painted BEFORE the stroke so the outline sits on top.
+    pub fill_kind: u8,
+    /// Solid fill colour, or gradient stop 0 (RGBA, straight alpha).
+    pub fill_r: u8, pub fill_g: u8, pub fill_b: u8, pub fill_a: u8,
+    /// Gradient stop 1 (RGBA). Used only when `fill_kind == 2`.
+    pub fill2_r: u8, pub fill2_g: u8, pub fill2_b: u8, pub fill2_a: u8,
+    /// Linear-gradient direction in degrees (0 = →, 90 = ↓, …). `fill_kind == 2`.
+    pub fill_angle: u16,
 }
 
 /// A single Photoshop-style layer: an independent RGBA pixel buffer plus its
@@ -433,13 +443,17 @@ fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
         }
         pts.push(']');
         out.push_str(&format!(
-            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"points\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"points\":{}}}",
             s.id, s.kind,
             s.x0, s.y0, s.x1, s.y1,
             s.r, s.g, s.b,
             s.stroke_width,
             s.arrow_style,
             s.number,
+            s.fill_kind,
+            s.fill_r, s.fill_g, s.fill_b, s.fill_a,
+            s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a,
+            s.fill_angle,
             pts,
         ));
     }
@@ -486,6 +500,18 @@ fn point_segment_distance(px: f64, py: f64, ax: f64, ay: f64, bx: f64, by: f64) 
 /// the flattened pixels are identical.
 fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let color = [s.r, s.g, s.b, 255];
+    // Interior fill (rect=0, circle=1 only), painted BEFORE the stroke so the
+    // outline sits on top. fill_kind: 1 = solid, 2 = linear gradient.
+    if (s.kind == 0 || s.kind == 1) && s.fill_kind != 0 {
+        crate::drawing::fill_shape(
+            data, w, h, s.kind,
+            s.x0, s.y0, s.x1, s.y1,
+            s.fill_kind,
+            [s.fill_r, s.fill_g, s.fill_b, s.fill_a],
+            [s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a],
+            s.fill_angle,
+        );
+    }
     match s.kind {
         4 => crate::drawing::draw_arrow(
             data, w, h,
@@ -1588,9 +1614,15 @@ impl ImageHorseTool {
         color_hex: &str,
         stroke_width: f64,
         arrow_style: u8,
+        fill_kind: u8,
+        fill_hex: &str,
+        fill2_hex: &str,
+        fill_angle: u16,
     ) -> u32 {
         self.snap(if kind == 4 { "Add Arrow" } else { "Add Shape" });
         let c = drawing::parse_hex_color(color_hex);
+        let f = drawing::parse_hex_color(fill_hex);
+        let f2 = drawing::parse_hex_color(fill2_hex);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
         self.layers[self.active].shape_annotations.push(ShapeAnnotation {
@@ -1602,6 +1634,10 @@ impl ImageHorseTool {
             arrow_style,
             number: 0,
             points: Vec::new(),
+            fill_kind,
+            fill_r: f[0], fill_g: f[1], fill_b: f[2], fill_a: f[3],
+            fill2_r: f2[0], fill2_g: f2[1], fill2_b: f2[2], fill2_a: f2[3],
+            fill_angle,
         });
         id
     }
@@ -1618,12 +1654,20 @@ impl ImageHorseTool {
         r: u8, g: u8, b: u8,
         stroke_width: f64,
         arrow_style: u8,
+        fill_kind: u8,
+        fill_r: u8, fill_g: u8, fill_b: u8, fill_a: u8,
+        fill2_r: u8, fill2_g: u8, fill2_b: u8, fill2_a: u8,
+        fill_angle: u16,
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
         self.layers[self.active].shape_annotations.push(ShapeAnnotation {
             id, kind, x0, y0, x1, y1, r, g, b, stroke_width, arrow_style,
             number: 0, points: Vec::new(),
+            fill_kind,
+            fill_r, fill_g, fill_b, fill_a,
+            fill2_r, fill2_g, fill2_b, fill2_a,
+            fill_angle,
         });
         id
     }
@@ -1645,6 +1689,7 @@ impl ImageHorseTool {
             r: c[0], g: c[1], b: c[2],
             stroke_width: 0.0, arrow_style: 0,
             number, points: Vec::new(),
+            ..Default::default()
         });
         id
     }
@@ -1661,6 +1706,7 @@ impl ImageHorseTool {
             id, kind: 5, x0, y0, x1, y1, r, g, b,
             stroke_width: 0.0, arrow_style: 0,
             number, points: Vec::new(),
+            ..Default::default()
         });
         id
     }
@@ -1685,6 +1731,7 @@ impl ImageHorseTool {
             r: c[0], g: c[1], b: c[2],
             stroke_width, arrow_style: 0,
             number: 0, points: pts,
+            ..Default::default()
         });
         id
     }
@@ -1704,6 +1751,7 @@ impl ImageHorseTool {
             id, kind: 6, x0, y0, x1, y1, r, g, b,
             stroke_width, arrow_style: 0,
             number: 0, points: pts,
+            ..Default::default()
         });
         id
     }
@@ -1720,18 +1768,28 @@ impl ImageHorseTool {
         color_hex: &str,
         stroke_width: f64,
         arrow_style: u8,
+        fill_kind: u8,
+        fill_hex: &str,
+        fill2_hex: &str,
+        fill_angle: u16,
     ) -> bool {
         if !self.layers[self.active].shape_annotations.iter().any(|s| s.id == id) {
             return false;
         }
         self.snap("Edit Shape");
         let c = drawing::parse_hex_color(color_hex);
+        let f = drawing::parse_hex_color(fill_hex);
+        let f2 = drawing::parse_hex_color(fill2_hex);
         if let Some(s) = self.layers[self.active].shape_annotations.iter_mut().find(|s| s.id == id) {
             s.kind = kind;
             s.x0 = x0; s.y0 = y0; s.x1 = x1; s.y1 = y1;
             s.r = c[0]; s.g = c[1]; s.b = c[2];
             s.stroke_width = stroke_width;
             s.arrow_style = arrow_style;
+            s.fill_kind = fill_kind;
+            s.fill_r = f[0]; s.fill_g = f[1]; s.fill_b = f[2]; s.fill_a = f[3];
+            s.fill2_r = f2[0]; s.fill2_g = f2[1]; s.fill2_b = f2[2]; s.fill2_a = f2[3];
+            s.fill_angle = fill_angle;
         }
         true
     }
@@ -2943,6 +3001,38 @@ mod layer_tests {
     }
 
     #[test]
+    fn shape_solid_fill_paints_interior() {
+        let mut t = ImageHorseTool::new(20, 20);
+        t.load_image(&solid(20, 20, [255, 255, 255, 255]));
+        // Rect (4,4)-(16,16), solid blue fill (kind 1), thin black stroke.
+        t.add_shape_annotation(0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 1, "#0000ff", "#000000", 0);
+        let p = px(&t, 10, 10); // interior centre
+        assert_eq!([p[0], p[1], p[2]], [0, 0, 255], "interior should be blue fill, got {p:?}");
+    }
+
+    #[test]
+    fn shape_no_fill_leaves_interior_untouched() {
+        let mut t = ImageHorseTool::new(20, 20);
+        t.load_image(&solid(20, 20, [255, 255, 255, 255]));
+        // fill_kind 0 = none → interior stays white.
+        t.add_shape_annotation(0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0);
+        assert_eq!(px(&t, 10, 10), [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn shape_gradient_fill_varies_across_axis() {
+        let mut t = ImageHorseTool::new(40, 40);
+        t.load_image(&solid(40, 40, [255, 255, 255, 255]));
+        // Horizontal (angle 0) gradient red→green across a wide rect; no stroke
+        // bleed in the centre band we sample.
+        t.add_shape_annotation(0, 2.0, 2.0, 38.0, 38.0, "#000000", 1.0, 0, 2, "#ff0000", "#00ff00", 0);
+        let left = px(&t, 6, 20);
+        let right = px(&t, 34, 20);
+        assert!(left[0] > left[1], "left end should be redder, got {left:?}");
+        assert!(right[1] > right[0], "right end should be greener, got {right:?}");
+    }
+
+    #[test]
     fn visibility_toggle_hides_layer() {
         let mut t = ImageHorseTool::new(2, 2);
         t.load_image(&solid(2, 2, [255, 0, 0, 255]));
@@ -3078,7 +3168,7 @@ mod layer_persistence_tests {
         let mut t = ImageHorseTool::new(16, 16);
         t.load_image(&solid(16, 16, [0, 0, 0, 255]));
         // Shape on the base layer (active = 0).
-        t.add_shape_annotation(0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0);
+        t.add_shape_annotation(0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0);
         // New empty top layer.
         t.add_layer("top");
         let s0 = t.get_layer_shape_annotations(0);

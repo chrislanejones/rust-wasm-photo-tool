@@ -115,6 +115,12 @@ export interface PersistedShape {
   arrow_style: number;
   /** Pin label (kind 5). */
   number?: number;
+  /** Interior fill (rect/circle): 0 none, 1 solid, 2 linear gradient. Older
+   *  saves omit these — treat absent as 0/no-fill on restore. */
+  fill_kind?: number;
+  fill_r?: number; fill_g?: number; fill_b?: number; fill_a?: number;
+  fill2_r?: number; fill2_g?: number; fill2_b?: number; fill2_a?: number;
+  fill_angle?: number;
   /** Polyline vertices (kind 6) as [[x,y],…]. */
   points?: number[][];
 }
