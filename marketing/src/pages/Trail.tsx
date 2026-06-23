@@ -26,6 +26,19 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.17",
+    date: "2026-06-19",
+    headline: "Blur, pixelate & redaction tools + a Diagnostics Window",
+    entries: [
+      { tag: "feature", text: "The blur brush now has three modes — Soften (Gaussian), Pixelate (a mosaic of big squares, adjustable block size), and Solid (paint an opaque color over something). Perfect for hiding faces, license plates, or sensitive text before you share an image." },
+      { tag: "feature", text: "Redaction boxes — drag a rectangle to cover an area with a solid color or a pixel mosaic. Because it's a real shape, you can reselect, move, resize, undo, and put it on its own layer, just like any other box." },
+      { tag: "rust",    text: "Pixelate and redaction run entirely in Rust over the brushed (or boxed) region — grid-aligned mosaic averaging and opaque fill — so they stay fast and edit the active layer in place." },
+      { tag: "ui",      text: "The Review panel header now shows the magnifying-glass icon, matching the Review button in the top bar (it used to show the history clock)." },
+      { tag: "feature", text: "Diagnostics Window (Alt+Delete) — renamed, and now split into two tabs: System Telemetry (the event log) and Resources, a small htop-style view of FPS / main-thread load, JS memory, the WASM engine's memory, and what each subsystem is doing. Its backdrop is lighter now so your image stays visible behind it." },
+      { tag: "infra",   text: "Security hardening — the AI (Replicate) webhook now verifies its signature and only pulls results from trusted hosts, upload URLs require sign-in, and subscription records can only be written by the verified billing webhook." },
+    ],
+  },
+  {
     version: "v0.9.16",
     date: "2026-06-18",
     headline: "Shape fill & gradients, sharper thumbnails, configurable stamps",

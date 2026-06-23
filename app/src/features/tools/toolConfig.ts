@@ -43,7 +43,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: "brush",
     label: "Paint",
-    description: "Paint & blur brush",
+    description: "Paint & Blur",
     icon: Paintbrush,
     gradient: "from-blue-500 to-indigo-500",
   },

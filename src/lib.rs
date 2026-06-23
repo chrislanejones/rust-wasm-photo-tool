@@ -266,6 +266,8 @@ pub struct ShapeAnnotation {
     pub fill2_r: u8, pub fill2_g: u8, pub fill2_b: u8, pub fill2_a: u8,
     /// Linear-gradient direction in degrees (0 = →, 90 = ↓, …). `fill_kind == 2`.
     pub fill_angle: u16,
+    /// Mosaic block size in px for `fill_kind == 3` (pixelate). 0 → default 16.
+    pub fill_block: u32,
 }
 
 /// A single Photoshop-style layer: an independent RGBA pixel buffer plus its
@@ -443,7 +445,7 @@ fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
         }
         pts.push(']');
         out.push_str(&format!(
-            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"points\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"points\":{}}}",
             s.id, s.kind,
             s.x0, s.y0, s.x1, s.y1,
             s.r, s.g, s.b,
@@ -454,6 +456,7 @@ fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
             s.fill_r, s.fill_g, s.fill_b, s.fill_a,
             s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a,
             s.fill_angle,
+            s.fill_block,
             pts,
         ));
     }
@@ -510,6 +513,7 @@ fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
             [s.fill_r, s.fill_g, s.fill_b, s.fill_a],
             [s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a],
             s.fill_angle,
+            s.fill_block,
         );
     }
     match s.kind {
@@ -1542,6 +1546,50 @@ impl ImageHorseTool {
     pub fn begin_blur_stroke(&mut self) {
         self.snap("Blur");
     }
+
+    // ── Effects brush: pixelate (mosaic) + solid redaction ───────────────
+    // Sibling modes of the blur brush. Same brush footprint (radius = half the
+    // brush-size slider); each mode paints destructively into the active layer.
+
+    /// Pixelate a circular brush region into `block_size`px mosaic squares.
+    /// Call from JS: tool.pixelate_region(cx, cy, brush_radius, block_size)
+    pub fn pixelate_region(&mut self, cx: f64, cy: f64, brush_radius: f64, block_size: u32) {
+        filters::pixelate_region(
+            &mut self.layers[self.active].buf.data,
+            self.width,
+            self.height,
+            cx,
+            cy,
+            brush_radius,
+            block_size,
+        );
+    }
+
+    /// Begin a pixelate stroke — saves undo snapshot once.
+    pub fn begin_pixelate_stroke(&mut self) {
+        self.snap("Pixelate");
+    }
+
+    /// Paint an opaque solid colour over a circular brush region (redaction).
+    /// Call from JS: tool.redact_region(cx, cy, brush_radius, r, g, b)
+    pub fn redact_region(&mut self, cx: f64, cy: f64, brush_radius: f64, r: u8, g: u8, b: u8) {
+        filters::redact_region(
+            &mut self.layers[self.active].buf.data,
+            self.width,
+            self.height,
+            cx,
+            cy,
+            brush_radius,
+            r,
+            g,
+            b,
+        );
+    }
+
+    /// Begin a redact stroke — saves undo snapshot once.
+    pub fn begin_redact_stroke(&mut self) {
+        self.snap("Redact");
+    }
  
     // Note: No end_blur_stroke needed — the snapshot is already saved.
     // Just call blur_region() repeatedly during the stroke, then
@@ -1618,6 +1666,7 @@ impl ImageHorseTool {
         fill_hex: &str,
         fill2_hex: &str,
         fill_angle: u16,
+        fill_block: u32,
     ) -> u32 {
         self.snap(if kind == 4 { "Add Arrow" } else { "Add Shape" });
         let c = drawing::parse_hex_color(color_hex);
@@ -1638,6 +1687,7 @@ impl ImageHorseTool {
             fill_r: f[0], fill_g: f[1], fill_b: f[2], fill_a: f[3],
             fill2_r: f2[0], fill2_g: f2[1], fill2_b: f2[2], fill2_a: f2[3],
             fill_angle,
+            fill_block,
         });
         id
     }
@@ -1658,6 +1708,7 @@ impl ImageHorseTool {
         fill_r: u8, fill_g: u8, fill_b: u8, fill_a: u8,
         fill2_r: u8, fill2_g: u8, fill2_b: u8, fill2_a: u8,
         fill_angle: u16,
+        fill_block: u32,
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
@@ -1668,6 +1719,7 @@ impl ImageHorseTool {
             fill_r, fill_g, fill_b, fill_a,
             fill2_r, fill2_g, fill2_b, fill2_a,
             fill_angle,
+            fill_block,
         });
         id
     }
@@ -1772,6 +1824,7 @@ impl ImageHorseTool {
         fill_hex: &str,
         fill2_hex: &str,
         fill_angle: u16,
+        fill_block: u32,
     ) -> bool {
         if !self.layers[self.active].shape_annotations.iter().any(|s| s.id == id) {
             return false;
@@ -1790,6 +1843,7 @@ impl ImageHorseTool {
             s.fill_r = f[0]; s.fill_g = f[1]; s.fill_b = f[2]; s.fill_a = f[3];
             s.fill2_r = f2[0]; s.fill2_g = f2[1]; s.fill2_b = f2[2]; s.fill2_a = f2[3];
             s.fill_angle = fill_angle;
+            s.fill_block = fill_block;
         }
         true
     }
@@ -3005,7 +3059,7 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(20, 20);
         t.load_image(&solid(20, 20, [255, 255, 255, 255]));
         // Rect (4,4)-(16,16), solid blue fill (kind 1), thin black stroke.
-        t.add_shape_annotation(0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 1, "#0000ff", "#000000", 0);
+        t.add_shape_annotation(0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 1, "#0000ff", "#000000", 0, 0);
         let p = px(&t, 10, 10); // interior centre
         assert_eq!([p[0], p[1], p[2]], [0, 0, 255], "interior should be blue fill, got {p:?}");
     }
@@ -3015,7 +3069,7 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(20, 20);
         t.load_image(&solid(20, 20, [255, 255, 255, 255]));
         // fill_kind 0 = none → interior stays white.
-        t.add_shape_annotation(0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0);
+        t.add_shape_annotation(0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0);
         assert_eq!(px(&t, 10, 10), [255, 255, 255, 255]);
     }
 
@@ -3025,11 +3079,59 @@ mod layer_tests {
         t.load_image(&solid(40, 40, [255, 255, 255, 255]));
         // Horizontal (angle 0) gradient red→green across a wide rect; no stroke
         // bleed in the centre band we sample.
-        t.add_shape_annotation(0, 2.0, 2.0, 38.0, 38.0, "#000000", 1.0, 0, 2, "#ff0000", "#00ff00", 0);
+        t.add_shape_annotation(0, 2.0, 2.0, 38.0, 38.0, "#000000", 1.0, 0, 2, "#ff0000", "#00ff00", 0, 0);
         let left = px(&t, 6, 20);
         let right = px(&t, 34, 20);
         assert!(left[0] > left[1], "left end should be redder, got {left:?}");
         assert!(right[1] > right[0], "right end should be greener, got {right:?}");
+    }
+
+    #[test]
+    fn redact_region_paints_opaque_color() {
+        let mut t = ImageHorseTool::new(20, 20);
+        t.load_image(&solid(20, 20, [255, 255, 255, 255]));
+        t.begin_redact_stroke();
+        t.redact_region(10.0, 10.0, 5.0, 0, 0, 0);
+        assert_eq!(px(&t, 10, 10), [0, 0, 0, 255], "brush centre redacted to black");
+        assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "corner outside brush untouched");
+    }
+
+    #[test]
+    fn pixelate_region_keeps_solid_color() {
+        let mut t = ImageHorseTool::new(32, 32);
+        t.load_image(&solid(32, 32, [40, 80, 120, 255]));
+        t.begin_pixelate_stroke();
+        t.pixelate_region(16.0, 16.0, 16.0, 8);
+        // Averaging a uniform region leaves the colour unchanged.
+        assert_eq!(px(&t, 16, 16), [40, 80, 120, 255]);
+    }
+
+    #[test]
+    fn shape_pixelate_fill_quantizes_into_blocks() {
+        let mut t = ImageHorseTool::new(16, 16);
+        // Horizontal grey ramp so neighbouring columns differ before pixelating.
+        let mut data = Vec::with_capacity(16 * 16 * 4);
+        for _y in 0..16 {
+            for x in 0..16u32 {
+                let v = (x * 17) as u8;
+                data.extend_from_slice(&[v, v, v, 255]);
+            }
+        }
+        t.load_image(&data);
+        // Whole-image rect, pixelate fill (kind 3), one 16px block → one cell.
+        t.add_shape_annotation(0, 0.0, 0.0, 15.0, 15.0, "#000000", 0.0, 0, 3, "#000000", "#000000", 0, 16);
+        let a = px(&t, 2, 8);
+        let b = px(&t, 13, 8);
+        assert_eq!(a, b, "a single mosaic block must be uniform, {a:?} vs {b:?}");
+    }
+
+    #[test]
+    fn shape_json_includes_fill_block() {
+        let mut t = ImageHorseTool::new(16, 16);
+        t.load_image(&solid(16, 16, [0, 0, 0, 255]));
+        t.add_shape_annotation(0, 1.0, 1.0, 10.0, 10.0, "#000000", 1.0, 0, 3, "#000000", "#000000", 0, 24);
+        let json = t.get_layer_shape_annotations(0);
+        assert!(json.contains("\"fill_block\":24"), "got {json}");
     }
 
     #[test]
@@ -3168,7 +3270,7 @@ mod layer_persistence_tests {
         let mut t = ImageHorseTool::new(16, 16);
         t.load_image(&solid(16, 16, [0, 0, 0, 255]));
         // Shape on the base layer (active = 0).
-        t.add_shape_annotation(0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0);
+        t.add_shape_annotation(0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0);
         // New empty top layer.
         t.add_layer("top");
         let s0 = t.get_layer_shape_annotations(0);

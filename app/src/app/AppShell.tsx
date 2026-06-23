@@ -750,12 +750,30 @@ export function AppShell() {
       const t = stamp.toolRef.current;
       if (!t || e.button !== 0) return;
       isBlurringRef.current = true;
-      t.begin_blur_stroke();
       const { x, y } = getCoords(e);
-      t.blur_region(x, y, toolSettings.blurSize / 2, toolSettings.blurIntensity);
+      const r = toolSettings.blurSize / 2;
+      if (toolSettings.blurMode === "pixelate") {
+        t.begin_pixelate_stroke();
+        t.pixelate_region(x, y, r, toolSettings.pixelSize);
+      } else if (toolSettings.blurMode === "solid") {
+        const n = parseInt(toolSettings.redactColor.slice(1), 16) || 0;
+        t.begin_redact_stroke();
+        t.redact_region(x, y, r, (n >> 16) & 255, (n >> 8) & 255, n & 255);
+      } else {
+        t.begin_blur_stroke();
+        t.blur_region(x, y, r, toolSettings.blurIntensity);
+      }
       stamp.flushToCanvas();
     },
-    [stamp, getCoords, toolSettings.blurSize, toolSettings.blurIntensity],
+    [
+      stamp,
+      getCoords,
+      toolSettings.blurMode,
+      toolSettings.blurSize,
+      toolSettings.blurIntensity,
+      toolSettings.pixelSize,
+      toolSettings.redactColor,
+    ],
   );
 
   const blurMove = useCallback(
@@ -764,10 +782,26 @@ export function AppShell() {
       const t = stamp.toolRef.current;
       if (!t) return;
       const { x, y } = getCoords(e);
-      t.blur_region(x, y, toolSettings.blurSize / 2, toolSettings.blurIntensity);
+      const r = toolSettings.blurSize / 2;
+      if (toolSettings.blurMode === "pixelate") {
+        t.pixelate_region(x, y, r, toolSettings.pixelSize);
+      } else if (toolSettings.blurMode === "solid") {
+        const n = parseInt(toolSettings.redactColor.slice(1), 16) || 0;
+        t.redact_region(x, y, r, (n >> 16) & 255, (n >> 8) & 255, n & 255);
+      } else {
+        t.blur_region(x, y, r, toolSettings.blurIntensity);
+      }
       stamp.flushToCanvas();
     },
-    [stamp, getCoords, toolSettings.blurSize, toolSettings.blurIntensity],
+    [
+      stamp,
+      getCoords,
+      toolSettings.blurMode,
+      toolSettings.blurSize,
+      toolSettings.blurIntensity,
+      toolSettings.pixelSize,
+      toolSettings.redactColor,
+    ],
   );
 
   const blurUp = useCallback(() => {

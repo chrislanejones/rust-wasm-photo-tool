@@ -5,10 +5,19 @@ import { TEXT_COLORS } from "@/lib/colors";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { quickSpring } from "@/lib/animations";
 
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
 const BLUR_SIZE_PRESETS = [8, 16, 32, 64] as const;
+const PIXEL_SIZE_PRESETS = [8, 16, 32, 48] as const;
+
+// Blur-brush modes — gaussian (soften), pixelate (mosaic), solid (redact).
+const BLUR_MODES = [
+  { id: "gaussian", label: "Blur" },
+  { id: "pixelate", label: "Pixelate" },
+  { id: "solid", label: "Solid" },
+] as const;
 
 type PaintMode = "paint" | "blur";
 
@@ -34,7 +43,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
       <TabGroup
         tabs={[
           { id: "paint", label: "Paint" },
-          { id: "blur", label: "Blur Brush" },
+          { id: "blur", label: "Blur" },
         ]}
         active={mode}
         onChange={handleModeChange}
@@ -90,7 +99,17 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
             className="space-y-8"
           >
-            {/* Blur Size */}
+            {/* Mode: Gaussian blur / Pixelate / Solid redaction */}
+            <ToolButtonGroup
+              columns={3}
+              options={BLUR_MODES}
+              value={settings.blurMode ?? "gaussian"}
+              onChange={(id) =>
+                onChange({ ...settings, blurMode: id as ToolSettings["blurMode"] })
+              }
+            />
+
+            {/* Brush footprint — shared by every mode */}
             <SizeSlider
               label="Brush Size"
               value={settings.blurSize}
@@ -101,18 +120,43 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
               blurredDots
             />
 
-            {/* Blur Intensity */}
-            <SizeSlider
-              label="Blur Intensity"
-              value={settings.blurIntensity}
-              onChange={(v) => onChange({ ...settings, blurIntensity: v })}
-              min={1}
-              max={20}
-              unit="px"
-            />
+            {(settings.blurMode ?? "gaussian") === "gaussian" && (
+              <SizeSlider
+                label="Blur Intensity"
+                value={settings.blurIntensity}
+                onChange={(v) => onChange({ ...settings, blurIntensity: v })}
+                min={1}
+                max={20}
+                unit="px"
+              />
+            )}
+
+            {settings.blurMode === "pixelate" && (
+              <SizeSlider
+                label="Block Size"
+                value={settings.pixelSize ?? 16}
+                onChange={(v) => onChange({ ...settings, pixelSize: v })}
+                min={4}
+                max={64}
+                unit="px"
+                presets={PIXEL_SIZE_PRESETS}
+              />
+            )}
+
+            {settings.blurMode === "solid" && (
+              <ColorSwatchGrid
+                colors={TEXT_COLORS}
+                value={settings.redactColor ?? "#000000"}
+                onChange={(color) => onChange({ ...settings, redactColor: color })}
+              />
+            )}
 
             <p className="text-[10px] text-theme-muted-foreground leading-relaxed">
-              Click and drag on the image to blur regions. Uses WASM separable Gaussian blur.
+              {settings.blurMode === "pixelate"
+                ? "Click and drag to mosaic regions into blocks — great for redacting faces or text."
+                : settings.blurMode === "solid"
+                  ? "Click and drag to paint an opaque block over sensitive areas."
+                  : "Click and drag on the image to blur regions. Uses WASM separable Gaussian blur."}
             </p>
           </motion.div>
         )}

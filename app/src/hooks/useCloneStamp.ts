@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject, MouseEvent } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
+import { registerWasmMemory } from "@/lib/resourceMonitor";
 
 /** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
 async function decodePngToRgba(
@@ -204,6 +205,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
         memory: WebAssembly.Memory;
       };
       wasmMemoryRef.current = wasmExports.memory;
+      registerWasmMemory(wasmExports.memory);
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
@@ -234,6 +236,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
         memory: WebAssembly.Memory;
       };
       wasmMemoryRef.current = wasmExports.memory;
+      registerWasmMemory(wasmExports.memory);
       const canvas = canvasRef.current;
       if (!canvas) return;
       canvas.width = width;
@@ -262,6 +265,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
         memory: WebAssembly.Memory;
       };
       wasmMemoryRef.current = wasmExports.memory;
+      registerWasmMemory(wasmExports.memory);
 
       // Decode current canvas PNG → raw RGBA
       const { rgba: canvasRgba } = await decodePngToRgba(saved.canvasPng);
@@ -324,6 +328,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
                 s.fill_r ?? 0, s.fill_g ?? 0, s.fill_b ?? 0, s.fill_a ?? 0,
                 s.fill2_r ?? 0, s.fill2_g ?? 0, s.fill2_b ?? 0, s.fill2_a ?? 0,
                 s.fill_angle ?? 0,
+                s.fill_block ?? 0,
               );
             }
           }
@@ -461,6 +466,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
               s.fill_r ?? 0, s.fill_g ?? 0, s.fill_b ?? 0, s.fill_a ?? 0,
               s.fill2_r ?? 0, s.fill2_g ?? 0, s.fill2_b ?? 0, s.fill2_a ?? 0,
               s.fill_angle ?? 0,
+              s.fill_block ?? 0,
             );
           }
         }

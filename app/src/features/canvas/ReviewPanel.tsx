@@ -11,6 +11,7 @@ import {
   Layers2,
   MousePointerSquareDashed,
   Plus,
+  Search,
   Undo2,
   X,
 } from "lucide-react";
@@ -143,7 +144,7 @@ export function ReviewPanel({
       {/* ── Panel header: title + close ─────────────────────────────────── */}
       <div className="review-head">
         <h2 className="flex items-center gap-2 text-xs font-semibold">
-          <History className="h-3.5 w-3.5" />
+          <Search className="h-3.5 w-3.5" />
           Review
         </h2>
         <TinyButton onClick={onClose} title="Close" className="ml-auto">

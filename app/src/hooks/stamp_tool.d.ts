@@ -177,6 +177,24 @@ declare module "stamp_tool" {
       intensity: number,
     ): void;
     begin_blur_stroke(): void;
+    /** Pixelate (mosaic) a circular brush region into block_size px squares. */
+    pixelate_region(
+      cx: number,
+      cy: number,
+      brush_radius: number,
+      block_size: number,
+    ): void;
+    begin_pixelate_stroke(): void;
+    /** Paint an opaque solid colour over a circular brush region (redaction). */
+    redact_region(
+      cx: number,
+      cy: number,
+      brush_radius: number,
+      r: number,
+      g: number,
+      b: number,
+    ): void;
+    begin_redact_stroke(): void;
     begin_draw_stroke(label: string): void;
     draw_arrow(
       from_x: number,
@@ -509,6 +527,7 @@ declare module "stamp_tool" {
       fill_hex: string,
       fill2_hex: string,
       fill_angle: number,
+      fill_block: number,
     ): number;
     /** Restore a persisted shape WITHOUT pushing history (load path). Colours are raw bytes. */
     restore_shape_annotation(
@@ -532,6 +551,7 @@ declare module "stamp_tool" {
       fill2_b: number,
       fill2_a: number,
       fill_angle: number,
+      fill_block: number,
     ): number;
     /** Update a shape in full (geometry + style). Pushes an "Edit Shape" history step. */
     update_shape_annotation(
@@ -548,6 +568,7 @@ declare module "stamp_tool" {
       fill_hex: string,
       fill2_hex: string,
       fill_angle: number,
+      fill_block: number,
     ): boolean;
     /** Remove a shape. Pushes a "Delete Shape" history step. */
     remove_shape_annotation(id: number): boolean;

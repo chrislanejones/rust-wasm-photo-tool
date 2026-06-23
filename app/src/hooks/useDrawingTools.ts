@@ -45,10 +45,12 @@ export interface DrawEditState {
     kindByte?: number;
     /** Interior fill, captured on reselect so it round-trips (rect/circle).
      *  Treated exactly like strokeColor: preserved across move/resize. */
-    fillMode: "none" | "solid" | "gradient";
+    fillMode: "none" | "solid" | "gradient" | "pixelate";
     fillColor: string;
     fillColor2: string;
     gradientAngle: number;
+    /** Mosaic block size (px) for fillMode "pixelate". */
+    fillBlock: number;
   };
 }
 
@@ -73,6 +75,8 @@ export interface ShapeMeta {
   fill2_r: number; fill2_g: number; fill2_b: number; fill2_a: number;
   /** Gradient direction in degrees. */
   fill_angle: number;
+  /** Mosaic block size (px) for fill_kind 3 (pixelate). */
+  fill_block: number;
   /** Polyline vertices (kind 6) as [[x,y],…]. */
   points: number[][];
 }
@@ -268,13 +272,21 @@ export function useDrawingTools({
     const fillColor = es.style?.fillColor ?? s.fillColor;
     const fillColor2 = es.style?.fillColor2 ?? s.fillColor2;
     const gradientAngle = es.style?.gradientAngle ?? s.gradientAngle;
+    const fillBlock = es.style?.fillBlock ?? s.fillBlock;
     const canFill = kind === 0 || kind === 1;
     const fillKind = canFill
-      ? fillMode === "solid" ? 1 : fillMode === "gradient" ? 2 : 0
+      ? fillMode === "solid"
+        ? 1
+        : fillMode === "gradient"
+          ? 2
+          : fillMode === "pixelate"
+            ? 3
+            : 0
       : 0;
     const fillHex = fillColor ?? "#000000";
     const fill2Hex = fillColor2 ?? "#000000";
     const fillAngle = gradientAngle ?? 0;
+    const fillBlockVal = fillBlock ?? 16;
     if (es.editId != null) {
       // Re-selection committed without a drag → just un-hide it, no history.
       if (!editDirtyRef.current) {
@@ -297,6 +309,7 @@ export function useDrawingTools({
         fillHex,
         fill2Hex,
         fillAngle,
+        fillBlockVal,
       );
       tool.set_editing_shape(-1);
     } else {
@@ -313,6 +326,7 @@ export function useDrawingTools({
         fillHex,
         fill2Hex,
         fillAngle,
+        fillBlockVal,
       );
     }
     flushToCanvas();
@@ -370,10 +384,17 @@ export function useDrawingTools({
           arrowStyle: sh.arrow_style === 1 ? "double" : "single",
           kindByte: sh.kind,
           fillMode:
-            sh.fill_kind === 1 ? "solid" : sh.fill_kind === 2 ? "gradient" : "none",
+            sh.fill_kind === 1
+              ? "solid"
+              : sh.fill_kind === 2
+                ? "gradient"
+                : sh.fill_kind === 3
+                  ? "pixelate"
+                  : "none",
           fillColor: rgbToHex(sh.fill_r, sh.fill_g, sh.fill_b),
           fillColor2: rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
           gradientAngle: sh.fill_angle,
+          fillBlock: sh.fill_block ?? 16,
         },
       };
       tool.set_editing_shape(id);

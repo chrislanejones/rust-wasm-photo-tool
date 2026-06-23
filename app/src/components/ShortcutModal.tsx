@@ -91,7 +91,7 @@ const SHORTCUT_GROUPS = [
 const DEV_TOOLS_GROUP = {
   title: "Dev Tools",
   shortcuts: [
-    { keys: ["Alt", "Delete"], action: "Toggle Diagnostics Log" },
+    { keys: ["Alt", "Delete"], action: "Toggle Diagnostics Window" },
     { keys: ["Alt", "L"], action: "User / Tier Selector" },
   ],
 };

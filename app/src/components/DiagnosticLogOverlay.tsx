@@ -1,7 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trash2, Activity } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { X, Trash2, Activity, Gauge } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
 import { fadeIn, quickSpring } from "@/lib/animations";
+import { ResourceMonitor } from "@/components/ResourceMonitor";
 import {
   clearDiagnostics,
   getDiagnostics,
@@ -14,6 +15,8 @@ interface Props {
   open: boolean;
   onClose: () => void;
 }
+
+type Tab = "telemetry" | "resources";
 
 const SOURCE_CLASS: Record<LogSource, string> = {
   WASM_ENGINE: "bg-amber-500/10 text-amber-400 border-amber-500/20",
@@ -34,6 +37,12 @@ function fmtTime(ts: number): string {
 
 export function DiagnosticLogOverlay({ open, onClose }: Props) {
   const entries = useSyncExternalStore(subscribeDiagnostics, getDiagnostics);
+  const [tab, setTab] = useState<Tab>("telemetry");
+
+  const tabs: { id: Tab; label: string; icon: typeof Activity }[] = [
+    { id: "telemetry", label: "System Telemetry", icon: Activity },
+    { id: "resources", label: "Resources", icon: Gauge },
+  ];
 
   return (
     <AnimatePresence>
@@ -43,7 +52,7 @@ export function DiagnosticLogOverlay({ open, onClose }: Props) {
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="fixed inset-0 z-60 flex items-end justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-60 flex items-end justify-center bg-black/40"
           onClick={onClose}
         >
           <motion.div
@@ -54,20 +63,13 @@ export function DiagnosticLogOverlay({ open, onClose }: Props) {
             onClick={(e) => e.stopPropagation()}
             className="mb-6 flex max-h-[70vh] w-[min(960px,94vw)] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/95 text-zinc-100 shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2.5">
-              <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-zinc-400">
-                <Activity className="h-4 w-4" />
-                System Telemetry
-                <span className="text-zinc-600">({entries.length})</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={clearDiagnostics}
-                  className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Clear
-                </button>
+            <div className="border-b border-zinc-800">
+              {/* Title + close */}
+              <div className="flex items-center justify-between px-4 pt-2.5 pb-2">
+                <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-zinc-300">
+                  <Activity className="h-4 w-4" />
+                  Diagnostics Window
+                </div>
                 <button
                   onClick={onClose}
                   className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
@@ -75,10 +77,43 @@ export function DiagnosticLogOverlay({ open, onClose }: Props) {
                   <X className="h-4 w-4" />
                 </button>
               </div>
+              {/* Tab switcher + contextual clear */}
+              <div className="flex items-center justify-between px-4 pb-2">
+                <div className="flex items-center gap-1 rounded-lg bg-zinc-900 p-1">
+                  {tabs.map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setTab(id)}
+                      className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider transition-colors ${
+                        tab === id
+                          ? "bg-zinc-700 text-zinc-100"
+                          : "text-zinc-500 hover:text-zinc-300"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                      {id === "telemetry" && (
+                        <span className="text-zinc-600">({entries.length})</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {tab === "telemetry" && (
+                  <button
+                    onClick={clearDiagnostics}
+                    className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              {entries.length === 0 ? (
+              {tab === "resources" ? (
+                <ResourceMonitor active={open && tab === "resources"} />
+              ) : entries.length === 0 ? (
                 <div className="px-4 py-10 text-center font-mono text-xs text-zinc-600">
                   No events yet. Warnings, errors, and timed operations appear here.
                 </div>

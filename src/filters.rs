@@ -165,3 +165,104 @@ pub fn gaussian_blur_region(
     }
 }
 
+/// Pixelate (mosaic) a circular brush region. Cells are snapped to a global
+/// `block`×`block` grid so repeated dabs land on the same squares; each cell is
+/// averaged over the part that lies within the image, then written back to the
+/// cell pixels that fall inside the brush circle. `block_size` is clamped to
+/// 2..=128.
+pub fn pixelate_region(
+    data: &mut [u8],
+    width: u32,
+    height: u32,
+    cx: f64,
+    cy: f64,
+    brush_radius: f64,
+    block_size: u32,
+) {
+    let w = width as i32;
+    let h = height as i32;
+    let block = block_size.clamp(2, 128) as i32;
+    let br_sq = brush_radius * brush_radius;
+
+    let min_x = ((cx - brush_radius).floor() as i32).max(0);
+    let max_x = ((cx + brush_radius).ceil() as i32).min(w - 1);
+    let min_y = ((cy - brush_radius).floor() as i32).max(0);
+    let max_y = ((cy + brush_radius).ceil() as i32).min(h - 1);
+    if min_x > max_x || min_y > max_y {
+        return;
+    }
+
+    // Walk grid-aligned cells covering the brush bbox.
+    let mut by = (min_y / block) * block;
+    while by <= max_y {
+        let mut bx = (min_x / block) * block;
+        while bx <= max_x {
+            let cx0 = bx.max(0);
+            let cy0 = by.max(0);
+            let cx1 = (bx + block - 1).min(w - 1);
+            let cy1 = (by + block - 1).min(h - 1);
+
+            let (mut sr, mut sg, mut sb, mut sa, mut n) = (0u64, 0u64, 0u64, 0u64, 0u64);
+            for yy in cy0..=cy1 {
+                for xx in cx0..=cx1 {
+                    let i = ((yy * w + xx) * 4) as usize;
+                    sr += data[i] as u64;
+                    sg += data[i + 1] as u64;
+                    sb += data[i + 2] as u64;
+                    sa += data[i + 3] as u64;
+                    n += 1;
+                }
+            }
+            if n > 0 {
+                let avg = [(sr / n) as u8, (sg / n) as u8, (sb / n) as u8, (sa / n) as u8];
+                for yy in cy0..=cy1 {
+                    for xx in cx0..=cx1 {
+                        let dx = xx as f64 - cx;
+                        let dy = yy as f64 - cy;
+                        if dx * dx + dy * dy > br_sq {
+                            continue;
+                        }
+                        let i = ((yy * w + xx) * 4) as usize;
+                        data[i..i + 4].copy_from_slice(&avg);
+                    }
+                }
+            }
+            bx += block;
+        }
+        by += block;
+    }
+}
+
+/// Paint an opaque solid colour over a circular brush region (redaction).
+pub fn redact_region(
+    data: &mut [u8],
+    width: u32,
+    height: u32,
+    cx: f64,
+    cy: f64,
+    brush_radius: f64,
+    r: u8,
+    g: u8,
+    b: u8,
+) {
+    let w = width as i32;
+    let h = height as i32;
+    let br_sq = brush_radius * brush_radius;
+    let min_x = ((cx - brush_radius).floor() as i32).max(0);
+    let max_x = ((cx + brush_radius).ceil() as i32).min(w - 1);
+    let min_y = ((cy - brush_radius).floor() as i32).max(0);
+    let max_y = ((cy + brush_radius).ceil() as i32).min(h - 1);
+    let fill = [r, g, b, 255];
+    for yy in min_y..=max_y {
+        for xx in min_x..=max_x {
+            let dx = xx as f64 - cx;
+            let dy = yy as f64 - cy;
+            if dx * dx + dy * dy > br_sq {
+                continue;
+            }
+            let i = ((yy * w + xx) * 4) as usize;
+            data[i..i + 4].copy_from_slice(&fill);
+        }
+    }
+}
+

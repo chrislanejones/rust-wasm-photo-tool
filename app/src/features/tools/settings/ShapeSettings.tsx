@@ -25,6 +25,7 @@ const FILL_MODES = [
   { id: "none",     label: "None"     },
   { id: "solid",    label: "Solid"    },
   { id: "gradient", label: "Gradient" },
+  { id: "pixelate", label: "Pixelate" },
 ] as const;
 
 // Gradient direction presets. `id` is the angle in degrees (string for the
@@ -153,6 +154,23 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
                       onChange({ ...settings, gradientAngle: Number(id) })
                     }
                   />
+                </div>
+              )}
+
+              {settings.fillMode === "pixelate" && (
+                <div className="space-y-2">
+                  <SizeSlider
+                    label="Block Size"
+                    value={settings.fillBlock ?? 16}
+                    min={4}
+                    max={64}
+                    unit="px"
+                    onChange={(v) => onChange({ ...settings, fillBlock: v })}
+                  />
+                  <p className="text-[11px] leading-relaxed text-theme-muted-foreground">
+                    Mosaics whatever is beneath the box — a re-selectable redaction
+                    box you can move, resize, and undo from the Review panel.
+                  </p>
                 </div>
               )}
             </div>

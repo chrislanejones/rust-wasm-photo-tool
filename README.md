@@ -659,6 +659,18 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 6 | **Configurable red-stamp angle** — the `−5°` rubber-stamp tilt is now an `angle_deg` parameter threaded through `render_stamp_label` → `commit_red_stamp` (JS passes `STAMP_ANGLE_DEG`, unchanged default), ready for a future UI control | Complete |
 | 7 | **Safe crop returns** — `constrain_crop_to_ratio` / `compute_aspect_crop` now return `Option<Vec<u32>>` (→ `undefined` in JS) instead of a silent empty array on invalid input; both JS callers guard explicitly so a malformed call can't quietly destructure a zero-size crop | Complete |
 
+## v3.9 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **Blur-brush modes — Gaussian / Pixelate / Solid** — the Effects blur brush gains a mode control. Keeps Gaussian; adds **Pixelate** (grid-aligned mosaic, adjustable block size) and **Solid** (opaque redaction color). New Rust `filters::pixelate_region` / `redact_region` + `pixelate_region` / `redact_region` / `begin_pixelate_stroke` / `begin_redact_stroke` bindings; `ToolSettings` grew `blurMode` / `pixelSize` / `redactColor`; `AppShell` blur-brush handlers dispatch on `blurMode` | Complete |
+| 2 | **Redaction boxes — drag-rectangle, re-selectable** — modeled as a rect-shape fill rather than a new shape kind: `fill_kind` gains `3 = pixelate` and a `fill_block` field, so a redaction box inherits History, Reselect, Layers, and resize/move handles like any other bounding box. Solid redaction = rect + solid fill + `stroke_width 0`; pixelate mosaics the layer pixels beneath it in `render_shape_into` / `fill_shape`. Threaded through `add_/update_/restore_shape_annotation`, the shapes JSON, `PersistedShape`, and `selectShape`/`commitEdit` (so the mode/block size survive reselect) | Complete |
+| 3 | **Diagnostics Window (Alt+Delete) — Telemetry + Resources tabs** — the dev overlay is retitled **Diagnostics Window** (header + `ShortcutModal`) and split into **System Telemetry** (the existing event log) and a new **Resources** tab. Backdrop lightened to `bg-black/40` with the blur removed so the editor stays legible behind it | Complete |
+| 4 | **htop-style Resources monitor** — `ResourceMonitor.tsx` + `lib/resourceMonitor.ts`: live CPU/main-thread load + FPS (via `requestAnimationFrame`), JS heap (`performance.memory`), the WASM engine's live linear-memory size, and a per-subsystem process list (WASM_ENGINE / UI_THREAD / CONVEX_DB / REPLICATE_AI / CONSOLE) derived from the diagnostics ring buffer. `useCloneStamp` calls `registerWasmMemory(...)` at each engine (re)init so the monitor reads real memory without a second WASM instance; sampling halts when the tab isn't visible | Complete |
+| 5 | **Review panel header icon** — the Review panel header now uses the `Search` magnifying glass, matching the TopBar Review toggle (was the `History` clock); `History` stays imported for the History sub-section toggle | Complete |
+| 6 | **Security hardening** — the Replicate webhook verifies its signature (Web Crypto HMAC) and fails closed, and allowlists the result host (SSRF guard); `generateUploadUrl` is gated behind `requireUser`; `subscriptions.upsert` is now an `internalMutation`; dead anonymous-session endpoints were removed; Clerk/convex bumped | Complete |
+| 7 | **Stopped tracking build output** — `www-dist/` is now gitignored (was committed), so the deployed bundle is rebuilt by CI instead of living in git history | Complete |
+
 ## License
 
 MIT

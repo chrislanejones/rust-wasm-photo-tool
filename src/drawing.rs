@@ -388,8 +388,10 @@ fn lerp_rgba(a: [u8; 4], b: [u8; 4], t: f64) -> [u8; 4] {
 
 /// Fill the interior of a rectangle (`shape == 0`) or circle (`shape == 1`)
 /// defined by the bbox (x0,y0)-(x1,y1). `fill_kind`: 1 = solid `c0`, 2 = linear
-/// gradient `c0`→`c1` along `angle_deg` (0 = left→right, 90 = top→bottom).
-/// Composited source-over; the caller draws the stroke on top afterwards.
+/// gradient `c0`→`c1` along `angle_deg` (0 = left→right, 90 = top→bottom),
+/// 3 = pixelate/mosaic the underlying pixels in `block`×`block` cells.
+/// Composited source-over (1/2) or overwritten (3); the caller draws the stroke
+/// on top afterwards.
 pub fn fill_shape(
     data: &mut [u8],
     w: u32, h: u32,
@@ -398,6 +400,7 @@ pub fn fill_shape(
     fill_kind: u8,
     c0: [u8; 4], c1: [u8; 4],
     angle_deg: u16,
+    fill_block: u32,
 ) {
     let wi = w as i32;
     let hi = h as i32;
@@ -415,6 +418,52 @@ pub fn fill_shape(
     let px1 = (maxx.ceil() as i32).min(wi - 1);
     let py1 = (maxy.ceil() as i32).min(hi - 1);
     if px0 > px1 || py0 > py1 { return; }
+
+    // Pixelate/mosaic fill: average grid-aligned cells of the pixels already in
+    // `data` (this layer + earlier-rendered shapes) and overwrite them, clipped
+    // to the shape. Block size falls back to 16 and is clamped to 2..=128.
+    if fill_kind == 3 {
+        let block = (if fill_block == 0 { 16 } else { fill_block.clamp(2, 128) }) as i32;
+        let mut by = (py0 / block) * block;
+        while by <= py1 {
+            let mut bx = (px0 / block) * block;
+            while bx <= px1 {
+                let cx0 = bx.max(0);
+                let cy0 = by.max(0);
+                let cx1 = (bx + block - 1).min(wi - 1);
+                let cy1 = (by + block - 1).min(hi - 1);
+                let (mut sr, mut sg, mut sb, mut sa, mut n) = (0u64, 0u64, 0u64, 0u64, 0u64);
+                for yy in cy0..=cy1 {
+                    for xx in cx0..=cx1 {
+                        let i = ((yy * wi + xx) * 4) as usize;
+                        sr += data[i] as u64;
+                        sg += data[i + 1] as u64;
+                        sb += data[i + 2] as u64;
+                        sa += data[i + 3] as u64;
+                        n += 1;
+                    }
+                }
+                if n > 0 {
+                    let avg = [(sr / n) as u8, (sg / n) as u8, (sb / n) as u8, (sa / n) as u8];
+                    for yy in cy0..=cy1 {
+                        for xx in cx0..=cx1 {
+                            if xx < px0 || xx > px1 || yy < py0 || yy > py1 { continue; }
+                            if shape == 1 {
+                                let dx = xx as f64 + 0.5 - cx;
+                                let dy = yy as f64 + 0.5 - cy;
+                                if (dx * dx + dy * dy).sqrt() > radius { continue; }
+                            }
+                            let i = ((yy * wi + xx) * 4) as usize;
+                            data[i..i + 4].copy_from_slice(&avg);
+                        }
+                    }
+                }
+                bx += block;
+            }
+            by += block;
+        }
+        return;
+    }
 
     // Gradient axis: project pixel centres onto the unit direction and
     // normalise against the bbox's projected span so t spans 0..1 edge-to-edge.

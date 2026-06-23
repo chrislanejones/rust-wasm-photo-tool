@@ -39,15 +39,21 @@ export interface ToolSettings extends StampSettings {
   shape?: "rect" | "circle" | "handCircle" | "line";
 
   // Shape interior fill (rect + circle only). Painted under the stroke.
-  /** "none" = outline only, "solid" = fillColor, "gradient" = fillColor→fillColor2. */
-  fillMode: "none" | "solid" | "gradient";
+  /** "none" = outline only, "solid" = fillColor, "gradient" = fillColor→fillColor2,
+   *  "pixelate" = mosaic the pixels beneath (a re-selectable redaction box). */
+  fillMode: "none" | "solid" | "gradient" | "pixelate";
   fillColor: string;       // solid fill / gradient stop 0 (hex)
   fillColor2: string;      // gradient stop 1 (hex)
   gradientAngle: number;   // degrees: 0 →, 45 ↘, 90 ↓, 135 ↙
+  fillBlock: number;       // mosaic block size (px) for fillMode "pixelate"
 
-  // Effects (was Blur)
-  blurSize: number;
-  blurIntensity: number;
+  // Effects (was Blur) — the Paint tool's Blur Brush + the Levels panel.
+  /** Blur-brush effect: "gaussian" softens, "pixelate" mosaics, "solid" redacts. */
+  blurMode: "gaussian" | "pixelate" | "solid";
+  blurSize: number;          // brush footprint (shared by all blur-brush modes)
+  blurIntensity: number;     // gaussian kernel radius (px)
+  pixelSize: number;         // mosaic block size (px) for "pixelate"
+  redactColor: string;       // opaque fill colour for "solid"
   effectBrightness: number;  // -100 to +100, applied on commit
   effectContrast: number;    // 0 to 300, applied on commit (100 = neutral)
 

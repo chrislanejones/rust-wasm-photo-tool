@@ -121,6 +121,8 @@ export interface PersistedShape {
   fill_r?: number; fill_g?: number; fill_b?: number; fill_a?: number;
   fill2_r?: number; fill2_g?: number; fill2_b?: number; fill2_a?: number;
   fill_angle?: number;
+  /** Mosaic block size (px) for fill_kind 3 (pixelate). Absent on older saves. */
+  fill_block?: number;
   /** Polyline vertices (kind 6) as [[x,y],…]. */
   points?: number[][];
 }

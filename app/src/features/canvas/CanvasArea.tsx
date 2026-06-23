@@ -101,7 +101,7 @@ interface Props {
     strokeWidth: number;
     arrowStyle: "single" | "double";
     shape: "rect" | "circle" | "handCircle" | "line";
-    fillMode: "none" | "solid" | "gradient";
+    fillMode: "none" | "solid" | "gradient" | "pixelate";
     fillColor: string;
     fillColor2: string;
     gradientAngle: number;
@@ -722,6 +722,23 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     <stop offset="0%" stopColor={fillCfg.fillColor} />
                     <stop offset="100%" stopColor={fillCfg.fillColor2} />
                   </linearGradient>
+                </defs>
+              );
+            } else if (fillCfg.fillMode === "pixelate") {
+              // A true live mosaic isn't practical in SVG — preview a checker
+              // hint; the real pixelation is applied to the pixels on commit.
+              fillAttr = "url(#draw-fill-pixelate)";
+              gradientDef = (
+                <defs>
+                  <pattern
+                    id="draw-fill-pixelate"
+                    width="8" height="8"
+                    patternUnits="userSpaceOnUse"
+                  >
+                    <rect width="8" height="8" fill="rgba(120,120,120,0.4)" />
+                    <rect width="4" height="4" fill="rgba(40,40,40,0.5)" />
+                    <rect x="4" y="4" width="4" height="4" fill="rgba(40,40,40,0.5)" />
+                  </pattern>
                 </defs>
               );
             }
