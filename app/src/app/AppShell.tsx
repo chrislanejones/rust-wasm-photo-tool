@@ -1541,8 +1541,8 @@ export function AppShell() {
     setShowGallery,
     setShowHistory,
     setShowShortcutModal,
-    // Diagnostics log (Alt+Delete) is a Dev Tool — gated until unlocked.
-    setShowDiagnostics: devToolsEnabled ? setShowDiagnostics : undefined,
+    // Diagnostics Window (Alt+Delete) is always available — not gated.
+    setShowDiagnostics,
     onZoomIn: handleZoomIn,
     onZoomOut: handleZoomOut,
     onZoomReset: handleZoomReset,
@@ -1605,12 +1605,11 @@ export function AppShell() {
         showDevTools={devToolsEnabled}
       />
 
-      {devToolsEnabled && (
-        <DiagnosticLogOverlay
-          open={showDiagnostics}
-          onClose={() => setShowDiagnostics(false)}
-        />
-      )}
+      {/* Diagnostics Window (Alt+Delete) is always available. */}
+      <DiagnosticLogOverlay
+        open={showDiagnostics}
+        onClose={() => setShowDiagnostics(false)}
+      />
 
       {devToolsEnabled && (
         <DevTierDialog

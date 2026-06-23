@@ -52,7 +52,7 @@ export function DiagnosticLogOverlay({ open, onClose }: Props) {
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="fixed inset-0 z-60 flex items-end justify-center bg-black/40"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-[3px]"
           onClick={onClose}
         >
           <motion.div
@@ -61,7 +61,7 @@ export function DiagnosticLogOverlay({ open, onClose }: Props) {
             exit={{ y: 24, opacity: 0 }}
             transition={quickSpring}
             onClick={(e) => e.stopPropagation()}
-            className="mb-6 flex max-h-[70vh] w-[min(960px,94vw)] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/95 text-zinc-100 shadow-2xl"
+            className="flex h-[80vh] w-[min(960px,94vw)] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/95 text-zinc-100 shadow-2xl"
           >
             <div className="border-b border-zinc-800">
               {/* Title + close */}
@@ -93,7 +93,9 @@ export function DiagnosticLogOverlay({ open, onClose }: Props) {
                       <Icon className="h-3.5 w-3.5" />
                       {label}
                       {id === "telemetry" && (
-                        <span className="text-zinc-600">({entries.length})</span>
+                        <span className={tab === id ? "text-zinc-300" : "text-zinc-400"}>
+                          ({entries.length})
+                        </span>
                       )}
                     </button>
                   ))}

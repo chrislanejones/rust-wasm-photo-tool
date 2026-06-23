@@ -671,6 +671,14 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 6 | **Security hardening** — the Replicate webhook verifies its signature (Web Crypto HMAC) and fails closed, and allowlists the result host (SSRF guard); `generateUploadUrl` is gated behind `requireUser`; `subscriptions.upsert` is now an `internalMutation`; dead anonymous-session endpoints were removed; Clerk/convex bumped | Complete |
 | 7 | **Stopped tracking build output** — `www-dist/` is now gitignored (was committed), so the deployed bundle is rebuilt by CI instead of living in git history | Complete |
 
+## v4.0 Change Summary
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **Diagnostics Window polish** — the overlay is now centered and a fixed `h-[80vh]` tall, so **System Telemetry** and **Resources** are the same height; a light `backdrop-blur-[3px]` sits behind it; System Telemetry scrolls within the fixed height; and the tab's `(count)` badge uses higher-contrast colors (`text-zinc-300`/`400`) | Complete |
+| 2 | **Alt+Delete always available** — the Diagnostics Window is no longer gated behind the dev-tools unlock: `setShowDiagnostics` is always wired in `useKeyboardShortcuts` and `<DiagnosticLogOverlay>` always mounts, so the shortcut works on every boot | Complete |
+| 3 | **Shortcut-menu sections** — "Toggle Diagnostics Window" now lives in an always-shown **Dev Tools** group; the **Secret Menu** group (the `Alt+L` User / Tier Selector) only appears — and only works — after the status-bar triple-click unlock | Complete |
+
 ## License
 
 MIT

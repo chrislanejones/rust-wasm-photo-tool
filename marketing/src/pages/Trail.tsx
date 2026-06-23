@@ -26,6 +26,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.18",
+    date: "2026-06-23",
+    headline: "Diagnostics Window polish + a tidier shortcut menu",
+    entries: [
+      { tag: "ui",      text: "The Diagnostics Window (Alt+Delete) is now centered and taller, with a soft blur behind it, and both tabs — System Telemetry and Resources — are the same height. The event log scrolls on its own, and the count next to the tab is easier to read." },
+      { tag: "feature", text: "Alt+Delete now opens the Diagnostics Window for everyone, every time — no secret unlock required." },
+      { tag: "ui",      text: "The keyboard-shortcut menu lists the Diagnostics Window under an always-visible Dev Tools section. The User / Tier Selector moved into a hidden Secret Menu that only appears — and only works — after you triple-click the status-bar button." },
+    ],
+  },
+  {
     version: "v0.9.17",
     date: "2026-06-19",
     headline: "Blur, pixelate & redaction tools + a Diagnostics Window",

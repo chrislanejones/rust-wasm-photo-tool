@@ -5,7 +5,7 @@ import { fadeIn, quickSpring } from "@/lib/animations";
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** When true, append the hidden "Dev Tools" section (unlocked via the
+  /** When true, append the hidden "Secret Menu" section (unlocked via the
    *  status-bar tiny button or dev builds). */
   showDevTools?: boolean;
 }
@@ -85,20 +85,26 @@ const SHORTCUT_GROUPS = [
       { keys: ["Alt", "Shift", "E"], action: "Export all images (ZIP)" },
     ],
   },
+  {
+    // Always shown — the Diagnostics Window is open to everyone.
+    title: "Dev Tools",
+    shortcuts: [
+      { keys: ["Alt", "Delete"], action: "Toggle Diagnostics Window" },
+    ],
+  },
 ];
 
-/** Hidden section, shown only once Dev Tools are unlocked. */
-const DEV_TOOLS_GROUP = {
-  title: "Dev Tools",
+/** Hidden section, shown only once dev tools are unlocked (triple-click). */
+const SECRET_MENU_GROUP = {
+  title: "Secret Menu",
   shortcuts: [
-    { keys: ["Alt", "Delete"], action: "Toggle Diagnostics Window" },
     { keys: ["Alt", "L"], action: "User / Tier Selector" },
   ],
 };
 
 export function ShortcutModal({ open, onClose, showDevTools }: Props) {
   const groups = showDevTools
-    ? [...SHORTCUT_GROUPS, DEV_TOOLS_GROUP]
+    ? [...SHORTCUT_GROUPS, SECRET_MENU_GROUP]
     : SHORTCUT_GROUPS;
   return (
     <AnimatePresence>
