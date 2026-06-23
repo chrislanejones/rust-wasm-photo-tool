@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trash2, Activity, Gauge } from "lucide-react";
+import { X, Trash2, Activity, Gauge, Image as ImageIcon } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { fadeIn, quickSpring } from "@/lib/animations";
 import { ResourceMonitor } from "@/components/ResourceMonitor";
+import { ImageMetaPanel, type ImageMeta } from "@/components/ImageMetaPanel";
 import {
   clearDiagnostics,
   getDiagnostics,
@@ -14,9 +15,10 @@ import {
 interface Props {
   open: boolean;
   onClose: () => void;
+  imageMeta?: ImageMeta;
 }
 
-type Tab = "telemetry" | "resources";
+type Tab = "telemetry" | "resources" | "imagemeta";
 
 const SOURCE_CLASS: Record<LogSource, string> = {
   WASM_ENGINE: "bg-amber-500/10 text-amber-400 border-amber-500/20",
@@ -35,13 +37,14 @@ function fmtTime(ts: number): string {
   )}`;
 }
 
-export function DiagnosticLogOverlay({ open, onClose }: Props) {
+export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
   const entries = useSyncExternalStore(subscribeDiagnostics, getDiagnostics);
   const [tab, setTab] = useState<Tab>("telemetry");
 
   const tabs: { id: Tab; label: string; icon: typeof Activity }[] = [
     { id: "telemetry", label: "System Telemetry", icon: Activity },
     { id: "resources", label: "Resources", icon: Gauge },
+    { id: "imagemeta", label: "Current Image Meta", icon: ImageIcon },
   ];
 
   return (
@@ -115,6 +118,11 @@ export function DiagnosticLogOverlay({ open, onClose }: Props) {
             <div className="flex-1 overflow-y-auto">
               {tab === "resources" ? (
                 <ResourceMonitor active={open && tab === "resources"} />
+              ) : tab === "imagemeta" ? (
+                <ImageMetaPanel
+                  active={open && tab === "imagemeta"}
+                  meta={imageMeta ?? { photoId: null }}
+                />
               ) : entries.length === 0 ? (
                 <div className="px-4 py-10 text-center font-mono text-xs text-zinc-600">
                   No events yet. Warnings, errors, and timed operations appear here.

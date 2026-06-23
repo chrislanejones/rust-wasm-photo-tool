@@ -31,3 +31,6 @@ skills-lock.json
 
 # Build output (Netlify builds from source)
 www-dist
+
+# Windows/WSL alternate-data-stream artifacts
+*:Zone.Identifier

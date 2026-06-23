@@ -46,7 +46,7 @@ export default function Features() {
           <Feature color="emerald" title="Format conversion"     body="Encode and decode PNG, JPEG, WebP, and AVIF. Resize and re-compress in a single round-trip." tags="PNG · JPEG · WebP · AVIF" />
           <Feature color="amber"   title="Batch Image Editor"    body="Stamp a logo onto every photo in one pass, or browse the gallery as a 5×3 grid mosaic with the active photo as the hero tile. Compositing, scaling, and PNG encoding all run in Rust — zero canvas round-trips." tags="Bulk logo · Grid view · SVG logos · Rust composite" />
           <Feature color="violet"  title="AI enhancements"       body="Background removal is live via a Convex → Replicate pipeline; 4× upscaling, object removal, and alt-text generation are queued up next." tags="rembg (live) · Real-ESRGAN · SD Inpaint · BLIP" />
-          <Feature color="blue"    title="Privacy by default"    body="Demo mode never uploads. Even on the paid tier, processing stays local — uploads exist for sharing, not computation." tags="No server processing" />
+          <Feature color="blue"    title="Privacy by default"    body="Demo mode never uploads, and processing stays local on every tier. A per-export EXIF padlock lets you keep your camera metadata — GPS, capture time, lens — or strip it for privacy before an image ever leaves the tab." tags="No server processing · EXIF keep / strip" />
         </div>
       </div>
     </section>

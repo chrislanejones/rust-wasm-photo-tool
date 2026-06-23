@@ -571,6 +571,33 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     URL.revokeObjectURL(url);
   }, [flushToCanvas, syncState]);
 
+  // Return the encoded export bytes as a Blob (no download). Lets callers
+  // post-process — e.g. apply the EXIF keep/strip policy — before saving.
+  const exportBlob = useCallback(
+    async (
+      format: "png" | "jpeg" | "webp" | "avif",
+      quality: number = 0.92,
+    ): Promise<Blob | null> => {
+      const t = toolRef.current;
+      if (format === "png") {
+        if (!t) return null;
+        return new Blob([new Uint8Array(t.export_png())], { type: "image/png" });
+      }
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      flushToCanvas();
+      const mimeMap: Record<string, string> = {
+        jpeg: "image/jpeg",
+        webp: "image/webp",
+        avif: "image/avif",
+      };
+      return await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((blob) => resolve(blob), mimeMap[format], quality),
+      );
+    },
+    [canvasRef, flushToCanvas],
+  );
+
   const exportAs = useCallback(
     (format: "png" | "jpeg" | "webp" | "avif", quality: number = 0.92, sourceName = "image") => {
       if (format === "png") {
@@ -1041,6 +1068,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     // Export
     exportPng,
     exportAs,
+    exportBlob,
     // Mouse
     onMouseDown,
     onMouseMove,

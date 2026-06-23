@@ -23,7 +23,9 @@ function openDb(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+/** SHA-256 of any byte source, as a lowercase hex string. Used both as the
+ *  content-address key for originals and by the Diagnostics image-meta tab. */
+export async function sha256Hex(bytes: BufferSource): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))

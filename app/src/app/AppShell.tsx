@@ -42,6 +42,11 @@ import { useRecentTexts } from "@/hooks/useRecentTexts";
 import { putOriginal, getOriginal, getOriginalAsBlobUrl, deleteOriginal } from "@/lib/originalsStore";
 import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
+import {
+  readExifTiff,
+  applyExifToReencoded,
+  applyExifToVerbatim,
+} from "@/lib/exif";
 import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels, ImageTooLargeError } from "@/lib/workingCopy";
 import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
 import { logDiagnostic, installConsoleCapture } from "@/lib/diagnosticsLog";
@@ -151,6 +156,9 @@ export function AppShell() {
   // originalUrl is populated by the compare effect; not set on photo select
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
+  // EXIF padlock (Compress tab): true = keep camera metadata on export,
+  // false = strip it. Default keep, matching pre-feature behavior.
+  const [exifKeep, setExifKeep] = useState(true);
   const [hasBeenModified, setHasBeenModified] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -681,11 +689,37 @@ export function AppShell() {
   }, [photos.length, stampReset]);
   useEffect(() => () => { revealTimers.current.forEach(clearTimeout); }, []);
 
-  const handleExport = useCallback(() => {
-    const activeName =
-      photos.find((p) => p.id === activePhotoId)?.name ?? "image";
-    stamp.exportAs(exportFormat, quality / 100, activeName);
-  }, [stamp, exportFormat, quality, photos, activePhotoId]);
+  const handleExport = useCallback(async () => {
+    const entry = photos.find((p) => p.id === activePhotoId) ?? null;
+    const activeName = entry?.name ?? "image";
+    const blob = await stamp.exportBlob(exportFormat, quality / 100);
+    if (!blob) return;
+
+    let bytes = new Uint8Array(await blob.arrayBuffer());
+    // The canvas export is always freshly re-encoded, so it carries no EXIF.
+    // Keep → transplant the true original's EXIF (JPEG/WebP); strip → leave clean.
+    let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
+    if (exifKeep && entry && (exportFormat === "jpeg" || exportFormat === "webp")) {
+      const orig = await getOriginal(entry.uploadKey ?? entry.originalKey);
+      if (orig) sourceTiff = readExifTiff(new Uint8Array(orig.bytes), orig.mimeType);
+    }
+    bytes = applyExifToReencoded(
+      bytes,
+      exportFormat,
+      exifKeep ? "keep" : "strip",
+      sourceTiff,
+      stamp.state.width,
+      stamp.state.height,
+    );
+
+    const stem = activeName.replace(/\.[^.]+$/, "");
+    const url = URL.createObjectURL(new Blob([bytes], { type: blob.type }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${stem}-revised${EXT[exportFormat]}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep]);
 
   const handleDeleteAll = useCallback(() => {
     setDeleteAllOpen(true);
@@ -1459,8 +1493,12 @@ export function AppShell() {
     const zip = new JSZip();
     const usedNames = new Set<string>();
 
+    // EXIF padlock: keep metadata (transplant onto re-encodes) or strip it.
+    const mode = exifKeep ? "keep" : "strip";
+
     for (const photo of list) {
-      let blob: Blob;
+      let bytes: Uint8Array<ArrayBuffer>;
+      let mime: string;
       let ext: string;
 
       if (isChanged(photo.id)) {
@@ -1469,21 +1507,34 @@ export function AppShell() {
           // Canvas edits (draw / text / crop / resize / transform) →
           // composite via Rust + re-encode at the chosen format/quality.
           const { pixels, w, h } = await compositeSavedEdit(edit);
-          blob = await encodeRgba(pixels, w, h, exportFormat, quality / 100);
+          const enc = await encodeRgba(pixels, w, h, exportFormat, quality / 100);
+          bytes = new Uint8Array(await enc.arrayBuffer());
+          mime = enc.type || "application/octet-stream";
           ext = EXT[exportFormat];
+          // The re-encode carries no EXIF; keep → transplant the true
+          // original's metadata (JPEG/WebP), strip → already clean.
+          let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
+          if (mode === "keep" && (exportFormat === "jpeg" || exportFormat === "webp")) {
+            const src = await getOriginal(photo.uploadKey ?? photo.originalKey);
+            if (src) sourceTiff = readExifTiff(new Uint8Array(src.bytes), src.mimeType);
+          }
+          bytes = applyExifToReencoded(bytes, exportFormat, mode, sourceTiff, w, h);
         } else {
           // Compressed/quality-changed only (no canvas snapshot): the processed
           // bytes already live at originalKey.
           const orig = await getOriginal(photo.originalKey);
           if (!orig) continue;
-          blob = new Blob([orig.bytes], { type: orig.mimeType });
+          bytes = applyExifToVerbatim(new Uint8Array(orig.bytes), orig.mimeType, mode);
+          mime = orig.mimeType;
           ext = extFromMime(orig.mimeType);
         }
       } else {
-        // Untouched → original bytes, verbatim, in their original format.
+        // Untouched → original bytes in their original format. Keep passes them
+        // through verbatim; strip scrubs EXIF/GPS before they leave the device.
         const orig = await getOriginal(photo.originalKey);
         if (!orig) continue;
-        blob = new Blob([orig.bytes], { type: orig.mimeType });
+        bytes = applyExifToVerbatim(new Uint8Array(orig.bytes), orig.mimeType, mode);
+        mime = orig.mimeType;
         ext = extFromMime(orig.mimeType);
       }
 
@@ -1492,7 +1543,7 @@ export function AppShell() {
       let name = `${base}${ext}`;
       for (let n = 2; usedNames.has(name); n++) name = `${base}-${n}${ext}`;
       usedNames.add(name);
-      zip.file(name, blob);
+      zip.file(name, new Blob([bytes], { type: mime }));
     }
 
     const out = await zip.generateAsync({ type: "blob" });
@@ -1513,6 +1564,7 @@ export function AppShell() {
       imageSavings,
       loadPhotoEdit,
       savePhotoEdit,
+      exifKeep,
     ],
   );
 
@@ -1609,6 +1661,30 @@ export function AppShell() {
       <DiagnosticLogOverlay
         open={showDiagnostics}
         onClose={() => setShowDiagnostics(false)}
+        imageMeta={{
+          photoId: activePhotoId,
+          name: activeEntry?.name,
+          mimeType: activeEntry?.mimeType,
+          origWidth: activeEntry?.origWidth,
+          origHeight: activeEntry?.origHeight,
+          currentWidth: stamp.state.width,
+          currentHeight: stamp.state.height,
+          originalByteSize: activeEntry?.originalByteSize,
+          currentByteSize: activeEntry?.byteSize,
+          originalKey: activeEntry?.originalKey,
+          uploadKey: activeEntry?.uploadKey,
+          undoCount: stamp.state.undoCount,
+          redoCount: stamp.state.redoCount,
+          modified:
+            activePhotoId != null &&
+            (modifiedPhotos.has(activePhotoId) ||
+              hasBeenModified ||
+              stamp.state.undoCount > 0),
+          getCanvasPng: () => {
+            const t = stamp.toolRef.current;
+            return t ? new Uint8Array(t.export_png()) : null;
+          },
+        }}
       />
 
       {devToolsEnabled && (
@@ -1708,6 +1784,8 @@ export function AppShell() {
             undoCount={stamp.state.undoCount}
             quality={quality}
             onQualityChange={handleQualityChange}
+            exifKeep={exifKeep}
+            onExifKeepChange={setExifKeep}
             hasBeenModified={hasBeenModified}
             compareActive={compareActive}
             onToggleCompare={handleToggleCompare}

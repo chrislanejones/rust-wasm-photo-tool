@@ -26,6 +26,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.19",
+    date: "2026-06-23",
+    headline: "EXIF privacy control + a Current Image Meta panel",
+    entries: [
+      { tag: "feature", text: "EXIF padlock on export — a lock toggle in the Compress panel decides what leaves your machine. Locked keeps your photo's metadata intact (GPS, capture time, camera and lens) — great for photographers — while unlocked strips it for privacy. It applies to Export, Export All, and Export Selected, and it closes a gap where an untouched original used to carry its GPS location into the exported ZIP." },
+      { tag: "feature", text: "Current Image Meta — a new tab in the Diagnostics Window (Alt+Delete) shows the live SHA-256 fingerprint of the current canvas (it changes with every edit), the original's SHA-256 content key, the image's dimensions and byte sizes, and its EXIF: camera, lens, capture time, exposure, and GPS as a one-click map link, with a heads-up when location is embedded." },
+      { tag: "ui",      text: "The EXIF lock reuses the familiar padlock and badge styling from elsewhere in the app, with a two-line label that spells out exactly what's kept or removed on export." },
+    ],
+  },
+  {
     version: "v0.9.18",
     date: "2026-06-23",
     headline: "Diagnostics Window polish + a tidier shortcut menu",
