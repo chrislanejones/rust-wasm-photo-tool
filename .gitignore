@@ -28,3 +28,6 @@ rolled_repo/
 AGENTS.md
 CLAUDE.md
 skills-lock.json
+
+# Build output (Netlify builds from source)
+www-dist
