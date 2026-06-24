@@ -51,8 +51,8 @@ function Row({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="shrink-0 text-zinc-500">{label}</span>
-      <span className="min-w-0 text-right text-zinc-200">{children}</span>
+      <span className="shrink-0 text-text-muted">{label}</span>
+      <span className="min-w-0 text-right text-text-primary">{children}</span>
     </div>
   );
 }
@@ -70,11 +70,11 @@ function CopyButton({ value }: { value: string }) {
           () => {},
         );
       }}
-      className="rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+      className="rounded p-1 text-text-muted transition-colors hover:bg-card hover:text-text-primary"
       title="Copy"
     >
       {copied ? (
-        <Check className="h-3.5 w-3.5 text-emerald-400" />
+        <Check className="h-3.5 w-3.5 text-success" />
       ) : (
         <Copy className="h-3.5 w-3.5" />
       )}
@@ -100,24 +100,24 @@ function HashBox({
   tone?: "zinc" | "emerald";
   onRefresh?: () => void;
 }) {
-  const accent = tone === "emerald" ? "text-emerald-400" : "text-amber-400";
+  const accent = tone === "emerald" ? "text-success" : "text-warning";
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
+    <div className="rounded-lg border border-border bg-background/60 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${accent}`} />
           <div className="leading-tight">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
               {title}
             </div>
-            <div className="text-[10px] text-zinc-500">{subtitle}</div>
+            <div className="text-[10px] text-text-muted">{subtitle}</div>
           </div>
         </div>
         <div className="flex items-center gap-0.5">
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+              className="rounded p-1 text-text-muted transition-colors hover:bg-card hover:text-text-primary"
               title="Recompute"
             >
               <RefreshCw
@@ -130,7 +130,7 @@ function HashBox({
       </div>
       <div
         className={`break-all font-mono text-xs leading-relaxed ${
-          hash ? accent : "text-zinc-600"
+          hash ? accent : "text-text-muted"
         }`}
       >
         {pending ? "computing…" : (hash ?? "—")}
@@ -252,7 +252,7 @@ export function ImageMetaPanel({
       className="space-y-4 p-4 font-mono text-xs"
     >
       {!meta.photoId ? (
-        <div className="flex flex-col items-center gap-2 px-4 py-12 text-center text-zinc-600">
+        <div className="flex flex-col items-center gap-2 px-4 py-12 text-center text-text-muted">
           <ImageOff className="h-6 w-6" />
           <span>No image selected.</span>
         </div>
@@ -277,18 +277,18 @@ export function ImageMetaPanel({
           />
 
           {/* Identity */}
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-1">
+          <div className="rounded-lg border border-border bg-background/40 px-3 py-1">
             <Row label="Name">
               <span className="break-all">{meta.name ?? "—"}</span>
             </Row>
             <Row label="MIME type">{meta.mimeType ?? "—"}</Row>
             <Row label="Photo key">
-              <span className="break-all text-zinc-400">{meta.photoId}</span>
+              <span className="break-all text-text-secondary">{meta.photoId}</span>
             </Row>
           </div>
 
           {/* Dimensions + size */}
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-1">
+          <div className="rounded-lg border border-border bg-background/40 px-3 py-1">
             <Row label="Original size">
               {meta.origWidth && meta.origHeight
                 ? `${meta.origWidth} × ${meta.origHeight}`
@@ -305,7 +305,7 @@ export function ImageMetaPanel({
             <Row label="Current bytes">
               {formatBytes(meta.currentByteSize) ?? "—"}
               {savings != null && savings > 0 && (
-                <span className="ml-2 text-emerald-400">−{savings}%</span>
+                <span className="ml-2 text-success">−{savings}%</span>
               )}
             </Row>
             <Row label="Canvas PNG bytes">
@@ -314,15 +314,15 @@ export function ImageMetaPanel({
           </div>
 
           {/* Capture metadata (EXIF) */}
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
-            <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-300">
+          <div className="rounded-lg border border-border bg-background/40 px-3 py-2">
+            <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
               <Camera className="h-3.5 w-3.5 text-sky-400" />
               Capture metadata (EXIF)
             </div>
             {!exifChecked ? (
-              <div className="py-2 text-center text-zinc-600">reading…</div>
+              <div className="py-2 text-center text-text-muted">reading…</div>
             ) : !exif ? (
-              <div className="py-2 text-zinc-600">
+              <div className="py-2 text-text-muted">
                 No EXIF metadata in the original
                 {meta.mimeType &&
                 meta.mimeType !== "image/jpeg" &&
@@ -385,13 +385,13 @@ export function ImageMetaPanel({
                       {exif.gps.lat.toFixed(5)}, {exif.gps.lon.toFixed(5)}
                     </a>
                   ) : (
-                    <span className="text-zinc-500">none</span>
+                    <span className="text-text-muted">none</span>
                   )}
                 </Row>
               </>
             )}
             {exif?.gps && (
-              <div className="mt-1.5 flex items-start gap-1.5 text-[10px] leading-snug text-amber-500/80">
+              <div className="mt-1.5 flex items-start gap-1.5 text-[10px] leading-snug text-warning/80">
                 <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
                 <span>
                   Location is embedded. Unlock the EXIF padlock in Compress to
@@ -402,19 +402,19 @@ export function ImageMetaPanel({
           </div>
 
           {/* Edit state */}
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-1">
+          <div className="rounded-lg border border-border bg-background/40 px-3 py-1">
             <Row label="Undo steps">{meta.undoCount ?? 0}</Row>
             <Row label="Redo steps">{meta.redoCount ?? 0}</Row>
             <Row label="Modified">
               {meta.modified ? (
-                <span className="text-amber-400">yes — pending sync</span>
+                <span className="text-warning">yes — pending sync</span>
               ) : (
-                <span className="text-zinc-500">no</span>
+                <span className="text-text-muted">no</span>
               )}
             </Row>
           </div>
 
-          <div className="flex items-start gap-2 px-1 text-[10px] leading-relaxed text-zinc-600">
+          <div className="flex items-start gap-2 px-1 text-[10px] leading-relaxed text-text-muted">
             <LayersIcon className="mt-0.5 h-3 w-3 shrink-0" />
             <span>
               The full edit archive (canvas + undo/redo + layers + overlays) is

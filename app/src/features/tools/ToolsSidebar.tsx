@@ -194,10 +194,9 @@ export function ToolsSidebar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="fixed left-3 top-3 bottom-[48px] z-40 w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
+      className="fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
       style={{
-        boxShadow:
-          "0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
+        boxShadow: "var(--shadow-panel)",
       }}
     >
       <div className="flex items-center justify-between px-4 pt-3 pb-2">

@@ -9,6 +9,7 @@ import {
   Settings,
   SlidersHorizontal,
   Palette,
+  Package,
   CreditCard,
   ShieldCheck,
   Check,
@@ -20,6 +21,7 @@ import { Modal } from "@/components/ui/Modal";
 import { SuperUserPane, type SuperUserControls } from "@/components/SuperUserPane";
 import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
 import { AppearancePane } from "@/components/AppearancePane";
+import { ExportPane } from "@/components/ExportPane";
 import { UserMenu } from "@/components/UserMenu";
 import { LargeButton } from "@/components/ui/large-button";
 import {
@@ -36,7 +38,7 @@ const PRO_FEATURES = [
   "Unlimited share links",
 ];
 
-type SettingsTab = "general" | "appearance" | "billing" | "superuser";
+type SettingsTab = "general" | "appearance" | "export" | "billing" | "superuser";
 
 /** Human-readable summary of what changed, for the Apply toast. */
 function describeChanges(prev: Preferences, next: Preferences): string[] {
@@ -69,6 +71,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] = [
     { id: "general", label: "General", icon: SlidersHorizontal },
     { id: "appearance", label: "Appearance", icon: Palette },
+    { id: "export", label: "Export", icon: Package },
     { id: "billing", label: "Plan & Billing", icon: CreditCard },
     ...(superUser
       ? [{ id: "superuser" as SettingsTab, label: "Super User", icon: ShieldCheck }]
@@ -187,6 +190,8 @@ export function SubscriptionButton({ general, superUser }: Props) {
                 value={draft.theme}
                 onChange={(theme) => setDraft((d) => ({ ...d, theme }))}
               />
+            ) : tab === "export" ? (
+              <ExportPane />
             ) : tab === "superuser" && superUser ? (
               <SuperUserPane {...superUser} />
             ) : (

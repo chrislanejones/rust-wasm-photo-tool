@@ -56,8 +56,12 @@ export function ToggleButtonGroup({
             className={cn(
               "flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-all",
               fill && "flex-1",
+              // Active = raised elevated pill. In dark, --accent-ui and
+              // --bg-elevated are both #2b2b2b (unchanged); in light, bg-elevated
+              // is #fff so the active toggle separates from the #e9e3d8 container
+              // (bg-accent/--accent-ui #ece6db was too close to read as active).
               active
-                ? "bg-accent text-text-primary shadow-md"
+                ? "bg-bg-elevated text-text-primary shadow-md"
                 : "text-text-muted hover:text-text-primary hover:bg-bg-elevated",
             )}
           >

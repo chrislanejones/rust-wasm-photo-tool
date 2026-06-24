@@ -1,11 +1,113 @@
 @import "tailwindcss";
 
+/* Tailwind v4 class-based dark mode. `.dark` on <html> selects the dark palette;
+   the light palette is the default `:root`. The class is set pre-paint in
+   index.html (no FOUC) and kept in sync at runtime by lib/useTheme.ts. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ═══════════════════════════════════════════════════════════════════════════
    DESIGN TOKENS
+
+   Color tokens are theme-scoped: light values live in `:root`, dark values in
+   `.dark` (the original earth-tone palette, verbatim). The `@theme inline`
+   mapping below points Tailwind utilities at these vars, so flipping the class
+   re-themes all token-driven chrome for free. Non-color tokens (radius, fonts,
+   shadows) are theme-independent and stay in `:root` only.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* App design tokens — earth tone / warm brown theme */
+  /* Let native controls / scrollbars / form widgets adapt to the active theme. */
+  color-scheme: light dark;
+
+  /* ── Theme-independent tokens ── */
+  --radius: 6px;
+  --radius-lg: 10px;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "DM Sans", sans-serif;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  /* Floating side-panel / sidebar elevation (Tools, Review). */
+  --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+
+  /* ── Z-index ladder — the single source for stacking order. Use
+     var(--z-*) in CSS and z-[var(--z-*)] in JSX; no more "+1 to win". ── */
+  --z-canvas: 1; /* canvas-wrapper / pen overlay base */
+  --z-canvas-overlay: 10; /* loaders, in-canvas badges */
+  --z-compare: 20; /* compare slider handle, NEW pill */
+  --z-topbar: 30; /* floating top bar */
+  --z-panel: 40; /* Tools / Gallery / Review side panels + status bar */
+  --z-dialog: 50; /* dialogs, dropdowns, tooltips, magnifier */
+  --z-modal: 60; /* modals layered above dialogs */
+  --z-progress: 100; /* top load-progress bar */
+  --z-idle: 200; /* full-screen idle overlay */
+  --z-cursor: 1000; /* brush cursor / source marker (always on top) */
+
+  /* ── Motion — durations + shared easing. ── */
+  --dur-fast: 0.1s;
+  --dur-base: 0.15s;
+  --dur-slow: 0.2s;
+  --dur-slower: 0.3s;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Layout heights. ── */
+  --statusbar-h: 36px; /* fixed bottom status bar */
+  --statusbar-gap: 12px; /* gutter between floating panels and the status bar */
+  /* Bottom offset for floating side panels (clears the status bar + gutter). */
+  --panel-bottom: calc(var(--statusbar-h) + var(--statusbar-gap)); /* = 48px */
+
+  /* ── LIGHT palette — warm paper counterpart to the dark earth-tone ──
+     Brand accent (--accent/--primary) stays the warm cream #fcdfc2 in both
+     themes (matches the accent picker). The thin-line contrast roles
+     (--ring/--border-active/--current-color) use a deeper warm tan so focus
+     and selection stay visible on light surfaces. */
+  --bg-primary: #f3efe8;
+  --bg-secondary: #fbf9f5;
+  --bg-tertiary: #e9e3d8;
+  --bg-elevated: #ffffff;
+  --border: #e4ddcd;
+  --border-active: #c98f3f;
+  --text-primary: #2a2622;
+  --text-secondary: #5c554c;
+  --text-muted: #8a8175;
+  /* Light-mode accent = deeper warm tan (not the dark-mode cream): cream is
+     illegible as text / a slider thumb / a thin line on light surfaces. Used
+     for --accent + --primary so all fills, text-primary, and the range thumb
+     read on light. Dark mode keeps the cream below. */
+  --accent: #c98f3f;
+  --accent-foreground: #3a3128;
+  --accent-dim: rgba(201, 143, 63, 0.15);
+  --accent-glow: rgba(201, 143, 63, 0.3);
+  --success: #16a34a;
+  --success-dim: rgba(22, 163, 74, 0.15);
+  --warning: #d97706;
+  --undo-color: #5c554c;
+  --redo-color: #c2bbae;
+  --current-color: #c98f3f;
+
+  /* shadcn/ui CSS variables — light */
+  --background: #f3efe8;
+  --foreground: #2a2622;
+  --card: #fbf9f5;
+  --card-foreground: #2a2622;
+  --popover: #ffffff;
+  --popover-foreground: #2a2622;
+  --primary: #c98f3f;
+  --primary-foreground: #3a3128;
+  --secondary: #efe7d8;
+  --secondary-foreground: #5c4326;
+  --muted: #ece6db;
+  --muted-foreground: #5c554c;
+  --accent-ui: #ece6db;
+  --accent-ui-foreground: #2a2622;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --input: #d8d0c2;
+  --ring: #c98f3f;
+}
+
+.dark {
+  /* ── DARK palette — original earth-tone / warm brown (verbatim) ── */
   --bg-primary: #121212;
   --bg-secondary: #181818;
   --bg-tertiary: #222222;
@@ -25,15 +127,8 @@
   --undo-color: #b4b4b4;
   --redo-color: #484848;
   --current-color: #fcdfc2;
-  --radius: 6px;
-  --radius-lg: 10px;
-  --font-mono: "JetBrains Mono", monospace;
-  --font-sans: "DM Sans", sans-serif;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
 
-  /* shadcn/ui CSS variables — mapped to earth tone theme */
+  /* shadcn/ui CSS variables — dark */
   --background: #121212;
   --foreground: #eeeeee;
   --card: #181818;
@@ -90,6 +185,8 @@
   --color-text-muted: var(--text-muted);
   --color-accent-dim: var(--accent-dim);
   --color-accent-glow: var(--accent-glow);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   /* NOTE: --color-accent-foreground is intentionally NOT redefined here. It is
      set above to --accent-ui-foreground (light) so `hover:text-accent-foreground`
      stays readable on the dark `bg-accent` (outline/ghost buttons, e.g. the
@@ -147,7 +244,7 @@ body {
   display: flex;
   flex-direction: column;
   /* reserve space for the fixed status bar */
-  padding-bottom: 36px;
+  padding-bottom: var(--statusbar-h);
 }
 
 .main-content {
@@ -191,7 +288,7 @@ body {
   object-fit: contain;
   background: transparent;
   position: relative;
-  z-index: 1;
+  z-index: var(--z-canvas);
 }
 
 /* Empty state when no image is loaded */
@@ -240,7 +337,7 @@ body {
 .canvas-loader {
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: var(--z-canvas-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -267,7 +364,7 @@ body {
   border-radius: 50%;
   pointer-events: none;
   transform: translate(-50%, -50%);
-  z-index: 1000;
+  z-index: var(--z-cursor);
   mix-blend-mode: difference;
 }
 
@@ -277,7 +374,7 @@ body {
   width: 20px;
   height: 20px;
   pointer-events: none;
-  z-index: 999;
+  z-index: var(--z-cursor);
   transform: translate(-50%, -50%);
 }
 
@@ -332,18 +429,16 @@ textarea:focus-visible {
   position: fixed;
   right: 12px;
   top: 12px;
-  bottom: 48px;
+  bottom: var(--panel-bottom);
   width: 260px;
-  z-index: 40;
+  z-index: var(--z-panel);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.03);
+  box-shadow: var(--shadow-panel);
 }
 
 /* Panel header: "Review" title + close. */
@@ -467,7 +562,7 @@ textarea:focus-visible {
   font: inherit;
   padding: 1px 4px;
   border: 1px solid var(--accent, #6366f1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.25);
   color: inherit;
 }
@@ -654,14 +749,14 @@ textarea:focus-visible {
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
   padding: 0 16px;
-  height: 36px;
+  height: var(--statusbar-h);
   display: flex;
   align-items: center;
   gap: 0;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
-  z-index: 50;
+  z-index: var(--z-panel);
   backdrop-filter: blur(8px);
 }
 
@@ -838,7 +933,7 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-runnable-track {
   width: 100%;
   height: 4px;
-  background: var(--bg-elevated);
+  background: var(--bg-tertiary);
   border-radius: 2px;
   cursor: pointer;
 }
@@ -846,7 +941,7 @@ input[type="range"]::-webkit-slider-runnable-track {
 input[type="range"]::-moz-range-track {
   width: 100%;
   height: 4px;
-  background: var(--bg-elevated);
+  background: var(--bg-tertiary);
   border-radius: 2px;
   cursor: pointer;
 }
@@ -1047,18 +1142,30 @@ input[type="range"].slider-overlay::-moz-range-thumb {
   background-color: #d0d0d0;
 }
 
-.checkerboard-dark {
+/* Main canvas transparency grid. Theme-driven: warm light squares on light,
+   the original near-black grid on dark (see `.dark` override below). Applied
+   via the `checkerboard-canvas` class in AppShell. */
+.checkerboard-canvas {
   background-image:
-    linear-gradient(45deg, #2a2a2a 25%, transparent 25%),
-    linear-gradient(-45deg, #2a2a2a 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #2a2a2a 75%),
-    linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
+    linear-gradient(45deg, #d4cdbf 25%, transparent 25%),
+    linear-gradient(-45deg, #d4cdbf 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d4cdbf 75%),
+    linear-gradient(-45deg, transparent 75%, #d4cdbf 75%);
   background-size: 14px 14px;
   background-position:
     0 0,
     0 7px,
     7px -7px,
     -7px 0;
+  background-color: #e9e3d8;
+}
+
+.dark .checkerboard-canvas {
+  background-image:
+    linear-gradient(45deg, #2a2a2a 25%, transparent 25%),
+    linear-gradient(-45deg, #2a2a2a 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2a2a2a 75%),
+    linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
   background-color: #1a1a1a;
 }
 
@@ -1091,7 +1198,7 @@ input[type="range"].slider-overlay::-moz-range-thumb {
   right: 4px;
   width: 20px;
   height: 20px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: rgba(185, 20, 20, 0.9);
   border: none;
   padding: 0;
@@ -1196,6 +1303,15 @@ input[type="range"].slider-overlay::-moz-range-thumb {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* Subtle edge vignette — gentle on light so corners don't look grimy. */
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+}
+
+.dark .canvas-wrapper::after {
   background: radial-gradient(
     ellipse at center,
     transparent 50%,
@@ -1357,7 +1473,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   padding: 0 6px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
@@ -1401,14 +1517,15 @@ input[type="range"]:focus::-webkit-slider-thumb {
    (--bg-secondary), borrow the app's accent / text / font, and drop the
    card shadow, border, and rounding. */
 .emoji-picker-host em-emoji-picker {
-  --rgb-background: 24, 24, 24;   /* #181818 — matches the sidebar panel */
-  --rgb-input: 43, 43, 43;        /* #2b2b2b — matches app inputs (--bg-elevated) */
-  --rgb-color: 238, 238, 238;     /* #eeeeee — --text-primary */
-  --rgb-accent: 252, 223, 194;    /* #fcdfc2 — --accent */
+  /* Light theme — blend into the light sidebar panel. Dark values below. */
+  --rgb-background: 251, 249, 245; /* #fbf9f5 — light sidebar panel */
+  --rgb-input: 236, 230, 219;      /* #ece6db — light muted/input */
+  --rgb-color: 42, 38, 34;         /* #2a2622 — light --text-primary */
+  --rgb-accent: 201, 143, 63;      /* #c98f3f — light accent/contrast */
   --color-border: transparent;
   --font-family: var(--font-sans);
   --font-size: 13px;
-  --border-radius: 10px;
+  --border-radius: var(--radius-lg);
   --shadow: none;
   background: transparent !important;
   border: none !important;
@@ -1416,6 +1533,13 @@ input[type="range"]:focus::-webkit-slider-thumb {
   width: 100% !important;
   min-height: 300px;
   max-height: 360px;
+}
+
+.dark .emoji-picker-host em-emoji-picker {
+  --rgb-background: 24, 24, 24;   /* #181818 — matches the sidebar panel */
+  --rgb-input: 43, 43, 43;        /* #2b2b2b — matches app inputs (--bg-elevated) */
+  --rgb-color: 238, 238, 238;     /* #eeeeee — --text-primary */
+  --rgb-accent: 252, 223, 194;    /* #fcdfc2 — --accent */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1438,6 +1562,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
    CLERK OVERRIDES
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.cl-socialButtonsProviderIcon__github {
+/* Invert the dark GitHub glyph only in dark mode; keep it black on light. */
+.dark .cl-socialButtonsProviderIcon__github {
   filter: invert(1);
 }

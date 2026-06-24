@@ -87,9 +87,9 @@ export function AISettings({
       </h3>
 
       {!aiEnabled && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-          <Lock className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
-          <p className="text-[10px] text-amber-200/90 leading-relaxed">
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
+          <Lock className="h-4 w-4 shrink-0 text-warning mt-0.5" />
+          <p className="text-[10px] text-warning/90 leading-relaxed">
             AI tools run on Replicate and are a <strong>Paid</strong> feature.
             Upgrade to unlock background removal, text extraction, and more.
           </p>
@@ -125,10 +125,10 @@ export function AISettings({
               : "Remove Background"}
         </button>
         {lastType === "rembg" && error && (
-          <p className="mt-2 text-[10px] text-red-400 leading-relaxed">{error}</p>
+          <p className="mt-2 text-[10px] text-destructive leading-relaxed">{error}</p>
         )}
         {lastType === "rembg" && phase === "done" && !error && (
-          <p className="mt-2 text-[10px] text-emerald-400">
+          <p className="mt-2 text-[10px] text-success">
             Background removed - applied to canvas.
           </p>
         )}
@@ -163,7 +163,7 @@ export function AISettings({
               : "Extract Text"}
         </button>
         {lastType === "ocr" && error && (
-          <p className="mt-2 text-[10px] text-red-400 leading-relaxed">{error}</p>
+          <p className="mt-2 text-[10px] text-destructive leading-relaxed">{error}</p>
         )}
         {lastType === "ocr" && phase === "done" && !error && (
           <div className="mt-2">
@@ -223,10 +223,10 @@ export function AISettings({
               : "Remove Object"}
         </button>
         {lastType === "inpaint" && error && (
-          <p className="mt-2 text-[10px] text-red-400 leading-relaxed">{error}</p>
+          <p className="mt-2 text-[10px] text-destructive leading-relaxed">{error}</p>
         )}
         {lastType === "inpaint" && phase === "done" && !error && (
-          <p className="mt-2 text-[10px] text-emerald-400">
+          <p className="mt-2 text-[10px] text-success">
             Object removed - applied to canvas.
           </p>
         )}

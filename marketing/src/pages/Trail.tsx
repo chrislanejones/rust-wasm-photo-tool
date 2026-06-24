@@ -27,6 +27,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.23",
+    date: "2026-06-24",
+    headline: "Light mode — pick light, dark, or follow your system",
+    entries: [
+      { tag: "feature", text: "Image Horse now has a full light theme alongside the original dark one. Choose Light, Dark, or System in Settings → Appearance — “System” follows your operating system and switches live the moment your OS does. Your choice is saved and synced to your account." },
+      { tag: "ui",      text: "The whole app follows the theme — every panel, dialog, toast, the sign-in window, even the emoji picker — warm earth-tone in the dark, warm paper in the light. No flash of the wrong colors when the page loads." },
+      { tag: "ui",      text: "Under the hood the entire UI moved onto one set of design tokens (color, elevation, radius, motion, and a z-index ladder), so the two themes stay perfectly in step and the interface can’t drift out of sync." },
+    ],
+  },
+  {
     version: "v0.9.22",
     date: "2026-06-24",
     headline: "A real Bézier pen — draw, fill, and re-edit vector paths",

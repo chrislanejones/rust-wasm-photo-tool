@@ -151,7 +151,7 @@ export function ObjectRemovalModal({
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
           onClick={busy ? undefined : onClose}
         >
           <motion.div
@@ -160,22 +160,22 @@ export function ObjectRemovalModal({
             exit={{ scale: 0.96, opacity: 0 }}
             transition={quickSpring}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[90vh] w-[min(720px,95vw)] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl"
+            className="flex max-h-[90vh] w-[min(720px,95vw)] flex-col overflow-hidden rounded-xl border border-border bg-background text-text-primary shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2.5">
+            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <Eraser className="h-4 w-4" /> Object Removal
               </div>
               <button
                 onClick={onClose}
                 disabled={busy}
-                className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-40"
+                className="rounded p-1 text-text-secondary hover:bg-card hover:text-text-primary disabled:opacity-40"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="px-4 pt-3 text-[11px] text-zinc-400">
+            <div className="px-4 pt-3 text-[11px] text-text-secondary">
               Paint over the object you want to remove, then click Remove Object.
             </div>
 
@@ -196,8 +196,8 @@ export function ObjectRemovalModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 border-t border-zinc-800 px-4 py-3">
-              <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+            <div className="flex items-center gap-3 border-t border-border px-4 py-3">
+              <label className="flex items-center gap-2 text-[11px] text-text-secondary">
                 Brush
                 <input
                   type="range"
@@ -212,7 +212,7 @@ export function ObjectRemovalModal({
               <button
                 onClick={clearMask}
                 disabled={!hasMask || busy}
-                className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-40"
+                className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-text-secondary hover:bg-card hover:text-text-primary disabled:opacity-40"
               >
                 <Undo2 className="h-3.5 w-3.5" /> Clear
               </button>
@@ -220,7 +220,7 @@ export function ObjectRemovalModal({
               <button
                 onClick={onClose}
                 disabled={busy}
-                className="rounded-md px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                className="rounded-md px-3 py-1.5 text-xs text-text-secondary hover:bg-card disabled:opacity-40"
               >
                 Cancel
               </button>

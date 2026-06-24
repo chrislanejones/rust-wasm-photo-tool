@@ -4,6 +4,7 @@ import data from "@emoji-mart/data";
 import type { StampSettings } from "@/lib/types";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
+import { useResolvedTheme } from "@/lib/useTheme";
 
 const SIZE_PRESETS = [8, 16, 24, 32] as const;
 const HARDNESS_PRESETS = [0, 33, 66, 100] as const;
@@ -46,6 +47,7 @@ export function StampSettingsPanel({
 }: StampSettingsPanelProps) {
   const [internalMode, setInternalMode] = useState<StampMode>("clone");
   const mode = activeMode ?? internalMode;
+  const emojiTheme = useResolvedTheme();
   const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
 
   const handleModeChange = (id: string) => {
@@ -79,7 +81,7 @@ export function StampSettingsPanel({
       {/* ── Clone Stamp panel ── */}
       {mode === "clone" && (
         <div className="space-y-6">
-          <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs large-badge-item type-current">
+          <div className="mb-8 flex justify-center gap-2 px-3 py-4 rounded-lg text-xs large-badge-item type-current">
             <span className="large-badge">
               {hasSource
                 ? "Source set — click to paint"
@@ -205,7 +207,7 @@ export function StampSettingsPanel({
             <Picker
               data={data}
               onEmojiSelect={(e: { native: string }) => onEmojiChange?.(e.native)}
-              theme="dark"
+              theme={emojiTheme}
               previewPosition="none"
               skinTonePosition="none"
               navPosition="top"

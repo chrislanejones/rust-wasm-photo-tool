@@ -25,6 +25,7 @@ import { ADMIN_EMAIL } from "@/lib/superuser";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
 import { usePreferences } from "@/lib/preferences";
+import { useTheme } from "@/lib/useTheme";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleOverlay } from "@/components/IdleOverlay";
 import { Toaster, toast } from "@/components/ui/sonner";
@@ -220,6 +221,9 @@ export function AppShell() {
 
   // App-wide preferences (Settings → General), persisted to localStorage.
   const [prefs, applyPreferences] = usePreferences();
+  // Apply the saved theme to <html> (light/dark/system); index.html sets the
+  // initial class pre-paint, this keeps it in sync as the choice changes.
+  useTheme(prefs.theme);
   // The Settings modal owns the draft; here we just expose live prefs + the
   // commit. maxHistory reaches the engine via the effect below; idle reaches
   // the hook below — both keyed on the committed prefs.
@@ -1561,9 +1565,9 @@ export function AppShell() {
             </span>
           </div>
           {/* -mx-4 cancels the toast's px-4 so the bar bleeds to both edges. */}
-          <div className="-mx-4 h-1.5 overflow-hidden bg-white/10">
+          <div className="-mx-4 h-1.5 overflow-hidden bg-foreground/10">
             <div
-              className="h-full bg-emerald-400 transition-[width] duration-300 ease-out"
+              className="h-full bg-success transition-[width] duration-300 ease-out"
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -1747,7 +1751,7 @@ export function AppShell() {
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="fixed top-0 left-0 right-0 z-100 h-1 bg-bg-elevated"
+            className="fixed top-0 left-0 right-0 z-[var(--z-progress)] h-1 bg-bg-elevated"
           >
             <motion.div
               className="h-full bg-linear-to-r from-accent via-accent to-accent/60 rounded-r-full"
@@ -2036,7 +2040,7 @@ export function AppShell() {
                   }}
                 >
                   <div
-                    className="canvas-grid-host checkerboard-dark"
+                    className="canvas-grid-host checkerboard-canvas"
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(5, 1fr)",
@@ -2127,7 +2131,7 @@ export function AppShell() {
                         />
                       </div>
                       {(!activePhotoId || photos.length === 0) && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-zinc-950/95 text-center text-theme-muted-foreground">
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/95 text-center text-theme-muted-foreground">
                           <ImagePlus className="h-10 w-10 opacity-60" />
                           <p className="text-sm font-medium">No photos loaded</p>
                           <p className="text-xs">Upload images to start batch editing</p>
@@ -2265,7 +2269,7 @@ export function AppShell() {
           <ContextMenuItem
             onClick={handleDeleteAll}
             disabled={photos.length === 0}
-            className="text-red-400 focus:text-red-400"
+            className="text-destructive focus:text-destructive"
           >
             <Trash2 className="h-4 w-4 mr-2" /> Delete All
             <ContextMenuShortcut>Alt+D</ContextMenuShortcut>

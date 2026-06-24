@@ -353,7 +353,7 @@ app/src/
 - **Keyboard Shortcut Modal** — Alt+/ opens a full reference overlay grouped by category (two columns per group)
 - **Hidden Dev Tools** — three clicks on a blank status-bar button unlock the Diagnostics Log (Alt+Delete) and the user/tier selector (Alt+L) in production, and append a Dev Tools section to the Alt+/ modal
 - **AI Panel** — Placeholder cards for: Remove Background (rembg), 4× Upscale (Real-ESRGAN), Object Removal (SD Inpaint), Auto Alt Text (BLIP), Smart Crop, Auto-Enhance — wired to Convex `ai_jobs` + Replicate when ready
-- **Dark Theme** — JetBrains Mono + DM Sans, dark palette with accent highlights
+- **Light / Dark / System theme** — full light & dark palettes (warm earth-tone dark, warm-paper light) driven by CSS-variable tokens in `styles.css` (`:root` light, `.dark` dark, `@custom-variant dark`); "System" follows the OS via `matchMedia` and updates live. Pre-paint guard in `index.html` (no FOUC). Set in **Settings → Appearance**, persisted to localStorage + Convex. JetBrains Mono + DM Sans throughout
 
 ## Tech Stack
 
@@ -725,6 +725,16 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 7   | **Dialog header / body / footer (`ui/dialog.tsx`)** — restructured to a title-left + boxed-`X` header bar (with a divider), a padded `DialogBody`, and a bordered footer; `DialogContent` went to `p-0` so each section pads itself. Applies to the Download and Delete-All dialogs | Complete |
 | 8   | **Hardening / quality** — surfaced previously-silent failures to the Diagnostics log via `logDiagnostic("CONVEX_DB", …)` for cloud-edit save (`useEditPersistence`) and `users.upsert` (`useStoreUser`); fixed an `<img src="">` (empty string → full-page re-request) per gallery thumbnail in `GalleryBar`; removed debug `console.log`s from the `redo` path; replaced a triple `as any` namespace-dig in `ToolsSidebar` with a typed `StampSettingsPanel` import | Complete |
 | 9   | **Marketing** — Features cards refreshed (pick-format-at-download, tunable undo history); Trail Log **v0.9.21** | Complete |
+
+## v4.4 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Light / Dark / System theme** — the app was dark-only; now `styles.css` splits the palette into a default light `:root` and a `.dark` block (the original earth-tone, verbatim) with `@custom-variant dark (&:where(.dark, .dark *))`. New `lib/useTheme.ts` (`useTheme` applies the class + tracks the OS for "System"; `useResolvedTheme` exposes the live theme via a `<html>`-class MutationObserver). A pre-paint inline script in `index.html` sets the class before React mounts (no FOUC) and updates `<meta name="theme-color">` + `color-scheme`. The toggle lives in **Settings → Appearance** (`AppearancePane`), persisted via the existing `usePreferences` (localStorage + Convex) | Complete |
+| 2   | **Semantic-token sweep (~75 utilities)** — hardcoded `zinc/white/black/emerald/red/amber` chrome utilities across ImageMetaPanel, ResourceMonitor, DiagnosticLogOverlay, AISettings, BatchSettings, ObjectRemovalModal, GalleryBar, GridThumbnails, AppShell, etc. → semantic tokens (`text-text-*`, `bg-card/muted/background`, `border-border`, `text-success/warning/destructive`). Left intentionally static: over-photo overlays (CompareSlider, Magnifier, modal scrims), saturated brand/category accents, brand gradients, the annotation palette | Complete |
+| 3   | **Third-party + CSS darks themed** — Clerk (`ConvexClerkProvider`: `baseTheme`/variables by theme + `dark:` element variants), `sonner`, and the emoji-mart picker now follow `useResolvedTheme`. `.checkerboard-canvas`, the canvas vignette, the emoji `--rgb-*` vars, and the GitHub-icon `invert` all flip via `.dark`. Light accent uses a deeper warm tan (`#c98f3f`) so text/rings/slider thumbs read on light; `ToggleButtonGroup` active state → `bg-bg-elevated` (visible in both themes) | Complete |
+| 4   | **Design-token centralization** — `styles.css :root` is now the single source for a **z-index ladder** (`--z-canvas … --z-cursor`, replacing ad-hoc `z-*`), `--shadow-panel` (de-dups the Tools/Review panel shadow), **motion** (`--dur-*` + `--ease-standard`), **radius** (CSS literals → `--radius*`), and **layout heights** (`--statusbar-h` / `--panel-bottom`) — which also fixes a latent status-bar height mismatch (28 / 36 / 48 now derive from one value) | Complete |
+| 5   | **Docs & marketing** — README feature line + this summary; marketing **Features** gains a "Light, dark, or system" card; Trail Log **v0.9.23** | Complete |
 
 ## License
 

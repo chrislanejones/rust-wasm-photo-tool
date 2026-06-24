@@ -14,26 +14,26 @@ import type { LogSource } from "@/lib/diagnosticsLog";
 
 /** Solid bar fill per subsystem, echoing the badge colors in the log table. */
 const BAR_CLASS: Record<LogSource, string> = {
-  WASM_ENGINE: "bg-amber-500",
+  WASM_ENGINE: "bg-warning",
   CONVEX_DB: "bg-blue-500",
   REPLICATE_AI: "bg-violet-500",
-  UI_THREAD: "bg-emerald-500",
-  CONSOLE: "bg-zinc-500",
+  UI_THREAD: "bg-success",
+  CONSOLE: "bg-bg-elevated",
 };
 
 const TEXT_CLASS: Record<LogSource, string> = {
-  WASM_ENGINE: "text-amber-400",
+  WASM_ENGINE: "text-warning",
   CONVEX_DB: "text-blue-400",
   REPLICATE_AI: "text-violet-400",
-  UI_THREAD: "text-emerald-400",
-  CONSOLE: "text-zinc-400",
+  UI_THREAD: "text-success",
+  CONSOLE: "text-text-secondary",
 };
 
 /** Pick a green→amber→red bar color from a 0..1 load. */
 function loadBar(load: number): string {
-  if (load > 0.66) return "bg-red-500";
-  if (load > 0.33) return "bg-amber-500";
-  return "bg-emerald-500";
+  if (load > 0.66) return "bg-destructive";
+  if (load > 0.33) return "bg-warning";
+  return "bg-success";
 }
 
 function Gauge({
@@ -52,13 +52,13 @@ function Gauge({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex w-20 shrink-0 items-center gap-1.5 text-zinc-400">
+      <div className="flex w-20 shrink-0 items-center gap-1.5 text-text-secondary">
         {icon}
         <span className="whitespace-nowrap text-[10px] uppercase tracking-wider">
           {label}
         </span>
       </div>
-      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-zinc-800/80">
+      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-card/80">
         {pct != null && (
           <div
             className={`h-full rounded-full ${barClass ?? loadBar(pct)} transition-[width] duration-300`}
@@ -66,7 +66,7 @@ function Gauge({
           />
         )}
       </div>
-      <div className="w-32 shrink-0 whitespace-nowrap text-right tabular-nums text-zinc-300">
+      <div className="w-32 shrink-0 whitespace-nowrap text-right tabular-nums text-text-secondary">
         {value}
       </div>
     </div>
@@ -77,26 +77,26 @@ function ProcRow({ p, now }: { p: ProcessRow; now: number }) {
   const idle = p.lastTs == null;
   const ago = idle ? "—" : `${Math.round((now - (p.lastTs ?? now)) / 1000)}s`;
   return (
-    <tr className="border-t border-zinc-800/60 hover:bg-zinc-800/30">
+    <tr className="border-t border-border hover:bg-card/30">
       <td className="px-3 py-1">
         <span className={`font-bold ${TEXT_CLASS[p.source]}`}>{p.source}</span>
       </td>
-      <td className="px-3 py-1 text-right tabular-nums text-zinc-400">
+      <td className="px-3 py-1 text-right tabular-nums text-text-secondary">
         {p.events}
       </td>
-      <td className="px-3 py-1 text-right tabular-nums text-zinc-400">
+      <td className="px-3 py-1 text-right tabular-nums text-text-secondary">
         {p.cpuMs > 0 ? `${p.cpuMs.toFixed(1)}ms` : "—"}
       </td>
-      <td className="px-3 py-1 text-right tabular-nums text-zinc-500">{ago}</td>
+      <td className="px-3 py-1 text-right tabular-nums text-text-muted">{ago}</td>
       <td className="px-3 py-1">
         <div className="flex items-center gap-2">
-          <div className="relative h-2.5 w-24 overflow-hidden rounded-sm bg-zinc-900">
+          <div className="relative h-2.5 w-24 overflow-hidden rounded-sm bg-background">
             <div
               className={`h-full ${BAR_CLASS[p.source]} transition-[width] duration-300`}
               style={{ width: `${Math.min(100, p.cpuPct)}%` }}
             />
           </div>
-          <span className="w-10 text-right tabular-nums text-zinc-400">
+          <span className="w-10 text-right tabular-nums text-text-secondary">
             {p.cpuPct.toFixed(0)}%
           </span>
         </div>
@@ -111,7 +111,7 @@ export function ResourceMonitor({ active }: { active: boolean }) {
 
   if (!snap) {
     return (
-      <div className="px-4 py-10 text-center font-mono text-xs text-zinc-600">
+      <div className="px-4 py-10 text-center font-mono text-xs text-text-muted">
         Sampling…
       </div>
     );
@@ -166,7 +166,7 @@ export function ResourceMonitor({ active }: { active: boolean }) {
           icon={<Boxes className="h-3.5 w-3.5" />}
           label="WASM"
           pct={wasmPct}
-          barClass="bg-amber-500"
+          barClass="bg-warning"
           value={snap.wasmBytes != null ? fmtBytes(snap.wasmBytes) : "not loaded"}
         />
         <Gauge
@@ -178,13 +178,13 @@ export function ResourceMonitor({ active }: { active: boolean }) {
         />
       </div>
 
-      <div className="text-[10px] text-zinc-600">
+      <div className="text-[10px] text-text-muted">
         {snap.cores} logical cores
         {snap.deviceMemoryGB != null ? ` · ~${snap.deviceMemoryGB} GB device RAM` : ""}
         {" · "}
         {(snap.windowMs / 1000).toFixed(0)}s activity window
       </div>
-      <div className="text-[10px] leading-relaxed text-zinc-600">
+      <div className="text-[10px] leading-relaxed text-text-muted">
         Tab = whole-page footprint (JS + WASM + canvas + workers), shown only when
         the page is cross-origin isolated. JS Heap &amp; WASM alone miss
         canvas/image memory; WASM only grows — reload to reclaim it.
@@ -192,7 +192,7 @@ export function ResourceMonitor({ active }: { active: boolean }) {
 
       {/* ── Per-subsystem "process" list ─────────────────────────────────── */}
       <table className="w-full border-collapse">
-        <thead className="text-zinc-500">
+        <thead className="text-text-muted">
           <tr>
             <th className="px-3 py-1.5 text-left font-medium">Subsystem</th>
             <th className="px-3 py-1.5 text-right font-medium">Events</th>
@@ -208,7 +208,7 @@ export function ResourceMonitor({ active }: { active: boolean }) {
         </tbody>
       </table>
 
-      <div className="text-center text-[10px] text-zinc-600">
+      <div className="text-center text-[10px] text-text-muted">
         %CPU = share of timed work across subsystems in the last{" "}
         {(snap.windowMs / 1000).toFixed(0)}s
       </div>

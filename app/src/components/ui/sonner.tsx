@@ -1,9 +1,11 @@
 import { Toaster as SonnerToaster, toast } from "sonner";
+import { useResolvedTheme } from "@/lib/useTheme";
 
 export function Toaster(props: React.ComponentProps<typeof SonnerToaster>) {
+  const theme = useResolvedTheme();
   return (
     <SonnerToaster
-      theme="dark"
+      theme={theme}
       position="top-center"
       offset={80}
       closeButton
@@ -17,7 +19,7 @@ export function Toaster(props: React.ComponentProps<typeof SonnerToaster>) {
           // strong shadow + ring for separation. Gives every toast type the
           // visibility of the "Copied to clipboard" toast.
           toast:
-            "group pointer-events-auto flex items-center gap-3 w-full rounded-xl border border-white/15 bg-theme-muted text-theme-foreground font-medium shadow-2xl ring-1 ring-black/50 px-4 py-3 text-sm",
+            "group pointer-events-auto flex items-center gap-3 w-full rounded-xl border border-border bg-theme-muted text-theme-foreground font-medium shadow-2xl ring-1 ring-black/10 dark:ring-black/50 px-4 py-3 text-sm",
           // Fill the toast width so custom content (e.g. the compress progress
           // bar) spans edge-to-edge instead of shrinking to its text width.
           content: "flex-1 min-w-0",

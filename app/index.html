@@ -3,6 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#121212" />
+    <!-- Pre-paint theme guard: set the .dark class from saved prefs BEFORE React
+         mounts so there's no light/dark flash. Mirrors lib/preferences.ts
+         (LS key + ThemeChoice) and lib/useTheme.ts (resolution logic). -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("image-horse-prefs");
+          var theme = "dark";
+          if (raw) {
+            var t = JSON.parse(raw).theme;
+            if (t === "light" || t === "dark" || t === "system") theme = t;
+          }
+          var dark =
+            theme === "dark" ||
+            (theme === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var el = document.documentElement;
+          el.classList.toggle("dark", dark);
+          el.style.colorScheme = dark ? "dark" : "light";
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute("content", dark ? "#121212" : "#f3efe8");
+        } catch (e) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
     <link rel="icon" href="/Image-Horse-Logo.svg" type="image/svg+xml" />
     <title>Image Horse</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />

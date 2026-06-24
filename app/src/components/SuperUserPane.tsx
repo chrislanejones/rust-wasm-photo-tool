@@ -31,9 +31,9 @@ const TIERS_LIST: { mode: UserMode; label: string; icon: typeof User }[] = [
 
 /** Tint a matrix value like the marketing pricing table. */
 function valueClass(v: string): string {
-  if (v === "yes" || v === "unlimited" || v === "∞") return "text-emerald-400";
+  if (v === "yes" || v === "unlimited" || v === "∞") return "text-success";
   if (v === "—") return "text-text-muted";
-  return "text-amber-400";
+  return "text-warning";
 }
 
 function MatrixRow({ label, value }: { label: string; value: string }) {

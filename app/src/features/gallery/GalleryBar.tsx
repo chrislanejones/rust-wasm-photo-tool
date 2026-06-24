@@ -299,7 +299,7 @@ export function GalleryBar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="fixed left-0 right-0 bottom-[48px] z-40 pointer-events-none"
+      className="fixed left-0 right-0 bottom-[var(--panel-bottom)] z-[var(--z-panel)] pointer-events-none"
     >
       <motion.div
         animate={{

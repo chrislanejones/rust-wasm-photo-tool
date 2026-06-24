@@ -73,9 +73,9 @@ interface ResizeSettingsProps {
 }
 
 function trafficColor(score: number) {
-  if (score >= 80) return "bg-emerald-500";
-  if (score >= 40) return "bg-amber-500";
-  return "bg-red-500";
+  if (score >= 80) return "bg-success";
+  if (score >= 40) return "bg-warning";
+  return "bg-destructive";
 }
 
 export function ResizeSettings({

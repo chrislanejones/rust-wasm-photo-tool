@@ -20,11 +20,11 @@ interface Props {
 type Tab = "telemetry" | "resources" | "imagemeta";
 
 const SOURCE_CLASS: Record<LogSource, string> = {
-  WASM_ENGINE: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  WASM_ENGINE: "bg-warning/10 text-warning border-warning/20",
   CONVEX_DB: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   REPLICATE_AI: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-  UI_THREAD: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  CONSOLE: "bg-zinc-700/40 text-zinc-300 border-zinc-600/40",
+  UI_THREAD: "bg-success/10 text-success border-success/20",
+  CONSOLE: "bg-bg-elevated/40 text-text-secondary border-border/40",
 };
 
 function fmtTime(ts: number): string {
@@ -101,12 +101,12 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
                   meta={imageMeta ?? { photoId: null }}
                 />
               ) : entries.length === 0 ? (
-                <div className="px-4 py-10 text-center font-mono text-xs text-zinc-600">
+                <div className="px-4 py-10 text-center font-mono text-xs text-text-muted">
                   No events yet. Warnings, errors, and timed operations appear here.
                 </div>
               ) : (
                 <table className="w-full border-collapse font-mono text-xs">
-                  <thead className="sticky top-0 bg-zinc-900 text-zinc-500">
+                  <thead className="sticky top-0 bg-background text-text-muted">
                     <tr>
                       <th className="px-3 py-1.5 text-left font-medium">Time</th>
                       <th className="px-3 py-1.5 text-left font-medium">Source</th>
@@ -118,9 +118,9 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
                     {[...entries].reverse().map((log: LogEntry) => (
                       <tr
                         key={log.id}
-                        className="border-t border-zinc-800/60 hover:bg-zinc-800/30"
+                        className="border-t border-border hover:bg-card/30"
                       >
-                        <td className="whitespace-nowrap px-3 py-1 text-zinc-500">
+                        <td className="whitespace-nowrap px-3 py-1 text-text-muted">
                           {fmtTime(log.ts)}
                         </td>
                         <td className="px-3 py-1">
@@ -130,8 +130,8 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
                             {log.source}
                           </span>
                         </td>
-                        <td className="px-3 py-1 text-zinc-300">{log.message}</td>
-                        <td className="whitespace-nowrap px-3 py-1 text-right font-semibold text-emerald-400">
+                        <td className="px-3 py-1 text-text-secondary">{log.message}</td>
+                        <td className="whitespace-nowrap px-3 py-1 text-right font-semibold text-success">
                           {log.durationMs != null
                             ? `${log.durationMs.toFixed(1)}ms`
                             : "—"}

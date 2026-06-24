@@ -26,7 +26,7 @@ export function IdleOverlay({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.4 }}
-          className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-6 bg-black"
+          className="fixed inset-0 z-[var(--z-idle)] flex flex-col items-center justify-center gap-6 bg-background"
           role="dialog"
           aria-modal="true"
         >
@@ -37,8 +37,8 @@ export function IdleOverlay({
             draggable={false}
           />
           <div className="text-center">
-            <h2 className="text-lg font-semibold text-white">Paused to save power</h2>
-            <p className="mx-auto mt-1 max-w-xs text-sm text-zinc-400">
+            <h2 className="text-lg font-semibold text-text-primary">Paused to save power</h2>
+            <p className="mx-auto mt-1 max-w-xs text-sm text-text-secondary">
               Background activity is throttled after a while idle. Your edits are
               safe.
             </p>

@@ -47,7 +47,7 @@ export function MagnifierOverlay({ magnifier }: Props) {
 
   return (
     <div
-      className="pointer-events-none absolute z-50 rounded-xl overflow-hidden shadow-2xl border border-white/20"
+      className="pointer-events-none absolute z-[var(--z-dialog)] rounded-xl overflow-hidden shadow-2xl border border-white/20"
       style={{
         left: magnifier.screenX + offsetX,
         top: magnifier.screenY + offsetY,

@@ -126,7 +126,7 @@ export function TopBar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="fixed top-3 left-0 right-0 z-30 pointer-events-none"
+      className="fixed top-3 left-0 right-0 z-[var(--z-topbar)] pointer-events-none"
     >
       <motion.div
         animate={{

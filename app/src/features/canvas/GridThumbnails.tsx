@@ -125,7 +125,7 @@ export function GridThumbnails({
           <div
             key={p.id}
             style={{ gridArea: area }}
-            className="relative overflow-hidden rounded-md border border-border bg-zinc-950 hover:ring-2 hover:ring-orange-400"
+            className="relative overflow-hidden rounded-md border border-border bg-background hover:ring-2 hover:ring-orange-400"
           >
             <button
               type="button"

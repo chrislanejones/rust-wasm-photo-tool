@@ -668,14 +668,14 @@ export function BatchSettings({
         <div
           role="status"
           aria-live="polite"
-          className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-300"
+          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-[11px] text-success"
         >
           {`✓ Applied to ${appliedCount} image${appliedCount === 1 ? "" : "s"}`}
         </div>
       )}
 
       {errorMsg && (
-        <p className="text-[11px] text-red-400 leading-relaxed">{errorMsg}</p>
+        <p className="text-[11px] text-destructive leading-relaxed">{errorMsg}</p>
       )}
       </>
       )}
@@ -999,14 +999,14 @@ function TextBatchPanel({
         <div
           role="status"
           aria-live="polite"
-          className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-300"
+          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-[11px] text-success"
         >
           {`✓ Applied to ${appliedCount} image${appliedCount === 1 ? "" : "s"}`}
         </div>
       )}
 
       {errorMsg && (
-        <p className="text-[11px] text-red-400 leading-relaxed">{errorMsg}</p>
+        <p className="text-[11px] text-destructive leading-relaxed">{errorMsg}</p>
       )}
     </div>
   );
