@@ -8,6 +8,7 @@ import { TinyButton } from "@/components/ui/tiny-button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { formatBytes } from "@/lib/format";
 import { TIERS } from "@/lib/tiers";
+import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 
 export interface PhotoEntry {
   id: string;
@@ -302,8 +303,8 @@ export function GalleryBar({
     >
       <motion.div
         animate={{
-          marginLeft: showTools ? 320 : 12,
-          marginRight: showHistory ? 284 : 12,
+          marginLeft: showTools ? PANEL_OPEN_GUTTER : 12,
+          marginRight: showHistory ? PANEL_OPEN_GUTTER : 12,
         }}
         transition={panelSpacingTransition}
         style={{ position: "relative" }}

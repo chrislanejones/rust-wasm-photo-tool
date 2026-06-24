@@ -275,6 +275,18 @@ declare module "stamp_tool" {
       b: number,
       opacity: number,
     ): void;
+    /** Begin a stabilized ("lazy mouse") stroke, anchoring the tip. */
+    paint_stab_begin(x: number, y: number): void;
+    /** Advance the stabilized tip toward the cursor; paints + returns true if it cleared the leash. */
+    paint_stab_to(
+      raw_x: number, raw_y: number, leash: number,
+      radius: number, r: number, g: number, b: number, opacity: number,
+    ): boolean;
+    /** Catch up to the real cursor on stroke end and clear the stabilizer. */
+    paint_stab_flush(
+      raw_x: number, raw_y: number,
+      radius: number, r: number, g: number, b: number, opacity: number,
+    ): boolean;
 
     // Color picker helpers (Rust pixel sampling)
     get_pixel(x: number, y: number): Uint8Array;
@@ -495,11 +507,13 @@ declare module "stamp_tool" {
       x0: number, y0: number, x1: number, y1: number,
       number: number,
       color_hex: string,
+      label_kind: number,
     ): number;
     /** Restore a persisted pin WITHOUT pushing history. Colour is raw r,g,b. */
     restore_pin_annotation(
       x0: number, y0: number, x1: number, y1: number,
       number: number, r: number, g: number, b: number,
+      label_kind: number,
     ): number;
     /** Add a freehand/polyline pen (kind 6). `points` is a flat [x0,y0,x1,y1,…] array. Pushes "Add Pen". */
     add_polyline_annotation(

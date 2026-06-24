@@ -46,15 +46,12 @@ interface ToolsSidebarProps {
   stampSettings: StampSettingsType;
   onStampSettingsChange: (s: StampSettingsType) => void;
   hasSource: boolean;
+  /** Download button: exports the single photo, or opens the chooser dialog
+   *  when the gallery holds more than one. */
   onExport: () => void;
-  onExportAll: () => void;
   canExport: boolean;
-  /** Total photos in the gallery — Export All needs at least 2. */
+  /** Total photos in the gallery — pluralizes the Download label. */
   photoCount: number;
-  /** How many photos have canvas edits — Export All needs at least 1. */
-  modifiedCount: number;
-  /** Whether the ACTIVE photo has any changes — gates single export. */
-  activeModified: boolean;
   exportFormat: ExportFormat;
   onExportFormatChange?: (f: ExportFormat) => void;
   onFlipH: () => void;
@@ -137,11 +134,8 @@ export function ToolsSidebar({
   onStampSettingsChange,
   hasSource,
   onExport,
-  onExportAll,
   canExport,
   photoCount,
-  modifiedCount,
-  activeModified,
   exportFormat,
   onExportFormatChange,
   onFlipH,
@@ -205,7 +199,7 @@ export function ToolsSidebar({
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="fixed left-3 top-3 bottom-[48px] z-40 w-[296px] max-[999px]:w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
+      className="fixed left-3 top-3 bottom-[48px] z-40 w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
       style={{
         boxShadow:
           "0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
@@ -361,47 +355,27 @@ export function ToolsSidebar({
         )}
       </div>
 
-      <div className="p-4 border-t border-border flex gap-2">
-        {/* Single export: only when the active photo has actual changes. */}
+      <div className="p-4 border-t border-border">
+        {/* One Download button. With a single photo it downloads directly;
+            with several it opens the Selected / All / Cancel chooser (zip).
+            Label pluralizes the format when the gallery holds more than one. */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex-1">
+            <div>
               <LargeButton
                 onClick={onExport}
-                disabled={!canExport || !activeModified}
+                disabled={!canExport}
                 className="w-full"
               >
-                <Download className="h-4 w-4 hidden min-[1000px]:block" /> Export{" "}
-                {exportFormat.toUpperCase()}
+                <Download className="h-4 w-4" />
+                Download {exportFormat.toUpperCase()}
+                {photoCount > 1 ? "s" : ""}
               </LargeButton>
             </div>
           </TooltipTrigger>
-          {(!canExport || !activeModified) && (
+          {!canExport && (
             <TooltipContent side="top" className="max-w-[200px] text-center">
-              <p className="text-xs">Edit the photo first, then export.</p>
-            </TooltipContent>
-          )}
-        </Tooltip>
-        {/* Export All: needs 2+ photos and at least one edited. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex-1">
-              <LargeButton
-                onClick={onExportAll}
-                disabled={!canExport || photoCount <= 1 || modifiedCount === 0}
-                className="w-full"
-              >
-                <Download className="h-4 w-4 hidden min-[1000px]:block" /> Export All
-              </LargeButton>
-            </div>
-          </TooltipTrigger>
-          {(!canExport || photoCount <= 1 || modifiedCount === 0) && (
-            <TooltipContent side="top" className="max-w-[220px] text-center">
-              <p className="text-xs">
-                {photoCount <= 1
-                  ? "Load at least 2 photos to export all."
-                  : "Edit at least one photo, then export all."}
-              </p>
+              <p className="text-xs">Load an image first.</p>
             </TooltipContent>
           )}
         </Tooltip>

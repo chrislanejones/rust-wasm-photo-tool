@@ -239,7 +239,7 @@ export function ResizeSettings({
   ]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full -mt-2">
       {/* Resize ↔ Compress toggle (mirrors Paint's Paint | Blur Brush tabs) */}
       <TabGroup
         tabs={[
@@ -251,7 +251,7 @@ export function ResizeSettings({
       />
 
       {/* ── Content ── */}
-      <div className="space-y-8 flex-1 mt-5">
+      <div className="space-y-8 flex-1 mt-2.5">
         <AnimatePresence mode="wait">
           {tab === "resize" && (
             <motion.div
@@ -322,7 +322,7 @@ export function ResizeSettings({
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0, transition: quickSpring }}
               exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
-              className="space-y-8"
+              className="space-y-6"
             >
               {/* ── Method / Format side by side to save vertical space ── */}
               <div className="grid grid-cols-2 gap-3">
@@ -336,7 +336,7 @@ export function ResizeSettings({
                       value={method}
                       onChange={(e) => setMethod(e.target.value as ResampleMethod)}
                       disabled={disabled}
-                      className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+                      className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
                     >
                       {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
                         <option key={m} value={m}>
@@ -360,7 +360,7 @@ export function ResizeSettings({
                         onExportFormatChange(e.target.value as ExportFormat)
                       }
                       disabled={disabled}
-                      className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+                      className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
                     >
                       {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
                         <option key={f} value={f}>

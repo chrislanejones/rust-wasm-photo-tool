@@ -67,8 +67,10 @@ export interface ShapeMeta {
   b: number;
   stroke_width: number;
   arrow_style: number;
-  /** Pin label (kind 5). */
+  /** Pin sequence index (kind 5). */
   number: number;
+  /** Pin label style (kind 5): 0 = number, 1 = letter. */
+  label_kind?: number;
   /** Interior fill (rect/circle): 0 none, 1 solid, 2 linear gradient. */
   fill_kind: number;
   fill_r: number; fill_g: number; fill_b: number; fill_a: number;
@@ -109,10 +111,9 @@ interface UseDrawingToolsOptions {
   settings: ToolSettings;
   flushToCanvas: () => void;
   syncState: () => void;
-  /** Pens sub-mode when the Shapes tool's Pens tab is active. `null` for the
-   *  normal Shapes/Arrows rubber-band behavior. "pins" drops numbered callouts
-   *  on click; "freehand" draws a polyline pen stroke on drag. */
-  penMode?: "pins" | "freehand" | null;
+  /** "pins" when the Shapes tool's Pins tab is active (click drops a callout
+   *  disc); `null` for the normal Shapes/Arrows rubber-band behavior. */
+  penMode?: "pins" | null;
   /** Locked aspect ratio for crop drags as `[w, h]`. Null = free drag. */
   cropRatio?: [number, number] | null;
   /** Image dimensions used to clip the constrained crop to the canvas. */
@@ -132,11 +133,10 @@ export function useDrawingTools({
   imageWidth,
   imageHeight,
 }: UseDrawingToolsOptions) {
-  // Pen sub-mode + in-progress freehand vertices, kept in refs so the stable
-  // mouse callbacks read the freshest values.
+  // Pins sub-mode kept in a ref so the stable mouse callbacks read the freshest
+  // value.
   const penModeRef = useRef(penMode);
   penModeRef.current = penMode;
-  const freehandPoints = useRef<Point[]>([]);
   // Keep ratio + image dims in a ref so onMouseMove/Up closures see the
   // freshest values without forcing a reattach of all the handlers.
   const cropRatioRef = useRef(cropRatio);
@@ -424,15 +424,18 @@ export function useDrawingTools({
     [toolRef, flushToCanvas, syncState, refreshShapes],
   );
 
-  /** Drop an auto-numbered callout pin at `p`. The number = (max existing pin
-   *  label on this photo) + 1, so it resets per photo when the shape list is
-   *  reloaded. Pins are a filled circle bbox + label (Rust kind 5). */
+  /** Drop an auto-sequenced callout pin at `p`. The sequence index = (max
+   *  existing pin index on this photo) + 1, so it resets per photo when the
+   *  shape list is reloaded. Diameter follows the Stroke Width slider; the
+   *  label style (number vs letter) follows the Pins tab toggle. Pins are a
+   *  filled circle bbox + label (Rust kind 5). */
   const dropPin = useCallback(
     (p: Point) => {
       const tool = toolRef.current;
       if (!tool) return;
       const s = settingsRef.current;
-      const r = Math.max(8, s.pinSize ?? 32) / 2;
+      // Map the 1-10 stroke-width slider to a callout-sized disc radius.
+      const r = 8 + s.strokeWidth * 3;
       let maxNum = 0;
       try {
         for (const sh of JSON.parse(tool.get_shape_annotations()) as ShapeMeta[]) {
@@ -441,7 +444,11 @@ export function useDrawingTools({
       } catch {
         /* ignore parse errors — start from 1 */
       }
-      tool.add_pin_annotation(p.x - r, p.y - r, p.x + r, p.y + r, maxNum + 1, s.strokeColor);
+      const labelKind = s.pinLabel === "letters" ? 1 : 0;
+      tool.add_pin_annotation(
+        p.x - r, p.y - r, p.x + r, p.y + r,
+        maxNum + 1, s.strokeColor, labelKind,
+      );
       flushToCanvas();
       syncState();
       refreshShapes();
@@ -565,24 +572,14 @@ export function useDrawingTools({
       // includes the just-committed pixels.
       if (editStateRef.current) commitEdit();
       const p = getCoords(e);
-      // Pens tab: pins drop on click; freehand collects a stroke on drag.
-      const pen = penModeRef.current;
-      if (activeTool === "shapes" && pen) {
-        if (pen === "pins") {
-          const hit = toolRef.current?.shape_annotation_at(p.x, p.y) ?? -1;
-          if (hit >= 0) {
-            selectShape(hit); // click an existing pin → move it
-            return;
-          }
-          dropPin(p);
+      // Pins tab: clicking drops a callout disc, or re-selects an existing pin.
+      if (activeTool === "shapes" && penModeRef.current === "pins") {
+        const hit = toolRef.current?.shape_annotation_at(p.x, p.y) ?? -1;
+        if (hit >= 0) {
+          selectShape(hit); // click an existing pin → move it
           return;
         }
-        // freehand → start a polyline stroke
-        isDrawing.current = true;
-        startPoint.current = p;
-        lastPoint.current = p;
-        freehandPoints.current = [p];
-        preSnapshot.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        dropPin(p);
         return;
       }
       // Shape/arrow tools: clicking an existing live shape re-selects it for
@@ -614,16 +611,6 @@ export function useDrawingTools({
       lastPoint.current = p;
       const start = startPoint.current;
       ctx.putImageData(preSnapshot.current, 0, 0);
-      if (activeTool === "shapes" && penModeRef.current === "freehand") {
-        freehandPoints.current.push(p);
-        drawPolylinePreview(
-          ctx,
-          freehandPoints.current,
-          settings.strokeColor,
-          settings.strokeWidth,
-        );
-        return;
-      }
       if (activeTool === "arrow") {
         drawArrowPreview(
           ctx,
@@ -671,27 +658,6 @@ export function useDrawingTools({
     const ctx = canvas?.getContext("2d");
     const start = startPoint.current;
     const end = lastPoint.current ?? start;
-    if (activeTool === "shapes" && penModeRef.current === "freehand") {
-      if (preSnapshot.current && ctx) ctx.putImageData(preSnapshot.current, 0, 0);
-      const pts = freehandPoints.current;
-      if (pts.length >= 2) {
-        const flat = new Float64Array(pts.length * 2);
-        pts.forEach((pt, i) => {
-          flat[i * 2] = pt.x;
-          flat[i * 2 + 1] = pt.y;
-        });
-        const s = settingsRef.current;
-        toolRef.current?.add_polyline_annotation(flat, s.strokeColor, s.strokeWidth);
-        flushToCanvas();
-        syncState();
-        refreshShapes();
-      }
-      freehandPoints.current = [];
-      startPoint.current = null;
-      lastPoint.current = null;
-      preSnapshot.current = null;
-      return;
-    }
     if (activeTool === "crop") {
       if (preSnapshot.current && ctx) {
         ctx.putImageData(preSnapshot.current, 0, 0);
@@ -820,24 +786,6 @@ function drawArrowPreview(
 
   drawHead(to.x, to.y, angle);
   if (style === "double") drawHead(from.x, from.y, angle + Math.PI);
-}
-
-/** Live freehand pen preview during the drag (committed to Rust on mouseup). */
-function drawPolylinePreview(
-  ctx: CanvasRenderingContext2D,
-  pts: { x: number; y: number }[],
-  color: string,
-  width: number,
-) {
-  if (pts.length < 2) return;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = width;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-  ctx.stroke();
 }
 
 function drawShapePreview(

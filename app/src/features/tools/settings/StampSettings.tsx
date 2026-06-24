@@ -7,6 +7,7 @@ import { SizeSlider } from "@/components/SizeSlider";
 
 const SIZE_PRESETS = [8, 16, 24, 32] as const;
 const HARDNESS_PRESETS = [0, 33, 66, 100] as const;
+const OPACITY_PRESETS = [25, 50, 75, 100] as const;
 const EMOJI_SIZE_PRESETS = [32, 48, 64, 96] as const;
 
 interface StampSettingsPanelProps {
@@ -63,7 +64,7 @@ export function StampSettingsPanel({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 -mt-2">
       {/* ── Mode switcher ── */}
       <TabGroup
         tabs={[
@@ -77,7 +78,7 @@ export function StampSettingsPanel({
 
       {/* ── Clone Stamp panel ── */}
       {mode === "clone" && (
-        <div className="space-y-8">
+        <div className="space-y-6">
           <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs large-badge-item type-current">
             <span className="large-badge">
               {hasSource
@@ -87,16 +88,14 @@ export function StampSettingsPanel({
           </div>
 
           {/* Brush Size */}
-          <div className="pt-8">
-            <SizeSlider
-              label="Brush Size"
-              value={settings.brushSize}
-              min={4}
-              max={64}
-              onChange={(v) => onChange({ ...settings, brushSize: v })}
-              presets={SIZE_PRESETS}
-            />
-          </div>
+          <SizeSlider
+            label="Brush Size"
+            value={settings.brushSize}
+            min={4}
+            max={64}
+            onChange={(v) => onChange({ ...settings, brushSize: v })}
+            presets={SIZE_PRESETS}
+          />
 
           {/* Hardness */}
           <SizeSlider
@@ -118,13 +117,13 @@ export function StampSettingsPanel({
             }}
           />
 
-          {/* Opacity */}
+          {/* Opacity — preset dots (numbers) to match Brush Size / Hardness. */}
           <SizeSlider
             label="Opacity"
             value={Math.round(settings.opacity * 100)}
             onChange={(v) => onChange({ ...settings, opacity: v / 100 })}
-            min={10}
-            max={100}
+            presets={OPACITY_PRESETS}
+            variant="numbers"
             unit="%"
           />
         </div>

@@ -81,7 +81,7 @@ export function AISettings({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 -mt-2">
       <h3 className="text-xs font-semibold font-mono text-text-muted">
         AI Tools
       </h3>

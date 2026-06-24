@@ -72,11 +72,18 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const isDrawingRef = useRef(false);
   const sourcePosRef = useRef<{ x: number; y: number } | null>(null);
   // WASM linear memory captured from the `init()` return so flushToCanvas can
-  // view the pixel buffer in-place (zero-copy) instead of going through
-  // get_image_data() which allocates a fresh Vec<u8> each frame. The view
-  // must be reconstructed every flush because WASM memory can grow and
-  // invalidate any previously-created view.
+  // view the pixel buffer in-place instead of going through get_image_data()
+  // which allocates a fresh Vec<u8> each frame. The view must be reconstructed
+  // every flush because WASM memory can grow and invalidate any previously-
+  // created view.
   const wasmMemoryRef = useRef<WebAssembly.Memory | null>(null);
+  // Stable, JS-owned blit backbuffer. We copy the WASM composite into this
+  // (reused across frames) and hand *it* to putImageData — never an ImageData
+  // backed directly by WASM memory. When the WASM heap grows (≈ stroke 5-8 as
+  // undo snapshots accumulate) the shared ArrayBuffer detaches; with a
+  // desynchronized 2D context Firefox reads that detached buffer on its
+  // deferred present and paints garbage. A private copy is immune.
+  const backbufferRef = useRef<ImageData | null>(null);
 
   const [state, setState] = useState<CloneStampState>(INITIAL_STATE);
 
@@ -159,20 +166,25 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     if (wasmMem) {
       const ptr = t.data_ptr();
       const len = t.data_len();
-      const view = new Uint8ClampedArray(
-        wasmMem.buffer as ArrayBuffer,
-        ptr,
-        len,
-      );
-      // ImageData expects Uint8ClampedArray<ArrayBuffer>; the WASM view is
-      // typed as Uint8ClampedArray<ArrayBufferLike>. Coerce — runtime is
-      // identical, only TS narrowing differs.
-      ctx.putImageData(
-        new ImageData(view as Uint8ClampedArray<ArrayBuffer>, w, h),
-        0,
-        0,
-      );
-      return;
+      // View WASM linear memory, then COPY into a stable JS-owned backbuffer.
+      // Handing putImageData an ImageData backed by the live WASM heap is the
+      // root of the Firefox "garbage after ~5-8 strokes" bug: a later
+      // memory.grow() detaches the shared ArrayBuffer and the desynchronized
+      // present reads it stale. Copying into a private (reused) buffer is safe
+      // in every browser. The view is rebuilt each call against the current
+      // (post-grow) buffer.
+      const view = new Uint8ClampedArray(wasmMem.buffer as ArrayBuffer, ptr, len);
+      let back = backbufferRef.current;
+      if (!back || back.width !== w || back.height !== h) {
+        back = new ImageData(w, h);
+        backbufferRef.current = back;
+      }
+      if (view.length === back.data.length) {
+        back.data.set(view);
+        ctx.putImageData(back, 0, 0);
+        return;
+      }
+      // Length mismatch (shouldn't happen) — fall through to the safe copy.
     }
     // Fallback (no WASM memory handle): copy the composite out of Rust.
     const composed = t.get_image_data();
@@ -313,6 +325,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
               tool.restore_pin_annotation(
                 s.x0, s.y0, s.x1, s.y1,
                 s.number ?? 0, s.r, s.g, s.b,
+                s.label_kind ?? 0,
               );
             } else if (s.kind === 6) {
               const flat = new Float64Array((s.points ?? []).flat());
@@ -451,6 +464,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
             tool.restore_pin_annotation(
               s.x0, s.y0, s.x1, s.y1,
               s.number ?? 0, s.r, s.g, s.b,
+              s.label_kind ?? 0,
             );
           } else if (s.kind === 6) {
             const flat = new Float64Array((s.points ?? []).flat());

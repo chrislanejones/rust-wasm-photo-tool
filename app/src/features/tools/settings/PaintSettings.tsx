@@ -9,6 +9,7 @@ import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { quickSpring } from "@/lib/animations";
 
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
+const OPACITY_PRESETS = [25, 50, 75, 100] as const;
 const BLUR_SIZE_PRESETS = [8, 16, 32, 64] as const;
 const PIXEL_SIZE_PRESETS = [8, 16, 32, 48] as const;
 
@@ -17,6 +18,14 @@ const BLUR_MODES = [
   { id: "gaussian", label: "Blur" },
   { id: "pixelate", label: "Pixelate" },
   { id: "solid", label: "Solid" },
+] as const;
+
+// Stroke-stabilizer strength (off → high leash). Off by default.
+const STABILIZER_LEVELS = [
+  { id: "off",  label: "Off"  },
+  { id: "low",  label: "Low"  },
+  { id: "med",  label: "Med"  },
+  { id: "high", label: "High" },
 ] as const;
 
 type PaintMode = "paint" | "blur";
@@ -39,7 +48,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-2.5 -mt-2">
       <TabGroup
         tabs={[
           { id: "paint", label: "Paint" },
@@ -56,7 +65,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0, transition: quickSpring }}
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
-            className="space-y-8"
+            className="space-y-4"
           >
             {/* Brush Size */}
             <SizeSlider
@@ -68,13 +77,13 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
               presets={BRUSH_SIZE_PRESETS}
             />
 
-            {/* Opacity */}
+            {/* Opacity — preset dots (numbers variant) to match Brush Size. */}
             <SizeSlider
               label="Opacity"
               value={settings.brushOpacity}
               onChange={(v) => onChange({ ...settings, brushOpacity: v })}
-              min={10}
-              max={100}
+              presets={OPACITY_PRESETS}
+              variant="numbers"
               unit="%"
             />
 
@@ -85,9 +94,23 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
               onChange={(color) => onChange({ ...settings, brushColor: color })}
             />
 
-            <p className="text-[10px] text-theme-muted-foreground leading-relaxed">
-              Click and drag to paint. Rendering runs in WASM for smooth strokes.
-            </p>
+            {/* Stroke Stabilizer — pulled-string "lazy mouse" smoothing. Off by
+                default; Low/Med/High set the leash (smoothing strength). */}
+            <div className="space-y-2">
+              <label className="text-[11px] text-theme-muted-foreground">
+                Stroke Stabilizer
+              </label>
+              <ToolButtonGroup
+                options={STABILIZER_LEVELS}
+                value={settings.paintStabilizer ?? "off"}
+                onChange={(id) =>
+                  onChange({
+                    ...settings,
+                    paintStabilizer: id as ToolSettings["paintStabilizer"],
+                  })
+                }
+              />
+            </div>
           </motion.div>
         )}
 
@@ -97,7 +120,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0, transition: quickSpring }}
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
-            className="space-y-8"
+            className="space-y-4"
           >
             {/* Mode: Gaussian blur / Pixelate / Solid redaction */}
             <ToolButtonGroup
@@ -150,14 +173,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                 onChange={(color) => onChange({ ...settings, redactColor: color })}
               />
             )}
-
-            <p className="text-[10px] text-theme-muted-foreground leading-relaxed">
-              {settings.blurMode === "pixelate"
-                ? "Click and drag to mosaic regions into blocks — great for redacting faces or text."
-                : settings.blurMode === "solid"
-                  ? "Click and drag to paint an opaque block over sensitive areas."
-                  : "Click and drag on the image to blur regions. Uses WASM separable Gaussian blur."}
-            </p>
           </motion.div>
         )}
       </AnimatePresence>

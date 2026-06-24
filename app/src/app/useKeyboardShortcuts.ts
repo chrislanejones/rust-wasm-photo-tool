@@ -199,7 +199,7 @@ export function useKeyboardShortcuts({
         }
 
         switch (e.code) {
-          case "KeyU": e.preventDefault(); setShowUpload((v) => !v); break;
+          case "KeyN": e.preventDefault(); setShowUpload((v) => !v); break;
           case "KeyT": e.preventDefault(); setShowTools((v) => !v); break;
           case "KeyG": e.preventDefault(); setShowGallery((v) => !v); break;
           case "KeyR": e.preventDefault(); setShowHistory((v) => !v); break;

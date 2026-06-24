@@ -73,7 +73,7 @@ export function TextSettings({
   const [mode, setMode] = useState<TextMode>("text");
 
   return (
-    <div className="space-y-5" data-text-panel>
+    <div className="space-y-5 -mt-2" data-text-panel>
       <TabGroup
         tabs={[
           { id: "text", label: "Text" },
@@ -112,7 +112,7 @@ export function TextSettings({
                 <select
                   value={settings.fontFamily ?? "sans-serif"}
                   onChange={(e) => onChange({ ...settings, fontFamily: e.target.value })}
-                  className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-sm text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+                  className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
                   style={{ fontFamily: settings.fontFamily ?? "sans-serif" }}
                 >
                   {FONT_FAMILIES.map((f) => (

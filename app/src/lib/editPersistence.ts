@@ -113,8 +113,10 @@ export interface PersistedShape {
   b: number;
   stroke_width: number;
   arrow_style: number;
-  /** Pin label (kind 5). */
+  /** Pin sequence index (kind 5). */
   number?: number;
+  /** Pin label style (kind 5): 0 = number, 1 = letter. Absent on older saves. */
+  label_kind?: number;
   /** Interior fill (rect/circle): 0 none, 1 solid, 2 linear gradient. Older
    *  saves omit these — treat absent as 0/no-fill on restore. */
   fill_kind?: number;

@@ -47,6 +47,8 @@ import {
   applyExifToReencoded,
   applyExifToVerbatim,
 } from "@/lib/exif";
+import { pinLabelText } from "@/lib/pinLabel";
+import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels, ImageTooLargeError } from "@/lib/workingCopy";
 import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
 import { logDiagnostic, installConsoleCapture } from "@/lib/diagnosticsLog";
@@ -624,6 +626,7 @@ export function AppShell() {
     installConsoleCapture();
   }, []);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
 
@@ -857,9 +860,7 @@ export function AppShell() {
     flushToCanvas: flushAndSync,
     syncState: stamp.syncState,
     penMode:
-      activeTool === "shapes" && shapesMode === "pens"
-        ? (toolSettings.penMode ?? "pins")
-        : null,
+      activeTool === "shapes" && shapesMode === "pens" ? "pins" : null,
     cropRatio,
     imageWidth: stamp.state.width,
     imageHeight: stamp.state.height,
@@ -961,10 +962,11 @@ export function AppShell() {
     const counters: Record<number, number> = {};
     drawingTools.shapes.forEach((s) => {
       counters[s.kind] = (counters[s.kind] ?? 0) + 1;
-      // Pins show their own callout number; everything else gets an ordinal.
+      // Pins show their own callout label (number or letter); everything else
+      // gets an ordinal.
       const label =
         s.kind === 5
-          ? `Pin ${s.number}`
+          ? `Pin ${pinLabelText(s.number, s.label_kind)}`
           : `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`;
       items.push({ key: `s${s.id}`, type: "shape", id: s.id, label });
     });
@@ -1580,6 +1582,10 @@ export function AppShell() {
     );
   }, [exportPhotosToZip, photos, selectedIds]);
 
+  // The single Download button always opens the chooser dialog (Selected / All
+  // / Cancel). The plural label ("JPEGs") only reflects the gallery count.
+  const handleExportClick = useCallback(() => setExportDialogOpen(true), []);
+
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
@@ -1723,6 +1729,43 @@ export function AppShell() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Download {exportFormat.toUpperCase()}s</DialogTitle>
+            <DialogDescription>
+              Export the selected photos or the whole gallery. More than one
+              image downloads together as a{" "}
+              <span className="font-mono">.zip</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <LargeButton
+              className="flex-1"
+              onClick={() => {
+                setExportDialogOpen(false);
+                if (selectedIds.size > 0) handleExportSelected();
+                else void handleExport();
+              }}
+            >
+              {selectedIds.size > 0 ? `Selected (${selectedIds.size})` : "Selected"}
+            </LargeButton>
+            <LargeButton
+              className="flex-1"
+              onClick={() => {
+                setExportDialogOpen(false);
+                handleExportAll();
+              }}
+            >
+              All ({photos.length})
+            </LargeButton>
+            <DialogClose asChild>
+              <LargeButton className="flex-1">Cancel</LargeButton>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AnimatePresence>
         {showTopBar && (
           <TopBar
@@ -1754,17 +1797,9 @@ export function AppShell() {
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
             hasSource={stamp.state.hasSource}
-            onExport={handleExport}
-            onExportAll={handleExportAll}
+            onExport={handleExportClick}
             canExport={hasImage}
             photoCount={photos.length}
-            modifiedCount={modifiedPhotos.size}
-            activeModified={
-              activePhotoId != null &&
-              (modifiedPhotos.has(activePhotoId) ||
-                hasBeenModified ||
-                stamp.state.undoCount > 0)
-            }
             exportFormat={exportFormat}
             onExportFormatChange={setExportFormat}
             onFlipH={stamp.flipHorizontal}
@@ -1829,8 +1864,8 @@ export function AppShell() {
         <ContextMenuTrigger asChild>
           <motion.main
             animate={{
-              marginLeft: showTools ? 320 : 0,
-              marginRight: showHistory ? 284 : 0,
+              marginLeft: showTools ? PANEL_OPEN_GUTTER : 0,
+              marginRight: showHistory ? PANEL_OPEN_GUTTER : 0,
             }}
             transition={panelSpacingTransition}
             className="main-content"

@@ -45,7 +45,10 @@ export function ToolButtonGroup<T extends string>({
           {label}
         </label>
       )}
-      <div className={cn("grid gap-2", COL_CLASS[columns])}>
+      {/* grid-auto-rows:1fr equalizes every row to the tallest, so a longer
+          label (e.g. "Hand-drawn") makes all buttons that size — not just its
+          own row. Buttons stretch to fill via the default align-self. */}
+      <div className={cn("grid gap-2 [grid-auto-rows:1fr]", COL_CLASS[columns])}>
         {options.map((opt) => {
           const Icon = opt.icon;
           return (

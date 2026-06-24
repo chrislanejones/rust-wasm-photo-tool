@@ -41,8 +41,8 @@ export default function Features() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-4">
-          <Feature color="orange"  title="WASM-powered editor"   body="Rust-compiled filters, transforms, and rasterization run at near-native speed on the visitor's CPU." tags="Brightness · Contrast · Blur · Crop · Resize" />
-          <Feature color="pink"    title="Layered annotations"   body="Rectangles, ellipses, arrows, numbered callout pins, freehand pen strokes, text, and emoji — organized in real-layer stacks with locking and blend modes." tags="Rect · Ellipse · Arrow · Pin · Pen · Text" />
+          <Feature color="orange"  title="WASM-powered editor"   body="Rust-compiled filters, transforms, and rasterization run at near-native speed on the visitor's CPU — including a pulled-string stroke stabilizer for steady freehand lines." tags="Brightness · Contrast · Blur · Crop · Resize · Stabilizer" />
+          <Feature color="pink"    title="Layered annotations"   body="Rectangles, ellipses, arrows, numbered or lettered callout pins, text, and emoji — plus blur / pixelate / black-box redaction — organized in real-layer stacks with per-layer opacity." tags="Rect · Ellipse · Arrow · Pins · Text · Redact" />
           <Feature color="emerald" title="Format conversion"     body="Encode and decode PNG, JPEG, WebP, and AVIF. Resize and re-compress in a single round-trip." tags="PNG · JPEG · WebP · AVIF" />
           <Feature color="amber"   title="Batch Image Editor"    body="Stamp a logo onto every photo in one pass, or browse the gallery as a 5×3 grid mosaic with the active photo as the hero tile. Compositing, scaling, and PNG encoding all run in Rust — zero canvas round-trips." tags="Bulk logo · Grid view · SVG logos · Rust composite" />
           <Feature color="violet"  title="AI enhancements"       body="Background removal is live via a Convex → Replicate pipeline; 4× upscaling, object removal, and alt-text generation are queued up next." tags="rembg (live) · Real-ESRGAN · SD Inpaint · BLIP" />

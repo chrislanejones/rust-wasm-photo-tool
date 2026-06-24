@@ -7,6 +7,12 @@ interface Props {
   onClick: () => void;
 }
 
+/**
+ * One tool tile. Sizing is fully spatial — `aspect-square w-full` fills its
+ * grid cell, and the icon is a percentage of the tile — so the toolbar reflows
+ * cleanly at any panel width. Inactive tiles stay neutral/monochrome (no
+ * rainbow grid); only the active tool wears its accent gradient.
+ */
 export function ToolButton({ tool, active, disabled = false, onClick }: Props) {
   const Icon = tool.icon;
 
@@ -15,25 +21,21 @@ export function ToolButton({ tool, active, disabled = false, onClick }: Props) {
       onClick={onClick}
       disabled={disabled}
       aria-disabled={disabled}
-      className={`relative p-0.8 rounded-xl transition-all duration-200 ${
+      className={[
+        "group flex aspect-square w-full items-center justify-center rounded-2xl",
+        "transition-all duration-200 ease-out",
         disabled
-          ? "opacity-40 cursor-not-allowed grayscale"
-          : active
-            ? "ring-2 ring-white ring-offset-1 ring-offset-bg-secondary"
-            : "hover:ring-2 hover:ring-accent/50 hover:ring-offset-2 hover:ring-offset-bg-secondary"
-      }`}
+          ? "cursor-not-allowed bg-bg-tertiary/40 opacity-40 grayscale"
+          : [
+              active
+                ? `bg-gradient-to-br ${tool.gradient} text-white shadow-md shadow-black/25`
+                : "bg-bg-tertiary text-text-muted hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]",
+              // Warm accent ("brown") ring on hover, like the app's other buttons.
+              "hover:ring-2 hover:ring-theme-primary/60 hover:ring-offset-2 hover:ring-offset-bg-secondary",
+            ].join(" "),
+      ].join(" ")}
     >
-      <span
-        className={`flex items-center justify-center rounded-xl bg-gradient-to-br ${tool.gradient} shadow-lg transition-all duration-200 max-[999px]:h-10 max-[999px]:w-10 ${
-          disabled
-            ? "h-12 w-12"
-            : active
-              ? "h-12 w-12 scale-100 hover:shadow-xl"
-              : "h-12 w-12 hover:scale-105 hover:shadow-xl"
-        }`}
-      >
-        <Icon className="h-7 w-7 max-[999px]:h-5 max-[999px]:w-5 text-white drop-shadow-sm" />
-      </span>
+      <Icon className="h-1/2 w-1/2 transition-transform duration-200 ease-out group-hover:scale-110" />
     </button>
   );
 }

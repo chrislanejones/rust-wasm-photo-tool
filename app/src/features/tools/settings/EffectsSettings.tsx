@@ -126,7 +126,7 @@ export function EffectsSettings({
   const displayColor = pickedColor ?? settings.brushColor;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 -mt-2">
       <TabGroup
         tabs={[
           { id: "levels", label: "Levels" },
@@ -209,7 +209,7 @@ export function EffectsSettings({
               <span className="text-[11px] text-theme-muted-foreground">
                 Quick Adjust
               </span>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
                 {PRESETS.map(({ label, Icon, brightness: b, contrast: c }) => (
                   <ToolButton
                     key={label}

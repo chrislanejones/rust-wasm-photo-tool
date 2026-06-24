@@ -32,6 +32,8 @@ export interface ToolSettings extends StampSettings {
   arrowStyle: "single" | "double";
   brushColor: string;
   brushOpacity: number;
+  /** Paint stroke stabilizer strength (pulled-string "lazy mouse"). Off by default. */
+  paintStabilizer: "off" | "low" | "med" | "high";
   fontSize: number;
   fontFamily: string;
   fontWeight: "normal" | "bold";
@@ -71,9 +73,7 @@ export interface ToolSettings extends StampSettings {
    *  the bubble. Only meaningful when bgKind === "bubble". */
   bgTail: number;
 
-  // Pens (Shapes tool → Pens tab)
-  /** Pins drop auto-numbered callout circles; Freehand draws polyline strokes. */
-  penMode: "pins" | "freehand";
-  /** Diameter (px) of a dropped numbered pin. */
-  pinSize: number;
+  // Pins (Shapes tool → Pins tab) — drop auto-sequenced callout discs.
+  /** Pin label style: numbers (1, 2, 3…) or letters (A, B, C…). */
+  pinLabel: "numbers" | "letters";
 }

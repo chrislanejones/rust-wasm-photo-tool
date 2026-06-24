@@ -76,8 +76,10 @@ export function SizeSlider(props: SizeSliderProps) {
     const { presets, blurredDots, renderPreset, variant = "dots" } = props;
     const sliderPos = valueToPos(value, presets);
     return (
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {labelRow}
+        {/* Compact "dots above the track" preset row — tight click targets so
+            this variant sits close to the plain slider's height. */}
         <div className="flex items-center justify-between px-1">
           {presets.map((preset, i) => {
             const isActive = value === preset;
@@ -88,9 +90,9 @@ export function SizeSlider(props: SizeSliderProps) {
                 onClick={() => onChange(preset)}
                 disabled={disabled}
                 className={[
-                  "flex items-center justify-center w-9 h-9 rounded-full transition-all",
+                  "flex items-center justify-center w-7 h-7 rounded-full transition-all",
                   isActive
-                    ? "ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
+                    ? "ring-2 ring-theme-ring ring-offset-1 ring-offset-theme-sidebar"
                     : "hover:bg-theme-accent",
                 ].join(" ")}
                 aria-label={`${label} ${preset}${unit}`}

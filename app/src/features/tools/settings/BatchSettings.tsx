@@ -520,7 +520,7 @@ export function BatchSettings({
   const [mode, setMode] = useState<"logo" | "text">("logo");
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-2.5">
       <TabGroup
         tabs={[
           { id: "logo", label: "Logo" },

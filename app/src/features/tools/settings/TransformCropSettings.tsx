@@ -108,7 +108,7 @@ export function TransformCropSettings({
         <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
           Transform
         </span>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
           <ToolButton disabled={disabled} onClick={onFlipH}>
             <FlipHorizontal /> Flip H
           </ToolButton>

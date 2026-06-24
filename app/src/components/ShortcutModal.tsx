@@ -37,7 +37,7 @@ const SHORTCUT_GROUPS = [
   {
     title: "Panels",
     shortcuts: [
-      { keys: ["Alt", "U"], action: "Toggle Upload" },
+      { keys: ["Alt", "N"], action: "Toggle New" },
       { keys: ["Alt", "T"], action: "Toggle Tools" },
       { keys: ["Alt", "G"], action: "Toggle Gallery" },
       { keys: ["Alt", "R"], action: "Toggle Review" },

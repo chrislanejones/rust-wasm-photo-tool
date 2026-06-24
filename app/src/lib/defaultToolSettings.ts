@@ -15,6 +15,7 @@ export const defaultToolSettings: ToolSettings = {
   fillBlock: 16,
   brushColor: "#ef4444",
   brushOpacity: 100,
+  paintStabilizer: "off", // off by default
   fontSize: 24,
   fontFamily: "sans-serif",
   fontWeight: "normal",
@@ -34,6 +35,5 @@ export const defaultToolSettings: ToolSettings = {
   bgPadding: 8,
   bgCornerRadius: 8,
   bgTail: 135, // degrees — points down-left (the classic speech-bubble default)
-  penMode: "pins",
-  pinSize: 32,
+  pinLabel: "numbers",
 };

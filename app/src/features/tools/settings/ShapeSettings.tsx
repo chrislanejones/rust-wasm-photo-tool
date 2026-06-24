@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Square, Circle, PenLine, Minus, MapPin, Spline } from "lucide-react";
+import { Square, Circle, PenLine, Minus, Hash, Type } from "lucide-react";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { TabGroup } from "@/components/TabGroup";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
@@ -14,9 +14,14 @@ const SHAPES = [
   { id: "line",       label: "Line",      icon: Minus   },
 ] as const;
 
-const PEN_MODES = [
-  { id: "pins",     label: "Pins",     icon: MapPin },
-  { id: "freehand", label: "Freehand", icon: Spline },
+const PIN_LABELS = [
+  { id: "numbers", label: "Numbers", icon: Hash },
+  { id: "letters", label: "Letters", icon: Type },
+] as const;
+
+const ARROW_STYLES = [
+  { id: "single", label: "→ Single" },
+  { id: "double", label: "↔ Double" },
 ] as const;
 
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
@@ -55,11 +60,11 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
   return (
     // data-draw-panel: clicking inside this panel must NOT commit a pending
     // shape edit, so stroke/colour/shape tweaks live-update the overlay.
-    <div className="space-y-6" data-draw-panel>
+    <div className="space-y-3 -mt-2" data-draw-panel>
       <TabGroup
         tabs={[
           { id: "shapes", label: "Shapes" },
-          { id: "pens", label: "Pens" },
+          { id: "pens", label: "Pins" },
           { id: "arrows", label: "Arrows" },
         ]}
         active={mode}
@@ -178,56 +183,37 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
         </div>
       )}
 
-      {/* ── Pens tab ── */}
+      {/* ── Pins tab ── click the image to drop an auto-sequenced callout disc.
+          A static body (no mode toggle / panel swap): Stroke Width → pin
+          label style → colour. */}
       {mode === "pens" && (
         <div className="space-y-6">
-          {/* Pins (numbered callouts) vs Freehand polyline */}
+          {/* Pin size — reuses the Stroke Width slider. */}
+          <SizeSlider
+            label="Stroke Width"
+            value={settings.strokeWidth}
+            min={1}
+            max={10}
+            onChange={(v) => onChange({ ...settings, strokeWidth: v })}
+            presets={STROKE_WIDTH_PRESETS}
+            renderPreset={(preset) => (
+              <span
+                className="rounded-full bg-theme-foreground"
+                style={{ width: preset * 2, height: preset * 2 }}
+              />
+            )}
+          />
+
+          {/* Pin label style: Numbers / Letters — between width and colour. */}
           <ToolButtonGroup
-            options={PEN_MODES}
-            value={settings.penMode ?? "pins"}
+            options={PIN_LABELS}
+            value={settings.pinLabel ?? "numbers"}
             onChange={(id) =>
-              onChange({ ...settings, penMode: id as "pins" | "freehand" })
+              onChange({ ...settings, pinLabel: id as "numbers" | "letters" })
             }
           />
 
-          {(settings.penMode ?? "pins") === "pins" ? (
-            <>
-              <p className="text-[11px] leading-relaxed text-theme-muted-foreground">
-                Click the image to drop auto-numbered callout pins (1, 2, 3…).
-                Click an existing pin to move it.
-              </p>
-              <SizeSlider
-                label="Pin Size"
-                value={settings.pinSize ?? 32}
-                min={16}
-                max={72}
-                unit="px"
-                onChange={(v) => onChange({ ...settings, pinSize: v })}
-              />
-            </>
-          ) : (
-            <>
-              <p className="text-[11px] leading-relaxed text-theme-muted-foreground">
-                Drag on the image to draw a freehand pen stroke.
-              </p>
-              <SizeSlider
-                label="Stroke Width"
-                value={settings.strokeWidth}
-                min={1}
-                max={10}
-                onChange={(v) => onChange({ ...settings, strokeWidth: v })}
-                presets={STROKE_WIDTH_PRESETS}
-                renderPreset={(preset) => (
-                  <span
-                    className="rounded-full bg-theme-foreground"
-                    style={{ width: preset * 2, height: preset * 2 }}
-                  />
-                )}
-              />
-            </>
-          )}
-
-          {/* Color (shared: pin fill / pen stroke) */}
+          {/* Color (pin fill). */}
           <ColorSwatchGrid
             colors={TEXT_COLORS}
             value={settings.strokeColor}
@@ -236,9 +222,10 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
         </div>
       )}
 
-      {/* ── Arrows tab ── */}
+      {/* ── Arrows tab ── mirrors the Pins tab: Stroke Width (dots variant) →
+          style toggle → colour, same spacing + same components. */}
       {mode === "arrows" && (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Stroke Width */}
           <SizeSlider
             label="Stroke Width"
@@ -255,22 +242,14 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
             )}
           />
 
-          {/* Arrow Style */}
-          <div className="space-y-4">
-            <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
-              Arrow Style
-            </label>
-            <TabGroup
-              tabs={[
-                { id: "single", label: "→ Single" },
-                { id: "double", label: "↔ Double" },
-              ]}
-              active={settings.arrowStyle ?? "single"}
-              onChange={(id) =>
-                onChange({ ...settings, arrowStyle: id as "single" | "double" })
-              }
-            />
-          </div>
+          {/* Arrow style: Single / Double — same component as the Pins toggle. */}
+          <ToolButtonGroup
+            options={ARROW_STYLES}
+            value={settings.arrowStyle ?? "single"}
+            onChange={(id) =>
+              onChange({ ...settings, arrowStyle: id as "single" | "double" })
+            }
+          />
 
           {/* Color */}
           <ColorSwatchGrid

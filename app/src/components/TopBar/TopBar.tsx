@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { slideFromTop, panelSpacingTransition } from "@/lib/animations";
+import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import {
   Tooltip,
   TooltipContent,
@@ -75,12 +76,12 @@ export function TopBar({
 
   const toggleButtons: ToggleGroupItem[] = [
     {
-      key: "U",
+      key: "N",
       icon: Upload,
-      label: "Upload",
+      label: "New",
       active: showUpload,
       onToggle: onToggleUpload,
-      tooltip: { label: "Upload", shortcut: "Alt + U" },
+      tooltip: { label: "New", shortcut: "Alt + N" },
     },
     {
       key: "T",
@@ -118,8 +119,8 @@ export function TopBar({
     >
       <motion.div
         animate={{
-          paddingLeft: showTools ? 320 : 12,
-          paddingRight: showHistory ? 284 : 12,
+          paddingLeft: showTools ? PANEL_OPEN_GUTTER : 12,
+          paddingRight: showHistory ? PANEL_OPEN_GUTTER : 12,
         }}
         transition={panelSpacingTransition}
       >

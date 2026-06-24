@@ -251,8 +251,10 @@ pub struct ShapeAnnotation {
     pub stroke_width: f64,
     /// Arrows only: 0=single-headed, 1=double-headed. Ignored for shapes.
     pub arrow_style: u8,
-    /// Numbered callout pins (kind 5): the label drawn in the circle. 0 otherwise.
+    /// Numbered callout pins (kind 5): the 1-based sequence index. 0 otherwise.
     pub number: u32,
+    /// Pin label style (kind 5): 0 = number (1, 2, 3…), 1 = letter (A, B, C…).
+    pub label_kind: u8,
     /// Freehand/polyline pens (kind 6): the vertex list. Empty otherwise. The
     /// bbox (x0,y0,x1,y1) is derived from these for hit-test / Reselect.
     pub points: Vec<(f64, f64)>,
@@ -336,6 +338,10 @@ pub struct ImageHorseTool {
     /// overlay, suppress its baked tile from the composite so the user sees only
     /// the live overlay (not a doubled copy underneath). `None` when idle.
     editing_text_id: Option<u32>,
+    /// Paint stroke-stabilizer trailing tip ("lazy mouse"). Set on stroke start;
+    /// advances toward the cursor only when it pulls past the leash. `None` when
+    /// no stabilized stroke is active.
+    paint_stab_tip: Option<(f64, f64)>,
 }
 
 /// Escape a string as a JSON string body (without surrounding quotes).
@@ -445,13 +451,14 @@ fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
         }
         pts.push(']');
         out.push_str(&format!(
-            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"points\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"points\":{}}}",
             s.id, s.kind,
             s.x0, s.y0, s.x1, s.y1,
             s.r, s.g, s.b,
             s.stroke_width,
             s.arrow_style,
             s.number,
+            s.label_kind,
             s.fill_kind,
             s.fill_r, s.fill_g, s.fill_b, s.fill_a,
             s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a,
@@ -532,8 +539,50 @@ fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     }
 }
 
-/// Render a numbered callout pin: a filled disc (from the bbox) with the
-/// number centred on it in a contrasting colour.
+/// A pin's drawn label: `number` as a digit string (kind 0) or as a
+/// spreadsheet-style letter sequence (kind 1): 1→A … 26→Z, 27→AA, 28→AB…
+fn pin_label(number: u32, label_kind: u8) -> String {
+    if label_kind != 1 {
+        return number.to_string();
+    }
+    if number == 0 {
+        return "?".to_string();
+    }
+    let mut n = number;
+    let mut chars = Vec::new();
+    while n > 0 {
+        n -= 1;
+        chars.push((b'A' + (n % 26) as u8) as char);
+        n /= 26;
+    }
+    chars.iter().rev().collect()
+}
+
+/// Tight ink bounding box (min_x, min_y, max_x, max_y inclusive) of a rendered
+/// RGBA tile — the extent of pixels with non-trivial alpha. Used to centre a
+/// glyph by its *visual* mass rather than its padded line box, so a single
+/// digit or letter lands dead-centre on the pin disc.
+fn ink_bounds(pixels: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32, u32)> {
+    let (mut min_x, mut min_y, mut max_x, mut max_y) = (w, h, 0u32, 0u32);
+    let mut found = false;
+    for y in 0..h {
+        for x in 0..w {
+            let a = pixels[((y * w + x) * 4 + 3) as usize];
+            if a > 16 {
+                found = true;
+                if x < min_x { min_x = x; }
+                if y < min_y { min_y = y; }
+                if x > max_x { max_x = x; }
+                if y > max_y { max_y = y; }
+            }
+        }
+    }
+    if found { Some((min_x, min_y, max_x, max_y)) } else { None }
+}
+
+/// Render a callout pin: a filled disc (from the bbox) with its label —
+/// a number (1, 2, 3…) or a letter (A, B, C…) — centred on it in a
+/// contrasting colour.
 fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let cx = (s.x0 + s.x1) * 0.5;
     let cy = (s.y0 + s.y1) * 0.5;
@@ -541,14 +590,27 @@ fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     if radius < 1.0 { return; }
     crate::drawing::fill_circle(data, w, h, cx, cy, radius, [s.r, s.g, s.b, 255]);
 
-    // Black or white number depending on fill luminance.
+    // Black or white label depending on fill luminance.
     let lum = 0.299 * s.r as f64 + 0.587 * s.g as f64 + 0.114 * s.b as f64;
     let (nr, ng, nb) = if lum > 140.0 { (20u8, 20u8, 20u8) } else { (255u8, 255u8, 255u8) };
-    let label = s.number.to_string();
-    let font_size = (radius * 1.2).max(10.0) as f32;
+    let label = pin_label(s.number, s.label_kind);
+    // Shrink multi-character labels ("10", "AA") so they stay inside the disc.
+    let chars = label.chars().count().max(1) as f64;
+    let font_size = (radius * if chars <= 1.0 { 1.2 } else { 1.9 / chars }).max(9.0) as f32;
     let rendered = crate::text::render_text(&label, font_size, nr, ng, nb, true);
-    let dx = (cx - rendered.width as f64 * 0.5).round() as i32;
-    let dy = (cy - rendered.height as f64 * 0.5).round() as i32;
+    // Centre by the glyph's visual ink box, not the padded line box, so it sits
+    // dead-centre regardless of font ascent/descent padding.
+    let (dx, dy) = match ink_bounds(&rendered.pixels, rendered.width, rendered.height) {
+        Some((min_x, min_y, max_x, max_y)) => {
+            let box_cx = (min_x + max_x + 1) as f64 * 0.5;
+            let box_cy = (min_y + max_y + 1) as f64 * 0.5;
+            ((cx - box_cx).round() as i32, (cy - box_cy).round() as i32)
+        }
+        None => (
+            (cx - rendered.width as f64 * 0.5).round() as i32,
+            (cy - rendered.height as f64 * 0.5).round() as i32,
+        ),
+    };
     crate::transform::paste_region(
         data, w as i32, h as i32,
         &rendered.pixels, rendered.width, rendered.height,
@@ -903,6 +965,7 @@ impl ImageHorseTool {
             next_shape_id: 1,
             editing_shape_id: None,
             editing_text_id: None,
+            paint_stab_tip: None,
         }
     }
 
@@ -1682,6 +1745,7 @@ impl ImageHorseTool {
             stroke_width,
             arrow_style,
             number: 0,
+            label_kind: 0,
             points: Vec::new(),
             fill_kind,
             fill_r: f[0], fill_g: f[1], fill_b: f[2], fill_a: f[3],
@@ -1714,7 +1778,7 @@ impl ImageHorseTool {
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
         self.layers[self.active].shape_annotations.push(ShapeAnnotation {
             id, kind, x0, y0, x1, y1, r, g, b, stroke_width, arrow_style,
-            number: 0, points: Vec::new(),
+            number: 0, label_kind: 0, points: Vec::new(),
             fill_kind,
             fill_r, fill_g, fill_b, fill_a,
             fill2_r, fill2_g, fill2_b, fill2_a,
@@ -1731,6 +1795,7 @@ impl ImageHorseTool {
         x0: f64, y0: f64, x1: f64, y1: f64,
         number: u32,
         color_hex: &str,
+        label_kind: u8,
     ) -> u32 {
         self.snap("Add Pin");
         let c = drawing::parse_hex_color(color_hex);
@@ -1740,7 +1805,7 @@ impl ImageHorseTool {
             id, kind: 5, x0, y0, x1, y1,
             r: c[0], g: c[1], b: c[2],
             stroke_width: 0.0, arrow_style: 0,
-            number, points: Vec::new(),
+            number, label_kind, points: Vec::new(),
             ..Default::default()
         });
         id
@@ -1751,13 +1816,14 @@ impl ImageHorseTool {
         &mut self,
         x0: f64, y0: f64, x1: f64, y1: f64,
         number: u32, r: u8, g: u8, b: u8,
+        label_kind: u8,
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
         self.layers[self.active].shape_annotations.push(ShapeAnnotation {
             id, kind: 5, x0, y0, x1, y1, r, g, b,
             stroke_width: 0.0, arrow_style: 0,
-            number, points: Vec::new(),
+            number, label_kind, points: Vec::new(),
             ..Default::default()
         });
         id
@@ -2142,6 +2208,66 @@ impl ImageHorseTool {
             let t = if steps == 0 { 1.0 } else { i as f64 / steps as f64 };
             self.paint_dab(x0 + dx * t, y0 + dy * t, radius, r, g, b, opacity);
         }
+    }
+
+    // ── Stroke stabilizer ("lazy mouse") ──────────────────────────────────
+    // The brush tip trails the cursor on a `leash` (px). It only advances —
+    // and paints — when the cursor pulls past the leash, so jiggles smaller
+    // than the leash are absorbed. Larger leash = more smoothing.
+
+    /// Begin a stabilized stroke with the tip anchored at the press point.
+    pub fn paint_stab_begin(&mut self, x: f64, y: f64) {
+        self.paint_stab_tip = Some((x, y));
+    }
+
+    /// Advance the stabilized tip toward `(raw_x, raw_y)` and paint the
+    /// segment if it cleared the leash. Returns true when something was painted.
+    pub fn paint_stab_to(
+        &mut self,
+        raw_x: f64, raw_y: f64, leash: f64,
+        radius: f64, r: u8, g: u8, b: u8, opacity: f64,
+    ) -> bool {
+        let (tx, ty) = match self.paint_stab_tip {
+            Some(t) => t,
+            None => {
+                self.paint_stab_tip = Some((raw_x, raw_y));
+                return false;
+            }
+        };
+        let dx = raw_x - tx;
+        let dy = raw_y - ty;
+        let dist = (dx * dx + dy * dy).sqrt();
+        if dist > leash && dist > 0.0 {
+            let k = 1.0 - leash / dist; // fraction of the gap to close
+            let nx = tx + dx * k;
+            let ny = ty + dy * k;
+            self.paint_stroke_to(tx, ty, nx, ny, radius, r, g, b, opacity);
+            self.paint_stab_tip = Some((nx, ny));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Catch up: paint the final segment from the trailing tip to the real
+    /// cursor so the stroke ends under the pointer, then clear the stabilizer.
+    pub fn paint_stab_flush(
+        &mut self,
+        raw_x: f64, raw_y: f64,
+        radius: f64, r: u8, g: u8, b: u8, opacity: f64,
+    ) -> bool {
+        let painted = if let Some((tx, ty)) = self.paint_stab_tip {
+            if (tx - raw_x).abs() > 0.001 || (ty - raw_y).abs() > 0.001 {
+                self.paint_stroke_to(tx, ty, raw_x, raw_y, radius, r, g, b, opacity);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        self.paint_stab_tip = None;
+        painted
     }
 
     // ── Color picker helpers ─────────────────────────────────────────────

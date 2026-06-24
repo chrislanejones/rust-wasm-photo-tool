@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { EDITOR_URL } from "../config";
 
 type Tag = "feature" | "perf" | "fix" | "rust" | "ui" | "infra" | "mock";
@@ -25,6 +26,23 @@ interface Release {
 }
 
 const RELEASES: Release[] = [
+  {
+    version: "v0.9.20",
+    date: "2026-06-24",
+    headline: "Stroke stabilizer, lettered pins, and a big UI consistency pass",
+    entries: [
+      { tag: "feature", text: "Paint stroke stabilizer — turn on Low / Med / High smoothing and the brush tip trails the cursor on a leash, so quick jitters never reach the canvas (great for steady freehand lines). Off by default." },
+      { tag: "feature", text: "Pins can now be lettered — the Pins tool drops auto-sequenced callouts as numbers (1, 2, 3…) or letters (A, B, C…), each centered in its disc, sized by the stroke-width slider. Freehand pen was retired in favor of cleaner callouts." },
+      { tag: "feature", text: "Download chooser — one Download button now opens a tidy Selected / All / Cancel dialog when you have more than one image, and multi-image exports come down as a .zip." },
+      { tag: "ui",      text: "The top-bar Upload button is now New (it also makes blank canvases), and its shortcut moved to Alt+N." },
+      { tag: "ui",      text: "Toolbar refresh — the tool grid is calmer and more even: neutral tiles with only the active tool colored, a soft accent ring on hover, and sizes that scale cleanly at any width." },
+      { tag: "ui",      text: "Across every settings panel: tighter, consistent spacing, unified slider and button controls, and pickers whose buttons all match size even when a label is long (so other languages won't break the grid)." },
+      { tag: "ui",      text: "Dialogs now match the rest of the app — same surface, the same little close button, and no stray focus ring." },
+      { tag: "fix",     text: "Fixed a Firefox-only glitch where the canvas could turn to garbage after several brush strokes, and fixed the canvas/gallery drifting out of alignment when the toolbar was open." },
+      { tag: "fix",     text: "Exported edits can keep or strip EXIF — a padlock in Compress lets photographers keep GPS/time/camera metadata or scrub it for privacy (was shipped just before this; now exposed everywhere export happens)." },
+      { tag: "infra",   text: "This Trail Log got a sticky month filter at the top so you can jump straight to a month." },
+    ],
+  },
   {
     version: "v0.9.19",
     date: "2026-06-23",
@@ -449,7 +467,17 @@ function ReleaseCard({ release, isLatest }: { release: Release; isLatest: boolea
   );
 }
 
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+/** Unique YYYY-MM keys present in the log, newest first (RELEASES is sorted). */
+const MONTHS = Array.from(new Set(RELEASES.map((r) => r.date.slice(0, 7))));
+
 export default function Trail() {
+  const [month, setMonth] = useState<string>("all");
+  const shown =
+    month === "all" ? RELEASES : RELEASES.filter((r) => r.date.startsWith(month));
   return (
     <section className="relative">
       <div className="absolute inset-x-0 top-0 h-[400px] bg-gradient-to-b from-orange-500/10 via-pink-500/5 to-transparent pointer-events-none" />
@@ -478,10 +506,40 @@ export default function Trail() {
           </div>
         </div>
 
+        {/* Month filter — a sticky pill toggle (same shape as the app's tab
+            toggles) to narrow the giant log to a single month. */}
+        <div className="sticky top-4 z-20 mb-10 flex justify-center">
+          <div className="inline-flex flex-wrap justify-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/90 p-1 shadow-lg backdrop-blur">
+            {[
+              { key: "all", label: "All" },
+              ...MONTHS.map((ym) => ({
+                key: ym,
+                label: MONTH_NAMES[parseInt(ym.slice(5, 7), 10) - 1],
+              })),
+            ].map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setMonth(t.key)}
+                className={`mono rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  month === t.key
+                    ? "bg-orange-500 text-white shadow"
+                    : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* timeline rail */}
         <div className="relative pl-6 border-l-2 border-zinc-800 space-y-6">
-          {RELEASES.map((release, i) => (
-            <ReleaseCard key={release.version} release={release} isLatest={i === 0} />
+          {shown.map((release) => (
+            <ReleaseCard
+              key={release.version}
+              release={release}
+              isLatest={release.version === RELEASES[0].version}
+            />
           ))}
         </div>
 

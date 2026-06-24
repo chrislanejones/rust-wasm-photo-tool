@@ -8,7 +8,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { LargeButton } from "@/components/ui/large-button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import type { UserMode } from "@/components/StatusBar";
 import { TIERS } from "@/lib/tiers";
@@ -126,17 +126,17 @@ export function DevTierDialog({
           </label>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            variant="outline"
+        <DialogFooter className="gap-2 sm:gap-2">
+          <LargeButton
+            className="flex-1"
             onClick={onReset}
             disabled={!overridden}
             title="Clear override; use the real auth mode"
           >
             Reset
-          </Button>
+          </LargeButton>
           <DialogClose asChild>
-            <Button>Done</Button>
+            <LargeButton className="flex-1">Done</LargeButton>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
