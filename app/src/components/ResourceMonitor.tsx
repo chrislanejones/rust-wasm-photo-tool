@@ -4,7 +4,7 @@
 // view of what the app is spending the machine on — main-thread frame load,
 // JS heap, the WASM engine's linear memory, and a per-subsystem process list.
 
-import { Cpu, MemoryStick, Boxes } from "lucide-react";
+import { Cpu, MemoryStick, Boxes, HardDrive, Layers } from "lucide-react";
 import {
   fmtBytes,
   useResourceMonitor,
@@ -51,20 +51,22 @@ function Gauge({
   barClass?: string;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex w-16 shrink-0 items-center gap-1.5 text-zinc-400">
+    <div className="flex items-center gap-3">
+      <div className="flex w-20 shrink-0 items-center gap-1.5 text-zinc-400">
         {icon}
-        <span className="text-[10px] uppercase tracking-wider">{label}</span>
+        <span className="whitespace-nowrap text-[10px] uppercase tracking-wider">
+          {label}
+        </span>
       </div>
-      <div className="relative h-3.5 flex-1 overflow-hidden rounded-sm border border-zinc-800 bg-zinc-900">
+      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-zinc-800/80">
         {pct != null && (
           <div
-            className={`h-full ${barClass ?? loadBar(pct)} transition-[width] duration-300`}
+            className={`h-full rounded-full ${barClass ?? loadBar(pct)} transition-[width] duration-300`}
             style={{ width: `${Math.min(100, Math.max(0, pct * 100))}%` }}
           />
         )}
       </div>
-      <div className="w-32 shrink-0 text-right tabular-nums text-zinc-300">
+      <div className="w-32 shrink-0 whitespace-nowrap text-right tabular-nums text-zinc-300">
         {value}
       </div>
     </div>
@@ -119,24 +121,35 @@ export function ResourceMonitor({ active }: { active: boolean }) {
     snap.jsHeapUsed != null && snap.jsHeapLimit
       ? snap.jsHeapUsed / snap.jsHeapLimit
       : null;
-  // WASM has no fixed ceiling here; show its size relative to the JS heap
-  // limit just to give the bar a sensible scale.
-  const wasmPct =
-    snap.wasmBytes != null && snap.jsHeapLimit
-      ? snap.wasmBytes / snap.jsHeapLimit
-      : snap.wasmBytes != null
-        ? 0.1
-        : null;
+  // The footprint gauges (Tab / WASM / Canvas) have no per-tab ceiling, so scale
+  // them against device RAM (fallback 4 GB) — a meaningful, stable denominator,
+  // unlike the old "fraction of the JS-heap limit / flat 0.1" which made a large
+  // WASM heap render as a tiny bar.
+  const memBudget = (snap.deviceMemoryGB ?? 4) * 1024 ** 3;
+  const wasmPct = snap.wasmBytes != null ? snap.wasmBytes / memBudget : null;
+  const canvasPct =
+    snap.canvasBytes != null ? snap.canvasBytes / memBudget : null;
+  const tabPct = snap.tabBytes != null ? snap.tabBytes / memBudget : null;
 
   return (
     <div className="flex flex-col gap-3 p-4 font-mono text-xs">
       {/* ── Top gauges: main thread + memory ─────────────────────────────── */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <Gauge
           icon={<Cpu className="h-3.5 w-3.5" />}
           label="CPU"
           pct={snap.cpuLoad}
           value={`${snap.fps} fps · ${snap.frameMs.toFixed(1)}ms`}
+        />
+        {/* Whole-tab footprint — the number that matches Chrome's task manager.
+            Listed first because it's the only one that captures canvas/worker
+            memory; the gauges below break out the parts we can read directly. */}
+        <Gauge
+          icon={<HardDrive className="h-3.5 w-3.5" />}
+          label="Tab"
+          pct={tabPct}
+          barClass={tabPct != null ? loadBar(tabPct) : undefined}
+          value={snap.tabBytes != null ? fmtBytes(snap.tabBytes) : "n/a"}
         />
         <Gauge
           icon={<MemoryStick className="h-3.5 w-3.5" />}
@@ -156,6 +169,13 @@ export function ResourceMonitor({ active }: { active: boolean }) {
           barClass="bg-amber-500"
           value={snap.wasmBytes != null ? fmtBytes(snap.wasmBytes) : "not loaded"}
         />
+        <Gauge
+          icon={<Layers className="h-3.5 w-3.5" />}
+          label="Canvas"
+          pct={canvasPct}
+          barClass="bg-violet-500"
+          value={snap.canvasBytes != null ? fmtBytes(snap.canvasBytes) : "—"}
+        />
       </div>
 
       <div className="text-[10px] text-zinc-600">
@@ -163,6 +183,11 @@ export function ResourceMonitor({ active }: { active: boolean }) {
         {snap.deviceMemoryGB != null ? ` · ~${snap.deviceMemoryGB} GB device RAM` : ""}
         {" · "}
         {(snap.windowMs / 1000).toFixed(0)}s activity window
+      </div>
+      <div className="text-[10px] leading-relaxed text-zinc-600">
+        Tab = whole-page footprint (JS + WASM + canvas + workers), shown only when
+        the page is cross-origin isolated. JS Heap &amp; WASM alone miss
+        canvas/image memory; WASM only grows — reload to reclaim it.
       </div>
 
       {/* ── Per-subsystem "process" list ─────────────────────────────────── */}

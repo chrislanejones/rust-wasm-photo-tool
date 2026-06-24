@@ -21,6 +21,30 @@ export function registerWasmMemory(mem: WebAssembly.Memory): void {
   wasmMemory = mem;
 }
 
+// ── Off-heap memory probes ───────────────────────────────────────────────────
+// performance.memory only sees the JS heap, and a WebAssembly.Memory only its
+// own linear buffer. The browser's per-tab footprint additionally includes
+// canvas backing stores, decoded images, and worker heaps — the bulk of a photo
+// editor's memory. These two probes recover what we can: a true whole-tab total
+// (when cross-origin isolated) and a canvas-backing-store estimate.
+
+interface MemoryMeasurement {
+  bytes: number;
+}
+type MeasureMemory = () => Promise<MemoryMeasurement>;
+
+/** Σ (width · height · 4) over every <canvas> currently in the DOM. Cheap and
+ *  synchronous; an estimate of the GPU/canvas memory performance.memory misses
+ *  (main canvas, working copy, thumbnails, magnifier). Excludes OffscreenCanvas
+ *  and worker-owned canvases, which aren't in the document. */
+function estimateCanvasBytes(): number {
+  let total = 0;
+  for (const c of Array.from(document.querySelectorAll("canvas"))) {
+    total += c.width * c.height * 4;
+  }
+  return total;
+}
+
 // Subsystems shown as "processes", in a stable default order.
 const ALL_SOURCES: LogSource[] = [
   "WASM_ENGINE",
@@ -58,6 +82,14 @@ export interface ResourceSnapshot {
   jsHeapLimit: number | null;
   /** WASM linear memory size in bytes, or null until the engine loads. */
   wasmBytes: number | null;
+  /** Whole-tab memory (all JS heaps + WASM + canvas + workers) from
+   *  performance.measureUserAgentSpecificMemory(); null unless the page is
+   *  cross-origin isolated (COOP+COEP) and the API is supported. This is the
+   *  number that matches Chrome's per-tab "Memory footprint". */
+  tabBytes: number | null;
+  /** Estimated canvas backing-store bytes (Σ width·height·4 over DOM canvases).
+   *  Off-heap GPU memory that performance.memory cannot see. */
+  canvasBytes: number | null;
   /** Logical CPU cores reported by the browser. */
   cores: number;
   /** Approx device RAM in GB (Chrome only; null elsewhere). */
@@ -113,6 +145,10 @@ function buildProcesses(now: number): ProcessRow[] {
 export function useResourceMonitor(active: boolean): ResourceSnapshot | null {
   const [snap, setSnap] = useState<ResourceSnapshot | null>(null);
   const fpsRef = useRef({ fps: 0, frameMs: 0 });
+  // Last whole-tab measurement. measureUserAgentSpecificMemory() is async and
+  // browser-throttled, so we cache its result and read it synchronously in the
+  // snapshot build.
+  const tabBytesRef = useRef<number | null>(null);
 
   // FPS / frame-interval sampler.
   useEffect(() => {
@@ -141,14 +177,48 @@ export function useResourceMonitor(active: boolean): ResourceSnapshot | null {
   useEffect(() => {
     if (!active) {
       setSnap(null);
+      tabBytesRef.current = null;
       return;
     }
     const target = 1000 / 60;
+    const perf = performance as Performance & {
+      memory?: PerfMemory;
+      measureUserAgentSpecificMemory?: MeasureMemory;
+    };
+
+    // Whole-tab memory is async + browser-throttled and only available when the
+    // page is cross-origin isolated (COOP+COEP). Sample at most every 5s, cache
+    // the last value, and never block the snapshot on the promise.
+    let lastMeasure = 0;
+    let measuring = false;
+    const maybeMeasureTab = (nowMs: number) => {
+      if (
+        measuring ||
+        !crossOriginIsolated ||
+        typeof perf.measureUserAgentSpecificMemory !== "function" ||
+        nowMs - lastMeasure < 5000
+      )
+        return;
+      measuring = true;
+      lastMeasure = nowMs;
+      perf
+        .measureUserAgentSpecificMemory()
+        .then((m) => {
+          tabBytesRef.current = m.bytes;
+        })
+        .catch(() => {
+          // Throttled or unsupported — keep the previously cached value.
+        })
+        .finally(() => {
+          measuring = false;
+        });
+    };
+
     const build = () => {
       const { fps, frameMs } = fpsRef.current;
-      const perfMem = (performance as Performance & { memory?: PerfMemory })
-        .memory;
+      const perfMem = perf.memory;
       const nav = navigator as Navigator & { deviceMemory?: number };
+      maybeMeasureTab(performance.now());
       setSnap({
         fps: Math.round(fps),
         frameMs,
@@ -159,6 +229,8 @@ export function useResourceMonitor(active: boolean): ResourceSnapshot | null {
         jsHeapUsed: perfMem?.usedJSHeapSize ?? null,
         jsHeapLimit: perfMem?.jsHeapSizeLimit ?? null,
         wasmBytes: wasmMemory ? wasmMemory.buffer.byteLength : null,
+        tabBytes: tabBytesRef.current,
+        canvasBytes: estimateCanvasBytes(),
         cores: nav.hardwareConcurrency ?? 0,
         deviceMemoryGB: nav.deviceMemory ?? null,
         processes: buildProcesses(Date.now()),

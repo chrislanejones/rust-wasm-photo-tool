@@ -28,7 +28,9 @@ const STABILIZER_LEVELS = [
   { id: "high", label: "High" },
 ] as const;
 
-type PaintMode = "paint" | "blur";
+const PEN_WIDTH_PRESETS = [2, 4, 8, 16] as const;
+
+type PaintMode = "paint" | "blur" | "pen";
 
 interface PaintSettingsProps {
   settings: ToolSettings;
@@ -53,6 +55,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
         tabs={[
           { id: "paint", label: "Paint" },
           { id: "blur", label: "Blur" },
+          { id: "pen", label: "Pen" },
         ]}
         active={mode}
         onChange={handleModeChange}
@@ -173,6 +176,60 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                 onChange={(color) => onChange({ ...settings, redactColor: color })}
               />
             )}
+          </motion.div>
+        )}
+
+        {mode === "pen" && (
+          <motion.div
+            key="pen"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0, transition: quickSpring }}
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+            className="space-y-4"
+          >
+            <p className="text-[11px] leading-relaxed text-theme-muted-foreground">
+              Click to drop points, drag to pull Bézier handles. Enter closes the
+              path, Esc finishes it open, Backspace undoes a point.
+            </p>
+
+            <SizeSlider
+              label="Stroke Width"
+              value={settings.strokeWidth}
+              min={1}
+              max={40}
+              onChange={(v) => onChange({ ...settings, strokeWidth: v })}
+              presets={PEN_WIDTH_PRESETS}
+            />
+
+            <ColorSwatchGrid
+              colors={TEXT_COLORS}
+              value={settings.strokeColor}
+              onChange={(color) => onChange({ ...settings, strokeColor: color })}
+            />
+
+            {/* Background — fills the closed path's interior (under the stroke). */}
+            <div className="space-y-2">
+              <label className="text-[11px] text-theme-muted-foreground">
+                Background
+              </label>
+              <ToolButtonGroup
+                options={[
+                  { id: "none", label: "None" },
+                  { id: "solid", label: "Solid" },
+                ]}
+                value={settings.fillMode === "none" ? "none" : "solid"}
+                onChange={(id) =>
+                  onChange({ ...settings, fillMode: id as ToolSettings["fillMode"] })
+                }
+              />
+              {settings.fillMode !== "none" && (
+                <ColorSwatchGrid
+                  colors={TEXT_COLORS}
+                  value={settings.fillColor}
+                  onChange={(color) => onChange({ ...settings, fillColor: color })}
+                />
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

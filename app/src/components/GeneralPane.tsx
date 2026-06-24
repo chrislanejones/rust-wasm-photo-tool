@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
 import { SizeSlider } from "@/components/SizeSlider";
-import { LargeButton } from "@/components/ui/large-button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
-import { MAX_HISTORY_MIN, MAX_HISTORY_MAX } from "@/lib/preferences";
+import {
+  MAX_HISTORY_MIN,
+  MAX_HISTORY_MAX,
+  type Preferences,
+} from "@/lib/preferences";
 
 /**
  * Settings → General pane. App-wide preferences, persisted via
@@ -39,15 +41,19 @@ import { MAX_HISTORY_MIN, MAX_HISTORY_MAX } from "@/lib/preferences";
  * boundary. Keep the visual language consistent with `SuperUserPane` (section
  * heading + `space-y-4`, `ToggleButtonGroup` for choices, `LargeButton` actions).
  */
+/** AppShell → Settings modal contract: the live prefs + a commit callback. */
 export interface GeneralControls {
-  /** Currently-applied (and persisted) undo depth. */
-  maxHistory: number;
-  /** Apply a new undo depth → WASM engine + persist. */
-  onApplyMaxHistory: (n: number) => void;
-  /** Idle timeout in minutes (0 = never). */
-  idleTimeoutMin: number;
-  /** Change the idle timeout → persist + re-arm. */
-  onSetIdleTimeout: (min: number) => void;
+  /** Currently-applied (and persisted) preferences. */
+  current: Preferences;
+  /** Commit a full preferences object → WASM engine + localStorage + Convex. */
+  onApply: (next: Preferences) => void;
+}
+
+interface GeneralPaneProps {
+  /** The draft being edited (owned by the Settings modal). */
+  value: Preferences;
+  /** Patch the draft; the Settings footer's Apply commits it. */
+  onChange: (patch: Partial<Preferences>) => void;
 }
 
 const IDLE_OPTIONS: { min: number; label: string }[] = [
@@ -57,17 +63,7 @@ const IDLE_OPTIONS: { min: number; label: string }[] = [
   { min: 0, label: "Never" },
 ];
 
-export function GeneralPane({
-  maxHistory,
-  onApplyMaxHistory,
-  idleTimeoutMin,
-  onSetIdleTimeout,
-}: GeneralControls) {
-  // Draft slider value; only committed to the engine on Apply & Save.
-  const [draft, setDraft] = useState(maxHistory);
-  useEffect(() => setDraft(maxHistory), [maxHistory]);
-  const dirty = draft !== maxHistory;
-
+export function GeneralPane({ value, onChange }: GeneralPaneProps) {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
@@ -75,21 +71,19 @@ export function GeneralPane({
           <h3 className="text-sm font-semibold text-text-primary">Undo history</h3>
           <p className="mt-1 text-xs leading-relaxed text-text-muted">
             How many undo steps the editor keeps. Higher = more undo, but more
-            memory. Applies to the WASM engine and trims immediately if lowered.
+            memory. Applied to the WASM engine on Apply (trims immediately if
+            lowered).
           </p>
         </div>
         <SizeSlider
           label="History depth"
-          value={draft}
-          onChange={setDraft}
+          value={value.maxHistory}
+          onChange={(n) => onChange({ maxHistory: n })}
           min={MAX_HISTORY_MIN}
           max={MAX_HISTORY_MAX}
           step={50}
           unit=" steps"
         />
-        <LargeButton onClick={() => onApplyMaxHistory(draft)} disabled={!dirty}>
-          {dirty ? `Apply & Save (${draft})` : "Saved"}
-        </LargeButton>
       </section>
 
       <section className="space-y-3">
@@ -107,8 +101,8 @@ export function GeneralPane({
             key: String(min),
             icon: Clock,
             label,
-            active: idleTimeoutMin === min,
-            onToggle: () => onSetIdleTimeout(min),
+            active: value.idleTimeoutMin === min,
+            onToggle: () => onChange({ idleTimeoutMin: min }),
           }))}
         />
       </section>

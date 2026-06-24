@@ -90,8 +90,8 @@ interface ToolsSidebarProps {
   toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
   // Paint sub-mode (paint vs blur brush)
-  brushMode?: "paint" | "blur";
-  onBrushModeChange?: (mode: "paint" | "blur") => void;
+  brushMode?: "paint" | "blur" | "pen";
+  onBrushModeChange?: (mode: "paint" | "blur" | "pen") => void;
   // Effects sub-mode + color picker
   effectsMode?: EffectsMode;
   onEffectsModeChange?: (mode: EffectsMode) => void;
@@ -247,6 +247,7 @@ export function ToolsSidebar({
             isCompressing={isCompressing}
             compressProgress={compressProgress}
             selectedCount={selectedCount}
+            totalCount={photoCount}
           />
         )}
 

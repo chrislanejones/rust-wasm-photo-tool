@@ -9,3 +9,11 @@
 // shrinking the toolbar (296→260px) left a stale 320 behind in two of them.
 export const SIDE_PANEL_WIDTH = 260;
 export const PANEL_OPEN_GUTTER = SIDE_PANEL_WIDTH + 24; // 260 + 12 + 12 = 284
+
+// ── Responsive breakpoints (window width, px) ────────────────────────────────
+// One source of truth for the top bar's collapse logic. Below BP_COMPACT the bar
+// goes icon-only and drops Undo/Redo (still reachable in the Review panel + via
+// Ctrl+Z); BP_TIGHT additionally collapses when both side panels are open and
+// eating the horizontal room.
+export const BP_COMPACT = 1000;
+export const BP_TIGHT = 1200;

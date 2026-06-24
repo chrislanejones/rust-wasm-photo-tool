@@ -104,6 +104,21 @@ export const upsert = mutation({
   },
 });
 
+/** Persist the user's app settings — a JSON blob + its SHA-256. The hash lets
+ *  the caller skip redundant writes; we also no-op here when it's unchanged. */
+export const saveSettings = mutation({
+  args: { settings: v.string(), hash: v.string() },
+  handler: async (ctx, { settings, hash }) => {
+    const user = await requireUser(ctx);
+    if (user.settingsHash === hash) return; // unchanged — nothing to write
+    await ctx.db.patch(user._id, {
+      settings,
+      settingsHash: hash,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 /** Increment daily usage counter (resets after 24h). */
 export const incrementUsage = mutation({
   args: { amount: v.optional(v.number()) },

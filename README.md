@@ -113,7 +113,9 @@ src/
 ├── filters.rs      Brightness, contrast, Gaussian blur (separable 2-pass, bounding-box region;
 │                   cached kernel keyed on intensity + f32 accumulators)
 ├── drawing.rs      Arrow rendering (anti-aliased, arrowhead), geometric shapes (rect, circle, line,
-│                   hand-drawn circle); fill_rounded_rect + fill_triangle_public for speech bubbles
+│                   hand-drawn circle); fill_rounded_rect + fill_triangle_public for speech bubbles;
+│                   Bézier pen paths — flatten_cubic_path (de Casteljau) strokes the curve via
+│                   draw_polyline, fill_polygon (scanline even-odd) backs the optional path background
 ├── text.rs         Liberation Sans font embedded at compile time (subset to Latin-1 + Extended-A
 │                   for a 60% WASM size cut); renders text → pixel buffer; rotate_pixels for
 │                   annotation tiles
@@ -198,6 +200,11 @@ app/src/
 │   │   │                             move handle, endpoint circles for lines/arrows. The text
 │   │   │                             overlay rotates around the Rust tile's pivot (via measure_text)
 │   │   │                             so committed text matches the preview
+│   │   ├── PenOverlay.tsx            Bézier pen overlay (Paint→Pen): click to drop corner anchors,
+│   │   │                             drag to pull smooth handles, grab any anchor/handle to reshape;
+│   │   │                             click a committed path to re-open it for editing. Commits as a
+│   │   │                             kind-7 ShapeAnnotation (cubic control sequence) with optional
+│   │   │                             solid fill; sits below the chrome (z-29) so panels stay clickable
 │   │   ├── CompareSlider.tsx         Squoosh-style A/B before/after slider; rAF-deduped box sync
 │   │   │                             driven by ResizeObserver + MutationObserver on canvas style
 │   │   │                             so the overlay tracks zoom and pan transforms
@@ -239,7 +246,8 @@ app/src/
 │   │       │                         shapesMode lifted to AppShell for correct canvas routing
 │   │       ├── BatchSettings.tsx     Coming-soon panel for Images toolbar tool (batch icon stamp)
 │   │       ├── PaintSettings.tsx     Tab-switched: Paint (size/color/opacity) +
-│   │       │                         Blur Brush (radius, intensity) — both route canvas events
+│   │       │                         Blur Brush (radius, intensity) + Pen (Bézier vector paths:
+│   │       │                         stroke width/color + optional solid background fill)
 │   │       └── TextSettings.tsx      Font family (12 browser-safe fonts), size, weight, color;
 │   │                                 up to 8 recent texts (click to re-open canvas box at last
 │   │                                 position, restoring all settings including font)
@@ -317,7 +325,8 @@ app/src/
 - **Blur Brush** — Box-blur with stroke-based region masking; configurable radius and intensity; now lives in the Brush tool's "Blur Brush" tab
 - **Arrows** — Anti-aliased arrows with arrowhead (single or double), drawn directly on the pixel buffer; accessible from the Arrows sub-tab inside the Shapes tool
 - **Shapes** — Rectangles, circles, hand-drawn circles, and lines rendered in WASM; Shapes tool has a Shapes/Arrows tab switcher at the top
-- **Paint / Brush** — Freehand painting via WASM `paint_dab` + `paint_stroke_to`; configurable brush size, color, and opacity; tab-switched with Blur Brush in the same panel
+- **Paint / Brush** — Freehand painting via WASM `paint_dab` + `paint_stroke_to`; configurable brush size, color, and opacity; tab-switched with Blur Brush and Pen in the same panel
+- **Pen (Vector Paths)** — Photoshop-style Bézier pen (Paint → Pen tab): click to drop corner anchors, click-drag to pull smooth curve handles, and grab any anchor or handle to reshape the path. Enter closes it, Esc finishes it open. An optional solid **background** fills the closed interior (Rust scanline polygon fill, under the stroke). Committed paths stay **re-editable** — click one to re-open its anchors/handles — and round-trip through history, photo-switch, reload, and cloud sync as a kind-7 `ShapeAnnotation` (cubic control sequence flattened with de Casteljau)
 - **Text** — Click-to-place text with configurable font family (12 browser-safe options), size, weight, and color; up to 8 recent texts that re-open the canvas text box at the last used position, restoring all text settings
 - **Emoji Stamp** — Browser renders emoji to `OffscreenCanvas`, pixels sent to WASM `stamp_pixels()` for alpha compositing; emoji picker lives in the Stamp tool's Emojis tab
 - **Export** — Lossless PNG via Rust encoder, JPEG/WebP/AVIF via browser
@@ -331,7 +340,7 @@ app/src/
 
 - **Animated Panels** — Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)
 - **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), **Batch Image Editor** (bulk logo stamp + grid mosaic view), AI (Brain)
-- **Tab Switchers** — Stamp (Clone / Stamps / Emojis), Shapes (Shapes / Arrows), Paint (Paint / Blur Brush), Effects (Levels / Color Picker) via shared `TabGroup` component
+- **Tab Switchers** — Stamp (Clone / Stamps / Emojis), Shapes (Shapes / Arrows), Paint (Paint / Blur Brush / Pen), Effects (Levels / Color Picker) via shared `TabGroup` component
 - **Spacebar Pan** — Hold Space for grab-to-pan; all tool handlers bypassed during pan
 - **A/B Compare Slider** — Squoosh-style draggable divider; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned
 - **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch/**duplicate** (content-addressed, zero-copy; carries edits); PgUp/PgDn cycling; multi-select with Export / Delete / Duplicate / Unselect; header count + per-tier limit `(i)` tooltip; originals preserved in IndexedDB at full resolution regardless of working-copy downscale

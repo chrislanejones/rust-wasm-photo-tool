@@ -72,6 +72,52 @@ pub fn fill_circle(
     }
 }
 
+/// Scanline even-odd fill of an arbitrary (possibly concave) closed polygon
+/// given as a point list — used to fill the interior of a flattened Bézier pen
+/// path. Source-over blended; the boundary is left to the stroke on top.
+pub fn fill_polygon(data: &mut [u8], w: u32, h: u32, points: &[(f64, f64)], color: [u8; 4]) {
+    if points.len() < 3 || color[3] == 0 {
+        return;
+    }
+    let wi = w as i32;
+    let hi = h as i32;
+    let mut min_y = f64::MAX;
+    let mut max_y = f64::MIN;
+    for &(_, y) in points {
+        min_y = min_y.min(y);
+        max_y = max_y.max(y);
+    }
+    let y0 = (min_y.floor() as i32).max(0);
+    let y1 = (max_y.ceil() as i32).min(hi - 1);
+    let n = points.len();
+    let mut xs: Vec<f64> = Vec::new();
+    for y in y0..=y1 {
+        let yc = y as f64 + 0.5;
+        xs.clear();
+        for i in 0..n {
+            let (xi, yi) = points[i];
+            let (xj, yj) = points[(i + 1) % n];
+            if (yi <= yc && yj > yc) || (yj <= yc && yi > yc) {
+                let t = (yc - yi) / (yj - yi);
+                xs.push(xi + t * (xj - xi));
+            }
+        }
+        xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let mut k = 0;
+        while k + 1 < xs.len() {
+            let xa = (xs[k].ceil() as i32).max(0);
+            let xb = (xs[k + 1].floor() as i32).min(wi - 1);
+            for x in xa..=xb {
+                let idx = ((y * wi + x) * 4) as usize;
+                if idx + 3 < data.len() {
+                    blend_pixel(data, idx, color);
+                }
+            }
+            k += 2;
+        }
+    }
+}
+
 /// Freehand/polyline pen: thick round-capped segments between consecutive
 /// vertices. A single point renders as a dot.
 pub fn draw_polyline(
@@ -91,6 +137,53 @@ pub fn draw_polyline(
     for p in points.windows(2) {
         draw_line_thick(data, wi, hi, p[0].0, p[0].1, p[1].0, p[1].1, color, width);
     }
+}
+
+/// Flatten a cubic Bézier path given as a flat control sequence
+/// `[a0, c0_out, c1_in, a1, c1_out, c2_in, a2, …]` into a polyline ready for
+/// `draw_polyline`. Each `(anchor, out, in, anchor)` quad is one cubic segment;
+/// corner anchors simply have their handles coincide with the anchor point.
+/// Step count adapts to the control-polygon length so long curves stay smooth.
+pub fn flatten_cubic_path(ctrl: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    if ctrl.len() < 4 {
+        return ctrl.to_vec();
+    }
+    let mut out = Vec::with_capacity(ctrl.len() * 12);
+    out.push(ctrl[0]);
+    let mut i = 0;
+    while i + 3 < ctrl.len() {
+        let (p0, p1, p2, p3) = (ctrl[i], ctrl[i + 1], ctrl[i + 2], ctrl[i + 3]);
+        let approx = pt_dist(p0, p1) + pt_dist(p1, p2) + pt_dist(p2, p3);
+        let steps = ((approx / 3.0) as usize).clamp(8, 256);
+        for s in 1..=steps {
+            let t = s as f64 / steps as f64;
+            out.push(cubic_point(p0, p1, p2, p3, t));
+        }
+        i += 3;
+    }
+    out
+}
+
+fn pt_dist(a: (f64, f64), b: (f64, f64)) -> f64 {
+    let dx = a.0 - b.0;
+    let dy = a.1 - b.1;
+    (dx * dx + dy * dy).sqrt()
+}
+
+/// Cubic Bézier point at parameter `t` (de Casteljau weights).
+fn cubic_point(
+    p0: (f64, f64),
+    p1: (f64, f64),
+    p2: (f64, f64),
+    p3: (f64, f64),
+    t: f64,
+) -> (f64, f64) {
+    let u = 1.0 - t;
+    let (w0, w1, w2, w3) = (u * u * u, 3.0 * u * u * t, 3.0 * u * t * t, t * t * t);
+    (
+        w0 * p0.0 + w1 * p1.0 + w2 * p2.0 + w3 * p3.0,
+        w0 * p0.1 + w1 * p1.1 + w2 * p2.1 + w3 * p3.1,
+    )
 }
 
 /// Public filled rounded-rect helper. Renders into an RGBA buffer of size

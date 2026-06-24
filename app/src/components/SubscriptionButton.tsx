@@ -2,11 +2,13 @@
 // selected pane on the right). General (app preferences), Plan & Billing (Stripe
 // tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
 // the TopBar).
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAction, useQuery } from "convex/react";
+import { toast } from "sonner";
 import {
   Settings,
   SlidersHorizontal,
+  Palette,
   CreditCard,
   ShieldCheck,
   Check,
@@ -17,6 +19,14 @@ import { api } from "../../../convex/_generated/api";
 import { Modal } from "@/components/ui/Modal";
 import { SuperUserPane, type SuperUserControls } from "@/components/SuperUserPane";
 import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
+import { AppearancePane } from "@/components/AppearancePane";
+import { UserMenu } from "@/components/UserMenu";
+import { LargeButton } from "@/components/ui/large-button";
+import {
+  DEFAULT_PREFERENCES,
+  serializePreferences,
+  type Preferences,
+} from "@/lib/preferences";
 
 const PRO_FEATURES = [
   "All AI tools — background removal, OCR, object removal",
@@ -26,7 +36,23 @@ const PRO_FEATURES = [
   "Unlimited share links",
 ];
 
-type SettingsTab = "general" | "billing" | "superuser";
+type SettingsTab = "general" | "appearance" | "billing" | "superuser";
+
+/** Human-readable summary of what changed, for the Apply toast. */
+function describeChanges(prev: Preferences, next: Preferences): string[] {
+  const out: string[] = [];
+  if (prev.maxHistory !== next.maxHistory)
+    out.push(`Undo history → ${next.maxHistory}`);
+  if (prev.idleTimeoutMin !== next.idleTimeoutMin)
+    out.push(
+      `Idle screen → ${next.idleTimeoutMin === 0 ? "Never" : `${next.idleTimeoutMin} min`}`,
+    );
+  if (prev.theme !== next.theme)
+    out.push(
+      `Theme → ${next.theme === "system" ? "System" : next.theme === "dark" ? "Dark mode" : "Light mode"}`,
+    );
+  return out;
+}
 
 interface Props {
   /** App-wide preferences for the General tab. */
@@ -42,11 +68,31 @@ export function SubscriptionButton({ general, superUser }: Props) {
 
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] = [
     { id: "general", label: "General", icon: SlidersHorizontal },
+    { id: "appearance", label: "Appearance", icon: Palette },
     { id: "billing", label: "Plan & Billing", icon: CreditCard },
     ...(superUser
       ? [{ id: "superuser" as SettingsTab, label: "Super User", icon: ShieldCheck }]
       : []),
   ];
+
+  // Draft prefs the General pane edits; committed by the footer's Apply.
+  const [draft, setDraft] = useState<Preferences>(general.current);
+  useEffect(() => {
+    if (open) setDraft(general.current); // re-sync on open / after a commit
+  }, [open, general.current]);
+  const settingsDirty =
+    serializePreferences(draft) !== serializePreferences(general.current);
+  const atDefaults =
+    serializePreferences(draft) === serializePreferences(DEFAULT_PREFERENCES);
+  const handleApplySettings = () => {
+    const changes = describeChanges(general.current, draft);
+    general.onApply(draft);
+    toast.success(
+      "Settings applied",
+      changes.length ? { description: changes.join(" · ") } : undefined,
+    );
+  };
+
   const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -89,6 +135,25 @@ export function SubscriptionButton({ general, superUser }: Props) {
         title="Settings"
         icon={Settings}
         fill
+        footer={
+          <div className="flex items-center justify-between gap-2">
+            {/* Clerk user button / sign-in — same component as the top bar. */}
+            <UserMenu />
+            {(tab === "general" || tab === "appearance") && (
+              <div className="flex items-center gap-2">
+                <LargeButton
+                  onClick={() => setDraft(DEFAULT_PREFERENCES)}
+                  disabled={atDefaults}
+                >
+                  Restore Settings
+                </LargeButton>
+                <LargeButton onClick={handleApplySettings} disabled={!settingsDirty}>
+                  Apply
+                </LargeButton>
+              </div>
+            )}
+          </div>
+        }
       >
         <div className="flex h-full">
           {/* GNOME-style category rail (left) */}
@@ -113,7 +178,15 @@ export function SubscriptionButton({ general, superUser }: Props) {
           {/* Selected pane (right) */}
           <div className="flex-1 overflow-y-auto p-5">
             {tab === "general" ? (
-              <GeneralPane {...general} />
+              <GeneralPane
+                value={draft}
+                onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+              />
+            ) : tab === "appearance" ? (
+              <AppearancePane
+                value={draft.theme}
+                onChange={(theme) => setDraft((d) => ({ ...d, theme }))}
+              />
             ) : tab === "superuser" && superUser ? (
               <SuperUserPane {...superUser} />
             ) : (

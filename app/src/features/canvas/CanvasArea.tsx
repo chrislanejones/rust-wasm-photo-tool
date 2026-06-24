@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTools";
 import { CompareSlider } from "./CompareSlider";
+import { PenOverlay } from "./PenOverlay";
 
 // Data-URI SVG cursor for the rotate handle — there's no standard CSS
 // rotation cursor, so we draw a small curved-arrow glyph. Falls back to
@@ -106,6 +107,17 @@ interface Props {
     fillColor2: string;
     gradientAngle: number;
   };
+  /** Bézier pen tool (Paint → Pen sub-mode). When active, an interactive
+   *  pen overlay captures the canvas; finished paths commit via onPenCommit. */
+  penActive?: boolean;
+  penColor?: string;
+  penStrokeWidth?: number;
+  onPenCommit?: (flatPoints: number[], close: boolean) => void;
+  /** Pen edit: hit-test a committed path, then load/commit/cancel a reshape. */
+  onPenHitTest?: (imgX: number, imgY: number) => { id: number; points: number[] } | null;
+  onPenEditStart?: (id: number) => void;
+  onPenEditCommit?: (id: number, flatPoints: number[]) => void;
+  onPenEditCancel?: (id: number) => void;
 }
 
 /**
@@ -257,6 +269,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       drawEditState,
       onDrawEditChange,
       drawSettings,
+      penActive,
+      penColor,
+      penStrokeWidth,
+      onPenCommit,
+      onPenHitTest,
+      onPenEditStart,
+      onPenEditCommit,
+      onPenEditCancel,
     },
     ref,
   ) => {
@@ -591,6 +611,20 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           onMouseOut={onCanvasLeave}
         />
         <CompareSlider beforeUrl={beforeUrl} canvasEl={canvasRef.current} active={compareActive} />
+
+        {/* Bézier pen overlay — interactive path creation (Paint → Pen). */}
+        {penActive && canvasRef.current && (
+          <PenOverlay
+            canvasEl={canvasRef.current}
+            color={penColor ?? "#ef4444"}
+            strokeWidth={penStrokeWidth ?? 3}
+            onCommit={onPenCommit ?? (() => {})}
+            onHitTest={onPenHitTest}
+            onEditStart={onPenEditStart}
+            onEditCommit={onPenEditCommit}
+            onEditCancel={onPenEditCancel}
+          />
+        )}
 
         {/* ── Crop overlay: dark mask + rule-of-thirds + draggable handles ── */}
         {activeTool === "crop" && cropSelection && canvasRef.current && (() => {

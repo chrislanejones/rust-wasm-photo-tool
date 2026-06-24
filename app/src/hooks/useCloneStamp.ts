@@ -330,6 +330,13 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
             } else if (s.kind === 6) {
               const flat = new Float64Array((s.points ?? []).flat());
               tool.restore_polyline_annotation(flat, s.r, s.g, s.b, s.stroke_width);
+            } else if (s.kind === 7) {
+              const flat = new Float64Array((s.points ?? []).flat());
+              tool.restore_bezier_annotation(
+                flat, s.r, s.g, s.b, s.stroke_width,
+                s.fill_kind ?? 0,
+                s.fill_r ?? 0, s.fill_g ?? 0, s.fill_b ?? 0, s.fill_a ?? 0,
+              );
             } else {
               tool.restore_shape_annotation(
                 s.kind,
@@ -469,6 +476,13 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
           } else if (s.kind === 6) {
             const flat = new Float64Array((s.points ?? []).flat());
             tool.restore_polyline_annotation(flat, s.r, s.g, s.b, s.stroke_width);
+          } else if (s.kind === 7) {
+            const flat = new Float64Array((s.points ?? []).flat());
+            tool.restore_bezier_annotation(
+              flat, s.r, s.g, s.b, s.stroke_width,
+              s.fill_kind ?? 0,
+              s.fill_r ?? 0, s.fill_g ?? 0, s.fill_b ?? 0, s.fill_a ?? 0,
+            );
           } else {
             tool.restore_shape_annotation(
               s.kind,

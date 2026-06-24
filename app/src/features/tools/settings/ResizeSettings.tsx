@@ -68,6 +68,8 @@ interface ResizeSettingsProps {
   compressProgress: { completed: number; total: number };
   /** Number of selected gallery photos; >0 switches to "Compress Selected". */
   selectedCount: number;
+  /** Total photos in the gallery; the "All Images" button hides when ≤ 1. */
+  totalCount: number;
 }
 
 function trafficColor(score: number) {
@@ -97,6 +99,7 @@ export function ResizeSettings({
   onAutoCompress,
   isCompressing,
   selectedCount,
+  totalCount,
 }: ResizeSettingsProps) {
   const [width, setWidth] = useState(String(imageWidth));
   const [height, setHeight] = useState(String(imageHeight));
@@ -322,7 +325,7 @@ export function ResizeSettings({
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0, transition: quickSpring }}
               exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
-              className="space-y-6"
+              className="space-y-4"
             >
               {/* ── Method / Format side by side to save vertical space ── */}
               <div className="grid grid-cols-2 gap-3">
@@ -389,22 +392,23 @@ export function ResizeSettings({
                   Export Selected. Reuses the aspect-lock button + Clone Stamp
                   badge styling. */}
               <div className="space-y-2">
-                <label className="text-[11px] text-theme-muted-foreground">
-                  EXIF Metadata on Export
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => onExifKeepChange(!exifKeep)}
-                    title={
-                      exifKeep
-                        ? "EXIF kept — click to strip metadata"
-                        : "EXIF stripped — click to keep metadata"
-                    }
-                    aria-pressed={exifKeep}
+                {/* Full-width badge: padlock on the left, status text centered
+                    in the remaining space. The whole badge is the toggle. */}
+                <button
+                  onClick={() => onExifKeepChange(!exifKeep)}
+                  title={
+                    exifKeep
+                      ? "EXIF kept — click to strip metadata"
+                      : "EXIF stripped — click to keep metadata"
+                  }
+                  aria-pressed={exifKeep}
+                  className="flex w-full items-center gap-2 px-3 py-2 rounded-lg text-left large-badge-item type-current"
+                >
+                  <span
                     className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border transition-colors ${
                       exifKeep
                         ? "bg-theme-primary text-theme-primary-foreground border-theme-primary"
-                        : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground border-theme-border"
+                        : "bg-theme-muted/20 text-theme-muted-foreground border-theme-border"
                     }`}
                   >
                     {exifKeep ? (
@@ -412,18 +416,18 @@ export function ResizeSettings({
                     ) : (
                       <Unlock className="h-4 w-4" />
                     )}
-                  </button>
-                  <div className="flex flex-1 flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-lg text-center large-badge-item type-current">
+                  </span>
+                  <span className="flex flex-1 flex-col items-center justify-center gap-0.5 text-center">
                     <span className="font-mono text-[11px] font-semibold leading-tight text-theme-primary">
-                      {exifKeep ? "EXIF intact" : "EXIF stripped"}
+                      {exifKeep ? "Exporting Keeps EXIF" : "Exporting Removes EXIF"}
                     </span>
                     <span className="font-mono text-[10px] leading-tight text-theme-muted-foreground">
                       {exifKeep
-                        ? "keeps GPS, time & camera"
-                        : "removes GPS, time & camera"}
+                        ? "Keep sensitive GPS & Time Data"
+                        : "Remove sensitive GPS & Time Data"}
                     </span>
-                  </div>
-                </div>
+                  </span>
+                </button>
               </div>
 
               {/* ── Web Performance Gain ── */}
@@ -474,9 +478,10 @@ export function ResizeSettings({
           Auto Compress
         </div>
         {/* Compression progress is surfaced via a sonner toast, not inline.
-            "Selected Image" compresses whatever is in the ring — enabled as long
-            as a photo is active (disabled handles the empty-gallery case). */}
-        <div className="grid grid-cols-2 gap-2">
+            "Compress Image" compresses whatever is in the ring — enabled as long
+            as a photo is active (disabled handles the empty-gallery case). The
+            "All Images" button is hidden when the gallery holds a single image. */}
+        <div className={totalCount > 1 ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
           <LargeButton
             onClick={() => handleAutoCompress("selected")}
             disabled={disabled || isCompressing}
@@ -485,16 +490,18 @@ export function ResizeSettings({
             {isCompressing
               ? "Compressing…"
               : selectedCount > 1
-                ? "Selected Images"
-                : "Selected Image"}
+                ? "Compress Images"
+                : "Compress Image"}
           </LargeButton>
-          <LargeButton
-            onClick={() => handleAutoCompress("all")}
-            disabled={disabled || isCompressing}
-            className="w-full"
-          >
-            {isCompressing ? "Compressing…" : "All Images"}
-          </LargeButton>
+          {totalCount > 1 && (
+            <LargeButton
+              onClick={() => handleAutoCompress("all")}
+              disabled={disabled || isCompressing}
+              className="w-full"
+            >
+              {isCompressing ? "Compressing…" : "Compress All Images"}
+            </LargeButton>
+          )}
         </div>
 
         <hr className="border-theme-sidebar-border" />

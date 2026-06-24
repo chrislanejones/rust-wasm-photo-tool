@@ -244,7 +244,8 @@ pub struct TextAnnotation {
 #[derive(Clone, Default)]
 pub struct ShapeAnnotation {
     pub id: u32,
-    /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline.
+    /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline,
+    /// 7=bezier (cubic pen path; `points` holds the flat control sequence).
     pub kind: u8,
     pub x0: f64, pub y0: f64,   // start point / bbox corner (canvas coords)
     pub x1: f64, pub y1: f64,   // end point / opposite bbox corner
@@ -532,6 +533,16 @@ fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
         ),
         5 => render_pin(data, w, h, s),
         6 => crate::drawing::draw_polyline(data, w, h, &s.points, color, s.stroke_width),
+        7 => {
+            let pts = crate::drawing::flatten_cubic_path(&s.points);
+            if s.fill_kind != 0 {
+                crate::drawing::fill_polygon(
+                    data, w, h, &pts,
+                    [s.fill_r, s.fill_g, s.fill_b, s.fill_a],
+                );
+            }
+            crate::drawing::draw_polyline(data, w, h, &pts, color, s.stroke_width);
+        }
         _ => crate::drawing::draw_shape(
             data, w, h,
             s.x0, s.y0, s.x1, s.y1,
@@ -1114,8 +1125,7 @@ impl ImageHorseTool {
     }
 
     pub fn end_stroke(&mut self) {
-        let max = self.hist.max_history;
-        self.stamp.end_stroke(&mut self.hist.undo_stack, max);
+        self.stamp.end_stroke(&mut self.hist);
     }
 
     /// Set the undo-history depth (clamped to 50–1000). Trims the oldest
@@ -1880,6 +1890,91 @@ impl ImageHorseTool {
             ..Default::default()
         });
         id
+    }
+
+    /// Add a Bézier pen path (kind 7). `points` is a flat cubic control
+    /// sequence `[a0x,a0y, out0x,out0y, in1x,in1y, a1x,a1y, …]`. Pushes "Add Pen Path".
+    pub fn add_bezier_annotation(
+        &mut self,
+        points: &[f64],
+        color_hex: &str,
+        stroke_width: f64,
+        fill_kind: u8,
+        fill_color_hex: &str,
+    ) -> u32 {
+        self.snap("Add Pen Path");
+        let c = drawing::parse_hex_color(color_hex);
+        let fc = drawing::parse_hex_color(fill_color_hex);
+        let pts = flat_to_points(points);
+        let (x0, y0, x1, y1) = points_bbox(&pts);
+        let id = self.next_shape_id;
+        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
+        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
+            id, kind: 7, x0, y0, x1, y1,
+            r: c[0], g: c[1], b: c[2],
+            stroke_width, arrow_style: 0,
+            number: 0, points: pts,
+            fill_kind,
+            fill_r: fc[0], fill_g: fc[1], fill_b: fc[2], fill_a: fc[3],
+            ..Default::default()
+        });
+        id
+    }
+
+    /// Restore a persisted Bézier path WITHOUT pushing history. Raw r,g,b.
+    pub fn restore_bezier_annotation(
+        &mut self,
+        points: &[f64],
+        r: u8, g: u8, b: u8,
+        stroke_width: f64,
+        fill_kind: u8,
+        fill_r: u8, fill_g: u8, fill_b: u8, fill_a: u8,
+    ) -> u32 {
+        let pts = flat_to_points(points);
+        let (x0, y0, x1, y1) = points_bbox(&pts);
+        let id = self.next_shape_id;
+        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
+        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
+            id, kind: 7, x0, y0, x1, y1, r, g, b,
+            stroke_width, arrow_style: 0,
+            number: 0, points: pts,
+            fill_kind, fill_r, fill_g, fill_b, fill_a,
+            ..Default::default()
+        });
+        id
+    }
+
+    /// Replace just the control points of an existing annotation (no history).
+    /// Used for live drag-editing of a Bézier path's anchors/handles; the
+    /// caller pushes one snapshot when the drag gesture ends.
+    pub fn set_annotation_points(&mut self, id: u32, points: &[f64]) {
+        let pts = flat_to_points(points);
+        let (x0, y0, x1, y1) = points_bbox(&pts);
+        if let Some(s) = self.layers[self.active]
+            .shape_annotations
+            .iter_mut()
+            .find(|s| s.id == id)
+        {
+            s.points = pts;
+            s.x0 = x0; s.y0 = y0; s.x1 = x1; s.y1 = y1;
+        }
+    }
+
+    /// Commit a reshape of an existing Bézier path: pushes one "Edit Pen Path"
+    /// snapshot (so undo restores the prior shape), then replaces its control
+    /// points. Style (colour / width / fill) is left untouched.
+    pub fn update_bezier_annotation(&mut self, id: u32, points: &[f64]) {
+        self.snap("Edit Pen Path");
+        let pts = flat_to_points(points);
+        let (x0, y0, x1, y1) = points_bbox(&pts);
+        if let Some(s) = self.layers[self.active]
+            .shape_annotations
+            .iter_mut()
+            .find(|s| s.id == id)
+        {
+            s.points = pts;
+            s.x0 = x0; s.y0 = y0; s.x1 = x1; s.y1 = y1;
+        }
     }
 
     /// Update an existing shape annotation in full (geometry + style). Pushes

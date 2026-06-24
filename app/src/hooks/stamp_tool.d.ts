@@ -528,6 +528,27 @@ declare module "stamp_tool" {
       r: number, g: number, b: number,
       stroke_width: number,
     ): number;
+    /** Add a Bézier pen path (kind 7). Flat cubic control sequence + optional
+     *  fill (fill_kind 0=none, 1=solid). Pushes "Add Pen Path". */
+    add_bezier_annotation(
+      points: Float64Array,
+      color_hex: string,
+      stroke_width: number,
+      fill_kind: number,
+      fill_color_hex: string,
+    ): number;
+    /** Restore a persisted Bézier path WITHOUT pushing history. Colour is raw r,g,b. */
+    restore_bezier_annotation(
+      points: Float64Array,
+      r: number, g: number, b: number,
+      stroke_width: number,
+      fill_kind: number,
+      fill_r: number, fill_g: number, fill_b: number, fill_a: number,
+    ): number;
+    /** Replace just the control points of an annotation (no history) — live drag-edit. */
+    set_annotation_points(id: number, points: Float64Array): void;
+    /** Commit a Bézier-path reshape: snapshot "Edit Pen Path" + replace its points. */
+    update_bezier_annotation(id: number, points: Float64Array): void;
     /** Add a live shape/arrow. Pushes an "Add Shape"/"Add Arrow" history step. Returns the new id. */
     add_shape_annotation(
       kind: number,

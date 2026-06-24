@@ -6,6 +6,7 @@ import { LargeButton } from "@/components/ui/large-button";
 import { TinyButton } from "@/components/ui/tiny-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
+import { TEXT_COLORS } from "@/lib/colors";
 import { UserMenu } from "@/components/UserMenu";
 import { parseColor } from "@/lib/colorParser";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
@@ -21,9 +22,6 @@ const PAGE_PRESETS: { id: string; label: string; w: number; h: number }[] = [
   { id: "5x7", label: "5×7", w: 1500, h: 2100 },
   { id: "8x10", label: "8×10", w: 2400, h: 3000 },
 ];
-
-/** Quick background swatches; ColorSwatchGrid's "+" adds any hex (Rust-parsed). */
-const BG_COLORS: readonly string[] = ["#ffffff", "#000000"];
 
 /** Codeberg's mountain mark — lucide ships no brand icon for it, so inline the
  *  simple-icons path. `.btn-icon svg` sizes it to 14px to match lucide icons. */
@@ -341,7 +339,7 @@ export function UploadDialog({
                       }
                     >
                       <ColorSwatchGrid
-                        colors={BG_COLORS}
+                        colors={TEXT_COLORS}
                         value={bgColor}
                         onChange={setBgColor}
                         label="Background"

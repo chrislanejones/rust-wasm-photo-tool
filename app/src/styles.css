@@ -1396,24 +1396,26 @@ input[type="range"]:focus::-webkit-slider-thumb {
   width: 100%;
 }
 
+/* Re-skin the third-party emoji-mart picker so it reads as part of the panel,
+   not a dropped-in dark card: blend its background into the sidebar
+   (--bg-secondary), borrow the app's accent / text / font, and drop the
+   card shadow, border, and rounding. */
 .emoji-picker-host em-emoji-picker {
-  --padding: 0 !important;
-  --padding-small: 0 !important;
-  --shadow: none !important;
-  --border-radius: 0 !important;
-  --rgb-background: 18, 18, 20 !important;
-  --rgb-input: 24, 24, 28 !important;
+  --rgb-background: 24, 24, 24;   /* #181818 — matches the sidebar panel */
+  --rgb-input: 43, 43, 43;        /* #2b2b2b — matches app inputs (--bg-elevated) */
+  --rgb-color: 238, 238, 238;     /* #eeeeee — --text-primary */
+  --rgb-accent: 252, 223, 194;    /* #fcdfc2 — --accent */
+  --color-border: transparent;
+  --font-family: var(--font-sans);
+  --font-size: 13px;
+  --border-radius: 10px;
+  --shadow: none;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   width: 100% !important;
-  min-height: 320px;
-  max-height: 380px;
-}
-
-.emoji-picker-host em-emoji-picker::part(search) {
-  margin: 0 !important;
-  padding: 4px !important;
+  min-height: 300px;
+  max-height: 360px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

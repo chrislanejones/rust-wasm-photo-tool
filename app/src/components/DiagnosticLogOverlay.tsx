@@ -87,7 +87,11 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
           )}
         </div>
       }
-      footer="Alt + Delete to toggle · in-memory only, never sent anywhere"
+      footer={
+        <p className="text-center font-mono text-[10px] text-text-muted">
+          Alt + Delete to toggle · in-memory only, never sent anywhere
+        </p>
+      }
     >
       {tab === "resources" ? (
                 <ResourceMonitor active={open && tab === "resources"} />

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { slideFromTop, panelSpacingTransition } from "@/lib/animations";
-import { PANEL_OPEN_GUTTER } from "@/lib/layout";
+import { PANEL_OPEN_GUTTER, BP_COMPACT, BP_TIGHT } from "@/lib/layout";
 import {
   Tooltip,
   TooltipContent,
@@ -69,8 +69,10 @@ export function TopBar({
   superUser,
 }: TopBarProps) {
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
-  // is tight: always under 1000px, and under 1200px when both side panels
-  // (toolbar + history) are open and eating the horizontal room.
+  // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
+  // (toolbar + history) are open and eating the horizontal room. Below
+  // BP_COMPACT (`narrow`) we also drop Undo/Redo entirely — they live in the
+  // Review panel (and Ctrl+Z) — leaving Zoom as the left cluster.
   const [winWidth, setWinWidth] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth : 1280,
   );
@@ -79,8 +81,9 @@ export function TopBar({
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+  const narrow = winWidth < BP_COMPACT;
   const compact =
-    winWidth < 1000 || (winWidth < 1200 && showTools && showHistory);
+    narrow || (winWidth < BP_TIGHT && showTools && showHistory);
 
   const toggleButtons: ToggleGroupItem[] = [
     {
@@ -134,43 +137,49 @@ export function TopBar({
       >
         <div className="pointer-events-auto">
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border">
-            {/* Left cluster: Undo/Redo + Zoom, anchored left */}
+            {/* Left cluster: Undo/Redo + Zoom, anchored left. Below BP_COMPACT
+                Undo/Redo drop out (they live in the Review panel + Ctrl+Z),
+                leaving Zoom as the left cluster. */}
             <div className="flex items-center gap-3 min-w-0">
-            {/* Undo / Redo */}
-            <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={onUndo}
-                    disabled={!canUndo}
-                    className="btn-icon"
-                  >
-                    <Undo2 className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p className="font-medium">Undo</p>
-                  <p className="text-muted-foreground text-xs">Ctrl+Z</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={onRedo}
-                    disabled={!canRedo}
-                    className="btn-icon"
-                  >
-                    <Redo2 className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p className="font-medium">Redo</p>
-                  <p className="text-muted-foreground text-xs">Ctrl+Shift+Z</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
+            {!narrow && (
+              <>
+                {/* Undo / Redo */}
+                <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={onUndo}
+                        disabled={!canUndo}
+                        className="btn-icon"
+                      >
+                        <Undo2 className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="font-medium">Undo</p>
+                      <p className="text-muted-foreground text-xs">Ctrl+Z</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={onRedo}
+                        disabled={!canRedo}
+                        className="btn-icon"
+                      >
+                        <Redo2 className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="font-medium">Redo</p>
+                      <p className="text-muted-foreground text-xs">Ctrl+Shift+Z</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
 
-            <div className="w-px h-6 bg-border shrink-0" />
+                <div className="w-px h-6 bg-border shrink-0" />
+              </>
+            )}
 
             {/* Zoom */}
             <Tooltip>
@@ -183,7 +192,10 @@ export function TopBar({
                   >
                     <ZoomOut className="h-4 w-4" />
                   </button>
-                  {!compact && (
+                  {/* Show the % whenever there's room: wide, or narrow (where
+                      Undo/Redo dropped out and freed space). Hidden only in the
+                      cramped BP_TIGHT case (both side panels open, 1000–1200). */}
+                  {(narrow || !compact) && (
                     <span className="text-xs font-medium font-mono w-12 text-center tabular-nums text-text-primary">
                       {Math.round(zoom * 100)}%
                     </span>

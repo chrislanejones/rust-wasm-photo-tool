@@ -12,6 +12,10 @@ export default defineSchema({
     tier: v.union(v.literal("free"), v.literal("pro"), v.literal("team")),
     dailyUsage: v.number(),
     usageResetAt: v.number(),
+    // App preferences (Settings → General/Appearance), stored as a JSON blob
+    // plus its SHA-256 so the client can skip redundant writes / verify on load.
+    settings: v.optional(v.string()),
+    settingsHash: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

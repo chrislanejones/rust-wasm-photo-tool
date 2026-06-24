@@ -24,7 +24,7 @@ import { ShortcutModal } from "@/components/ShortcutModal";
 import { ADMIN_EMAIL } from "@/lib/superuser";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
-import { usePreferences, clampHistory } from "@/lib/preferences";
+import { usePreferences } from "@/lib/preferences";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleOverlay } from "@/components/IdleOverlay";
 import { Toaster, toast } from "@/components/ui/sonner";
@@ -88,6 +88,7 @@ import {
   RotateCcw,
   Archive,
   ImagePlus,
+  Image as ImageIcon,
   Pipette,
 } from "lucide-react";
 
@@ -185,7 +186,7 @@ export function AppShell() {
   // Item 2: Pan mode state
   const [isPanning, setIsPanning] = useState(false);
 
-  const [brushMode, setBrushMode] = useState<"paint" | "blur">("paint");
+  const [brushMode, setBrushMode] = useState<"paint" | "blur" | "pen">("paint");
   const [effectsMode, setEffectsMode] = useState<EffectsMode>("levels");
   const [colorPickerActive, setColorPickerActive] = useState(false);
   const [stampSubMode, setStampSubMode] = useState<"clone" | "red" | "emojis">("clone");
@@ -218,16 +219,13 @@ export function AppShell() {
     : null;
 
   // App-wide preferences (Settings → General), persisted to localStorage.
-  const [prefs, updatePrefs] = usePreferences();
+  const [prefs, applyPreferences] = usePreferences();
+  // The Settings modal owns the draft; here we just expose live prefs + the
+  // commit. maxHistory reaches the engine via the effect below; idle reaches
+  // the hook below — both keyed on the committed prefs.
   const general: GeneralControls = {
-    maxHistory: prefs.maxHistory,
-    onApplyMaxHistory: (n) => {
-      const v = clampHistory(n);
-      stamp.setMaxHistory(v); // apply to the live WASM engine
-      updatePrefs({ maxHistory: v });
-    },
-    idleTimeoutMin: prefs.idleTimeoutMin,
-    onSetIdleTimeout: (min) => updatePrefs({ idleTimeoutMin: min }),
+    current: prefs,
+    onApply: applyPreferences,
   };
 
   // Re-apply the saved undo depth to the engine on first load, image swap, and
@@ -672,6 +670,85 @@ export function AppShell() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
+
+  // Bézier pen (Paint → Pen sub-mode): the PenOverlay captures the canvas and
+  // commits finished paths as live kind-7 annotations.
+  const penActive = activeTool === "brush" && brushMode === "pen";
+  const handlePenCommit = useCallback(
+    (flatPoints: number[]) => {
+      const tool = stamp.toolRef.current;
+      if (!tool || flatPoints.length < 8) return; // need ≥ 2 anchors
+      // Background fill: solid interior when the pen's fill mode is on.
+      const fillKind = toolSettings.fillMode !== "none" ? 1 : 0;
+      tool.add_bezier_annotation(
+        new Float64Array(flatPoints),
+        toolSettings.strokeColor,
+        toolSettings.strokeWidth,
+        fillKind,
+        toolSettings.fillColor,
+      );
+      stamp.flushToCanvas();
+      stamp.syncState();
+    },
+    [
+      stamp,
+      toolSettings.strokeColor,
+      toolSettings.strokeWidth,
+      toolSettings.fillMode,
+      toolSettings.fillColor,
+    ],
+  );
+
+  // Pen re-edit (Stage 3b): hit-test → load a committed kind-7 path → reshape →
+  // commit. The baked copy is hidden via set_editing_shape while editing.
+  const handlePenHitTest = useCallback(
+    (ix: number, iy: number): { id: number; points: number[] } | null => {
+      const tool = stamp.toolRef.current;
+      if (!tool) return null;
+      const id = tool.shape_annotation_at(ix, iy);
+      if (id < 0) return null;
+      try {
+        const shapes = JSON.parse(tool.get_shape_annotations()) as Array<{
+          id: number;
+          kind: number;
+          points: number[][];
+        }>;
+        const path = shapes.find((s) => s.id === id && s.kind === 7);
+        return path ? { id, points: path.points.flat() } : null;
+      } catch {
+        return null;
+      }
+    },
+    [stamp],
+  );
+  const handlePenEditStart = useCallback(
+    (id: number) => {
+      const tool = stamp.toolRef.current;
+      if (!tool) return;
+      tool.set_editing_shape(id); // hide the baked path; the overlay shows it
+      stamp.flushToCanvas();
+      stamp.syncState();
+    },
+    [stamp],
+  );
+  const handlePenEditCommit = useCallback(
+    (id: number, flatPoints: number[]) => {
+      const tool = stamp.toolRef.current;
+      if (!tool) return;
+      tool.update_bezier_annotation(id, new Float64Array(flatPoints));
+      tool.set_editing_shape(-1);
+      stamp.flushToCanvas();
+      stamp.syncState();
+    },
+    [stamp],
+  );
+  const handlePenEditCancel = useCallback(() => {
+    const tool = stamp.toolRef.current;
+    if (!tool) return;
+    tool.set_editing_shape(-1);
+    stamp.flushToCanvas();
+    stamp.syncState();
+  }, [stamp]);
 
   useEffect(() => {
     if (activeTool !== "effects") setColorPickerActive(false);
@@ -1618,15 +1695,9 @@ export function AppShell() {
     [exportPhotosToZip, photos],
   );
 
-  const handleExportSelected = useCallback(() => {
-    void exportPhotosToZip(
-      photos.filter((p) => selectedIds.has(p.id)),
-      "selected-photos.zip",
-    );
-  }, [exportPhotosToZip, photos, selectedIds]);
-
-  // The single Download button always opens the chooser dialog (Selected / All
-  // / Cancel). The plural label ("JPEGs") only reflects the gallery count.
+  // The single Download button always opens the chooser dialog (Canvas Image /
+  // All / Clipboard Copy). The "All" button is hidden when only one image is
+  // loaded. The plural label ("JPEGs") reflects the gallery count.
   const handleExportClick = useCallback(() => setExportDialogOpen(true), []);
 
   useKeyboardShortcuts({
@@ -1761,10 +1832,11 @@ export function AppShell() {
       </Dialog>
 
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Download {DOWNLOAD_FORMATS.find((f) => f.value === exportFormat)?.label}
+              Copy or Download{" "}
+              {DOWNLOAD_FORMATS.find((f) => f.value === exportFormat)?.label}
               {photos.length > 1 ? "s" : ""}
             </DialogTitle>
           </DialogHeader>
@@ -1773,12 +1845,12 @@ export function AppShell() {
             <DialogDescription>
               {photos.length > 1 ? (
                 <>
-                  Export the selected photos or the whole gallery — more than one
-                  image downloads together as a{" "}
+                  Export the selected image, all images, or copy to clipboard —
+                  multiple images download together as a{" "}
                   <span className="font-mono">.zip</span>.
                 </>
               ) : (
-                "Pick a format, then download."
+                <>Export this image, or copy it to the clipboard.</>
               )}
             </DialogDescription>
 
@@ -1797,44 +1869,38 @@ export function AppShell() {
           </DialogBody>
 
           <DialogFooter className="gap-2 sm:gap-2">
-            {photos.length > 1 ? (
-              <>
-                <LargeButton
-                  className="flex-1"
-                  onClick={() => {
-                    setExportDialogOpen(false);
-                    if (selectedIds.size > 0) handleExportSelected();
-                    else void handleExport();
-                  }}
-                >
-                  {selectedIds.size > 0
-                    ? `Selected (${selectedIds.size})`
-                    : "This image"}
-                </LargeButton>
-                <LargeButton
-                  className="flex-1"
-                  onClick={() => {
-                    setExportDialogOpen(false);
-                    handleExportAll();
-                  }}
-                >
-                  All ({photos.length})
-                </LargeButton>
-              </>
-            ) : (
+            <LargeButton
+              className="flex-1"
+              onClick={() => {
+                setExportDialogOpen(false);
+                void handleExport();
+              }}
+            >
+              <ImageIcon className="h-4 w-4" />
+              Canvas Image
+            </LargeButton>
+            {photos.length > 1 && (
               <LargeButton
                 className="flex-1"
                 onClick={() => {
                   setExportDialogOpen(false);
-                  void handleExport();
+                  handleExportAll();
                 }}
               >
-                Download
+                <Archive className="h-4 w-4" />
+                All ({photos.length})
               </LargeButton>
             )}
-            <DialogClose asChild>
-              <LargeButton className="flex-1">Cancel</LargeButton>
-            </DialogClose>
+            <LargeButton
+              className="flex-1"
+              onClick={() => {
+                setExportDialogOpen(false);
+                void handleCopyToClipboard();
+              }}
+            >
+              <Clipboard className="h-4 w-4" />
+              Clipboard Copy
+            </LargeButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2050,6 +2116,14 @@ export function AppShell() {
                             fillColor2: toolSettings.fillColor2,
                             gradientAngle: toolSettings.gradientAngle,
                           }}
+                          penActive={penActive}
+                          penColor={toolSettings.strokeColor}
+                          penStrokeWidth={toolSettings.strokeWidth}
+                          onPenCommit={handlePenCommit}
+                          onPenHitTest={handlePenHitTest}
+                          onPenEditStart={handlePenEditStart}
+                          onPenEditCommit={handlePenEditCommit}
+                          onPenEditCancel={handlePenEditCancel}
                         />
                       </div>
                       {(!activePhotoId || photos.length === 0) && (
@@ -2127,6 +2201,14 @@ export function AppShell() {
                         fillColor2: toolSettings.fillColor2,
                         gradientAngle: toolSettings.gradientAngle,
                       }}
+                      penActive={penActive}
+                      penColor={toolSettings.strokeColor}
+                      penStrokeWidth={toolSettings.strokeWidth}
+                      onPenCommit={handlePenCommit}
+                      onPenHitTest={handlePenHitTest}
+                      onPenEditStart={handlePenEditStart}
+                      onPenEditCommit={handlePenEditCommit}
+                      onPenEditCancel={handlePenEditCancel}
                     />
                   </div>
                 </div>
@@ -2155,12 +2237,11 @@ export function AppShell() {
             {exportFormat.toUpperCase()}
             <ContextMenuShortcut>Alt+E</ContextMenuShortcut>
           </ContextMenuItem>
-          <ContextMenuItem
-            onClick={handleExportAll}
-            disabled={photos.length === 0}
-          >
-            <Archive className="h-4 w-4 mr-2" /> Export All (ZIP)
-          </ContextMenuItem>
+          {photos.length > 1 && (
+            <ContextMenuItem onClick={handleExportAll}>
+              <Archive className="h-4 w-4 mr-2" /> Export All (ZIP)
+            </ContextMenuItem>
+          )}
           <ContextMenuSeparator />
           <ContextMenuItem
             onClick={handleActivateEyedropper}
@@ -2226,6 +2307,8 @@ export function AppShell() {
             onClose={() => setShowHistory(false)}
             onUndo={stamp.undo}
             canUndo={canUndo}
+            onRedo={stamp.redo}
+            canRedo={canRedo}
             objects={reselectObjects}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}

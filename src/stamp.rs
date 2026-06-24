@@ -3,7 +3,7 @@
 /// Source point, offset tracking, stroke lifecycle (begin / continue / end),
 /// spacing-based interpolation, and the per-pixel dab blending kernel.
 
-use crate::history::Snapshot;
+use crate::history::{History, Snapshot};
 
 pub struct StampState {
     pub source_x: Option<i32>,
@@ -117,20 +117,15 @@ impl StampState {
         self.stroke_to(data, w, h, dest_x, dest_y);
     }
 
-    pub fn end_stroke(
-        &mut self,
-        undo_stack: &mut std::collections::VecDeque<Snapshot>,
-        max_history: usize,
-    ) {
+    pub fn end_stroke(&mut self, history: &mut History) {
         if !self.stroke_active {
             return;
         }
         self.stroke_active = false;
         if let Some(snap) = self.stroke_pre_snapshot.take() {
-            undo_stack.push_back(snap);
-            if undo_stack.len() > max_history {
-                undo_stack.pop_front();
-            }
+            // Route through History so the stroke snapshot is subject to the
+            // same step + byte limits as every other history-creating action.
+            history.push_stroke(snap);
         }
         self.stroke_src_data.clear();
         self.last_stamp_x = None;

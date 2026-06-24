@@ -78,9 +78,7 @@ export function Modal({
             <div className="flex-1 overflow-y-auto">{children}</div>
 
             {footer && (
-              <div className="border-t border-border px-4 py-1.5 text-center font-mono text-[10px] text-text-muted">
-                {footer}
-              </div>
+              <div className="border-t border-border px-4 py-2.5">{footer}</div>
             )}
           </motion.div>
         </motion.div>

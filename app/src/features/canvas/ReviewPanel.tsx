@@ -11,6 +11,7 @@ import {
   Layers2,
   MousePointerSquareDashed,
   Plus,
+  Redo2,
   Search,
   Undo2,
   X,
@@ -42,9 +43,11 @@ interface Props {
   onJump: (index: number) => void;
   onDelete: (index: number) => void;
   onClose: () => void;
-  /** Undo button in the History section header. */
+  /** Undo / redo buttons in the History section header. */
   onUndo: () => void;
   canUndo: boolean;
+  onRedo: () => void;
+  canRedo: boolean;
   /** Live placed objects (text + shapes) for the Reselect list. */
   objects: ReselectObject[];
   /** Click an object → load it into the canvas edit overlay to move/resize. */
@@ -88,6 +91,8 @@ export function ReviewPanel({
   onClose,
   onUndo,
   canUndo,
+  onRedo,
+  canRedo,
   objects,
   onSelectObject,
   onDeleteObject,
@@ -185,6 +190,9 @@ export function ReviewPanel({
               <div className="ml-auto flex items-center gap-1.5">
                 <TinyButton onClick={onUndo} disabled={!canUndo} title="Undo">
                   <Undo2 className="h-3.5 w-3.5" />
+                </TinyButton>
+                <TinyButton onClick={onRedo} disabled={!canRedo} title="Redo">
+                  <Redo2 className="h-3.5 w-3.5" />
                 </TinyButton>
                 <TinyNumberBox>{history.length}</TinyNumberBox>
               </div>

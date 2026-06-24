@@ -27,6 +27,20 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.22",
+    date: "2026-06-24",
+    headline: "A real Bézier pen — draw, fill, and re-edit vector paths",
+    entries: [
+      { tag: "feature", text: "New Pen tool (Paint → Pen) — a Photoshop-style Bézier pen. Click to drop corner points, click-drag to pull smooth curve handles, and grab any point or handle to reshape the path as you go. Enter closes it, Esc leaves it open." },
+      { tag: "feature", text: "Give a path a background — flip the Pen panel’s background to Solid and a closed path fills its interior, under the stroke, curves and all." },
+      { tag: "feature", text: "Pen paths stay editable — click a finished path to re-open it with all its anchors and handles, drag to reshape, and it re-commits as a single undo step. Paths survive switching photos, reloads, and cloud sync." },
+      { tag: "ui",      text: "Compress panel wording — the buttons now read “Compress Image” and “Compress All Images”, and “Compress All Images” hides when your gallery holds a single image." },
+      { tag: "ui",      text: "Download dialog — the clipboard button reads “Clipboard Copy”, and the “All” button only shows when you have more than one image." },
+      { tag: "fix",     text: "With the Pen active, the gallery and side panels stay clickable on tall images (the pen’s drawing layer no longer sits on top of the toolbar)." },
+      { tag: "rust",    text: "Under the hood: Bézier paths are a new Rust annotation kind — flattened with de Casteljau and filled with a scanline polygon fill — so they inherit history, re-edit, and persistence for free." },
+    ],
+  },
+  {
     version: "v0.9.21",
     date: "2026-06-24",
     headline: "Settings menu, pick-your-format downloads, and a hardening pass",
