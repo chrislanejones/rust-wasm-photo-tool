@@ -541,7 +541,7 @@ export function BatchSettings({
       ) : (
       <>
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
+        <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
           Logo
         </p>
         {!logo ? (
@@ -569,7 +569,7 @@ export function BatchSettings({
             }`}
           >
             <ImagePlus className="h-5 w-5 text-theme-muted-foreground" />
-            <p className="text-[11px] text-theme-muted-foreground leading-relaxed">
+            <p className="text-2xs text-theme-muted-foreground leading-relaxed">
               Drop a logo or click to pick.
               <br />
               PNG, JPG, WebP, SVG.
@@ -586,12 +586,12 @@ export function BatchSettings({
               />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] text-theme-foreground truncate">
+              <p className="text-2xs text-theme-foreground truncate">
                 {logo.width}×{logo.height}
               </p>
               <button
                 onClick={clearLogo}
-                className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-theme-muted-foreground hover:text-theme-foreground"
+                className="mt-0.5 inline-flex items-center gap-1 text-2xs text-theme-muted-foreground hover:text-theme-foreground"
                 type="button"
               >
                 <X className="h-3 w-3" /> Remove
@@ -609,7 +609,7 @@ export function BatchSettings({
       </div>
 
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
+        <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
           Position
         </p>
         <div className="grid grid-cols-3 gap-1.5">
@@ -668,14 +668,14 @@ export function BatchSettings({
         <div
           role="status"
           aria-live="polite"
-          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-[11px] text-success"
+          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-2xs text-success"
         >
           {`✓ Applied to ${appliedCount} image${appliedCount === 1 ? "" : "s"}`}
         </div>
       )}
 
       {errorMsg && (
-        <p className="text-[11px] text-destructive leading-relaxed">{errorMsg}</p>
+        <p className="text-2xs text-destructive leading-relaxed">{errorMsg}</p>
       )}
       </>
       )}
@@ -928,7 +928,7 @@ function TextBatchPanel({
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
+        <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
           Text
         </p>
         <textarea
@@ -936,9 +936,9 @@ function TextBatchPanel({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Enter overlay text…"
-          className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-[11px] text-theme-foreground placeholder:text-theme-muted-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
+          className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-2xs text-theme-foreground placeholder:text-theme-muted-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
         />
-        <p className="mt-1 text-[10px] text-theme-muted-foreground">
+        <p className="mt-1 text-2xs text-theme-muted-foreground">
           Rendered in Rust with the embedded Liberation Sans font.
         </p>
       </div>
@@ -959,7 +959,7 @@ function TextBatchPanel({
       />
 
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
+        <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
           Position
         </p>
         <div className="grid grid-cols-3 gap-1.5">
@@ -999,14 +999,14 @@ function TextBatchPanel({
         <div
           role="status"
           aria-live="polite"
-          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-[11px] text-success"
+          className="rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-2xs text-success"
         >
           {`✓ Applied to ${appliedCount} image${appliedCount === 1 ? "" : "s"}`}
         </div>
       )}
 
       {errorMsg && (
-        <p className="text-[11px] text-destructive leading-relaxed">{errorMsg}</p>
+        <p className="text-2xs text-destructive leading-relaxed">{errorMsg}</p>
       )}
     </div>
   );

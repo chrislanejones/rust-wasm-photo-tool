@@ -133,7 +133,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
               {settings.fillMode === "gradient" && (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <span className="text-[11px] text-theme-muted-foreground">From</span>
+                    <span className="text-2xs text-theme-muted-foreground">From</span>
                     <ColorSwatchGrid
                       colors={TEXT_COLORS}
                       value={settings.fillColor}
@@ -141,7 +141,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
                     />
                   </div>
                   <div className="space-y-2">
-                    <span className="text-[11px] text-theme-muted-foreground">To</span>
+                    <span className="text-2xs text-theme-muted-foreground">To</span>
                     <ColorSwatchGrid
                       colors={TEXT_COLORS}
                       value={settings.fillColor2}
@@ -172,7 +172,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
                     unit="px"
                     onChange={(v) => onChange({ ...settings, fillBlock: v })}
                   />
-                  <p className="text-[11px] leading-relaxed text-theme-muted-foreground">
+                  <p className="text-2xs leading-relaxed text-theme-muted-foreground">
                     Mosaics whatever is beneath the box — a re-selectable redaction
                     box you can move, resize, and undo from the Review panel.
                   </p>

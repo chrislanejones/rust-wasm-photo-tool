@@ -27,6 +27,34 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.25",
+    date: "2026-06-24",
+    headline: "Faster engine, an Edit & Move tool, and safer deletes",
+    entries: [
+      { tag: "perf",    text: "Histograms now compute in Rust straight from the image buffer instead of re-sampling the canvas every time the picture changes — smoother, lighter, and much easier on your battery." },
+      { tag: "perf",    text: "All the pixel blending — shapes, text, and layers — was rewritten to use fast integer math instead of slower floating-point. Same result, far less work per pixel." },
+      { tag: "feature", text: "“Crop & Transform” is now “Edit and Move”. Crop comes first, then Transform (flip / rotate), and a brand-new Align section with six buttons to snap a selected text or shape to any edge or the center of the canvas." },
+      { tag: "rust",    text: "Aligning is computed in Rust (a new `align_annotation` export): it measures the object’s bounding box and moves it precisely, as a single undo step." },
+      { tag: "ui",      text: "Cleaner panels — the Tools, Review, and Gallery headers dropped their titles and close buttons; the buttons themselves are the header now (close panels from the top bar). The Gallery keeps its photo count and all delete / select actions." },
+      { tag: "ui",      text: "The Review panel gained a live Histogram section and switched its section switcher to compact icons." },
+      { tag: "feature", text: "Deleting a photo now asks first — the trash icons, the right-click “Delete image”, “Delete Selected”, and “Delete All” all confirm before anything is removed." },
+      { tag: "feature", text: "New Reduce Motion toggle (Settings → Appearance → Motion) minimizes panel slides and transitions for a calmer, faster interface — saved with your account." },
+      { tag: "fix",     text: "The emoji picker now sits flush with the tools-panel edges." },
+    ],
+  },
+  {
+    version: "v0.9.24",
+    date: "2026-06-24",
+    headline: "Rulers & grids — line up your edits with on-canvas guides",
+    entries: [
+      { tag: "feature", text: "New Rulers & Grids settings (Settings → Rulers & Grids). Turn on top + left pixel rulers, and overlay a grid to line things up — choose a square pixel grid, golden-ratio guides, or split the image into any number of columns and rows. Pick the grid’s color and opacity too." },
+      { tag: "ui",      text: "The guides sit over your photo without touching a single pixel — they track zoom and pan, and the ruler labels update as you zoom. Your settings are saved with your account." },
+      { tag: "rust",    text: "The grid layout itself is computed in Rust (a new `grid_lines` WASM export) as the single source of truth, then drawn as a crisp SVG overlay — so every grid type lines up exactly with the image." },
+      { tag: "ui",      text: "Alt+S now opens Settings (it used to rotate). Rotate is still a click away in the tools." },
+      { tag: "ui",      text: "The Settings window has a consistent footer everywhere — your account button on the left, Restore / Apply on the right — across General, Appearance, Rulers & Grids, and Super User." },
+    ],
+  },
+  {
     version: "v0.9.23",
     date: "2026-06-24",
     headline: "Light mode — pick light, dark, or follow your system",

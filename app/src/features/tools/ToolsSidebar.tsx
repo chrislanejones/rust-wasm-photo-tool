@@ -1,10 +1,9 @@
 // ===== FILE: app/src/features/tools/ToolsSidebar.tsx =====
 // Item 7: "effects" replaces "blur" — includes brightness, contrast, blur
 import { motion } from "framer-motion";
-import { Download, Wrench, X } from "lucide-react";
+import { Download } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
 import { LargeButton } from "@/components/ui/large-button";
-import { TinyButton } from "@/components/ui/tiny-button";
 import {
   Tooltip,
   TooltipContent,
@@ -22,6 +21,7 @@ import type { ShapesMode } from "./settings/ShapeSettings";
 import { ToolGrid } from "./ToolGrid";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
+import type { AlignMode } from "./settings/TransformCropSettings";
 import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
 import { ArrowSettings } from "./settings/ArrowSettings";
@@ -41,6 +41,12 @@ interface ToolsSidebarProps {
   stampSettings: StampSettingsType;
   onStampSettingsChange: (s: StampSettingsType) => void;
   hasSource: boolean;
+  /** Align the selected object's bounding box (Edit & Move → Align). */
+  onAlign?: (mode: AlignMode) => void;
+  /** Whether an object is selected on the canvas (enables the Align row). */
+  hasSelection?: boolean;
+  /** Select the last-added object's bounding box as the align target. */
+  onSelectBoundingBox?: () => void;
   /** Download button: exports the single photo, or opens the chooser dialog
    *  when the gallery holds more than one. */
   onExport: () => void;
@@ -122,12 +128,14 @@ interface ToolsSidebarProps {
 }
 
 export function ToolsSidebar({
-  onClose,
   activeTool,
   onToolChange,
   stampSettings,
   onStampSettingsChange,
   hasSource,
+  onAlign,
+  hasSelection,
+  onSelectBoundingBox,
   onExport,
   canExport,
   photoCount,
@@ -199,17 +207,8 @@ export function ToolsSidebar({
         boxShadow: "var(--shadow-panel)",
       }}
     >
-      <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <h2 className="flex items-center gap-2 text-xs font-semibold">
-          <Wrench className="h-3.5 w-3.5" />
-          Toolbar
-        </h2>
-        <TinyButton onClick={onClose} title="Close toolbar">
-          <X className="h-4 w-4" />
-        </TinyButton>
-      </div>
-
-      <div className="px-4 pb-4 border-b border-border">
+      {/* No title/close — the 10 tool icons are the only thing in the header. */}
+      <div className="px-4 pt-3 pb-4 border-b border-border">
         <ToolGrid
           activeTool={activeTool}
           onToolChange={onToolChange}
@@ -262,6 +261,9 @@ export function ToolsSidebar({
             onSetCropSelection={onSetCropSelection}
             cropRatio={cropRatio ?? null}
             onCropRatioChange={onCropRatioChange ?? (() => {})}
+            onAlign={onAlign}
+            hasSelection={hasSelection}
+            onSelectBoundingBox={onSelectBoundingBox}
           />
         )}
 

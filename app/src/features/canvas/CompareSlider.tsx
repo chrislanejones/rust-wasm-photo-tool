@@ -150,10 +150,10 @@ export function CompareSlider({ beforeUrl, canvasEl, active }: CompareSliderProp
           boxShadow: "0 0 8px rgba(0,0,0,0.5), 0 0 2px rgba(0,0,0,0.3)",
         }}
       >
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/70 text-[10px] text-white font-mono whitespace-nowrap select-none">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/70 text-2xs text-white font-mono whitespace-nowrap select-none">
           Original
         </div>
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/70 text-[10px] text-white font-mono whitespace-nowrap select-none">
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/70 text-2xs text-white font-mono whitespace-nowrap select-none">
           Edited
         </div>
       </div>

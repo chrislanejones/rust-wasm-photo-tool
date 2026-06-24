@@ -9,7 +9,7 @@ export interface ToolButtonProps
 }
 
 const base =
-  "inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-ring focus-visible:ring-offset-1 focus-visible:ring-offset-theme-sidebar disabled:opacity-40 disabled:pointer-events-none [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0";
+  "inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-2xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-ring focus-visible:ring-offset-1 focus-visible:ring-offset-theme-sidebar disabled:opacity-40 disabled:pointer-events-none [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0";
 
 const inactive =
   "border-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:bg-theme-muted/30";

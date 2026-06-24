@@ -1,11 +1,16 @@
 // ===== FILE: app/src/features/canvas/CanvasArea.tsx =====
 // Item 2: Spacebar pan (Photoshop-style hand tool)
 // Item 3: Alt+Scroll zoom fix (zoom transform now uses panOffset)
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTools";
 import { CompareSlider } from "./CompareSlider";
 import { PenOverlay } from "./PenOverlay";
+import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
+import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
+import type { GridKind } from "@/lib/preferences";
+
+const EMPTY_SEGMENTS = new Float32Array(0);
 
 // Data-URI SVG cursor for the rotate handle — there's no standard CSS
 // rotation cursor, so we draw a small curved-arrow glyph. Falls back to
@@ -118,6 +123,18 @@ interface Props {
   onPenEditStart?: (id: number) => void;
   onPenEditCommit?: (id: number, flatPoints: number[]) => void;
   onPenEditCancel?: (id: number) => void;
+  /** Canvas "Rulers & Grids" config (Settings → Rulers & Grids). Renders a
+   *  non-destructive grid + pixel rulers overlay when enabled. */
+  guides?: {
+    rulers: boolean;
+    grid: boolean;
+    gridKind: GridKind;
+    gridSpacing: number;
+    gridCols: number;
+    gridRows: number;
+    gridColor: string;
+    gridOpacity: number;
+  };
 }
 
 /**
@@ -277,6 +294,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onPenEditStart,
       onPenEditCommit,
       onPenEditCancel,
+      guides,
     },
     ref,
   ) => {
@@ -284,6 +302,39 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
     const internalContainerRef = useRef<HTMLDivElement>(null);
     const containerRef = externalContainerRef ?? internalContainerRef;
+
+    // ── Rulers & Grids: grid geometry comes from Rust (gridLinesSync). Warm the
+    // WASM fn once the grid is enabled, then recompute segments when the image
+    // size or the grid config changes. The overlay projects these to screen. ──
+    const [gridReady, setGridReady] = useState(false);
+    useEffect(() => {
+      if (!guides?.grid) return;
+      ensureGridGeometry()
+        .then(() => setGridReady(true))
+        .catch(() => {});
+    }, [guides?.grid]);
+    const gridSegments = useMemo(() => {
+      const w = state.width;
+      const h = state.height;
+      if (!guides?.grid || w < 1 || h < 1) return EMPTY_SEGMENTS;
+      return gridLinesSync(w, h, {
+        kind: guides.gridKind,
+        spacing: guides.gridSpacing,
+        cols: guides.gridCols,
+        rows: guides.gridRows,
+      });
+      // gridReady forces a recompute once WASM finishes loading.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+      guides?.grid,
+      guides?.gridKind,
+      guides?.gridSpacing,
+      guides?.gridCols,
+      guides?.gridRows,
+      state.width,
+      state.height,
+      gridReady,
+    ]);
 
     // ── Redraw bridge ──────────────────────────────────────────────────────
     // The <canvas> DOM element gets re-created whenever the surrounding tool
@@ -611,6 +662,33 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           onMouseOut={onCanvasLeave}
         />
         <CompareSlider beforeUrl={beforeUrl} canvasEl={canvasRef.current} active={compareActive} />
+
+        {/* ── Rulers & Grids overlay (non-destructive; grid geometry from Rust) ── */}
+        {guides &&
+          (guides.grid || guides.rulers) &&
+          canvasRef.current &&
+          imgW > 0 &&
+          imgH > 0 &&
+          (() => {
+            const canvas = canvasRef.current!;
+            const r = canvas.getBoundingClientRect();
+            return (
+              <CanvasGuidesOverlay
+                rect={r}
+                sx={r.width / canvas.width}
+                sy={r.height / canvas.height}
+                imgW={imgW}
+                imgH={imgH}
+                guides={{
+                  rulers: guides.rulers,
+                  grid: guides.grid,
+                  gridColor: guides.gridColor,
+                  gridOpacity: guides.gridOpacity,
+                }}
+                gridSegments={guides.grid ? gridSegments : EMPTY_SEGMENTS}
+              />
+            );
+          })()}
 
         {/* Bézier pen overlay — interactive path creation (Paint → Pen). */}
         {penActive && canvasRef.current && (

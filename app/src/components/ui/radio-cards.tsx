@@ -59,12 +59,12 @@ export function RadioCards<T extends string>({
               onChange={() => onValueChange(opt.value)}
               className="sr-only"
             />
-            <span className="flex items-center justify-between text-sm font-medium text-text-primary">
+            <span className="flex items-center justify-between text-sm font-semibold text-text-primary">
               {opt.label}
               {selected && <Check className="h-3.5 w-3.5 text-theme-primary" />}
             </span>
             {opt.hint && (
-              <span className="text-[11px] leading-tight text-text-muted">
+              <span className="text-2xs leading-tight text-text-muted">
                 {opt.hint}
               </span>
             )}

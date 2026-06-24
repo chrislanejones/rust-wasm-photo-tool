@@ -54,7 +54,7 @@ function Gauge({
     <div className="flex items-center gap-3">
       <div className="flex w-20 shrink-0 items-center gap-1.5 text-text-secondary">
         {icon}
-        <span className="whitespace-nowrap text-[10px] uppercase tracking-wider">
+        <span className="whitespace-nowrap text-2xs uppercase tracking-wider">
           {label}
         </span>
       </div>
@@ -178,13 +178,13 @@ export function ResourceMonitor({ active }: { active: boolean }) {
         />
       </div>
 
-      <div className="text-[10px] text-text-muted">
+      <div className="text-2xs text-text-muted">
         {snap.cores} logical cores
         {snap.deviceMemoryGB != null ? ` · ~${snap.deviceMemoryGB} GB device RAM` : ""}
         {" · "}
         {(snap.windowMs / 1000).toFixed(0)}s activity window
       </div>
-      <div className="text-[10px] leading-relaxed text-text-muted">
+      <div className="text-2xs leading-relaxed text-text-muted">
         Tab = whole-page footprint (JS + WASM + canvas + workers), shown only when
         the page is cross-origin isolated. JS Heap &amp; WASM alone miss
         canvas/image memory; WASM only grows — reload to reclaim it.
@@ -194,11 +194,11 @@ export function ResourceMonitor({ active }: { active: boolean }) {
       <table className="w-full border-collapse">
         <thead className="text-text-muted">
           <tr>
-            <th className="px-3 py-1.5 text-left font-medium">Subsystem</th>
-            <th className="px-3 py-1.5 text-right font-medium">Events</th>
-            <th className="px-3 py-1.5 text-right font-medium">CPU Time</th>
-            <th className="px-3 py-1.5 text-right font-medium">Last</th>
-            <th className="px-3 py-1.5 text-left font-medium">%CPU</th>
+            <th className="px-3 py-1.5 text-left font-semibold">Subsystem</th>
+            <th className="px-3 py-1.5 text-right font-semibold">Events</th>
+            <th className="px-3 py-1.5 text-right font-semibold">CPU Time</th>
+            <th className="px-3 py-1.5 text-right font-semibold">Last</th>
+            <th className="px-3 py-1.5 text-left font-semibold">%CPU</th>
           </tr>
         </thead>
         <tbody>
@@ -208,7 +208,7 @@ export function ResourceMonitor({ active }: { active: boolean }) {
         </tbody>
       </table>
 
-      <div className="text-center text-[10px] text-text-muted">
+      <div className="text-center text-2xs text-text-muted">
         %CPU = share of timed work across subsystems in the last{" "}
         {(snap.windowMs / 1000).toFixed(0)}s
       </div>

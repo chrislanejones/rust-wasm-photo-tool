@@ -317,10 +317,11 @@ app/src/
 
 - **Clone Stamp** — Alt+Click source, paint to clone with adjustable size, hardness, opacity, spacing
 - **Red Stamps** — REJECTED / APPROVED / DRAFT / CONFIDENTIAL / UNDER REVIEW presets; JS renders label to OffscreenCanvas, Rust scales to brush size via bilinear resize and composites with "Red Stamp" history entry
-- **Transforms** — Flip horizontal/vertical, rotate 90° CW/CCW
-- **Crop** — Interactive SVG overlay with rule-of-thirds guides and 8 draggable resize handles; crop committed through Rust
+- **Edit & Move (Crop · Transform · Align)** — the crop/transform tool, renamed. **Crop**: interactive SVG overlay with rule-of-thirds guides and 8 draggable resize handles, committed through Rust. **Transform**: flip horizontal/vertical, rotate 90° CW/CCW. **Align**: six buttons snap a selected text/shape's bounding box to any canvas edge or center, computed in Rust (`align_annotation`) as a single undo step
 - **Resize** — Bilinear-scaled resize fully in WASM; no canvas round-trip
 - **Levels** — Brightness (−100% to +100%), contrast (0% to 300%); each adjustment is a separate undo snapshot
+- **Histogram** — live RGB / Luma scope in the Review panel, computed in Rust (`calculate_histogram`) straight from the composite buffer — no per-frame offscreen-canvas sampling
+- **Fast integer compositing** — all alpha blending (`blend_pixel`, `blend_over`) uses integer source-over math instead of per-pixel float `÷255.0`, verified identical to the old result within ±1
 - **Color Picker** — Eyedropper activates on Effects → Color Picker tab; hovering the canvas shows a floating 11×11 magnifier (sourced from Rust `get_pixel_region`); clicking picks the pixel color and sets it as both brush and text color
 - **Blur Brush** — Box-blur with stroke-based region masking; configurable radius and intensity; now lives in the Brush tool's "Blur Brush" tab
 - **Arrows** — Anti-aliased arrows with arrowhead (single or double), drawn directly on the pixel buffer; accessible from the Arrows sub-tab inside the Shapes tool
@@ -354,6 +355,7 @@ app/src/
 - **Hidden Dev Tools** — three clicks on a blank status-bar button unlock the Diagnostics Log (Alt+Delete) and the user/tier selector (Alt+L) in production, and append a Dev Tools section to the Alt+/ modal
 - **AI Panel** — Placeholder cards for: Remove Background (rembg), 4× Upscale (Real-ESRGAN), Object Removal (SD Inpaint), Auto Alt Text (BLIP), Smart Crop, Auto-Enhance — wired to Convex `ai_jobs` + Replicate when ready
 - **Light / Dark / System theme** — full light & dark palettes (warm earth-tone dark, warm-paper light) driven by CSS-variable tokens in `styles.css` (`:root` light, `.dark` dark, `@custom-variant dark`); "System" follows the OS via `matchMedia` and updates live. Pre-paint guard in `index.html` (no FOUC). Set in **Settings → Appearance**, persisted to localStorage + Convex. JetBrains Mono + DM Sans throughout
+- **Rulers & Grids** — toggleable top/left pixel rulers (tick labels track zoom) + a configurable non-destructive grid overlay: square px spacing, golden-ratio lines, or N×M divisions, with color + opacity. Set in **Settings → Rulers & Grids**, persisted. The grid-layout geometry is computed in **Rust** (`grid_lines` WASM export) as the single source, projected to an SVG overlay on the canvas
 
 ## Tech Stack
 
@@ -735,6 +737,16 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 3   | **Third-party + CSS darks themed** — Clerk (`ConvexClerkProvider`: `baseTheme`/variables by theme + `dark:` element variants), `sonner`, and the emoji-mart picker now follow `useResolvedTheme`. `.checkerboard-canvas`, the canvas vignette, the emoji `--rgb-*` vars, and the GitHub-icon `invert` all flip via `.dark`. Light accent uses a deeper warm tan (`#c98f3f`) so text/rings/slider thumbs read on light; `ToggleButtonGroup` active state → `bg-bg-elevated` (visible in both themes) | Complete |
 | 4   | **Design-token centralization** — `styles.css :root` is now the single source for a **z-index ladder** (`--z-canvas … --z-cursor`, replacing ad-hoc `z-*`), `--shadow-panel` (de-dups the Tools/Review panel shadow), **motion** (`--dur-*` + `--ease-standard`), **radius** (CSS literals → `--radius*`), and **layout heights** (`--statusbar-h` / `--panel-bottom`) — which also fixes a latent status-bar height mismatch (28 / 36 / 48 now derive from one value) | Complete |
 | 5   | **Docs & marketing** — README feature line + this summary; marketing **Features** gains a "Light, dark, or system" card; Trail Log **v0.9.23** | Complete |
+
+## v4.5 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Rulers & Grids (new `Settings → Rulers & Grids` tab)** — `RulersGridsPane.tsx` toggles top/left pixel **rulers** and a non-destructive **grid** overlay, with three layouts: **square** (px spacing), **golden ratio**, and **N×M divisions** (columns × rows), plus grid color + opacity. New `Preferences` fields (`rulers`, `grid`, `gridKind`, `gridSpacing`, `gridCols`, `gridRows`, `gridColor`, `gridOpacity`) persisted via the existing `usePreferences` (localStorage + Convex) | Complete |
+| 2   | **Rust grid geometry (`grid_lines` WASM export)** — `src/lib.rs` gains a free `#[wasm_bindgen]` fn that returns the grid line segments `[x1,y1,x2,y2,…]` in image space for all three kinds — the single source of grid-layout math. Wrapped by `lib/gridGeometry.ts` (memoized WASM init + a sync handle, mirroring `colorParser.ts`); the `.d.ts` shadow (`hooks/stamp_tool.d.ts`) was hand-synced | Complete |
+| 3   | **Canvas overlay (`CanvasGuidesOverlay.tsx`)** — a fixed SVG that projects the Rust grid segments image-space → screen-space using the canvas `getBoundingClientRect()` + scale (same pattern as the crop / rule-of-thirds overlay), so it tracks zoom + pan. Rulers draw tick marks + zoom-aware px labels along the top and left edges. Wired through `CanvasArea` → the full-size editing canvas in `AppShell` (Batch grid-host intentionally excluded) | Complete |
+| 4   | **Alt+S → Open Settings** — the Alt+S shortcut (was Rotate 90° CW) now opens the Settings modal via an `image-horse:open-settings` window event the `SubscriptionButton` listens for; `ShortcutModal` updated. Rotate remains available in the UI. The Settings footer (UserMenu/account on the left, **Restore Settings** + **Apply**→toast on the right) is now consistent across the **General**, **Appearance**, **Rulers & Grids**, and **Super User** tabs | Complete |
+| 5   | **Docs & marketing** — README feature line + this summary; marketing **Features** card + Trail Log **v0.9.24** | Complete |
 
 ## License
 

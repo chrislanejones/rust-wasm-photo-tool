@@ -363,19 +363,28 @@ pub fn fill_triangle_public(
 }
 
 fn blend_pixel(data: &mut [u8], idx: usize, color: [u8; 4]) {
-    let sa = color[3] as f64 / 255.0;
-    if sa < 0.001 { return; }
-    let da = data[idx + 3] as f64 / 255.0;
-    let out_a = sa + da * (1.0 - sa);
-    if out_a > 0.001 {
+    // Straight-alpha source-over in pure integer math — no f32 / ÷255.0 round
+    // trip (this runs per pixel across every draw + fill loop). Kept in an ×255
+    // domain so there's no intermediate rounding (matches the old f32 result
+    // within ±1). With sa,da in 0..=255:
+    //   dst_w     = da·(255−sa)          (dest's surviving weight, ×255)
+    //   out_a×255 = sa·255 + dst_w
+    //   out_c     = (src·sa·255 + dst·dst_w) / (out_a×255)
+    let sa = color[3] as u32;
+    if sa == 0 {
+        return;
+    }
+    let da = data[idx + 3] as u32;
+    let dst_w = da * (255 - sa);
+    let out_a_hi = sa * 255 + dst_w;
+    if out_a_hi > 0 {
+        let half = out_a_hi / 2;
         for c in 0..3 {
-            let sv = color[c] as f64 / 255.0;
-            let dv = data[idx + c] as f64 / 255.0;
-            let ov = (sv * sa + dv * da * (1.0 - sa)) / out_a;
-            data[idx + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
+            let num = color[c] as u32 * sa * 255 + data[idx + c] as u32 * dst_w;
+            data[idx + c] = ((num + half) / out_a_hi) as u8;
         }
     }
-    data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+    data[idx + 3] = ((out_a_hi + 127) / 255) as u8;
 }
 
 fn fill_triangle(

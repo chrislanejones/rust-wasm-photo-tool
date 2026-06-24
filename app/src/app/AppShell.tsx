@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useStoreUser } from "@/hooks/useStoreUser";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
 import { useDrawingTools } from "@/hooks/useDrawingTools";
@@ -25,17 +25,25 @@ import { ADMIN_EMAIL } from "@/lib/superuser";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
 import { usePreferences } from "@/lib/preferences";
-import { useTheme } from "@/lib/useTheme";
+import { useTheme, useReduceMotion } from "@/lib/useTheme";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleOverlay } from "@/components/IdleOverlay";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
+import type { AlignMode } from "@/features/tools/settings/TransformCropSettings";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
 import { ReviewPanel } from "@/features/canvas/ReviewPanel";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
+import { ResumeDialog } from "@/components/ResumeDialog";
+import {
+  loadGalleryManifest,
+  saveGalleryManifest,
+  clearGalleryManifest,
+  type GalleryManifest,
+} from "@/lib/galleryManifest";
 import { getPhotoLimit, DEFAULT_PHOTO_LIMIT } from "@/lib/photoLimits";
 import { hasReplicateAI } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
@@ -171,6 +179,7 @@ export function AppShell() {
 
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
+  const [resumeManifest, setResumeManifest] = useState<GalleryManifest | null>(null);
   const [imageSavings, setImageSavings] = useState<Record<string, { savingsPercent: number }>>({});
   const [modifiedPhotos, setModifiedPhotos] = useState<Set<string>>(new Set());
   // originalUrl is populated by the compare effect; not set on photo select
@@ -196,7 +205,11 @@ export function AppShell() {
    *  Drags in useDrawingTools snap to this ratio via Rust when set. */
   const [cropRatio, setCropRatio] = useState<[number, number] | null>(null);
   const [userMode, setUserMode] = useState<UserMode>("demo");
-  const handleAuthMode = useCallback((m: UserMode) => setUserMode(m), []);
+  const [authResolved, setAuthResolved] = useState(false);
+  const handleAuthMode = useCallback((m: UserMode) => {
+    setUserMode(m);
+    setAuthResolved(true);
+  }, []);
 
   // Tier override (set from the Super User settings tab). When set, it wins over
   // the Clerk-derived mode so the No Login / Logged In / Paid versions can be
@@ -224,6 +237,22 @@ export function AppShell() {
   // Apply the saved theme to <html> (light/dark/system); index.html sets the
   // initial class pre-paint, this keeps it in sync as the choice changes.
   useTheme(prefs.theme);
+  // Reduce motion (Settings → Appearance): toggles the `.reduce-motion` class for
+  // CSS transitions; the <MotionConfig> wrapper below handles framer-motion.
+  useReduceMotion(prefs.reduceMotion);
+  // Canvas "Rulers & Grids" overlay config (Settings → Rulers & Grids). Inline
+  // object is fine — the overlay's memos key on the primitive values, not its
+  // identity, so a fresh wrapper per render doesn't recompute geometry.
+  const guidesConfig = {
+    rulers: prefs.rulers,
+    grid: prefs.grid,
+    gridKind: prefs.gridKind,
+    gridSpacing: prefs.gridSpacing,
+    gridCols: prefs.gridCols,
+    gridRows: prefs.gridRows,
+    gridColor: prefs.gridColor,
+    gridOpacity: prefs.gridOpacity,
+  };
   // The Settings modal owns the draft; here we just expose live prefs + the
   // commit. maxHistory reaches the engine via the effect below; idle reaches
   // the hook below — both keyed on the committed prefs.
@@ -671,6 +700,10 @@ export function AppShell() {
     installConsoleCapture();
   }, []);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  // Per-image + selected delete confirmations (mirror the Delete All dialog).
+  // `deletePhotoId` holds the id awaiting confirmation (null = closed).
+  const [deletePhotoId, setDeletePhotoId] = useState<string | null>(null);
+  const [deleteSelectedOpen, setDeleteSelectedOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const [activeTool, setActiveTool] = useState<ToolType>("compress");
@@ -679,11 +712,13 @@ export function AppShell() {
   // commits finished paths as live kind-7 annotations.
   const penActive = activeTool === "brush" && brushMode === "pen";
   const handlePenCommit = useCallback(
-    (flatPoints: number[]) => {
+    (flatPoints: number[], close: boolean) => {
       const tool = stamp.toolRef.current;
       if (!tool || flatPoints.length < 8) return; // need ≥ 2 anchors
-      // Background fill: solid interior when the pen's fill mode is on.
-      const fillKind = toolSettings.fillMode !== "none" ? 1 : 0;
+      // Background fill only makes sense for a CLOSED path — an open path fills a
+      // degenerate sliver between its endpoints. Fill only when the path was
+      // closed AND a background colour is set.
+      const fillKind = close && toolSettings.fillMode !== "none" ? 1 : 0;
       tool.add_bezier_annotation(
         new Float64Array(flatPoints),
         toolSettings.strokeColor,
@@ -816,6 +851,53 @@ export function AppShell() {
   }, [photos.length, stampReset]);
   useEffect(() => () => { revealTimers.current.forEach(clearTimeout); }, []);
 
+  // ── Returning-session resume ───────────────────────────────────────────────
+  // Originals + per-photo edits already persist in IndexedDB, but the gallery
+  // LIST is React-only — so a tab close (Ctrl+W) or reload would drop it. We
+  // save a manifest whenever the gallery changes, and on a fresh load with an
+  // empty gallery either prompt to Resume (anonymous) or silently reopen
+  // (signed in, per Settings → General → "When you return").
+  const resumeChecked = useRef(false);
+  const galleryWasNonEmpty = useRef(false);
+
+  useEffect(() => {
+    if (resumeChecked.current || photos.length > 0 || !authResolved) return;
+    resumeChecked.current = true;
+    void loadGalleryManifest().then((m) => {
+      if (!m || m.photos.length === 0) return;
+      if (userMode === "demo") {
+        setResumeManifest(m); // anonymous → Resume prompt
+      } else if (prefs.reopenLastSession) {
+        setPhotos(m.photos); // signed in → auto-reopen (auto-select loads photo 0)
+      }
+      // signed in + "Start fresh" → leave the upload screen as-is
+    });
+  }, [authResolved, userMode, photos.length, prefs.reopenLastSession]);
+
+  // Persist the manifest on every gallery change; drop it once the gallery is
+  // emptied during the session (Delete All etc.) so we never offer to resume
+  // photos the user just removed.
+  useEffect(() => {
+    if (photos.length > 0) {
+      galleryWasNonEmpty.current = true;
+      void saveGalleryManifest(photos, activePhotoId);
+    } else if (galleryWasNonEmpty.current) {
+      void clearGalleryManifest();
+    }
+  }, [photos, activePhotoId]);
+
+  const handleResumeSession = useCallback(() => {
+    const m = resumeManifest;
+    setResumeManifest(null);
+    if (m) setPhotos(m.photos); // 0 → N reveals the chrome + auto-selects photo 0
+  }, [resumeManifest]);
+
+  const handleStartFresh = useCallback(() => {
+    setResumeManifest(null);
+    void clearGalleryManifest();
+    setShowUpload(true);
+  }, []);
+
   const handleExport = useCallback(async () => {
     const entry = photos.find((p) => p.id === activePhotoId) ?? null;
     const activeName = entry?.name ?? "image";
@@ -912,18 +994,17 @@ export function AppShell() {
       if (!t || e.button !== 0) return;
       isBlurringRef.current = true;
       const { x, y } = getCoords(e);
-      const r = toolSettings.blurSize / 2;
-      if (toolSettings.blurMode === "pixelate") {
-        t.begin_pixelate_stroke();
-        t.pixelate_region(x, y, r, toolSettings.pixelSize);
-      } else if (toolSettings.blurMode === "solid") {
-        const n = parseInt(toolSettings.redactColor.slice(1), 16) || 0;
-        t.begin_redact_stroke();
-        t.redact_region(x, y, r, (n >> 16) & 255, (n >> 8) & 255, n & 255);
-      } else {
-        t.begin_blur_stroke();
-        t.blur_region(x, y, r, toolSettings.blurIntensity);
-      }
+      // Mode branch, hex parse (redaction), undo-snap, and per-stroke
+      // interpolation all live in Rust now (effect_down / effect_move / _up).
+      t.effect_down(
+        x,
+        y,
+        toolSettings.blurSize,
+        toolSettings.blurMode,
+        toolSettings.blurIntensity,
+        toolSettings.pixelSize,
+        toolSettings.redactColor,
+      );
       stamp.flushToCanvas();
     },
     [
@@ -943,31 +1024,15 @@ export function AppShell() {
       const t = stamp.toolRef.current;
       if (!t) return;
       const { x, y } = getCoords(e);
-      const r = toolSettings.blurSize / 2;
-      if (toolSettings.blurMode === "pixelate") {
-        t.pixelate_region(x, y, r, toolSettings.pixelSize);
-      } else if (toolSettings.blurMode === "solid") {
-        const n = parseInt(toolSettings.redactColor.slice(1), 16) || 0;
-        t.redact_region(x, y, r, (n >> 16) & 255, (n >> 8) & 255, n & 255);
-      } else {
-        t.blur_region(x, y, r, toolSettings.blurIntensity);
-      }
-      stamp.flushToCanvas();
+      if (t.effect_move(x, y)) stamp.flushToCanvas();
     },
-    [
-      stamp,
-      getCoords,
-      toolSettings.blurMode,
-      toolSettings.blurSize,
-      toolSettings.blurIntensity,
-      toolSettings.pixelSize,
-      toolSettings.redactColor,
-    ],
+    [stamp, getCoords],
   );
 
   const blurUp = useCallback(() => {
     if (!isBlurringRef.current) return;
     isBlurringRef.current = false;
+    stamp.toolRef.current?.effect_up();
     stamp.syncState();
   }, [stamp]);
 
@@ -1105,8 +1170,14 @@ export function AppShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp.state.history, activePhotoId]);
 
+  // The object the Align row acts on (set by reselect / "Select bounding box").
+  const [selectedObject, setSelectedObject] = useState<ReselectObject | null>(
+    null,
+  );
+
   const handleSelectObject = useCallback(
     (o: ReselectObject) => {
+      setSelectedObject(o);
       if (o.type === "text") {
         setActiveTool("text");
         textTool.selectAnnotation(o.id);
@@ -1116,6 +1187,49 @@ export function AppShell() {
     },
     [textTool, drawingTools],
   );
+
+  // Align the selected object's bounding box to a canvas edge / center. The bbox
+  // math + translate live in Rust (`align_annotation`); JS just flushes and
+  // re-syncs the live overlays afterward.
+  const handleAlign = useCallback(
+    (mode: AlignMode) => {
+      const tool = stamp.toolRef.current;
+      if (!tool || !selectedObject) return;
+      const moved = tool.align_annotation(
+        selectedObject.id,
+        selectedObject.type === "text",
+        mode,
+        stamp.state.width,
+        stamp.state.height,
+      );
+      if (!moved) return;
+      tool.set_editing_shape(-1);
+      stamp.flushToCanvas();
+      stamp.syncState();
+      drawingTools.refreshShapes();
+      textTool.refreshAnnotations();
+    },
+    [stamp, selectedObject, drawingTools, textTool],
+  );
+
+  // "Select bounding box" → grab the most-recently-added object as the align
+  // target (so Align is usable without hunting the Reselect list first).
+  const handleSelectBoundingBox = useCallback(() => {
+    const last = reselectObjects[reselectObjects.length - 1];
+    if (last) handleSelectObject(last);
+  }, [reselectObjects, handleSelectObject]);
+
+  // Histogram bins straight from Rust (`calculate_histogram` over the composite
+  // buffer) — replaces HistogramView's old per-resample canvas sampling loop.
+  const getHistogram = useCallback((): Uint32Array | null => {
+    const tool = stamp.toolRef.current;
+    return tool ? tool.calculate_histogram() : null;
+  }, [stamp]);
+
+  // Drop the Align selection when switching photos (annotation ids are per-photo).
+  useEffect(() => {
+    setSelectedObject(null);
+  }, [activePhotoId]);
 
   const handleDeleteObject = useCallback(
     (o: ReselectObject) => {
@@ -1142,6 +1256,15 @@ export function AppShell() {
   });
 
   const effectiveStamp = (() => {
+    // Idle handlers for tools that don't paint on the canvas. The clone stamp's
+    // own onMouseDown/Move/Up ride along on `...stamp`; without overriding them
+    // they "leak" — e.g. on the Effects tool the clone stamp would keep drawing.
+    const idle = {
+      ...stamp,
+      onMouseDown: (() => {}) as typeof stamp.onMouseDown,
+      onMouseMove: (() => {}) as typeof stamp.onMouseMove,
+      onMouseUp: (() => {}) as typeof stamp.onMouseUp,
+    };
     if (activeTool === "effects") {
       if (colorPickerActive) {
         return {
@@ -1151,7 +1274,7 @@ export function AppShell() {
           onMouseUp: stamp.onMouseUp,
         };
       }
-      return stamp;
+      return idle;
     }
     if (["arrow", "shapes", "crop"].includes(activeTool))
       return {
@@ -1197,7 +1320,9 @@ export function AppShell() {
         onMouseDown: combinedDown,
       };
     }
-    return stamp;
+    // No painting tool selected → idle handlers, so the clone stamp only acts
+    // when the Stamp tool itself is active (it used to leak onto other tools).
+    return idle;
   })();
 
   const handleZoomIn = useCallback(() => {
@@ -1558,7 +1683,7 @@ export function AppShell() {
       compressTotalRef.current = total;
       const node = (
         <div className="flex w-full min-w-[220px] flex-col gap-2">
-          <div className="flex items-baseline justify-between gap-3 pr-6 text-sm font-medium">
+          <div className="flex items-baseline justify-between gap-3 pr-6 text-sm font-semibold">
             <span>Compressing…</span>
             <span className="font-mono text-xs tabular-nums text-theme-muted-foreground">
               {completed}/{total} · {pct}%
@@ -1704,14 +1829,44 @@ export function AppShell() {
   // loaded. The plural label ("JPEGs") reflects the gallery count.
   const handleExportClick = useCallback(() => setExportDialogOpen(true), []);
 
+  // Ctrl+[ / Ctrl+] — resize the active brush. Routes to whichever brush the
+  // current tool uses (paint / blur / clone+redaction stamp / emoji), each
+  // clamped to its own slider range and pushed to the WASM tool where needed.
+  const adjustBrushSize = useCallback(
+    (direction: -1 | 1) => {
+      const step = 5 * direction;
+      const clamp = (v: number, lo: number, hi: number) =>
+        Math.max(lo, Math.min(hi, v));
+      if (activeTool === "brush") {
+        if (brushMode === "paint") {
+          setToolSettings((p) => ({ ...p, brushSize: clamp(p.brushSize + step, 1, 50) }));
+        } else if (brushMode === "blur") {
+          setToolSettings((p) => ({ ...p, blurSize: clamp(p.blurSize + step, 4, 128) }));
+        }
+        // pen mode draws vector paths — no brush size
+      } else if (activeTool === "stamp") {
+        if (stampSubMode === "emojis") {
+          setToolSettings((p) => ({ ...p, emojiSize: clamp(p.emojiSize + step, 16, 128) }));
+        } else {
+          // clone + redaction share the stamp brush size (React state + WASM tool)
+          setStampSettings((p) => {
+            const next = clamp(p.brushSize + step, 4, 64);
+            stamp.setBrushSize(next);
+            return { ...p, brushSize: next };
+          });
+        }
+      }
+    },
+    [activeTool, brushMode, stampSubMode, setToolSettings, setStampSettings, stamp],
+  );
+
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
     onExport: handleExport,
     onExportAll: handleExportAll,
     onDeleteAll: handleDeleteAll,
-    onBrushSizeChange: setStampSettings,
-    setBrushSizeOnTool: stamp.setBrushSize,
+    onAdjustBrushSize: adjustBrushSize,
     setShowUpload,
     setShowTools,
     setShowGallery,
@@ -1743,6 +1898,7 @@ export function AppShell() {
   const canRedo = stamp.state.redoCount > 0;
 
   return (
+    <MotionConfig reducedMotion={prefs.reduceMotion ? "always" : "never"}>
     <div className="app-shell">
       <AnimatePresence>
         {isImageLoading && (
@@ -1763,12 +1919,19 @@ export function AppShell() {
       </AnimatePresence>
 
       <UploadDialog
-        open={showUpload}
+        open={showUpload && !resumeManifest}
         onClose={() => setShowUpload(false)}
         onFiles={handleAddPhotos}
         isLoading={isImageLoading}
         loadProgress={loadProgress}
         canClose={photos.length > 0}
+      />
+
+      <ResumeDialog
+        open={!!resumeManifest}
+        photos={resumeManifest?.photos ?? []}
+        onResume={handleResumeSession}
+        onStartFresh={handleStartFresh}
       />
 
       <ShortcutModal
@@ -1835,13 +1998,76 @@ export function AppShell() {
         </DialogContent>
       </Dialog>
 
+      {/* Single-image delete confirm — per-image trashcan + right-click "Delete image". */}
+      <Dialog
+        open={deletePhotoId !== null}
+        onOpenChange={(o) => !o && setDeletePhotoId(null)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete this image?</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <DialogDescription>
+              This removes the image and its edit history. This cannot be undone.
+            </DialogDescription>
+          </DialogBody>
+          <DialogFooter>
+            <DialogClose asChild>
+              <LargeButton className="flex-1">Cancel</LargeButton>
+            </DialogClose>
+            <LargeButton
+              onClick={() => {
+                const id = deletePhotoId;
+                setDeletePhotoId(null);
+                if (id) handleRemovePhoto(id);
+              }}
+              className="flex-1 border-destructive/40 bg-destructive/15 text-destructive hover:border-destructive hover:bg-destructive/25 hover:brightness-100"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete image
+            </LargeButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete-selected confirm. */}
+      <Dialog open={deleteSelectedOpen} onOpenChange={setDeleteSelectedOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete selected images?</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <DialogDescription>
+              This removes the {selectedIds.size} selected image
+              {selectedIds.size !== 1 ? "s" : ""} and their edit history. This
+              cannot be undone.
+            </DialogDescription>
+          </DialogBody>
+          <DialogFooter>
+            <DialogClose asChild>
+              <LargeButton className="flex-1">Cancel</LargeButton>
+            </DialogClose>
+            <LargeButton
+              onClick={() => {
+                setDeleteSelectedOpen(false);
+                handleDeleteSelected();
+              }}
+              className="flex-1 border-destructive/40 bg-destructive/15 text-destructive hover:border-destructive hover:bg-destructive/25 hover:brightness-100"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete selected
+            </LargeButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Copy or Download{" "}
-              {DOWNLOAD_FORMATS.find((f) => f.value === exportFormat)?.label}
-              {photos.length > 1 ? "s" : ""}
+              Download {photos.length > 1 ? "Images" : "Image"} or Copy to
+              Clipboard
             </DialogTitle>
           </DialogHeader>
 
@@ -1861,7 +2087,7 @@ export function AppShell() {
             {/* Format picker — a second shot at the format for anyone who missed
                 the Compress dropdown. */}
             <div className="space-y-2">
-              <span className="text-xs font-medium text-text-muted">Format</span>
+              <span className="text-xs font-semibold text-text-muted">Format</span>
               <RadioCards
                 name="download-format"
                 value={exportFormat}
@@ -1977,6 +2203,9 @@ export function AppShell() {
             onSetCropSelection={drawingTools.setCropSelection}
             cropRatio={cropRatio}
             onCropRatioChange={setCropRatio}
+            onAlign={handleAlign}
+            hasSelection={selectedObject !== null}
+            onSelectBoundingBox={handleSelectBoundingBox}
             toolSettings={toolSettings}
             onToolSettingsChange={handleToolSettingsChange}
             shapesMode={shapesMode}
@@ -2133,12 +2362,12 @@ export function AppShell() {
                       {(!activePhotoId || photos.length === 0) && (
                         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/95 text-center text-theme-muted-foreground">
                           <ImagePlus className="h-10 w-10 opacity-60" />
-                          <p className="text-sm font-medium">No photos loaded</p>
+                          <p className="text-sm font-semibold">No photos loaded</p>
                           <p className="text-xs">Upload images to start batch editing</p>
                         </div>
                       )}
                       {activePhotoId && photos.length > 0 && (
-                        <div className="absolute top-2 left-2 z-20 rounded-full bg-orange-500 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white shadow-md">
+                        <div className="absolute top-2 left-2 z-20 rounded-full bg-orange-500 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wider text-white shadow-md">
                           Selected
                         </div>
                       )}
@@ -2170,6 +2399,7 @@ export function AppShell() {
                       onTextKeyDown={textTool.onTextKeyDown}
                       onTextChange={textTool.onTextChange}
                       onTextBlur={textTool.onTextBlur}
+                      guides={guidesConfig}
                       textSettings={{
                         fontSize: toolSettings.fontSize,
                         fontFamily: toolSettings.fontFamily,
@@ -2267,12 +2497,11 @@ export function AppShell() {
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem
-            onClick={handleDeleteAll}
-            disabled={photos.length === 0}
+            onClick={() => activePhotoId && setDeletePhotoId(activePhotoId)}
+            disabled={!activePhotoId}
             className="text-destructive focus:text-destructive"
           >
-            <Trash2 className="h-4 w-4 mr-2" /> Delete All
-            <ContextMenuShortcut>Alt+D</ContextMenuShortcut>
+            <Trash2 className="h-4 w-4 mr-2" /> Delete image
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -2283,7 +2512,7 @@ export function AppShell() {
             photos={photos}
             activeId={activePhotoId}
             onSelect={handleSelectPhoto}
-            onRemove={handleRemovePhoto}
+            onRemove={(id) => setDeletePhotoId(id)}
             onClose={() => setShowGallery(false)}
             showTools={showTools}
             showHistory={showHistory}
@@ -2292,7 +2521,7 @@ export function AppShell() {
             modifiedPhotos={modifiedPhotos}
             maxPhotos={maxPhotos}
             onDeleteAll={handleDeleteAll}
-            onDeleteSelected={handleDeleteSelected}
+            onDeleteSelected={() => setDeleteSelectedOpen(true)}
             onDuplicateSelected={handleDuplicateSelected}
             onExportSelected={handleExportClick}
             selectedIds={selectedIds}
@@ -2328,6 +2557,8 @@ export function AppShell() {
             onMoveLayer={stamp.moveLayer}
             onMergeDown={stamp.mergeDown}
             onFlattenAll={stamp.flattenAll}
+            getHistogram={getHistogram}
+            histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}`}
           />
         )}
       </AnimatePresence>
@@ -2364,5 +2595,6 @@ export function AppShell() {
           />
         )}
     </div>
+    </MotionConfig>
   );
 }

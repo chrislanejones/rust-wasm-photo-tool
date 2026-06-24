@@ -10,22 +10,71 @@ import { logDiagnostic } from "@/lib/diagnosticsLog";
 
 export type ThemeChoice = "system" | "dark" | "light";
 
+/** Canvas grid layout: uniform px squares, golden-ratio lines, or N×M divisions. */
+export type GridKind = "square" | "golden" | "grid";
+
 export interface Preferences {
   /** Undo-history depth applied to the WASM engine (50–1000). */
   maxHistory: number;
   /** Minutes of inactivity before the idle screen; 0 = never. */
   idleTimeoutMin: number;
-  /** Appearance theme. Persisted, but not yet applied (app is dark-only). */
+  /** Appearance theme (light / dark / system). */
   theme: ThemeChoice;
+  // ── Rulers & Grids (canvas overlays; non-destructive) ──────────────────────
+  /** Show top + left pixel rulers along the canvas. */
+  rulers: boolean;
+  /** Show the grid overlay. */
+  grid: boolean;
+  /** Which grid layout to draw. */
+  gridKind: GridKind;
+  /** Square-grid spacing in image px. */
+  gridSpacing: number;
+  /** Columns for the N×M grid. */
+  gridCols: number;
+  /** Rows for the N×M grid. */
+  gridRows: number;
+  /** Grid line color (hex). */
+  gridColor: string;
+  /** Grid line opacity, 0–100. */
+  gridOpacity: number;
+  /** Reopen the previous session's gallery on launch. Signed-in users control
+   *  this here; anonymous users get the Resume prompt instead. */
+  reopenLastSession: boolean;
+  /** Minimize UI animation (panel slides, fades, transitions) for a calmer,
+   *  faster interface — accessibility / motion-sensitivity. */
+  reduceMotion: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   maxHistory: 50,
   idleTimeoutMin: 30,
   theme: "dark",
+  rulers: false,
+  grid: false,
+  gridKind: "square",
+  gridSpacing: 50,
+  gridCols: 4,
+  gridRows: 3,
+  gridColor: "#ffffff",
+  gridOpacity: 40,
+  reopenLastSession: true,
+  reduceMotion: false,
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];
+const GRID_KINDS: GridKind[] = ["square", "golden", "grid"];
+
+/** Clamp an integer pref into [min, max] with a fallback. */
+function clampInt(v: unknown, min: number, max: number, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v)
+    ? Math.min(max, Math.max(min, Math.round(v)))
+    : fallback;
+}
+
+/** Validate a #rgb/#rrggbb(aa) hex, else fall back. */
+function safeHex(v: unknown, fallback: string): string {
+  return typeof v === "string" && /^#([0-9a-fA-F]{3,8})$/.test(v) ? v : fallback;
+}
 
 /** History bounds — mirror the Rust settings policy (src/settings.rs). */
 export const MAX_HISTORY_MIN = 50;
@@ -50,6 +99,24 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
     theme: THEME_CHOICES.includes(p?.theme as ThemeChoice)
       ? (p?.theme as ThemeChoice)
       : DEFAULT_PREFERENCES.theme,
+    rulers: typeof p?.rulers === "boolean" ? p.rulers : DEFAULT_PREFERENCES.rulers,
+    grid: typeof p?.grid === "boolean" ? p.grid : DEFAULT_PREFERENCES.grid,
+    gridKind: GRID_KINDS.includes(p?.gridKind as GridKind)
+      ? (p?.gridKind as GridKind)
+      : DEFAULT_PREFERENCES.gridKind,
+    gridSpacing: clampInt(p?.gridSpacing, 8, 500, DEFAULT_PREFERENCES.gridSpacing),
+    gridCols: clampInt(p?.gridCols, 1, 64, DEFAULT_PREFERENCES.gridCols),
+    gridRows: clampInt(p?.gridRows, 1, 64, DEFAULT_PREFERENCES.gridRows),
+    gridColor: safeHex(p?.gridColor, DEFAULT_PREFERENCES.gridColor),
+    gridOpacity: clampInt(p?.gridOpacity, 5, 100, DEFAULT_PREFERENCES.gridOpacity),
+    reopenLastSession:
+      typeof p?.reopenLastSession === "boolean"
+        ? p.reopenLastSession
+        : DEFAULT_PREFERENCES.reopenLastSession,
+    reduceMotion:
+      typeof p?.reduceMotion === "boolean"
+        ? p.reduceMotion
+        : DEFAULT_PREFERENCES.reduceMotion,
   };
 }
 
@@ -59,6 +126,16 @@ export function serializePreferences(p: Preferences): string {
     maxHistory: p.maxHistory,
     idleTimeoutMin: p.idleTimeoutMin,
     theme: p.theme,
+    rulers: p.rulers,
+    grid: p.grid,
+    gridKind: p.gridKind,
+    gridSpacing: p.gridSpacing,
+    gridCols: p.gridCols,
+    gridRows: p.gridRows,
+    gridColor: p.gridColor,
+    gridOpacity: p.gridOpacity,
+    reopenLastSession: p.reopenLastSession,
+    reduceMotion: p.reduceMotion,
   });
 }
 

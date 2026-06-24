@@ -80,7 +80,7 @@ export function ColorSwatchGrid({
 
   return (
     <div className="space-y-2">
-      <label className="text-[11px] text-theme-muted-foreground">{label}</label>
+      <label className="text-2xs text-theme-muted-foreground">{label}</label>
       <div className="flex flex-wrap gap-2 py-1">
         {colors.map((color) => (
           <Swatch
@@ -145,7 +145,7 @@ export function ColorSwatchGrid({
                 }
               }}
               placeholder="#ff5a3c or rgba(255,90,60,1)"
-              className="flex-1 min-w-0 rounded-md border border-theme-border bg-theme-background/40 px-2 py-1 text-[11px] text-theme-foreground placeholder:text-theme-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-theme-primary"
+              className="flex-1 min-w-0 rounded-md border border-theme-border bg-theme-background/40 px-2 py-1 text-2xs text-theme-foreground placeholder:text-theme-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-theme-primary"
             />
             <button
               type="button"
@@ -158,7 +158,7 @@ export function ColorSwatchGrid({
             </button>
           </div>
           {error && (
-            <p className="text-[10px] text-destructive pl-1">{error}</p>
+            <p className="text-2xs text-destructive pl-1">{error}</p>
           )}
         </div>
       )}

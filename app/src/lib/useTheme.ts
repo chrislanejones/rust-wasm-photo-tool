@@ -43,6 +43,19 @@ export function useTheme(theme: ThemeChoice): void {
 }
 
 /**
+ * Toggle the global `.reduce-motion` class on <html> from the user's preference.
+ * Pairs with the CSS rule that near-zeroes transition/animation durations and a
+ * `<MotionConfig reducedMotion="always">` wrapper that stops framer-motion's
+ * transform animations — together they give an opted-out user a calm, near-static
+ * UI. Pure DOM (not a Rust/WASM concern).
+ */
+export function useReduceMotion(on: boolean): void {
+  useEffect(() => {
+    document.documentElement.classList.toggle("reduce-motion", on);
+  }, [on]);
+}
+
+/**
  * Reactive resolved theme ("dark" | "light") for third-party components that
  * can't read our CSS vars (Clerk, sonner, emoji-mart). Tracks the `.dark` class
  * on <html> — kept authoritative by useTheme for both manual and system changes,

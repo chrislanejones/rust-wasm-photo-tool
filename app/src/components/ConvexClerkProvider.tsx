@@ -46,7 +46,7 @@ export function ConvexClerkProvider({ children }: { children: ReactNode }) {
           headerSubtitle: "text-zinc-500 dark:text-zinc-400",
           socialButtonsBlockButton:
             "bg-white dark:bg-zinc-700 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors",
-          socialButtonsBlockButtonText: "text-zinc-900 dark:text-white font-medium",
+          socialButtonsBlockButtonText: "text-zinc-900 dark:text-white font-semibold",
           // Invert the (dark) GitHub glyph only in dark mode; keep it black on light.
           "socialButtonsProviderIcon__github": "dark:invert",
           formButtonPrimary: "bg-purple-600 hover:bg-purple-500 text-white",

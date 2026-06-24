@@ -175,7 +175,7 @@ export function ObjectRemovalModal({
               </button>
             </div>
 
-            <div className="px-4 pt-3 text-[11px] text-text-secondary">
+            <div className="px-4 pt-3 text-2xs text-text-secondary">
               Paint over the object you want to remove, then click Remove Object.
             </div>
 
@@ -197,7 +197,7 @@ export function ObjectRemovalModal({
             </div>
 
             <div className="flex items-center gap-3 border-t border-border px-4 py-3">
-              <label className="flex items-center gap-2 text-[11px] text-text-secondary">
+              <label className="flex items-center gap-2 text-2xs text-text-secondary">
                 Brush
                 <input
                   type="range"
@@ -212,7 +212,7 @@ export function ObjectRemovalModal({
               <button
                 onClick={clearMask}
                 disabled={!hasMask || busy}
-                className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-text-secondary hover:bg-card hover:text-text-primary disabled:opacity-40"
+                className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-text-secondary hover:bg-card hover:text-text-primary disabled:opacity-40"
               >
                 <Undo2 className="h-3.5 w-3.5" /> Clear
               </button>

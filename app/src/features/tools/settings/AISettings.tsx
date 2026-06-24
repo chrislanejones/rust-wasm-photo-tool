@@ -89,7 +89,7 @@ export function AISettings({
       {!aiEnabled && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
           <Lock className="h-4 w-4 shrink-0 text-warning mt-0.5" />
-          <p className="text-[10px] text-warning/90 leading-relaxed">
+          <p className="text-2xs text-warning/90 leading-relaxed">
             AI tools run on Replicate and are a <strong>Paid</strong> feature.
             Upgrade to unlock background removal, text extraction, and more.
           </p>
@@ -104,7 +104,7 @@ export function AISettings({
             <span className="text-xs font-semibold text-text-primary">
               Background Removal
             </span>
-            <p className="text-[10px] text-text-muted mt-0.5 leading-relaxed">
+            <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
               One-click background isolation powered by rembg, run via Replicate.
             </p>
           </div>
@@ -125,10 +125,10 @@ export function AISettings({
               : "Remove Background"}
         </button>
         {lastType === "rembg" && error && (
-          <p className="mt-2 text-[10px] text-destructive leading-relaxed">{error}</p>
+          <p className="mt-2 text-2xs text-destructive leading-relaxed">{error}</p>
         )}
         {lastType === "rembg" && phase === "done" && !error && (
-          <p className="mt-2 text-[10px] text-success">
+          <p className="mt-2 text-2xs text-success">
             Background removed - applied to canvas.
           </p>
         )}
@@ -142,7 +142,7 @@ export function AISettings({
             <span className="text-xs font-semibold text-text-primary">
               Text Extract (OCR)
             </span>
-            <p className="text-[10px] text-text-muted mt-0.5 leading-relaxed">
+            <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
               Read the text out of the current image, via Replicate OCR.
             </p>
           </div>
@@ -163,31 +163,31 @@ export function AISettings({
               : "Extract Text"}
         </button>
         {lastType === "ocr" && error && (
-          <p className="mt-2 text-[10px] text-destructive leading-relaxed">{error}</p>
+          <p className="mt-2 text-2xs text-destructive leading-relaxed">{error}</p>
         )}
         {lastType === "ocr" && phase === "done" && !error && (
           <div className="mt-2">
             {textResult && textResult.trim() ? (
               <>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-text-muted">
+                  <span className="text-2xs text-text-muted">
                     Extracted text
                   </span>
                   <button
                     type="button"
                     onClick={copyText}
-                    className="flex items-center gap-1 text-[10px] text-text-muted hover:text-text-primary"
+                    className="flex items-center gap-1 text-2xs text-text-muted hover:text-text-primary"
                   >
                     <Copy className="h-3 w-3" />
                     {copied ? "Copied" : "Copy"}
                   </button>
                 </div>
-                <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-black/20 border border-border/50 p-2 text-[10px] text-text-primary leading-relaxed">
+                <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-black/20 border border-border/50 p-2 text-2xs text-text-primary leading-relaxed">
                   {textResult}
                 </pre>
               </>
             ) : (
-              <p className="text-[10px] text-text-muted">No text detected.</p>
+              <p className="text-2xs text-text-muted">No text detected.</p>
             )}
           </div>
         )}
@@ -201,7 +201,7 @@ export function AISettings({
             <span className="text-xs font-semibold text-text-primary">
               Object Removal
             </span>
-            <p className="text-[10px] text-text-muted mt-0.5 leading-relaxed">
+            <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
               Brush over an object to erase it; LaMa fills the gap. Runs via
               Replicate.
             </p>
@@ -223,10 +223,10 @@ export function AISettings({
               : "Remove Object"}
         </button>
         {lastType === "inpaint" && error && (
-          <p className="mt-2 text-[10px] text-destructive leading-relaxed">{error}</p>
+          <p className="mt-2 text-2xs text-destructive leading-relaxed">{error}</p>
         )}
         {lastType === "inpaint" && phase === "done" && !error && (
-          <p className="mt-2 text-[10px] text-success">
+          <p className="mt-2 text-2xs text-success">
             Object removed - applied to canvas.
           </p>
         )}
@@ -244,11 +244,11 @@ export function AISettings({
               <span className="text-xs font-semibold text-text-primary">
                 {title}
               </span>
-              <span className="rounded-full bg-theme-muted/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-theme-foreground/70">
+              <span className="rounded-full bg-theme-muted/40 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-theme-foreground/70">
                 Coming Soon
               </span>
             </div>
-            <p className="text-[10px] text-text-muted mt-0.5 leading-relaxed">
+            <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
               {description}
             </p>
           </div>

@@ -100,7 +100,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             {/* Stroke Stabilizer — pulled-string "lazy mouse" smoothing. Off by
                 default; Low/Med/High set the leash (smoothing strength). */}
             <div className="space-y-2">
-              <label className="text-[11px] text-theme-muted-foreground">
+              <label className="text-2xs text-theme-muted-foreground">
                 Stroke Stabilizer
               </label>
               <ToolButtonGroup
@@ -187,7 +187,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
             className="space-y-4"
           >
-            <p className="text-[11px] leading-relaxed text-theme-muted-foreground">
+            <p className="text-2xs leading-relaxed text-theme-muted-foreground">
               Click to drop points, drag to pull Bézier handles. Enter closes the
               path, Esc finishes it open, Backspace undoes a point.
             </p>
@@ -209,7 +209,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
 
             {/* Background — fills the closed path's interior (under the stroke). */}
             <div className="space-y-2">
-              <label className="text-[11px] text-theme-muted-foreground">
+              <label className="text-2xs text-theme-muted-foreground">
                 Background
               </label>
               <ToolButtonGroup

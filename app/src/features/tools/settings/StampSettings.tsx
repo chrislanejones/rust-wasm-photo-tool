@@ -145,7 +145,7 @@ export function StampSettingsPanel({
           />
 
           <div className="space-y-4">
-            <p className="text-[10px] text-text-muted/60 leading-relaxed">
+            <p className="text-2xs text-text-muted/60 leading-relaxed">
               Select a stamp, then click on the image to place it. Full
               undo/redo via Rust.
             </p>
@@ -179,7 +179,7 @@ export function StampSettingsPanel({
                       />
                     )}
                     <span
-                      className="text-sm font-black tracking-[0.15em] uppercase"
+                      className="text-sm font-bold tracking-[0.15em] uppercase"
                       style={{
                         color: stamp.color,
                         fontFamily: '"Arial Black", "Impact", sans-serif',

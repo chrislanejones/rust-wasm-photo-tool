@@ -16,7 +16,7 @@ import {
   Upload,
   Image,
   Wrench,
-  Search,
+  BookOpenCheck,
   ZoomIn,
   ZoomOut,
   Undo2,
@@ -112,7 +112,7 @@ export function TopBar({
     },
     {
       key: "R",
-      icon: Search,
+      icon: BookOpenCheck,
       label: "Review",
       active: showHistory,
       onToggle: onToggleHistory,
@@ -156,7 +156,7 @@ export function TopBar({
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
-                      <p className="font-medium">Undo</p>
+                      <p className="font-semibold">Undo</p>
                       <p className="text-muted-foreground text-xs">Ctrl+Z</p>
                     </TooltipContent>
                   </Tooltip>
@@ -171,7 +171,7 @@ export function TopBar({
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
-                      <p className="font-medium">Redo</p>
+                      <p className="font-semibold">Redo</p>
                       <p className="text-muted-foreground text-xs">Ctrl+Shift+Z</p>
                     </TooltipContent>
                   </Tooltip>
@@ -196,7 +196,7 @@ export function TopBar({
                       Undo/Redo dropped out and freed space). Hidden only in the
                       cramped BP_TIGHT case (both side panels open, 1000–1200). */}
                   {(narrow || !compact) && (
-                    <span className="text-xs font-medium font-mono w-12 text-center tabular-nums text-text-primary">
+                    <span className="text-xs font-semibold font-mono w-12 text-center tabular-nums text-text-primary">
                       {Math.round(zoom * 100)}%
                     </span>
                   )}
@@ -210,7 +210,7 @@ export function TopBar({
                 </div>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p className="font-medium">Zoom</p>
+                <p className="font-semibold">Zoom</p>
                 <p className="text-muted-foreground text-xs">
                   Alt + Scroll · Alt + / Alt −
                 </p>

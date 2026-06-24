@@ -83,6 +83,20 @@ declare module "stamp_tool" {
   export function parse_color(input: string): Uint8Array;
 
   /**
+   * Grid-overlay line geometry. Returns a flat list of segments
+   * `[x1, y1, x2, y2, …]` in image-space px. `kind`: 0 = square (param_a =
+   * spacing px), 1 = golden ratio, 2 = columns×rows (param_a = cols, param_b =
+   * rows). The "Rulers & Grids" single source of grid-layout math.
+   */
+  export function grid_lines(
+    width: number,
+    height: number,
+    kind: number,
+    param_a: number,
+    param_b: number,
+  ): Float32Array;
+
+  /**
    * Compute the largest centred rectangle with the given aspect ratio
    * that fits inside an `image_w` × `image_h` image. Returns `[x, y, w, h]`
    * as a Uint32Array, or `undefined` if any input is 0.
@@ -288,6 +302,25 @@ declare module "stamp_tool" {
       raw_x: number, raw_y: number,
       radius: number, r: number, g: number, b: number, opacity: number,
     ): boolean;
+    /** High-level brush driver — JS forwards pointer coords; hex parse,
+     *  stabilizer leash, stroke state, and per-stroke opacity all live in Rust. */
+    paint_down(
+      x: number, y: number, size: number,
+      color: string, opacity: number, stab: string,
+    ): void;
+    /** Continue the active stroke; returns true if it painted (→ flush). */
+    paint_move(x: number, y: number): boolean;
+    /** End the active stroke (stabilizer catch-up) + free buffers; true if painted. */
+    paint_up(): boolean;
+    /** Effects-brush driver (blur / pixelate / redaction) — mirrors the paint
+     *  driver; mode branch, hex parse, and stroke interpolation live in Rust.
+     *  `mode` is "blur" | "pixelate" | "solid". */
+    effect_down(
+      x: number, y: number, size: number,
+      mode: string, intensity: number, pixel_size: number, color: string,
+    ): void;
+    effect_move(x: number, y: number): boolean;
+    effect_up(): void;
 
     // Color picker helpers (Rust pixel sampling)
     get_pixel(x: number, y: number): Uint8Array;
@@ -608,6 +641,19 @@ declare module "stamp_tool" {
     ): boolean;
     /** Remove a shape. Pushes a "Delete Shape" history step. */
     remove_shape_annotation(id: number): boolean;
+    /** Align a committed text/shape annotation's bbox to a canvas edge/center.
+     *  mode ∈ left|centerH|right|top|middleV|bottom. Caller flushes to re-render. */
+    align_annotation(
+      id: number,
+      is_text: boolean,
+      mode: string,
+      canvas_w: number,
+      canvas_h: number,
+    ): boolean;
+    /** Per-channel histogram of the current composite (computed in Rust from the
+     *  authoritative buffer — no canvas sampling). Flat 1024-element array:
+     *  [0,256)=R, [256,512)=G, [512,768)=B, [768,1024)=Luma. */
+    calculate_histogram(): Uint32Array;
     /** Suppress one shape from render while its JS overlay preview is shown. Pass -1 to clear. */
     set_editing_shape(id: number): void;
     /** Suppress an in-edit text annotation's baked tile from the composite

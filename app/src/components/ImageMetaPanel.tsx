@@ -107,10 +107,10 @@ function HashBox({
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${accent}`} />
           <div className="leading-tight">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+            <div className="text-2xs font-semibold uppercase tracking-wider text-text-secondary">
               {title}
             </div>
-            <div className="text-[10px] text-text-muted">{subtitle}</div>
+            <div className="text-2xs text-text-muted">{subtitle}</div>
           </div>
         </div>
         <div className="flex items-center gap-0.5">
@@ -315,7 +315,7 @@ export function ImageMetaPanel({
 
           {/* Capture metadata (EXIF) */}
           <div className="rounded-lg border border-border bg-background/40 px-3 py-2">
-            <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+            <div className="mb-1 flex items-center gap-2 text-2xs font-semibold uppercase tracking-wider text-text-secondary">
               <Camera className="h-3.5 w-3.5 text-sky-400" />
               Capture metadata (EXIF)
             </div>
@@ -391,7 +391,7 @@ export function ImageMetaPanel({
               </>
             )}
             {exif?.gps && (
-              <div className="mt-1.5 flex items-start gap-1.5 text-[10px] leading-snug text-warning/80">
+              <div className="mt-1.5 flex items-start gap-1.5 text-2xs leading-snug text-warning/80">
                 <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
                 <span>
                   Location is embedded. Unlock the EXIF padlock in Compress to
@@ -414,7 +414,7 @@ export function ImageMetaPanel({
             </Row>
           </div>
 
-          <div className="flex items-start gap-2 px-1 text-[10px] leading-relaxed text-text-muted">
+          <div className="flex items-start gap-2 px-1 text-2xs leading-relaxed text-text-muted">
             <LayersIcon className="mt-0.5 h-3 w-3 shrink-0" />
             <span>
               The full edit archive (canvas + undo/redo + layers + overlays) is

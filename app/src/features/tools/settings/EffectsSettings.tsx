@@ -157,7 +157,7 @@ export function EffectsSettings({
                 disabled={!imageReady}
                 valueDisplay={brightness > 0 ? `+${brightness}` : String(brightness)}
               />
-              <p className="text-[9px] text-theme-muted-foreground">
+              <p className="text-2xs text-theme-muted-foreground">
                 Drag &amp; release — applies delta from current position. Undo-able.
               </p>
             </div>
@@ -180,7 +180,7 @@ export function EffectsSettings({
                       : "0"
                 }
               />
-              <p className="text-[9px] text-theme-muted-foreground">
+              <p className="text-2xs text-theme-muted-foreground">
                 100 = neutral. Slider latches — drag again to adjust further.
               </p>
             </div>
@@ -198,7 +198,7 @@ export function EffectsSettings({
                   unit="%"
                   disabled={!imageReady}
                 />
-                <p className="text-[9px] text-theme-muted-foreground">
+                <p className="text-2xs text-theme-muted-foreground">
                   Gaussian blur across the full image. Resets after apply.
                 </p>
               </div>
@@ -206,7 +206,7 @@ export function EffectsSettings({
 
             {/* Quick Presets */}
             <div className="space-y-3 pt-2 border-t border-theme-sidebar-border">
-              <span className="text-[11px] text-theme-muted-foreground">
+              <span className="text-2xs text-theme-muted-foreground">
                 Quick Adjust
               </span>
               <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
@@ -221,7 +221,7 @@ export function EffectsSettings({
                   </ToolButton>
                 ))}
               </div>
-              <p className="text-[9px] text-theme-muted-foreground">
+              <p className="text-2xs text-theme-muted-foreground">
                 One-shot adjustments. Each is undo-able.
               </p>
             </div>
@@ -236,7 +236,7 @@ export function EffectsSettings({
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
             className="space-y-6"
           >
-            <p className="text-[10px] text-theme-muted-foreground leading-relaxed">
+            <p className="text-2xs text-theme-muted-foreground leading-relaxed">
               Click the eyedropper to activate, then hover over the image to
               magnify pixels. Click to pick a color — it will be set as your
               brush and text color.
@@ -246,7 +246,7 @@ export function EffectsSettings({
               disabled={!imageReady}
               onClick={() => onSetColorPickerActive?.(!colorPickerActive)}
               className={[
-                "w-full flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                "w-full flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all",
                 colorPickerActive
                   ? "bg-theme-primary text-theme-primary-foreground ring-2 ring-theme-primary/40"
                   : "bg-theme-muted text-theme-foreground hover:bg-theme-accent",
@@ -270,7 +270,7 @@ export function EffectsSettings({
                   <span className="block text-sm font-mono text-theme-foreground uppercase">
                     {displayColor}
                   </span>
-                  <span className="block text-[10px] text-theme-muted-foreground">
+                  <span className="block text-2xs text-theme-muted-foreground">
                     brush &amp; text color
                   </span>
                 </div>
@@ -278,7 +278,7 @@ export function EffectsSettings({
             </div>
 
             {colorPickerActive && (
-              <div className="rounded-lg bg-theme-muted/50 px-3 py-2 text-[10px] text-theme-muted-foreground leading-relaxed">
+              <div className="rounded-lg bg-theme-muted/50 px-3 py-2 text-2xs text-theme-muted-foreground leading-relaxed">
                 A pixel magnifier follows your cursor over the canvas. Hover to
                 preview, click to pick.
               </div>

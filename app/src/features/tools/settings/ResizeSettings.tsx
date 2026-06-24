@@ -331,7 +331,7 @@ export function ResizeSettings({
               <div className="grid grid-cols-2 gap-3">
                 {/* ── Method ── */}
                 <div className="space-y-4">
-                  <label className="text-[11px] text-theme-muted-foreground">
+                  <label className="text-2xs text-theme-muted-foreground">
                     Method
                   </label>
                   <div className="relative">
@@ -353,7 +353,7 @@ export function ResizeSettings({
 
                 {/* ── Format ── */}
                 <div className="space-y-4">
-                  <label className="text-[11px] text-theme-muted-foreground">
+                  <label className="text-2xs text-theme-muted-foreground">
                     Format
                   </label>
                   <div className="relative">
@@ -418,10 +418,10 @@ export function ResizeSettings({
                     )}
                   </span>
                   <span className="flex flex-1 flex-col items-center justify-center gap-0.5 text-center">
-                    <span className="font-mono text-[11px] font-semibold leading-tight text-theme-primary">
+                    <span className="font-mono text-2xs font-semibold leading-tight text-theme-primary">
                       {exifKeep ? "Exporting Keeps EXIF" : "Exporting Removes EXIF"}
                     </span>
-                    <span className="font-mono text-[10px] leading-tight text-theme-muted-foreground">
+                    <span className="font-mono text-2xs leading-tight text-theme-muted-foreground">
                       {exifKeep
                         ? "Keep sensitive GPS & Time Data"
                         : "Remove sensitive GPS & Time Data"}
@@ -432,7 +432,7 @@ export function ResizeSettings({
 
               {/* ── Web Performance Gain ── */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-2xs">
                   <h4 className="text-theme-muted-foreground">
                     Web Performance Gain
                   </h4>
@@ -450,7 +450,7 @@ export function ResizeSettings({
 
               {/* ── PageSpeed Insights Score ── */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-2xs">
                   <h4 className="text-theme-muted-foreground">
                     PageSpeed Insights Score
                   </h4>

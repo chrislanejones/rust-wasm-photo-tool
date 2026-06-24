@@ -206,6 +206,30 @@
   --color-theme-chart4: #f0a060;
 }
 
+/* ── Typography scale (Task 1) — 6 steps; only lg / 2xl are fluid. A regular
+   (non-inline) @theme so these emit as real custom properties — raw CSS below
+   references them via var(--text-*) — AND generate the text-* utilities. 2xs is
+   new (collapses the old 8/9/10/11px band); xs/sm/base match Tailwind v4
+   defaults and are pinned for clarity; lg/2xl override with clamp(). */
+@theme {
+  --text-2xs: 0.625rem;   /* 10px */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);    /* 17→20px (fluid) */
+  --text-2xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.75rem);  /* 20→28px (fluid) */
+  --tracking-label: 0.06em;
+}
+
+/* Recurring uppercase mono label (panel headers / section captions). Task 1. */
+.label-caps {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    RESET & BASE
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -317,14 +341,14 @@ body {
 
 .canvas-empty-title {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-muted);
 }
 
 .canvas-empty-hint {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   opacity: 0.6;
 }
@@ -455,7 +479,8 @@ textarea:focus-visible {
   margin: 0;
 }
 
-/* Padding wrapper around the shared ToggleButtonGroup. */
+/* Padding wrapper around the shared ToggleButtonGroup (compact = icon-only,
+   since the section labels were too long to fit as text). */
 .review-toggles {
   padding: 8px 10px;
 }
@@ -486,7 +511,7 @@ textarea:focus-visible {
 
 .review-section-name {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -593,7 +618,7 @@ textarea:focus-visible {
 }
 
 .layer-opacity-val {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   opacity: 0.7;
   min-width: 30px;
   text-align: right;
@@ -620,7 +645,7 @@ textarea:focus-visible {
   border-radius: var(--radius);
   cursor: pointer;
   transition: all 0.12s;
-  font-size: 12px;
+  font-size: var(--text-xs);
   margin-bottom: 2px;
   border: 1px solid transparent;
 }
@@ -685,7 +710,7 @@ textarea:focus-visible {
 .large-badge {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -707,7 +732,7 @@ textarea:focus-visible {
 
 .history-index {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   min-width: 18px;
   text-align: center;
@@ -754,7 +779,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 0;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   z-index: var(--z-panel);
   backdrop-filter: blur(8px);
@@ -834,7 +859,7 @@ textarea:focus-visible {
 }
 
 .status-zoom-label {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
 }
 
@@ -844,7 +869,7 @@ kbd {
   border-radius: 3px;
   padding: 0px 4px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--text-secondary);
   line-height: 16px;
 }
@@ -858,7 +883,7 @@ kbd {
 
 .status-zoom {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 600;
   color: var(--text-secondary);
   min-width: 40px;
@@ -897,6 +922,21 @@ kbd {
 .btn-icon svg {
   width: 14px;
   height: 14px;
+}
+
+/* ── Reduce motion (Settings → Appearance) ───────────────────────────────────
+   Near-zeroes CSS transitions/animations app-wide. Framer-motion animates via
+   inline transforms (not CSS), so it's handled separately by a
+   <MotionConfig reducedMotion="always"> wrapper in AppShell. */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* Extra-small icon button — same surface/border/hover/disabled treatment as
@@ -1176,7 +1216,7 @@ input[type="range"].slider-overlay::-moz-range-thumb {
   right: 0;
   background: rgba(0, 0, 0, 0.7);
   color: #ccc;
-  font-size: 8px;
+  font-size: var(--text-2xs);
   font-family: var(--font-mono);
   line-height: 1.2;
   padding: 1px 3px;
@@ -1372,7 +1412,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   align-items: center;
   gap: 10px;
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -1424,7 +1464,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .shortcut-group-title {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -1454,7 +1494,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .shortcut-action {
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
@@ -1475,7 +1515,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 600;
   color: var(--text-primary);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -1483,7 +1523,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .shortcut-plus {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   margin: 0 2px;
 }
@@ -1493,12 +1533,12 @@ input[type="range"]:focus::-webkit-slider-thumb {
   border-top: 1px solid var(--border);
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
 }
 
 .shortcut-modal-footer .shortcut-kbd {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   min-width: 20px;
   height: 18px;
   padding: 0 4px;
@@ -1509,7 +1549,11 @@ input[type="range"]:focus::-webkit-slider-thumb {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .emoji-picker-host {
-  width: 100%;
+  /* The Stamp settings live in a p-4 (16px) scroll container, so width:100% left
+     the emoji grid inset 16px from the tools-panel edges. Bleed it back past that
+     padding so the grid sits flush with the panel like the tool icons above. */
+  width: calc(100% + 32px);
+  margin-inline: -16px;
 }
 
 /* Re-skin the third-party emoji-mart picker so it reads as part of the panel,
@@ -1524,7 +1568,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   --rgb-accent: 201, 143, 63;      /* #c98f3f — light accent/contrast */
   --color-border: transparent;
   --font-family: var(--font-sans);
-  --font-size: 13px;
+  --font-size: var(--text-sm);
   --border-radius: var(--radius-lg);
   --shadow: none;
   background: transparent !important;
@@ -1552,7 +1596,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   align-items: center;
   padding: 20px 10px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-family: var(--font-mono);
   font-style: italic;
   opacity: 0.6;

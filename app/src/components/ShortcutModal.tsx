@@ -55,15 +55,15 @@ const SHORTCUT_GROUPS = [
     shortcuts: [
       { keys: ["Alt", "F"], action: "Flip Horizontal" },
       { keys: ["Alt", "V"], action: "Flip Vertical" },
-      { keys: ["Alt", "S"], action: "Rotate 90° CW" },
+      { keys: ["Alt", "S"], action: "Open Settings" },
     ],
   },
   {
     title: "Clone Stamp",
     shortcuts: [
       { keys: ["Alt", "Click"], action: "Set Source Point" },
-      { keys: ["Alt", "["], action: "Decrease Brush Size" },
-      { keys: ["Alt", "]"], action: "Increase Brush Size" },
+      { keys: ["Ctrl", "["], action: "Decrease Brush Size" },
+      { keys: ["Ctrl", "]"], action: "Increase Brush Size" },
     ],
   },
   {

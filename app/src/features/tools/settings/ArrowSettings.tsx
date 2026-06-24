@@ -16,11 +16,11 @@ export function ArrowSettings(_props: ArrowSettingsProps) {
           <p className="text-sm font-semibold text-theme-foreground">
             Coming Soon
           </p>
-          <span className="inline-block rounded-full bg-theme-primary/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-theme-primary">
+          <span className="inline-block rounded-full bg-theme-primary/15 px-2.5 py-0.5 text-2xs font-bold uppercase tracking-widest text-theme-primary">
             In Development
           </span>
         </div>
-        <p className="max-w-[200px] text-[11px] text-theme-muted-foreground leading-relaxed">
+        <p className="max-w-[200px] text-2xs text-theme-muted-foreground leading-relaxed">
           Something new is planned for this section. Stay tuned.
         </p>
       </div>

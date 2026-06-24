@@ -54,7 +54,7 @@ export function ToggleButtonGroup({
             onClick={onToggle}
             title={tooltip ? undefined : label}
             className={cn(
-              "flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium font-mono transition-all",
+              "flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold font-mono transition-all",
               fill && "flex-1",
               // Active = raised elevated pill. In dark, --accent-ui and
               // --bg-elevated are both #2b2b2b (unchanged); in light, bg-elevated
@@ -77,7 +77,7 @@ export function ToggleButtonGroup({
           <Tooltip key={key}>
             <TooltipTrigger asChild>{button}</TooltipTrigger>
             <TooltipContent side="bottom">
-              <p className="font-medium">{tooltip.label ?? label}</p>
+              <p className="font-semibold">{tooltip.label ?? label}</p>
               {tooltip.shortcut && (
                 <p className="text-muted-foreground text-xs">
                   {tooltip.shortcut}

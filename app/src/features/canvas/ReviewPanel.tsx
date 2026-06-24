@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
+  ChartArea,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -12,10 +13,10 @@ import {
   MousePointerSquareDashed,
   Plus,
   Redo2,
-  Search,
   Undo2,
   X,
 } from "lucide-react";
+import { HistogramView } from "./HistogramView";
 import { slideFromRight } from "@/lib/animations";
 import { TinyButton } from "@/components/ui/tiny-button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
@@ -35,8 +36,8 @@ export interface ReselectObject {
   label: string;
 }
 
-/** The three toggleable body sections of the Review panel. */
-type SectionKey = "history" | "reselect" | "layers";
+/** The toggleable body sections of the Review panel. */
+type SectionKey = "history" | "reselect" | "layers" | "histogram";
 
 interface Props {
   history: HistoryEntry[];
@@ -70,6 +71,11 @@ interface Props {
   onMoveLayer: (id: number, newIndex: number) => void;
   onMergeDown: (id: number) => void;
   onFlattenAll: () => void;
+  // ── Histogram ──
+  /** Pulls the per-channel histogram from Rust (no canvas sampling). */
+  getHistogram: () => Uint32Array | null;
+  /** Changes when the active image content changes → triggers a resample. */
+  histogramSignature: string;
 }
 
 const DeleteGlyph = () => (
@@ -80,15 +86,15 @@ const DeleteGlyph = () => (
 
 const TOGGLES: { key: SectionKey; icon: typeof History; label: string }[] = [
   { key: "history", icon: History, label: "History" },
-  { key: "reselect", icon: MousePointerSquareDashed, label: "Reselect" },
   { key: "layers", icon: Layers, label: "Layers" },
+  { key: "reselect", icon: MousePointerSquareDashed, label: "Reselect" },
+  { key: "histogram", icon: ChartArea, label: "Histogram" },
 ];
 
 export function ReviewPanel({
   history,
   onJump,
   onDelete,
-  onClose,
   onUndo,
   canUndo,
   onRedo,
@@ -108,17 +114,33 @@ export function ReviewPanel({
   onMoveLayer,
   onMergeDown,
   onFlattenAll,
+  getHistogram,
+  histogramSignature,
 }: Props) {
   // Which body sections are open. The body splits its height evenly among the
   // open sections (1 → full, 2 → halves, 3 → thirds), each with its own header
   // and scroll area. All three start open.
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
     history: true,
-    reselect: true,
     layers: true,
+    reselect: true,
+    histogram: false, // starts closed to keep the panel roomy
   });
+  // At most three sections open at once. Closing is always allowed. Opening a
+  // fourth evicts one to make room: Reselect yields first (so clicking Histogram
+  // bumps Reselect), but if you've manually closed a different section there's a
+  // free slot and Histogram just fills it — nothing gets bumped.
   const toggle = (k: SectionKey) =>
-    setOpen((prev) => ({ ...prev, [k]: !prev[k] }));
+    setOpen((prev) => {
+      if (prev[k]) return { ...prev, [k]: false };
+      const openKeys = TOGGLES.map((t) => t.key).filter((key) => prev[key]);
+      if (openKeys.length < 3) return { ...prev, [k]: true };
+      const victim: SectionKey =
+        k !== "reselect" && prev.reselect
+          ? "reselect"
+          : (openKeys.find((key) => key !== k) as SectionKey);
+      return { ...prev, [victim]: false, [k]: true };
+    });
   const openCount = TOGGLES.filter((t) => open[t.key]).length;
 
   // Inline-rename state for the Layers list (null = not renaming).
@@ -146,24 +168,14 @@ export function ReviewPanel({
       exit="exit"
       className="review-panel"
     >
-      {/* ── Panel header: title + close ─────────────────────────────────── */}
-      <div className="review-head">
-        <h2 className="flex items-center gap-2 text-xs font-semibold">
-          <Search className="h-3.5 w-3.5" />
-          Review
-        </h2>
-        <TinyButton onClick={onClose} title="Close" className="ml-auto">
-          <X className="h-4 w-4" />
-        </TinyButton>
-      </div>
-      <hr className="review-rule" />
+      {/* No title/close — the four section toggles below are the header. */}
 
       {/* ── Section toggles — same multi-select button group the top bar
           uses for Upload / Tools / Gallery. ───────────────────────────── */}
       <div className="review-toggles">
         <ToggleButtonGroup
           fill
-          noIcons
+          compact
           items={TOGGLES.map(({ key, icon, label }) => ({
             key,
             icon,
@@ -509,6 +521,31 @@ export function ReviewPanel({
                 })}
               </ul>
             )}
+          </section>
+        )}
+
+        {/* ── Histogram: live RGB / luminance distribution of the canvas.
+            The chart itself is the standalone, self-styled HistogramView; this
+            section just gives it a height-constrained flex slot. ──────────── */}
+        {open.histogram && (
+          <section className="review-section">
+            <div className="review-section-head">
+              <ChartArea className="h-3.5 w-3.5" />
+              <span className="review-section-name">Histogram</span>
+              <div className="ml-auto flex items-center gap-1.5">
+                <TinyButton
+                  onClick={() => toggle("histogram")}
+                  title="Close section"
+                >
+                  <X className="h-4 w-4" />
+                </TinyButton>
+              </div>
+            </div>
+            <HistogramView
+              getHistogram={getHistogram}
+              signature={histogramSignature}
+              active={open.histogram}
+            />
           </section>
         )}
       </div>

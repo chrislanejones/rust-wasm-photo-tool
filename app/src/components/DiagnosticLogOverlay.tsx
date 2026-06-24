@@ -60,7 +60,7 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider transition-colors ${
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-2xs uppercase tracking-wider transition-colors ${
                   tab === id
                     ? "bg-bg-elevated text-text-primary"
                     : "text-text-muted hover:text-text-primary"
@@ -88,7 +88,7 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
         </div>
       }
       footer={
-        <p className="text-center font-mono text-[10px] text-text-muted">
+        <p className="text-center font-mono text-2xs text-text-muted">
           Alt + Delete to toggle · in-memory only, never sent anywhere
         </p>
       }
@@ -108,10 +108,10 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
                 <table className="w-full border-collapse font-mono text-xs">
                   <thead className="sticky top-0 bg-background text-text-muted">
                     <tr>
-                      <th className="px-3 py-1.5 text-left font-medium">Time</th>
-                      <th className="px-3 py-1.5 text-left font-medium">Source</th>
-                      <th className="px-3 py-1.5 text-left font-medium">Message</th>
-                      <th className="px-3 py-1.5 text-right font-medium">Duration</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Time</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Source</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Message</th>
+                      <th className="px-3 py-1.5 text-right font-semibold">Duration</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -125,7 +125,7 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
                         </td>
                         <td className="px-3 py-1">
                           <span
-                            className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${SOURCE_CLASS[log.source]}`}
+                            className={`rounded border px-1.5 py-0.5 text-2xs font-bold ${SOURCE_CLASS[log.source]}`}
                           >
                             {log.source}
                           </span>

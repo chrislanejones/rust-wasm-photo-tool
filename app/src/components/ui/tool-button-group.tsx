@@ -41,7 +41,7 @@ export function ToolButtonGroup<T extends string>({
   return (
     <div className={cn("space-y-2", className)}>
       {label && (
-        <label className="text-[11px] text-theme-muted-foreground">
+        <label className="text-2xs text-theme-muted-foreground">
           {label}
         </label>
       )}

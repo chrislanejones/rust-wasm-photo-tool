@@ -9,8 +9,11 @@ import {
   Settings,
   SlidersHorizontal,
   Palette,
+  Ruler,
   Package,
+  Cloud,
   CreditCard,
+  Gauge,
   ShieldCheck,
   Check,
   Loader2,
@@ -21,7 +24,10 @@ import { Modal } from "@/components/ui/Modal";
 import { SuperUserPane, type SuperUserControls } from "@/components/SuperUserPane";
 import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
 import { AppearancePane } from "@/components/AppearancePane";
+import { RulersGridsPane } from "@/components/RulersGridsPane";
 import { ExportPane } from "@/components/ExportPane";
+import { StoragePane } from "@/components/StoragePane";
+import { AIUsagePane } from "@/components/AIUsagePane";
 import { UserMenu } from "@/components/UserMenu";
 import { LargeButton } from "@/components/ui/large-button";
 import {
@@ -38,7 +44,15 @@ const PRO_FEATURES = [
   "Unlimited share links",
 ];
 
-type SettingsTab = "general" | "appearance" | "export" | "billing" | "superuser";
+type SettingsTab =
+  | "general"
+  | "appearance"
+  | "rulers"
+  | "export"
+  | "storage"
+  | "billing"
+  | "aiusage"
+  | "superuser";
 
 /** Human-readable summary of what changed, for the Apply toast. */
 function describeChanges(prev: Preferences, next: Preferences): string[] {
@@ -53,6 +67,13 @@ function describeChanges(prev: Preferences, next: Preferences): string[] {
     out.push(
       `Theme → ${next.theme === "system" ? "System" : next.theme === "dark" ? "Dark mode" : "Light mode"}`,
     );
+  if (prev.rulers !== next.rulers)
+    out.push(`Rulers → ${next.rulers ? "On" : "Off"}`);
+  if (prev.grid !== next.grid) out.push(`Grid → ${next.grid ? "On" : "Off"}`);
+  if (prev.gridKind !== next.gridKind)
+    out.push(`Grid layout → ${next.gridKind}`);
+  if (prev.reduceMotion !== next.reduceMotion)
+    out.push(`Motion → ${next.reduceMotion ? "Reduced" : "Full"}`);
   return out;
 }
 
@@ -68,11 +89,23 @@ export function SubscriptionButton({ general, superUser }: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<SettingsTab>("general");
 
+  // Alt+S (and any other caller) opens Settings via a window event — keeps the
+  // open state here without threading a controlled prop through the tree.
+  useEffect(() => {
+    const openSettings = () => setOpen(true);
+    window.addEventListener("image-horse:open-settings", openSettings);
+    return () =>
+      window.removeEventListener("image-horse:open-settings", openSettings);
+  }, []);
+
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] = [
     { id: "general", label: "General", icon: SlidersHorizontal },
     { id: "appearance", label: "Appearance", icon: Palette },
+    { id: "rulers", label: "Rulers & Grids", icon: Ruler },
     { id: "export", label: "Export", icon: Package },
+    { id: "storage", label: "S3 / Image Hosting", icon: Cloud },
     { id: "billing", label: "Plan & Billing", icon: CreditCard },
+    { id: "aiusage", label: "AI Usage", icon: Gauge },
     ...(superUser
       ? [{ id: "superuser" as SettingsTab, label: "Super User", icon: ShieldCheck }]
       : []),
@@ -142,7 +175,10 @@ export function SubscriptionButton({ general, superUser }: Props) {
           <div className="flex items-center justify-between gap-2">
             {/* Clerk user button / sign-in — same component as the top bar. */}
             <UserMenu />
-            {(tab === "general" || tab === "appearance") && (
+            {(tab === "general" ||
+              tab === "appearance" ||
+              tab === "rulers" ||
+              tab === "superuser") && (
               <div className="flex items-center gap-2">
                 <LargeButton
                   onClick={() => setDraft(DEFAULT_PREFERENCES)}
@@ -189,9 +225,22 @@ export function SubscriptionButton({ general, superUser }: Props) {
               <AppearancePane
                 value={draft.theme}
                 onChange={(theme) => setDraft((d) => ({ ...d, theme }))}
+                reduceMotion={draft.reduceMotion}
+                onReduceMotionChange={(reduceMotion) =>
+                  setDraft((d) => ({ ...d, reduceMotion }))
+                }
+              />
+            ) : tab === "rulers" ? (
+              <RulersGridsPane
+                value={draft}
+                onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
               />
             ) : tab === "export" ? (
               <ExportPane />
+            ) : tab === "storage" ? (
+              <StoragePane isPaid={isPaid} tier={tier} />
+            ) : tab === "aiusage" ? (
+              <AIUsagePane />
             ) : tab === "superuser" && superUser ? (
               <SuperUserPane {...superUser} />
             ) : (
@@ -228,7 +277,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
                         {PRO_FEATURES.map((f) => (
                           <li
                             key={f}
-                            className="flex items-start gap-2 text-[11px] text-zinc-300"
+                            className="flex items-start gap-2 text-2xs text-zinc-300"
                           >
                             <Check className="mt-0.5 h-3 w-3 shrink-0 text-violet-400" />
                             {f}
@@ -266,12 +315,12 @@ export function SubscriptionButton({ general, superUser }: Props) {
                     </div>
 
                     {sub?.cancelAtPeriodEnd && (
-                      <p className="text-[10px] text-amber-400">
+                      <p className="text-2xs text-amber-400">
                         Your plan cancels at the end of the current period.
                       </p>
                     )}
                     {err && (
-                      <p className="text-[10px] leading-relaxed text-red-400">{err}</p>
+                      <p className="text-2xs leading-relaxed text-red-400">{err}</p>
                     )}
                   </>
                 )}

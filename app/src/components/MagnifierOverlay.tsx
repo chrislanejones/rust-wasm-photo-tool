@@ -55,7 +55,7 @@ export function MagnifierOverlay({ magnifier }: Props) {
       }}
     >
       <canvas ref={canvasRef} width={SIZE} height={SIZE} />
-      <div className="bg-black/80 px-2 py-1 text-center font-mono text-[10px] text-white tracking-widest">
+      <div className="bg-black/80 px-2 py-1 text-center font-mono text-2xs text-white tracking-widest">
         {magnifier.centerColor.toUpperCase()}
       </div>
     </div>

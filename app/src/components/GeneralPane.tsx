@@ -1,4 +1,4 @@
-import { Clock } from "lucide-react";
+import { Clock, History } from "lucide-react";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import {
@@ -104,6 +104,37 @@ export function GeneralPane({ value, onChange }: GeneralPaneProps) {
             active: value.idleTimeoutMin === min,
             onToggle: () => onChange({ idleTimeoutMin: min }),
           }))}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">When you return</h3>
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">
+            After you close the tab and come back, reopen your last gallery right
+            where you left off — or start with a clean upload. Either way your
+            edits stay saved.
+          </p>
+        </div>
+        <ToggleButtonGroup
+          fill
+          noIcons
+          items={[
+            {
+              key: "reopen",
+              icon: History,
+              label: "Reopen last session",
+              active: value.reopenLastSession,
+              onToggle: () => onChange({ reopenLastSession: true }),
+            },
+            {
+              key: "fresh",
+              icon: History,
+              label: "Start fresh",
+              active: !value.reopenLastSession,
+              onToggle: () => onChange({ reopenLastSession: false }),
+            },
+          ]}
         />
       </section>
     </div>

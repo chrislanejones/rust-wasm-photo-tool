@@ -143,7 +143,7 @@ export function GridThumbnails({
               )}
             </button>
             {isLastTile && overflowCount > 0 && (
-              <span className="absolute bottom-1 right-1 rounded bg-zinc-900/80 px-1.5 py-0.5 text-[10px] text-zinc-100">
+              <span className="absolute bottom-1 right-1 rounded bg-zinc-900/80 px-1.5 py-0.5 text-2xs text-zinc-100">
                 +{overflowCount} more
               </span>
             )}

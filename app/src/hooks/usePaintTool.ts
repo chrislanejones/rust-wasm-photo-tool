@@ -1,23 +1,6 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useRef } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
-
-/** Stabilizer strength → leash length (px). Off bypasses the stabilizer. */
-const STAB_LEASH: Record<ToolSettings["paintStabilizer"], number> = {
-  off: 0,
-  low: 12,
-  med: 22,
-  high: 36,
-};
-
-function parseHex(hex: string) {
-  const h = hex.replace("#", "");
-  return {
-    r: parseInt(h.slice(0, 2), 16) || 0,
-    g: parseInt(h.slice(2, 4), 16) || 0,
-    b: parseInt(h.slice(4, 6), 16) || 0,
-  };
-}
 
 interface Opts {
   toolRef: React.RefObject<ImageHorseTool | null>;
@@ -27,6 +10,14 @@ interface Opts {
   syncState: () => void;
 }
 
+/**
+ * Thin pointer-event forwarder for the paint brush. All the brush logic now
+ * lives in Rust behind `paint_down` / `paint_move` / `paint_up`: hex-colour
+ * parsing, the stabilizer ("lazy mouse") leash, the stroke state machine, and
+ * per-stroke opacity (overlapping dabs combine by max coverage, so a 50% stroke
+ * stays a true 50% instead of building up toward opaque). JS only maps the event
+ * to canvas-space coords and re-flushes the canvas when Rust reports it painted.
+ */
 export function usePaintTool({
   toolRef,
   canvasRef,
@@ -35,19 +26,6 @@ export function usePaintTool({
   syncState,
 }: Opts) {
   const painting = useRef(false);
-  // `last` is the previously painted point (raw 1:1 path only). With the
-  // stabilizer on, the trailing tip lives in Rust; `rawCursor` tracks the true
-  // pointer so Rust can "catch up" to it on mouse-up.
-  const last = useRef<{ x: number; y: number } | null>(null);
-  const rawCursor = useRef<{ x: number; y: number } | null>(null);
-
-  // Memoize the parsed brush colour: every paint dab + stroke segment
-  // re-reads it, so we want to skip the parseInt-x3 cost per mouse event
-  // (only re-parse when the hex actually changes).
-  const brushRgb = useMemo(
-    () => parseHex(settings.brushColor),
-    [settings.brushColor],
-  );
 
   const coords = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -68,27 +46,21 @@ export function usePaintTool({
       if (!t || e.button !== 0) return;
       painting.current = true;
       const { x, y } = coords(e);
-      last.current = { x, y };
-      rawCursor.current = { x, y };
-      const { r, g, b } = brushRgb;
-      t.paint_begin();
-      t.paint_dab(
+      t.paint_down(
         x,
         y,
-        settings.brushSize / 2,
-        r,
-        g,
-        b,
+        settings.brushSize,
+        settings.brushColor,
         settings.brushOpacity / 100,
+        settings.paintStabilizer,
       );
-      if (settings.paintStabilizer !== "off") t.paint_stab_begin(x, y);
       flushToCanvas();
     },
     [
       toolRef,
       coords,
-      brushRgb,
       settings.brushSize,
+      settings.brushColor,
       settings.brushOpacity,
       settings.paintStabilizer,
       flushToCanvas,
@@ -101,68 +73,18 @@ export function usePaintTool({
       const t = toolRef.current;
       if (!t) return;
       const { x, y } = coords(e);
-      rawCursor.current = { x, y };
-      const { r, g, b } = brushRgb;
-      const radius = settings.brushSize / 2;
-      const opacity = settings.brushOpacity / 100;
-      const stab = settings.paintStabilizer;
-
-      if (stab !== "off") {
-        // Pulled-string "lazy mouse" — the trailing tip and leash math live in
-        // Rust (paint_stab_to). It only paints when the cursor clears the leash.
-        if (t.paint_stab_to(x, y, STAB_LEASH[stab], radius, r, g, b, opacity)) {
-          flushToCanvas();
-        }
-        return;
-      }
-
-      if (!last.current) return;
-      const p = last.current;
-      t.paint_stroke_to(p.x, p.y, x, y, radius, r, g, b, opacity);
-      flushToCanvas();
-      last.current = { x, y };
+      if (t.paint_move(x, y)) flushToCanvas();
     },
-    [
-      toolRef,
-      coords,
-      brushRgb,
-      settings.brushSize,
-      settings.brushOpacity,
-      settings.paintStabilizer,
-      flushToCanvas,
-    ],
+    [toolRef, coords, flushToCanvas],
   );
 
   const onMouseUp = useCallback(() => {
     if (!painting.current) return;
     painting.current = false;
     const t = toolRef.current;
-    // Stabilizer catch-up (in Rust): draw the final segment to where the cursor
-    // actually is so the stroke ends under the pointer, then clear the tip.
-    if (t && settings.paintStabilizer !== "off" && rawCursor.current) {
-      const { r, g, b } = brushRgb;
-      const raw = rawCursor.current;
-      if (
-        t.paint_stab_flush(
-          raw.x, raw.y,
-          settings.brushSize / 2, r, g, b, settings.brushOpacity / 100,
-        )
-      ) {
-        flushToCanvas();
-      }
-    }
-    last.current = null;
-    rawCursor.current = null;
+    if (t && t.paint_up()) flushToCanvas();
     syncState();
-  }, [
-    toolRef,
-    brushRgb,
-    settings.brushSize,
-    settings.brushOpacity,
-    settings.paintStabilizer,
-    flushToCanvas,
-    syncState,
-  ]);
+  }, [toolRef, flushToCanvas, syncState]);
 
   return { onMouseDown, onMouseMove, onMouseUp };
 }

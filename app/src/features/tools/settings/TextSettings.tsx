@@ -105,7 +105,7 @@ export function TextSettings({
 
             {/* Font Family */}
             <div className="space-y-4">
-              <label className="text-[11px] text-theme-muted-foreground">
+              <label className="text-2xs text-theme-muted-foreground">
                 Font Family
               </label>
               <div className="relative">
@@ -127,7 +127,7 @@ export function TextSettings({
 
             {/* Font Weight */}
             <div className="space-y-4">
-              <label className="text-[11px] text-theme-muted-foreground">
+              <label className="text-2xs text-theme-muted-foreground">
                 Font Weight
               </label>
               <TabGroup

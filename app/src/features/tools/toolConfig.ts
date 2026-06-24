@@ -2,7 +2,7 @@
 import type { ToolType } from "@/lib/types";
 import {
   Shrink,
-  Crop,
+  SquareMousePointer,
   Paintbrush,
   Type,
   FileText,
@@ -35,9 +35,9 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "crop",
-    label: "Crop & Transform",
-    description: "Crop, flip & rotate images",
-    icon: Crop,
+    label: "Edit and Move",
+    description: "Crop, transform & align",
+    icon: SquareMousePointer,
     gradient: "from-cyan-500 to-blue-500",
   },
   {

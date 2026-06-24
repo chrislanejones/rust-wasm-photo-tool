@@ -142,11 +142,11 @@ export default function Pricing() {
           />
           <PlanCard
             tier="Free" tag="logged in" price="$0" sub="per month" color="emerald" cta="Create account"
-            features={["Persistence", "24 images", "3 projects", "100 MB", "3 layers / image"]}
+            features={["Edit sync (cloud)", "Originals stay on-device", "24 images", "3 projects", "3 layers / image"]}
           />
           <PlanCard
             tier="Pro" tag="best value" price="$10" sub="per month" color="violet" highlight cta="Start Pro"
-            features={["100 photos (coming soon)", "Unlimited storage", "Unlimited layers", "4× upscale", "Object removal", "AI unlimited"]}
+            features={["100 photos (coming soon)", "Cloud originals · 5 GB or your own S3", "Unlimited layers", "4× upscale", "Object removal", "AI unlimited"]}
           />
         </div>
 
@@ -181,8 +181,9 @@ export default function Pricing() {
           <TierCategory label="Gallery & storage" />
           <TierRow feature="Gallery" sub="photos loaded in session" demo="12 images" free="24 images" pro="100 images" />
           <TierRow feature="Auto compress all" demo="yes" free="yes" pro="yes" />
-          <TierRow feature="Image persistence" sub="saved across sessions" demo="—" free="UploadThing" pro="UploadThing" />
-          <TierRow feature="File storage quota" demo="—" free="100 MB" pro="5 GB" />
+          <TierRow feature="Edit persistence" sub="edits saved across sessions" demo="—" free="yes" pro="yes" />
+          <TierRow feature="Original files" sub="full-res source image" demo="local" free="on your device" pro="UploadThing / your S3" />
+          <TierRow feature="Cloud storage quota" sub="originals — Pro only" demo="—" free="—" pro="5 GB · or BYO S3" />
 
           <TierCategory label="Projects & data (Convex)" />
           <TierRow feature="Projects" sub="organize into folders" demo="—" free="3 projects" pro="unlimited" />
@@ -201,9 +202,9 @@ export default function Pricing() {
 
           <TierCategory label="Our server cost per user" />
           <TierRow feature="Convex"       demo="$0" free="~$0.01/mo" pro="~$0.05/mo" italic />
-          <TierRow feature="UploadThing"  demo="$0" free="~$0.02/mo" pro="~$0.10/mo" italic />
+          <TierRow feature="UploadThing / S3" sub="Pro originals only" demo="$0" free="$0" pro="~$0.10/mo" italic />
           <TierRow feature="Replicate AI" demo="$0" free="~$0.05/mo" pro="~$0.30/mo" italic />
-          <TierRow feature="Total"        demo="$0" free="~$0.08/mo" pro="~$0.45/mo" bold />
+          <TierRow feature="Total"        demo="$0" free="~$0.06/mo" pro="~$0.45/mo" bold />
         </div>
 
         {/* Principle */}
@@ -211,8 +212,8 @@ export default function Pricing() {
           <div className="text-xs text-zinc-300 leading-relaxed">
             <span className="text-zinc-100 font-medium">Design principle:</span> Demo mode costs us nothing because WASM runs on the user's device.
             The gallery limits (12 images in demo, 24 once signed in) and session-only storage are the natural nudge toward signup — no artificial
-            "sign in to use blur" gates on tools that run locally. Convex, UploadThing, and Replicate only activate
-            after auth, so our bill scales with real users, not drive-by traffic.
+            "sign in to use blur" gates on tools that run locally. Convex edit-sync activates after sign-in;
+            UploadThing / S3 originals and Replicate AI are Pro-only — so our bill scales with paying users, not drive-by traffic.
           </div>
         </div>
 

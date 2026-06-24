@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
-import { X, Image, Check, Zap, ChevronLeft, ChevronRight, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
+import { Check, Zap, ChevronLeft, ChevronRight, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LargeButton } from "@/components/ui/large-button";
-import { TinyButton } from "@/components/ui/tiny-button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { formatBytes } from "@/lib/format";
 import { TIERS } from "@/lib/tiers";
@@ -193,7 +192,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       </AnimatePresence>
 
       {hasSavings && (
-        <div className="absolute top-1 left-1 z-20 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-500/90 text-white text-[9px] font-bold font-mono shadow-lg pointer-events-none">
+        <div className="absolute top-1 left-1 z-20 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-500/90 text-white text-2xs font-bold font-mono shadow-lg pointer-events-none">
           <Zap className="h-2.5 w-2.5" />-{savings!.savingsPercent}%
         </div>
       )}
@@ -228,7 +227,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         </motion.div>
       </TooltipTrigger>
       <TooltipContent side="top" className="text-xs leading-snug">
-        <p className="font-medium">{entry.name}</p>
+        <p className="font-semibold">{entry.name}</p>
         {meta && <p className="text-text-muted">{meta}</p>}
       </TooltipContent>
     </Tooltip>
@@ -240,7 +239,6 @@ export function GalleryBar({
   activeId,
   onSelect,
   onRemove,
-  onClose,
   showTools,
   showHistory,
   compressionProgress,
@@ -313,8 +311,7 @@ export function GalleryBar({
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="flex items-center gap-2 text-xs font-semibold">
-              <Image className="h-3.5 w-3.5" />
-              Gallery
+              {/* No "Gallery" icon/title — just the count + the action buttons. */}
               <span className="flex items-center gap-1 text-xs font-normal text-text-muted">
                 {selectionActive ? (
                   // While selecting: "Selected: <selected> of <total>".
@@ -347,7 +344,7 @@ export function GalleryBar({
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom">
-                            <p className="font-medium mb-1.5">
+                            <p className="font-semibold mb-1.5">
                               Gallery photos per session
                             </p>
                             <ul className="space-y-1 text-xs">
@@ -429,9 +426,6 @@ export function GalleryBar({
                   <span className="hidden sm:inline">Unselect</span>
                 </LargeButton>
               )}
-              <TinyButton onClick={onClose} title="Close gallery">
-                <X className="h-4 w-4" />
-              </TinyButton>
             </div>
           </div>
 

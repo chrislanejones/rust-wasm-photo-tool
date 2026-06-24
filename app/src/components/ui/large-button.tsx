@@ -19,7 +19,7 @@ export const LargeButton = forwardRef<
     ref={ref}
     className={cn(
       "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5",
-      "text-xs font-medium text-text-primary transition-all",
+      "text-xs font-semibold text-text-primary transition-all",
       // Match icon size to the font size (like the JPEG/PNG format dropdown).
       "[&_svg]:size-[1em]",
       "bg-bg-elevated border border-border",

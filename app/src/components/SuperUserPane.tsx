@@ -40,7 +40,7 @@ function MatrixRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between px-2.5 py-1.5">
       <span className="text-text-muted">{label}</span>
-      <span className={`font-mono font-medium ${valueClass(value)}`}>{value}</span>
+      <span className={`font-mono font-semibold ${valueClass(value)}`}>{value}</span>
     </div>
   );
 }

@@ -4,6 +4,13 @@ import {
   FlipHorizontal,
   FlipVertical,
   Crop,
+  BoxSelect,
+  AlignStartVertical,
+  AlignCenterVertical,
+  AlignEndVertical,
+  AlignStartHorizontal,
+  AlignCenterHorizontal,
+  AlignEndHorizontal,
 } from "lucide-react";
 import { LargeButton } from "@/components/ui/large-button";
 import { ToolButton } from "@/components/ui/tool-button";
@@ -52,6 +59,31 @@ function ratioIdFromLock(lock: [number, number] | null): RatioId {
   return "free";
 }
 
+/* ── Align ─────────────────────────────────────────────────────────────
+ * Move the currently-selected object's bounding box to an edge / center of
+ * the canvas. The actual move is done in Rust (it owns the annotation
+ * geometry); this panel just emits the mode. */
+export type AlignMode =
+  | "left"
+  | "centerH"
+  | "right"
+  | "top"
+  | "middleV"
+  | "bottom";
+
+const ALIGN_BUTTONS: {
+  mode: AlignMode;
+  icon: typeof AlignStartVertical;
+  label: string;
+}[] = [
+  { mode: "left", icon: AlignStartVertical, label: "Align left" },
+  { mode: "centerH", icon: AlignCenterVertical, label: "Center horizontally" },
+  { mode: "right", icon: AlignEndVertical, label: "Align right" },
+  { mode: "top", icon: AlignStartHorizontal, label: "Align top" },
+  { mode: "middleV", icon: AlignCenterHorizontal, label: "Center vertically" },
+  { mode: "bottom", icon: AlignEndHorizontal, label: "Align bottom" },
+];
+
 /* ── Main component ──────────────────────────────────────────────────── */
 
 interface TransformCropSettingsProps {
@@ -66,6 +98,12 @@ interface TransformCropSettingsProps {
   /** Currently-locked aspect ratio as `[w, h]`. `null` = Free. */
   cropRatio: [number, number] | null;
   onCropRatioChange: (lock: [number, number] | null) => void;
+  /** Align the currently-selected object (text / shape) within the canvas. */
+  onAlign?: (mode: AlignMode) => void;
+  /** Whether an object is selected on the canvas (enables the Align row). */
+  hasSelection?: boolean;
+  /** Select the last-added object's bounding box as the align target. */
+  onSelectBoundingBox?: () => void;
 }
 
 export function TransformCropSettings({
@@ -79,6 +117,9 @@ export function TransformCropSettings({
   onSetCropSelection,
   cropRatio,
   onCropRatioChange,
+  onAlign,
+  hasSelection = false,
+  onSelectBoundingBox,
 }: TransformCropSettingsProps) {
   const ratio = ratioIdFromLock(cropRatio);
 
@@ -103,43 +144,12 @@ export function TransformCropSettings({
 
   return (
     <div className="space-y-6">
-      {/* ── Geometry ────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2 -mt-2">
-        <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-          Transform
-        </span>
-        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
-          <ToolButton disabled={disabled} onClick={onFlipH}>
-            <FlipHorizontal /> Flip H
-          </ToolButton>
-          <ToolButton disabled={disabled} onClick={onFlipV}>
-            <FlipVertical /> Flip V
-          </ToolButton>
-          <ToolButton disabled={disabled} onClick={onRotate90Cw}>
-            <RotateCw /> Rotate 90°
-          </ToolButton>
-          <ToolButton
-            disabled={disabled}
-            onClick={() => {
-              onRotate90Cw();
-              onRotate90Cw();
-              onRotate90Cw();
-            }}
-          >
-            <RotateCcw /> Rotate −90°
-          </ToolButton>
-        </div>
-      </div>
-
-      {/* ── Crop ───────────────────────────────────────────────────── */}
+      {/* ── Crop (first; no verbiage — just the ratio + apply) ───────────── */}
       {onApplyCrop && (
-        <div className="space-y-3 pt-3 border-t border-theme-sidebar-border">
+        <div className="space-y-3 -mt-2">
           <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
             Crop
           </span>
-          <p className="text-xs text-theme-muted-foreground leading-relaxed">
-            Pick a ratio or drag on the canvas to select an area, then apply.
-          </p>
 
           <ToolButtonGroup
             label="Ratio"
@@ -166,6 +176,61 @@ export function TransformCropSettings({
           </LargeButton>
         </div>
       )}
+
+      {/* ── Transform ───────────────────────────────────────────────────── */}
+      <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
+        <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
+          Transform
+        </span>
+        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
+          <ToolButton disabled={disabled} onClick={onFlipH}>
+            <FlipHorizontal /> Flip H
+          </ToolButton>
+          <ToolButton disabled={disabled} onClick={onFlipV}>
+            <FlipVertical /> Flip V
+          </ToolButton>
+          <ToolButton disabled={disabled} onClick={onRotate90Cw}>
+            <RotateCw /> Rotate 90°
+          </ToolButton>
+          <ToolButton
+            disabled={disabled}
+            onClick={() => {
+              onRotate90Cw();
+              onRotate90Cw();
+              onRotate90Cw();
+            }}
+          >
+            <RotateCcw /> Rotate −90°
+          </ToolButton>
+        </div>
+      </div>
+
+      {/* ── Align — move the selected object's bounding box (Rust-driven) ─── */}
+      <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
+        <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
+          Align
+        </span>
+        <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
+          {ALIGN_BUTTONS.map(({ mode, icon: Icon, label }) => (
+            <ToolButton
+              key={mode}
+              title={label}
+              aria-label={label}
+              disabled={disabled || !onAlign || !hasSelection}
+              onClick={() => onAlign?.(mode)}
+            >
+              <Icon />
+            </ToolButton>
+          ))}
+        </div>
+        <LargeButton
+          className="w-full"
+          disabled={disabled}
+          onClick={onSelectBoundingBox}
+        >
+          <BoxSelect className="h-4 w-4" /> Select bounding box
+        </LargeButton>
+      </div>
     </div>
   );
 }

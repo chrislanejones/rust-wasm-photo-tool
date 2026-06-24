@@ -61,7 +61,7 @@ export function SizeSlider(props: SizeSliderProps) {
   const display = valueDisplay ?? `${value}${unit}`;
 
   const labelRow = (
-    <div className="flex items-center justify-between text-[11px]">
+    <div className="flex items-center justify-between text-2xs">
       <span className="text-theme-muted-foreground">{label}</span>
       <span className="text-theme-foreground tabular-nums">{display}</span>
     </div>

@@ -66,6 +66,68 @@ pub fn blank_png(width: u32, height: u32, r: u8, g: u8, b: u8, a: u8) -> Vec<u8>
     })
 }
 
+/// Compute the line geometry for the canvas "Rulers & Grids" overlay. The
+/// frontend renders the returned segments as a non-destructive SVG overlay
+/// (scaled by zoom) — this is the single source for grid-layout math, so all
+/// three grid kinds agree everywhere.
+///
+/// Returns a flat list of segments `[x1, y1, x2, y2, …]` in **image-space pixel
+/// coordinates** (origin top-left). Only interior dividers are emitted (no
+/// border at 0 / width / height).
+///
+/// `kind`:
+/// - `0` — **square** grid at a fixed pixel spacing (`param_a` = spacing px)
+/// - `1` — **golden ratio**: lines at φ⁻¹ ≈ 0.382 and 0.618 on each axis
+/// - `2` — **columns × rows**: evenly divide into `param_a` cols, `param_b` rows
+#[wasm_bindgen]
+pub fn grid_lines(width: u32, height: u32, kind: u8, param_a: f32, param_b: f32) -> Vec<f32> {
+    let w = width as f32;
+    let h = height as f32;
+    let mut out: Vec<f32> = Vec::new();
+    if w < 1.0 || h < 1.0 {
+        return out;
+    }
+    match kind {
+        // Square grid at a fixed pixel spacing (interior lines only).
+        0 => {
+            let step = param_a.max(2.0);
+            let mut x = step;
+            while x < w - 0.5 {
+                out.extend_from_slice(&[x, 0.0, x, h]);
+                x += step;
+            }
+            let mut y = step;
+            while y < h - 0.5 {
+                out.extend_from_slice(&[0.0, y, w, y]);
+                y += step;
+            }
+        }
+        // Golden ratio: φ and 1-φ on each axis.
+        1 => {
+            let phi: f32 = 0.618_034;
+            for f in [1.0 - phi, phi] {
+                out.extend_from_slice(&[w * f, 0.0, w * f, h]);
+                out.extend_from_slice(&[0.0, h * f, w, h * f]);
+            }
+        }
+        // Columns × rows: evenly-spaced interior dividers.
+        2 => {
+            let cols = (param_a.round() as i32).clamp(1, 64);
+            let rows = (param_b.round() as i32).clamp(1, 64);
+            for i in 1..cols {
+                let x = w * (i as f32) / (cols as f32);
+                out.extend_from_slice(&[x, 0.0, x, h]);
+            }
+            for j in 1..rows {
+                let y = h * (j as f32) / (rows as f32);
+                out.extend_from_slice(&[0.0, y, w, y]);
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
 /// Web-performance indicators for the Resize &amp; Compress panel.
 ///
 /// Returns `[lighthouse_score, web_performance_gain]`, both in `0..=100`:
@@ -344,6 +406,32 @@ pub struct ImageHorseTool {
     /// advances toward the cursor only when it pulls past the leash. `None` when
     /// no stabilized stroke is active.
     paint_stab_tip: Option<(f64, f64)>,
+
+    // ── Paint-brush stroke state ──────────────────────────────────────────
+    /// Per-pixel max coverage (0..255) for the active paint stroke. Dabs combine
+    /// with max(), so overlapping dabs within one stroke can't compound alpha —
+    /// the whole stroke gets its opacity applied once on composite.
+    paint_cov: Vec<u8>,
+    /// Active-layer snapshot at stroke start; the stroke is recomposited over it
+    /// each move so the rendered opacity stays exactly the slider value.
+    paint_base: Vec<u8>,
+    /// Stroke colour / opacity / radius — fixed for the whole stroke.
+    paint_color: (u8, u8, u8),
+    paint_opacity: f32,
+    paint_radius: f64,
+    /// Stabilizer leash in px (0 = off) + last raw-path point (non-stabilized).
+    paint_leash: f64,
+    paint_last: Option<(f64, f64)>,
+    paint_raw: (f64, f64),
+
+    // ── Effects-brush (blur / pixelate / redaction) stroke state ──────────
+    /// 0 = blur, 1 = pixelate, 2 = redaction (set on effect_down).
+    effect_mode: u8,
+    effect_radius: f64,
+    effect_intensity: u32,      // blur strength
+    effect_pixel: u32,          // pixelate block size
+    effect_color: (u8, u8, u8), // redaction fill
+    effect_last: Option<(f64, f64)>,
 }
 
 /// Escape a string as a JSON string body (without surrounding quotes).
@@ -704,26 +792,30 @@ fn render_layer(
 /// Blend `src` (RGBA, same `w×h` as `dst`) over `dst` source-over, with the
 /// source alpha pre-scaled by `opacity` (0.0..=1.0).
 fn blend_over(dst: &mut [u8], src: &[u8], opacity: f64) {
-    let op = opacity.clamp(0.0, 1.0) as f32;
+    let op = opacity.clamp(0.0, 1.0);
     if op <= 0.0 {
         return;
     }
+    // Layer opacity as a 0..=255 integer multiplier, applied once up front so the
+    // per-pixel inner loop is pure integer source-over (same trick as
+    // drawing::blend_pixel — no f32 / ÷255.0 per channel per pixel).
+    let op255 = (op * 255.0).round() as u32;
     let n = dst.len().min(src.len());
     let mut i = 0;
     while i + 3 < n {
-        let sa = src[i + 3] as f32 / 255.0 * op;
-        if sa > 0.0 {
-            let da = dst[i + 3] as f32 / 255.0;
-            let out_a = sa + da * (1.0 - sa);
-            if out_a > 1e-6 {
+        let sa = ((src[i + 3] as u32 * op255 + 127) / 255).min(255);
+        if sa > 0 {
+            let da = dst[i + 3] as u32;
+            let dst_w = da * (255 - sa);
+            let out_a_hi = sa * 255 + dst_w; // out_a ×255 — no intermediate rounding
+            if out_a_hi > 0 {
+                let half = out_a_hi / 2;
                 for c in 0..3 {
-                    let sv = src[i + c] as f32 / 255.0;
-                    let dv = dst[i + c] as f32 / 255.0;
-                    let ov = (sv * sa + dv * da * (1.0 - sa)) / out_a;
-                    dst[i + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
+                    let num = src[i + c] as u32 * sa * 255 + dst[i + c] as u32 * dst_w;
+                    dst[i + c] = ((num + half) / out_a_hi) as u8;
                 }
             }
-            dst[i + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+            dst[i + 3] = ((out_a_hi + 127) / 255) as u8;
         }
         i += 4;
     }
@@ -978,6 +1070,20 @@ impl ImageHorseTool {
             editing_shape_id: None,
             editing_text_id: None,
             paint_stab_tip: None,
+            paint_cov: Vec::new(),
+            paint_base: Vec::new(),
+            paint_color: (0, 0, 0),
+            paint_opacity: 1.0,
+            paint_radius: 0.0,
+            paint_leash: 0.0,
+            paint_last: None,
+            paint_raw: (0.0, 0.0),
+            effect_mode: 0,
+            effect_radius: 0.0,
+            effect_intensity: 8,
+            effect_pixel: 12,
+            effect_color: (0, 0, 0),
+            effect_last: None,
         }
     }
 
@@ -1051,6 +1157,30 @@ impl ImageHorseTool {
 
     pub fn data_len(&self) -> usize {
         self.composite_cache.len()
+    }
+
+    /// Per-channel histogram of the current composite (the authoritative RGBA
+    /// buffer already blitted to the canvas). Returns a flat 1024-element array:
+    /// `[0,256)` = R, `[256,512)` = G, `[512,768)` = B, `[768,1024)` = Luma.
+    /// Fully-transparent pixels are skipped. Integer Rec.601-ish luma
+    /// `(R*3 + G*6 + B) / 10` keeps it float- and allocation-free — this replaces
+    /// the per-resample JS path (offscreen drawImage + getImageData + pixel loop).
+    pub fn calculate_histogram(&self) -> Vec<u32> {
+        let mut bins = vec![0u32; 256 * 4];
+        for px in self.composite_cache.chunks_exact(4) {
+            if px[3] == 0 {
+                continue; // ignore fully-transparent pixels
+            }
+            let r = px[0] as usize;
+            let g = px[1] as usize;
+            let b = px[2] as usize;
+            let luma = ((r * 3 + g * 6 + b) / 10).min(255);
+            bins[r] += 1;
+            bins[256 + g] += 1;
+            bins[512 + b] += 1;
+            bins[768 + luma] += 1;
+        }
+        bins
     }
 
     // ── Zoom ────────────────────────────────────────────────────────────
@@ -1671,6 +1801,76 @@ impl ImageHorseTool {
     pub fn begin_redact_stroke(&mut self) {
         self.snap("Redact");
     }
+
+    // ── High-level effects-brush driver (blur / pixelate / redaction) ──────
+    // Mirrors the paint driver: JS forwards pointer coords; the mode branch, the
+    // hex parse (redaction), and per-stroke interpolation all live here.
+    // `effect_move` steps dabs along the segment so a fast drag no longer leaves
+    // gaps (the old per-mouse-event JS driver only stamped at sampled points).
+
+    pub fn effect_down(
+        &mut self,
+        x: f64, y: f64, size: f64,
+        mode: &str, intensity: u32, pixel_size: u32, color: &str,
+    ) {
+        self.effect_mode = match mode {
+            "pixelate" => 1,
+            "solid" => 2,
+            _ => 0,
+        };
+        self.effect_radius = (size * 0.5).max(0.0);
+        self.effect_intensity = intensity;
+        self.effect_pixel = pixel_size;
+        let [r, g, b, _] = parse_hex(color.trim_start_matches('#')).unwrap_or([0, 0, 0, 255]);
+        self.effect_color = (r, g, b);
+        match self.effect_mode {
+            1 => self.begin_pixelate_stroke(),
+            2 => self.begin_redact_stroke(),
+            _ => self.begin_blur_stroke(),
+        }
+        self.effect_last = Some((x, y));
+        self.apply_effect_dab(x, y);
+    }
+
+    /// Stamp one effect dab at (x, y) using the current mode + params.
+    fn apply_effect_dab(&mut self, x: f64, y: f64) {
+        let r = self.effect_radius;
+        match self.effect_mode {
+            1 => self.pixelate_region(x, y, r, self.effect_pixel),
+            2 => {
+                let (cr, cg, cb) = self.effect_color;
+                self.redact_region(x, y, r, cr, cg, cb);
+            }
+            _ => self.blur_region(x, y, r, self.effect_intensity),
+        }
+    }
+
+    /// Continue the effects stroke to (x, y), interpolating dabs along the
+    /// segment (~half-radius steps) so fast drags don't leave gaps. Returns true
+    /// if it painted (so the caller knows to re-flush).
+    pub fn effect_move(&mut self, x: f64, y: f64) -> bool {
+        let (lx, ly) = match self.effect_last {
+            Some(p) => p,
+            None => return false,
+        };
+        let dx = x - lx;
+        let dy = y - ly;
+        let dist = (dx * dx + dy * dy).sqrt();
+        let step = (self.effect_radius * 0.5).max(1.0);
+        let steps = (dist / step).ceil() as u32;
+        // Start at 1 — (lx, ly) was already stamped on the previous call.
+        for i in 1..=steps {
+            let t = i as f64 / steps as f64;
+            self.apply_effect_dab(lx + dx * t, ly + dy * t);
+        }
+        self.effect_last = Some((x, y));
+        true
+    }
+
+    /// End the effects stroke (the undo snapshot was taken on effect_down).
+    pub fn effect_up(&mut self) {
+        self.effect_last = None;
+    }
  
     // Note: No end_blur_stroke needed — the snapshot is already saved.
     // Just call blur_region() repeatedly during the stroke, then
@@ -2017,6 +2217,80 @@ impl ImageHorseTool {
         true
     }
 
+    /// Align a committed annotation's bounding box to an edge / center of the
+    /// canvas. `mode` ∈ {left, centerH, right, top, middleV, bottom}. `is_text`
+    /// picks the text vs shape list (active layer). Snaps history once; the
+    /// caller flushes to re-render. Returns true if the annotation was moved.
+    pub fn align_annotation(
+        &mut self,
+        id: u32,
+        is_text: bool,
+        mode: &str,
+        canvas_w: f64,
+        canvas_h: f64,
+    ) -> bool {
+        // Current bbox (minx, miny, maxx, maxy) — computed without holding a
+        // mutable borrow across snap().
+        let bbox: Option<(f64, f64, f64, f64)> = if is_text {
+            self.layers[self.active]
+                .text_annotations
+                .iter()
+                .find(|t| t.id == id)
+                .map(|t| {
+                    let minx = (t.x + t.tile_offset_x) as f64;
+                    let miny = (t.y + t.tile_offset_y) as f64;
+                    (minx, miny, minx + t.tile_w as f64, miny + t.tile_h as f64)
+                })
+        } else {
+            self.layers[self.active]
+                .shape_annotations
+                .iter()
+                .find(|s| s.id == id)
+                .map(|s| (s.x0.min(s.x1), s.y0.min(s.y1), s.x0.max(s.x1), s.y0.max(s.y1)))
+        };
+        let Some((minx, miny, maxx, maxy)) = bbox else {
+            return false;
+        };
+        let (bw, bh) = (maxx - minx, maxy - miny);
+        let (dx, dy) = match mode {
+            "left" => (-minx, 0.0),
+            "centerH" => ((canvas_w - bw) / 2.0 - minx, 0.0),
+            "right" => (canvas_w - maxx, 0.0),
+            "top" => (0.0, -miny),
+            "middleV" => (0.0, (canvas_h - bh) / 2.0 - miny),
+            "bottom" => (0.0, canvas_h - maxy),
+            _ => return false,
+        };
+        if dx.abs() < 0.5 && dy.abs() < 0.5 {
+            return true; // already aligned — no history churn
+        }
+        self.snap("Align");
+        if is_text {
+            if let Some(t) = self.layers[self.active]
+                .text_annotations
+                .iter_mut()
+                .find(|t| t.id == id)
+            {
+                t.x += dx.round() as i32;
+                t.y += dy.round() as i32;
+            }
+        } else if let Some(s) = self.layers[self.active]
+            .shape_annotations
+            .iter_mut()
+            .find(|s| s.id == id)
+        {
+            s.x0 += dx;
+            s.y0 += dy;
+            s.x1 += dx;
+            s.y1 += dy;
+            for p in s.points.iter_mut() {
+                p.0 += dx;
+                p.1 += dy;
+            }
+        }
+        true
+    }
+
     /// Remove a shape annotation. Pushes a "Delete Shape" snapshot so undo
     /// restores it. Returns true if found.
     pub fn remove_shape_annotation(&mut self, id: u32) -> bool {
@@ -2234,41 +2508,53 @@ impl ImageHorseTool {
 
     pub fn paint_begin(&mut self) {
         self.snap("Paint");
+        let n = (self.width * self.height) as usize;
+        self.paint_cov = vec![0u8; n];
+        self.paint_base = self.layers[self.active].buf.data.clone();
+        self.paint_color = (0, 0, 0);
+        self.paint_opacity = 1.0;
     }
 
-    pub fn paint_dab(
-        &mut self,
-        cx: f64, cy: f64, radius: f64,
-        r: u8, g: u8, b: u8, opacity: f64,
-    ) {
+    /// Stamp one dab's soft-edged profile into the coverage buffer (max-combine,
+    /// never additive — this is what kills per-dab alpha build-up). Returns the
+    /// touched bbox, or None if it fell outside the canvas / the stroke isn't
+    /// primed (paint_begin not run).
+    fn accumulate_dab(&mut self, cx: f64, cy: f64, radius: f64) -> Option<(i32, i32, i32, i32)> {
         let w = self.width as i32;
         let h = self.height as i32;
-        let data = &mut self.layers[self.active].buf.data;
-        let brush_alpha = opacity.clamp(0.0, 1.0) as f32;
+        let n = (self.width * self.height) as usize;
+        if self.paint_cov.len() != n {
+            return None;
+        }
         let r_f32 = radius as f32;
+        if r_f32 <= 0.0 {
+            return None;
+        }
         let r_sq = r_f32 * r_f32;
         let min_x = ((cx - radius).floor() as i32).max(0);
         let max_x = ((cx + radius).ceil() as i32).min(w - 1);
         let min_y = ((cy - radius).floor() as i32).max(0);
         let max_y = ((cy + radius).ceil() as i32).min(h - 1);
+        if min_x > max_x || min_y > max_y {
+            return None;
+        }
 
-        // Hoisted invariants: hardened-zone radius² (no sqrt/falloff inside)
-        // and channel locals for the source brush colour.
-        let inv_radius = if r_f32 > 0.0 { 1.0_f32 / r_f32 } else { 1.0 };
+        // Hoisted invariants: hardened-zone radius² (no sqrt/falloff inside).
+        let inv_radius = 1.0_f32 / r_f32;
         let hard_r = r_f32 * 0.7;
         let hard_r_sq = hard_r * hard_r;
-        let sr = r as f32 / 255.0;
-        let sg = g as f32 / 255.0;
-        let sb = b as f32 / 255.0;
         let cx_f32 = cx as f32;
         let cy_f32 = cy as f32;
+        let cov = &mut self.paint_cov;
 
         for py in min_y..=max_y {
             for px in min_x..=max_x {
                 let dx = px as f32 - cx_f32;
                 let dy = py as f32 - cy_f32;
                 let dist_sq = dx * dx + dy * dy;
-                if dist_sq > r_sq { continue; }
+                if dist_sq > r_sq {
+                    continue;
+                }
                 let edge = if r_f32 > 1.0 {
                     if dist_sq <= hard_r_sq {
                         1.0
@@ -2277,23 +2563,74 @@ impl ImageHorseTool {
                         let t = (norm - 0.7) / 0.3;
                         (1.0 - t * t).max(0.0)
                     }
-                } else { 1.0 };
-                let sa = brush_alpha * edge;
-                let idx = ((py * w + px) * 4) as usize;
-                if idx + 3 >= data.len() { continue; }
-                // Porter-Duff source-over
-                let da = data[idx + 3] as f32 / 255.0;
-                let out_a = sa + da * (1.0 - sa);
-                data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
-                if out_a > 1e-6 {
-                    let src_rgb = [sr, sg, sb];
-                    for c in 0..3usize {
-                        let dv = data[idx + c] as f32 / 255.0;
-                        let ov = (src_rgb[c] * sa + dv * da * (1.0 - sa)) / out_a;
-                        data[idx + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
-                    }
+                } else {
+                    1.0
+                };
+                let c = (edge * 255.0).round() as u8;
+                let i = (py * w + px) as usize;
+                if c > cov[i] {
+                    cov[i] = c; // max-combine: overlap can't exceed full coverage
                 }
             }
+        }
+        Some((min_x, min_y, max_x, max_y))
+    }
+
+    /// Recomposite `paint_base` + the stroke (brush colour at coverage*opacity)
+    /// over `bbox` into the active layer. Porter-Duff source-over; idempotent for
+    /// a given coverage, so re-running over overlapping regions is safe.
+    fn recomposite_stroke_bbox(&mut self, min_x: i32, min_y: i32, max_x: i32, max_y: i32) {
+        let w = self.width as i32;
+        let active = self.active;
+        let (cr, cg, cb) = self.paint_color;
+        let op = self.paint_opacity.clamp(0.0, 1.0);
+        let sr = cr as f32 / 255.0;
+        let sg = cg as f32 / 255.0;
+        let sb = cb as f32 / 255.0;
+        let cov = &self.paint_cov;
+        let base = &self.paint_base;
+        let data = &mut self.layers[active].buf.data;
+        if base.len() != data.len() {
+            return;
+        }
+
+        for py in min_y..=max_y {
+            for px in min_x..=max_x {
+                let i = (py * w + px) as usize;
+                let idx = i * 4;
+                if idx + 3 >= data.len() {
+                    continue;
+                }
+                let sa = (cov[i] as f32 / 255.0) * op;
+                let ba = base[idx + 3] as f32 / 255.0;
+                let out_a = sa + ba * (1.0 - sa);
+                data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+                if out_a > 1e-6 {
+                    let src = [sr, sg, sb];
+                    for c in 0..3usize {
+                        let bv = base[idx + c] as f32 / 255.0;
+                        let ov = (src[c] * sa + bv * ba * (1.0 - sa)) / out_a;
+                        data[idx + c] = (ov * 255.0).round().clamp(0.0, 255.0) as u8;
+                    }
+                } else {
+                    data[idx] = 0;
+                    data[idx + 1] = 0;
+                    data[idx + 2] = 0;
+                }
+            }
+        }
+    }
+
+    /// Single dab (the stroke's first touch). Accumulates coverage + recomposites.
+    pub fn paint_dab(
+        &mut self,
+        cx: f64, cy: f64, radius: f64,
+        r: u8, g: u8, b: u8, opacity: f64,
+    ) {
+        self.paint_color = (r, g, b);
+        self.paint_opacity = opacity.clamp(0.0, 1.0) as f32;
+        if let Some((min_x, min_y, max_x, max_y)) = self.accumulate_dab(cx, cy, radius) {
+            self.recomposite_stroke_bbox(min_x, min_y, max_x, max_y);
         }
     }
 
@@ -2302,15 +2639,93 @@ impl ImageHorseTool {
         x0: f64, y0: f64, x1: f64, y1: f64,
         radius: f64, r: u8, g: u8, b: u8, opacity: f64,
     ) {
+        self.paint_color = (r, g, b);
+        self.paint_opacity = opacity.clamp(0.0, 1.0) as f32;
         let dx = x1 - x0;
         let dy = y1 - y0;
         let dist = (dx * dx + dy * dy).sqrt();
         let step = (radius * 0.25).max(1.0);
         let steps = (dist / step).ceil() as u32;
+        // Accumulate every dab's coverage first, then recomposite the union bbox
+        // once — correct per-stroke opacity, and far fewer recomposites per move.
+        let mut bbox: Option<(i32, i32, i32, i32)> = None;
         for i in 0..=steps {
             let t = if steps == 0 { 1.0 } else { i as f64 / steps as f64 };
-            self.paint_dab(x0 + dx * t, y0 + dy * t, radius, r, g, b, opacity);
+            if let Some(bb) = self.accumulate_dab(x0 + dx * t, y0 + dy * t, radius) {
+                bbox = Some(match bbox {
+                    None => bb,
+                    Some(a) => (a.0.min(bb.0), a.1.min(bb.1), a.2.max(bb.2), a.3.max(bb.3)),
+                });
+            }
         }
+        if let Some((min_x, min_y, max_x, max_y)) = bbox {
+            self.recomposite_stroke_bbox(min_x, min_y, max_x, max_y);
+        }
+    }
+
+    // ── High-level brush driver — the whole stroke lives in Rust ───────────
+    // JS just forwards pointer coords. `paint_down` parses the hex colour, maps
+    // the stabilizer level → leash, snapshots the layer, and lays the first dab;
+    // `paint_move` continues the stroke (stabilized or raw); `paint_up` flushes
+    // the stabilizer catch-up and frees the stroke buffers. Each returns whether
+    // it painted, so the caller knows when to re-flush the canvas.
+
+    pub fn paint_down(
+        &mut self,
+        x: f64, y: f64, size: f64,
+        color: &str, opacity: f64, stab: &str,
+    ) {
+        let [r, g, b, _] = parse_hex(color.trim_start_matches('#')).unwrap_or([0, 0, 0, 255]);
+        self.paint_begin();
+        let radius = (size * 0.5).max(0.0);
+        self.paint_radius = radius;
+        self.paint_leash = match stab {
+            "low" => 12.0,
+            "med" => 22.0,
+            "high" => 36.0,
+            _ => 0.0,
+        };
+        self.paint_last = Some((x, y));
+        self.paint_raw = (x, y);
+        self.paint_dab(x, y, radius, r, g, b, opacity);
+        if self.paint_leash > 0.0 {
+            self.paint_stab_begin(x, y);
+        }
+    }
+
+    /// Continue the active stroke toward (x, y). Returns true if it painted.
+    pub fn paint_move(&mut self, x: f64, y: f64) -> bool {
+        self.paint_raw = (x, y);
+        let (r, g, b) = self.paint_color;
+        let radius = self.paint_radius;
+        let leash = self.paint_leash;
+        let op = self.paint_opacity as f64;
+        if leash > 0.0 {
+            return self.paint_stab_to(x, y, leash, radius, r, g, b, op);
+        }
+        if let Some((lx, ly)) = self.paint_last {
+            self.paint_stroke_to(lx, ly, x, y, radius, r, g, b, op);
+            self.paint_last = Some((x, y));
+            return true;
+        }
+        false
+    }
+
+    /// End the active stroke (stabilizer catch-up to the true cursor) and free
+    /// the stroke buffers. Returns true if it painted.
+    pub fn paint_up(&mut self) -> bool {
+        let mut painted = false;
+        if self.paint_leash > 0.0 {
+            let (rx, ry) = self.paint_raw;
+            let (r, g, b) = self.paint_color;
+            painted =
+                self.paint_stab_flush(rx, ry, self.paint_radius, r, g, b, self.paint_opacity as f64);
+        }
+        self.paint_last = None;
+        self.paint_leash = 0.0;
+        self.paint_cov = Vec::new();
+        self.paint_base = Vec::new();
+        painted
     }
 
     // ── Stroke stabilizer ("lazy mouse") ──────────────────────────────────

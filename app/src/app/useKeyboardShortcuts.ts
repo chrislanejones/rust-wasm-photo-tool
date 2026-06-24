@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { StampSettings, ToolType } from "@/lib/types";
+import type { ToolType } from "@/lib/types";
 
 /** All ten tools in toolbar order — keys 1-9, 0 */
 const TOOL_BY_DIGIT: Record<string, ToolType> = {
@@ -40,8 +40,8 @@ interface KeyboardShortcutOptions {
   onExport: () => void;
   onExportAll?: () => void;
   onDeleteAll: () => void;
-  onBrushSizeChange: (fn: (prev: StampSettings) => StampSettings) => void;
-  setBrushSizeOnTool: (size: number) => void;
+  /** Shrink (-1) or grow (+1) the active brush — routed by tool in AppShell. */
+  onAdjustBrushSize: (direction: -1 | 1) => void;
   setShowUpload: React.Dispatch<React.SetStateAction<boolean>>;
   setShowTools: React.Dispatch<React.SetStateAction<boolean>>;
   setShowGallery: React.Dispatch<React.SetStateAction<boolean>>;
@@ -70,8 +70,7 @@ export function useKeyboardShortcuts({
   onExport,
   onExportAll,
   onDeleteAll,
-  onBrushSizeChange,
-  setBrushSizeOnTool,
+  onAdjustBrushSize,
   setShowUpload,
   setShowTools,
   setShowGallery,
@@ -161,6 +160,17 @@ export function useKeyboardShortcuts({
           onCopyToClipboard?.();
           return;
         }
+        // Ctrl/Cmd + [ or ] → shrink / grow the active brush (any brush tool).
+        if (e.code === "BracketLeft") {
+          e.preventDefault();
+          onAdjustBrushSize(-1);
+          return;
+        }
+        if (e.code === "BracketRight") {
+          e.preventDefault();
+          onAdjustBrushSize(1);
+          return;
+        }
         return;
       }
 
@@ -193,28 +203,15 @@ export function useKeyboardShortcuts({
           case "KeyT": e.preventDefault(); setShowTools((v) => !v); break;
           case "KeyG": e.preventDefault(); setShowGallery((v) => !v); break;
           case "KeyR": e.preventDefault(); setShowHistory((v) => !v); break;
-          case "BracketLeft":
-            e.preventDefault();
-            onBrushSizeChange((prev) => {
-              const next = Math.max(2, prev.brushSize - 5);
-              setBrushSizeOnTool(next);
-              return { ...prev, brushSize: next };
-            });
-            break;
-          case "BracketRight":
-            e.preventDefault();
-            onBrushSizeChange((prev) => {
-              const next = Math.min(200, prev.brushSize + 5);
-              setBrushSizeOnTool(next);
-              return { ...prev, brushSize: next };
-            });
-            break;
           case "Equal": e.preventDefault(); onZoomIn(); break;
           case "Minus": e.preventDefault(); onZoomOut(); break;
           case "Digit0": e.preventDefault(); onZoomReset?.(); break;
           case "KeyF": e.preventDefault(); onFlipH?.(); break;
           case "KeyV": e.preventDefault(); onFlipV?.(); break;
-          case "KeyS": e.preventDefault(); onRotateCw?.(); break;
+          case "KeyS":
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent("image-horse:open-settings"));
+            break;
           case "KeyE": e.preventDefault(); onExport(); break;
           case "KeyD": e.preventDefault(); onDeleteAll(); break;
         }
@@ -247,8 +244,8 @@ export function useKeyboardShortcuts({
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [
-    onUndo, onRedo, onExport, onExportAll, onDeleteAll, onBrushSizeChange,
-    setBrushSizeOnTool, setShowUpload, setShowTools, setShowGallery,
+    onUndo, onRedo, onExport, onExportAll, onDeleteAll, onAdjustBrushSize,
+    setShowUpload, setShowTools, setShowGallery,
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
     onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
