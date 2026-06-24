@@ -128,6 +128,7 @@ declare module "stamp_tool" {
     begin_stroke(dest_x: number, dest_y: number): void;
     continue_stroke(dest_x: number, dest_y: number): void;
     end_stroke(): void;
+    set_max_history(n: number): void;
     undo(): boolean;
     redo(): boolean;
     undo_count(): number;

@@ -1,7 +1,6 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Trash2, Activity, Gauge, Image as ImageIcon } from "lucide-react";
+import { Trash2, Activity, Gauge, Image as ImageIcon } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
-import { fadeIn, quickSpring } from "@/lib/animations";
+import { Modal } from "@/components/ui/Modal";
 import { ResourceMonitor } from "@/components/ResourceMonitor";
 import { ImageMetaPanel, type ImageMeta } from "@/components/ImageMetaPanel";
 import {
@@ -48,75 +47,49 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
   ];
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          variants={fadeIn}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-[3px]"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ y: 24, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 24, opacity: 0 }}
-            transition={quickSpring}
-            onClick={(e) => e.stopPropagation()}
-            className="flex h-[80vh] w-[min(960px,94vw)] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/95 text-zinc-100 shadow-2xl"
-          >
-            <div className="border-b border-zinc-800">
-              {/* Title + close */}
-              <div className="flex items-center justify-between px-4 pt-2.5 pb-2">
-                <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-zinc-300">
-                  <Activity className="h-4 w-4" />
-                  Diagnostics Window
-                </div>
-                <button
-                  onClick={onClose}
-                  className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              {/* Tab switcher + contextual clear */}
-              <div className="flex items-center justify-between px-4 pb-2">
-                <div className="flex items-center gap-1 rounded-lg bg-zinc-900 p-1">
-                  {tabs.map(({ id, label, icon: Icon }) => (
-                    <button
-                      key={id}
-                      onClick={() => setTab(id)}
-                      className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider transition-colors ${
-                        tab === id
-                          ? "bg-zinc-700 text-zinc-100"
-                          : "text-zinc-500 hover:text-zinc-300"
-                      }`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {label}
-                      {id === "telemetry" && (
-                        <span className={tab === id ? "text-zinc-300" : "text-zinc-400"}>
-                          ({entries.length})
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                {tab === "telemetry" && (
-                  <button
-                    onClick={clearDiagnostics}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Clear
-                  </button>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Diagnostics Window"
+      icon={Activity}
+      fill
+      toolbar={
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 rounded-lg bg-bg-tertiary p-1">
+            {tabs.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider transition-colors ${
+                  tab === id
+                    ? "bg-bg-elevated text-text-primary"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+                {id === "telemetry" && (
+                  <span className={tab === id ? "text-text-secondary" : "text-text-muted"}>
+                    ({entries.length})
+                  </span>
                 )}
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {tab === "resources" ? (
+              </button>
+            ))}
+          </div>
+          {tab === "telemetry" && (
+            <button
+              onClick={clearDiagnostics}
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-text-muted hover:bg-bg-elevated hover:text-text-primary"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          )}
+        </div>
+      }
+      footer="Alt + Delete to toggle · in-memory only, never sent anywhere"
+    >
+      {tab === "resources" ? (
                 <ResourceMonitor active={open && tab === "resources"} />
               ) : tab === "imagemeta" ? (
                 <ImageMetaPanel
@@ -164,14 +137,6 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
                   </tbody>
                 </table>
               )}
-            </div>
-
-            <div className="border-t border-zinc-800 px-4 py-1.5 text-center font-mono text-[10px] text-zinc-600">
-              Alt + Delete to toggle · in-memory only, never sent anywhere
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </Modal>
   );
 }

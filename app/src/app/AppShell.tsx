@@ -21,7 +21,12 @@ import { panelSpacingTransition, imageLoadBarFade, imageLoadBarProgress } from "
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
-import { DevTierDialog } from "@/components/DevTierDialog";
+import { ADMIN_EMAIL } from "@/lib/superuser";
+import type { SuperUserControls } from "@/components/SuperUserPane";
+import type { GeneralControls } from "@/components/GeneralPane";
+import { usePreferences, clampHistory } from "@/lib/preferences";
+import { useIdleTimeout } from "@/hooks/useIdleTimeout";
+import { IdleOverlay } from "@/components/IdleOverlay";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
@@ -180,22 +185,49 @@ export function AppShell() {
   const [userMode, setUserMode] = useState<UserMode>("demo");
   const handleAuthMode = useCallback((m: UserMode) => setUserMode(m), []);
 
-  // Dev-only tier override (Alt+L). When set, it wins over the Clerk-derived
-  // mode so the No Login / Logged In / Paid versions can be tested without
-  // real auth. Gated to dev builds at the render/shortcut sites.
-  const [showDevTier, setShowDevTier] = useState(false);
+  // Tier override (set from the Super User settings tab). When set, it wins over
+  // the Clerk-derived mode so the No Login / Logged In / Paid versions can be
+  // tested without real auth. Only the admin can reach the tab that sets it.
   const [devTierOverride, setDevTierOverride] = useState<UserMode | null>(null);
   const effectiveUserMode = devTierOverride ?? userMode;
 
-  // Hidden Dev Tools unlock: three clicks on the status-bar tiny button reveals
-  // the diagnostics log + tier selector (always on in dev builds).
-  const [devToolsUnlocked, setDevToolsUnlocked] = useState(false);
-  const devUnlockCountRef = useRef(0);
-  const devToolsEnabled = import.meta.env.DEV || devToolsUnlocked;
-  const handleDevUnlockClick = useCallback(() => {
-    devUnlockCountRef.current += 1;
-    if (devUnlockCountRef.current >= 3) setDevToolsUnlocked(true);
-  }, []);
+  // Super User settings tab — only the admin account sees it. The tier override
+  // is client-side UI gating only (the real tier stays enforced server-side by
+  // Convex), so this is a convenience gate, not a security boundary.
+  const { user } = useUser();
+  const isSuperUser =
+    user?.primaryEmailAddress?.emailAddress?.toLowerCase() === ADMIN_EMAIL;
+  const superUser: SuperUserControls | null = isSuperUser
+    ? {
+        mode: effectiveUserMode,
+        overridden: devTierOverride !== null,
+        onSelect: (m) => setDevTierOverride(m),
+        onReset: () => setDevTierOverride(null),
+      }
+    : null;
+
+  // App-wide preferences (Settings → General), persisted to localStorage.
+  const [prefs, updatePrefs] = usePreferences();
+  const general: GeneralControls = {
+    maxHistory: prefs.maxHistory,
+    onApplyMaxHistory: (n) => {
+      const v = clampHistory(n);
+      stamp.setMaxHistory(v); // apply to the live WASM engine
+      updatePrefs({ maxHistory: v });
+    },
+    idleTimeoutMin: prefs.idleTimeoutMin,
+    onSetIdleTimeout: (min) => updatePrefs({ idleTimeoutMin: min }),
+  };
+
+  // Re-apply the saved undo depth to the engine on first load, image swap, and
+  // change — each new image creates a fresh engine that defaults to 50.
+  useEffect(() => {
+    stamp.setMaxHistory(prefs.maxHistory);
+  }, [prefs.maxHistory, stamp.state.ready, activePhotoId, stamp.setMaxHistory]);
+
+  // Idle screen — dims to "Continue with Image Horse" after the configured
+  // timeout (0 = never) and lets the browser throttle the tab.
+  const { idle, wake } = useIdleTimeout(prefs.idleTimeoutMin);
 
   // Gallery photo cap for the current tier. Resolved from Rust (`photo_limit`)
   // so the WASM layer is the single source of truth. Starts at the most
@@ -1618,10 +1650,6 @@ export function AppShell() {
     onPrevPhoto: handlePrevPhoto,
     onSpaceDown: () => setIsPanning(true),
     onSpaceUp: () => setIsPanning(false),
-    // Alt+L tier switcher — a Dev Tool, gated until unlocked (always on in dev).
-    onToggleDevTier: devToolsEnabled
-      ? () => setShowDevTier((v) => !v)
-      : undefined,
   });
 
   const hasImage = stamp.state.ready;
@@ -1660,8 +1688,9 @@ export function AppShell() {
       <ShortcutModal
         open={showShortcutModal}
         onClose={() => setShowShortcutModal(false)}
-        showDevTools={devToolsEnabled}
       />
+
+      <IdleOverlay open={idle} onContinue={wake} />
 
       {/* Diagnostics Window (Alt+Delete) is always available. */}
       <DiagnosticLogOverlay
@@ -1692,17 +1721,6 @@ export function AppShell() {
           },
         }}
       />
-
-      {devToolsEnabled && (
-        <DevTierDialog
-          open={showDevTier}
-          onOpenChange={setShowDevTier}
-          mode={effectiveUserMode}
-          overridden={devTierOverride !== null}
-          onSelect={(m) => setDevTierOverride(m)}
-          onReset={() => setDevTierOverride(null)}
-        />
-      )}
 
       <Toaster />
 
@@ -1784,6 +1802,8 @@ export function AppShell() {
             onToggleTools={() => setShowTools((v) => !v)}
             onToggleGallery={() => setShowGallery((v) => !v)}
             onToggleHistory={() => setShowHistory((v) => !v)}
+            general={general}
+            superUser={superUser}
           />
         )}
       </AnimatePresence>
@@ -2181,7 +2201,6 @@ export function AppShell() {
               ? { keys: "Enter/Esc", label: "place / cancel" }
               : TOOL_SHORTCUT[activeTool]
           }
-          onUnlockClick={handleDevUnlockClick}
         />
       )}
 

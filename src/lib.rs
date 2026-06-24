@@ -15,6 +15,7 @@ use wasm_bindgen::prelude::*;
 
 mod core;
 mod history;
+mod settings;
 mod stamp;
 mod transform;
 mod filters;
@@ -1113,8 +1114,15 @@ impl ImageHorseTool {
     }
 
     pub fn end_stroke(&mut self) {
-        self.stamp
-            .end_stroke(&mut self.hist.undo_stack, history::MAX_HISTORY);
+        let max = self.hist.max_history;
+        self.stamp.end_stroke(&mut self.hist.undo_stack, max);
+    }
+
+    /// Set the undo-history depth (clamped to 50–1000). Trims the oldest
+    /// snapshots immediately if the cap is lowered. Driven by the General
+    /// settings slider; persisted on the JS side and re-applied on load.
+    pub fn set_max_history(&mut self, n: u32) {
+        self.hist.set_max_history(n as usize);
     }
 
     // ── History ─────────────────────────────────────────────────────────

@@ -509,6 +509,12 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     toolRef.current?.set_spacing(s);
   }, []);
 
+  /** Set the undo-history depth on the live engine (50–1000). Safe no-op until
+   *  an image/engine exists; re-applied after each load from AppShell. */
+  const setMaxHistory = useCallback((n: number) => {
+    toolRef.current?.set_max_history(n);
+  }, []);
+
   // ── History ───────────────────────────────────────────────────────────────
   /** Fire a window event so consumers (e.g. the text tool) can re-sync any
    *  derived state (the live annotation list, hover/edit selection, etc.)
@@ -1073,6 +1079,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     setHardness,
     setOpacity,
     setSpacing,
+    setMaxHistory,
     // History
     undo,
     redo,

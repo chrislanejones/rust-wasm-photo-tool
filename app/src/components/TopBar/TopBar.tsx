@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { UserMenu } from "@/components/UserMenu";
 import { SubscriptionButton } from "@/components/SubscriptionButton";
+import type { SuperUserControls } from "@/components/SuperUserPane";
+import type { GeneralControls } from "@/components/GeneralPane";
 
 interface TopBarProps {
   zoom: number;
@@ -41,6 +43,10 @@ interface TopBarProps {
   onToggleTools: () => void;
   onToggleGallery: () => void;
   onToggleHistory: () => void;
+  /** App-wide preferences for the Settings → General tab. */
+  general: GeneralControls;
+  /** Admin-only: adds the Super User tab to the Settings modal. */
+  superUser?: SuperUserControls | null;
 }
 
 export function TopBar({
@@ -59,6 +65,8 @@ export function TopBar({
   onToggleTools,
   onToggleGallery,
   onToggleHistory,
+  general,
+  superUser,
 }: TopBarProps) {
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under 1000px, and under 1200px when both side panels
@@ -208,7 +216,7 @@ export function TopBar({
 
             {/* Right cluster: Clerk user menu, anchored right */}
             <div className="flex items-center justify-end gap-1 min-w-0">
-              <SubscriptionButton />
+              <SubscriptionButton general={general} superUser={superUser} />
               <UserMenu />
             </div>
           </div>

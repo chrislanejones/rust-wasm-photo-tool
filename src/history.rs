@@ -12,9 +12,8 @@
 
 use std::collections::VecDeque;
 
+use crate::settings;
 use crate::Layer;
-
-pub const MAX_HISTORY: usize = 50;
 
 pub struct Snapshot {
     pub label: String,
@@ -29,6 +28,9 @@ pub struct Snapshot {
 pub struct History {
     pub undo_stack: VecDeque<Snapshot>,
     pub redo_stack: Vec<Snapshot>,
+    /// Live undo depth (user-tunable via settings; defaults to
+    /// `settings::DEFAULT_MAX_HISTORY`). Enforced here on push.
+    pub max_history: usize,
 }
 
 impl History {
@@ -36,13 +38,23 @@ impl History {
         Self {
             undo_stack: VecDeque::new(),
             redo_stack: Vec::new(),
+            max_history: settings::DEFAULT_MAX_HISTORY,
+        }
+    }
+
+    /// Update the undo depth at runtime (clamped to the allowed range) and trim
+    /// the oldest snapshots immediately if the new cap is lower.
+    pub fn set_max_history(&mut self, n: usize) {
+        self.max_history = settings::clamp_max_history(n);
+        while self.undo_stack.len() > self.max_history {
+            self.undo_stack.pop_front();
         }
     }
 
     /// Push a pre-built snapshot onto the undo stack. Clears the redo stack.
     pub fn push(&mut self, snap: Snapshot) {
         self.undo_stack.push_back(snap);
-        if self.undo_stack.len() > MAX_HISTORY {
+        while self.undo_stack.len() > self.max_history {
             self.undo_stack.pop_front();
         }
         self.redo_stack.clear();

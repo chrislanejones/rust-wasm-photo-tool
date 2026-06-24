@@ -1,13 +1,22 @@
-// Gear button + Plan & Billing modal. Self-contained: holds its own modal
-// state, reads tier/subscription from Convex, and drives Stripe Checkout /
-// Customer Portal via the convex/stripe actions. Drop it anywhere (e.g. the
-// TopBar next to the user menu).
-import { motion, AnimatePresence } from "framer-motion";
+// Gear button + Settings modal (GNOME-style: a category rail on the left, the
+// selected pane on the right). General (app preferences), Plan & Billing (Stripe
+// tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
+// the TopBar).
 import { useState } from "react";
 import { useAction, useQuery } from "convex/react";
-import { Settings, X, Check, Loader2, ExternalLink } from "lucide-react";
+import {
+  Settings,
+  SlidersHorizontal,
+  CreditCard,
+  ShieldCheck,
+  Check,
+  Loader2,
+  ExternalLink,
+} from "lucide-react";
 import { api } from "../../../convex/_generated/api";
-import { fadeIn, quickSpring } from "@/lib/animations";
+import { Modal } from "@/components/ui/Modal";
+import { SuperUserPane, type SuperUserControls } from "@/components/SuperUserPane";
+import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
 
 const PRO_FEATURES = [
   "All AI tools — background removal, OCR, object removal",
@@ -17,8 +26,27 @@ const PRO_FEATURES = [
   "Unlimited share links",
 ];
 
-export function SubscriptionButton() {
+type SettingsTab = "general" | "billing" | "superuser";
+
+interface Props {
+  /** App-wide preferences for the General tab. */
+  general: GeneralControls;
+  /** When set (admin only), adds a gated "Super User" tab with the tier
+   *  override. Omit / null for everyone else. */
+  superUser?: SuperUserControls | null;
+}
+
+export function SubscriptionButton({ general, superUser }: Props) {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<SettingsTab>("general");
+
+  const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] = [
+    { id: "general", label: "General", icon: SlidersHorizontal },
+    { id: "billing", label: "Plan & Billing", icon: CreditCard },
+    ...(superUser
+      ? [{ id: "superuser" as SettingsTab, label: "Super User", icon: ShieldCheck }]
+      : []),
+  ];
   const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -49,42 +77,50 @@ export function SubscriptionButton() {
         type="button"
         onClick={() => setOpen(true)}
         className="btn-icon"
-        title="Plan & billing"
-        aria-label="Plan & billing"
+        title="Settings"
+        aria-label="Settings"
       >
         <Settings className="h-4 w-4" />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-            onClick={() => setOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              transition={quickSpring}
-              onClick={(e) => e.stopPropagation()}
-              className="w-[min(440px,95vw)] overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl"
-            >
-              <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2.5">
-                <span className="text-sm font-semibold">Plan &amp; Billing</span>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Settings"
+        icon={Settings}
+        fill
+      >
+        <div className="flex h-full">
+          {/* GNOME-style category rail (left) */}
+          <nav className="w-48 shrink-0 space-y-1 overflow-y-auto border-r border-border bg-bg-tertiary/30 p-2">
+            {tabs.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                  tab === id
+                    ? "bg-bg-elevated text-text-primary"
+                    : "text-text-secondary hover:bg-bg-elevated/60"
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </button>
+            ))}
+          </nav>
 
-              <div className="space-y-4 p-4">
+          {/* Selected pane (right) */}
+          <div className="flex-1 overflow-y-auto p-5">
+            {tab === "general" ? (
+              <GeneralPane {...general} />
+            ) : tab === "superuser" && superUser ? (
+              <SuperUserPane {...superUser} />
+            ) : (
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-text-primary">
+                  Plan &amp; Billing
+                </h3>
                 {me === undefined ? (
                   <p className="text-xs text-zinc-400">Loading…</p>
                 ) : me === null ? (
@@ -162,10 +198,10 @@ export function SubscriptionButton() {
                   </>
                 )}
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            )}
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

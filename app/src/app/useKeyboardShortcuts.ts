@@ -62,8 +62,6 @@ interface KeyboardShortcutOptions {
   // Item 2: Spacebar pan
   onSpaceDown?: () => void;
   onSpaceUp?: () => void;
-  // Dev-only tier switcher (Alt+L); undefined in production builds
-  onToggleDevTier?: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -92,7 +90,6 @@ export function useKeyboardShortcuts({
   onPrevPhoto,
   onSpaceDown,
   onSpaceUp,
-  onToggleDevTier,
 }: KeyboardShortcutOptions) {
   const spaceHeldRef = useRef(false);
 
@@ -191,13 +188,6 @@ export function useKeyboardShortcuts({
           }
         }
 
-        // Alt+L → dev-only tier switcher (handler is undefined in prod builds)
-        if (e.code === "KeyL" && onToggleDevTier) {
-          e.preventDefault();
-          onToggleDevTier();
-          return;
-        }
-
         switch (e.code) {
           case "KeyN": e.preventDefault(); setShowUpload((v) => !v); break;
           case "KeyT": e.preventDefault(); setShowTools((v) => !v); break;
@@ -262,6 +252,5 @@ export function useKeyboardShortcuts({
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
     onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
-    onToggleDevTier,
   ]);
 }

@@ -5,9 +5,6 @@ import { fadeIn, quickSpring } from "@/lib/animations";
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** When true, append the hidden "Secret Menu" section (unlocked via the
-   *  status-bar tiny button or dev builds). */
-  showDevTools?: boolean;
 }
 
 const SHORTCUT_GROUPS = [
@@ -94,18 +91,8 @@ const SHORTCUT_GROUPS = [
   },
 ];
 
-/** Hidden section, shown only once dev tools are unlocked (triple-click). */
-const SECRET_MENU_GROUP = {
-  title: "Secret Menu",
-  shortcuts: [
-    { keys: ["Alt", "L"], action: "User / Tier Selector" },
-  ],
-};
-
-export function ShortcutModal({ open, onClose, showDevTools }: Props) {
-  const groups = showDevTools
-    ? [...SHORTCUT_GROUPS, SECRET_MENU_GROUP]
-    : SHORTCUT_GROUPS;
+export function ShortcutModal({ open, onClose }: Props) {
+  const groups = SHORTCUT_GROUPS;
   return (
     <AnimatePresence>
       {open && (
