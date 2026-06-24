@@ -6,9 +6,38 @@ import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { MAX_HISTORY_MIN, MAX_HISTORY_MAX } from "@/lib/preferences";
 
 /**
- * Settings → General pane. App-wide preferences:
+ * Settings → General pane. App-wide preferences, persisted via
+ * `lib/preferences.ts` (`usePreferences`, localStorage key `image-horse-prefs`):
  * - Undo history depth (50–1000), applied to the WASM engine via Apply & Save.
  * - Idle screen timeout (drives the "Continue with Image Horse" overlay).
+ *
+ * ── Roadmap (each = add a field on `Preferences` + a control below) ───────────
+ * The prefs store + this pane are the foundation; future settings just plug in.
+ *
+ * • Export defaults ⭐ (highest value — Image Horse is a compression tool first):
+ *     default format / quality / EXIF keep-strip. Seed `defaultToolSettings`
+ *     + the EXIF policy from prefs on load; the Compress panel owns the live
+ *     controls.
+ * • Appearance:
+ *     - Accent color — the warm #fcdfc2 (`--theme-primary` / `--accent` /
+ *       `--ring` in styles.css). Reuse `ColorSwatchGrid` + `useUserColors`; set
+ *       the CSS var on `:root`. (First themed var — no theme infra yet.)
+ *     - Reduce motion — swap `panelSpacingTransition` / modal+zoom springs for
+ *       `{ duration: 0 }`; also honor `matchMedia('prefers-reduced-motion')`.
+ *       a11y + slow-machine win; nothing handles it today.
+ * • Behavior:
+ *     - Confirm before "Delete All" (gate the existing Delete-All dialog).
+ *     - Restore last session on launch (edits persist to `image-horse-edits`;
+ *       today a reload drops logged-out users back to the upload screen).
+ * • Data & privacy (bottom danger-zone, destructive `LargeButton`):
+ *     - Clear local data — wipe LS keys `image-horse-user-colors` /
+ *       `-recent-texts` and IndexedDB `image-horse-originals` / `-edits`
+ *       (`indexedDB.deleteDatabase`).
+ *
+ * Other tabs (not General): Super User ✓, Plan & Billing ✓; maybe a Shortcuts
+ * tab later (mirror `ShortcutModal`). All client-side prefs — not a security
+ * boundary. Keep the visual language consistent with `SuperUserPane` (section
+ * heading + `space-y-4`, `ToggleButtonGroup` for choices, `LargeButton` actions).
  */
 export interface GeneralControls {
   /** Currently-applied (and persisted) undo depth. */

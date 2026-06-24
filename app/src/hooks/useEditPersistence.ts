@@ -20,6 +20,7 @@ import type {
   PersistedShape,
   PersistedLayer,
 } from "@/lib/editPersistence";
+import { logDiagnostic } from "@/lib/diagnosticsLog";
 
 // ── Archive encoding ───────────────────────────────────────────────────────
 // Packs canvas + full undo/redo history into a single binary blob so one
@@ -331,8 +332,16 @@ export function useEditPersistence() {
           // Also write IDB so the local machine can reload without a round-trip
           await idbSave(photoId, toolRef);
           return;
-        } catch {
-          // fall through to IDB-only
+        } catch (err) {
+          // Cloud save failed (upload / storage / auth). Fall through to a local
+          // IDB save so the edit isn't lost — but record it, so the failure
+          // shows up in the Diagnostics Window instead of vanishing silently.
+          logDiagnostic(
+            "CONVEX_DB",
+            `Cloud edit save failed for ${photoId}; saved locally only: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
         }
       }
       await idbSave(photoId, toolRef);

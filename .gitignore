@@ -34,3 +34,6 @@ www-dist
 
 # Windows/WSL alternate-data-stream artifacts
 *:Zone.Identifier
+
+# Local planning / action-plan docs (not for the repo)
+action-plan.md

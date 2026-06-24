@@ -20,7 +20,7 @@ import type { EffectsMode } from "./settings/EffectsSettings";
 import type { StampMode } from "./settings/StampSettings";
 import type { ShapesMode } from "./settings/ShapeSettings";
 import { ToolGrid } from "./ToolGrid";
-import * as StampSettingsModule from "./settings/StampSettings";
+import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
@@ -33,11 +33,6 @@ import { PaintSettings } from "./settings/PaintSettings";
 import { TextSettings } from "./settings/TextSettings";
 import { AISettings } from "./settings/AISettings";
 import type { AIResultPixels } from "@/hooks/useAIJob";
-
-const StampSettingsPanel =
-  (StampSettingsModule as any).StampSettingsPanel ??
-  (StampSettingsModule as any).StampSettings ??
-  (StampSettingsModule as any).default;
 
 interface ToolsSidebarProps {
   onClose: () => void;
@@ -270,7 +265,7 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "stamp" && StampSettingsPanel && (
+        {activeTool === "stamp" && (
           <StampSettingsPanel
             settings={stampSettings}
             onChange={onStampSettingsChange}

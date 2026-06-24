@@ -532,16 +532,12 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   }, [flushToCanvas, syncState, broadcastAnnotationsChanged]);
 
   const redo = useCallback(() => {
-    console.log("Redo function called, redoCount:", state.redoCount);
     if (toolRef.current?.redo()) {
-      console.log("Redo successful");
       flushToCanvas();
       syncState();
       broadcastAnnotationsChanged();
-    } else {
-      console.log("Redo failed or no redo available");
     }
-  }, [flushToCanvas, syncState, state.redoCount, broadcastAnnotationsChanged]);
+  }, [flushToCanvas, syncState, broadcastAnnotationsChanged]);
 
   const jumpToHistory = useCallback(
     (index: number) => {

@@ -27,6 +27,19 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.21",
+    date: "2026-06-24",
+    headline: "Settings menu, pick-your-format downloads, and a hardening pass",
+    entries: [
+      { tag: "feature", text: "New Settings menu — the gear by your avatar opens a tidy window with General (set your undo-history depth, and an idle screen) and Plan & Billing, all in one place." },
+      { tag: "feature", text: "Pick your format right in the Download dialog — a JPEG / PNG / WebP / AVIF card picker now lives in the box, so you can switch formats without hunting for the Compress dropdown. It stays in sync with the panel." },
+      { tag: "feature", text: "Tunable undo history — crank undo up to 1000 steps (or keep it lean) from Settings → General. More undo is yours for a little more memory." },
+      { tag: "feature", text: "Idle power-saver — leave a tab open a while and it dims to a “Continue with Image Horse” screen so your browser can throttle the tab and save battery. Your edits are kept; click to come right back." },
+      { tag: "ui",      text: "Download dialog polish — a proper header and footer, and the “All” button only appears when you actually have more than one image. Export Selected now opens the same dialog so you can choose a format first." },
+      { tag: "fix",     text: "Quieter, clearer errors — cloud-sync failures now surface in the Diagnostics window instead of vanishing, plus a stray image-reload fix and some debug-log cleanup under the hood." },
+    ],
+  },
+  {
     version: "v0.9.20",
     date: "2026-06-24",
     headline: "Stroke stabilizer, lettered pins, and a big UI consistency pass",

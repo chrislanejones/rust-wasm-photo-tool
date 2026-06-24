@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { logDiagnostic } from "@/lib/diagnosticsLog";
 
 /**
  * Ensure a Convex `users` row exists for the signed-in Clerk user.
@@ -22,9 +23,17 @@ export function useStoreUser() {
     }
     if (stored.current) return;
     stored.current = true;
-    void upsert().catch(() => {
-      // Allow a retry on the next auth change if the upsert failed.
+    void upsert().catch((err) => {
+      // Allow a retry on the next auth change if the upsert failed — and surface
+      // it: a failed upsert means the user row never gets created, so tier /
+      // subscription / AI-gating silently have nothing to read.
       stored.current = false;
+      logDiagnostic(
+        "CONVEX_DB",
+        `users.upsert failed (user row not created): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     });
   }, [isAuthenticated, upsert]);
 }

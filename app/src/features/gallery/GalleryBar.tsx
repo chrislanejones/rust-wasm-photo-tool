@@ -126,7 +126,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       )}
       <img
         ref={imgRef}
-        src={thumbUrl}
+        src={thumbUrl || undefined}
         alt={entry.name}
         draggable={false}
         decoding="async"

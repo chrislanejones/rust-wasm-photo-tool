@@ -47,6 +47,7 @@ import { useRecentTexts } from "@/hooks/useRecentTexts";
 import { putOriginal, getOriginal, getOriginalAsBlobUrl, deleteOriginal } from "@/lib/originalsStore";
 import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
+import { RadioCards } from "@/components/ui/radio-cards";
 import {
   readExifTiff,
   applyExifToReencoded,
@@ -71,6 +72,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogBody,
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
@@ -116,6 +118,15 @@ function capMessage(mode: UserMode, max: number): string {
     return `Free accounts hold ${max} photos. Pro (100) is coming soon.`;
   return `Gallery is limited to ${max} photos.`;
 }
+
+// Format choices shown in the Download dialog — a second chance to pick a
+// format for anyone who missed the dropdown in the Compress panel.
+const DOWNLOAD_FORMATS: { value: ExportFormat; label: string; hint: string }[] = [
+  { value: "jpeg", label: "JPEG", hint: "Small · no transparency" },
+  { value: "png", label: "PNG", hint: "Lossless · transparency" },
+  { value: "webp", label: "WebP", hint: "Small · transparency" },
+  { value: "avif", label: "AVIF", hint: "Smallest · modern" },
+];
 
 function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
   const { isLoaded, isSignedIn } = useUser();
@@ -1728,11 +1739,13 @@ export function AppShell() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete all images?</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
             <DialogDescription>
               This will remove all {photos.length} image{photos.length !== 1 ? "s" : ""} and their edit history. This cannot be undone.
             </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2">
+          </DialogBody>
+          <DialogFooter>
             <DialogClose asChild>
               <LargeButton className="flex-1">Cancel</LargeButton>
             </DialogClose>
@@ -1750,33 +1763,75 @@ export function AppShell() {
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Download {exportFormat.toUpperCase()}s</DialogTitle>
-            <DialogDescription>
-              Export the selected photos or the whole gallery. More than one
-              image downloads together as a{" "}
-              <span className="font-mono">.zip</span>.
-            </DialogDescription>
+            <DialogTitle>
+              Download {DOWNLOAD_FORMATS.find((f) => f.value === exportFormat)?.label}
+              {photos.length > 1 ? "s" : ""}
+            </DialogTitle>
           </DialogHeader>
+
+          <DialogBody className="space-y-4">
+            <DialogDescription>
+              {photos.length > 1 ? (
+                <>
+                  Export the selected photos or the whole gallery — more than one
+                  image downloads together as a{" "}
+                  <span className="font-mono">.zip</span>.
+                </>
+              ) : (
+                "Pick a format, then download."
+              )}
+            </DialogDescription>
+
+            {/* Format picker — a second shot at the format for anyone who missed
+                the Compress dropdown. */}
+            <div className="space-y-2">
+              <span className="text-xs font-medium text-text-muted">Format</span>
+              <RadioCards
+                name="download-format"
+                value={exportFormat}
+                onValueChange={setExportFormat}
+                options={DOWNLOAD_FORMATS}
+                columns={2}
+              />
+            </div>
+          </DialogBody>
+
           <DialogFooter className="gap-2 sm:gap-2">
-            <LargeButton
-              className="flex-1"
-              onClick={() => {
-                setExportDialogOpen(false);
-                if (selectedIds.size > 0) handleExportSelected();
-                else void handleExport();
-              }}
-            >
-              {selectedIds.size > 0 ? `Selected (${selectedIds.size})` : "Selected"}
-            </LargeButton>
-            <LargeButton
-              className="flex-1"
-              onClick={() => {
-                setExportDialogOpen(false);
-                handleExportAll();
-              }}
-            >
-              All ({photos.length})
-            </LargeButton>
+            {photos.length > 1 ? (
+              <>
+                <LargeButton
+                  className="flex-1"
+                  onClick={() => {
+                    setExportDialogOpen(false);
+                    if (selectedIds.size > 0) handleExportSelected();
+                    else void handleExport();
+                  }}
+                >
+                  {selectedIds.size > 0
+                    ? `Selected (${selectedIds.size})`
+                    : "This image"}
+                </LargeButton>
+                <LargeButton
+                  className="flex-1"
+                  onClick={() => {
+                    setExportDialogOpen(false);
+                    handleExportAll();
+                  }}
+                >
+                  All ({photos.length})
+                </LargeButton>
+              </>
+            ) : (
+              <LargeButton
+                className="flex-1"
+                onClick={() => {
+                  setExportDialogOpen(false);
+                  void handleExport();
+                }}
+              >
+                Download
+              </LargeButton>
+            )}
             <DialogClose asChild>
               <LargeButton className="flex-1">Cancel</LargeButton>
             </DialogClose>
@@ -2154,7 +2209,7 @@ export function AppShell() {
             onDeleteAll={handleDeleteAll}
             onDeleteSelected={handleDeleteSelected}
             onDuplicateSelected={handleDuplicateSelected}
-            onExportSelected={handleExportSelected}
+            onExportSelected={handleExportClick}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelectPhoto}
             onClearSelection={clearSelection}
