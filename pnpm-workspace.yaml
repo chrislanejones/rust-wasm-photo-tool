@@ -1,5 +1,38 @@
-allowBuilds:
-  esbuild: true
+# Single pnpm workspace for the whole repo.
+# Members: the editor app and the marketing site. The Rust/WASM crate builds
+# to ./pkg (see `build:wasm`) and is consumed by the app via a Vite alias, so
+# it is intentionally NOT a workspace package.
+packages:
+  - app
+  - marketing
+
+# Single source of truth for versions shared across packages. Reference these
+# from a package.json with `"<dep>": "catalog:"`.
+catalog:
+  react: ^19.0.0
+  react-dom: ^19.0.0
+  '@types/react': ^19.0.0
+  '@types/react-dom': ^19.0.0
+  '@vitejs/plugin-react': ^4.3.4
+  vite: ^6.0.5
+  typescript: ^5.7.2
+  tailwindcss: ^4.0.6
+  '@tailwindcss/vite': ^4.0.6
+  convex: ^1.41.0
+
+# Security/version floors, applied repo-wide (previously copy-pasted per package).
 overrides:
   js-cookie: '>=3.0.7'
   ws: '>=8.21.0'
+  # Security floor, capped at the major @clerk/clerk-react@5.x expects (it
+  # declares ^3.47.7); a bare '>=' lets pnpm jump to 4.x and breaks the build.
+  '@clerk/shared': '^3.47.7'
+
+# Single gate for which dependencies may run install/build scripts.
+# (@swc/core is pulled in transitively but unused — nothing here compiles with
+# SWC — so its native build stays off, matching prior behavior.)
+allowBuilds:
+  esbuild: true
+  tesseract.js: true
+  '@swc/core': false
+  '@clerk/shared': false

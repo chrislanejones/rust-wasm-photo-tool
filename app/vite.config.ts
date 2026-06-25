@@ -15,7 +15,9 @@ export default defineConfig({
       "@features": path.resolve(__dirname, "./src/features"),
       "@components": path.resolve(__dirname, "./src/components"),
       "@app": path.resolve(__dirname, "./src/app"),
-      stamp_tool: path.resolve(__dirname, "./pkg/stamp_tool.js"),
+      // Single source of truth for the WASM bundle: built once to ../pkg by
+      // `pnpm run build:wasm` at the repo root. (server.fs.allow includes "..".)
+      stamp_tool: path.resolve(__dirname, "../pkg/stamp_tool.js"),
     },
   },
   server: {

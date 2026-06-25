@@ -1,8 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "installCommand": "echo 'deps are installed in buildCommand'",
-  "buildCommand": "cd marketing && pnpm install && pnpm run build",
-  "outputDirectory": "marketing/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
-}
