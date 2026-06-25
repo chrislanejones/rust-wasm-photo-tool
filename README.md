@@ -375,29 +375,32 @@ app/src/
 
 ## Getting Started
 
-Repo lives in WSL (Debian) at `~/repo/rust-wasm-photo-tool/`:
+Repo lives in WSL (Debian) at `~/repo/rust-wasm-photo-tool/`. It is a **single pnpm
+workspace** (`app` + `marketing`) with shared dependency versions declared in the
+`pnpm-workspace.yaml` catalog — so install once at the root and run either package
+from there:
 
 ```bash
 cd ~/repo/rust-wasm-photo-tool
 
-# Build the WASM module
-wasm-pack build --target web
+# Build the WASM module (consumed by the app via a Vite alias → ./pkg)
+pnpm build:wasm        # wasm-pack build --target web --out-dir pkg
 
-# Install frontend dependencies
-cd app
+# Install the whole workspace (resolves the catalog: deps)
 pnpm install
 
-# Start development server
-pnpm dev
+# Start the editor app
+pnpm dev               # → pnpm --filter stamp-tool dev
+
+# Start the marketing site
+pnpm dev:marketing     # → pnpm --filter photo-horse-marketing dev
 ```
 
-To run the marketing site:
-
-```bash
-cd ~/repo/rust-wasm-photo-tool/marketing
-pnpm install
-pnpm dev
-```
+**Deploying the marketing site (Vercel):** because its shared deps use pnpm
+`catalog:`, the Vercel project's **Root Directory must be the repo root** (not
+`marketing/`) so the workspace catalog resolves. The root `vercel.json` builds it
+via `pnpm run build:marketing` → `marketing/dist`, and the root `package.json` pins
+`packageManager: pnpm@10.26.0` (the `catalog:` protocol needs pnpm ≥ 9.5).
 
 ### With Convex
 

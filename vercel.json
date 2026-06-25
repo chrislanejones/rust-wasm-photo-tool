@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "pnpm run build:marketing",
+  "outputDirectory": "marketing/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

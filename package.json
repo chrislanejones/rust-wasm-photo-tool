@@ -2,6 +2,7 @@
   "name": "rust-wasm-photo-tool",
   "version": "0.2.0",
   "private": true,
+  "packageManager": "pnpm@10.26.0",
   "scripts": {
     "dev": "pnpm --filter stamp-tool dev",
     "dev:marketing": "pnpm --filter photo-horse-marketing dev",

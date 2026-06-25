@@ -36,6 +36,7 @@ const RELEASES: Release[] = [
       { tag: "feature", text: "Snapped / narrow windows: below ~900px the side panels stop crushing the canvas and float as overlay drawers (with a scrim, one open at a time); below ~600px a friendly “needs a wider window” notice appears. One shared breakpoint hook drives it all." },
       { tag: "fix", text: "Reduce Motion now also stops the panel / canvas / gallery slide animations — those animate layout (margin/width), which had been slipping past the motion-reduction wrapper." },
       { tag: "feature", text: "Keyboard-accessibility pass: a “Skip to canvas” link, landmark roles + labels on the toolbar / panels / canvas, real accessible names on the tool buttons, and Escape-to-close + dialog semantics on the modals." },
+      { tag: "fix", text: "Marketing site deploy: the single-pnpm-workspace move put its shared deps behind pnpm catalogs, which the Vercel build couldn’t resolve — pinned pnpm 10.26 and restored a workspace-aware root vercel.json so the site builds and deploys again." },
     ],
   },
   {
