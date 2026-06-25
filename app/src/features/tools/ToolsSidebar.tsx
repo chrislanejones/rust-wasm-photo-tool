@@ -75,9 +75,6 @@ interface ToolsSidebarProps {
   undoCount: number;
   quality: number;
   onQualityChange: (q: number) => void;
-  /** EXIF padlock: keep vs strip metadata on export. */
-  exifKeep: boolean;
-  onExifKeepChange: (keep: boolean) => void;
   hasBeenModified: boolean;
   compareActive: boolean;
   onToggleCompare: () => void;
@@ -160,8 +157,6 @@ export function ToolsSidebar({
   undoCount,
   quality,
   onQualityChange,
-  exifKeep,
-  onExifKeepChange,
   hasBeenModified,
   compareActive,
   onToggleCompare,
@@ -205,6 +200,8 @@ export function ToolsSidebar({
       initial="hidden"
       animate="visible"
       exit="exit"
+      role="region"
+      aria-label="Tool options"
       className="fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
       style={{
         boxShadow: "var(--shadow-panel)",
@@ -236,8 +233,6 @@ export function ToolsSidebar({
             activePhotoId={activePhotoId}
             quality={quality}
             onQualityChange={onQualityChange}
-            exifKeep={exifKeep}
-            onExifKeepChange={onExifKeepChange}
             onResize={onResize}
             exportFormat={exportFormat}
             onExportFormatChange={onExportFormatChange ?? (() => {})}

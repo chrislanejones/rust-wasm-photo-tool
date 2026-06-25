@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { slideFromBottom, panelSpacingTransition, thumbEnter } from "@/lib/animations";
+import { slideFromBottom, panelSpacingTransition, instantTransition, thumbEnter } from "@/lib/animations";
 import { Check, Zap, ChevronLeft, ChevronRight, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LargeButton } from "@/components/ui/large-button";
@@ -37,6 +37,10 @@ interface Props {
   onClose: () => void;
   showTools: boolean;
   showHistory: boolean;
+  /** Reduce Motion preference — when on, skip the margin-slide animation. */
+  reduceMotion?: boolean;
+  /** Narrow window — side panels overlay, so the gallery bar stays full-bleed. */
+  narrow?: boolean;
   compressionProgress: Record<string, number>;
   compressionSavings?: Record<string, { savingsPercent: number }>;
   modifiedPhotos?: Set<string>;
@@ -241,6 +245,8 @@ export function GalleryBar({
   onRemove,
   showTools,
   showHistory,
+  reduceMotion,
+  narrow,
   compressionProgress,
   compressionSavings,
   modifiedPhotos,
@@ -301,10 +307,10 @@ export function GalleryBar({
     >
       <motion.div
         animate={{
-          marginLeft: showTools ? PANEL_OPEN_GUTTER : 12,
-          marginRight: showHistory ? PANEL_OPEN_GUTTER : 12,
+          marginLeft: !narrow && showTools ? PANEL_OPEN_GUTTER : 12,
+          marginRight: !narrow && showHistory ? PANEL_OPEN_GUTTER : 12,
         }}
-        transition={panelSpacingTransition}
+        transition={reduceMotion ? instantTransition : panelSpacingTransition}
         style={{ position: "relative" }}
         className="pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
       >

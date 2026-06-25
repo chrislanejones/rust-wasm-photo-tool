@@ -21,6 +21,9 @@ export function ToolButton({ tool, active, disabled = false, onClick }: Props) {
       onClick={onClick}
       disabled={disabled}
       aria-disabled={disabled}
+      aria-label={tool.label}
+      aria-pressed={active}
+      title={tool.label}
       className={[
         "group flex aspect-square w-full items-center justify-center rounded-2xl",
         "transition-all duration-200 ease-out",

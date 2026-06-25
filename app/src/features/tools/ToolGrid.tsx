@@ -14,7 +14,7 @@ interface Props {
 
 export function ToolGrid({ activeTool, onToolChange, disabledTools }: Props) {
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="grid grid-cols-5 gap-2" role="toolbar" aria-label="Select tool">
       {TOOLS.map((tool) => {
         const disabledEntry = disabledTools?.[tool.id];
         const isDisabled = Boolean(disabledEntry);

@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { fadeIn, quickSpring } from "@/lib/animations";
 import { TinyButton } from "@/components/ui/tiny-button";
 
@@ -37,6 +37,21 @@ export function Modal({
   children,
   fill = false,
 }: ModalProps) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  // Keyboard a11y: this shared shell isn't a radix Dialog, so it owns its keys /
+  // focus — Escape closes it, and focus moves into the dialog on open.
+  useEffect(() => {
+    if (!open) return;
+    boxRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
   // Portal to <body> so the modal escapes any transformed ancestor (e.g. the
   // framer-motion TopBar) — a CSS transform traps `position: fixed` to that
   // ancestor and its stacking context, which would mis-position the overlay and
@@ -53,12 +68,17 @@ export function Modal({
           onClick={onClose}
         >
           <motion.div
+            ref={boxRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            tabIndex={-1}
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={quickSpring}
             onClick={(e) => e.stopPropagation()}
-            className={`flex w-full max-w-[760px] flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary text-text-primary shadow-2xl ${
+            className={`flex w-full max-w-[760px] flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary text-text-primary shadow-2xl outline-none ${
               fill ? "h-[80vh]" : "max-h-[80vh]"
             }`}
           >

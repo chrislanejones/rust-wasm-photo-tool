@@ -51,9 +51,6 @@ interface ResizeSettingsProps {
   activePhotoId: string | null;
   quality: number;
   onQualityChange: (q: number) => void;
-  /** EXIF padlock: true = keep metadata on export, false = strip it. */
-  exifKeep: boolean;
-  onExifKeepChange: (keep: boolean) => void;
   /** Apply Compression & Resize: resample to w×h with the given Rust filter
    *  code, then re-encode at the panel's format + quality. */
   onResize: (w: number, h: number, filter: number) => void;
@@ -88,8 +85,6 @@ export function ResizeSettings({
   activePhotoId,
   quality,
   onQualityChange,
-  exifKeep,
-  onExifKeepChange,
   onResize,
   exportFormat,
   onExportFormatChange,
@@ -386,49 +381,7 @@ export function ResizeSettings({
                 unit="%"
               />
 
-              {/* ── EXIF padlock ──
-                  Locked = keep camera metadata (EXIF/GPS) on export.
-                  Unlocked = strip it. Applies to Export, Export All, and
-                  Export Selected. Reuses the aspect-lock button + Clone Stamp
-                  badge styling. */}
-              <div className="space-y-2">
-                {/* Full-width badge: padlock on the left, status text centered
-                    in the remaining space. The whole badge is the toggle. */}
-                <button
-                  onClick={() => onExifKeepChange(!exifKeep)}
-                  title={
-                    exifKeep
-                      ? "EXIF kept — click to strip metadata"
-                      : "EXIF stripped — click to keep metadata"
-                  }
-                  aria-pressed={exifKeep}
-                  className="flex w-full items-center gap-2 px-3 py-2 rounded-lg text-left large-badge-item type-current"
-                >
-                  <span
-                    className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                      exifKeep
-                        ? "bg-theme-primary text-theme-primary-foreground border-theme-primary"
-                        : "bg-theme-muted/20 text-theme-muted-foreground border-theme-border"
-                    }`}
-                  >
-                    {exifKeep ? (
-                      <Lock className="h-4 w-4" />
-                    ) : (
-                      <Unlock className="h-4 w-4" />
-                    )}
-                  </span>
-                  <span className="flex flex-1 flex-col items-center justify-center gap-0.5 text-center">
-                    <span className="font-mono text-2xs font-semibold leading-tight text-theme-primary">
-                      {exifKeep ? "Exporting Keeps EXIF" : "Exporting Removes EXIF"}
-                    </span>
-                    <span className="font-mono text-2xs leading-tight text-theme-muted-foreground">
-                      {exifKeep
-                        ? "Keep sensitive GPS & Time Data"
-                        : "Remove sensitive GPS & Time Data"}
-                    </span>
-                  </span>
-                </button>
-              </div>
+              {/* EXIF keep/strip moved to Settings → Security. */}
 
               {/* ── Web Performance Gain ── */}
               <div className="space-y-4">

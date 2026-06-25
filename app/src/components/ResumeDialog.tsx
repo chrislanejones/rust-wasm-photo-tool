@@ -2,9 +2,21 @@
 // saved locally (IndexedDB), so after a tab close (Ctrl+W) / reload we offer to
 // pick up where they left off — or start fresh. Signed-in users skip this and
 // control auto-reopen from Settings → General instead.
-import { useEffect, useMemo } from "react";
-import { KeyRound, Upload } from "lucide-react";
+//
+// Uses the shared Dialog primitives so it matches the other modals: title in the
+// header (with a close X), content in the body, the two actions in the footer.
+import { useCallback, useEffect, useMemo } from "react";
+import { motion, useAnimation } from "framer-motion";
+import { Upload } from "lucide-react";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface Props {
   open: boolean;
@@ -13,10 +25,15 @@ interface Props {
   onStartFresh: () => void;
 }
 
-export function ResumeDialog({ open, photos, onResume, onStartFresh }: Props) {
+export function ResumeDialog({
+  open,
+  photos,
+  onResume,
+  onStartFresh,
+}: Props) {
   // Object URLs for a few thumbnail previews; revoked on unmount / change.
   const thumbUrls = useMemo(
-    () => photos.slice(0, 4).map((p) => URL.createObjectURL(p.thumbBlob)),
+    () => photos.slice(0, 5).map((p) => URL.createObjectURL(p.thumbBlob)),
     [photos],
   );
   useEffect(
@@ -24,64 +41,77 @@ export function ResumeDialog({ open, photos, onResume, onStartFresh }: Props) {
     [thumbUrls],
   );
 
-  if (!open) return null;
   const n = photos.length;
   const more = n - thumbUrls.length;
 
+  // The header X / Esc / click-outside don't dismiss — there's no neutral
+  // "close" here (you must pick Resume or Start fresh), so a close attempt just
+  // shakes the box to nudge a choice, the same way the upload dialog does.
+  const controls = useAnimation();
+  const triggerShake = useCallback(async () => {
+    await controls.start({
+      x: [0, -14, 14, -10, 10, -6, 6, -3, 3, 0],
+      transition: { duration: 0.55, ease: "easeInOut" },
+    });
+    controls.set({ x: 0 });
+  }, [controls]);
+
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-panel">
-        <h2 className="text-lg font-semibold text-text-primary">Welcome back</h2>
-        <p className="mt-1 text-sm text-text-secondary">
-          Your last session is still here — {n} {n === 1 ? "image" : "images"},
-          saved on this device.
-        </p>
+    <Dialog open={open} onOpenChange={(o) => !o && triggerShake()}>
+      <DialogContent className="max-w-sm">
+        <motion.div animate={controls}>
+        <DialogHeader>
+          <DialogTitle>Welcome back</DialogTitle>
+        </DialogHeader>
 
-        {thumbUrls.length > 0 && (
-          <div className="mt-4 flex items-center gap-2">
-            {thumbUrls.map((u, i) => (
-              <img
-                key={i}
-                src={u}
-                alt=""
-                className="h-12 w-12 rounded-lg border border-border object-cover"
-              />
-            ))}
-            {more > 0 && (
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-bg-elevated text-2xs text-text-muted">
-                +{more}
-              </div>
-            )}
-          </div>
-        )}
+        <DialogBody className="space-y-3">
+          <p className="text-sm text-text-secondary">
+            Your last session is still here — {n} {n === 1 ? "image" : "images"},
+            saved on this device.
+          </p>
 
-        {/* Local + private — non-interactive status (not a button). */}
-        <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elevated px-2.5 py-1 text-2xs text-text-muted">
-          <KeyRound className="h-3 w-3" />
-          Private — saved on this device only
-        </div>
+          {thumbUrls.length > 0 && (
+            <div className="flex items-center gap-2">
+              {thumbUrls.map((u, i) => (
+                <img
+                  key={i}
+                  src={u}
+                  alt=""
+                  className="h-12 w-12 rounded-lg border border-border object-cover"
+                />
+              ))}
+              {more > 0 && (
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-bg-elevated text-lg font-semibold text-text-secondary">
+                  +{more}
+                </div>
+              )}
+            </div>
+          )}
 
-        <div className="mt-5 flex flex-col gap-2">
+          <p className="text-2xs text-text-muted">
+            “Start fresh” clears this saved session and opens a new upload.
+          </p>
+        </DialogBody>
+
+        <DialogFooter>
           <button
             type="button"
             onClick={onResume}
-            className="w-full rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-foreground)] transition hover:brightness-110"
+            className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-foreground)] transition hover:brightness-110"
           >
             Resume editing
           </button>
           <button
             type="button"
             onClick={onStartFresh}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-elevated px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-elevated/70"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-elevated px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-elevated/70"
           >
             <Upload className="h-3.5 w-3.5" />
             Start fresh
           </button>
-        </div>
-        <p className="mt-2 text-center text-2xs text-text-muted">
-          “Start fresh” clears this saved session and opens a new upload.
-        </p>
-      </div>
-    </div>
+        </DialogFooter>
+        </motion.div>
+      </DialogContent>
+    </Dialog>
   );
 }

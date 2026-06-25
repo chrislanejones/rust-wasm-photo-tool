@@ -1,7 +1,6 @@
 // app/src/components/TopBar/TopBar.tsx
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { slideFromTop, panelSpacingTransition } from "@/lib/animations";
+import { slideFromTop, panelSpacingTransition, instantTransition } from "@/lib/animations";
 import { PANEL_OPEN_GUTTER, BP_COMPACT, BP_TIGHT } from "@/lib/layout";
 import {
   Tooltip,
@@ -43,6 +42,14 @@ interface TopBarProps {
   onToggleTools: () => void;
   onToggleGallery: () => void;
   onToggleHistory: () => void;
+  /** Shared window width (from useBreakpoint) — drives the compact / narrow
+   *  collapse; TopBar no longer owns a resize listener. */
+  winWidth: number;
+  /** Side panels are overlay drawers (window < BP_NARROW) — when true the bar
+   *  stays full-bleed instead of padding to clear the panels. */
+  drawerMode: boolean;
+  /** Reduce Motion — make the panel-clearance padding snap instantly. */
+  reduceMotion?: boolean;
   /** App-wide preferences for the Settings → General tab. */
   general: GeneralControls;
   /** Admin-only: adds the Super User tab to the Settings modal. */
@@ -65,6 +72,9 @@ export function TopBar({
   onToggleTools,
   onToggleGallery,
   onToggleHistory,
+  winWidth,
+  drawerMode,
+  reduceMotion,
   general,
   superUser,
 }: TopBarProps) {
@@ -73,14 +83,6 @@ export function TopBar({
   // (toolbar + history) are open and eating the horizontal room. Below
   // BP_COMPACT (`narrow`) we also drop Undo/Redo entirely — they live in the
   // Review panel (and Ctrl+Z) — leaving Zoom as the left cluster.
-  const [winWidth, setWinWidth] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth : 1280,
-  );
-  useEffect(() => {
-    const onResize = () => setWinWidth(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
   const narrow = winWidth < BP_COMPACT;
   const compact =
     narrow || (winWidth < BP_TIGHT && showTools && showHistory);
@@ -126,14 +128,16 @@ export function TopBar({
       initial="hidden"
       animate="visible"
       exit="exit"
+      role="toolbar"
+      aria-label="Editor controls"
       className="fixed top-3 left-0 right-0 z-[var(--z-topbar)] pointer-events-none"
     >
       <motion.div
         animate={{
-          paddingLeft: showTools ? PANEL_OPEN_GUTTER : 12,
-          paddingRight: showHistory ? PANEL_OPEN_GUTTER : 12,
+          paddingLeft: !drawerMode && showTools ? PANEL_OPEN_GUTTER : 12,
+          paddingRight: !drawerMode && showHistory ? PANEL_OPEN_GUTTER : 12,
         }}
-        transition={panelSpacingTransition}
+        transition={reduceMotion ? instantTransition : panelSpacingTransition}
       >
         <div className="pointer-events-auto">
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border">

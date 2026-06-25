@@ -14,6 +14,7 @@ import {
   Cloud,
   CreditCard,
   Gauge,
+  Shield,
   ShieldCheck,
   Check,
   Loader2,
@@ -24,6 +25,7 @@ import { Modal } from "@/components/ui/Modal";
 import { SuperUserPane, type SuperUserControls } from "@/components/SuperUserPane";
 import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
 import { AppearancePane } from "@/components/AppearancePane";
+import { SecurityPane } from "@/components/SecurityPane";
 import { RulersGridsPane } from "@/components/RulersGridsPane";
 import { ExportPane } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
@@ -47,6 +49,7 @@ const PRO_FEATURES = [
 type SettingsTab =
   | "general"
   | "appearance"
+  | "security"
   | "rulers"
   | "export"
   | "storage"
@@ -101,6 +104,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] = [
     { id: "general", label: "General", icon: SlidersHorizontal },
     { id: "appearance", label: "Appearance", icon: Palette },
+    { id: "security", label: "Security", icon: Shield },
     { id: "rulers", label: "Rulers & Grids", icon: Ruler },
     { id: "export", label: "Export", icon: Package },
     { id: "storage", label: "S3 / Image Hosting", icon: Cloud },
@@ -177,6 +181,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
             <UserMenu />
             {(tab === "general" ||
               tab === "appearance" ||
+              tab === "security" ||
               tab === "rulers" ||
               tab === "superuser") && (
               <div className="flex items-center gap-2">
@@ -229,6 +234,11 @@ export function SubscriptionButton({ general, superUser }: Props) {
                 onReduceMotionChange={(reduceMotion) =>
                   setDraft((d) => ({ ...d, reduceMotion }))
                 }
+              />
+            ) : tab === "security" ? (
+              <SecurityPane
+                value={draft.exifKeep}
+                onChange={(exifKeep) => setDraft((d) => ({ ...d, exifKeep }))}
               />
             ) : tab === "rulers" ? (
               <RulersGridsPane

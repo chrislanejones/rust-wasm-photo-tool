@@ -16,6 +16,14 @@ export const panelSpacingTransition: Transition = {
   mass: 0.8,
 };
 
+// Instant (no-motion) transition — swap in for the spring/tween transitions
+// above when the user has Reduce Motion on. Framer-motion animates layout props
+// (margin, width, …) through inline styles, NOT CSS, so the global
+// `.reduce-motion` rule can't reach them, and `<MotionConfig reducedMotion=
+// "always">` only suppresses TRANSFORM/layout animations — margin/width slip
+// through. Use this for those non-transform animations so they snap instantly.
+export const instantTransition: Transition = { duration: 0 };
+
 // Slide animations with consistent quick timing
 export const slideFromLeft: Variants = {
   hidden: { x: "-100%", opacity: 0 },

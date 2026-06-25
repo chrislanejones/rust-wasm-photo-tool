@@ -155,6 +155,9 @@ export function ObjectRemovalModal({
           onClick={busy ? undefined : onClose}
         >
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Object Removal"
             initial={{ scale: 0.96, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.96, opacity: 0 }}
@@ -169,6 +172,7 @@ export function ObjectRemovalModal({
               <button
                 onClick={onClose}
                 disabled={busy}
+                aria-label="Close"
                 className="rounded p-1 text-text-secondary hover:bg-card hover:text-text-primary disabled:opacity-40"
               >
                 <X className="h-4 w-4" />

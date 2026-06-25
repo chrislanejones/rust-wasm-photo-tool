@@ -166,6 +166,7 @@ export function ReviewPanel({
       initial="hidden"
       animate="visible"
       exit="exit"
+      aria-label="Review"
       className="review-panel"
     >
       {/* No title/close — the four section toggles below are the header. */}

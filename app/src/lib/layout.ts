@@ -17,3 +17,9 @@ export const PANEL_OPEN_GUTTER = SIDE_PANEL_WIDTH + 24; // 260 + 12 + 12 = 284
 // eating the horizontal room.
 export const BP_COMPACT = 1000;
 export const BP_TIGHT = 1200;
+// Below BP_NARROW the side panels stop pushing the canvas and float as overlay
+// drawers (one open at a time, behind a scrim) so a snapped half-screen window
+// keeps a usable canvas. Below BP_MIN the window is too small to edit
+// comfortably and <SmallWindowNotice/> appears.
+export const BP_NARROW = 900;
+export const BP_MIN = 600;

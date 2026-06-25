@@ -43,6 +43,9 @@ export interface Preferences {
   /** Minimize UI animation (panel slides, fades, transitions) for a calmer,
    *  faster interface — accessibility / motion-sensitivity. */
   reduceMotion: boolean;
+  /** Keep camera metadata (EXIF — GPS, capture time, lens) on JPEG/WebP export,
+   *  or strip it for privacy. Applies to all export paths. */
+  exifKeep: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -59,6 +62,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   gridOpacity: 40,
   reopenLastSession: true,
   reduceMotion: false,
+  exifKeep: true,
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];
@@ -117,6 +121,8 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
       typeof p?.reduceMotion === "boolean"
         ? p.reduceMotion
         : DEFAULT_PREFERENCES.reduceMotion,
+    exifKeep:
+      typeof p?.exifKeep === "boolean" ? p.exifKeep : DEFAULT_PREFERENCES.exifKeep,
   };
 }
 
@@ -136,6 +142,7 @@ export function serializePreferences(p: Preferences): string {
     gridOpacity: p.gridOpacity,
     reopenLastSession: p.reopenLastSession,
     reduceMotion: p.reduceMotion,
+    exifKeep: p.exifKeep,
   });
 }
 

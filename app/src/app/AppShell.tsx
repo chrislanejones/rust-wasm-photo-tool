@@ -17,7 +17,9 @@ import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
-import { panelSpacingTransition, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
+import { panelSpacingTransition, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
+import { useBreakpoint } from "@/lib/useBreakpoint";
+import { SmallWindowNotice } from "@/components/SmallWindowNotice";
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
@@ -185,9 +187,6 @@ export function AppShell() {
   // originalUrl is populated by the compare effect; not set on photo select
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
-  // EXIF padlock (Compress tab): true = keep camera metadata on export,
-  // false = strip it. Default keep, matching pre-feature behavior.
-  const [exifKeep, setExifKeep] = useState(true);
   const [hasBeenModified, setHasBeenModified] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -234,12 +233,19 @@ export function AppShell() {
 
   // App-wide preferences (Settings → General), persisted to localStorage.
   const [prefs, applyPreferences] = usePreferences();
+  // EXIF keep/strip now lives in preferences (Settings → Security); all export
+  // paths read this committed value.
+  const exifKeep = prefs.exifKeep;
   // Apply the saved theme to <html> (light/dark/system); index.html sets the
   // initial class pre-paint, this keeps it in sync as the choice changes.
   useTheme(prefs.theme);
   // Reduce motion (Settings → Appearance): toggles the `.reduce-motion` class for
   // CSS transitions; the <MotionConfig> wrapper below handles framer-motion.
   useReduceMotion(prefs.reduceMotion);
+  // Shared responsive breakpoints (one resize listener) — drives the top bar's
+  // compact collapse, the narrow overlay-drawer behaviour for the side panels,
+  // and the too-small notice.
+  const bp = useBreakpoint();
   // Canvas "Rulers & Grids" overlay config (Settings → Rulers & Grids). Inline
   // object is fine — the overlay's memos key on the primitive values, not its
   // identity, so a fresh wrapper per render doesn't recompute geometry.
@@ -694,8 +700,33 @@ export function AppShell() {
   const [showTools, setShowTools] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  // Small-window notice: dismissed for this stretch of being too-small; reset
+  // once the window grows back so it re-appears if they snap small again.
+  const [smallNoticeDismissed, setSmallNoticeDismissed] = useState(false);
+  // Most-recently-opened side panel — narrow mode closes the *other* one.
+  const lastPanelRef = useRef<"tools" | "history" | null>(null);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+
+  // ── Narrow-window (overlay-drawer) bookkeeping ──────────────────────────
+  useEffect(() => {
+    if (showTools) lastPanelRef.current = "tools";
+  }, [showTools]);
+  useEffect(() => {
+    if (showHistory) lastPanelRef.current = "history";
+  }, [showHistory]);
+  // Below BP_NARROW the side panels are overlay drawers that can't coexist —
+  // when both end up open, close whichever opened first.
+  useEffect(() => {
+    if (bp.narrow && showTools && showHistory) {
+      if (lastPanelRef.current === "history") setShowTools(false);
+      else setShowHistory(false);
+    }
+  }, [bp.narrow, showTools, showHistory]);
+  // Re-arm the too-small notice once the window is wide enough again.
+  useEffect(() => {
+    if (!bp.tooSmall) setSmallNoticeDismissed(false);
+  }, [bp.tooSmall]);
   useEffect(() => {
     installConsoleCapture();
   }, []);
@@ -1945,6 +1976,14 @@ export function AppShell() {
   return (
     <MotionConfig reducedMotion={prefs.reduceMotion ? "always" : "never"}>
     <div className="app-shell">
+      {/* Keyboard a11y: jump straight to the canvas, past all the chrome.
+          Visually hidden until focused (Tab on load). */}
+      <a
+        href="#main-canvas"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[var(--z-progress)] focus:rounded-lg focus:bg-[var(--accent)] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--accent-foreground)] focus:shadow-2xl focus:outline-none focus:ring-2 focus:ring-white/60"
+      >
+        Skip to canvas
+      </a>
       <AnimatePresence>
         {isImageLoading && (
           <motion.div
@@ -1958,10 +1997,38 @@ export function AppShell() {
               className="h-full bg-linear-to-r from-accent via-accent to-accent/60 rounded-r-full"
               {...imageLoadBarProgress}
               animate={{ width: `${Math.min(loadProgress, 100)}%` }}
+              transition={
+                prefs.reduceMotion ? instantTransition : imageLoadBarProgress.transition
+              }
             />
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Narrow-window drawer scrim — dims the canvas behind an open side panel
+          and click-to-closes it. Sits above the canvas (z 10) but below the top
+          bar (30) / panels (40) so all chrome stays bright + interactive. */}
+      <AnimatePresence>
+        {bp.narrow && (showTools || showHistory) && (
+          <motion.div
+            key="drawer-scrim"
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            onClick={() => {
+              setShowTools(false);
+              setShowHistory(false);
+            }}
+            className="fixed inset-0 z-[20] bg-black/40"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Too-small window (< BP_MIN): a dismissible notice, not a layout fork. */}
+      {bp.tooSmall && !smallNoticeDismissed && (
+        <SmallWindowNotice onDismiss={() => setSmallNoticeDismissed(true)} />
+      )}
 
       <UploadDialog
         open={showUpload && !resumeManifest}
@@ -2198,6 +2265,9 @@ export function AppShell() {
             onToggleTools={() => setShowTools((v) => !v)}
             onToggleGallery={() => setShowGallery((v) => !v)}
             onToggleHistory={() => setShowHistory((v) => !v)}
+            winWidth={bp.width}
+            drawerMode={bp.narrow}
+            reduceMotion={prefs.reduceMotion}
             general={general}
             superUser={superUser}
           />
@@ -2235,8 +2305,6 @@ export function AppShell() {
             undoCount={stamp.state.undoCount}
             quality={quality}
             onQualityChange={handleQualityChange}
-            exifKeep={exifKeep}
-            onExifKeepChange={setExifKeep}
             hasBeenModified={hasBeenModified}
             compareActive={compareActive}
             onToggleCompare={handleToggleCompare}
@@ -2292,12 +2360,15 @@ export function AppShell() {
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <motion.main
+            id="main-canvas"
+            aria-label="Image canvas"
+            tabIndex={-1}
             animate={{
-              marginLeft: showTools ? PANEL_OPEN_GUTTER : 0,
-              marginRight: showHistory ? PANEL_OPEN_GUTTER : 0,
+              marginLeft: !bp.narrow && showTools ? PANEL_OPEN_GUTTER : 0,
+              marginRight: !bp.narrow && showHistory ? PANEL_OPEN_GUTTER : 0,
             }}
-            transition={panelSpacingTransition}
-            className="main-content"
+            transition={prefs.reduceMotion ? instantTransition : panelSpacingTransition}
+            className="main-content focus:outline-none"
             style={{ position: "relative" }}
           >
             <>
@@ -2576,6 +2647,8 @@ export function AppShell() {
             onClose={() => setShowGallery(false)}
             showTools={showTools}
             showHistory={showHistory}
+            reduceMotion={prefs.reduceMotion}
+            narrow={bp.narrow}
             compressionProgress={compressProgress.items ?? {}}
             compressionSavings={imageSavings}
             modifiedPhotos={modifiedPhotos}

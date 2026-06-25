@@ -27,6 +27,18 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.27",
+    date: "2026-06-25",
+    headline: "Security tab, snapped-window layout, reduce-motion fixes, and a keyboard-accessibility pass",
+    entries: [
+      { tag: "feature", text: "EXIF keep/strip moved out of the Compress panel into a new Settings → Security tab — and it’s now a saved preference, not a per-session toggle, applied to every export." },
+      { tag: "feature", text: "The “Welcome back” resume dialog was rebuilt on the shared modal (title in the header, the two actions in the footer), shows five thumbnails plus a “+N” tile, and its close ✕ now shakes instead of dismissing — you pick Resume or Start fresh." },
+      { tag: "feature", text: "Snapped / narrow windows: below ~900px the side panels stop crushing the canvas and float as overlay drawers (with a scrim, one open at a time); below ~600px a friendly “needs a wider window” notice appears. One shared breakpoint hook drives it all." },
+      { tag: "fix", text: "Reduce Motion now also stops the panel / canvas / gallery slide animations — those animate layout (margin/width), which had been slipping past the motion-reduction wrapper." },
+      { tag: "feature", text: "Keyboard-accessibility pass: a “Skip to canvas” link, landmark roles + labels on the toolbar / panels / canvas, real accessible names on the tool buttons, and Escape-to-close + dialog semantics on the modals." },
+    ],
+  },
+  {
     version: "v0.9.26",
     date: "2026-06-24",
     headline: "Text drop shadows, a magic-wand selection tool, and pen fixes",
