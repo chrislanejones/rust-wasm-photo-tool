@@ -40,6 +40,11 @@ interface KeyboardShortcutOptions {
   onExport: () => void;
   onExportAll?: () => void;
   onDeleteAll: () => void;
+  /** Selection Marker: Alt+A selects all; Alt+D deselects when something is
+   *  selected, otherwise falls back to Delete All. */
+  onSelectAll?: () => void;
+  onDeselect?: () => void;
+  hasSelection?: boolean;
   /** Shrink (-1) or grow (+1) the active brush — routed by tool in AppShell. */
   onAdjustBrushSize: (direction: -1 | 1) => void;
   setShowUpload: React.Dispatch<React.SetStateAction<boolean>>;
@@ -70,6 +75,9 @@ export function useKeyboardShortcuts({
   onExport,
   onExportAll,
   onDeleteAll,
+  onSelectAll,
+  onDeselect,
+  hasSelection,
   onAdjustBrushSize,
   setShowUpload,
   setShowTools,
@@ -213,7 +221,12 @@ export function useKeyboardShortcuts({
             window.dispatchEvent(new CustomEvent("image-horse:open-settings"));
             break;
           case "KeyE": e.preventDefault(); onExport(); break;
-          case "KeyD": e.preventDefault(); onDeleteAll(); break;
+          case "KeyA": e.preventDefault(); onSelectAll?.(); break;
+          case "KeyD":
+            e.preventDefault();
+            if (hasSelection) onDeselect?.();
+            else onDeleteAll();
+            break;
         }
         return;
       }
@@ -244,7 +257,7 @@ export function useKeyboardShortcuts({
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [
-    onUndo, onRedo, onExport, onExportAll, onDeleteAll, onAdjustBrushSize,
+    onUndo, onRedo, onExport, onExportAll, onDeleteAll, onSelectAll, onDeselect, hasSelection, onAdjustBrushSize,
     setShowUpload, setShowTools, setShowGallery,
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
     onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,

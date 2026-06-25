@@ -362,6 +362,41 @@ pub fn fill_triangle_public(
     fill_triangle(out, w as i32, h as i32, p1, p2, p3, [r, g, b, a]);
 }
 
+/// In-place separable box blur on a single-channel f32 coverage buffer. Run
+/// twice it approximates a Gaussian — used for soft drop shadows on text tiles.
+pub fn box_blur_f32(buf: &mut [f32], w: u32, h: u32, radius: u32) {
+    if radius == 0 || w == 0 || h == 0 {
+        return;
+    }
+    let (w, h, r) = (w as usize, h as usize, radius as usize);
+    let mut tmp = vec![0f32; buf.len()];
+    // Horizontal pass.
+    for y in 0..h {
+        let row = y * w;
+        for x in 0..w {
+            let x0 = x.saturating_sub(r);
+            let x1 = (x + r).min(w - 1);
+            let mut sum = 0f32;
+            for v in &buf[row + x0..=row + x1] {
+                sum += v;
+            }
+            tmp[row + x] = sum / (x1 - x0 + 1) as f32;
+        }
+    }
+    // Vertical pass.
+    for x in 0..w {
+        for y in 0..h {
+            let y0 = y.saturating_sub(r);
+            let y1 = (y + r).min(h - 1);
+            let mut sum = 0f32;
+            for yy in y0..=y1 {
+                sum += tmp[yy * w + x];
+            }
+            buf[y * w + x] = sum / (y1 - y0 + 1) as f32;
+        }
+    }
+}
+
 fn blend_pixel(data: &mut [u8], idx: usize, color: [u8; 4]) {
     // Straight-alpha source-over in pure integer math — no f32 / ÷255.0 round
     // trip (this runs per pixel across every draw + fill loop). Kept in an ×255

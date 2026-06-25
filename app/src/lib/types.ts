@@ -73,6 +73,16 @@ export interface ToolSettings extends StampSettings {
    *  the bubble. Only meaningful when bgKind === "bubble". */
   bgTail: number;
 
+  // Text drop shadow (soft, Rust-rendered) — shared color/offset/blur with
+  // independent "apply to box" / "apply to text" toggles.
+  shadowBox: boolean;
+  shadowText: boolean;
+  shadowColor: string;      // hex
+  shadowOpacity: number;    // 0-100
+  shadowOffsetX: number;    // px
+  shadowOffsetY: number;    // px
+  shadowBlur: number;       // px
+
   // Pins (Shapes tool → Pins tab) — drop auto-sequenced callout discs.
   /** Pin label style: numbers (1, 2, 3…) or letters (A, B, C…). */
   pinLabel: "numbers" | "letters";

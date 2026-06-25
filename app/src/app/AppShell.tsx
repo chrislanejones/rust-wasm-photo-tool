@@ -712,13 +712,14 @@ export function AppShell() {
   // commits finished paths as live kind-7 annotations.
   const penActive = activeTool === "brush" && brushMode === "pen";
   const handlePenCommit = useCallback(
-    (flatPoints: number[], close: boolean) => {
+    (flatPoints: number[]) => {
       const tool = stamp.toolRef.current;
       if (!tool || flatPoints.length < 8) return; // need ≥ 2 anchors
-      // Background fill only makes sense for a CLOSED path — an open path fills a
-      // degenerate sliver between its endpoints. Fill only when the path was
-      // closed AND a background colour is set.
-      const fillKind = close && toolSettings.fillMode !== "none" ? 1 : 0;
+      // Any path with a background colour fills its interior — Rust's fill_polygon
+      // auto-closes the flattened curve, so an open curve OR a full (closed) loop
+      // both fill. (Previously this was gated on an explicit `close`, so a curve
+      // or circle finished without closing never filled.)
+      const fillKind = toolSettings.fillMode !== "none" ? 1 : 0;
       tool.add_bezier_annotation(
         new Float64Array(flatPoints),
         toolSettings.strokeColor,
@@ -988,6 +989,46 @@ export function AppShell() {
     };
   }, []);
 
+  // ── Selection Marker (magic-wand) — Edit & Move → Selection (above Align) ──
+  // All masking math is Rust; JS just stores the returned overlay + routes ops.
+  const [selectionTolerance, setSelectionTolerance] = useState(24);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectionMask, setSelectionMask] = useState<Uint8Array | null>(null);
+
+  const handleSelectionClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const tool = stamp.toolRef.current;
+      if (!tool) return;
+      const { x, y } = getCoords(e);
+      const mask = tool.magic_wand_select(x, y, selectionTolerance);
+      setSelectionMask(mask.length ? mask : null);
+    },
+    [stamp, getCoords, selectionTolerance],
+  );
+  const handleSelectAll = useCallback(() => {
+    const tool = stamp.toolRef.current;
+    if (!tool) return;
+    const mask = tool.select_all();
+    setSelectionMask(mask.length ? mask : null);
+  }, [stamp]);
+  const handleDeselect = useCallback(() => {
+    stamp.toolRef.current?.clear_selection();
+    setSelectionMask(null);
+  }, [stamp]);
+  const handleDeleteSelection = useCallback(() => {
+    const tool = stamp.toolRef.current;
+    if (tool?.delete_selection()) {
+      stamp.flushToCanvas();
+      stamp.syncState();
+    }
+    setSelectionMask(null);
+  }, [stamp]);
+
+  // Leaving the Edit & Move tool exits selection mode (the overlay is hidden too).
+  useEffect(() => {
+    if (activeTool !== "crop") setSelectionMode(false);
+  }, [activeTool]);
+
   const blurDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const t = stamp.toolRef.current;
@@ -1147,6 +1188,7 @@ export function AppShell() {
       4: "Arrow",
       5: "Pin",
       6: "Pen",
+      7: "Pen Path",
     };
     const counters: Record<number, number> = {};
     drawingTools.shapes.forEach((s) => {
@@ -1866,6 +1908,9 @@ export function AppShell() {
     onExport: handleExport,
     onExportAll: handleExportAll,
     onDeleteAll: handleDeleteAll,
+    onSelectAll: handleSelectAll,
+    onDeselect: handleDeselect,
+    hasSelection: selectionMask !== null,
     onAdjustBrushSize: adjustBrushSize,
     setShowUpload,
     setShowTools,
@@ -2206,6 +2251,16 @@ export function AppShell() {
             onAlign={handleAlign}
             hasSelection={selectedObject !== null}
             onSelectBoundingBox={handleSelectBoundingBox}
+            selection={{
+              tolerance: selectionTolerance,
+              onToleranceChange: setSelectionTolerance,
+              mode: selectionMode,
+              onToggleMode: () => setSelectionMode((m) => !m),
+              onSelectAll: handleSelectAll,
+              onDeselect: handleDeselect,
+              onDelete: handleDeleteSelection,
+              active: selectionMask !== null,
+            }}
             toolSettings={toolSettings}
             onToolSettingsChange={handleToolSettingsChange}
             shapesMode={shapesMode}
@@ -2396,6 +2451,11 @@ export function AppShell() {
                       textInput={textTool.textInput}
                       textareaRef={textTool.textareaRef}
                       onCanvasClick={textTool.onCanvasClick}
+                      selectionActive={activeTool === "crop" && selectionMode}
+                      onSelectionClick={handleSelectionClick}
+                      selectionMask={activeTool === "crop" ? selectionMask : null}
+                      selectionWidth={stamp.state.width}
+                      selectionHeight={stamp.state.height}
                       onTextKeyDown={textTool.onTextKeyDown}
                       onTextChange={textTool.onTextChange}
                       onTextBlur={textTool.onTextBlur}

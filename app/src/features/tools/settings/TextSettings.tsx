@@ -26,6 +26,13 @@ const FONT_FAMILIES = [
 
 const FONT_SIZE_PRESETS = [16, 32, 48, 72] as const;
 
+const SHADOW_MODE_OPTIONS = [
+  { id: "off", label: "Off" },
+  { id: "box", label: "Box" },
+  { id: "text", label: "Text" },
+  { id: "both", label: "Both" },
+] as const;
+
 const BG_KIND_OPTIONS = [
   { id: "none", label: "None" },
   { id: "rect", label: "Text BG" },
@@ -220,6 +227,75 @@ export function TextSettings({
                   max={100}
                   unit="%"
                   onChange={(v) => onChange({ ...settings, bgOpacity: v })}
+                />
+              </>
+            )}
+
+            {/* Drop shadow — soft, Rust-rendered. Works with or without a
+                background: "Box" casts from the bubble, "Text" from the glyphs. */}
+            <ToolButtonGroup
+              label="Drop Shadow"
+              options={SHADOW_MODE_OPTIONS}
+              value={
+                settings.shadowBox && settings.shadowText
+                  ? "both"
+                  : settings.shadowBox
+                    ? "box"
+                    : settings.shadowText
+                      ? "text"
+                      : "off"
+              }
+              onChange={(id) =>
+                onChange({
+                  ...settings,
+                  shadowBox: id === "box" || id === "both",
+                  shadowText: id === "text" || id === "both",
+                })
+              }
+              columns={4}
+            />
+
+            {(settings.shadowBox || settings.shadowText) && (
+              <>
+                <ColorSwatchGrid
+                  label="Shadow Color"
+                  colors={TEXT_COLORS}
+                  value={settings.shadowColor}
+                  onChange={(color) =>
+                    onChange({ ...settings, shadowColor: color })
+                  }
+                />
+                <SizeSlider
+                  label="Shadow Opacity"
+                  value={settings.shadowOpacity}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  onChange={(v) => onChange({ ...settings, shadowOpacity: v })}
+                />
+                <SizeSlider
+                  label="Offset X"
+                  value={settings.shadowOffsetX}
+                  min={-20}
+                  max={20}
+                  unit="px"
+                  onChange={(v) => onChange({ ...settings, shadowOffsetX: v })}
+                />
+                <SizeSlider
+                  label="Offset Y"
+                  value={settings.shadowOffsetY}
+                  min={-20}
+                  max={20}
+                  unit="px"
+                  onChange={(v) => onChange({ ...settings, shadowOffsetY: v })}
+                />
+                <SizeSlider
+                  label="Blur"
+                  value={settings.shadowBlur}
+                  min={0}
+                  max={30}
+                  unit="px"
+                  onChange={(v) => onChange({ ...settings, shadowBlur: v })}
                 />
               </>
             )}

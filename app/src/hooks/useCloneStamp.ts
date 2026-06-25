@@ -318,6 +318,15 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
               a.bg_padding ?? 8,
               a.bg_corner_radius ?? 8,
               a.bg_tail ?? 0,
+              a.shadow_box ?? false,
+              a.shadow_text ?? false,
+              a.shadow_r ?? 0,
+              a.shadow_g ?? 0,
+              a.shadow_b ?? 0,
+              a.shadow_a ?? 0,
+              a.shadow_dx ?? 0,
+              a.shadow_dy ?? 0,
+              a.shadow_blur ?? 0,
             );
           }
           for (const s of layer.shapes ?? []) {

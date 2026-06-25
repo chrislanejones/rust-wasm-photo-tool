@@ -5,6 +5,9 @@ import {
   FlipVertical,
   Crop,
   BoxSelect,
+  MousePointerClick,
+  SquareDashed,
+  Trash2,
   AlignStartVertical,
   AlignCenterVertical,
   AlignEndVertical,
@@ -15,7 +18,22 @@ import {
 import { LargeButton } from "@/components/ui/large-button";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { SizeSlider } from "@/components/SizeSlider";
 import type { CropSelection } from "@/hooks/useDrawingTools";
+
+/** Controls for the Selection Marker (magic-wand) — Edit & Move → Selection. */
+export interface SelectionControls {
+  tolerance: number;
+  onToleranceChange: (v: number) => void;
+  /** Whether click-to-select mode is on (canvas clicks flood-select). */
+  mode: boolean;
+  onToggleMode: () => void;
+  onSelectAll: () => void;
+  onDeselect: () => void;
+  onDelete: () => void;
+  /** Whether something is currently selected (enables Deselect / Delete). */
+  active: boolean;
+}
 
 /* ── Aspect-ratio presets ─────────────────────────────────────────────
  * "free" leaves the user dragging without constraint; everything else
@@ -104,6 +122,8 @@ interface TransformCropSettingsProps {
   hasSelection?: boolean;
   /** Select the last-added object's bounding box as the align target. */
   onSelectBoundingBox?: () => void;
+  /** Selection Marker (magic-wand) controls — shown above Align. */
+  selection?: SelectionControls;
 }
 
 export function TransformCropSettings({
@@ -120,6 +140,7 @@ export function TransformCropSettings({
   onAlign,
   hasSelection = false,
   onSelectBoundingBox,
+  selection,
 }: TransformCropSettingsProps) {
   const ratio = ratioIdFromLock(cropRatio);
 
@@ -204,6 +225,58 @@ export function TransformCropSettings({
           </ToolButton>
         </div>
       </div>
+
+      {/* ── Selection Marker (magic-wand) — Rust flood-fill ─────────────── */}
+      {selection && (
+        <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
+          <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
+            Selection Marker
+          </span>
+          <ToolButton
+            active={selection.mode}
+            disabled={disabled}
+            onClick={selection.onToggleMode}
+            className="w-full"
+          >
+            <MousePointerClick />{" "}
+            {selection.mode ? "Click-to-select: on" : "Click-to-select"}
+          </ToolButton>
+          <SizeSlider
+            label="Tolerance"
+            value={selection.tolerance}
+            min={0}
+            max={120}
+            onChange={selection.onToleranceChange}
+          />
+          <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
+            <ToolButton
+              disabled={disabled}
+              onClick={selection.onSelectAll}
+              title="Select all (Alt+A)"
+            >
+              <BoxSelect /> All
+            </ToolButton>
+            <ToolButton
+              disabled={disabled || !selection.active}
+              onClick={selection.onDeselect}
+              title="Deselect (Alt+D)"
+            >
+              <SquareDashed /> None
+            </ToolButton>
+            <ToolButton
+              disabled={disabled || !selection.active}
+              onClick={selection.onDelete}
+              title="Delete selection"
+            >
+              <Trash2 /> Delete
+            </ToolButton>
+          </div>
+          <p className="text-2xs text-theme-muted-foreground leading-relaxed">
+            Turn on click-to-select, then click a region to flood-select similar
+            colors. Alt+A selects all, Alt+D deselects.
+          </p>
+        </div>
+      )}
 
       {/* ── Align — move the selected object's bounding box (Rust-driven) ─── */}
       <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">

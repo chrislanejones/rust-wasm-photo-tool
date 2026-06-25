@@ -7,6 +7,7 @@ import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTool
 import { CompareSlider } from "./CompareSlider";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
+import { SelectionOverlay } from "./SelectionOverlay";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
 
@@ -80,6 +81,13 @@ interface Props {
     bgTail?: number;
   };
   colorPickerActive?: boolean;
+  /** Selection Marker (magic-wand): when active, a canvas click flood-selects. */
+  selectionActive?: boolean;
+  onSelectionClick?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
+  /** Canvas-sized RGBA selection overlay (from Rust), drawn over the image. */
+  selectionMask?: Uint8Array | null;
+  selectionWidth?: number;
+  selectionHeight?: number;
   containerRef?: React.RefObject<HTMLDivElement | null>;
   onTextPositionChange?: (canvasX: number, canvasY: number) => void;
   onTextFontSizeChange?: (size: number) => void;
@@ -283,6 +291,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       cropSelection,
       onCropChange,
       colorPickerActive,
+      selectionActive,
+      onSelectionClick,
+      selectionMask,
+      selectionWidth,
+      selectionHeight,
       drawEditState,
       onDrawEditChange,
       drawSettings,
@@ -655,13 +668,33 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           onMouseMove={wrappedMouseMove}
           onMouseUp={wrappedMouseUp}
           onMouseLeave={isPanning ? handlePanMouseUp : onMouseUp}
-          onClick={isTextTool ? onCanvasClick : undefined}
+          onClick={
+            isTextTool
+              ? onCanvasClick
+              : selectionActive
+                ? onSelectionClick
+                : undefined
+          }
           onMouseEnter={(e) =>
             onCanvasEnter(e.currentTarget.getBoundingClientRect())
           }
           onMouseOut={onCanvasLeave}
         />
         <CompareSlider beforeUrl={beforeUrl} canvasEl={canvasRef.current} active={compareActive} />
+
+        {/* ── Selection Marker overlay (magic-wand mask, computed in Rust) ── */}
+        {selectionMask &&
+          selectionMask.length > 0 &&
+          canvasRef.current &&
+          !!selectionWidth &&
+          !!selectionHeight && (
+            <SelectionOverlay
+              canvasEl={canvasRef.current}
+              mask={selectionMask}
+              width={selectionWidth}
+              height={selectionHeight}
+            />
+          )}
 
         {/* ── Rulers & Grids overlay (non-destructive; grid geometry from Rust) ── */}
         {guides &&

@@ -27,6 +27,19 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.26",
+    date: "2026-06-24",
+    headline: "Text drop shadows, a magic-wand selection tool, and pen fixes",
+    entries: [
+      { tag: "feature", text: "Text can now cast a soft drop shadow — on the letters, the background box, or both (Text → Background → Drop Shadow), with color, opacity, offset and blur. It’s saved with your edit and survives photo switches and reloads." },
+      { tag: "rust",    text: "The shadow is rendered in Rust: the chosen silhouette is offset and Gaussian-ish blurred, painted behind everything, and the text tile grows to fit — so the Align tool’s bounding box includes the shadow too." },
+      { tag: "feature", text: "New Selection Marker (magic-wand) in the Edit & Move tool, just above Align: click a region to flood-select similar colors, then delete it. Alt+A selects everything, Alt+D deselects." },
+      { tag: "rust",    text: "The selection flood-fill, the mask, and the delete all run in Rust; a translucent overlay shows exactly what’s selected." },
+      { tag: "feature", text: "The Batch Image Editor’s text overlay gained Bold (applied for real to every image) and a font-family picker." },
+      { tag: "fix",     text: "Bézier pen: a Background color now fills any path — an open curve or a full circle — not just explicitly-closed ones. And committed pen paths now show up as “Pen Path” in the Reselect list." },
+    ],
+  },
+  {
     version: "v0.9.25",
     date: "2026-06-24",
     headline: "Faster engine, an Edit & Move tool, and safer deletes",

@@ -21,7 +21,7 @@ import type { ShapesMode } from "./settings/ShapeSettings";
 import { ToolGrid } from "./ToolGrid";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
-import type { AlignMode } from "./settings/TransformCropSettings";
+import type { AlignMode, SelectionControls } from "./settings/TransformCropSettings";
 import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
 import { ArrowSettings } from "./settings/ArrowSettings";
@@ -47,6 +47,8 @@ interface ToolsSidebarProps {
   hasSelection?: boolean;
   /** Select the last-added object's bounding box as the align target. */
   onSelectBoundingBox?: () => void;
+  /** Selection Marker (magic-wand) controls. */
+  selection?: SelectionControls;
   /** Download button: exports the single photo, or opens the chooser dialog
    *  when the gallery holds more than one. */
   onExport: () => void;
@@ -136,6 +138,7 @@ export function ToolsSidebar({
   onAlign,
   hasSelection,
   onSelectBoundingBox,
+  selection,
   onExport,
   canExport,
   photoCount,
@@ -264,6 +267,7 @@ export function ToolsSidebar({
             onAlign={onAlign}
             hasSelection={hasSelection}
             onSelectBoundingBox={onSelectBoundingBox}
+            selection={selection}
           />
         )}
 

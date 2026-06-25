@@ -35,5 +35,12 @@ export const defaultToolSettings: ToolSettings = {
   bgPadding: 8,
   bgCornerRadius: 8,
   bgTail: 135, // degrees — points down-left (the classic speech-bubble default)
+  shadowBox: false,
+  shadowText: false,
+  shadowColor: "#000000",
+  shadowOpacity: 60,
+  shadowOffsetX: 2,
+  shadowOffsetY: 2,
+  shadowBlur: 4,
   pinLabel: "numbers",
 };

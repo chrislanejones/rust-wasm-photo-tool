@@ -214,6 +214,7 @@ export function useTextTool({
     // Tail angle in degrees, normalized to 0-359 for the Rust u32 param.
     const bgTail = ((Math.round(s.bgTail) % 360) + 360) % 360;
 
+    let targetId: number | null = null;
     if (editingId !== null) {
       tool.update_text_annotation(
         editingId,
@@ -235,8 +236,9 @@ export function useTextTool({
         bgCornerRadius,
         bgTail,
       );
+      targetId = editingId;
     } else {
-      tool.add_text_annotation(
+      targetId = tool.add_text_annotation(
         ti.text,
         ti.fontSize,
         r,
@@ -254,6 +256,23 @@ export function useTextTool({
         bgPadding,
         bgCornerRadius,
         bgTail,
+      );
+    }
+    // Apply / sync the soft drop shadow on the committed annotation (Rust no-ops
+    // when unchanged, so this is cheap to call on every commit).
+    if (targetId !== null && targetId >= 0) {
+      const shadowAlpha = Math.round(
+        Math.max(0, Math.min(100, s.shadowOpacity)) * 2.55,
+      );
+      tool.set_text_shadow(
+        targetId,
+        s.shadowBox,
+        s.shadowText,
+        s.shadowColor,
+        shadowAlpha,
+        Math.round(s.shadowOffsetX),
+        Math.round(s.shadowOffsetY),
+        Math.max(0, Math.round(s.shadowBlur)),
       );
     }
     refreshAnnotations();

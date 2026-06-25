@@ -206,7 +206,9 @@ export function StampSettingsPanel({
           <div className="emoji-picker-host">
             <Picker
               data={data}
-              onEmojiSelect={(e: { native: string }) => onEmojiChange?.(e.native)}
+              onEmojiSelect={(e: { native: string }) =>
+                onEmojiChange?.(e.native)
+              }
               theme={emojiTheme}
               previewPosition="none"
               skinTonePosition="none"

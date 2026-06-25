@@ -698,6 +698,21 @@ const TEXT_POSITIONS: { id: TextPosition; label: string }[] = [
   { id: "bottom-right", label: "BR" },
 ];
 
+const TEXT_FONT_FAMILIES = [
+  { label: "Sans Serif", value: "sans-serif" },
+  { label: "Serif", value: "serif" },
+  { label: "Monospace", value: "monospace" },
+  { label: "Arial", value: "Arial, sans-serif" },
+  { label: "Georgia", value: "Georgia, serif" },
+  { label: "Times New Roman", value: "Times New Roman, serif" },
+  { label: "Courier New", value: "Courier New, monospace" },
+  { label: "Verdana", value: "Verdana, sans-serif" },
+  { label: "Impact", value: "Impact, sans-serif" },
+  { label: "Comic Sans", value: "Comic Sans MS, cursive" },
+  { label: "Trebuchet", value: "Trebuchet MS, sans-serif" },
+  { label: "Palatino", value: "Palatino, serif" },
+] as const;
+
 function TextBatchPanel({
   photos,
   activePhotoId,
@@ -708,6 +723,8 @@ function TextBatchPanel({
 }: BatchSettingsProps) {
   const [text, setText] = useState("");
   const [fontSize, setFontSize] = useState(32);
+  const [bold, setBold] = useState(false);
+  const [fontFamily, setFontFamily] = useState("sans-serif");
   const [textColor, setTextColor] = useState("#ffffff");
   const [position, setPosition] = useState<TextPosition>("bottom-right");
   const [margin, setMargin] = useState(24);
@@ -777,7 +794,7 @@ function TextBatchPanel({
           try {
             tool.load_image(targetBytes);
             // Measure in Rust so we can corner-align without knowing glyph metrics.
-            const m = tool.measure_text(text, fontSize, false);
+            const m = tool.measure_text(text, fontSize, bold);
             const { dx, dy } = computeOffset(
               position,
               working.width,
@@ -786,7 +803,7 @@ function TextBatchPanel({
               m[1],
               margin,
             );
-            tool.commit_text(text, fontSize, r, g, b, false, dx, dy, 0);
+            tool.commit_text(text, fontSize, r, g, b, bold, dx, dy, 0);
             composited = new Uint8Array(tool.get_image_data());
           } finally {
             tool.free();
@@ -878,7 +895,7 @@ function TextBatchPanel({
             }
             const workW = tool.width();
             const workH = tool.height();
-            const m = tool.measure_text(text, fontSize, false);
+            const m = tool.measure_text(text, fontSize, bold);
             const { dx, dy } = computeOffset(
               position,
               workW,
@@ -888,7 +905,7 @@ function TextBatchPanel({
               margin,
             );
             // commit_text pushes a "Text" snapshot, giving us undo support.
-            tool.commit_text(text, fontSize, r, g, b, false, dx, dy, 0);
+            tool.commit_text(text, fontSize, r, g, b, bold, dx, dy, 0);
             flushToCanvas();
             syncState();
             succeeded++;
@@ -914,6 +931,7 @@ function TextBatchPanel({
   }, [
     text,
     fontSize,
+    bold,
     textColor,
     position,
     margin,
@@ -936,10 +954,12 @@ function TextBatchPanel({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Enter overlay text…"
+          style={{ fontFamily, fontWeight: bold ? "bold" : "normal" }}
           className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-2xs text-theme-foreground placeholder:text-theme-muted-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
         />
         <p className="mt-1 text-2xs text-theme-muted-foreground">
-          Rendered in Rust with the embedded Liberation Sans font.
+          Rendered in Rust (Liberation Sans). Bold applies to the output; the font
+          family is a preview only — the baked text stays Liberation Sans.
         </p>
       </div>
 
@@ -951,6 +971,33 @@ function TextBatchPanel({
         max={96}
         unit="px"
       />
+
+      {/* Font family (preview only) + weight (real — Liberation Sans Bold). */}
+      <div>
+        <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
+          Font
+        </p>
+        <select
+          value={fontFamily}
+          onChange={(e) => setFontFamily(e.target.value)}
+          style={{ fontFamily }}
+          className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-2xs text-theme-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
+        >
+          {TEXT_FONT_FAMILIES.map((f) => (
+            <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <ToolButton active={!bold} onClick={() => setBold(false)}>
+            Normal
+          </ToolButton>
+          <ToolButton active={bold} onClick={() => setBold(true)}>
+            Bold
+          </ToolButton>
+        </div>
+      </div>
 
       <ColorSwatchGrid
         colors={TEXT_COLORS}

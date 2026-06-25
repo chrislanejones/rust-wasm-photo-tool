@@ -465,6 +465,18 @@ declare module "stamp_tool" {
       bg_corner_radius: number,
       bg_tail: number,
     ): boolean;
+    /** Set/clear the soft drop shadow on a text annotation; rebuilds its tile.
+     *  on_box/on_text choose the silhouette; shared color/alpha/offset/blur. */
+    set_text_shadow(
+      id: number,
+      on_box: boolean,
+      on_text: boolean,
+      color_hex: string,
+      alpha: number,
+      dx: number,
+      dy: number,
+      blur: number,
+    ): boolean;
     remove_text_annotation(id: number): boolean;
     get_text_annotations(): string;
     /** Returns the matching annotation id, or -1 if no hit. */
@@ -528,6 +540,10 @@ declare module "stamp_tool" {
       bg_padding: number,
       bg_corner_radius: number,
       bg_tail: number,
+      shadow_box: boolean,
+      shadow_text: boolean,
+      shadow_r: number, shadow_g: number, shadow_b: number, shadow_a: number,
+      shadow_dx: number, shadow_dy: number, shadow_blur: number,
     ): number;
     /** Finish a layer-restore: set active index + recomposite. */
     finish_layer_restore(active_index: number): void;
@@ -654,6 +670,19 @@ declare module "stamp_tool" {
      *  authoritative buffer — no canvas sampling). Flat 1024-element array:
      *  [0,256)=R, [256,512)=G, [512,768)=B, [768,1024)=Luma. */
     calculate_histogram(): Uint32Array;
+    // ── Selection Marker (magic-wand) ──
+    /** Flood-select from (x,y) within per-channel `tolerance`; stores the mask,
+     *  returns a canvas-sized RGBA overlay (selected pixels tinted). */
+    magic_wand_select(x: number, y: number, tolerance: number): Uint8Array;
+    /** Select the whole canvas; returns the overlay RGBA. */
+    select_all(): Uint8Array;
+    /** Current selection as an RGBA overlay (empty if nothing selected). */
+    selection_overlay(): Uint8Array;
+    has_selection(): boolean;
+    /** Deselect (no history). */
+    clear_selection(): void;
+    /** Delete selected pixels (transparent) on the active layer; deselects. */
+    delete_selection(): boolean;
     /** Suppress one shape from render while its JS overlay preview is shown. Pass -1 to clear. */
     set_editing_shape(id: number): void;
     /** Suppress an in-edit text annotation's baked tile from the composite

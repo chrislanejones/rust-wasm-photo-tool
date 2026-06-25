@@ -291,6 +291,14 @@ pub struct TextAnnotation {
     pub bg_padding: u32,
     pub bg_corner_radius: u32,
     pub bg_tail: u32,          // speech-bubble tail angle in degrees (0-359, CW from +x / east); only used when background_kind == 2
+    // Soft drop shadow — shared color/offset/blur with independent box/text
+    // toggles. Cast from the selected silhouette(s), offset, blurred, and painted
+    // behind everything when the tile is built. All-zero / both-false = no shadow.
+    pub shadow_box: bool,
+    pub shadow_text: bool,
+    pub shadow_r: u8, pub shadow_g: u8, pub shadow_b: u8, pub shadow_a: u8,
+    pub shadow_dx: i32, pub shadow_dy: i32,
+    pub shadow_blur: u32,
 }
 
 /// A live (non-destructive) shape/arrow annotation. Mirrors `TextAnnotation`:
@@ -402,6 +410,10 @@ pub struct ImageHorseTool {
     /// overlay, suppress its baked tile from the composite so the user sees only
     /// the live overlay (not a doubled copy underneath). `None` when idle.
     editing_text_id: Option<u32>,
+    /// Magic-wand selection mask (one bool per pixel, row-major w×h). `None` when
+    /// nothing is selected. Built by the Selection Marker tool's flood-fill /
+    /// select-all; `delete_selection` clears the masked pixels.
+    selection: Option<Vec<bool>>,
     /// Paint stroke-stabilizer trailing tip ("lazy mouse"). Set on stroke start;
     /// advances toward the cursor only when it pulls past the leash. `None` when
     /// no stabilized stroke is active.
@@ -459,6 +471,7 @@ fn json_escape(s: &str) -> String {
 /// either push onto the live overlay list or onto a history snapshot's
 /// annotation vector. Centralizes the tile-rebuild logic so add/update
 /// and snapshot-restore all share the same path.
+#[allow(clippy::too_many_arguments)]
 fn build_text_annotation(
     id: u32,
     text: &str,
@@ -473,6 +486,10 @@ fn build_text_annotation(
     bg_padding: u32,
     bg_corner_radius: u32,
     bg_tail: u32,
+    shadow_box: bool,
+    shadow_text: bool,
+    shadow_r: u8, shadow_g: u8, shadow_b: u8, shadow_a: u8,
+    shadow_dx: i32, shadow_dy: i32, shadow_blur: u32,
 ) -> TextAnnotation {
     let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
         build_annotation_tile(
@@ -480,6 +497,9 @@ fn build_text_annotation(
             background_kind,
             bg_r, bg_g, bg_b, bg_a,
             bg_padding, bg_corner_radius, bg_tail,
+            shadow_box, shadow_text,
+            shadow_r, shadow_g, shadow_b, shadow_a,
+            shadow_dx, shadow_dy, shadow_blur,
         );
     TextAnnotation {
         id,
@@ -497,6 +517,9 @@ fn build_text_annotation(
         bg_padding,
         bg_corner_radius,
         bg_tail,
+        shadow_box, shadow_text,
+        shadow_r, shadow_g, shadow_b, shadow_a,
+        shadow_dx, shadow_dy, shadow_blur,
     }
 }
 
@@ -508,7 +531,7 @@ fn annotations_to_json(anns: &[TextAnnotation]) -> String {
     for (i, a) in anns.iter().enumerate() {
         if i > 0 { out.push(','); }
         out.push_str(&format!(
-            "{{\"id\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{}}}",
+            "{{\"id\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{}}}",
             a.id,
             json_escape(&a.text),
             a.x, a.y,
@@ -521,6 +544,9 @@ fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             a.background_kind,
             a.bg_r, a.bg_g, a.bg_b, a.bg_a,
             a.bg_padding, a.bg_corner_radius, a.bg_tail,
+            a.shadow_box, a.shadow_text,
+            a.shadow_r, a.shadow_g, a.shadow_b, a.shadow_a,
+            a.shadow_dx, a.shadow_dy, a.shadow_blur,
         ));
     }
     out.push(']');
@@ -578,6 +604,22 @@ fn points_bbox(pts: &[(f64, f64)]) -> (f64, f64, f64, f64) {
         miny = miny.min(y); maxy = maxy.max(y);
     }
     (minx, miny, maxx, maxy)
+}
+
+/// Build a canvas-sized RGBA overlay from a selection mask: selected pixels get a
+/// translucent blue highlight, the rest stay transparent. The JS Selection
+/// overlay canvas draws this directly over the image.
+fn selection_overlay_rgba(mask: &[bool], w: usize, h: usize) -> Vec<u8> {
+    let mut out = vec![0u8; w * h * 4];
+    for (i, &sel) in mask.iter().enumerate() {
+        if sel {
+            out[i * 4] = 64;
+            out[i * 4 + 1] = 140;
+            out[i * 4 + 2] = 255;
+            out[i * 4 + 3] = 96;
+        }
+    }
+    out
 }
 
 /// Euclidean distance from point (px,py) to the segment (ax,ay)-(bx,by).
@@ -889,6 +931,66 @@ fn composite_layers(
 ///
 /// `background_kind`: 0 = none, 1 = filled rounded rect, 2 = rounded rect
 /// with a small triangular tail.
+/// Paint a soft drop shadow into `tile` from the given silhouette(s): an
+/// optional box coverage mask and/or an optional text-alpha source. The union is
+/// offset by (dx,dy), blurred twice (≈ Gaussian), and composited as the shadow
+/// colour — call it BEFORE drawing the box/text so it sits behind them.
+#[allow(clippy::too_many_arguments)]
+fn composite_drop_shadow(
+    tile: &mut [u8],
+    tile_w: u32,
+    tile_h: u32,
+    box_cov: Option<&[f32]>,
+    text_src: Option<(&[u8], u32, u32, i32, i32)>, // pixels, w, h, paste_x, paste_y
+    dx: i32, dy: i32, blur: u32,
+    sr: u8, sg: u8, sb: u8, sa: u8,
+) {
+    if sa == 0 {
+        return;
+    }
+    let n = (tile_w * tile_h) as usize;
+    let mut mask = vec![0f32; n];
+    if let Some(cov) = box_cov {
+        for (m, c) in mask.iter_mut().zip(cov.iter()) {
+            *m = m.max(*c);
+        }
+    }
+    if let Some((px, sw, sh, ox, oy)) = text_src {
+        for yy in 0..sh as i32 {
+            for xx in 0..sw as i32 {
+                let a = px[((yy * sw as i32 + xx) * 4 + 3) as usize];
+                if a == 0 {
+                    continue;
+                }
+                let tx = ox + xx;
+                let ty = oy + yy;
+                if tx >= 0 && ty >= 0 && (tx as u32) < tile_w && (ty as u32) < tile_h {
+                    let i = (ty as u32 * tile_w + tx as u32) as usize;
+                    mask[i] = mask[i].max(a as f32 / 255.0);
+                }
+            }
+        }
+    }
+    // Offset by (dx,dy): sample the source at the inverse offset.
+    let mut shifted = vec![0f32; n];
+    for ty in 0..tile_h as i32 {
+        for tx in 0..tile_w as i32 {
+            let sx = tx - dx;
+            let sy = ty - dy;
+            if sx >= 0 && sy >= 0 && (sx as u32) < tile_w && (sy as u32) < tile_h {
+                shifted[(ty as u32 * tile_w + tx as u32) as usize] =
+                    mask[(sy as u32 * tile_w + sx as u32) as usize];
+            }
+        }
+    }
+    if blur > 0 {
+        crate::drawing::box_blur_f32(&mut shifted, tile_w, tile_h, blur);
+        crate::drawing::box_blur_f32(&mut shifted, tile_w, tile_h, blur);
+    }
+    crate::drawing::blend_coverage(tile, &shifted, sr, sg, sb, sa);
+}
+
+#[allow(clippy::too_many_arguments)]
 fn build_annotation_tile(
     text: &str,
     font_size: f32,
@@ -900,27 +1002,55 @@ fn build_annotation_tile(
     bg_padding: u32,
     bg_corner_radius: u32,
     bg_tail: u32,
+    shadow_box: bool,
+    shadow_text: bool,
+    shadow_r: u8, shadow_g: u8, shadow_b: u8, shadow_a: u8,
+    shadow_dx: i32, shadow_dy: i32, shadow_blur: u32,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
     let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
     let raw_w = rendered.width;
     let raw_h = rendered.height;
 
-    // If no background, the historical fast-path applies.
+    // Reserve a uniform margin so the offset+blurred shadow isn't clipped — and
+    // so the tile bbox (used by the Align tool) grows to include the shadow.
+    let any_shadow = (shadow_box || shadow_text) && shadow_a > 0;
+    let sh_margin: u32 = if any_shadow {
+        shadow_blur + shadow_dx.unsigned_abs().max(shadow_dy.unsigned_abs())
+    } else {
+        0
+    };
+
+    // No background.
     if background_kind == 0 {
-        if rotation_deg.abs() < 0.5 {
+        // Fast path: nothing to compose (no shadow, no rotation).
+        if !any_shadow && rotation_deg.abs() < 0.5 {
             return (rendered.pixels, raw_w, raw_h, 0, 0);
         }
-        // `rotate_pixels(+θ)` rotates clockwise in screen coords — the same
-        // direction as the CSS `rotate(${rotation_deg}deg)` preview — so pass
-        // the angle as-is (no negation) or the baked tile spins the wrong way.
-        let rotated = crate::text::rotate_pixels(
-            &rendered.pixels,
-            raw_w,
-            raw_h,
-            rotation_deg as f32,
+        let tile_w = raw_w + sh_margin * 2;
+        let tile_h = raw_h + sh_margin * 2;
+        let tx = sh_margin as i32;
+        let ty = sh_margin as i32;
+        let mut tile = vec![0u8; (tile_w * tile_h * 4) as usize];
+        // Only the text can cast a shadow when there's no background box.
+        if any_shadow && shadow_text {
+            composite_drop_shadow(
+                &mut tile, tile_w, tile_h, None,
+                Some((&rendered.pixels, raw_w, raw_h, tx, ty)),
+                shadow_dx, shadow_dy, shadow_blur,
+                shadow_r, shadow_g, shadow_b, shadow_a,
+            );
+        }
+        crate::transform::paste_region(
+            &mut tile, tile_w as i32, tile_h as i32,
+            &rendered.pixels, raw_w, raw_h, tx, ty,
         );
-        let cx = raw_w as i32 / 2;
-        let cy = raw_h as i32 / 2;
+        if rotation_deg.abs() < 0.5 {
+            return (tile, tile_w, tile_h, 0, 0);
+        }
+        // `rotate_pixels(+θ)` is clockwise — matches the CSS preview.
+        let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, rotation_deg as f32);
+        let cx = tile_w as i32 / 2;
+        let cy = tile_h as i32 / 2;
         let off_x = cx - rotated.width as i32 / 2;
         let off_y = cy - rotated.height as i32 / 2;
         return (rotated.pixels, rotated.width, rotated.height, off_x, off_y);
@@ -938,15 +1068,17 @@ fn build_annotation_tile(
         0
     };
     let pad = bg_padding;
-    let tile_w = raw_w + pad * 2 + tail_margin * 2;
-    let tile_h = raw_h + pad * 2 + tail_margin * 2;
+    let tile_w = raw_w + pad * 2 + tail_margin * 2 + sh_margin * 2;
+    let tile_h = raw_h + pad * 2 + tail_margin * 2 + sh_margin * 2;
     let mut tile = vec![0u8; (tile_w * tile_h * 4) as usize];
 
-    // Background rect occupies the padded text area, inset by the tail margin.
-    let rect_x0 = tail_margin as i32;
-    let rect_y0 = tail_margin as i32;
-    let rect_x1 = (tail_margin + raw_w + pad * 2) as i32;
-    let rect_y1 = (tail_margin + raw_h + pad * 2) as i32;
+    // Origin offset = tail margin + shadow margin; the background rect occupies
+    // the padded text area, inset by both.
+    let origin = (tail_margin + sh_margin) as i32;
+    let rect_x0 = origin;
+    let rect_y0 = origin;
+    let rect_x1 = origin + (raw_w + pad * 2) as i32;
+    let rect_y1 = origin + (raw_h + pad * 2) as i32;
 
     // Build the bubble as a single coverage mask (rect ∪ tail), then composite
     // the colour ONCE. This keeps the tail flush with the body — no AA seam at
@@ -1015,12 +1147,36 @@ fn build_annotation_tile(
         );
     }
 
+    // Text sits inside the rect with `pad` margin (origin already folds in the
+    // tail + shadow margins).
+    let text_dx = origin + pad as i32;
+    let text_dy = origin + pad as i32;
+
+    // Soft drop shadow behind everything — cast from the box coverage and/or the
+    // text silhouette, per the toggles.
+    if any_shadow {
+        composite_drop_shadow(
+            &mut tile,
+            tile_w,
+            tile_h,
+            if shadow_box { Some(cov.as_slice()) } else { None },
+            if shadow_text {
+                Some((&rendered.pixels, raw_w, raw_h, text_dx, text_dy))
+            } else {
+                None
+            },
+            shadow_dx,
+            shadow_dy,
+            shadow_blur,
+            shadow_r,
+            shadow_g,
+            shadow_b,
+            shadow_a,
+        );
+    }
+
     crate::drawing::blend_coverage(&mut tile, &cov, bg_r, bg_g, bg_b, bg_a);
 
-    // Composite the text on top of the background. The text sits inside
-    // the rect with `pad` margin.
-    let text_dx = (tail_margin + pad) as i32;
-    let text_dy = (tail_margin + pad) as i32;
     crate::transform::paste_region(
         &mut tile,
         tile_w as i32,
@@ -1069,6 +1225,7 @@ impl ImageHorseTool {
             next_shape_id: 1,
             editing_shape_id: None,
             editing_text_id: None,
+            selection: None,
             paint_stab_tip: None,
             paint_cov: Vec::new(),
             paint_base: Vec::new(),
@@ -1181,6 +1338,119 @@ impl ImageHorseTool {
             bins[768 + luma] += 1;
         }
         bins
+    }
+
+    // ── Selection Marker (magic-wand) ────────────────────────────────────
+
+    /// Magic-wand select: 4-connected flood fill from (x,y) over the composite,
+    /// taking every pixel whose colour is within `tolerance` (per channel) of the
+    /// clicked pixel. Stores the mask; returns a canvas-sized RGBA overlay for the
+    /// JS selection layer to draw. Empty Vec if the click is out of bounds.
+    pub fn magic_wand_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
+        let w = self.width as usize;
+        let h = self.height as usize;
+        if w == 0 || h == 0 {
+            return Vec::new();
+        }
+        let (fx, fy) = (x.round(), y.round());
+        if fx < 0.0 || fy < 0.0 || fx >= w as f64 || fy >= h as f64 {
+            return Vec::new();
+        }
+        let buf = &self.composite_cache;
+        if buf.len() < w * h * 4 {
+            return Vec::new();
+        }
+        let start = fy as usize * w + fx as usize;
+        let t = [
+            buf[start * 4],
+            buf[start * 4 + 1],
+            buf[start * 4 + 2],
+            buf[start * 4 + 3],
+        ];
+        let tol = tolerance as i32;
+        let mut mask = vec![false; w * h];
+        let mut stack = vec![start];
+        while let Some(i) = stack.pop() {
+            if mask[i] {
+                continue;
+            }
+            let c = &buf[i * 4..i * 4 + 4];
+            if (c[0] as i32 - t[0] as i32).abs() > tol
+                || (c[1] as i32 - t[1] as i32).abs() > tol
+                || (c[2] as i32 - t[2] as i32).abs() > tol
+                || (c[3] as i32 - t[3] as i32).abs() > tol
+            {
+                continue;
+            }
+            mask[i] = true;
+            let (cx, cy) = (i % w, i / w);
+            if cx > 0 {
+                stack.push(i - 1);
+            }
+            if cx + 1 < w {
+                stack.push(i + 1);
+            }
+            if cy > 0 {
+                stack.push(i - w);
+            }
+            if cy + 1 < h {
+                stack.push(i + w);
+            }
+        }
+        let overlay = selection_overlay_rgba(&mask, w, h);
+        self.selection = Some(mask);
+        overlay
+    }
+
+    /// Select the whole canvas (Alt+A). Returns the overlay RGBA.
+    pub fn select_all(&mut self) -> Vec<u8> {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let mask = vec![true; w * h];
+        let overlay = selection_overlay_rgba(&mask, w, h);
+        self.selection = Some(mask);
+        overlay
+    }
+
+    /// The current selection as an RGBA overlay (empty if nothing is selected) —
+    /// lets JS re-draw the overlay (e.g. after an undo) without re-selecting.
+    pub fn selection_overlay(&self) -> Vec<u8> {
+        match &self.selection {
+            Some(m) => selection_overlay_rgba(m, self.width as usize, self.height as usize),
+            None => Vec::new(),
+        }
+    }
+
+    pub fn has_selection(&self) -> bool {
+        self.selection.as_ref().is_some_and(|m| m.iter().any(|&b| b))
+    }
+
+    /// Deselect (Alt+D). No history.
+    pub fn clear_selection(&mut self) {
+        self.selection = None;
+    }
+
+    /// Delete the selected pixels (make them transparent) on the active layer,
+    /// then deselect. Snaps history. Returns true if something was selected.
+    pub fn delete_selection(&mut self) -> bool {
+        let Some(mask) = self.selection.take() else {
+            return false;
+        };
+        if !mask.iter().any(|&b| b) {
+            return false;
+        }
+        self.snap("Delete Selection");
+        let data = &mut self.layers[self.active].buf.data;
+        for (i, &sel) in mask.iter().enumerate() {
+            let p = i * 4;
+            if sel && p + 3 < data.len() {
+                data[p] = 0;
+                data[p + 1] = 0;
+                data[p + 2] = 0;
+                data[p + 3] = 0;
+            }
+        }
+        self.recomposite();
+        true
     }
 
     // ── Zoom ────────────────────────────────────────────────────────────
@@ -1454,6 +1724,7 @@ impl ImageHorseTool {
             id, text, font_size, r, g, b, bold, x, y, rotation_deg,
             background_kind, bg_r, bg_g, bg_b, bg_a,
             bg_padding, bg_corner_radius, bg_tail,
+            false, false, 0, 0, 0, 0, 0, 0, 0, // shadow off; set via set_text_shadow
         );
         match self.hist.undo_stack.get_mut(snap_idx) {
             None => false,
@@ -1489,6 +1760,7 @@ impl ImageHorseTool {
             id, text, font_size, r, g, b, bold, x, y, rotation_deg,
             background_kind, bg_r, bg_g, bg_b, bg_a,
             bg_padding, bg_corner_radius, bg_tail,
+            false, false, 0, 0, 0, 0, 0, 0, 0, // shadow off; set via set_text_shadow
         );
         match self.hist.redo_stack.get_mut(snap_idx) {
             None => false,
@@ -2859,6 +3131,7 @@ impl ImageHorseTool {
             id, text, font_size, r, g, b, bold, x, y, rotation_deg,
             background_kind, bg_r, bg_g, bg_b, bg_a,
             bg_padding, bg_corner_radius, bg_tail,
+            false, false, 0, 0, 0, 0, 0, 0, 0, // shadow off; set via set_text_shadow
         );
         self.layers[self.active].text_annotations.push(ann);
         id
@@ -2886,12 +3159,22 @@ impl ImageHorseTool {
             return false;
         };
         self.snap("Edit Text");
+        // Preserve the existing drop shadow across a text/background edit.
+        let sh = {
+            let a = &self.layers[self.active].text_annotations[idx];
+            (
+                a.shadow_box, a.shadow_text,
+                a.shadow_r, a.shadow_g, a.shadow_b, a.shadow_a,
+                a.shadow_dx, a.shadow_dy, a.shadow_blur,
+            )
+        };
         let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
             build_annotation_tile(
                 text, font_size, r, g, b, bold, rotation_deg,
                 background_kind,
                 bg_r, bg_g, bg_b, bg_a,
                 bg_padding, bg_corner_radius, bg_tail,
+                sh.0, sh.1, sh.2, sh.3, sh.4, sh.5, sh.6, sh.7, sh.8,
             );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.text = text.to_string();
@@ -2910,6 +3193,72 @@ impl ImageHorseTool {
         a.bg_padding = bg_padding;
         a.bg_corner_radius = bg_corner_radius;
         a.bg_tail = bg_tail;
+        true
+    }
+
+    /// Set (or clear) the soft drop shadow on a text annotation and rebuild its
+    /// tile. `on_box` / `on_text` choose which silhouette casts the shadow;
+    /// colour / offset / blur are shared. Both toggles false (or `alpha` 0)
+    /// clears it. Pushes a "Text Shadow" snapshot. Returns true if found.
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_text_shadow(
+        &mut self,
+        id: u32,
+        on_box: bool,
+        on_text: bool,
+        color_hex: &str,
+        alpha: u8,
+        dx: i32,
+        dy: i32,
+        blur: u32,
+    ) -> bool {
+        let Some(idx) = self.layers[self.active]
+            .text_annotations
+            .iter()
+            .position(|a| a.id == id)
+        else {
+            return false;
+        };
+        let c = drawing::parse_hex_color(color_hex);
+        // No-op (and no history snapshot) when unchanged — lets commitText call
+        // this on every text commit cheaply.
+        {
+            let a = &self.layers[self.active].text_annotations[idx];
+            if a.shadow_box == on_box && a.shadow_text == on_text
+                && a.shadow_r == c[0] && a.shadow_g == c[1] && a.shadow_b == c[2]
+                && a.shadow_a == alpha && a.shadow_dx == dx && a.shadow_dy == dy
+                && a.shadow_blur == blur
+            {
+                return true;
+            }
+        }
+        self.snap("Text Shadow");
+        // Rebuild the tile with the new shadow, reusing the annotation's current
+        // text / background config.
+        let (text, fs, r, g, b, bold, rot, bk, br, bgc, bb, ba, bpad, brad, btail) = {
+            let a = &self.layers[self.active].text_annotations[idx];
+            (
+                a.text.clone(), a.font_size, a.r, a.g, a.b, a.bold, a.rotation_deg,
+                a.background_kind, a.bg_r, a.bg_g, a.bg_b, a.bg_a,
+                a.bg_padding, a.bg_corner_radius, a.bg_tail,
+            )
+        };
+        let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
+            build_annotation_tile(
+                &text, fs, r, g, b, bold, rot,
+                bk, br, bgc, bb, ba, bpad, brad, btail,
+                on_box, on_text, c[0], c[1], c[2], alpha, dx, dy, blur,
+            );
+        let a = &mut self.layers[self.active].text_annotations[idx];
+        a.shadow_box = on_box;
+        a.shadow_text = on_text;
+        a.shadow_r = c[0]; a.shadow_g = c[1]; a.shadow_b = c[2]; a.shadow_a = alpha;
+        a.shadow_dx = dx; a.shadow_dy = dy; a.shadow_blur = blur;
+        a.tile_pixels = std::sync::Arc::new(tile_pixels);
+        a.tile_w = tile_w;
+        a.tile_h = tile_h;
+        a.tile_offset_x = tile_offset_x;
+        a.tile_offset_y = tile_offset_y;
         true
     }
 
@@ -3286,6 +3635,7 @@ impl ImageHorseTool {
     /// Restore a text annotation onto the active (just-pushed) layer WITHOUT
     /// pushing history. Mirrors `restore_shape_annotation` for text. The tile is
     /// rebuilt from config; a fresh id is assigned.
+    #[allow(clippy::too_many_arguments)]
     pub fn restore_text_annotation(
         &mut self,
         text: &str,
@@ -3300,6 +3650,10 @@ impl ImageHorseTool {
         bg_padding: u32,
         bg_corner_radius: u32,
         bg_tail: u32,
+        shadow_box: bool,
+        shadow_text: bool,
+        shadow_r: u8, shadow_g: u8, shadow_b: u8, shadow_a: u8,
+        shadow_dx: i32, shadow_dy: i32, shadow_blur: u32,
     ) -> u32 {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
@@ -3307,6 +3661,9 @@ impl ImageHorseTool {
             id, text, font_size, r, g, b, bold, x, y, rotation_deg,
             background_kind, bg_r, bg_g, bg_b, bg_a,
             bg_padding, bg_corner_radius, bg_tail,
+            shadow_box, shadow_text,
+            shadow_r, shadow_g, shadow_b, shadow_a,
+            shadow_dx, shadow_dy, shadow_blur,
         );
         let active = self.active;
         if let Some(layer) = self.layers.get_mut(active) {

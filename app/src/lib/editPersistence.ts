@@ -97,6 +97,16 @@ export interface PersistedAnnotation {
   bg_padding?: number;
   bg_corner_radius?: number;
   bg_tail?: number;
+  // Drop shadow (optional — old persisted entries lack these).
+  shadow_box?: boolean;
+  shadow_text?: boolean;
+  shadow_r?: number;
+  shadow_g?: number;
+  shadow_b?: number;
+  shadow_a?: number;
+  shadow_dx?: number;
+  shadow_dy?: number;
+  shadow_blur?: number;
 }
 
 /** One live (non-destructive) shape/arrow annotation, as emitted by Rust's
@@ -232,6 +242,15 @@ export function parseSnapshotAnnotations(raw: string): PersistedAnnotation[] {
       bg_padding: a.bg_padding,
       bg_corner_radius: a.bg_corner_radius,
       bg_tail: a.bg_tail,
+      shadow_box: a.shadow_box,
+      shadow_text: a.shadow_text,
+      shadow_r: a.shadow_r,
+      shadow_g: a.shadow_g,
+      shadow_b: a.shadow_b,
+      shadow_a: a.shadow_a,
+      shadow_dx: a.shadow_dx,
+      shadow_dy: a.shadow_dy,
+      shadow_blur: a.shadow_blur,
     }));
   } catch {
     return [];
@@ -302,6 +321,15 @@ export async function savePhotoEdit(
       bg_padding: a.bg_padding,
       bg_corner_radius: a.bg_corner_radius,
       bg_tail: a.bg_tail,
+      shadow_box: a.shadow_box,
+      shadow_text: a.shadow_text,
+      shadow_r: a.shadow_r,
+      shadow_g: a.shadow_g,
+      shadow_b: a.shadow_b,
+      shadow_a: a.shadow_a,
+      shadow_dx: a.shadow_dx,
+      shadow_dy: a.shadow_dy,
+      shadow_blur: a.shadow_blur,
     }));
   } catch {
     annotations = [];
