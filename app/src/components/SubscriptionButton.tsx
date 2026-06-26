@@ -16,6 +16,7 @@ import {
   Gauge,
   Shield,
   ShieldCheck,
+  FlaskConical,
   Check,
   Loader2,
   ExternalLink,
@@ -30,6 +31,7 @@ import { RulersGridsPane } from "@/components/RulersGridsPane";
 import { ExportPane } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
 import { AIUsagePane } from "@/components/AIUsagePane";
+import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
 import { LargeButton } from "@/components/ui/large-button";
 import {
@@ -55,6 +57,7 @@ type SettingsTab =
   | "storage"
   | "billing"
   | "aiusage"
+  | "devtests"
   | "superuser";
 
 /** Human-readable summary of what changed, for the Apply toast. */
@@ -110,6 +113,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
     { id: "storage", label: "S3 / Image Hosting", icon: Cloud },
     { id: "billing", label: "Plan & Billing", icon: CreditCard },
     { id: "aiusage", label: "AI Usage", icon: Gauge },
+    { id: "devtests", label: "Dev Tests", icon: FlaskConical },
     ...(superUser
       ? [{ id: "superuser" as SettingsTab, label: "Super User", icon: ShieldCheck }]
       : []),
@@ -251,6 +255,8 @@ export function SubscriptionButton({ general, superUser }: Props) {
               <StoragePane isPaid={isPaid} tier={tier} />
             ) : tab === "aiusage" ? (
               <AIUsagePane />
+            ) : tab === "devtests" ? (
+              <DevTestsPane />
             ) : tab === "superuser" && superUser ? (
               <SuperUserPane {...superUser} />
             ) : (

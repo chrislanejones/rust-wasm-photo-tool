@@ -7,6 +7,11 @@ import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import {
+  PlacementGrid,
+  placementToAlign,
+  type AlignMode,
+} from "@/components/PlacementGrid";
 import { quickSpring } from "@/lib/animations";
 
 const FONT_FAMILIES = [
@@ -71,11 +76,17 @@ type TextMode = "text" | "background";
 interface TextSettingsProps {
   settings: ToolSettings;
   onChange: (s: ToolSettings) => void;
+  /** Place the selected text via the 3×3 grid (composes two single-axis aligns). */
+  onAlign?: (mode: AlignMode) => void;
+  /** A text is selected (created & selected / clicked / Reselect) → grid enabled. */
+  canPlace?: boolean;
 }
 
 export function TextSettings({
   settings,
   onChange,
+  onAlign,
+  canPlace = false,
 }: TextSettingsProps) {
   const [mode, setMode] = useState<TextMode>("text");
 
@@ -302,6 +313,26 @@ export function TextSettings({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {onAlign && (
+        <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+          <PlacementGrid
+            label="Placement"
+            disabled={!canPlace}
+            numpadKeys={canPlace}
+            onChange={(cell) => {
+              const [h, v] = placementToAlign(cell);
+              onAlign(h);
+              onAlign(v);
+            }}
+          />
+          {!canPlace && (
+            <p className="text-2xs text-theme-muted-foreground">
+              Select a text to place it on the canvas.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { motion, useAnimation } from "framer-motion";
 import { Upload } from "lucide-react";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,8 @@ interface Props {
   photos: PhotoEntry[];
   onResume: () => void;
   onStartFresh: () => void;
+  /** Optional override for the dialog box (e.g. the Dev Tests preview). */
+  className?: string;
 }
 
 export function ResumeDialog({
@@ -30,6 +33,7 @@ export function ResumeDialog({
   photos,
   onResume,
   onStartFresh,
+  className,
 }: Props) {
   // Object URLs for a few thumbnail previews; revoked on unmount / change.
   const thumbUrls = useMemo(
@@ -58,7 +62,7 @@ export function ResumeDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && triggerShake()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className={cn("max-w-sm", className)}>
         <motion.div animate={controls}>
         <DialogHeader>
           <DialogTitle>Welcome back</DialogTitle>

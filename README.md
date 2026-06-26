@@ -755,6 +755,18 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 4   | **Alt+S → Open Settings** — the Alt+S shortcut (was Rotate 90° CW) now opens the Settings modal via an `image-horse:open-settings` window event the `SubscriptionButton` listens for; `ShortcutModal` updated. Rotate remains available in the UI. The Settings footer (UserMenu/account on the left, **Restore Settings** + **Apply**→toast on the right) is now consistent across the **General**, **Appearance**, **Rulers & Grids**, and **Super User** tabs | Complete |
 | 5   | **Docs & marketing** — README feature line + this summary; marketing **Features** card + Trail Log **v0.9.24** | Complete |
 
+## v4.6 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Full-page cold-start flow** — the first paint on every load is one branded surface (`BrandRevealScreen`): the horse logo + a spinner settle in while the app inits WASM and checks IndexedDB for a saved session, then — deciding **before** painting (no New→Resume flash) — the logo eases up (framer `layout`) and reveals either the New panel or "Welcome back". `FirstRunScreen` is a thin wrapper that passes the revealed content; `AppShell` gained a `booting` + `firstRun` state machine. The spinner holds a minimum `BOOT_MIN_SPLASH_MS` (≈ one rotation) so a fast load never flashes | Complete |
+| 2   | **Shared upload guts (`NewActions`)** — the Browse / Paste / Sample / Blank actions, drop zone, blank-canvas panel, and links were extracted out of `UploadDialog` so the **same** body renders full-page on cold start (`FirstRunScreen`) and as the compact modal mid-session (`UploadDialog`, Alt+N). "Welcome back" is now a full-page `ResumeContent` (two thumbnails + a "+N" tile) sharing the same entrance; the modal `ResumeDialog` is retained for the Dev Tests preview | Complete |
+| 3   | **Idle screen → same reveal** — the flat black `IdleOverlay` was replaced by `IdleScreen`, which uses the shared `BrandRevealScreen` so the "paused to save power" message + Continue reveal with the same logo-eases-up entrance. Brand logo enlarged across all three surfaces (`h-32 sm:h-36`) | Complete |
+| 4   | **3×3 placement grid (`PlacementGrid`)** — a nine-button grid (corners / edge-centers / center; dot-in-position icons; Numpad 1-9 mapped spatially) replaces the old 6-button single-axis **Align** row. Removed from Edit & Move; added to **Text** and **Shapes** (places the currently-selected object, composing two `align_annotation` calls) and the **Batch editor** (both logo + text position pickers, extended from 5 → 9 positions in `computeOffset`) | Complete |
+| 5   | **Bézier pen — live Background fill preview** — `PenOverlay` now renders the fill under the stroke as you draw (SVG auto-closes the path, matching Rust's `fill_polygon` on commit), threaded via new `penFillMode` / `penFillColor` props through `CanvasArea`; previously the fill only appeared after commit. (The commit path was already correct.) | Complete |
+| 6   | **Settings → Dev Tests tab** — opens the Idle-screen and Welcome-back dialogs in isolation (black-backed boxes with header/footer; the Idle dialog's ✕ shakes) for design iteration without triggering their real conditions | Complete |
+| 7   | **Docs & marketing** — README feature line + this summary; Trail Log **v0.9.28** | Complete |
+
 ## License
 
 MIT

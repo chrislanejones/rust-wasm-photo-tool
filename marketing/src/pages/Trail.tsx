@@ -27,6 +27,18 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.28",
+    date: "2026-06-26",
+    headline: "A full-page start experience and a 3×3 placement grid",
+    entries: [
+      { tag: "ui", text: "Cold start is now one branded screen: the logo and a spinner settle in while the app checks for a saved session, then the logo eases upward and reveals either the New panel or “Welcome back” — decided before anything paints, so there’s no flash. The spinner always completes a turn, even on instant loads." },
+      { tag: "feature", text: "“Welcome back” is full-page too now, sharing that same logo-eases-up entrance: two thumbnails plus a “+N” tile and Resume / Start fresh." },
+      { tag: "ui", text: "The idle “paused to save power” screen got the same treatment, and the brand logo on all three screens is larger." },
+      { tag: "feature", text: "New 3×3 placement grid — nine buttons for the nine spots on the canvas (corners, edge-centers, center). It replaces the old alignment row and now lives in Text, Shapes, and the Batch editor; pick a text or shape and drop it into any anchor. Numpad 1-9 maps to the grid spatially." },
+      { tag: "fix", text: "Bézier pen: turning on a Background fill now previews live as you draw, instead of only appearing once the path is committed." },
+    ],
+  },
+  {
     version: "v0.9.27",
     date: "2026-06-25",
     headline: "Security tab, snapped-window layout, reduce-motion fixes, and a keyboard-accessibility pass",
@@ -36,7 +48,6 @@ const RELEASES: Release[] = [
       { tag: "feature", text: "Snapped / narrow windows: below ~900px the side panels stop crushing the canvas and float as overlay drawers (with a scrim, one open at a time); below ~600px a friendly “needs a wider window” notice appears. One shared breakpoint hook drives it all." },
       { tag: "fix", text: "Reduce Motion now also stops the panel / canvas / gallery slide animations — those animate layout (margin/width), which had been slipping past the motion-reduction wrapper." },
       { tag: "feature", text: "Keyboard-accessibility pass: a “Skip to canvas” link, landmark roles + labels on the toolbar / panels / canvas, real accessible names on the tool buttons, and Escape-to-close + dialog semantics on the modals." },
-      { tag: "fix", text: "Marketing site deploy: the single-pnpm-workspace move put its shared deps behind pnpm catalogs, which the Vercel build couldn’t resolve — pinned pnpm 10.26 and restored a workspace-aware root vercel.json so the site builds and deploys again." },
     ],
   },
   {

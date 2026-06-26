@@ -8,12 +8,6 @@ import {
   MousePointerClick,
   SquareDashed,
   Trash2,
-  AlignStartVertical,
-  AlignCenterVertical,
-  AlignEndVertical,
-  AlignStartHorizontal,
-  AlignCenterHorizontal,
-  AlignEndHorizontal,
 } from "lucide-react";
 import { LargeButton } from "@/components/ui/large-button";
 import { ToolButton } from "@/components/ui/tool-button";
@@ -77,31 +71,6 @@ function ratioIdFromLock(lock: [number, number] | null): RatioId {
   return "free";
 }
 
-/* ── Align ─────────────────────────────────────────────────────────────
- * Move the currently-selected object's bounding box to an edge / center of
- * the canvas. The actual move is done in Rust (it owns the annotation
- * geometry); this panel just emits the mode. */
-export type AlignMode =
-  | "left"
-  | "centerH"
-  | "right"
-  | "top"
-  | "middleV"
-  | "bottom";
-
-const ALIGN_BUTTONS: {
-  mode: AlignMode;
-  icon: typeof AlignStartVertical;
-  label: string;
-}[] = [
-  { mode: "left", icon: AlignStartVertical, label: "Align left" },
-  { mode: "centerH", icon: AlignCenterVertical, label: "Center horizontally" },
-  { mode: "right", icon: AlignEndVertical, label: "Align right" },
-  { mode: "top", icon: AlignStartHorizontal, label: "Align top" },
-  { mode: "middleV", icon: AlignCenterHorizontal, label: "Center vertically" },
-  { mode: "bottom", icon: AlignEndHorizontal, label: "Align bottom" },
-];
-
 /* ── Main component ──────────────────────────────────────────────────── */
 
 interface TransformCropSettingsProps {
@@ -116,13 +85,7 @@ interface TransformCropSettingsProps {
   /** Currently-locked aspect ratio as `[w, h]`. `null` = Free. */
   cropRatio: [number, number] | null;
   onCropRatioChange: (lock: [number, number] | null) => void;
-  /** Align the currently-selected object (text / shape) within the canvas. */
-  onAlign?: (mode: AlignMode) => void;
-  /** Whether an object is selected on the canvas (enables the Align row). */
-  hasSelection?: boolean;
-  /** Select the last-added object's bounding box as the align target. */
-  onSelectBoundingBox?: () => void;
-  /** Selection Marker (magic-wand) controls — shown above Align. */
+  /** Selection Marker (magic-wand) controls. */
   selection?: SelectionControls;
 }
 
@@ -137,9 +100,6 @@ export function TransformCropSettings({
   onSetCropSelection,
   cropRatio,
   onCropRatioChange,
-  onAlign,
-  hasSelection = false,
-  onSelectBoundingBox,
   selection,
 }: TransformCropSettingsProps) {
   const ratio = ratioIdFromLock(cropRatio);
@@ -278,32 +238,6 @@ export function TransformCropSettings({
         </div>
       )}
 
-      {/* ── Align — move the selected object's bounding box (Rust-driven) ─── */}
-      <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
-        <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-          Align
-        </span>
-        <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
-          {ALIGN_BUTTONS.map(({ mode, icon: Icon, label }) => (
-            <ToolButton
-              key={mode}
-              title={label}
-              aria-label={label}
-              disabled={disabled || !onAlign || !hasSelection}
-              onClick={() => onAlign?.(mode)}
-            >
-              <Icon />
-            </ToolButton>
-          ))}
-        </div>
-        <LargeButton
-          className="w-full"
-          disabled={disabled}
-          onClick={onSelectBoundingBox}
-        >
-          <BoxSelect className="h-4 w-4" /> Select bounding box
-        </LargeButton>
-      </div>
     </div>
   );
 }

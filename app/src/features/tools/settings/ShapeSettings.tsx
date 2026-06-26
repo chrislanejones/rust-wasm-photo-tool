@@ -4,6 +4,11 @@ import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { TabGroup } from "@/components/TabGroup";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SizeSlider } from "@/components/SizeSlider";
+import {
+  PlacementGrid,
+  placementToAlign,
+  type AlignMode,
+} from "@/components/PlacementGrid";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
 
@@ -50,9 +55,13 @@ interface ShapesSettingsProps {
   onChange: (s: ToolSettings) => void;
   activeMode?: ShapesMode;
   onModeChange?: (mode: ShapesMode) => void;
+  /** Place the selected shape via the 3×3 grid (composes two single-axis aligns). */
+  onAlign?: (mode: AlignMode) => void;
+  /** A shape is selected (created & selected / clicked / Reselect) → grid enabled. */
+  canPlace?: boolean;
 }
 
-export function ShapesSettings({ settings, onChange, activeMode, onModeChange }: ShapesSettingsProps) {
+export function ShapesSettings({ settings, onChange, activeMode, onModeChange, onAlign, canPlace = false }: ShapesSettingsProps) {
   const [internalMode, setInternalMode] = useState<ShapesMode>("shapes");
   const mode = activeMode ?? internalMode;
   const currentShape = (settings.shape ?? "rect") as ShapeType;
@@ -257,6 +266,26 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange }:
             value={settings.strokeColor}
             onChange={(color) => onChange({ ...settings, strokeColor: color })}
           />
+        </div>
+      )}
+
+      {onAlign && (
+        <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+          <PlacementGrid
+            label="Placement"
+            disabled={!canPlace}
+            numpadKeys={canPlace}
+            onChange={(cell) => {
+              const [h, v] = placementToAlign(cell);
+              onAlign(h);
+              onAlign(v);
+            }}
+          />
+          {!canPlace && (
+            <p className="text-2xs text-theme-muted-foreground">
+              Select a shape to place it on the canvas.
+            </p>
+          )}
         </div>
       )}
     </div>

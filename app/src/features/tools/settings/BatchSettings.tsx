@@ -9,6 +9,7 @@ import { ToolButton } from "@/components/ui/tool-button";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
+import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { TEXT_COLORS } from "@/lib/colors";
 import { getOriginal, putOriginal, deleteOriginal } from "@/lib/originalsStore";
 import {
@@ -22,12 +23,8 @@ import { toast } from "@/components/ui/sonner";
 
 const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
 
-type LogoPosition =
-  | "top-left"
-  | "top-right"
-  | "center"
-  | "bottom-left"
-  | "bottom-right";
+// Batch positions now use the shared 9-cell placement grid.
+type LogoPosition = PlacementCell;
 
 interface LogoState {
   bitmap: ImageBitmap;
@@ -47,14 +44,6 @@ interface BatchSettingsProps {
   syncState: () => void;
 }
 
-const POSITIONS: { id: LogoPosition; label: string }[] = [
-  { id: "top-left", label: "TL" },
-  { id: "top-right", label: "TR" },
-  { id: "center", label: "C" },
-  { id: "bottom-left", label: "BL" },
-  { id: "bottom-right", label: "BR" },
-];
-
 function computeOffset(
   pos: LogoPosition,
   workW: number,
@@ -63,21 +52,32 @@ function computeOffset(
   logoH: number,
   margin: number,
 ): { dx: number; dy: number } {
+  const left = margin;
+  const right = workW - logoW - margin;
+  const midX = Math.round((workW - logoW) / 2);
+  const top = margin;
+  const bottom = workH - logoH - margin;
+  const midY = Math.round((workH - logoH) / 2);
   switch (pos) {
     case "top-left":
-      return { dx: margin, dy: margin };
+      return { dx: left, dy: top };
+    case "top-center":
+      return { dx: midX, dy: top };
     case "top-right":
-      return { dx: workW - logoW - margin, dy: margin };
+      return { dx: right, dy: top };
+    case "middle-left":
+      return { dx: left, dy: midY };
     case "center":
-      return {
-        dx: Math.round((workW - logoW) / 2),
-        dy: Math.round((workH - logoH) / 2),
-      };
+      return { dx: midX, dy: midY };
+    case "middle-right":
+      return { dx: right, dy: midY };
     case "bottom-left":
-      return { dx: margin, dy: workH - logoH - margin };
+      return { dx: left, dy: bottom };
+    case "bottom-center":
+      return { dx: midX, dy: bottom };
     case "bottom-right":
     default:
-      return { dx: workW - logoW - margin, dy: workH - logoH - margin };
+      return { dx: right, dy: bottom };
   }
 }
 
@@ -612,17 +612,7 @@ export function BatchSettings({
         <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
           Position
         </p>
-        <div className="grid grid-cols-3 gap-1.5">
-          {POSITIONS.map((p) => (
-            <ToolButton
-              key={p.id}
-              active={position === p.id}
-              onClick={() => setPosition(p.id)}
-            >
-              {p.label}
-            </ToolButton>
-          ))}
-        </div>
+        <PlacementGrid value={position} onChange={setPosition} />
       </div>
 
       <SizeSlider
@@ -683,20 +673,7 @@ export function BatchSettings({
   );
 }
 
-type TextPosition =
-  | "top-left"
-  | "top-right"
-  | "center"
-  | "bottom-left"
-  | "bottom-right";
-
-const TEXT_POSITIONS: { id: TextPosition; label: string }[] = [
-  { id: "top-left", label: "TL" },
-  { id: "top-right", label: "TR" },
-  { id: "center", label: "C" },
-  { id: "bottom-left", label: "BL" },
-  { id: "bottom-right", label: "BR" },
-];
+type TextPosition = PlacementCell;
 
 const TEXT_FONT_FAMILIES = [
   { label: "Sans Serif", value: "sans-serif" },
@@ -1009,17 +986,7 @@ function TextBatchPanel({
         <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
           Position
         </p>
-        <div className="grid grid-cols-3 gap-1.5">
-          {TEXT_POSITIONS.map((p) => (
-            <ToolButton
-              key={p.id}
-              active={position === p.id}
-              onClick={() => setPosition(p.id)}
-            >
-              {p.label}
-            </ToolButton>
-          ))}
-        </div>
+        <PlacementGrid value={position} onChange={setPosition} />
       </div>
 
       <SizeSlider

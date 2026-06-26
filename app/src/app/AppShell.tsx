@@ -29,17 +29,19 @@ import type { GeneralControls } from "@/components/GeneralPane";
 import { usePreferences } from "@/lib/preferences";
 import { useTheme, useReduceMotion } from "@/lib/useTheme";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
-import { IdleOverlay } from "@/components/IdleOverlay";
+import { IdleScreen } from "@/components/IdleScreen";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
-import type { AlignMode } from "@/features/tools/settings/TransformCropSettings";
+import type { AlignMode } from "@/components/PlacementGrid";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
 import { ReviewPanel } from "@/features/canvas/ReviewPanel";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
-import { ResumeDialog } from "@/components/ResumeDialog";
+import { FirstRunScreen } from "@/features/upload/FirstRunScreen";
+import { NewActions } from "@/features/upload/NewActions";
+import { ResumeContent } from "@/features/upload/ResumeContent";
 import {
   loadGalleryManifest,
   saveGalleryManifest,
@@ -153,6 +155,12 @@ function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
   return null;
 }
 
+// Minimum time the boot splash stays up, even on an instant load. The spinner's
+// animate-spin is 1s per rotation, so ~900ms lets it complete roughly one full
+// turn — the splash reads as intentional instead of a one-frame flash. (0 under
+// reduce-motion: no forced wait when the spinner isn't animating anyway.)
+const BOOT_MIN_SPLASH_MS = 900;
+
 export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -182,6 +190,17 @@ export function AppShell() {
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [resumeManifest, setResumeManifest] = useState<GalleryManifest | null>(null);
+  // Cold-start boot splash (logo + spinner). True until WASM is up and the
+  // IndexedDB session check has resolved, so we route to New vs Resume without a
+  // flash.
+  const [booting, setBooting] = useState(true);
+  // True until the user first enters the editor (a photo becomes active). While
+  // true, the "New" surface is the full-page FirstRunScreen; once you've been in
+  // the app, every later empty/New state uses the compact UploadDialog instead.
+  const [firstRun, setFirstRun] = useState(true);
+  useEffect(() => {
+    if (photos.length > 0) setFirstRun(false); // latches false for the session
+  }, [photos.length]);
   const [imageSavings, setImageSavings] = useState<Record<string, { savingsPercent: number }>>({});
   const [modifiedPhotos, setModifiedPhotos] = useState<Set<string>>(new Set());
   // originalUrl is populated by the compare effect; not set on photo select
@@ -695,7 +714,9 @@ export function AppShell() {
     clearSelection,
   ]);
 
-  const [showUpload, setShowUpload] = useState(true);
+  // Starts false: the boot splash covers the first paint, and the boot effect
+  // opens this (the "New" dialog) only if there's no prior session to resume.
+  const [showUpload, setShowUpload] = useState(false);
   const [showTopBar, setShowTopBar] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
@@ -892,19 +913,46 @@ export function AppShell() {
   const resumeChecked = useRef(false);
   const galleryWasNonEmpty = useRef(false);
 
+  // Boot sequence: the splash stays up while we (1) init WASM and (2) check
+  // IndexedDB for a saved session, with the progress bar tracking those real
+  // milestones. Only once that resolves do we mount exactly one of New / Resume
+  // — deciding before paint so there's no New→Resume flash. A short minimum
+  // duration avoids a one-frame flicker on warm (fast) loads.
   useEffect(() => {
     if (resumeChecked.current || photos.length > 0 || !authResolved) return;
-    resumeChecked.current = true;
-    void loadGalleryManifest().then((m) => {
-      if (!m || m.photos.length === 0) return;
-      if (userMode === "demo") {
-        setResumeManifest(m); // anonymous → Resume prompt
-      } else if (prefs.reopenLastSession) {
-        setPhotos(m.photos); // signed in → auto-reopen (auto-select loads photo 0)
+    resumeChecked.current = true; // run-once latch (AppShell persists for the session)
+    const startedAt = performance.now();
+    void (async () => {
+      // 1) WASM ready — the biggest boot cost; idempotent if already loaded.
+      try {
+        const mod = await import("stamp_tool");
+        await mod.default();
+      } catch (e) {
+        console.error("WASM init failed during boot:", e);
       }
-      // signed in + "Start fresh" → leave the upload screen as-is
-    });
-  }, [authResolved, userMode, photos.length, prefs.reopenLastSession]);
+      // 2) Look for a prior session saved on this device.
+      const m = await loadGalleryManifest().catch(() => null);
+      // 3) Route.
+      if (m && m.photos.length > 0) {
+        if (userMode === "demo") {
+          setResumeManifest(m); // anonymous → Resume prompt
+        } else if (prefs.reopenLastSession) {
+          setPhotos(m.photos); // signed in → auto-reopen (auto-select loads photo 0)
+        } else {
+          setShowUpload(true); // signed in + "Start fresh" pref → New dialog
+        }
+      } else {
+        setShowUpload(true); // nothing saved (incl. fresh / cache-cleared browser) → New
+      }
+      // 4) Hold the splash for a minimum beat so a fast load doesn't flash the
+      // spinner for a few ms (which looks broken) — it spins ~one full turn.
+      // No cancel guard: re-renders must not abort the dismissal, and this
+      // component lives for the whole session.
+      const minMs = prefs.reduceMotion ? 0 : BOOT_MIN_SPLASH_MS;
+      const wait = Math.max(0, minMs - (performance.now() - startedAt));
+      window.setTimeout(() => setBooting(false), wait);
+    })();
+  }, [authResolved, userMode, photos.length, prefs.reopenLastSession, prefs.reduceMotion]);
 
   // Persist the manifest on every gallery change; drop it once the gallery is
   // emptied during the session (Delete All etc.) so we never offer to resume
@@ -1284,13 +1332,6 @@ export function AppShell() {
     },
     [stamp, selectedObject, drawingTools, textTool],
   );
-
-  // "Select bounding box" → grab the most-recently-added object as the align
-  // target (so Align is usable without hunting the Reselect list first).
-  const handleSelectBoundingBox = useCallback(() => {
-    const last = reselectObjects[reselectObjects.length - 1];
-    if (last) handleSelectObject(last);
-  }, [reselectObjects, handleSelectObject]);
 
   // Histogram bins straight from Rust (`calculate_histogram` over the composite
   // buffer) — replaces HistogramView's old per-resample canvas sampling loop.
@@ -2030,8 +2071,35 @@ export function AppShell() {
         <SmallWindowNotice onDismiss={() => setSmallNoticeDismissed(true)} />
       )}
 
+      {/* Cold start: one full-page surface. It's the splash (logo + spinner)
+          while booting, then the spinner fades, the logo eases up, and EITHER
+          the New actions or the Welcome-back content reveal — same entrance for
+          both. Auto-reopen just fades it out. Mid-session "New" uses the compact
+          UploadDialog below. */}
+      <FirstRunScreen
+        show={booting || (firstRun && (showUpload || !!resumeManifest))}
+        phase={booting ? "loading" : "ready"}
+        reduceMotion={prefs.reduceMotion}
+      >
+        {resumeManifest ? (
+          <ResumeContent
+            photos={resumeManifest.photos}
+            onResume={handleResumeSession}
+            onStartFresh={handleStartFresh}
+          />
+        ) : (
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-bg-secondary shadow-2xl">
+            <NewActions
+              onFiles={handleAddPhotos}
+              isLoading={isImageLoading}
+              loadProgress={loadProgress}
+            />
+          </div>
+        )}
+      </FirstRunScreen>
+
       <UploadDialog
-        open={showUpload && !resumeManifest}
+        open={showUpload && !resumeManifest && !booting && !firstRun}
         onClose={() => setShowUpload(false)}
         onFiles={handleAddPhotos}
         isLoading={isImageLoading}
@@ -2039,19 +2107,12 @@ export function AppShell() {
         canClose={photos.length > 0}
       />
 
-      <ResumeDialog
-        open={!!resumeManifest}
-        photos={resumeManifest?.photos ?? []}
-        onResume={handleResumeSession}
-        onStartFresh={handleStartFresh}
-      />
-
       <ShortcutModal
         open={showShortcutModal}
         onClose={() => setShowShortcutModal(false)}
       />
 
-      <IdleOverlay open={idle} onContinue={wake} />
+      <IdleScreen open={idle} onContinue={wake} reduceMotion={prefs.reduceMotion} />
 
       {/* Diagnostics Window (Alt+Delete) is always available. */}
       <DiagnosticLogOverlay
@@ -2317,8 +2378,7 @@ export function AppShell() {
             cropRatio={cropRatio}
             onCropRatioChange={setCropRatio}
             onAlign={handleAlign}
-            hasSelection={selectedObject !== null}
-            onSelectBoundingBox={handleSelectBoundingBox}
+            selectedKind={selectedObject?.type ?? null}
             selection={{
               tolerance: selectionTolerance,
               onToleranceChange: setSelectionTolerance,
@@ -2478,6 +2538,8 @@ export function AppShell() {
                           penActive={penActive}
                           penColor={toolSettings.strokeColor}
                           penStrokeWidth={toolSettings.strokeWidth}
+                          penFillMode={toolSettings.fillMode}
+                          penFillColor={toolSettings.fillColor}
                           onPenCommit={handlePenCommit}
                           onPenHitTest={handlePenHitTest}
                           onPenEditStart={handlePenEditStart}
@@ -2569,6 +2631,8 @@ export function AppShell() {
                       penActive={penActive}
                       penColor={toolSettings.strokeColor}
                       penStrokeWidth={toolSettings.strokeWidth}
+                      penFillMode={toolSettings.fillMode}
+                      penFillColor={toolSettings.fillColor}
                       onPenCommit={handlePenCommit}
                       onPenHitTest={handlePenHitTest}
                       onPenEditStart={handlePenEditStart}

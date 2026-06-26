@@ -21,7 +21,8 @@ import type { ShapesMode } from "./settings/ShapeSettings";
 import { ToolGrid } from "./ToolGrid";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
-import type { AlignMode, SelectionControls } from "./settings/TransformCropSettings";
+import type { SelectionControls } from "./settings/TransformCropSettings";
+import type { AlignMode } from "@/components/PlacementGrid";
 import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
 import { ArrowSettings } from "./settings/ArrowSettings";
@@ -41,12 +42,12 @@ interface ToolsSidebarProps {
   stampSettings: StampSettingsType;
   onStampSettingsChange: (s: StampSettingsType) => void;
   hasSource: boolean;
-  /** Align the selected object's bounding box (Edit & Move → Align). */
+  /** Place the selected object via the 3×3 grid (Text / Shape panels compose
+   *  two single-axis aligns). */
   onAlign?: (mode: AlignMode) => void;
-  /** Whether an object is selected on the canvas (enables the Align row). */
-  hasSelection?: boolean;
-  /** Select the last-added object's bounding box as the align target. */
-  onSelectBoundingBox?: () => void;
+  /** Kind of the currently-selected object — gates the placement grid to the
+   *  matching panel (text grid only when a text is selected, etc.). */
+  selectedKind?: "text" | "shape" | null;
   /** Selection Marker (magic-wand) controls. */
   selection?: SelectionControls;
   /** Download button: exports the single photo, or opens the chooser dialog
@@ -133,8 +134,7 @@ export function ToolsSidebar({
   onStampSettingsChange,
   hasSource,
   onAlign,
-  hasSelection,
-  onSelectBoundingBox,
+  selectedKind,
   selection,
   onExport,
   canExport,
@@ -259,9 +259,6 @@ export function ToolsSidebar({
             onSetCropSelection={onSetCropSelection}
             cropRatio={cropRatio ?? null}
             onCropRatioChange={onCropRatioChange ?? (() => {})}
-            onAlign={onAlign}
-            hasSelection={hasSelection}
-            onSelectBoundingBox={onSelectBoundingBox}
             selection={selection}
           />
         )}
@@ -311,6 +308,8 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
             activeMode={shapesMode}
             onModeChange={onShapesModeChange}
+            onAlign={onAlign}
+            canPlace={selectedKind === "shape"}
           />
         )}
 
@@ -338,6 +337,8 @@ export function ToolsSidebar({
           <TextSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}
+            onAlign={onAlign}
+            canPlace={selectedKind === "text"}
           />
         )}
 

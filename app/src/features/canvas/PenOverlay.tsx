@@ -78,6 +78,10 @@ interface PenOverlayProps {
   canvasEl: HTMLCanvasElement | null;
   color: string;
   strokeWidth: number;
+  /** Live fill preview (Paint → Pen → Background). "none" = outline only.
+   *  SVG auto-closes the fill, mirroring Rust's `fill_polygon` on commit. */
+  fillMode?: "none" | "solid" | "gradient" | "pixelate";
+  fillColor?: string;
   /** Commit a NEW path: flat control sequence + whether it closes. */
   onCommit: (flatPoints: number[], close: boolean) => void;
   /** Hit-test an image-space point against committed kind-7 paths. */
@@ -102,6 +106,8 @@ export function PenOverlay({
   canvasEl,
   color,
   strokeWidth,
+  fillMode,
+  fillColor,
   onCommit,
   onHitTest,
   onEditStart,
@@ -335,6 +341,12 @@ export function PenOverlay({
 
       {d && (
         <>
+          {/* Live Background fill — drawn under the stroke. SVG auto-closes the
+              path, matching the committed result (Rust fill_polygon). Semi-
+              transparent so the image stays visible while you place points. */}
+          {fillMode && fillMode !== "none" && (
+            <path d={d} fill={fillColor ?? "#000000"} fillOpacity={0.7} stroke="none" />
+          )}
           <path d={d} fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={sw + 2} strokeLinecap="round" strokeLinejoin="round" />
           <path d={d} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
         </>

@@ -125,6 +125,9 @@ interface Props {
   penActive?: boolean;
   penColor?: string;
   penStrokeWidth?: number;
+  /** Live Background fill for the pen preview (shares toolSettings fill). */
+  penFillMode?: "none" | "solid" | "gradient" | "pixelate";
+  penFillColor?: string;
   onPenCommit?: (flatPoints: number[], close: boolean) => void;
   /** Pen edit: hit-test a committed path, then load/commit/cancel a reshape. */
   onPenHitTest?: (imgX: number, imgY: number) => { id: number; points: number[] } | null;
@@ -302,6 +305,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       penActive,
       penColor,
       penStrokeWidth,
+      penFillMode,
+      penFillColor,
       onPenCommit,
       onPenHitTest,
       onPenEditStart,
@@ -729,6 +734,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             canvasEl={canvasRef.current}
             color={penColor ?? "#ef4444"}
             strokeWidth={penStrokeWidth ?? 3}
+            fillMode={penFillMode}
+            fillColor={penFillColor}
             onCommit={onPenCommit ?? (() => {})}
             onHitTest={onPenHitTest}
             onEditStart={onPenEditStart}
