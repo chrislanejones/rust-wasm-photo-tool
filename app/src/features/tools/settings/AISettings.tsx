@@ -89,9 +89,8 @@ export function AISettings({
       {!aiEnabled && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
           <Lock className="h-4 w-4 shrink-0 text-warning mt-0.5" />
-          <p className="text-2xs text-warning/90 leading-relaxed">
-            AI tools run on Replicate and are a <strong>Paid</strong> feature.
-            Upgrade to unlock background removal, text extraction, and more.
+          <p className="text-2xs text-warning/90">
+            AI tools need <strong>sign-in</strong> + a <strong>Paid</strong> plan.
           </p>
         </div>
       )}
@@ -104,9 +103,6 @@ export function AISettings({
             <span className="text-xs font-semibold text-text-primary">
               Background Removal
             </span>
-            <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
-              One-click background isolation powered by rembg, run via Replicate.
-            </p>
           </div>
         </div>
         <button
@@ -142,9 +138,6 @@ export function AISettings({
             <span className="text-xs font-semibold text-text-primary">
               Text Extract (OCR)
             </span>
-            <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
-              Read the text out of the current image, via Replicate OCR.
-            </p>
           </div>
         </div>
         <button
@@ -201,10 +194,6 @@ export function AISettings({
             <span className="text-xs font-semibold text-text-primary">
               Object Removal
             </span>
-            <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
-              Brush over an object to erase it; LaMa fills the gap. Runs via
-              Replicate.
-            </p>
           </div>
         </div>
         <button
@@ -233,7 +222,7 @@ export function AISettings({
       </div>
 
       {/* Still placeholders */}
-      {COMING_SOON.map(({ title, description, Icon }) => (
+      {COMING_SOON.map(({ title, Icon }) => (
         <div
           key={title}
           className="flex items-start gap-3 p-3 rounded-lg bg-bg-elevated/50 border border-border/50 opacity-60"
@@ -248,9 +237,6 @@ export function AISettings({
                 Coming Soon
               </span>
             </div>
-            <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">
-              {description}
-            </p>
           </div>
         </div>
       ))}

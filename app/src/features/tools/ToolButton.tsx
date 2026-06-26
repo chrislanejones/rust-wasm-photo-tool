@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "./toolConfig";
+import { HOVER_RING } from "@/lib/styles";
 
 interface Props {
   tool: ToolDefinition;
@@ -33,8 +34,8 @@ export function ToolButton({ tool, active, disabled = false, onClick }: Props) {
               active
                 ? `bg-gradient-to-br ${tool.gradient} text-white shadow-md shadow-black/25`
                 : "bg-bg-tertiary text-text-muted hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]",
-              // Warm accent ("brown") ring on hover, like the app's other buttons.
-              "hover:ring-2 hover:ring-theme-primary/60 hover:ring-offset-2 hover:ring-offset-bg-secondary",
+              // Warm-accent ("brown") ring on hover — shared HOVER_RING.
+              HOVER_RING,
             ].join(" "),
       ].join(" ")}
     >

@@ -2524,19 +2524,35 @@ impl ImageHorseTool {
             return false;
         };
         let (bw, bh) = (maxx - minx, maxy - miny);
+        // Cell centers of a 3×3 grid over the canvas: columns at w/6, w/2, 5w/6
+        // and rows at h/6, h/2, 5h/6. A "nine-grid" mode centers the bbox in the
+        // chosen cell; the legacy single-axis modes flush it to an edge/center.
+        let cx = |col: f64| col * canvas_w / 6.0 - minx - bw / 2.0;
+        let cy = |row: f64| row * canvas_h / 6.0 - miny - bh / 2.0;
         let (dx, dy) = match mode {
+            // Legacy single-axis edge aligns (kept for compatibility).
             "left" => (-minx, 0.0),
             "centerH" => ((canvas_w - bw) / 2.0 - minx, 0.0),
             "right" => (canvas_w - maxx, 0.0),
             "top" => (0.0, -miny),
             "middleV" => (0.0, (canvas_h - bh) / 2.0 - miny),
             "bottom" => (0.0, canvas_h - maxy),
+            // Nine-grid cell placement: center the object in cell (col, row).
+            "top-left" => (cx(1.0), cy(1.0)),
+            "top-center" => (cx(3.0), cy(1.0)),
+            "top-right" => (cx(5.0), cy(1.0)),
+            "middle-left" => (cx(1.0), cy(3.0)),
+            "center" => (cx(3.0), cy(3.0)),
+            "middle-right" => (cx(5.0), cy(3.0)),
+            "bottom-left" => (cx(1.0), cy(5.0)),
+            "bottom-center" => (cx(3.0), cy(5.0)),
+            "bottom-right" => (cx(5.0), cy(5.0)),
             _ => return false,
         };
         if dx.abs() < 0.5 && dy.abs() < 0.5 {
-            return true; // already aligned — no history churn
+            return true; // already placed — no history churn
         }
-        self.snap("Align");
+        self.snap("Place");
         if is_text {
             if let Some(t) = self.layers[self.active]
                 .text_annotations

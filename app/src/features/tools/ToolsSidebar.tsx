@@ -22,7 +22,7 @@ import { ToolGrid } from "./ToolGrid";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import type { SelectionControls } from "./settings/TransformCropSettings";
-import type { AlignMode } from "@/components/PlacementGrid";
+import type { PlacementCell } from "@/components/PlacementGrid";
 import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
 import { ArrowSettings } from "./settings/ArrowSettings";
@@ -42,9 +42,8 @@ interface ToolsSidebarProps {
   stampSettings: StampSettingsType;
   onStampSettingsChange: (s: StampSettingsType) => void;
   hasSource: boolean;
-  /** Place the selected object via the 3×3 grid (Text / Shape panels compose
-   *  two single-axis aligns). */
-  onAlign?: (mode: AlignMode) => void;
+  /** Place the selected object into one of the nine grid cells (Text / Shape). */
+  onPlace?: (cell: PlacementCell) => void;
   /** Kind of the currently-selected object — gates the placement grid to the
    *  matching panel (text grid only when a text is selected, etc.). */
   selectedKind?: "text" | "shape" | null;
@@ -133,7 +132,7 @@ export function ToolsSidebar({
   stampSettings,
   onStampSettingsChange,
   hasSource,
-  onAlign,
+  onPlace,
   selectedKind,
   selection,
   onExport,
@@ -308,7 +307,7 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
             activeMode={shapesMode}
             onModeChange={onShapesModeChange}
-            onAlign={onAlign}
+            onPlace={onPlace}
             canPlace={selectedKind === "shape"}
           />
         )}
@@ -337,7 +336,7 @@ export function ToolsSidebar({
           <TextSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}
-            onAlign={onAlign}
+            onPlace={onPlace}
             canPlace={selectedKind === "text"}
           />
         )}

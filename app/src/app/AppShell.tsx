@@ -32,7 +32,7 @@ import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
-import type { AlignMode } from "@/components/PlacementGrid";
+import type { PlacementCell } from "@/components/PlacementGrid";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
 import { ReviewPanel } from "@/features/canvas/ReviewPanel";
@@ -90,6 +90,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { LargeButton } from "@/components/ui/large-button";
+import { ActionTile } from "@/components/ui/action-tile";
+import { ShareButton } from "@/components/ShareButton";
 import {
   Undo,
   Redo,
@@ -912,14 +914,21 @@ export function AppShell() {
   // (signed in, per Settings → General → "When you return").
   const resumeChecked = useRef(false);
   const galleryWasNonEmpty = useRef(false);
+  // Live mirrors so the once-on-mount boot reads the CURRENT auth state without
+  // hard-blocking on it (Clerk can take seconds to load — it must not trap the
+  // splash).
+  const authResolvedRef = useRef(authResolved);
+  authResolvedRef.current = authResolved;
+  const userModeRef = useRef(userMode);
+  userModeRef.current = userMode;
 
-  // Boot sequence: the splash stays up while we (1) init WASM and (2) check
-  // IndexedDB for a saved session, with the progress bar tracking those real
-  // milestones. Only once that resolves do we mount exactly one of New / Resume
-  // — deciding before paint so there's no New→Resume flash. A short minimum
-  // duration avoids a one-frame flicker on warm (fast) loads.
+  // Boot sequence (runs once on mount): init WASM, give Clerk a brief CAPPED
+  // window to resolve (so we know signed-in vs anonymous) WITHOUT blocking the
+  // splash on it, check IndexedDB for a saved session, then mount exactly one of
+  // New / Resume — deciding before paint so there's no flash. A short minimum
+  // duration keeps the spinner from flashing on a fast load.
   useEffect(() => {
-    if (resumeChecked.current || photos.length > 0 || !authResolved) return;
+    if (resumeChecked.current || photos.length > 0) return;
     resumeChecked.current = true; // run-once latch (AppShell persists for the session)
     const startedAt = performance.now();
     void (async () => {
@@ -930,11 +939,20 @@ export function AppShell() {
       } catch (e) {
         console.error("WASM init failed during boot:", e);
       }
-      // 2) Look for a prior session saved on this device.
+      // 2) Give Clerk a brief, capped window to resolve so the route knows
+      // signed-in vs anonymous — but never hard-wait on it (a slow / blocked
+      // Clerk must not trap the app on the spinner). Treats unresolved as
+      // anonymous.
+      const deadline = performance.now() + 1200;
+      while (!authResolvedRef.current && performance.now() < deadline) {
+        await new Promise((r) => window.setTimeout(r, 50));
+      }
+      // 3) Look for a prior session saved on this device.
       const m = await loadGalleryManifest().catch(() => null);
-      // 3) Route.
+      // 4) Route (unresolved auth → treat as anonymous demo).
+      const mode = userModeRef.current;
       if (m && m.photos.length > 0) {
-        if (userMode === "demo") {
+        if (mode === "demo") {
           setResumeManifest(m); // anonymous → Resume prompt
         } else if (prefs.reopenLastSession) {
           setPhotos(m.photos); // signed in → auto-reopen (auto-select loads photo 0)
@@ -944,15 +962,15 @@ export function AppShell() {
       } else {
         setShowUpload(true); // nothing saved (incl. fresh / cache-cleared browser) → New
       }
-      // 4) Hold the splash for a minimum beat so a fast load doesn't flash the
+      // 5) Hold the splash for a minimum beat so a fast load doesn't flash the
       // spinner for a few ms (which looks broken) — it spins ~one full turn.
-      // No cancel guard: re-renders must not abort the dismissal, and this
-      // component lives for the whole session.
       const minMs = prefs.reduceMotion ? 0 : BOOT_MIN_SPLASH_MS;
       const wait = Math.max(0, minMs - (performance.now() - startedAt));
       window.setTimeout(() => setBooting(false), wait);
     })();
-  }, [authResolved, userMode, photos.length, prefs.reopenLastSession, prefs.reduceMotion]);
+    // Runs once on mount; live auth/mode read via refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist the manifest on every gallery change; drop it once the gallery is
   // emptied during the session (Delete All etc.) so we never offer to resume
@@ -1309,17 +1327,17 @@ export function AppShell() {
     [textTool, drawingTools],
   );
 
-  // Align the selected object's bounding box to a canvas edge / center. The bbox
-  // math + translate live in Rust (`align_annotation`); JS just flushes and
-  // re-syncs the live overlays afterward.
-  const handleAlign = useCallback(
-    (mode: AlignMode) => {
+  // Place the selected object into one of the nine grid cells — Rust centers the
+  // bbox in that ninth of the canvas (`align_annotation` with a cell mode); JS
+  // flushes and re-syncs the live overlays afterward.
+  const handlePlace = useCallback(
+    (cell: PlacementCell) => {
       const tool = stamp.toolRef.current;
       if (!tool || !selectedObject) return;
       const moved = tool.align_annotation(
         selectedObject.id,
         selectedObject.type === "text",
-        mode,
+        cell,
         stamp.state.width,
         stamp.state.height,
       );
@@ -2238,22 +2256,30 @@ export function AppShell() {
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>
-              Download {photos.length > 1 ? "Images" : "Image"} or Copy to
-              Clipboard
-            </DialogTitle>
+            <DialogTitle>Download, Copy, or Share</DialogTitle>
           </DialogHeader>
 
           <DialogBody className="space-y-4">
             <DialogDescription>
               {photos.length > 1 ? (
                 <>
-                  Export the selected image, all images, or copy to clipboard —
-                  multiple images download together as a{" "}
-                  <span className="font-mono">.zip</span>.
+                  Save the selected image — or all of them as a{" "}
+                  <span className="font-mono">.zip</span> — copy the canvas to
+                  your clipboard, or create a public{" "}
+                  <strong className="font-semibold text-text-secondary">
+                    share link
+                  </strong>{" "}
+                  anyone can open.
                 </>
               ) : (
-                <>Export this image, or copy it to the clipboard.</>
+                <>
+                  Save this image, copy the canvas to your clipboard, or create a
+                  public{" "}
+                  <strong className="font-semibold text-text-secondary">
+                    share link
+                  </strong>{" "}
+                  anyone can open.
+                </>
               )}
             </DialogDescription>
 
@@ -2271,39 +2297,41 @@ export function AppShell() {
             </div>
           </DialogBody>
 
-          <DialogFooter className="gap-2 sm:gap-2">
-            <LargeButton
-              className="flex-1"
+          <DialogFooter className="flex-row gap-2">
+            <ActionTile
+              icon={ImageIcon}
+              label="Canvas Image"
               onClick={() => {
                 setExportDialogOpen(false);
                 void handleExport();
               }}
-            >
-              <ImageIcon className="h-4 w-4" />
-              Canvas Image
-            </LargeButton>
+            />
+            <ShareButton
+              exportPng={() => stamp.exportBlob("png")}
+              canvasW={stamp.state.width}
+              canvasH={stamp.state.height}
+              fileName={photos.find((p) => p.id === activePhotoId)?.name}
+              disabled={!hasImage}
+              onShared={() => setExportDialogOpen(false)}
+            />
             {photos.length > 1 && (
-              <LargeButton
-                className="flex-1"
+              <ActionTile
+                icon={Archive}
+                label={`All (${photos.length})`}
                 onClick={() => {
                   setExportDialogOpen(false);
                   handleExportAll();
                 }}
-              >
-                <Archive className="h-4 w-4" />
-                All ({photos.length})
-              </LargeButton>
+              />
             )}
-            <LargeButton
-              className="flex-1"
+            <ActionTile
+              icon={Clipboard}
+              label="Clipboard"
               onClick={() => {
                 setExportDialogOpen(false);
                 void handleCopyToClipboard();
               }}
-            >
-              <Clipboard className="h-4 w-4" />
-              Clipboard Copy
-            </LargeButton>
+            />
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2377,7 +2405,7 @@ export function AppShell() {
             onSetCropSelection={drawingTools.setCropSelection}
             cropRatio={cropRatio}
             onCropRatioChange={setCropRatio}
-            onAlign={handleAlign}
+            onPlace={handlePlace}
             selectedKind={selectedObject?.type ?? null}
             selection={{
               tolerance: selectionTolerance,

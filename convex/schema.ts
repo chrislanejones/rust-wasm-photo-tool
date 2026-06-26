@@ -184,6 +184,24 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_userId_photoKey", ["userId", "photoKey"]),
 
+  // ── Share links (public, read-only canvas snapshots) ───────────────────────
+  // A `create` packs the flattened canvas PNG into Convex file storage and mints
+  // an unguessable `token`. The `get` query is PUBLIC (no auth) so anyone with
+  // the link can view/download the snapshot; ownership (userId) only gates
+  // listing/revoking. This is the "share link" the Pro paywall advertises.
+  shares: defineTable({
+    token: v.string(),
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+    canvasW: v.number(),
+    canvasH: v.number(),
+    title: v.optional(v.string()),
+    views: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_userId", ["userId"]),
+
   // ── AI Jobs ─────────────────────────────────────────────
   // Keyed by photoKey (the editor's string id, same as photo_edits) rather
   // than the unused `images` table. Input/output frames live in Convex file

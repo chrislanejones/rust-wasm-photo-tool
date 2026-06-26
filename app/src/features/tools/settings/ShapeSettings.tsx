@@ -1,14 +1,19 @@
 import { useState } from "react";
-import { Square, Circle, PenLine, Minus, Hash, Type } from "lucide-react";
+import {
+  Square,
+  Circle,
+  PenLine,
+  Minus,
+  Hash,
+  Type,
+  ArrowRight,
+  ArrowLeftRight,
+} from "lucide-react";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { TabGroup } from "@/components/TabGroup";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SizeSlider } from "@/components/SizeSlider";
-import {
-  PlacementGrid,
-  placementToAlign,
-  type AlignMode,
-} from "@/components/PlacementGrid";
+import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
 
@@ -25,8 +30,8 @@ const PIN_LABELS = [
 ] as const;
 
 const ARROW_STYLES = [
-  { id: "single", label: "→ Single" },
-  { id: "double", label: "↔ Double" },
+  { id: "single", label: "Single", icon: ArrowRight },
+  { id: "double", label: "Double", icon: ArrowLeftRight },
 ] as const;
 
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
@@ -55,13 +60,13 @@ interface ShapesSettingsProps {
   onChange: (s: ToolSettings) => void;
   activeMode?: ShapesMode;
   onModeChange?: (mode: ShapesMode) => void;
-  /** Place the selected shape via the 3×3 grid (composes two single-axis aligns). */
-  onAlign?: (mode: AlignMode) => void;
+  /** Place the selected shape into one of the nine grid cells. */
+  onPlace?: (cell: PlacementCell) => void;
   /** A shape is selected (created & selected / clicked / Reselect) → grid enabled. */
   canPlace?: boolean;
 }
 
-export function ShapesSettings({ settings, onChange, activeMode, onModeChange, onAlign, canPlace = false }: ShapesSettingsProps) {
+export function ShapesSettings({ settings, onChange, activeMode, onModeChange, onPlace, canPlace = false }: ShapesSettingsProps) {
   const [internalMode, setInternalMode] = useState<ShapesMode>("shapes");
   const mode = activeMode ?? internalMode;
   const currentShape = (settings.shape ?? "rect") as ShapeType;
@@ -87,8 +92,9 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
       {/* ── Shapes tab ── */}
       {mode === "shapes" && (
         <div className="space-y-6">
-          {/* Shape selector */}
+          {/* Shape selector — stacked tiles (icon on top, label below). */}
           <ToolButtonGroup
+            stacked
             options={SHAPES}
             value={currentShape}
             onChange={(id) => onChange({ ...settings, shape: id })}
@@ -197,6 +203,16 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
           label style → colour. */}
       {mode === "pens" && (
         <div className="space-y-6">
+          {/* Pin label style: Numbers / Letters — first, above the size. */}
+          <ToolButtonGroup
+            stacked
+            options={PIN_LABELS}
+            value={settings.pinLabel ?? "numbers"}
+            onChange={(id) =>
+              onChange({ ...settings, pinLabel: id as "numbers" | "letters" })
+            }
+          />
+
           {/* Pin size — reuses the Stroke Width slider. */}
           <SizeSlider
             label="Stroke Width"
@@ -213,15 +229,6 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
             )}
           />
 
-          {/* Pin label style: Numbers / Letters — between width and colour. */}
-          <ToolButtonGroup
-            options={PIN_LABELS}
-            value={settings.pinLabel ?? "numbers"}
-            onChange={(id) =>
-              onChange({ ...settings, pinLabel: id as "numbers" | "letters" })
-            }
-          />
-
           {/* Color (pin fill). */}
           <ColorSwatchGrid
             colors={TEXT_COLORS}
@@ -235,6 +242,16 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
           style toggle → colour, same spacing + same components. */}
       {mode === "arrows" && (
         <div className="space-y-6">
+          {/* Arrow style: Single / Double — first, above the size. */}
+          <ToolButtonGroup
+            stacked
+            options={ARROW_STYLES}
+            value={settings.arrowStyle ?? "single"}
+            onChange={(id) =>
+              onChange({ ...settings, arrowStyle: id as "single" | "double" })
+            }
+          />
+
           {/* Stroke Width */}
           <SizeSlider
             label="Stroke Width"
@@ -251,15 +268,6 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
             )}
           />
 
-          {/* Arrow style: Single / Double — same component as the Pins toggle. */}
-          <ToolButtonGroup
-            options={ARROW_STYLES}
-            value={settings.arrowStyle ?? "single"}
-            onChange={(id) =>
-              onChange({ ...settings, arrowStyle: id as "single" | "double" })
-            }
-          />
-
           {/* Color */}
           <ColorSwatchGrid
             colors={TEXT_COLORS}
@@ -269,17 +277,13 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
         </div>
       )}
 
-      {onAlign && (
+      {onPlace && (
         <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
           <PlacementGrid
             label="Placement"
             disabled={!canPlace}
             numpadKeys={canPlace}
-            onChange={(cell) => {
-              const [h, v] = placementToAlign(cell);
-              onAlign(h);
-              onAlign(v);
-            }}
+            onChange={onPlace}
           />
           {!canPlace && (
             <p className="text-2xs text-theme-muted-foreground">

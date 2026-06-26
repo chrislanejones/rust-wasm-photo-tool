@@ -186,8 +186,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
             {(tab === "general" ||
               tab === "appearance" ||
               tab === "security" ||
-              tab === "rulers" ||
-              tab === "superuser") && (
+              tab === "rulers") && (
               <div className="flex items-center gap-2">
                 <LargeButton
                   onClick={() => setDraft(DEFAULT_PREFERENCES)}

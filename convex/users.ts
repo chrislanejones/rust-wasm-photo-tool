@@ -157,3 +157,22 @@ export const devGrantTier = internalMutation({
     return { ok: true, message: `Set ${args.email} -> ${args.tier}` };
   },
 });
+
+/** ADMIN: set the SIGNED-IN admin's own tier — the Super User pane "Apply"
+ *  grants a real tier so AI can actually be tested. Public but gated to the
+ *  ADMIN_EMAIL Convex env var (throws for everyone else, and if the env var is
+ *  unset). Stripe / devGrantTier remain the source of truth for real users. */
+export const setMyTier = mutation({
+  args: {
+    tier: v.union(v.literal("free"), v.literal("pro"), v.literal("team")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const admin = process.env.ADMIN_EMAIL;
+    if (!admin || identity.email !== admin) throw new Error("Not authorized");
+    const user = await requireUser(ctx);
+    await ctx.db.patch(user._id, { tier: args.tier, updatedAt: Date.now() });
+    return { ok: true, tier: args.tier };
+  },
+});

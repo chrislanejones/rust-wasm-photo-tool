@@ -8,9 +8,14 @@ import {
   MousePointerClick,
   SquareDashed,
   Trash2,
+  Maximize,
+  Square,
+  RectangleHorizontal,
+  RectangleVertical,
 } from "lucide-react";
 import { LargeButton } from "@/components/ui/large-button";
 import { ToolButton } from "@/components/ui/tool-button";
+import { ActionTile } from "@/components/ui/action-tile";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SizeSlider } from "@/components/SizeSlider";
 import type { CropSelection } from "@/hooks/useDrawingTools";
@@ -43,13 +48,13 @@ type RatioId =
   | "16:9"
   | "9:16";
 
-const RATIO_OPTIONS: { id: RatioId; label: string }[] = [
-  { id: "free", label: "Free" },
-  { id: "1:1", label: "1:1" },
-  { id: "4:3", label: "4:3" },
-  { id: "3:2", label: "3:2" },
-  { id: "16:9", label: "16:9" },
-  { id: "9:16", label: "9:16" },
+const RATIO_OPTIONS: { id: RatioId; label: string; icon: typeof Square }[] = [
+  { id: "free", label: "Free", icon: Maximize },
+  { id: "1:1", label: "1:1", icon: Square },
+  { id: "4:3", label: "4:3", icon: RectangleHorizontal },
+  { id: "3:2", label: "3:2", icon: RectangleHorizontal },
+  { id: "16:9", label: "16:9", icon: RectangleHorizontal },
+  { id: "9:16", label: "9:16", icon: RectangleVertical },
 ];
 
 const RATIO_DIMS: Record<Exclude<RatioId, "free">, [number, number]> = {
@@ -133,6 +138,7 @@ export function TransformCropSettings({
           </span>
 
           <ToolButtonGroup
+            stacked
             label="Ratio"
             options={RATIO_OPTIONS}
             value={ratio}
@@ -164,25 +170,34 @@ export function TransformCropSettings({
           Transform
         </span>
         <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
-          <ToolButton disabled={disabled} onClick={onFlipH}>
-            <FlipHorizontal /> Flip H
-          </ToolButton>
-          <ToolButton disabled={disabled} onClick={onFlipV}>
-            <FlipVertical /> Flip V
-          </ToolButton>
-          <ToolButton disabled={disabled} onClick={onRotate90Cw}>
-            <RotateCw /> Rotate 90°
-          </ToolButton>
-          <ToolButton
+          <ActionTile
+            icon={FlipHorizontal}
+            label="Flip H"
+            disabled={disabled}
+            onClick={onFlipH}
+          />
+          <ActionTile
+            icon={FlipVertical}
+            label="Flip V"
+            disabled={disabled}
+            onClick={onFlipV}
+          />
+          <ActionTile
+            icon={RotateCw}
+            label="Rotate 90°"
+            disabled={disabled}
+            onClick={onRotate90Cw}
+          />
+          <ActionTile
+            icon={RotateCcw}
+            label="Rotate −90°"
             disabled={disabled}
             onClick={() => {
               onRotate90Cw();
               onRotate90Cw();
               onRotate90Cw();
             }}
-          >
-            <RotateCcw /> Rotate −90°
-          </ToolButton>
+          />
         </div>
       </div>
 

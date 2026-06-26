@@ -767,6 +767,19 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 6   | **Settings → Dev Tests tab** — opens the Idle-screen and Welcome-back dialogs in isolation (black-backed boxes with header/footer; the Idle dialog's ✕ shakes) for design iteration without triggering their real conditions | Complete |
 | 7   | **Docs & marketing** — README feature line + this summary; Trail Log **v0.9.28** | Complete |
 
+## v4.7 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Unified button system + `HOVER_RING` SSOT** — `ui/tool-button.tsx` gained a `stacked` (icon-on-top, bigger icon) variant; new `ui/action-tile.tsx` is the non-toggle stacked tile. The warm-accent ("brown") hover ring lives once in `lib/styles.ts` (`HOVER_RING`) and is imported by the shared `ToolButton`, the tool-rail `ToolButton`, and `RadioCards` (`--color-theme-sidebar === --bg-secondary`, so the offset matches panels + dialogs). Swept across Shapes / Pins / Arrows (stacked + the label toggles moved above Stroke Width), Crop **Ratio** (added lucide orientation icons, stacked), Effects → Quick Adjust, Edit & Move → Transform, and the Download dialog footer | Complete |
+| 2   | **Placement grid → cell-center (Rust)** — `align_annotation` gained nine combined modes ("top-left"…"bottom-right") that **center** the bbox in that ninth of the canvas (cell centers w/6,w/2,5w/6 × h/6,h/2,5h/6) as ONE history step ("Place"); `handlePlace(cell)` calls it once (was a 2-call edge-align that jammed objects into corners). `PlacementGrid` is full-width lucide `AlignVerticalJustify*` tiles; Numpad 1-9 mapped. WASM rebuilt (`pkg/` gitignored). Verified in-browser | Complete |
+| 3   | **Boot no longer blocks on auth** — the cold-start effect ran only after Clerk resolved (`!authResolved`), hanging the splash ~5s in dev. Now it runs on mount, inits WASM, gives Clerk a **capped 1.2s** window (live `authResolvedRef`/`userModeRef`), then routes (unresolved → anonymous). `BOOT_MIN_SPLASH_MS=900` min hold | Complete |
+| 4   | **Download dialog** — title "Download, Copy, or Share" + share-aware copy; four icon-on-top `ActionTile`s in a row; the format picker is now a checkbox-style single-select (`RadioCards`, radio semantics under checkbox visuals; dark-mode box contrast fixed; carries the tile hover ring) | Complete |
+| 5   | **Share links** (merged from a worktree) — `convex/shares.ts` + a `shares` table; `ShareButton` (Download dialog) uploads a read-only PNG snapshot to Convex storage, mints a public URL, copies it; `ShareViewer` + a `?v=<token>` route in `App.tsx` render the read-only view. Sign-in required (`useShare().canShare`) | Complete |
+| 6   | **AI panel cleanup** — stripped the per-tool paragraphs; the lock notice is one line ("AI tools need sign-in + a Paid plan"). `ObjectRemovalModal` now `createPortal`s to `<body>` so it opens **above** the gallery (it was trapped in the sidebar's stacking context) | Complete |
+| 7   | **Super User "Apply" grants a real tier** — the tier toggle was client-only, so the footer prefs-Apply was dead on that tab (removed it there). New **public, admin-gated** `users.setMyTier` (gated to the `ADMIN_EMAIL` Convex env var) lets the admin patch their **real** Convex tier from the pane → AI actually unlocks. Also re-deployed the drifted `auth.config` to dev (`convex dev --once`), fixing the `Not authenticated` AI errors for signed-in users | Complete |
+| 8   | **Docs & marketing** — README this summary; Trail Log **v0.9.29** | Complete |
+
 ## License
 
 MIT

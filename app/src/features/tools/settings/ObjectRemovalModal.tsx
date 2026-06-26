@@ -2,6 +2,7 @@
 // on a canvas, lets the user brush over the object to erase, then builds a
 // black/white mask PNG (white = region to remove) at the image's native
 // resolution and hands it back. No dependency on the main WASM canvas.
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { X, Eraser, Loader2, Undo2 } from "lucide-react";
@@ -143,7 +144,10 @@ export function ObjectRemovalModal({
     onConfirm(new Uint8Array(await blob.arrayBuffer()));
   };
 
-  return (
+  // Portal to <body> so the modal escapes the transformed sidebar's stacking
+  // context — otherwise the gallery/panels (their own stacking contexts) cover
+  // it, same reason the Settings modal is portaled.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -240,6 +244,7 @@ export function ObjectRemovalModal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

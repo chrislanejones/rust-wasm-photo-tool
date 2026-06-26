@@ -1,24 +1,20 @@
-// A 3×3 placement grid — nine buttons, one per quadrant of a frame (corners,
-// edge-centers, center). The grid spatially mirrors the canvas, and each button
-// puts its dot in the matching position so it reads on its own too.
+// A 3×3 placement grid — nine full-width buttons, one per cell of a 3×3 grid
+// over the canvas. Clicking a cell centers the selected object in that ninth
+// (the grid itself is never drawn). Same look as the other settings button rows
+// (full-width `grid-cols-3` + `ToolButton`), with lucide align icons inside.
 //
 // Two uses, one component:
 //   • persistent setting  — pass `value`; the chosen cell highlights (batch).
-//   • momentary action     — omit `value`; clicking just fires (place a selected
-//                            text/shape now).
+//   • momentary action     — omit `value`; clicking just fires (place now).
 //
 // Numpad maps spatially: 7/8/9 = top row, 4/5/6 = middle, 1/2/3 = bottom.
 import { useEffect } from "react";
-import { cn } from "@/lib/utils";
-
-/** Single-axis modes Rust `align_annotation` understands. */
-export type AlignMode =
-  | "left"
-  | "centerH"
-  | "right"
-  | "top"
-  | "middleV"
-  | "bottom";
+import {
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+} from "lucide-react";
+import { ToolButton } from "@/components/ui/tool-button";
 
 export type PlacementCell =
   | "top-left"
@@ -34,48 +30,34 @@ export type PlacementCell =
 const CELLS: {
   id: PlacementCell;
   label: string;
-  col: 0 | 1 | 2;
   row: 0 | 1 | 2;
   /** Numpad code that maps to this cell (spatial layout). */
   numpad: string;
 }[] = [
-  { id: "top-left", label: "Top left", col: 0, row: 0, numpad: "Numpad7" },
-  { id: "top-center", label: "Top center", col: 1, row: 0, numpad: "Numpad8" },
-  { id: "top-right", label: "Top right", col: 2, row: 0, numpad: "Numpad9" },
-  { id: "middle-left", label: "Middle left", col: 0, row: 1, numpad: "Numpad4" },
-  { id: "center", label: "Center", col: 1, row: 1, numpad: "Numpad5" },
-  { id: "middle-right", label: "Middle right", col: 2, row: 1, numpad: "Numpad6" },
-  { id: "bottom-left", label: "Bottom left", col: 0, row: 2, numpad: "Numpad1" },
-  { id: "bottom-center", label: "Bottom center", col: 1, row: 2, numpad: "Numpad2" },
-  { id: "bottom-right", label: "Bottom right", col: 2, row: 2, numpad: "Numpad3" },
+  { id: "top-left", label: "Top left", row: 0, numpad: "Numpad7" },
+  { id: "top-center", label: "Top center", row: 0, numpad: "Numpad8" },
+  { id: "top-right", label: "Top right", row: 0, numpad: "Numpad9" },
+  { id: "middle-left", label: "Middle left", row: 1, numpad: "Numpad4" },
+  { id: "center", label: "Center", row: 1, numpad: "Numpad5" },
+  { id: "middle-right", label: "Middle right", row: 1, numpad: "Numpad6" },
+  { id: "bottom-left", label: "Bottom left", row: 2, numpad: "Numpad1" },
+  { id: "bottom-center", label: "Bottom center", row: 2, numpad: "Numpad2" },
+  { id: "bottom-right", label: "Bottom right", row: 2, numpad: "Numpad3" },
 ];
 
-const JUSTIFY = ["justify-start", "justify-center", "justify-end"] as const;
-const ITEMS = ["items-start", "items-center", "items-end"] as const;
-
-/** Map a placement cell → [horizontal, vertical] single-axis align modes. */
-const ALIGN: Record<PlacementCell, [AlignMode, AlignMode]> = {
-  "top-left": ["left", "top"],
-  "top-center": ["centerH", "top"],
-  "top-right": ["right", "top"],
-  "middle-left": ["left", "middleV"],
-  center: ["centerH", "middleV"],
-  "middle-right": ["right", "middleV"],
-  "bottom-left": ["left", "bottom"],
-  "bottom-center": ["centerH", "bottom"],
-  "bottom-right": ["right", "bottom"],
-};
-
-export function placementToAlign(cell: PlacementCell): [AlignMode, AlignMode] {
-  return ALIGN[cell];
-}
+// Icon shows the vertical placement (top / middle / bottom row); the button's
+// column within the 3-wide grid gives the horizontal placement.
+const ROW_ICON = [
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+];
 
 export function PlacementGrid({
   value,
   onChange,
   disabled = false,
   label,
-  /** Enable Numpad 1-9 → cells while mounted (only when not disabled). */
   numpadKeys = false,
 }: {
   value?: PlacementCell | null;
@@ -111,35 +93,21 @@ export function PlacementGrid({
       <div
         role="group"
         aria-label={label ?? "Placement"}
-        className="grid w-fit grid-cols-3 gap-1"
+        className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]"
       >
-        {CELLS.map(({ id, label: cellLabel, col, row }) => {
-          const active = value === id;
+        {CELLS.map(({ id, label: cellLabel, row }) => {
+          const Icon = ROW_ICON[row];
           return (
-            <button
+            <ToolButton
               key={id}
-              type="button"
+              active={value === id}
               disabled={disabled}
-              aria-label={cellLabel}
-              aria-pressed={active}
               title={cellLabel}
+              aria-label={cellLabel}
               onClick={() => onChange(id)}
-              className={cn(
-                "flex h-8 w-8 rounded-md border p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                JUSTIFY[col],
-                ITEMS[row],
-                active
-                  ? "border-accent bg-accent/15"
-                  : "border-border bg-bg-elevated hover:bg-bg-elevated/70",
-              )}
             >
-              <span
-                className={cn(
-                  "h-1.5 w-1.5 rounded-sm",
-                  active ? "bg-accent" : "bg-text-muted",
-                )}
-              />
-            </button>
+              <Icon />
+            </ToolButton>
           );
         })}
       </div>

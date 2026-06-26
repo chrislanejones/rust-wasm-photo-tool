@@ -15,6 +15,8 @@ interface Props<T extends string> {
   columns?: 2 | 3 | 4 | 5;
   /** Optional small label rendered above the grid. */
   label?: string;
+  /** Icon-on-top, text-below tiles (vs the default icon-left row). */
+  stacked?: boolean;
   className?: string;
 }
 
@@ -36,6 +38,7 @@ export function ToolButtonGroup<T extends string>({
   onChange,
   columns = 2,
   label,
+  stacked = false,
   className,
 }: Props<T>) {
   return (
@@ -55,6 +58,7 @@ export function ToolButtonGroup<T extends string>({
             <ToolButton
               key={opt.id}
               active={value === opt.id}
+              stacked={stacked}
               onClick={() => onChange(opt.id)}
             >
               {Icon && <Icon />}

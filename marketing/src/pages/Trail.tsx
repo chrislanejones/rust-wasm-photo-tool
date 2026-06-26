@@ -27,6 +27,18 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.29",
+    date: "2026-06-26",
+    headline: "Unified button system, share links, and a snappier, smarter placement grid",
+    entries: [
+      { tag: "feature", text: "Share a read-only link to your image — Download → “Share link” uploads a snapshot and copies a public URL anyone can open (sign-in required)." },
+      { tag: "ui", text: "One unified button system across the settings: Shapes, Pins, Arrows, Crop ratios, the Effects Quick-Adjust, the Edit & Move Transform actions, and the Download options are all icon-on-top tiles now, with a warm hover ring — all from one shared component." },
+      { tag: "feature", text: "The placement grid now drops a text or shape into the CENTER of the chosen ninth of the canvas (not jammed into a corner), computed in Rust as a single undo step. Numpad 1-9 maps to the nine cells." },
+      { tag: "perf", text: "Cold start no longer blocks on the sign-in service before showing anything — it boots and reveals the New / Welcome-back screen fast, with a capped fallback so a slow sign-in can’t hang the splash." },
+      { tag: "ui", text: "Download dialog is now “Download, Copy, or Share” with a checkbox-style format picker; the AI tools panel was trimmed of its walls of text, and Object Removal opens above the gallery." },
+    ],
+  },
+  {
     version: "v0.9.28",
     date: "2026-06-26",
     headline: "A full-page start experience and a 3×3 placement grid",

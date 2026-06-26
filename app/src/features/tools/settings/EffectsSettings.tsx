@@ -4,7 +4,7 @@ import { Pipette, Wand2, Flame, Cloud, Moon } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
-import { ToolButton } from "@/components/ui/tool-button";
+import { ActionTile } from "@/components/ui/action-tile";
 import { quickSpring } from "@/lib/animations";
 
 interface EffectsSettingsProps {
@@ -211,14 +211,13 @@ export function EffectsSettings({
               </span>
               <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
                 {PRESETS.map(({ label, Icon, brightness: b, contrast: c }) => (
-                  <ToolButton
+                  <ActionTile
                     key={label}
+                    icon={Icon}
+                    label={label}
                     disabled={!imageReady}
                     onClick={() => applyPreset(b, c)}
-                  >
-                    <Icon />
-                    {label}
-                  </ToolButton>
+                  />
                 ))}
               </div>
               <p className="text-2xs text-theme-muted-foreground">
