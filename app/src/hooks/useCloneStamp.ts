@@ -31,6 +31,8 @@ export interface LayerInfo {
   visible: boolean;
   opacity: number; // 0..1
   active: boolean;
+  /** Whether this layer has a non-destructive mask (paint it in Edit-mask mode). */
+  hasMask: boolean;
 }
 
 export interface CloneStampState {
@@ -1084,6 +1086,44 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     broadcastAnnotationsChanged();
   }, [flushToCanvas, syncState, broadcastAnnotationsChanged]);
 
+  // ── Layer masks (non-destructive) ──
+  const addLayerMask = useCallback(
+    (id: number) => {
+      if (toolRef.current?.add_layer_mask(id)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [flushToCanvas, syncState],
+  );
+  const removeLayerMask = useCallback(
+    (id: number) => {
+      if (toolRef.current?.remove_layer_mask(id)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [flushToCanvas, syncState],
+  );
+  const applyLayerMask = useCallback(
+    (id: number) => {
+      if (toolRef.current?.apply_layer_mask(id)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [flushToCanvas, syncState],
+  );
+  const invertLayerMask = useCallback(
+    (id: number) => {
+      if (toolRef.current?.invert_layer_mask(id)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [flushToCanvas, syncState],
+  );
+
   return {
     state,
     toolRef,
@@ -1139,5 +1179,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     moveLayer,
     mergeDown,
     flattenAll,
+    addLayerMask,
+    removeLayerMask,
+    applyLayerMask,
+    invertLayerMask,
   };
 }

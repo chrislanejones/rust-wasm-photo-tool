@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
+  Aperture,
   ChartArea,
+  Check,
   ChevronDown,
   ChevronUp,
+  Contrast,
   Copy,
   Eye,
   EyeOff,
@@ -71,6 +74,20 @@ interface Props {
   onMoveLayer: (id: number, newIndex: number) => void;
   onMergeDown: (id: number) => void;
   onFlattenAll: () => void;
+  // ── Layer masks (non-destructive) ──
+  mask: {
+    /** Whether brush strokes currently paint the active layer's mask. */
+    editing: boolean;
+    /** Grey laid down while painting the mask: 0 = hide, 255 = reveal. */
+    value: number;
+    onAdd: (id: number) => void;
+    onRemove: (id: number) => void;
+    onApply: (id: number) => void;
+    onInvert: (id: number) => void;
+    /** Toggle Edit-mask mode for a layer (adds a mask first if it has none). */
+    onToggleEdit: (id: number) => void;
+    onSetValue: (v: number) => void;
+  };
   // ── Histogram ──
   /** Pulls the per-channel histogram from Rust (no canvas sampling). */
   getHistogram: () => Uint32Array | null;
@@ -117,6 +134,7 @@ export function ReviewPanel({
   onMoveLayer,
   onMergeDown,
   onFlattenAll,
+  mask,
   getHistogram,
   histogramSignature,
   histogramPhotoKey,
@@ -477,6 +495,30 @@ export function ReviewPanel({
                         </TinyButton>
                         <TinyButton
                           size="xs"
+                          title={
+                            layer.hasMask
+                              ? mask.editing && layer.active
+                                ? "Stop editing mask"
+                                : "Edit layer mask"
+                              : "Add layer mask"
+                          }
+                          className={
+                            layer.hasMask && mask.editing && layer.active
+                              ? "text-theme-accent"
+                              : layer.hasMask
+                                ? "text-theme-foreground"
+                                : undefined
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (layer.hasMask) mask.onToggleEdit(layer.id);
+                            else mask.onAdd(layer.id);
+                          }}
+                        >
+                          <Aperture />
+                        </TinyButton>
+                        <TinyButton
+                          size="xs"
                           title="Duplicate layer"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -519,6 +561,66 @@ export function ReviewPanel({
                           <span className="layer-opacity-val">
                             {Math.round(layer.opacity * 100)}%
                           </span>
+                        </div>
+                      )}
+
+                      {/* Mask controls — only for the active, masked layer. While
+                          editing, the Paint brush paints this mask (black hides,
+                          white reveals). */}
+                      {layer.active && layer.hasMask && (
+                        <div
+                          className="layer-mask-bar"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {mask.editing && (
+                            <>
+                              <TinyButton
+                                size="xs"
+                                title="Brush hides (paint black)"
+                                className={
+                                  mask.value < 128
+                                    ? "text-theme-accent"
+                                    : undefined
+                                }
+                                onClick={() => mask.onSetValue(0)}
+                              >
+                                <EyeOff />
+                              </TinyButton>
+                              <TinyButton
+                                size="xs"
+                                title="Brush reveals (paint white)"
+                                className={
+                                  mask.value >= 128
+                                    ? "text-theme-accent"
+                                    : undefined
+                                }
+                                onClick={() => mask.onSetValue(255)}
+                              >
+                                <Eye />
+                              </TinyButton>
+                            </>
+                          )}
+                          <TinyButton
+                            size="xs"
+                            title="Invert mask"
+                            onClick={() => mask.onInvert(layer.id)}
+                          >
+                            <Contrast />
+                          </TinyButton>
+                          <TinyButton
+                            size="xs"
+                            title="Apply mask (bake in, permanent)"
+                            onClick={() => mask.onApply(layer.id)}
+                          >
+                            <Check />
+                          </TinyButton>
+                          <TinyButton
+                            size="xs"
+                            title="Remove mask"
+                            onClick={() => mask.onRemove(layer.id)}
+                          >
+                            <X />
+                          </TinyButton>
                         </div>
                       )}
                     </li>

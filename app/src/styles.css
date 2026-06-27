@@ -624,6 +624,19 @@ textarea:focus-visible {
   text-align: right;
 }
 
+/* Mask controls for the active, masked layer — hide/reveal toggle + invert /
+   apply / remove, on their own row under the opacity slider. */
+.layer-mask-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-basis: 100%;
+  padding: 2px 2px 0;
+}
+.layer-mask-bar > :last-child {
+  margin-left: auto;
+}
+
 .history-list::-webkit-scrollbar {
   width: 4px;
 }

@@ -359,6 +359,12 @@ pub struct Layer {
     pub visible: bool,
     pub opacity: f64, // 0.0..=1.0
     pub buf: ImageBuffer,
+    /// Optional non-destructive layer mask — one grayscale byte per pixel
+    /// (255 = fully revealed, 0 = fully hidden), same w×h as the canvas. It
+    /// scales the layer's alpha at composite time (see `render_layer`) without
+    /// touching `buf`, so masking is fully reversible until "Apply Mask" bakes
+    /// it in. `None` when the layer has no mask.
+    pub mask: Option<Vec<u8>>,
     pub text_annotations: Vec<TextAnnotation>,
     pub shape_annotations: Vec<ShapeAnnotation>,
 }
@@ -371,6 +377,7 @@ impl Layer {
             visible: true,
             opacity: 1.0,
             buf: ImageBuffer::new(width, height),
+            mask: None,
             text_annotations: Vec::new(),
             shape_annotations: Vec::new(),
         }
@@ -448,6 +455,13 @@ pub struct ImageHorseTool {
     /// clears the active layer's alpha (coverage × opacity) toward transparent,
     /// keeping the base RGB so partial erases fade out without a colour shift.
     paint_erase: bool,
+    /// When true the active stroke paints the active layer's MASK (grayscale)
+    /// rather than its pixels — same dab/coverage/stabilizer engine, but the
+    /// recomposite writes `paint_mask_value` into the mask. `paint_mask_base` is
+    /// the mask snapshot at stroke start (keeps opacity from building up).
+    paint_mask: bool,
+    paint_mask_value: u8,
+    paint_mask_base: Vec<u8>,
 
     // ── Effects-brush (blur / pixelate / redaction) stroke state ──────────
     /// 0 = blur, 1 = pixelate, 2 = redaction (set on effect_down).
@@ -872,6 +886,20 @@ fn render_layer(
             a.y + a.tile_offset_y,
         );
     }
+    // Layer mask LAST: scale the whole layer's alpha (pixels + overlays) by the
+    // grayscale mask, so a mask hides the layer's entire contribution. Applied
+    // here means every composite/export/thumbnail/flatten path honours it for
+    // free. Only the alpha byte is touched; RGB is left intact.
+    if let Some(mask) = &layer.mask {
+        if mask.len() == (w as usize) * (h as usize) {
+            for (i, &m) in mask.iter().enumerate() {
+                let a = i * 4 + 3;
+                if a < out.len() {
+                    out[a] = ((out[a] as u16 * m as u16 + 127) / 255) as u8;
+                }
+            }
+        }
+    }
     out
 }
 
@@ -942,7 +970,13 @@ fn composite_layers_into(
     if move_preview.is_none() {
         let mut visible = layers.iter().filter(|l| l.visible);
         if let (Some(only), None) = (visible.next(), visible.next()) {
-            if only.opacity >= 0.999 && layer_has_no_overlays(only) && only.buf.data.len() == n {
+            // A masked layer isn't a straight copy — it must go through
+            // render_layer so the mask scales its alpha; so opt it out here.
+            if only.opacity >= 0.999
+                && only.mask.is_none()
+                && layer_has_no_overlays(only)
+                && only.buf.data.len() == n
+            {
                 out.copy_from_slice(&only.buf.data);
                 return;
             }
@@ -1294,6 +1328,9 @@ impl ImageHorseTool {
             paint_raw: (0.0, 0.0),
             paint_hardness: 0.8,
             paint_erase: false,
+            paint_mask: false,
+            paint_mask_value: 0,
+            paint_mask_base: Vec::new(),
             effect_mode: 0,
             effect_radius: 0.0,
             effect_intensity: 8,
@@ -1713,6 +1750,7 @@ impl ImageHorseTool {
             visible: true,
             opacity: 1.0,
             buf: ImageBuffer { width: w, height: h, data: data.to_vec() },
+            mask: None,
             text_annotations: Vec::new(),
             shape_annotations: Vec::new(),
         };
@@ -1733,6 +1771,7 @@ impl ImageHorseTool {
             visible: true,
             opacity: 1.0,
             buf: ImageBuffer { width: w, height: h, data: data.to_vec() },
+            mask: None,
             text_annotations: Vec::new(),
             shape_annotations: Vec::new(),
         };
@@ -2939,6 +2978,36 @@ impl ImageHorseTool {
     fn recomposite_stroke_bbox(&mut self, min_x: i32, min_y: i32, max_x: i32, max_y: i32) {
         let w = self.width as i32;
         let active = self.active;
+
+        // Mask stroke: scrub the dab's coverage×opacity toward `paint_mask_value`
+        // over the mask snapshot, writing the active layer's grayscale mask. The
+        // compositor (render_layer) turns that into a live reveal/hide. Handled
+        // first + returns, so the colour/erase path below stays untouched.
+        if self.paint_mask {
+            let op = self.paint_opacity.clamp(0.0, 1.0);
+            let value = self.paint_mask_value as f32;
+            let cov = &self.paint_cov;
+            let base = &self.paint_mask_base;
+            let Some(mask) = self.layers[active].mask.as_mut() else {
+                return;
+            };
+            if base.len() != mask.len() {
+                return;
+            }
+            for py in min_y..=max_y {
+                for px in min_x..=max_x {
+                    let i = (py * w + px) as usize;
+                    if i >= mask.len() || i >= cov.len() {
+                        continue;
+                    }
+                    let sa = (cov[i] as f32 / 255.0) * op;
+                    let out = base[i] as f32 * (1.0 - sa) + value * sa;
+                    mask[i] = out.round().clamp(0.0, 255.0) as u8;
+                }
+            }
+            return;
+        }
+
         let erase = self.paint_erase;
         let (cr, cg, cb) = self.paint_color;
         let op = self.paint_opacity.clamp(0.0, 1.0);
@@ -3111,6 +3180,65 @@ impl ImageHorseTool {
         self.paint_up()
     }
 
+    /// Mask brush driver — paints the active layer's grayscale MASK with the very
+    /// same dab / coverage / stabilizer engine as the colour brush, but the
+    /// recomposite writes into the mask instead of the pixels (see the
+    /// `paint_mask` branch of `recomposite_stroke_bbox`). `value` is the grey
+    /// laid down: 0 hides the layer there, 255 reveals it, in-between is partial.
+    /// `opacity` and `hardness` are 0..1. If the active layer has no mask yet a
+    /// fully-revealed one is created first (so the first stroke "just works").
+    /// `mask_paint_move` / `mask_paint_up` continue / end the stroke.
+    pub fn mask_paint_down(
+        &mut self,
+        x: f64, y: f64, size: f64,
+        value: u8, opacity: f64, hardness: f64, stab: &str,
+    ) {
+        let n = (self.width * self.height) as usize;
+        if n == 0 {
+            return;
+        }
+        self.snap("Mask");
+        // Ensure the active layer has a correctly-sized mask to paint into.
+        if self.layers[self.active]
+            .mask
+            .as_ref()
+            .map_or(true, |m| m.len() != n)
+        {
+            self.layers[self.active].mask = Some(vec![255u8; n]);
+        }
+        self.paint_mask_base = self.layers[self.active]
+            .mask
+            .clone()
+            .unwrap_or_else(|| vec![255u8; n]);
+        self.paint_cov = vec![0u8; n];
+        self.paint_base = Vec::new();
+        self.paint_mask = true;
+        self.paint_erase = false;
+        self.paint_mask_value = value;
+        self.paint_hardness = hardness.clamp(0.0, 1.0) as f32;
+        let radius = (size * 0.5).max(0.0);
+        self.paint_radius = radius;
+        self.paint_leash = Self::leash_for(stab);
+        self.paint_last = Some((x, y));
+        self.paint_raw = (x, y);
+        // Colour is irrelevant when masking; paint_dab sets paint_opacity and
+        // recomposites through the paint_mask branch.
+        self.paint_dab(x, y, radius, 0, 0, 0, opacity);
+        if self.paint_leash > 0.0 {
+            self.paint_stab_begin(x, y);
+        }
+    }
+
+    /// Continue the active mask stroke. True if it changed the mask.
+    pub fn mask_paint_move(&mut self, x: f64, y: f64) -> bool {
+        self.paint_move(x, y)
+    }
+
+    /// End the active mask stroke and free its buffers. True if it changed the mask.
+    pub fn mask_paint_up(&mut self) -> bool {
+        self.paint_up()
+    }
+
     /// Continue the active stroke toward (x, y). Returns true if it painted.
     pub fn paint_move(&mut self, x: f64, y: f64) -> bool {
         self.paint_raw = (x, y);
@@ -3144,6 +3272,8 @@ impl ImageHorseTool {
         self.paint_cov = Vec::new();
         self.paint_base = Vec::new();
         self.paint_erase = false;
+        self.paint_mask = false;
+        self.paint_mask_base = Vec::new();
         painted
     }
 
@@ -3501,12 +3631,13 @@ impl ImageHorseTool {
                 out.push(',');
             }
             out.push_str(&format!(
-                "{{\"id\":{},\"name\":\"{}\",\"visible\":{},\"opacity\":{},\"active\":{}}}",
+                "{{\"id\":{},\"name\":\"{}\",\"visible\":{},\"opacity\":{},\"active\":{},\"hasMask\":{}}}",
                 l.id,
                 json_escape(&l.name),
                 l.visible,
                 l.opacity,
                 i == self.active,
+                l.mask.is_some(),
             ));
         }
         out.push(']');
@@ -3713,6 +3844,19 @@ impl ImageHorseTool {
                     a.y + a.tile_offset_y,
                 );
             }
+            // Bake the lower layer's own mask into its alpha and drop it, so the
+            // merged pixels (including the upper layer we're about to blend in)
+            // aren't re-masked by it. The upper layer's mask is already baked in
+            // by `render_layer` above.
+            if let Some(mask) = lower.mask.take() {
+                for (i, &m) in mask.iter().enumerate() {
+                    let a = i * 4 + 3;
+                    if a < lower.buf.data.len() {
+                        lower.buf.data[a] =
+                            ((lower.buf.data[a] as u16 * m as u16 + 127) / 255) as u8;
+                    }
+                }
+            }
             blend_over(&mut lower.buf.data, &upper, upper_opacity);
         }
         self.layers.remove(idx);
@@ -3740,6 +3884,87 @@ impl ImageHorseTool {
         self.layers = vec![base];
         self.active = 0;
         self.editing_shape_id = None;
+    }
+
+    // ── Layer masks ───────────────────────────────────────────────────────
+    // A mask is a grayscale buffer (255 = revealed, 0 = hidden) scaling the
+    // layer's alpha at composite time (`render_layer`) — non-destructive until
+    // applied. Paint it with `mask_paint_*`. All four mutators snap history.
+
+    /// Add a fully-revealed (white) mask to layer `id`. Returns false if the
+    /// layer isn't found or already has a valid mask. (No recomposite — a white
+    /// mask is visually identical until you paint on it.)
+    pub fn add_layer_mask(&mut self, id: u32) -> bool {
+        let n = (self.width * self.height) as usize;
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        if self.layers[idx].mask.as_ref().is_some_and(|m| m.len() == n) {
+            return false;
+        }
+        self.snap("Add Mask");
+        self.layers[idx].mask = Some(vec![255u8; n]);
+        true
+    }
+
+    /// Discard layer `id`'s mask (reveal everything again). False if it had none.
+    pub fn remove_layer_mask(&mut self, id: u32) -> bool {
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        if self.layers[idx].mask.is_none() {
+            return false;
+        }
+        self.snap("Remove Mask");
+        self.layers[idx].mask = None;
+        self.recomposite();
+        true
+    }
+
+    /// Bake layer `id`'s mask into its alpha permanently, then drop the mask
+    /// (the masked-out pixels become genuinely transparent). False if no mask.
+    pub fn apply_layer_mask(&mut self, id: u32) -> bool {
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        if self.layers[idx].mask.is_none() {
+            return false;
+        }
+        self.snap("Apply Mask");
+        if let Some(mask) = self.layers[idx].mask.take() {
+            let data = &mut self.layers[idx].buf.data;
+            for (i, &m) in mask.iter().enumerate() {
+                let a = i * 4 + 3;
+                if a < data.len() {
+                    data[a] = ((data[a] as u16 * m as u16 + 127) / 255) as u8;
+                }
+            }
+        }
+        self.recomposite();
+        true
+    }
+
+    /// Invert layer `id`'s mask (reveal↔hide). False if it has none.
+    pub fn invert_layer_mask(&mut self, id: u32) -> bool {
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        if self.layers[idx].mask.is_none() {
+            return false;
+        }
+        self.snap("Invert Mask");
+        if let Some(mask) = self.layers[idx].mask.as_mut() {
+            for m in mask.iter_mut() {
+                *m = 255 - *m;
+            }
+        }
+        self.recomposite();
+        true
+    }
+
+    /// Whether layer `id` currently has a mask.
+    pub fn has_layer_mask(&self, id: u32) -> bool {
+        self.layers.iter().any(|l| l.id == id && l.mask.is_some())
     }
 
     // ── Layer persistence (serialize / restore) ──────────────────────────
@@ -3819,6 +4044,7 @@ impl ImageHorseTool {
             visible,
             opacity: opacity.clamp(0.0, 1.0),
             buf,
+            mask: None,
             text_annotations: Vec::new(),
             shape_annotations: Vec::new(),
         });

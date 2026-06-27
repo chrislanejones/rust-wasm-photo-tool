@@ -220,6 +220,10 @@ export function AppShell() {
   const [brushMode, setBrushMode] = useState<
     "paint" | "blur" | "pen" | "eraser"
   >("paint");
+  // Layer-mask editing: when on, the Paint brush paints the active layer's mask
+  // (maskPaintValue 0 = hide / black, 255 = reveal / white) instead of pixels.
+  const [maskEditing, setMaskEditing] = useState(false);
+  const [maskPaintValue, setMaskPaintValue] = useState(0);
   const [effectsMode, setEffectsMode] = useState<EffectsMode>("levels");
   const [colorPickerActive, setColorPickerActive] = useState(false);
   const [stampSubMode, setStampSubMode] = useState<"clone" | "red" | "emojis">("clone");
@@ -856,6 +860,7 @@ export function AppShell() {
   const effectiveBrushSize = (() => {
     switch (activeTool) {
       case "brush":
+        if (maskEditing) return toolSettings.brushSize / 2;
         if (brushMode === "blur") return toolSettings.blurSize / 2;
         if (brushMode === "eraser") return toolSettings.eraserSize / 2;
         return toolSettings.brushSize / 2;
@@ -1225,6 +1230,52 @@ export function AppShell() {
     erase: true,
   });
 
+  // Layer-mask brush: same hook, mask variant — paints the active layer's mask
+  // (non-destructive) via Rust's mask_paint_down/move/up. Active when the user
+  // is editing a mask from the Layers panel.
+  const maskTool = usePaintTool({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    settings: toolSettings,
+    flushToCanvas: stamp.flushToCanvas,
+    syncState: stamp.syncState,
+    maskMode: true,
+    maskValue: maskPaintValue,
+  });
+
+  // Mask edit-mode handlers (wired into the Layers panel). Entering mask edit
+  // selects the layer + switches to the Paint brush so strokes hit the mask.
+  const handleAddMask = useCallback(
+    (id: number) => {
+      stamp.setActiveLayer(id);
+      stamp.addLayerMask(id);
+      setActiveTool("brush");
+      setBrushMode("paint");
+      setMaskEditing(true);
+    },
+    [stamp],
+  );
+  const handleToggleMaskEdit = useCallback(
+    (id: number) => {
+      const activeId = stamp.toolRef.current?.active_layer_id();
+      if (maskEditing && activeId === id) {
+        setMaskEditing(false);
+        return;
+      }
+      stamp.setActiveLayer(id);
+      setActiveTool("brush");
+      setBrushMode("paint");
+      setMaskEditing(true);
+    },
+    [stamp, maskEditing],
+  );
+
+  // Mask editing is a brush activity — drop it when leaving the Paint tool so
+  // the panel highlight and canvas routing don't get stuck on.
+  useEffect(() => {
+    if (activeTool !== "brush") setMaskEditing(false);
+  }, [activeTool]);
+
   // Move tool (the repurposed "arrow" slot): drag the active layer's content.
   const moveLayerTool = useMoveLayerTool({
     toolRef: stamp.toolRef,
@@ -1447,6 +1498,14 @@ export function AppShell() {
         onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
       };
     if (activeTool === "brush") {
+      if (maskEditing) {
+        return {
+          ...stamp,
+          onMouseDown: maskTool.onMouseDown as typeof stamp.onMouseDown,
+          onMouseMove: maskTool.onMouseMove as typeof stamp.onMouseMove,
+          onMouseUp: maskTool.onMouseUp as typeof stamp.onMouseUp,
+        };
+      }
       if (brushMode === "blur") {
         return {
           ...stamp,
@@ -2825,6 +2884,16 @@ export function AppShell() {
             onMoveLayer={stamp.moveLayer}
             onMergeDown={stamp.mergeDown}
             onFlattenAll={stamp.flattenAll}
+            mask={{
+              editing: maskEditing,
+              value: maskPaintValue,
+              onAdd: handleAddMask,
+              onRemove: stamp.removeLayerMask,
+              onApply: stamp.applyLayerMask,
+              onInvert: stamp.invertLayerMask,
+              onToggleEdit: handleToggleMaskEdit,
+              onSetValue: setMaskPaintValue,
+            }}
             getHistogram={getHistogram}
             histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}`}
             histogramPhotoKey={activePhotoId ?? ""}

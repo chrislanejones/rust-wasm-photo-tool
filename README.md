@@ -791,6 +791,16 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 5   | **Batch commit** — this commit also lands accumulated in-progress work from prior sessions (Batch-editor settings, the Subscription/Settings theme sweep, Arrow settings, Super-User / User-menu, the move-layer tool, `MediaTile`). Whole tree compiles: `tsc --noEmit` clean, Rust builds, 26 Rust tests pass | Complete |
 | 6   | **Docs & marketing** — README this summary; Trail Log **v0.9.30** | Complete |
 
+## v4.9 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Non-destructive layer masks (Rust)** — every `Layer` gained an optional `mask: Option<Vec<u8>>` (grayscale; 255 = reveal, 0 = hide) applied to the layer's alpha inside `render_layer`, so it's honoured by **every** path (live composite, export, thumbnail, flatten) for free. The single-opaque-layer fast path now opts out when a mask is present (`mask.is_none()`) so a masked layer always routes through `render_layer` | Complete |
+| 2   | **Mask painting reuses the brush engine** — `mask_paint_down/move/up` drive the same `accumulate_dab` coverage + stabilizer + hardness machinery as the paint brush; a new `paint_mask` branch in `recomposite_stroke_bbox` scrubs coverage×opacity toward the paint value into the active layer's mask (black hides, white reveals), idempotent from a per-stroke snapshot. `usePaintTool` gained a `maskMode`/`maskValue` variant | Complete |
+| 3   | **Mask management** — `add_layer_mask` / `remove_layer_mask` / `apply_layer_mask` (bakes into alpha, permanent) / `invert_layer_mask` / `has_layer_mask`, all snapping history; `merge_down` bakes both the upper (via `render_layer`) and lower layers' masks correctly; `get_layers` JSON now reports `hasMask` | Complete |
+| 4   | **UI** — Layers panel: an Aperture button adds a mask / toggles Edit-mask mode (auto-selects the layer + switches to the Paint brush so strokes hit the mask); a control bar on the active masked layer gives a Hide/Reveal brush-value toggle plus Invert / Apply / Remove. Where a mask hides pixels, the transparency checkerboard shows through (matches the eraser) | Complete |
+| 5   | **Docs** — README this summary; Trail Log **v0.9.31**. Known gap: masks aren't persisted yet — `get_layer_png` serializes raw pixels only and the Convex archive is still single-layer, so masks survive undo/redo but not reload | Complete |
+
 ## License
 
 MIT

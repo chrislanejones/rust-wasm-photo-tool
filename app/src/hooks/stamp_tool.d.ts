@@ -502,7 +502,7 @@ declare module "stamp_tool" {
     /** Recompute the cached composite of all visible layers (call before reading data_ptr). */
     recomposite(): void;
     layer_count(): number;
-    /** JSON array bottom→top: [{id,name,visible,opacity,active}]. */
+    /** JSON array bottom→top: [{id,name,visible,opacity,active,hasMask}]. */
     get_layers(): string;
     /** Id of the active layer (receives all tool edits). */
     active_layer_id(): number;
@@ -522,6 +522,27 @@ declare module "stamp_tool" {
     merge_down(id: number): boolean;
     /** Flatten the whole stack into a single Background layer. */
     flatten_all(): void;
+
+    // ── Layer masks (non-destructive grayscale alpha; 255 = reveal, 0 = hide) ──
+    /** Add a fully-revealed (white) mask to a layer. False if not found / already masked. */
+    add_layer_mask(id: number): boolean;
+    /** Discard a layer's mask (reveal everything). False if it had none. */
+    remove_layer_mask(id: number): boolean;
+    /** Bake the mask into the layer's alpha permanently, then drop it. False if no mask. */
+    apply_layer_mask(id: number): boolean;
+    /** Invert the mask (reveal↔hide). False if it has none. */
+    invert_layer_mask(id: number): boolean;
+    has_layer_mask(id: number): boolean;
+    /** Paint the active layer's mask with the brush engine. `value` 0=hide, 255=reveal;
+     *  `opacity`/`hardness` are 0..1. Creates a white mask first if the layer has none. */
+    mask_paint_down(
+      x: number, y: number, size: number,
+      value: number, opacity: number, hardness: number, stab: string,
+    ): void;
+    /** Continue the active mask stroke; true if it changed the mask (→ flush). */
+    mask_paint_move(x: number, y: number): boolean;
+    /** End the active mask stroke + free buffers; true if it changed the mask. */
+    mask_paint_up(): boolean;
 
     // ── Move tool (reposition the active layer's content) ──
     /** Live, non-destructive drag offset for the active layer; recomposite then

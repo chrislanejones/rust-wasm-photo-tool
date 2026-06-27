@@ -27,6 +27,17 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.31",
+    date: "2026-06-27",
+    headline: "Non-destructive layer masks",
+    entries: [
+      { tag: "feature", text: "Layer masks — hide or reveal parts of a layer without erasing anything. Add a mask from the Layers panel, then paint it: black hides, white brings it back. Fully reversible until you Apply it." },
+      { tag: "rust", text: "Masks live in Rust and reuse the existing brush engine (soft dabs, hardness, stroke stabilizer), so painting a mask feels exactly like the paint brush — and every composite, export, and thumbnail honours the mask." },
+      { tag: "feature", text: "Mask actions in the layer row: Invert (swap hidden/shown), Apply (bake it in permanently), and Remove. Merging and flattening bake masks in correctly." },
+      { tag: "ui", text: "Where a mask hides pixels you now see the transparency checkerboard through them, matching the eraser." },
+    ],
+  },
+  {
     version: "v0.9.30",
     date: "2026-06-27",
     headline: "An eraser, a softer brush, and a selection marker that finally stays put",

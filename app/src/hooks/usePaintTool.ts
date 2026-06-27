@@ -11,6 +11,12 @@ interface Opts {
   /** Eraser variant: drive `erase_down/move/up` (clear alpha) instead of
    *  `paint_down/move/up` (lay down colour). Same stroke engine in Rust. */
   erase?: boolean;
+  /** Mask variant: drive `mask_paint_down/move/up` — paint the active layer's
+   *  grayscale mask (non-destructive) instead of pixels. Takes precedence over
+   *  `erase`. Uses the Paint brush's size/opacity/hardness/stabilizer. */
+  maskMode?: boolean;
+  /** Grey value laid into the mask when `maskMode`: 0 = hide, 255 = reveal. */
+  maskValue?: number;
 }
 
 /**
@@ -30,6 +36,8 @@ export function usePaintTool({
   flushToCanvas,
   syncState,
   erase = false,
+  maskMode = false,
+  maskValue = 0,
 }: Opts) {
   const painting = useRef(false);
 
@@ -52,7 +60,17 @@ export function usePaintTool({
       if (!t || e.button !== 0) return;
       painting.current = true;
       const { x, y } = coords(e);
-      if (erase) {
+      if (maskMode) {
+        t.mask_paint_down(
+          x,
+          y,
+          settings.brushSize,
+          maskValue,
+          settings.brushOpacity / 100,
+          settings.brushHardness / 100,
+          settings.paintStabilizer,
+        );
+      } else if (erase) {
         t.erase_down(
           x,
           y,
@@ -78,6 +96,8 @@ export function usePaintTool({
       toolRef,
       coords,
       erase,
+      maskMode,
+      maskValue,
       settings.brushSize,
       settings.brushColor,
       settings.brushOpacity,
@@ -96,20 +116,28 @@ export function usePaintTool({
       const t = toolRef.current;
       if (!t) return;
       const { x, y } = coords(e);
-      const changed = erase ? t.erase_move(x, y) : t.paint_move(x, y);
+      const changed = maskMode
+        ? t.mask_paint_move(x, y)
+        : erase
+          ? t.erase_move(x, y)
+          : t.paint_move(x, y);
       if (changed) flushToCanvas();
     },
-    [toolRef, coords, erase, flushToCanvas],
+    [toolRef, coords, erase, maskMode, flushToCanvas],
   );
 
   const onMouseUp = useCallback(() => {
     if (!painting.current) return;
     painting.current = false;
     const t = toolRef.current;
-    const changed = erase ? t?.erase_up() : t?.paint_up();
+    const changed = maskMode
+      ? t?.mask_paint_up()
+      : erase
+        ? t?.erase_up()
+        : t?.paint_up();
     if (changed) flushToCanvas();
     syncState();
-  }, [toolRef, erase, flushToCanvas, syncState]);
+  }, [toolRef, erase, maskMode, flushToCanvas, syncState]);
 
   return { onMouseDown, onMouseMove, onMouseUp };
 }
