@@ -8,15 +8,20 @@ interface Opts {
   settings: ToolSettings;
   flushToCanvas: () => void;
   syncState: () => void;
+  /** Eraser variant: drive `erase_down/move/up` (clear alpha) instead of
+   *  `paint_down/move/up` (lay down colour). Same stroke engine in Rust. */
+  erase?: boolean;
 }
 
 /**
- * Thin pointer-event forwarder for the paint brush. All the brush logic now
- * lives in Rust behind `paint_down` / `paint_move` / `paint_up`: hex-colour
- * parsing, the stabilizer ("lazy mouse") leash, the stroke state machine, and
- * per-stroke opacity (overlapping dabs combine by max coverage, so a 50% stroke
- * stays a true 50% instead of building up toward opaque). JS only maps the event
- * to canvas-space coords and re-flushes the canvas when Rust reports it painted.
+ * Thin pointer-event forwarder for the paint brush (and, with `erase`, the
+ * eraser). All the stroke logic lives in Rust behind `paint_down/move/up` (or
+ * `erase_down/move/up`): hex-colour parsing, the configurable edge hardness, the
+ * stabilizer ("lazy mouse") leash, the stroke state machine, and per-stroke
+ * opacity (overlapping dabs combine by max coverage, so a 50% stroke stays a
+ * true 50% instead of building up toward opaque). JS only maps the event to
+ * canvas-space coords and re-flushes the canvas when Rust reports it changed
+ * pixels. The eraser shares all of it — it just scrubs alpha in the recomposite.
  */
 export function usePaintTool({
   toolRef,
@@ -24,6 +29,7 @@ export function usePaintTool({
   settings,
   flushToCanvas,
   syncState,
+  erase = false,
 }: Opts) {
   const painting = useRef(false);
 
@@ -46,22 +52,39 @@ export function usePaintTool({
       if (!t || e.button !== 0) return;
       painting.current = true;
       const { x, y } = coords(e);
-      t.paint_down(
-        x,
-        y,
-        settings.brushSize,
-        settings.brushColor,
-        settings.brushOpacity / 100,
-        settings.paintStabilizer,
-      );
+      if (erase) {
+        t.erase_down(
+          x,
+          y,
+          settings.eraserSize,
+          settings.eraserOpacity / 100,
+          settings.eraserHardness / 100,
+          settings.paintStabilizer,
+        );
+      } else {
+        t.paint_down(
+          x,
+          y,
+          settings.brushSize,
+          settings.brushColor,
+          settings.brushOpacity / 100,
+          settings.brushHardness / 100,
+          settings.paintStabilizer,
+        );
+      }
       flushToCanvas();
     },
     [
       toolRef,
       coords,
+      erase,
       settings.brushSize,
       settings.brushColor,
       settings.brushOpacity,
+      settings.brushHardness,
+      settings.eraserSize,
+      settings.eraserOpacity,
+      settings.eraserHardness,
       settings.paintStabilizer,
       flushToCanvas,
     ],
@@ -73,18 +96,20 @@ export function usePaintTool({
       const t = toolRef.current;
       if (!t) return;
       const { x, y } = coords(e);
-      if (t.paint_move(x, y)) flushToCanvas();
+      const changed = erase ? t.erase_move(x, y) : t.paint_move(x, y);
+      if (changed) flushToCanvas();
     },
-    [toolRef, coords, flushToCanvas],
+    [toolRef, coords, erase, flushToCanvas],
   );
 
   const onMouseUp = useCallback(() => {
     if (!painting.current) return;
     painting.current = false;
     const t = toolRef.current;
-    if (t && t.paint_up()) flushToCanvas();
+    const changed = erase ? t?.erase_up() : t?.paint_up();
+    if (changed) flushToCanvas();
     syncState();
-  }, [toolRef, flushToCanvas, syncState]);
+  }, [toolRef, erase, flushToCanvas, syncState]);
 
   return { onMouseDown, onMouseMove, onMouseUp };
 }

@@ -255,8 +255,9 @@ function getCursorForTool(tool?: string, isPanning?: boolean, colorPickerActive?
   switch (tool) {
     case "text":
       return "text";
+    case "arrow": // repurposed slot → Move tool
+      return "move";
     case "crop":
-    case "arrow":
     case "shapes":
       return "crosshair";
     default:
@@ -639,15 +640,20 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       : baseMouseMove;
     const wrappedMouseUp = isPanning ? handlePanMouseUp : onMouseUp;
 
-    const { width: imgW, height: imgH, hasTransparency } = hookResult.state;
+    const { width: imgW, height: imgH } = hookResult.state;
 
     return (
       <div
         className="canvas-wrapper"
         ref={containerRef as React.RefObject<HTMLDivElement>}
       >
-        {/* Checkerboard behind the canvas — only when the image has transparent pixels */}
-        {hasTransparency && imgW > 0 && imgH > 0 && (
+        {/* Transparency checkerboard, sized + transformed to sit exactly behind
+            the image. Always rendered (an opaque image fully covers it, so it
+            costs nothing) so any transparent pixels — PNG alpha, a deleted
+            selection, or an eraser stroke — immediately read as "empty" instead
+            of black. This is the standard backdrop: it shows ONLY through the
+            image's transparent regions. */}
+        {imgW > 0 && imgH > 0 && (
           <div
             className="checkerboard"
             style={{
@@ -687,17 +693,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         />
         <CompareSlider beforeUrl={beforeUrl} canvasEl={canvasRef.current} active={compareActive} />
 
-        {/* ── Selection Marker overlay (magic-wand mask, computed in Rust) ── */}
+        {/* ── Selection Marker overlay (marching-ants marker, computed in Rust) ── */}
         {selectionMask &&
           selectionMask.length > 0 &&
-          canvasRef.current &&
           !!selectionWidth &&
           !!selectionHeight && (
             <SelectionOverlay
-              canvasEl={canvasRef.current}
               mask={selectionMask}
               width={selectionWidth}
               height={selectionHeight}
+              panOffset={panOffset}
+              zoom={zoom}
             />
           )}
 

@@ -21,6 +21,13 @@ export default defineConfig({
     },
   },
   server: {
+    // Bind all interfaces (0.0.0.0) so the dev server is reachable on the WSL2
+    // IP from the Windows browser, not just 127.0.0.1 — WSL localhost-forwarding
+    // can break under VPNs / mirrored networking. strictPort keeps it on 5173
+    // rather than silently bumping to 5174 when a stale instance lingers.
+    host: true,
+    port: 5173,
+    strictPort: true,
     fs: {
       allow: [".."],
     },

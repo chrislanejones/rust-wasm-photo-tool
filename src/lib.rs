@@ -414,6 +414,11 @@ pub struct ImageHorseTool {
     /// nothing is selected. Built by the Selection Marker tool's flood-fill /
     /// select-all; `delete_selection` clears the masked pixels.
     selection: Option<Vec<bool>>,
+    /// Live, non-destructive offset for the Move tool: while the user drags, the
+    /// ACTIVE layer is composited shifted by this (dx, dy) without touching its
+    /// stored pixels. `None` when no move is in progress. Committed by
+    /// `translate_active_layer`; transient (never part of a history snapshot).
+    move_preview: Option<(i32, i32)>,
     /// Paint stroke-stabilizer trailing tip ("lazy mouse"). Set on stroke start;
     /// advances toward the cursor only when it pulls past the leash. `None` when
     /// no stabilized stroke is active.
@@ -435,6 +440,14 @@ pub struct ImageHorseTool {
     paint_leash: f64,
     paint_last: Option<(f64, f64)>,
     paint_raw: (f64, f64),
+    /// Brush-edge hardness (0..1): fraction of the radius at full coverage before
+    /// the smoothstep falloff. 1.0 = crisp edge, lower = softer. Shared by the
+    /// paint brush and the eraser (set on `paint_down` / `erase_down`).
+    paint_hardness: f32,
+    /// When true the active stroke is an ERASER: instead of laying down colour it
+    /// clears the active layer's alpha (coverage × opacity) toward transparent,
+    /// keeping the base RGB so partial erases fade out without a colour shift.
+    paint_erase: bool,
 
     // ── Effects-brush (blur / pixelate / redaction) stroke state ──────────
     /// 0 = blur, 1 = pixelate, 2 = redaction (set on effect_down).
@@ -606,17 +619,48 @@ fn points_bbox(pts: &[(f64, f64)]) -> (f64, f64, f64, f64) {
     (minx, miny, maxx, maxy)
 }
 
-/// Build a canvas-sized RGBA overlay from a selection mask: selected pixels get a
-/// translucent blue highlight, the rest stay transparent. The JS Selection
-/// overlay canvas draws this directly over the image.
+/// Build a canvas-sized RGBA overlay from a selection mask — the selection
+/// *marker*. Rather than a flat translucent fill (which buried the pixels under
+/// it), this traces a crisp marching-ants–style outline around the selection
+/// boundary and leaves only a faint interior tint, so you can still see what
+/// you've selected. The whole marker is generated here in Rust; the JS overlay
+/// just blits this RGBA and CSS-scales it onto the canvas.
+///
+/// Boundary = a selected pixel that touches a non-selected 4-neighbour (or the
+/// image edge). Boundary pixels alternate black/white in a short diagonal dash
+/// so the ants stay legible over any image, light or dark.
 fn selection_overlay_rgba(mask: &[bool], w: usize, h: usize) -> Vec<u8> {
+    const FILL: [u8; 4] = [64, 140, 255, 38]; // faint translucent-blue interior
+    const DASH_PX: usize = 4; // dash period (image px) for the ant pattern
     let mut out = vec![0u8; w * h * 4];
-    for (i, &sel) in mask.iter().enumerate() {
-        if sel {
-            out[i * 4] = 64;
-            out[i * 4 + 1] = 140;
-            out[i * 4 + 2] = 255;
-            out[i * 4 + 3] = 96;
+    if w == 0 || h == 0 {
+        return out;
+    }
+    let sel = |x: usize, y: usize| mask[y * w + x];
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if !mask[i] {
+                continue;
+            }
+            let boundary = x == 0
+                || y == 0
+                || x + 1 == w
+                || y + 1 == h
+                || !sel(x - 1, y)
+                || !sel(x + 1, y)
+                || !sel(x, y - 1)
+                || !sel(x, y + 1);
+            let px = if boundary {
+                if ((x + y) / DASH_PX) % 2 == 0 {
+                    [255, 255, 255, 255]
+                } else {
+                    [0, 0, 0, 255]
+                }
+            } else {
+                FILL
+            };
+            out[i * 4..i * 4 + 4].copy_from_slice(&px);
         }
     }
     out
@@ -880,6 +924,10 @@ fn composite_layers_into(
     h: u32,
     editing_shape_id: Option<u32>,
     editing_text_id: Option<u32>,
+    // Live Move-tool preview: (active_index, dx, dy). When set, that layer's
+    // rendered pixels are shifted by (dx, dy) before blending — non-destructive,
+    // operating on the temporary render only.
+    move_preview: Option<(usize, i32, i32)>,
 ) {
     let n = (w as usize) * (h as usize) * 4;
     if out.len() != n {
@@ -889,21 +937,29 @@ fn composite_layers_into(
 
     // Fast path: exactly one visible, fully-opaque layer with no overlays →
     // copy its pixels straight in. Avoids the zero-fill + per-pixel blend that
-    // would otherwise run on every paint/stamp dab.
-    let mut visible = layers.iter().filter(|l| l.visible);
-    if let (Some(only), None) = (visible.next(), visible.next()) {
-        if only.opacity >= 0.999 && layer_has_no_overlays(only) && only.buf.data.len() == n {
-            out.copy_from_slice(&only.buf.data);
-            return;
+    // would otherwise run on every paint/stamp dab. Skipped during a move
+    // preview so the shift actually applies.
+    if move_preview.is_none() {
+        let mut visible = layers.iter().filter(|l| l.visible);
+        if let (Some(only), None) = (visible.next(), visible.next()) {
+            if only.opacity >= 0.999 && layer_has_no_overlays(only) && only.buf.data.len() == n {
+                out.copy_from_slice(&only.buf.data);
+                return;
+            }
         }
     }
 
     out.iter_mut().for_each(|b| *b = 0);
-    for layer in layers {
+    for (idx, layer) in layers.iter().enumerate() {
         if !layer.visible {
             continue;
         }
-        let rendered = render_layer(layer, w, h, editing_shape_id, editing_text_id);
+        let mut rendered = render_layer(layer, w, h, editing_shape_id, editing_text_id);
+        if let Some((active_idx, dx, dy)) = move_preview {
+            if idx == active_idx && (dx != 0 || dy != 0) {
+                rendered = crate::transform::translate(&rendered, w as i32, h as i32, dx, dy);
+            }
+        }
         blend_over(out, &rendered, layer.opacity);
     }
 }
@@ -918,7 +974,7 @@ fn composite_layers(
     editing_text_id: Option<u32>,
 ) -> Vec<u8> {
     let mut out = Vec::new();
-    composite_layers_into(&mut out, layers, w, h, editing_shape_id, editing_text_id);
+    composite_layers_into(&mut out, layers, w, h, editing_shape_id, editing_text_id, None);
     out
 }
 
@@ -1226,6 +1282,7 @@ impl ImageHorseTool {
             editing_shape_id: None,
             editing_text_id: None,
             selection: None,
+            move_preview: None,
             paint_stab_tip: None,
             paint_cov: Vec::new(),
             paint_base: Vec::new(),
@@ -1235,6 +1292,8 @@ impl ImageHorseTool {
             paint_leash: 0.0,
             paint_last: None,
             paint_raw: (0.0, 0.0),
+            paint_hardness: 0.8,
+            paint_erase: false,
             effect_mode: 0,
             effect_radius: 0.0,
             effect_intensity: 8,
@@ -1297,6 +1356,9 @@ impl ImageHorseTool {
         // Reuse the cache allocation across frames; take it out so we can pass
         // it as `&mut` alongside the immutable layer borrow.
         let mut cache = std::mem::take(&mut self.composite_cache);
+        let move_preview = self
+            .move_preview
+            .map(|(dx, dy)| (self.active, dx, dy));
         composite_layers_into(
             &mut cache,
             &self.layers,
@@ -1304,6 +1366,7 @@ impl ImageHorseTool {
             self.height,
             self.editing_shape_id,
             self.editing_text_id,
+            move_preview,
         );
         self.composite_cache = cache;
     }
@@ -2794,13 +2857,14 @@ impl ImageHorseTool {
 
     // ── Paint / Brush Tool ──────────────────────────────────────
 
-    pub fn paint_begin(&mut self) {
-        self.snap("Paint");
+    pub fn paint_begin(&mut self, label: &str) {
+        self.snap(label);
         let n = (self.width * self.height) as usize;
         self.paint_cov = vec![0u8; n];
         self.paint_base = self.layers[self.active].buf.data.clone();
         self.paint_color = (0, 0, 0);
         self.paint_opacity = 1.0;
+        self.paint_erase = false;
     }
 
     /// Stamp one dab's soft-edged profile into the coverage buffer (max-combine,
@@ -2827,10 +2891,15 @@ impl ImageHorseTool {
             return None;
         }
 
-        // Hoisted invariants: hardened-zone radius² (no sqrt/falloff inside).
+        // Hoisted invariants: the hardened-zone radius² (full coverage, no
+        // sqrt/falloff inside) and the falloff-band width. `hard_frac` is the
+        // brush hardness: 1.0 → crisp edge (hard zone == whole radius), lower →
+        // a wider smoothstep skirt. Read before the mutable cov borrow below.
+        let hard_frac = self.paint_hardness.clamp(0.0, 1.0);
         let inv_radius = 1.0_f32 / r_f32;
-        let hard_r = r_f32 * 0.7;
+        let hard_r = r_f32 * hard_frac;
         let hard_r_sq = hard_r * hard_r;
+        let band = (1.0 - hard_frac).max(1e-4); // normalized falloff width
         let cx_f32 = cx as f32;
         let cy_f32 = cy as f32;
         let cov = &mut self.paint_cov;
@@ -2848,7 +2917,7 @@ impl ImageHorseTool {
                         1.0
                     } else {
                         let norm = dist_sq.sqrt() * inv_radius;
-                        let t = (norm - 0.7) / 0.3;
+                        let t = ((norm - hard_frac) / band).clamp(0.0, 1.0);
                         (1.0 - t * t).max(0.0)
                     }
                 } else {
@@ -2870,6 +2939,7 @@ impl ImageHorseTool {
     fn recomposite_stroke_bbox(&mut self, min_x: i32, min_y: i32, max_x: i32, max_y: i32) {
         let w = self.width as i32;
         let active = self.active;
+        let erase = self.paint_erase;
         let (cr, cg, cb) = self.paint_color;
         let op = self.paint_opacity.clamp(0.0, 1.0);
         let sr = cr as f32 / 255.0;
@@ -2889,8 +2959,24 @@ impl ImageHorseTool {
                 if idx + 3 >= data.len() {
                     continue;
                 }
+                // Stroke strength at this pixel: dab coverage × the stroke opacity.
                 let sa = (cov[i] as f32 / 255.0) * op;
                 let ba = base[idx + 3] as f32 / 255.0;
+
+                if erase {
+                    // Eraser: scrub the base alpha down by the stroke strength
+                    // (sa = 1 fully clears it). RGB is carried over untouched so a
+                    // partial erase just fades to transparent — no colour fringe.
+                    // Recomputed from `base` each move, so it's idempotent over
+                    // overlapping coverage exactly like the paint path.
+                    let out_a = ba * (1.0 - sa);
+                    data[idx] = base[idx];
+                    data[idx + 1] = base[idx + 1];
+                    data[idx + 2] = base[idx + 2];
+                    data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+                    continue;
+                }
+
                 let out_a = sa + ba * (1.0 - sa);
                 data[idx + 3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
                 if out_a > 1e-6 {
@@ -2958,27 +3044,71 @@ impl ImageHorseTool {
     // the stabilizer catch-up and frees the stroke buffers. Each returns whether
     // it painted, so the caller knows when to re-flush the canvas.
 
-    pub fn paint_down(
-        &mut self,
-        x: f64, y: f64, size: f64,
-        color: &str, opacity: f64, stab: &str,
-    ) {
-        let [r, g, b, _] = parse_hex(color.trim_start_matches('#')).unwrap_or([0, 0, 0, 255]);
-        self.paint_begin();
-        let radius = (size * 0.5).max(0.0);
-        self.paint_radius = radius;
-        self.paint_leash = match stab {
+    /// Map a stabilizer level name → trailing-tip leash in px (0 = off). Shared
+    /// by the paint brush and the eraser. (Private — not part of the WASM API.)
+    fn leash_for(stab: &str) -> f64 {
+        match stab {
             "low" => 12.0,
             "med" => 22.0,
             "high" => 36.0,
             _ => 0.0,
-        };
+        }
+    }
+
+    pub fn paint_down(
+        &mut self,
+        x: f64, y: f64, size: f64,
+        color: &str, opacity: f64, hardness: f64, stab: &str,
+    ) {
+        let [r, g, b, _] = parse_hex(color.trim_start_matches('#')).unwrap_or([0, 0, 0, 255]);
+        self.paint_begin("Paint");
+        self.paint_erase = false;
+        self.paint_hardness = hardness.clamp(0.0, 1.0) as f32;
+        let radius = (size * 0.5).max(0.0);
+        self.paint_radius = radius;
+        self.paint_leash = Self::leash_for(stab);
         self.paint_last = Some((x, y));
         self.paint_raw = (x, y);
         self.paint_dab(x, y, radius, r, g, b, opacity);
         if self.paint_leash > 0.0 {
             self.paint_stab_begin(x, y);
         }
+    }
+
+    /// Eraser driver — the mirror of `paint_down`, sharing the dab / coverage /
+    /// stabilizer machinery. The stroke clears the active layer's alpha instead
+    /// of laying down colour (see `recomposite_stroke_bbox`'s erase branch), so
+    /// it reveals whatever is below the active layer (or transparency). There's
+    /// no colour: coverage × opacity drives how hard each pixel is scrubbed.
+    /// `erase_move` / `erase_up` just delegate to the paint stroke continuation
+    /// (the erase semantics live entirely in the recomposite step).
+    pub fn erase_down(
+        &mut self,
+        x: f64, y: f64, size: f64,
+        opacity: f64, hardness: f64, stab: &str,
+    ) {
+        self.paint_begin("Erase");
+        self.paint_erase = true;
+        self.paint_hardness = hardness.clamp(0.0, 1.0) as f32;
+        let radius = (size * 0.5).max(0.0);
+        self.paint_radius = radius;
+        self.paint_leash = Self::leash_for(stab);
+        self.paint_last = Some((x, y));
+        self.paint_raw = (x, y);
+        self.paint_dab(x, y, radius, 0, 0, 0, opacity);
+        if self.paint_leash > 0.0 {
+            self.paint_stab_begin(x, y);
+        }
+    }
+
+    /// Continue the active eraser stroke. Returns true if it scrubbed pixels.
+    pub fn erase_move(&mut self, x: f64, y: f64) -> bool {
+        self.paint_move(x, y)
+    }
+
+    /// End the active eraser stroke and free its buffers. True if it scrubbed.
+    pub fn erase_up(&mut self) -> bool {
+        self.paint_up()
     }
 
     /// Continue the active stroke toward (x, y). Returns true if it painted.
@@ -3013,6 +3143,7 @@ impl ImageHorseTool {
         self.paint_leash = 0.0;
         self.paint_cov = Vec::new();
         self.paint_base = Vec::new();
+        self.paint_erase = false;
         painted
     }
 
@@ -3495,6 +3626,53 @@ impl ImageHorseTool {
         // Keep the moved layer active so the UI selection follows it.
         self.active = to;
         true
+    }
+
+    /// Move tool — set the live, non-destructive drag offset for the ACTIVE
+    /// layer. The next `recomposite` renders that layer shifted by (dx, dy)
+    /// without altering stored pixels. `(0, 0)` clears the preview. No history.
+    pub fn set_move_preview(&mut self, dx: i32, dy: i32) {
+        self.move_preview = if dx == 0 && dy == 0 {
+            None
+        } else {
+            Some((dx, dy))
+        };
+    }
+
+    /// Move tool — discard any in-progress move preview without committing
+    /// (drag abort / Escape). No history.
+    pub fn cancel_move_preview(&mut self) {
+        self.move_preview = None;
+    }
+
+    /// Move tool — commit a move of the ACTIVE layer's content by (dx, dy):
+    /// shifts its pixel buffer AND its text/shape annotations so everything on
+    /// the layer travels together. Pushes one "Move Layer" snapshot. Clears any
+    /// live preview first. A zero delta clears the preview and does nothing else
+    /// (no empty history entry).
+    pub fn translate_active_layer(&mut self, dx: i32, dy: i32) {
+        self.move_preview = None;
+        if (dx == 0 && dy == 0) || self.active >= self.layers.len() {
+            return;
+        }
+        self.snap("Move Layer");
+        let (w, h) = (self.width as i32, self.height as i32);
+        let layer = &mut self.layers[self.active];
+        layer.buf.data = crate::transform::translate(&layer.buf.data, w, h, dx, dy);
+        for a in &mut layer.text_annotations {
+            a.x += dx;
+            a.y += dy;
+        }
+        for s in &mut layer.shape_annotations {
+            s.x0 += dx as f64;
+            s.y0 += dy as f64;
+            s.x1 += dx as f64;
+            s.y1 += dy as f64;
+            for p in &mut s.points {
+                p.0 += dx as f64;
+                p.1 += dy as f64;
+            }
+        }
     }
 
     /// Merge the layer with `id` down onto the layer directly below it (the
@@ -4297,12 +4475,45 @@ mod layer_persistence_tests {
     }
 
     #[test]
+    fn translate_active_layer_shifts_pixels_and_records_one_step() {
+        let mut t = ImageHorseTool::new(4, 4);
+        // Paint a single opaque red pixel at (1,1) on the background layer.
+        {
+            let buf = &mut t.layers[t.active].buf.data;
+            let i = ((1 * 4 + 1) * 4) as usize;
+            buf[i] = 255;
+            buf[i + 3] = 255;
+        }
+        let undo_before = t.undo_count();
+        t.translate_active_layer(1, 2); // → should land at (2,3)
+        let buf = &t.layers[t.active].buf.data;
+        let src = ((1 * 4 + 1) * 4) as usize;
+        let dst = ((3 * 4 + 2) * 4) as usize;
+        assert_eq!(buf[src + 3], 0, "original pixel cleared (now transparent)");
+        assert_eq!(buf[dst], 255, "red moved to the shifted position");
+        assert_eq!(buf[dst + 3], 255, "alpha moved with it");
+        assert_eq!(t.undo_count(), undo_before + 1, "one Move Layer history step");
+    }
+
+    #[test]
+    fn translate_active_layer_zero_delta_is_a_noop() {
+        let mut t = ImageHorseTool::new(4, 4);
+        let undo_before = t.undo_count();
+        t.set_move_preview(3, 3);
+        t.translate_active_layer(0, 0); // clears preview, records nothing
+        assert_eq!(t.undo_count(), undo_before, "zero move adds no history");
+        assert!(t.move_preview.is_none(), "preview cleared");
+    }
+
+    #[test]
     fn restore_text_annotation_attaches_to_active_layer() {
         let mut t = ImageHorseTool::new(32, 32);
         t.begin_layer_restore();
         t.push_restored_layer(&solid(32, 32, [255, 255, 255, 255]), 32, 32, "bg", true, 1.0);
         t.restore_text_annotation(
             "hi", 16.0, 0, 0, 0, false, 2, 2, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // shadow params (box, text, r, g, b, a, dx, dy, blur)
+            false, false, 0, 0, 0, 0, 0, 0, 0,
         );
         t.finish_layer_restore(0);
         let json = t.get_layer_text_annotations(0);

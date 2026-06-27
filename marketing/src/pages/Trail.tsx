@@ -27,6 +27,19 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.30",
+    date: "2026-06-27",
+    headline: "An eraser, a softer brush, and a selection marker that finally stays put",
+    entries: [
+      { tag: "feature", text: "New Eraser in the Paint tool — the sub-modes are now Paint · Blur · Pen · Eraser. The eraser scrubs the active layer back to transparent (revealing whatever is beneath it), with its own size, strength, and hardness; lower strength erases gradually." },
+      { tag: "feature", text: "The paint brush has a real Hardness control now (0–100%) — a crisp edge at the top, a soft skirt lower down — shared by the eraser." },
+      { tag: "rust", text: "Both the eraser and the brush-edge hardness live in Rust, reusing the same stroke engine the paint brush already used: soft dabs, true per-stroke opacity, and the lazy-mouse stabilizer." },
+      { tag: "ui", text: "The histogram now drops its bars to the floor when you switch photos and holds them down until the new photo is ready, then they rise into its shape — instead of flashing “no image”. Editing the same photo still morphs smoothly." },
+      { tag: "fix", text: "The magic-wand selection marker no longer drifts away when you zoom or pan — it now rides the exact same transform as the image. The marker is also a crisp marching-ants outline (drawn in Rust) instead of a flat blue wash that hid your pixels." },
+      { tag: "ui", text: "A transparency checkerboard now sits behind every image, so erased areas and transparent PNGs read as an empty grid right away instead of going black." },
+    ],
+  },
+  {
     version: "v0.9.29",
     date: "2026-06-26",
     headline: "Unified button system, share links, and a snappier, smarter placement grid",

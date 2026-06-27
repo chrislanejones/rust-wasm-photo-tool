@@ -5,7 +5,7 @@ import {
   SquareMousePointer,
   Paintbrush,
   Type,
-  FileText,
+  Move,
   Brain,
   Shapes,
   Sparkles,
@@ -43,7 +43,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: "brush",
     label: "Paint",
-    description: "Paint & Blur",
+    description: "Paint, blur, pen & erase",
     icon: Paintbrush,
     gradient: "from-blue-500 to-indigo-500",
   },
@@ -55,10 +55,13 @@ export const TOOLS: ToolDefinition[] = [
     gradient: "from-amber-400 to-orange-500",
   },
   {
+    // NB: the `arrow` id is legacy — this slot is now the Move tool (drag the
+    // active layer's content). Arrow-drawing lives under Shapes → Arrows.
     id: "arrow",
-    label: "Coming Soon",
-    description: "New tool in development",
-    icon: FileText,
+    label: "Move",
+    tooltipTitle: "Move Layer",
+    description: "Drag the active layer's contents",
+    icon: Move,
     gradient: "from-emerald-500 to-teal-500",
   },
   {

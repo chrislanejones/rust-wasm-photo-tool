@@ -26,8 +26,9 @@ export function FirstRunScreen({
       loading={!ready}
       reduceMotion={reduceMotion}
       ariaLabel={ready ? "Get started" : "Loading Image Horse"}
-      // Sign-in pinned top-right (new browser / cache-cleared users restore here).
-      topRight={<UserMenu />}
+      // Sign-in pinned top-right (new browser / cache-cleared users restore
+      // here) — welcome-back-sized so it's actually visible.
+      topRight={<UserMenu large />}
     >
       {children}
     </BrandRevealScreen>

@@ -161,6 +161,33 @@ pub fn paste_region(
     }
 }
 
+/// Shift the whole `data` buffer (RGBA, `img_w × img_h`) by (dx, dy) into a
+/// fresh buffer of the same dimensions. Content moved off-canvas is dropped;
+/// newly exposed area is left fully transparent. Used by the Move tool to
+/// reposition a layer's pixels.
+pub fn translate(data: &[u8], img_w: i32, img_h: i32, dx: i32, dy: i32) -> Vec<u8> {
+    let mut out = vec![0u8; (img_w * img_h * 4) as usize];
+    if data.len() != out.len() {
+        return out;
+    }
+    for sy in 0..img_h {
+        let ty = sy + dy;
+        if ty < 0 || ty >= img_h {
+            continue;
+        }
+        for sx in 0..img_w {
+            let tx = sx + dx;
+            if tx < 0 || tx >= img_w {
+                continue;
+            }
+            let si = ((sy * img_w + sx) * 4) as usize;
+            let di = ((ty * img_w + tx) * 4) as usize;
+            out[di..di + 4].copy_from_slice(&data[si..si + 4]);
+        }
+    }
+    out
+}
+
 /// Resize the image using bilinear interpolation.
 /// Returns (new_data, new_w, new_h). Minimum dimension is 1×1.
 pub fn resize_bilinear(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {

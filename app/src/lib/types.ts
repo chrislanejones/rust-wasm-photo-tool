@@ -32,8 +32,17 @@ export interface ToolSettings extends StampSettings {
   arrowStyle: "single" | "double";
   brushColor: string;
   brushOpacity: number;
-  /** Paint stroke stabilizer strength (pulled-string "lazy mouse"). Off by default. */
+  /** Paint brush edge hardness (0-100%): 100 = crisp edge, lower = softer skirt. */
+  brushHardness: number;
+  /** Paint stroke stabilizer strength (pulled-string "lazy mouse"). Off by default.
+   *  Shared by the Paint brush and the Eraser. */
   paintStabilizer: "off" | "low" | "med" | "high";
+
+  // Eraser (Paint tool → Eraser sub-mode) — clears the active layer to
+  // transparency. Reuses the paint stroke engine + paintStabilizer.
+  eraserSize: number;       // brush footprint (px)
+  eraserOpacity: number;    // erase strength (0-100%)
+  eraserHardness: number;   // edge hardness (0-100%)
   fontSize: number;
   fontFamily: string;
   fontWeight: "normal" | "bold";

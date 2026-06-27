@@ -3,7 +3,8 @@
 // tier/subscription), and an admin-only Super User tab. Drop it anywhere (e.g.
 // the TopBar).
 import { useState, useEffect } from "react";
-import { useAction, useQuery } from "convex/react";
+import { createPortal } from "react-dom";
+import { useAction, useQuery, useMutation } from "convex/react";
 import { toast } from "sonner";
 import {
   Settings,
@@ -137,6 +138,40 @@ export function SubscriptionButton({ general, superUser }: Props) {
     );
   };
 
+  // Super User: footer "Apply" grants the REAL Convex tier (admin-gated) so AI
+  // can be tested. "Restore Settings" / preference restore both confirm first.
+  const setMyTier = useMutation(api.users.setMyTier);
+  const [granting, setGranting] = useState(false);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+
+  const handleApplyTier = async () => {
+    if (!superUser) return;
+    setGranting(true);
+    const grant = superUser.mode === "paid" ? "pro" : "free";
+    try {
+      await setMyTier({ tier: grant });
+      toast.success(
+        `Your account is now ${grant} — AI ${grant === "pro" ? "unlocked" : "locked"}.`,
+      );
+    } catch (e) {
+      toast.error(
+        e instanceof Error && /authenticated|authorized/i.test(e.message)
+          ? "Sign in as the admin account first, then Apply."
+          : e instanceof Error
+            ? e.message
+            : "Couldn't apply tier.",
+      );
+    } finally {
+      setGranting(false);
+    }
+  };
+
+  const handleRestore = () => {
+    if (tab === "superuser") superUser?.onReset();
+    else setDraft(DEFAULT_PREFERENCES);
+    setRestoreConfirmOpen(false);
+  };
+
   const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -186,17 +221,31 @@ export function SubscriptionButton({ general, superUser }: Props) {
             {(tab === "general" ||
               tab === "appearance" ||
               tab === "security" ||
-              tab === "rulers") && (
+              tab === "rulers" ||
+              tab === "superuser") && (
               <div className="flex items-center gap-2">
                 <LargeButton
-                  onClick={() => setDraft(DEFAULT_PREFERENCES)}
-                  disabled={atDefaults}
+                  onClick={() => setRestoreConfirmOpen(true)}
+                  disabled={
+                    tab === "superuser" ? !superUser?.overridden : atDefaults
+                  }
                 >
                   Restore Settings
                 </LargeButton>
-                <LargeButton onClick={handleApplySettings} disabled={!settingsDirty}>
-                  Apply
-                </LargeButton>
+                {tab === "superuser" ? (
+                  <LargeButton onClick={handleApplyTier} disabled={granting}>
+                    {granting
+                      ? "Applying…"
+                      : `Apply ${superUser?.mode === "paid" ? "Paid" : "Free"}`}
+                  </LargeButton>
+                ) : (
+                  <LargeButton
+                    onClick={handleApplySettings}
+                    disabled={!settingsDirty}
+                  >
+                    Apply
+                  </LargeButton>
+                )}
               </div>
             )}
           </div>
@@ -344,6 +393,42 @@ export function SubscriptionButton({ general, superUser }: Props) {
           </div>
         </div>
       </Modal>
+
+      {/* Restore confirmation — portaled above the Settings modal (z-modal). */}
+      {restoreConfirmOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[var(--z-idle)] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+            onClick={() => setRestoreConfirmOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Restore settings"
+              className="w-full max-w-sm rounded-xl border border-border bg-bg-secondary p-5 text-text-primary shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold">Restore settings?</h3>
+              <p className="mt-2 text-sm text-text-muted leading-relaxed">
+                {tab === "superuser"
+                  ? "This clears the Super User tier override and returns to your real account tier."
+                  : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
+              </p>
+              <div className="mt-4 flex gap-2">
+                <LargeButton
+                  className="flex-1"
+                  onClick={() => setRestoreConfirmOpen(false)}
+                >
+                  Cancel
+                </LargeButton>
+                <LargeButton className="flex-1" onClick={handleRestore}>
+                  Restore
+                </LargeButton>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

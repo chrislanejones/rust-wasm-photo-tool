@@ -269,7 +269,9 @@ declare module "stamp_tool" {
       target_size: number,
       angle_deg: number,
     ): void;
-    paint_begin(): void;
+    /** Snapshot the layer (history `label`) + prime the per-stroke coverage
+     *  buffer. Called internally by paint_down / erase_down. */
+    paint_begin(label: string): void;
     paint_dab(
       cx: number,
       cy: number,
@@ -302,16 +304,28 @@ declare module "stamp_tool" {
       raw_x: number, raw_y: number,
       radius: number, r: number, g: number, b: number, opacity: number,
     ): boolean;
-    /** High-level brush driver — JS forwards pointer coords; hex parse,
-     *  stabilizer leash, stroke state, and per-stroke opacity all live in Rust. */
+    /** High-level brush driver — JS forwards pointer coords; hex parse, edge
+     *  hardness (0..1), stabilizer leash, stroke state, and per-stroke opacity
+     *  all live in Rust. */
     paint_down(
       x: number, y: number, size: number,
-      color: string, opacity: number, stab: string,
+      color: string, opacity: number, hardness: number, stab: string,
     ): void;
     /** Continue the active stroke; returns true if it painted (→ flush). */
     paint_move(x: number, y: number): boolean;
     /** End the active stroke (stabilizer catch-up) + free buffers; true if painted. */
     paint_up(): boolean;
+    /** Eraser driver — mirror of paint_down sharing the dab/coverage/stabilizer
+     *  engine, but clears the active layer's alpha instead of laying down colour
+     *  (no colour arg; hardness is 0..1). */
+    erase_down(
+      x: number, y: number, size: number,
+      opacity: number, hardness: number, stab: string,
+    ): void;
+    /** Continue the active eraser stroke; true if it scrubbed pixels (→ flush). */
+    erase_move(x: number, y: number): boolean;
+    /** End the active eraser stroke + free buffers; true if it scrubbed. */
+    erase_up(): boolean;
     /** Effects-brush driver (blur / pixelate / redaction) — mirrors the paint
      *  driver; mode branch, hex parse, and stroke interpolation live in Rust.
      *  `mode` is "blur" | "pixelate" | "solid". */
@@ -508,6 +522,16 @@ declare module "stamp_tool" {
     merge_down(id: number): boolean;
     /** Flatten the whole stack into a single Background layer. */
     flatten_all(): void;
+
+    // ── Move tool (reposition the active layer's content) ──
+    /** Live, non-destructive drag offset for the active layer; recomposite then
+     *  renders it shifted by (dx,dy). (0,0) clears it. No history. */
+    set_move_preview(dx: number, dy: number): void;
+    /** Discard an in-progress move preview without committing. No history. */
+    cancel_move_preview(): void;
+    /** Commit a move of the active layer's pixels + annotations by (dx,dy).
+     *  Pushes one "Move Layer" snapshot; a zero delta is a no-op. */
+    translate_active_layer(dx: number, dy: number): void;
 
     // ── Layer persistence (serialize / restore) ──
     /** PNG of one layer's raw pixels (no compositing, no overlays). */

@@ -517,7 +517,7 @@ export function BatchSettings({
     syncState,
   ]);
 
-  const [mode, setMode] = useState<"logo" | "text">("logo");
+  const [mode, setMode] = useState<"logo" | "text" | "rename">("logo");
 
   return (
     <div className="space-y-2.5">
@@ -525,9 +525,10 @@ export function BatchSettings({
         tabs={[
           { id: "logo", label: "Logo" },
           { id: "text", label: "Text" },
+          { id: "rename", label: "Rename" },
         ]}
         active={mode}
-        onChange={(id) => setMode(id as "logo" | "text")}
+        onChange={(id) => setMode(id as "logo" | "text" | "rename")}
       />
       {mode === "text" ? (
         <TextBatchPanel
@@ -538,6 +539,8 @@ export function BatchSettings({
           flushToCanvas={flushToCanvas}
           syncState={syncState}
         />
+      ) : mode === "rename" ? (
+        <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
       ) : (
       <>
       <div>
@@ -669,6 +672,175 @@ export function BatchSettings({
       )}
       </>
       )}
+    </div>
+  );
+}
+
+/** Power Rename — bulk-rename every image with a token pattern ({name}, {n}),
+ *  an optional find/replace on the original name, and sequential numbering, with
+ *  a live before→after preview. Names only (no pixels), so it's instant. */
+function RenameBatchPanel({
+  photos,
+  setPhotos,
+}: Pick<BatchSettingsProps, "photos" | "setPhotos">) {
+  const [pattern, setPattern] = useState("{name}");
+  const [find, setFind] = useState("");
+  const [replace, setReplace] = useState("");
+  const [useRegex, setUseRegex] = useState(false);
+  const [start, setStart] = useState(1);
+  const [pad, setPad] = useState(1);
+
+  const computeName = useCallback(
+    (name: string, i: number): string => {
+      const dot = name.lastIndexOf(".");
+      const baseRaw = dot > 0 ? name.slice(0, dot) : name;
+      const ext = dot > 0 ? name.slice(dot) : "";
+      let base = baseRaw;
+      if (find) {
+        try {
+          base = useRegex
+            ? base.replace(new RegExp(find, "g"), replace)
+            : base.split(find).join(replace);
+        } catch {
+          /* invalid regex — leave the base unchanged */
+        }
+      }
+      const num = String(start + i).padStart(Math.max(1, pad), "0");
+      const newBase = pattern.replace(/\{name\}/g, base).replace(/\{n\}/g, num);
+      // Never blank a name: empty pattern result falls back to the original base.
+      return (newBase.trim() || baseRaw) + ext;
+    },
+    [pattern, find, replace, useRegex, start, pad],
+  );
+
+  const preview = photos
+    .slice(0, 4)
+    .map((p, i) => ({ from: p.name, to: computeName(p.name, i) }));
+
+  const apply = () => {
+    if (photos.length === 0) return;
+    setPhotos((prev) =>
+      prev.map((p, i) => ({ ...p, name: computeName(p.name, i) })),
+    );
+    toast.success(
+      `Renamed ${photos.length} image${photos.length !== 1 ? "s" : ""}`,
+    );
+  };
+
+  const inputCls =
+    "w-full rounded-md border border-border bg-bg-elevated px-2 py-1.5 text-xs text-text-primary";
+
+  return (
+    <div className="space-y-3 pt-1">
+      <div className="space-y-1">
+        <span className="text-2xs text-theme-muted-foreground">Name pattern</span>
+        <input
+          value={pattern}
+          onChange={(e) => setPattern(e.target.value)}
+          placeholder="{name}"
+          className={`${inputCls} font-mono`}
+        />
+        <p className="text-2xs text-theme-muted-foreground">
+          <span className="font-mono">{"{name}"}</span> = original ·{" "}
+          <span className="font-mono">{"{n}"}</span> = number · the extension is
+          kept
+        </p>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-2xs text-theme-muted-foreground">
+            Find &amp; replace
+          </span>
+          <button
+            type="button"
+            onClick={() => setUseRegex((v) => !v)}
+            aria-pressed={useRegex}
+            title="Treat Find as a regular expression"
+            className={`rounded px-1.5 py-0.5 font-mono text-2xs transition-colors ${
+              useRegex
+                ? "bg-theme-primary/20 text-theme-primary"
+                : "bg-theme-muted/30 text-theme-muted-foreground hover:text-theme-foreground"
+            }`}
+          >
+            .* regex
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            value={find}
+            onChange={(e) => setFind(e.target.value)}
+            placeholder="Find"
+            className={inputCls}
+          />
+          <input
+            value={replace}
+            onChange={(e) => setReplace(e.target.value)}
+            placeholder="Replace"
+            className={inputCls}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="space-y-1">
+          <span className="text-2xs text-theme-muted-foreground">Start #</span>
+          <input
+            type="number"
+            min={0}
+            value={start}
+            onChange={(e) => setStart(parseInt(e.target.value, 10) || 0)}
+            className={`${inputCls} tabular-nums`}
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-2xs text-theme-muted-foreground">Pad digits</span>
+          <input
+            type="number"
+            min={1}
+            max={6}
+            value={pad}
+            onChange={(e) =>
+              setPad(Math.max(1, Math.min(6, parseInt(e.target.value, 10) || 1)))
+            }
+            className={`${inputCls} tabular-nums`}
+          />
+        </label>
+      </div>
+
+      <div className="space-y-1">
+        <span className="text-2xs text-theme-muted-foreground">Preview</span>
+        <div className="divide-y divide-border rounded-md border border-border bg-bg-elevated/40 text-2xs">
+          {preview.length === 0 ? (
+            <p className="px-2.5 py-2 text-theme-muted-foreground">No images.</p>
+          ) : (
+            preview.map((row, i) => (
+              <div key={i} className="flex items-center gap-2 px-2.5 py-1.5">
+                <span className="flex-1 truncate text-theme-muted-foreground line-through">
+                  {row.from}
+                </span>
+                <span className="shrink-0 text-theme-muted-foreground">→</span>
+                <span className="flex-1 truncate font-mono text-text-primary">
+                  {row.to}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+        {photos.length > preview.length && (
+          <p className="text-2xs text-theme-muted-foreground">
+            +{photos.length - preview.length} more
+          </p>
+        )}
+      </div>
+
+      <LargeButton
+        onClick={apply}
+        disabled={photos.length === 0}
+        className="w-full"
+      >
+        Rename {photos.length} image{photos.length !== 1 ? "s" : ""}
+      </LargeButton>
     </div>
   );
 }

@@ -76,6 +76,9 @@ interface Props {
   getHistogram: () => Uint32Array | null;
   /** Changes when the active image content changes → triggers a resample. */
   histogramSignature: string;
+  /** Active photo id — when it changes the histogram bars fall down, then rise
+   *  back up once the newly-selected photo has composited. */
+  histogramPhotoKey: string;
 }
 
 const DeleteGlyph = () => (
@@ -116,6 +119,7 @@ export function ReviewPanel({
   onFlattenAll,
   getHistogram,
   histogramSignature,
+  histogramPhotoKey,
 }: Props) {
   // Which body sections are open. The body splits its height evenly among the
   // open sections (1 → full, 2 → halves, 3 → thirds), each with its own header
@@ -545,6 +549,7 @@ export function ReviewPanel({
             <HistogramView
               getHistogram={getHistogram}
               signature={histogramSignature}
+              photoKey={histogramPhotoKey}
               active={open.histogram}
             />
           </section>

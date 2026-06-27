@@ -169,9 +169,12 @@ export const setMyTier = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
+    const user = await requireUser(ctx); // user row (email reliably set by useStoreUser)
     const admin = process.env.ADMIN_EMAIL;
-    if (!admin || identity.email !== admin) throw new Error("Not authorized");
-    const user = await requireUser(ctx);
+    // Prefer the stored email; fall back to the JWT claim (which some Clerk JWT
+    // templates omit — that was making this throw "Not authorized" when signed in).
+    const email = user.email ?? identity.email;
+    if (!admin || email !== admin) throw new Error("Not authorized");
     await ctx.db.patch(user._id, { tier: args.tier, updatedAt: Date.now() });
     return { ok: true, tier: args.tier };
   },

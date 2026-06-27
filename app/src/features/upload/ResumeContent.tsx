@@ -5,6 +5,7 @@
 import { useEffect, useMemo } from "react";
 import { Upload } from "lucide-react";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
+import { MediaTile } from "@/components/MediaTile";
 
 export function ResumeContent({
   photos,
@@ -34,18 +35,9 @@ export function ResumeContent({
 
         <div className="flex items-center justify-center gap-3">
           {thumbUrls.map((u, i) => (
-            <img
-              key={i}
-              src={u}
-              alt=""
-              className="h-16 w-16 rounded-xl border border-border object-cover"
-            />
+            <MediaTile key={i} src={u} />
           ))}
-          {more > 0 && (
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-border bg-bg-elevated text-lg font-semibold text-text-secondary">
-              +{more}
-            </div>
-          )}
+          {more > 0 && <MediaTile count={more} />}
         </div>
 
         <div className="flex w-full gap-2 pt-1">

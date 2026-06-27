@@ -94,9 +94,9 @@ interface ToolsSidebarProps {
   onCropRatioChange?: (lock: [number, number] | null) => void;
   toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
-  // Paint sub-mode (paint vs blur brush)
-  brushMode?: "paint" | "blur" | "pen";
-  onBrushModeChange?: (mode: "paint" | "blur" | "pen") => void;
+  // Paint sub-mode (paint / blur / pen / eraser)
+  brushMode?: "paint" | "blur" | "pen" | "eraser";
+  onBrushModeChange?: (mode: "paint" | "blur" | "pen" | "eraser") => void;
   // Effects sub-mode + color picker
   effectsMode?: EffectsMode;
   onEffectsModeChange?: (mode: EffectsMode) => void;

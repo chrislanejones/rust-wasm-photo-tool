@@ -12,6 +12,7 @@ import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
 import { useDrawingTools } from "@/hooks/useDrawingTools";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
+import { useMoveLayerTool } from "@/hooks/useMoveLayerTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
 import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
@@ -216,7 +217,9 @@ export function AppShell() {
   // Item 2: Pan mode state
   const [isPanning, setIsPanning] = useState(false);
 
-  const [brushMode, setBrushMode] = useState<"paint" | "blur" | "pen">("paint");
+  const [brushMode, setBrushMode] = useState<
+    "paint" | "blur" | "pen" | "eraser"
+  >("paint");
   const [effectsMode, setEffectsMode] = useState<EffectsMode>("levels");
   const [colorPickerActive, setColorPickerActive] = useState(false);
   const [stampSubMode, setStampSubMode] = useState<"clone" | "red" | "emojis">("clone");
@@ -853,7 +856,9 @@ export function AppShell() {
   const effectiveBrushSize = (() => {
     switch (activeTool) {
       case "brush":
-        return brushMode === "blur" ? toolSettings.blurSize / 2 : toolSettings.brushSize / 2;
+        if (brushMode === "blur") return toolSettings.blurSize / 2;
+        if (brushMode === "eraser") return toolSettings.eraserSize / 2;
+        return toolSettings.brushSize / 2;
       case "stamp":
         if (stampSubMode === "emojis") return (toolSettings.emojiSize * 1.2) / 2;
         return stampSettings.brushSize;
@@ -1209,6 +1214,25 @@ export function AppShell() {
     syncState: stamp.syncState,
   });
 
+  // Eraser (Paint → Eraser sub-mode): same hook, erase variant — scrubs the
+  // active layer's alpha via Rust's erase_down/move/up.
+  const eraserTool = usePaintTool({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    settings: toolSettings,
+    flushToCanvas: stamp.flushToCanvas,
+    syncState: stamp.syncState,
+    erase: true,
+  });
+
+  // Move tool (the repurposed "arrow" slot): drag the active layer's content.
+  const moveLayerTool = useMoveLayerTool({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    flushToCanvas: stamp.flushToCanvas,
+    syncState: stamp.syncState,
+  });
+
   const textTool = useTextTool({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -1408,7 +1432,14 @@ export function AppShell() {
       }
       return idle;
     }
-    if (["arrow", "shapes", "crop"].includes(activeTool))
+    if (activeTool === "arrow")
+      return {
+        ...stamp,
+        onMouseDown: moveLayerTool.onMouseDown as typeof stamp.onMouseDown,
+        onMouseMove: moveLayerTool.onMouseMove as typeof stamp.onMouseMove,
+        onMouseUp: moveLayerTool.onMouseUp as typeof stamp.onMouseUp,
+      };
+    if (["shapes", "crop"].includes(activeTool))
       return {
         ...stamp,
         onMouseDown: drawingTools.onMouseDown as typeof stamp.onMouseDown,
@@ -1424,6 +1455,16 @@ export function AppShell() {
           onMouseUp: blurUp,
         };
       }
+      if (brushMode === "eraser") {
+        return {
+          ...stamp,
+          onMouseDown: eraserTool.onMouseDown as typeof stamp.onMouseDown,
+          onMouseMove: eraserTool.onMouseMove as typeof stamp.onMouseMove,
+          onMouseUp: eraserTool.onMouseUp as typeof stamp.onMouseUp,
+        };
+      }
+      // "pen" mode draws via the PenOverlay; the canvas itself uses the paint
+      // handlers (harmless when the overlay is capturing).
       return {
         ...stamp,
         onMouseDown: paintTool.onMouseDown as typeof stamp.onMouseDown,
@@ -1974,6 +2015,8 @@ export function AppShell() {
           setToolSettings((p) => ({ ...p, brushSize: clamp(p.brushSize + step, 1, 50) }));
         } else if (brushMode === "blur") {
           setToolSettings((p) => ({ ...p, blurSize: clamp(p.blurSize + step, 4, 128) }));
+        } else if (brushMode === "eraser") {
+          setToolSettings((p) => ({ ...p, eraserSize: clamp(p.eraserSize + step, 1, 100) }));
         }
         // pen mode draws vector paths — no brush size
       } else if (activeTool === "stamp") {
@@ -2784,6 +2827,7 @@ export function AppShell() {
             onFlattenAll={stamp.flattenAll}
             getHistogram={getHistogram}
             histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}`}
+            histogramPhotoKey={activePhotoId ?? ""}
           />
         )}
       </AnimatePresence>

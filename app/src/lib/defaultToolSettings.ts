@@ -15,7 +15,11 @@ export const defaultToolSettings: ToolSettings = {
   fillBlock: 16,
   brushColor: "#ef4444",
   brushOpacity: 100,
-  paintStabilizer: "off", // off by default
+  brushHardness: 80,
+  paintStabilizer: "off", // off by default (shared with the eraser)
+  eraserSize: 24,
+  eraserOpacity: 100,
+  eraserHardness: 70,
   fontSize: 24,
   fontFamily: "sans-serif",
   fontWeight: "normal",

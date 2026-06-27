@@ -1,12 +1,7 @@
-import { useState } from "react";
-import { Crown, User, UserX, Loader2 } from "lucide-react";
-import { useMutation } from "convex/react";
-import { LargeButton } from "@/components/ui/large-button";
+import { Crown, User, UserX } from "lucide-react";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
-import { toast } from "@/components/ui/sonner";
 import type { UserMode } from "@/components/StatusBar";
 import { TIERS } from "@/lib/tiers";
-import { api } from "../../../convex/_generated/api";
 
 /**
  * Super User settings pane — the account-tier override (was the Alt+L dialog).
@@ -54,40 +49,15 @@ const TEST_EMAIL = (import.meta.env.VITE_DEV_TEST_EMAIL as string | undefined) ?
 const TEST_PASSWORD =
   (import.meta.env.VITE_DEV_TEST_PASSWORD as string | undefined) ?? "";
 
-export function SuperUserPane({ mode, overridden, onSelect, onReset }: SuperUserControls) {
-  const setMyTier = useMutation(api.users.setMyTier);
-  const [granting, setGranting] = useState(false);
-
-  // "Apply" = grant the REAL Convex tier (admin-gated server-side) so AI can be
-  // tested for real — the tier toggle above is only a client-side override.
-  const applyToAccount = async () => {
-    setGranting(true);
-    const tier = mode === "paid" ? "pro" : "free";
-    try {
-      await setMyTier({ tier });
-      toast.success(
-        `Your account is now ${tier} — AI ${tier === "pro" ? "unlocked" : "locked"}.`,
-      );
-    } catch (e) {
-      toast.error(
-        e instanceof Error && /authenticated|authorized/i.test(e.message)
-          ? "Sign in as the admin account first, then Apply."
-          : e instanceof Error
-            ? e.message
-            : "Couldn't apply tier.",
-      );
-    } finally {
-      setGranting(false);
-    }
-  };
-
+export function SuperUserPane({ mode, onSelect }: SuperUserControls) {
   return (
     <div className="space-y-4">
       <div>
         <h3 className="text-sm font-semibold text-text-primary">Super User</h3>
         <p className="mt-1 text-xs leading-relaxed text-text-muted">
-          The toggle is a local UI override. <strong>Apply</strong> grants the
-          tier to your real account (admin only) so AI works for real.
+          The toggle is a local UI override. Use <strong>Apply</strong> in the
+          footer to grant the tier to your real account (admin only) so AI works
+          for real, or <strong>Restore Settings</strong> to clear the override.
         </p>
       </div>
 
@@ -130,32 +100,6 @@ export function SuperUserPane({ mode, overridden, onSelect, onReset }: SuperUser
             className="rounded-md border border-border bg-bg-elevated px-2 py-1.5 font-mono text-text-primary"
           />
         </label>
-      </div>
-
-      <div className="flex gap-2">
-        <LargeButton
-          className="flex-1"
-          onClick={applyToAccount}
-          disabled={granting}
-          title="Grant this tier to your REAL account (admin only)"
-        >
-          {granting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Crown className="h-4 w-4" />
-          )}
-          {granting
-            ? "Applying…"
-            : `Apply ${mode === "paid" ? "Paid" : "Free"} to account`}
-        </LargeButton>
-        <LargeButton
-          className="flex-1"
-          onClick={onReset}
-          disabled={!overridden}
-          title="Clear the local override; use the real auth mode"
-        >
-          Reset override
-        </LargeButton>
       </div>
     </div>
   );

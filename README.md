@@ -780,6 +780,17 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 7   | **Super User "Apply" grants a real tier** — the tier toggle was client-only, so the footer prefs-Apply was dead on that tab (removed it there). New **public, admin-gated** `users.setMyTier` (gated to the `ADMIN_EMAIL` Convex env var) lets the admin patch their **real** Convex tier from the pane → AI actually unlocks. Also re-deployed the drifted `auth.config` to dev (`convex dev --once`), fixing the `Not authenticated` AI errors for signed-in users | Complete |
 | 8   | **Docs & marketing** — README this summary; Trail Log **v0.9.29** | Complete |
 
+## v4.8 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Eraser tool + configurable brush hardness (Rust)** — the Paint tool's sub-modes are now **Paint · Blur · Pen · Eraser**. New Rust `erase_down/move/up` reuse the whole paint stroke engine (soft dabs, max-coverage so a stroke holds its true opacity, lazy-mouse stabilizer) but **scrub the active layer's alpha toward transparent** — keeping the base RGB so a partial erase fades out with no colour fringe — via an `erase` branch in `recomposite_stroke_bbox`. The brush dab's edge **Hardness** (0–100%) is now a real control (was a hardcoded 0.7) read by `accumulate_dab`, shared by paint + eraser. New `ToolSettings`: `brushHardness`, `eraserSize/Opacity/Hardness`; `usePaintTool` gained an `erase` flag. WASM rebuilt; `stamp_tool.d.ts` shadow hand-synced | Complete |
+| 2   | **Histogram falls down when you cycle photos** — switching to another photo now drops the histogram bars to the baseline and holds them down for as long as the new photo takes to composite, then they rise into its shape; an in-place edit of the same photo keeps the smooth morph (no collapse-per-brush-stroke). Threaded a `photoKey` into `HistogramView` so a photo switch is distinguished from an edit | Complete |
+| 3   | **Selection marker → Rust + drift fix** — the magic-wand marker is now a Rust-traced **marching-ants–style dashed outline** (2-tone black/white boundary + a faint interior tint) instead of a flat blue fill that buried the pixels (`selection_overlay_rgba`). Fixed the marker drifting away on zoom/pan: it used a one-shot `getBoundingClientRect()` under `position:fixed`; `SelectionOverlay` now rides the same `translate(pan) scale(zoom)` transform as the canvas (mirrors the checkerboard) so it stays pinned to the pixels | Complete |
+| 4   | **Transparency checkerboard always behind the image** — the backdrop is no longer gated on `hasTransparency`; it's always rendered behind the canvas (an opaque image fully covers it, so it costs nothing) so eraser strokes, deleted selections, and PNG alpha read as an "empty grid" the instant they appear instead of risking a black flash. Standard editor behaviour: the checkerboard shows ONLY through the image's transparent regions | Complete |
+| 5   | **Batch commit** — this commit also lands accumulated in-progress work from prior sessions (Batch-editor settings, the Subscription/Settings theme sweep, Arrow settings, Super-User / User-menu, the move-layer tool, `MediaTile`). Whole tree compiles: `tsc --noEmit` clean, Rust builds, 26 Rust tests pass | Complete |
+| 6   | **Docs & marketing** — README this summary; Trail Log **v0.9.30** | Complete |
+
 ## License
 
 MIT
