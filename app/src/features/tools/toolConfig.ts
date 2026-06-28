@@ -60,7 +60,7 @@ export const TOOLS: ToolDefinition[] = [
     // Arrow-drawing lives under Shapes → Arrows.
     id: "arrow",
     label: "Layer Settings",
-    tooltipTitle: "Layer Settings (Move · Select)",
+    tooltipTitle: "Layer Settings",
     description: "Move the active layer & select regions",
     icon: Layers,
     gradient: "from-emerald-500 to-teal-500",

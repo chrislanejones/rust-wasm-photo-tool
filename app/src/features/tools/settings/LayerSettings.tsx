@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
 import { SizeSlider } from "@/components/SizeSlider";
+import { CanvasResize } from "@/components/CanvasResize";
 
 /** Controls for the Selection Marker (magic-wand) — lives in Layer Settings. */
 export interface SelectionControls {
@@ -29,6 +30,11 @@ interface LayerSettingsProps {
   onToggleMove: () => void;
   /** Selection Marker controls. */
   selection: SelectionControls;
+  /** Canvas (image) dimensions + resize apply — the backdrop is the canvas, so
+   *  its resizer lives here. */
+  canvasWidth: number;
+  canvasHeight: number;
+  onResizeCanvas: (w: number, h: number) => void;
 }
 
 /**
@@ -42,6 +48,9 @@ export function LayerSettings({
   moveActive,
   onToggleMove,
   selection,
+  canvasWidth,
+  canvasHeight,
+  onResizeCanvas,
 }: LayerSettingsProps) {
   return (
     <div className="space-y-6 -mt-2">
@@ -113,6 +122,14 @@ export function LayerSettings({
           colors. Alt+A selects all, Alt+D deselects.
         </p>
       </div>
+
+      {/* ── Canvas size (the checkerboard backdrop is the canvas) ─────────── */}
+      <CanvasResize
+        width={canvasWidth}
+        height={canvasHeight}
+        disabled={disabled}
+        onApply={onResizeCanvas}
+      />
     </div>
   );
 }

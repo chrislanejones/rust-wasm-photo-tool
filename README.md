@@ -812,6 +812,18 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 5   | **Ctrl+\ easter egg** — a confetti popper dialog celebrating the month's shipped features (67 in June, 90 lifetime, 24 releases) with highlighted feature icons | Complete |
 | 6   | **Docs** — README this summary; Trail Log **v0.9.32** | Complete |
 
+## v5.1 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Compact "master bar" (≤1000px)** — snapping the window narrow (or opening on a tablet) folds the whole UI into one left **master bar**: a **New** action + **Tools / Gallery / Review** tabs that swap its content, with Settings + account in the top row. The horizontal top bar is hidden and the canvas fills the rest. Lives in `components/master-bar/` and is **lazy-loaded** — desktop sessions never download it; the chunk arrives the first time you go narrow. Driven by `useBreakpoint().dock` | Complete |
+| 2   | **Vertical gallery** — the Gallery tab is the full `GalleryBar` inverted: **two square thumbnails per row**, **up/down arrows** instead of a scrollbar, all the same select / export / duplicate / delete controls, and the photo-count readout pinned to the bottom. A `vertical` prop flips strip orientation, scroll axis, and positioning; the image is an in-flow `aspect-ratio:1; object-fit:cover` square so rows stay uniform and never overlap | Complete |
+| 3   | **"Use compact version" notice** — a one-time dialog (shared Dialog primitives) greets the narrow layout, re-arming if the window grows wide then snaps narrow again | Complete |
+| 4   | **Settings → Import / Export** — the Export tab is renamed **Import / Export** and lists disabled **Import .ora** / **Export .ora** buttons next to the existing options | Complete |
+| 5   | **Shared dimension control** — Resize and the new Layer-Settings **Canvas Size** reuse one `DimensionFields` (Scale / W×H / aspect-lock) component, so resizing the image vs the canvas behave identically (canvas resize runs through Rust) | Complete |
+| 6   | **Fixes** — Selection-marker cursor no longer shows the move icon; the backdrop checkerboard now extends exactly **10px** past the image and follows the theme; added a **WASM panic hook** (`console_error_panic_hook`) so Rust panics print a real message instead of "unreachable" | Complete |
+| 7   | **Docs** — README this summary; Trail Log **v0.9.33** | Complete |
+
 ## License
 
 MIT

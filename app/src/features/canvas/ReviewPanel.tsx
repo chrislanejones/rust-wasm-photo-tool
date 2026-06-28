@@ -96,6 +96,9 @@ interface Props {
   /** Active photo id — when it changes the histogram bars fall down, then rise
    *  back up once the newly-selected photo has composited. */
   histogramPhotoKey: string;
+  /** Embedded mode: render as a plain flex column (no fixed `.review-panel`
+   *  chrome / slide animation) so it can fill the compact master bar. */
+  embedded?: boolean;
 }
 
 const DeleteGlyph = () => (
@@ -138,6 +141,7 @@ export function ReviewPanel({
   getHistogram,
   histogramSignature,
   histogramPhotoKey,
+  embedded = false,
 }: Props) {
   // Which body sections are open. The body splits its height evenly among the
   // open sections (1 → full, 2 → halves, 3 → thirds), each with its own header
@@ -184,12 +188,17 @@ export function ReviewPanel({
 
   return (
     <motion.aside
-      variants={slideFromRight}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+      variants={embedded ? undefined : slideFromRight}
+      initial={embedded ? undefined : "hidden"}
+      animate={embedded ? undefined : "visible"}
+      exit={embedded ? undefined : "exit"}
       aria-label="Review"
-      className="review-panel"
+      className={
+        embedded
+          ? // Compact master-bar content box: flush below the 48px chrome.
+            "fixed left-2 top-[56px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
+          : "review-panel"
+      }
     >
       {/* No title/close — the four section toggles below are the header. */}
 

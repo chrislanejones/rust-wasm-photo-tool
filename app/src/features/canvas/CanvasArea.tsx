@@ -83,6 +83,8 @@ interface Props {
   colorPickerActive?: boolean;
   /** Selection Marker (magic-wand): when active, a canvas click flood-selects. */
   selectionActive?: boolean;
+  /** Layer Settings → Move toggle on — drives the canvas cursor (move vs select). */
+  layerMoveActive?: boolean;
   onSelectionClick?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   /** Canvas-sized RGBA selection overlay (from Rust), drawn over the image. */
   selectionMask?: Uint8Array | null;
@@ -249,14 +251,24 @@ function handCirclePath(
   return d.join(" ");
 }
 
-function getCursorForTool(tool?: string, isPanning?: boolean, colorPickerActive?: boolean): string | undefined {
+function getCursorForTool(
+  tool?: string,
+  isPanning?: boolean,
+  colorPickerActive?: boolean,
+  selectionActive?: boolean,
+  moveActive?: boolean,
+): string | undefined {
   if (isPanning) return "grab";
   if (colorPickerActive && tool === "effects") return "crosshair";
   switch (tool) {
     case "text":
       return "text";
-    case "arrow": // repurposed slot → Move tool
-      return "move";
+    case "arrow":
+      // Layer Settings: cursor follows the active sub-mode (neither on → default,
+      // so it never looks stuck in Move while you're trying to select).
+      if (selectionActive) return "crosshair";
+      if (moveActive) return "move";
+      return undefined;
     case "crop":
     case "shapes":
       return "crosshair";
@@ -296,6 +308,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onCropChange,
       colorPickerActive,
       selectionActive,
+      layerMoveActive,
       onSelectionClick,
       selectionMask,
       selectionWidth,
@@ -625,7 +638,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
     const zoom = state.zoom;
     const isTextTool = activeTool === "text";
-    const cursor = getCursorForTool(activeTool, isPanning, colorPickerActive);
+    const cursor = getCursorForTool(
+      activeTool,
+      isPanning,
+      colorPickerActive,
+      selectionActive,
+      layerMoveActive,
+    );
     const panCursor = isDraggingPan ? "grabbing" : cursor;
 
     // Combined mouse handlers — pan takes priority when spacebar is held
@@ -647,19 +666,20 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         className="canvas-wrapper"
         ref={containerRef as React.RefObject<HTMLDivElement>}
       >
-        {/* Transparency checkerboard, sized + transformed to sit exactly behind
-            the image. Always rendered (an opaque image fully covers it, so it
-            costs nothing) so any transparent pixels — PNG alpha, a deleted
-            selection, or an eraser stroke — immediately read as "empty" instead
-            of black. This is the standard backdrop: it shows ONLY through the
-            image's transparent regions. */}
+        {/* Transparency checkerboard — the image's "canvas" backdrop. Sized 10px
+            larger than the image on every side (a tidy mat, not the whole desk)
+            and centered behind it; theme-aware (light grid in light mode, dark in
+            dark mode via `.checkerboard-canvas`). Always rendered (an opaque image
+            covers all but the 10px frame) so transparent pixels — PNG alpha, a
+            deleted selection, an eraser stroke — read as "empty" instead of black. */}
         {imgW > 0 && imgH > 0 && (
           <div
-            className="checkerboard"
+            className="checkerboard-canvas"
             style={{
               position: "absolute",
-              width: imgW,
-              height: imgH,
+              width: imgW + 10,
+              height: imgH + 10,
+              borderRadius: 2,
               transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
               transformOrigin: "center center",
               pointerEvents: "none",

@@ -110,7 +110,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
     { id: "appearance", label: "Appearance", icon: Palette },
     { id: "security", label: "Security", icon: Shield },
     { id: "rulers", label: "Rulers & Grids", icon: Ruler },
-    { id: "export", label: "Export", icon: Package },
+    { id: "export", label: "Import / Export", icon: Package },
     { id: "storage", label: "S3 / Image Hosting", icon: Cloud },
     { id: "billing", label: "Plan & Billing", icon: CreditCard },
     { id: "aiusage", label: "AI Usage", icon: Gauge },

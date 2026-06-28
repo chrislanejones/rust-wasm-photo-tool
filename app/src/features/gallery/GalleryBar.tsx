@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { slideFromBottom, panelSpacingTransition, instantTransition, thumbEnter } from "@/lib/animations";
-import { Check, Zap, ChevronLeft, ChevronRight, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
+import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter } from "@/lib/animations";
+import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LargeButton } from "@/components/ui/large-button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
@@ -60,6 +60,10 @@ interface Props {
   onToggleSelect: (id: string) => void;
   /** Clear the entire selection (the "Unselect" action). */
   onClearSelection?: () => void;
+  /** Vertical mode: the same gallery inverted for the compact master bar —
+   *  self-positions as the master-bar content box, stacks thumbs in a column,
+   *  and scrolls with up/down arrows (no scrollbar). */
+  vertical?: boolean;
 }
 
 interface ThumbProps {
@@ -77,11 +81,13 @@ interface ThumbProps {
   selectionActive: boolean;
   /** Toggle this thumb's checkbox. */
   onToggleSelect: () => void;
+  /** Vertical gallery: fill the grid column (square) instead of the fixed 96px. */
+  vertical?: boolean;
 }
 
 const TRANSPARENT_TYPES = new Set(["image/png", "image/webp", "image/svg+xml"]);
 
-function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect }: ThumbProps) {
+function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, vertical }: ThumbProps) {
   const [loading, setLoading] = useState(true);
   const [thumbUrl, setThumbUrl] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
@@ -114,7 +120,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           tabIndex={0}
           aria-label={`Select photo ${entry.name}`}
           aria-pressed={isActive}
-          className={`photo-thumb group ${isActive ? "active" : ""} ${selected ? "selected" : ""} relative`}
+          className={`photo-thumb group ${isActive ? "active" : ""} ${selected ? "selected" : ""} ${vertical ? "photo-thumb-grid" : ""} relative`}
           onClick={onSelect}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -122,7 +128,8 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
               onSelect();
             }
           }}
-          {...thumbEnter(index)}
+          {...(vertical ? {} : thumbEnter(index))}
+          style={vertical ? { width: "100%", height: "auto" } : undefined}
         >
       {maybeTransparent && (
         <div className="absolute inset-0 checkerboard rounded-lg" />
@@ -238,6 +245,85 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
   );
 }
 
+/** The gallery count readout — "Selected: # of #" while selecting, otherwise
+ *  "# of # — # max (i)". Rendered in the header (horizontal) or as a footer
+ *  (vertical / master bar). */
+function GalleryCount({
+  selectionActive,
+  selectedCount,
+  total,
+  maxPhotos,
+}: {
+  selectionActive: boolean;
+  selectedCount: number;
+  total: number;
+  maxPhotos?: number;
+}) {
+  return (
+    <h2 className="flex items-center gap-2 text-xs font-semibold">
+      <span className="flex items-center gap-1 text-xs font-normal text-text-muted">
+        {selectionActive ? (
+          <>
+            <span>Selected:</span>
+            <TinyNumberBox>{selectedCount}</TinyNumberBox>
+            <span>of</span>
+            <TinyNumberBox>{total}</TinyNumberBox>
+          </>
+        ) : (
+          <>
+            <TinyNumberBox>{total}</TinyNumberBox>
+            <span>of</span>
+            <TinyNumberBox>{total}</TinyNumberBox>
+            {maxPhotos != null && (
+              <>
+                <span>—</span>
+                <TinyNumberBox>{maxPhotos}</TinyNumberBox>
+                <span>max</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Why this limit?"
+                      className="text-text-muted hover:text-text-primary transition-colors"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="font-semibold mb-1.5">
+                      Gallery photos per session
+                    </p>
+                    <ul className="space-y-1 text-xs">
+                      <li className="flex items-center justify-between gap-6">
+                        <span>Logged out</span>
+                        <span className="font-mono tabular-nums">
+                          {TIERS.demo.galleryLimit}
+                        </span>
+                      </li>
+                      <li className="flex items-center justify-between gap-6">
+                        <span>Logged in</span>
+                        <span className="font-mono tabular-nums">
+                          {TIERS.loggedIn.galleryLimit}
+                        </span>
+                      </li>
+                      <li className="flex items-center justify-between gap-6">
+                        <span>Paid · {TIERS.paid.tag}</span>
+                        <span className="font-mono tabular-nums">
+                          {TIERS.paid.galleryLimit}
+                        </span>
+                      </li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </>
+        )}
+      </span>
+    </h2>
+  );
+}
+
 export function GalleryBar({
   photos,
   activeId,
@@ -258,6 +344,7 @@ export function GalleryBar({
   selectedIds,
   onToggleSelect,
   onClearSelection,
+  vertical = false,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
   const selectionActive = selectedIds.size > 0;
@@ -272,9 +359,14 @@ export function GalleryBar({
   const updateScrollState = useCallback(() => {
     const el = stripRef.current;
     if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 1);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
-  }, []);
+    if (vertical) {
+      setCanScrollLeft(el.scrollTop > 1);
+      setCanScrollRight(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+    } else {
+      setCanScrollLeft(el.scrollLeft > 1);
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    }
+  }, [vertical]);
 
   useEffect(() => {
     if (!activeId || !stripRef.current) return;
@@ -299,89 +391,63 @@ export function GalleryBar({
 
   return (
     <motion.div
-      variants={slideFromBottom}
+      variants={vertical ? slideFromLeft : slideFromBottom}
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="fixed left-0 right-0 bottom-[var(--panel-bottom)] z-[var(--z-panel)] pointer-events-none"
+      className={
+        vertical
+          ? // Master-bar content box: flush below the 48px chrome (top 56).
+            "fixed left-2 top-[56px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] flex w-[252px] flex-col overflow-hidden rounded-b-xl border border-t-0 border-border bg-bg-secondary"
+          : "fixed left-0 right-0 bottom-[var(--panel-bottom)] z-[var(--z-panel)] pointer-events-none"
+      }
+      style={vertical ? { boxShadow: "var(--shadow-panel)" } : undefined}
     >
       <motion.div
-        animate={{
-          marginLeft: !narrow && showTools ? PANEL_OPEN_GUTTER : 12,
-          marginRight: !narrow && showHistory ? PANEL_OPEN_GUTTER : 12,
-        }}
+        animate={
+          vertical
+            ? undefined
+            : {
+                marginLeft: !narrow && showTools ? PANEL_OPEN_GUTTER : 12,
+                marginRight: !narrow && showHistory ? PANEL_OPEN_GUTTER : 12,
+              }
+        }
         transition={reduceMotion ? instantTransition : panelSpacingTransition}
-        style={{ position: "relative" }}
-        className="pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
+        style={vertical ? undefined : { position: "relative" }}
+        className={
+          vertical
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
+        }
       >
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="flex items-center gap-2 text-xs font-semibold">
-              {/* No "Gallery" icon/title — just the count + the action buttons. */}
-              <span className="flex items-center gap-1 text-xs font-normal text-text-muted">
-                {selectionActive ? (
-                  // While selecting: "Selected: <selected> of <total>".
-                  <>
-                    <span>Selected:</span>
-                    <TinyNumberBox>{selectedIds.size}</TinyNumberBox>
-                    <span>of</span>
-                    <TinyNumberBox>{photos.length}</TinyNumberBox>
-                  </>
-                ) : (
-                  // Otherwise: "<total> of <total> — <cap> max  (i)" — mirrors
-                  // the "Selected: # of #" shape for visual consistency.
-                  <>
-                    <TinyNumberBox>{photos.length}</TinyNumberBox>
-                    <span>of</span>
-                    <TinyNumberBox>{photos.length}</TinyNumberBox>
-                    {maxPhotos != null && (
-                      <>
-                        <span>—</span>
-                        <TinyNumberBox>{maxPhotos}</TinyNumberBox>
-                        <span>max</span>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label="Why this limit?"
-                              className="text-text-muted hover:text-text-primary transition-colors"
-                            >
-                              <Info className="h-3.5 w-3.5" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            <p className="font-semibold mb-1.5">
-                              Gallery photos per session
-                            </p>
-                            <ul className="space-y-1 text-xs">
-                              <li className="flex items-center justify-between gap-6">
-                                <span>Logged out</span>
-                                <span className="font-mono tabular-nums">
-                                  {TIERS.demo.galleryLimit}
-                                </span>
-                              </li>
-                              <li className="flex items-center justify-between gap-6">
-                                <span>Logged in</span>
-                                <span className="font-mono tabular-nums">
-                                  {TIERS.loggedIn.galleryLimit}
-                                </span>
-                              </li>
-                              <li className="flex items-center justify-between gap-6">
-                                <span>Paid · {TIERS.paid.tag}</span>
-                                <span className="font-mono tabular-nums">
-                                  {TIERS.paid.galleryLimit}
-                                </span>
-                              </li>
-                            </ul>
-                          </TooltipContent>
-                        </Tooltip>
-                      </>
-                    )}
-                  </>
-                )}
-              </span>
-            </h2>
-            <div className="flex items-center gap-1">
+        <div className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "p-4"}>
+          <div
+            className={
+              vertical
+                ? // Divider + padding so the photos never crowd the count/actions
+                  // (the header grows when a selection appears).
+                  "mb-3 flex flex-col gap-2 border-b border-border pb-3"
+                : "flex items-center justify-between mb-3"
+            }
+          >
+            {/* Horizontal: count sits left of the actions. Vertical: it moves
+                to a footer at the bottom of the bar (rendered below). */}
+            {!vertical && (
+              <GalleryCount
+                selectionActive={selectionActive}
+                selectedCount={selectedIds.size}
+                total={photos.length}
+                maxPhotos={maxPhotos}
+              />
+            )}
+            <div
+              className={
+                vertical
+                  ? // Even 2-up grid of full-width action buttons (no ragged wrap).
+                    "grid grid-cols-2 gap-1.5 [&>button]:w-full"
+                  : "flex items-center gap-1"
+              }
+            >
               {selectionActive && onExportSelected && (
                 <LargeButton
                   onClick={onExportSelected}
@@ -435,19 +501,43 @@ export function GalleryBar({
             </div>
           </div>
 
-          <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
+          <div
+            className={
+              vertical
+                ? // minmax(0,1fr) lets the strip row shrink below its content so
+                  //  it scrolls (instead of squashing the tiles) when the header
+                  //  grows with selection actions.
+                  "grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 justify-items-center"
+                : "grid grid-cols-[auto_1fr_auto] gap-2 items-center"
+            }
+          >
             <button
-              onClick={() => stripRef.current?.scrollBy({ left: -220, behavior: "smooth" })}
+              onClick={() =>
+                stripRef.current?.scrollBy(
+                  vertical
+                    ? { top: -220, behavior: "smooth" }
+                    : { left: -220, behavior: "smooth" },
+                )
+              }
               disabled={!canScrollLeft}
               className="btn-icon flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label="Scroll left"
+              aria-label={vertical ? "Scroll up" : "Scroll left"}
             >
-              <ChevronLeft className="h-4 w-4" />
+              {vertical ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
             </button>
 
             <div
               ref={stripRef}
-              className="flex gap-2 overflow-x-auto py-1.5 pl-2"
+              className={
+                vertical
+                  ? // Two thumbs per row, with breathing room between tiles + above.
+                    "grid w-full grid-cols-2 gap-x-3 gap-y-4 overflow-y-auto px-2 pt-3 pb-3"
+                  : "flex gap-2 overflow-x-auto py-1.5 pl-2"
+              }
               style={{ scrollbarWidth: "none" }}
             >
               {photos.map((entry, i) => (
@@ -464,19 +554,42 @@ export function GalleryBar({
                   selected={selectedIds.has(entry.id)}
                   selectionActive={selectionActive}
                   onToggleSelect={() => onToggleSelect(entry.id)}
+                  vertical={vertical}
                 />
               ))}
             </div>
 
             <button
-              onClick={() => stripRef.current?.scrollBy({ left: 220, behavior: "smooth" })}
+              onClick={() =>
+                stripRef.current?.scrollBy(
+                  vertical
+                    ? { top: 220, behavior: "smooth" }
+                    : { left: 220, behavior: "smooth" },
+                )
+              }
               disabled={!canScrollRight}
               className="btn-icon flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label="Scroll right"
+              aria-label={vertical ? "Scroll down" : "Scroll right"}
             >
-              <ChevronRight className="h-4 w-4" />
+              {vertical ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
             </button>
           </div>
+
+          {/* Vertical (master bar): the count readout is pinned to the bottom. */}
+          {vertical && (
+            <div className="mt-3 flex justify-center border-t border-border pt-3">
+              <GalleryCount
+                selectionActive={selectionActive}
+                selectedCount={selectedIds.size}
+                total={photos.length}
+                maxPhotos={maxPhotos}
+              />
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>

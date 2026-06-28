@@ -1277,6 +1277,27 @@ input[type="range"].slider-overlay::-moz-range-thumb {
   transform: scale(1.04);
 }
 
+/* Compact vertical gallery: tiles fill their grid column as uniform squares.
+   The square is carried by the IMAGE (in-flow, aspect-ratio 1 + cover), NOT by
+   an absolute image — an absolute image leaves the tile with no in-flow content,
+   so the grid sizes its row to ~0 and the square then spills onto the next row
+   (overlapping tiles). Hover zoom is off so a tile can't overflow its column. */
+.photo-thumb.photo-thumb-grid {
+  width: 100%;
+  height: auto;
+}
+.photo-thumb.photo-thumb-grid,
+.photo-thumb.photo-thumb-grid:hover {
+  transform: none;
+}
+.photo-thumb.photo-thumb-grid img {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
 .photo-thumb:hover:not(.active) {
   border-color: transparent;
   box-shadow: 0 0 0 2px var(--text-muted);

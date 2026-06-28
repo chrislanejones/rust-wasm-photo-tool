@@ -6,6 +6,9 @@ export interface Breakpoint {
   width: number;
   /** < BP_COMPACT — top bar collapses to icon-only and drops Undo/Redo. */
   compact: boolean;
+  /** ≤ BP_COMPACT (~1000px, snapped half-screen) — the dock layout takes over
+   *  (left icon rail + sliding panel); we nudge toward split-screen/tablet. */
+  dock: boolean;
   /** < BP_NARROW — side panels float as overlay drawers (don't push the canvas). */
   narrow: boolean;
   /** < BP_MIN — window too small to edit comfortably; show the notice. */
@@ -39,6 +42,7 @@ export function useBreakpoint(): Breakpoint {
   return {
     width,
     compact: width < BP_COMPACT,
+    dock: width <= BP_COMPACT,
     narrow: width < BP_NARROW,
     tooSmall: width < BP_MIN,
   };

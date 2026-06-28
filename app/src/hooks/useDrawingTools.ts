@@ -517,6 +517,25 @@ export function useDrawingTools({
     return () => window.removeEventListener("keydown", onKey);
   }, [editState, commitEdit, cancelEdit]);
 
+  // Escape releases a pending crop selection (Edit & Transform tool) without
+  // applying it — bound only while a crop rect actually exists.
+  useEffect(() => {
+    if (activeTool !== "crop" || !cropSelection) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setCropSelection(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeTool, cropSelection]);
+
   // Pointerdown anywhere outside the overlay commits, except:
   //   • the overlay itself (handles/body — `[data-draw-overlay]`),
   //   • the shapes/arrows settings panel (`[data-draw-panel]`) so stroke and

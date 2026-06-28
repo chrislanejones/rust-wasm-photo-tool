@@ -1,8 +1,9 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SlidersHorizontal, Zap, Scaling, ChevronDown, Lock, Unlock } from "lucide-react";
+import { SlidersHorizontal, Zap, Scaling, ChevronDown } from "lucide-react";
 import { LargeButton } from "@/components/ui/large-button";
+import { DimensionFields } from "@/components/DimensionFields";
 import { SizeSlider } from "@/components/SizeSlider";
 import { TabGroup } from "@/components/TabGroup";
 import {
@@ -259,58 +260,17 @@ export function ResizeSettings({
               exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
               className="space-y-3"
             >
-              {/* ── Scale slider — proportional percent of the original dimensions ── */}
-              <SizeSlider
-                label="Scale"
-                value={widthPercent}
-                onChange={handlePercentChange}
-                min={1}
-                max={100}
-                unit="%"
+              <DimensionFields
+                width={width}
+                height={height}
+                widthPercent={widthPercent}
+                lockAspect={lockAspect}
                 disabled={disabled}
+                onWidthChange={handleWidthChange}
+                onHeightChange={handleHeightChange}
+                onPercentChange={handlePercentChange}
+                onToggleLock={() => setLockAspect((v) => !v)}
               />
-
-              {/* ── Dimensions: width / height / lock-aspect on one row ── */}
-              <div className="flex items-end gap-2">
-                <div className="flex flex-1 flex-col gap-0.5">
-                  <span className="text-xs text-text-secondary">width</span>
-                  <input
-                    type="number"
-                    value={width}
-                    onChange={(e) => handleWidthChange(e.target.value)}
-                    min={1}
-                    disabled={disabled}
-                    className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
-                  />
-                </div>
-                <div className="flex flex-1 flex-col gap-0.5">
-                  <span className="text-xs text-text-secondary">height</span>
-                  <input
-                    type="number"
-                    value={height}
-                    onChange={(e) => handleHeightChange(e.target.value)}
-                    min={1}
-                    disabled={disabled}
-                    className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
-                  />
-                </div>
-                <button
-                  onClick={() => setLockAspect((v) => !v)}
-                  title={lockAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
-                  aria-pressed={lockAspect}
-                  className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                    lockAspect
-                      ? "bg-theme-primary text-theme-primary-foreground border-theme-primary"
-                      : "bg-theme-muted/20 hover:bg-theme-muted/30 text-theme-muted-foreground border-theme-border"
-                  }`}
-                >
-                  {lockAspect ? (
-                    <Lock className="h-4 w-4" />
-                  ) : (
-                    <Unlock className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
             </motion.div>
           )}
 

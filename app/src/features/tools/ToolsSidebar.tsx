@@ -55,6 +55,12 @@ interface ToolsSidebarProps {
   /** Move-layer toggle — Layer Settings tool. */
   moveActive?: boolean;
   onToggleMove?: () => void;
+  /** Canvas resizer (Layer Settings) — applies a Rust resize to W×H. */
+  onResizeCanvas?: (w: number, h: number) => void;
+  /** Embedded mode: render the inner content as a plain flex column (no fixed
+   *  positioning / panel chrome / slide animation) so it can fill the compact
+   *  master bar's content area instead of floating as its own panel. */
+  embedded?: boolean;
   /** Download button: exports the single photo, or opens the chooser dialog
    *  when the gallery holds more than one. */
   onExport: () => void;
@@ -144,6 +150,8 @@ export function ToolsSidebar({
   eraser,
   moveActive,
   onToggleMove,
+  onResizeCanvas,
+  embedded = false,
   onExport,
   canExport,
   photoCount,
@@ -204,16 +212,20 @@ export function ToolsSidebar({
 }: ToolsSidebarProps) {
   return (
     <motion.div
-      variants={slideFromLeft}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+      variants={embedded ? undefined : slideFromLeft}
+      initial={embedded ? undefined : "hidden"}
+      animate={embedded ? undefined : "visible"}
+      exit={embedded ? undefined : "exit"}
       role="region"
       aria-label="Tool options"
-      className="fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
-      style={{
-        boxShadow: "var(--shadow-panel)",
-      }}
+      className={
+        embedded
+          ? // Compact master-bar content box: flush below the chrome (top 56 =
+            // top-2 + 48px chrome), filling to the status bar.
+            "fixed left-2 top-[56px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
+          : "fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
+      }
+      style={embedded ? { boxShadow: "var(--shadow-panel)" } : { boxShadow: "var(--shadow-panel)" }}
     >
       {/* No title/close — the 10 tool icons are the only thing in the header. */}
       <div className="px-4 pt-3 pb-4 border-b border-border">
@@ -309,6 +321,9 @@ export function ToolsSidebar({
             moveActive={moveActive ?? false}
             onToggleMove={onToggleMove ?? (() => {})}
             selection={selection}
+            canvasWidth={imageWidth}
+            canvasHeight={imageHeight}
+            onResizeCanvas={onResizeCanvas ?? (() => {})}
           />
         )}
 

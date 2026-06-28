@@ -4,7 +4,7 @@
 //   Item 4: PgUp/PgDn gallery cycling
 //   Item 7: blur → effects rename, brightness/contrast in effects panel
 //   All other existing functionality preserved
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useStoreUser } from "@/hooks/useStoreUser";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
@@ -21,6 +21,17 @@ import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
 import { SmallWindowNotice } from "@/components/SmallWindowNotice";
+import { TabletVersionNotice } from "@/components/TabletVersionNotice";
+import { MASTER_BAR_WIDTH } from "@/components/master-bar/constants";
+// Code-split: the compact-mode master bar only loads the first time the window
+// goes ≤1000px, so desktop sessions never download its chunk.
+const MasterBar = lazy(() =>
+  import("@/components/master-bar/MasterBar").then((m) => ({
+    default: m.MasterBar,
+  })),
+);
+import { UserMenu } from "@/components/UserMenu";
+import { SubscriptionButton } from "@/components/SubscriptionButton";
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
@@ -748,12 +759,19 @@ export function AppShell() {
   // opens this (the "New" dialog) only if there's no prior session to resume.
   const [showUpload, setShowUpload] = useState(false);
   const [showTopBar, setShowTopBar] = useState(false);
+  // Compact master-bar active tab (≤1000px). Tools is the default view.
+  const [masterTab, setMasterTab] = useState<"tools" | "gallery" | "review">(
+    "tools",
+  );
   const [showTools, setShowTools] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   // Small-window notice: dismissed for this stretch of being too-small; reset
   // once the window grows back so it re-appears if they snap small again.
   const [smallNoticeDismissed, setSmallNoticeDismissed] = useState(false);
+  // "Use split screen / tablet version" nudge: dismissed for this stretch of
+  // being snapped narrow; re-armed once the window grows back wide.
+  const [tabletNoticeDismissed, setTabletNoticeDismissed] = useState(false);
   // Most-recently-opened side panel — narrow mode closes the *other* one.
   const lastPanelRef = useRef<"tools" | "history" | null>(null);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
@@ -779,6 +797,10 @@ export function AppShell() {
   useEffect(() => {
     if (!bp.tooSmall) setSmallNoticeDismissed(false);
   }, [bp.tooSmall]);
+  // Re-arm the split-screen/tablet nudge once the window leaves the dock range.
+  useEffect(() => {
+    if (!bp.dock) setTabletNoticeDismissed(false);
+  }, [bp.dock]);
   useEffect(() => {
     installConsoleCapture();
   }, []);
@@ -2333,7 +2355,7 @@ export function AppShell() {
           and click-to-closes it. Sits above the canvas (z 10) but below the top
           bar (30) / panels (40) so all chrome stays bright + interactive. */}
       <AnimatePresence>
-        {bp.narrow && (showTools || showHistory) && (
+        {bp.narrow && !bp.dock && (showTools || showHistory) && (
           <motion.div
             key="drawer-scrim"
             variants={fadeIn}
@@ -2353,6 +2375,15 @@ export function AppShell() {
       {bp.tooSmall && !smallNoticeDismissed && (
         <SmallWindowNotice onDismiss={() => setSmallNoticeDismissed(true)} />
       )}
+
+      {/* Snapped/narrow (≤ ~1000px, but not too-small): nudge toward the
+          split-screen / tablet version before the compact dock layout. */}
+      <TabletVersionNotice
+        open={bp.dock && !bp.tooSmall && !tabletNoticeDismissed}
+        onOpenChange={(o) => {
+          if (!o) setTabletNoticeDismissed(true);
+        }}
+      />
 
       {/* Cold start: one full-page surface. It's the splash (logo + spinner)
           while booting, then the spinner fades, the logo eases up, and EITHER
@@ -2623,8 +2654,29 @@ export function AppShell() {
         </DialogContent>
       </Dialog>
 
+      {/* Compact master bar (≤1000px): the entire top-bar chrome lives here as
+          a left column with Tools/Gallery/Review tabs; the horizontal TopBar is
+          hidden in this mode. Lazily loaded — Suspense sits outside
+          AnimatePresence so the slide-out still works once the chunk is in. */}
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {bp.dock && showTopBar && (
+            <MasterBar
+              activeTab={masterTab}
+              onTab={setMasterTab}
+              onNew={() => setShowUpload(true)}
+              newActive={showUpload}
+              settingsSlot={
+                <SubscriptionButton general={general} superUser={superUser} />
+              }
+              userSlot={<UserMenu />}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
+
       <AnimatePresence>
-        {showTopBar && (
+        {!bp.dock && showTopBar && (
           <TopBar
             zoom={stamp.state.zoom}
             onZoomIn={handleZoomIn}
@@ -2651,8 +2703,9 @@ export function AppShell() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showTools && (
+        {(bp.dock ? masterTab === "tools" : showTools) && (
           <ToolsSidebar
+            embedded={bp.dock}
             onClose={() => setShowTools(false)}
             activeTool={activeTool}
             onToolChange={(t) => { setActiveTool(t); }}
@@ -2706,6 +2759,7 @@ export function AppShell() {
             }}
             moveActive={moveActive}
             onToggleMove={handleToggleMove}
+            onResizeCanvas={(w, h) => void handleApplyCompression(w, h, 3)}
             eraser={{
               active: cropEraserActive,
               onToggle: () => setCropEraserActive((v) => !v),
@@ -2754,8 +2808,14 @@ export function AppShell() {
             aria-label="Image canvas"
             tabIndex={-1}
             animate={{
-              marginLeft: !bp.narrow && showTools ? PANEL_OPEN_GUTTER : 0,
-              marginRight: !bp.narrow && showHistory ? PANEL_OPEN_GUTTER : 0,
+              // Compact mode: clear the master bar (left). Wide: two-sided push.
+              marginLeft: bp.dock
+                ? MASTER_BAR_WIDTH + 16
+                : !bp.narrow && showTools
+                  ? PANEL_OPEN_GUTTER
+                  : 0,
+              marginRight:
+                !bp.dock && !bp.narrow && showHistory ? PANEL_OPEN_GUTTER : 0,
             }}
             transition={prefs.reduceMotion ? instantTransition : panelSpacingTransition}
             className="main-content focus:outline-none"
@@ -2915,6 +2975,7 @@ export function AppShell() {
                       textareaRef={textTool.textareaRef}
                       onCanvasClick={textTool.onCanvasClick}
                       selectionActive={activeTool === "arrow" && selectionMode}
+                      layerMoveActive={activeTool === "arrow" && moveActive}
                       onSelectionClick={handleSelectionClick}
                       selectionMask={activeTool === "arrow" ? selectionMask : null}
                       selectionWidth={stamp.state.width}
@@ -3031,9 +3092,12 @@ export function AppShell() {
         </ContextMenuContent>
       </ContextMenu>
 
+      {/* Gallery: horizontal bottom strip in wide mode; the SAME bar inverted
+          to vertical (up/down arrows, all controls) in the compact Gallery tab. */}
       <AnimatePresence>
-        {showGallery && (
+        {(bp.dock ? masterTab === "gallery" : showGallery) && (
           <GalleryBar
+            vertical={bp.dock}
             photos={photos}
             activeId={activePhotoId}
             onSelect={handleSelectPhoto}
@@ -3059,8 +3123,9 @@ export function AppShell() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showHistory && (
+        {(bp.dock ? masterTab === "review" : showHistory) && (
           <ReviewPanel
+            embedded={bp.dock}
             history={stamp.state.history}
             onJump={stamp.jumpToHistory}
             onDelete={stamp.deleteHistoryEntry}

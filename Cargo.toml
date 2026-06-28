@@ -10,6 +10,10 @@ crate-type = ["cdylib", "rlib"]
 wasm-bindgen = "0.2.108"
 png = "0.17"
 ab_glyph = "0.2"
+# Routes Rust panics to console.error with a readable message + stack instead of
+# the opaque "unreachable executed" RuntimeError. Installed once on module init
+# (see `start` in lib.rs).
+console_error_panic_hook = "0.1"
 
 # Release tuning for the WASM build. wasm-pack builds in release by default;
 # LTO + a single codegen unit let the optimizer inline across modules (pairs

@@ -27,6 +27,20 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.33",
+    date: "2026-06-28",
+    headline: "A compact master bar for narrow & split-screen windows",
+    entries: [
+      { tag: "feature", text: "Snap the window narrow (≤1000px) — or open Image Horse on a tablet — and the whole interface folds into one left “master bar”: a New button plus Tools / Gallery / Review tabs that swap its contents, with settings and your account in the top row. The horizontal top bar disappears and the canvas takes the rest of the screen." },
+      { tag: "ui", text: "The Gallery tab is the full gallery turned vertical — two square thumbnails per row, scrolled with up/down arrows instead of a scrollbar, with all the same select / export / duplicate / delete controls and the photo count pinned to the bottom." },
+      { tag: "ui", text: "A one-time “Use compact version” notice greets the narrow layout so it’s clear the app intentionally reshaped for the smaller window." },
+      { tag: "perf", text: "The master bar is code-split — desktop sessions never download it; its bundle only loads the first time you go narrow." },
+      { tag: "ui", text: "Settings → Import / Export (renamed from Export) now lists Import .ora and Export .ora next to the existing options (both coming soon), and Resize shares its Scale / W×H / aspect-lock control with a new Layer-Settings “Canvas Size”." },
+      { tag: "fix", text: "The Selection-marker cursor no longer shows the move icon, and the canvas backdrop checkerboard now extends exactly 10px past the image and follows the light/dark theme." },
+      { tag: "rust", text: "Added a WASM panic hook (console_error_panic_hook) so a Rust panic surfaces a real message in the console instead of an opaque “unreachable”." },
+    ],
+  },
+  {
     version: "v0.9.32",
     date: "2026-06-27",
     headline: "Tool shelf reshuffle, drag-and-drop import, and a snappier histogram",

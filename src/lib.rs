@@ -27,6 +27,16 @@ use crate::core::ImageBuffer;
 use crate::history::{History, Snapshot};
 use crate::stamp::StampState;
 
+/// Module-init hook: route Rust panics to `console.error` with a readable
+/// message + stack (instead of the opaque "unreachable executed" RuntimeError).
+/// `set_once` is idempotent, and `#[wasm_bindgen(start)]` runs this exactly once
+/// when the module is instantiated — before any tool method or free function —
+/// so it covers every entry point. Purely additive; no API surface changes.
+#[wasm_bindgen(start)]
+pub fn start() {
+    console_error_panic_hook::set_once();
+}
+
 /// Maximum number of gallery photos allowed for a given account tier.
 ///
 /// Single source of truth for the gallery cap, shared by the upload gate
