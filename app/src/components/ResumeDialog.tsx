@@ -26,6 +26,11 @@ interface Props {
   onStartFresh: () => void;
   /** Optional override for the dialog box (e.g. the Dev Tests preview). */
   className?: string;
+  /** Dev-Tests preview mode: X / Esc / click-outside dismiss the box (instead of
+   *  shaking), and it stacks above the Settings modal so it's actually visible. */
+  dismissible?: boolean;
+  /** Neutral close for the preview's X (no Resume / Start-fresh choice made). */
+  onClose?: () => void;
 }
 
 export function ResumeDialog({
@@ -34,6 +39,8 @@ export function ResumeDialog({
   onResume,
   onStartFresh,
   className,
+  dismissible = false,
+  onClose,
 }: Props) {
   // Object URLs for a few thumbnail previews; revoked on unmount / change.
   const thumbUrls = useMemo(
@@ -61,8 +68,21 @@ export function ResumeDialog({
   }, [controls]);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && triggerShake()}>
-      <DialogContent className={cn("max-w-sm", className)}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (o) return;
+        if (dismissible) (onClose ?? onStartFresh)();
+        else triggerShake();
+      }}
+    >
+      <DialogContent
+        className={cn(
+          "max-w-sm",
+          className,
+          dismissible && "z-[var(--z-devpreview)]",
+        )}
+      >
         <motion.div animate={controls}>
         <DialogHeader>
           <DialogTitle>Welcome back</DialogTitle>

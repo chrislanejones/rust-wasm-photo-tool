@@ -117,6 +117,7 @@ import {
   ZoomOut,
   RotateCcw,
   Archive,
+  FolderArchive,
   ImagePlus,
   Image as ImageIcon,
   Pipette,
@@ -2455,7 +2456,7 @@ export function AppShell() {
         onOpenChange={setShowCelebration}
       />
 
-      <IdleScreen open={idle} onContinue={wake} reduceMotion={prefs.reduceMotion} />
+      <IdleScreen open={idle} onContinue={wake} />
 
       {/* Diagnostics Window (Alt+Delete) is always available. */}
       <DiagnosticLogOverlay
@@ -2641,8 +2642,8 @@ export function AppShell() {
             />
             {photos.length > 1 && (
               <ActionTile
-                icon={Archive}
-                label={`All (${photos.length})`}
+                icon={FolderArchive}
+                label={`Download All (${photos.length})`}
                 onClick={() => {
                   setExportDialogOpen(false);
                   handleExportAll();

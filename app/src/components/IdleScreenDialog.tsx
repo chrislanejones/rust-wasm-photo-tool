@@ -1,28 +1,24 @@
 // Dialog-box variant of the idle "paused to save power" screen, used by the
-// Settings → Dev Tests preview. (The real in-app idle screen is the full-screen
-// IdleScreen; this is the boxed-dialog version for design iteration.)
-//
-// Built on the shared Dialog primitives so it gets a consistent header + footer.
-// Only "Continue" dismisses it — the X / Esc / click-outside shake the box to
-// nudge a choice, the same way the upload + Welcome-back dialogs do.
+// Settings → Dev Tests preview. The real in-app idle screen is the full-screen
+// IdleScreen; this boxes the very same SmallDialog card so it can be previewed
+// inline. In `dismissible` mode the X / Esc / click-outside close it and it
+// stacks above the Settings modal; otherwise a close attempt shakes the box.
 import { useCallback } from "react";
 import { motion, useAnimation } from "framer-motion";
-import { PauseCircle } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogBody,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Hourglass } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { SmallDialog } from "@/components/SmallDialog";
 
 interface Props {
   open: boolean;
   onContinue: () => void;
+  /** Dev-Tests preview mode: X / Esc / click-outside dismiss the box (instead of
+   *  shaking), and it stacks above the Settings modal so it's actually visible. */
+  dismissible?: boolean;
 }
 
-export function IdleScreenDialog({ open, onContinue }: Props) {
+export function IdleScreenDialog({ open, onContinue, dismissible = false }: Props) {
   const controls = useAnimation();
   const triggerShake = useCallback(async () => {
     await controls.start({
@@ -33,32 +29,35 @@ export function IdleScreenDialog({ open, onContinue }: Props) {
   }, [controls]);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && triggerShake()}>
-      <DialogContent className="max-w-sm bg-black text-zinc-100">
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (o) return;
+        if (dismissible) onContinue();
+        else triggerShake();
+      }}
+    >
+      {/* Transparent, chrome-less content — the visible box is the SmallDialog
+          card, so no DialogHeader/DialogFooter (no header, no footer). */}
+      <DialogContent
+        aria-describedby={undefined}
+        className={cn(
+          "w-auto max-w-xs overflow-visible border-0 bg-transparent p-0 shadow-none",
+          dismissible && "z-[var(--z-devpreview)]",
+        )}
+      >
+        {/* Radix needs an accessible title; the visible heading lives in the card. */}
+        <DialogTitle className="sr-only">Idle Screen</DialogTitle>
         <motion.div animate={controls}>
-          <DialogHeader>
-            <DialogTitle>Idle Screen</DialogTitle>
-          </DialogHeader>
-
-          <DialogBody>
-            <div className="flex flex-col items-center gap-3 py-2 text-center">
-              <PauseCircle className="h-10 w-10 text-zinc-400" />
-              <p className="max-w-xs text-sm text-zinc-400">
-                Paused to save power. Background activity is throttled after a
-                while idle — your edits are safe.
-              </p>
-            </div>
-          </DialogBody>
-
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={onContinue}
-              className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-foreground)] transition hover:brightness-110"
-            >
-              Continue
-            </button>
-          </DialogFooter>
+          <SmallDialog
+            icon={Hourglass}
+            title="Paused to save power"
+            actionLabel="Continue with Image Horse"
+            onAction={onContinue}
+          >
+            Background activity is throttled after a while idle. Your edits are
+            safe.
+          </SmallDialog>
         </motion.div>
       </DialogContent>
     </Dialog>

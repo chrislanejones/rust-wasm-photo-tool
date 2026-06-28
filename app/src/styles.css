@@ -41,7 +41,8 @@
   --z-modal: 60; /* modals layered above dialogs */
   --z-progress: 100; /* top load-progress bar */
   --z-idle: 200; /* full-screen idle overlay */
-  --z-cursor: 1000; /* brush cursor / source marker (always on top) */
+  --z-devpreview: 210; /* Settings → Dev Tests dialog previews (above the settings modal) */
+  --z-cursor: 45; /* brush cursor / clone source marker — above canvas chrome, below dialogs/overlays */
 
   /* ── Motion — durations + shared easing. ── */
   --dur-fast: 0.1s;

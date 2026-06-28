@@ -847,6 +847,15 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 6   | **Fixes** — Selection-marker cursor no longer shows the move icon; the backdrop checkerboard now extends exactly **10px** past the image and follows the theme; added a **WASM panic hook** (`console_error_panic_hook`) so Rust panics print a real message instead of "unreachable" | Complete |
 | 7   | **Docs** — README this summary; Trail Log **v0.9.33** | Complete |
 
+## v5.2 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **WASM engine modularization** — the ~4,800-line `src/lib.rs` god-object split into focused modules (`annotations.rs` / `effects.rs` / `layer.rs` / `paint.rs` / `selection.rs` / `utils.rs`), shrinking `lib.rs` by ~60%. Behaviour-identical (same tools, same speed); far faster to build and work in | Complete |
+| 2   | **Shared `SmallDialog`** — the idle "paused to save power" screen, the small-window notice, and the resume prompt now use one compact card component (mid-size icon + title + body + single button). `IdleScreen` dropped its bespoke BrandReveal entrance for a dimmed backdrop + the shared card | Complete |
+| 3   | **Cursor fix** — the brush-size ring is gated to the brush-family tools (`brush` + `effects`); `compress` (Resize), `arrow` (Layer Settings), and `ai` now keep the standard default arrow on the canvas and over the panels (no stray paint ring, including when the pointer is idle) | Complete |
+| 4   | **Docs** — README this summary; Trail Log **v0.9.35** | Complete |
+
 ## License
 
 MIT

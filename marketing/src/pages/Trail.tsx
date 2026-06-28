@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.35",
+    date: "2026-06-28",
+    headline: "Tidier notice dialogs and a calmer cursor",
+    entries: [
+      { tag: "ui", text: "The idle “paused to save power” screen, the small-window notice, and the resume prompt now share one compact card — a mid-size icon, a line of copy, and a single button — for a consistent look across the app’s lightweight notices." },
+      { tag: "fix", text: "The brush-size ring now appears only for the brush tools (Paint / Blur / Eraser and the Effects blur). Tools that don’t paint — Resize, Layer Settings, AI — and the side panels now keep the normal arrow cursor instead of a stray paint ring." },
+    ],
+  },
+  {
     version: "v0.9.34",
     date: "2026-06-28",
     headline: "A big engine cleanup so features ship faster",

@@ -53,13 +53,19 @@ export function DevTestsPane() {
         />
       </div>
 
-      <IdleScreenDialog open={idleOpen} onContinue={() => setIdleOpen(false)} />
+      <IdleScreenDialog
+        open={idleOpen}
+        dismissible
+        onContinue={() => setIdleOpen(false)}
+      />
       <ResumeDialog
         open={welcomeOpen}
+        dismissible
         className="bg-black text-zinc-100"
         photos={[]}
         onResume={() => setWelcomeOpen(false)}
         onStartFresh={() => setWelcomeOpen(false)}
+        onClose={() => setWelcomeOpen(false)}
       />
     </div>
   );

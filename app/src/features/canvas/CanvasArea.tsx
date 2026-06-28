@@ -1138,8 +1138,15 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           );
         })()}
 
-        {/* Brush cursor — hidden during pan */}
-        {cursorVisible && !isTextTool && !cursor && !isPanning && (
+        {/* Brush-size ring — only for the size-based brush tools (Paint/Blur/
+            Eraser brush + the Effects blur brush). Other tools (Resize/compress,
+            Layer-Settings arrow, AI, …) keep the standard default arrow, on the
+            canvas and over the panels. `!cursor` still hides it while the Effects
+            color-picker shows its crosshair. Hidden during pan. */}
+        {cursorVisible &&
+          (activeTool === "brush" || activeTool === "effects") &&
+          !cursor &&
+          !isPanning && (
           <div
             className="brush-cursor"
             style={{
@@ -1162,7 +1169,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               height: 12,
               transform: "translate(-50%, -50%)",
               pointerEvents: "none",
-              zIndex: 999,
+              // z-index comes from the .source-marker class (var(--z-cursor)) so
+              // the clone-stamp crosshair stays below dialogs / idle / welcome.
             }}
           />
         )}

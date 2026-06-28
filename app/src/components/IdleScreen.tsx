@@ -1,58 +1,29 @@
 // Full-screen "paused to save power" idle screen, shown after the idle timeout.
-// Uses the shared BrandRevealScreen entrance so it matches the cold-start
-// surfaces: the logo settles in, then eases up to reveal the message + Continue.
-// Sits above everything (z-idle) so the editor is fully covered — the browser
-// can throttle the tab. Only "Continue" (→ wake) dismisses it; edits are safe.
-import { useEffect, useState } from "react";
-import { LargeButton } from "@/components/ui/large-button";
-import { BrandRevealScreen } from "@/components/BrandRevealScreen";
+// A dimmed full-screen backdrop with a centered SmallDialog card (the same box
+// as SmallWindowNotice) so the editor is fully covered — the browser can
+// throttle the tab. Only "Continue" (→ wake) dismisses it; edits are safe.
+import { Hourglass } from "lucide-react";
+import { SmallDialog } from "@/components/SmallDialog";
 
 export function IdleScreen({
   open,
   onContinue,
-  reduceMotion = false,
 }: {
   open: boolean;
   onContinue: () => void;
-  reduceMotion?: boolean;
 }) {
-  // Brief beat with the hero alone, then ease it up and reveal the content —
-  // the same entrance as cold start (no spinner; idle isn't "loading").
-  const [settled, setSettled] = useState(false);
-  useEffect(() => {
-    if (!open) {
-      setSettled(false);
-      return;
-    }
-    if (reduceMotion) {
-      setSettled(true);
-      return;
-    }
-    const t = window.setTimeout(() => setSettled(true), 350);
-    return () => window.clearTimeout(t);
-  }, [open, reduceMotion]);
+  if (!open) return null;
 
   return (
-    <BrandRevealScreen
-      show={open}
-      showContent={settled}
-      reduceMotion={reduceMotion}
-      ariaLabel="Paused — idle"
-    >
-      <div className="flex flex-col items-center gap-4 text-center">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">
-            Paused to save power
-          </h2>
-          <p className="mx-auto mt-1 max-w-xs text-sm text-text-secondary">
-            Background activity is throttled after a while idle. Your edits are
-            safe.
-          </p>
-        </div>
-        <LargeButton onClick={onContinue} autoFocus>
-          Continue with Image Horse
-        </LargeButton>
-      </div>
-    </BrandRevealScreen>
+    <div className="fixed inset-0 z-[var(--z-idle)] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm">
+      <SmallDialog
+        icon={Hourglass}
+        title="Paused to save power"
+        actionLabel="Continue with Image Horse"
+        onAction={onContinue}
+      >
+        Background activity is throttled after a while idle. Your edits are safe.
+      </SmallDialog>
+    </div>
   );
 }
