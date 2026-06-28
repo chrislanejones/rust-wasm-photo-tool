@@ -5,7 +5,7 @@ import {
   SquareMousePointer,
   Paintbrush,
   Type,
-  Move,
+  Layers,
   Brain,
   Shapes,
   Sparkles,
@@ -35,8 +35,8 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "crop",
-    label: "Edit and Move",
-    description: "Crop, transform & align",
+    label: "Edit and Transform",
+    description: "Crop, transform & erase",
     icon: SquareMousePointer,
     gradient: "from-cyan-500 to-blue-500",
   },
@@ -55,13 +55,14 @@ export const TOOLS: ToolDefinition[] = [
     gradient: "from-amber-400 to-orange-500",
   },
   {
-    // NB: the `arrow` id is legacy — this slot is now the Move tool (drag the
-    // active layer's content). Arrow-drawing lives under Shapes → Arrows.
+    // NB: the `arrow` id is legacy — this slot is now the Layer Settings tool:
+    // a Move-layer toggle (Ctrl+M) plus the Selection Marker (magic-wand).
+    // Arrow-drawing lives under Shapes → Arrows.
     id: "arrow",
-    label: "Move",
-    tooltipTitle: "Move Layer",
-    description: "Drag the active layer's contents",
-    icon: Move,
+    label: "Layer Settings",
+    tooltipTitle: "Layer Settings (Move · Select)",
+    description: "Move the active layer & select regions",
+    icon: Layers,
     gradient: "from-emerald-500 to-teal-500",
   },
   {

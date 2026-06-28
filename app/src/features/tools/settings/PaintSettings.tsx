@@ -11,7 +11,6 @@ import { quickSpring } from "@/lib/animations";
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
 const OPACITY_PRESETS = [25, 50, 75, 100] as const;
 const HARDNESS_PRESETS = [25, 50, 75, 100] as const;
-const ERASER_SIZE_PRESETS = [8, 16, 32, 64] as const;
 const BLUR_SIZE_PRESETS = [8, 16, 32, 64] as const;
 const PIXEL_SIZE_PRESETS = [8, 16, 32, 48] as const;
 
@@ -32,7 +31,7 @@ const STABILIZER_LEVELS = [
 
 const PEN_WIDTH_PRESETS = [2, 4, 8, 16] as const;
 
-type PaintMode = "paint" | "blur" | "pen" | "eraser";
+type PaintMode = "paint" | "blur" | "pen";
 
 interface PaintSettingsProps {
   settings: ToolSettings;
@@ -58,7 +57,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
           { id: "paint", label: "Paint" },
           { id: "blur", label: "Blur" },
           { id: "pen", label: "Pen" },
-          { id: "eraser", label: "Eraser" },
         ]}
         active={mode}
         onChange={handleModeChange}
@@ -244,72 +242,6 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   onChange={(color) => onChange({ ...settings, fillColor: color })}
                 />
               )}
-            </div>
-          </motion.div>
-        )}
-
-        {mode === "eraser" && (
-          <motion.div
-            key="eraser"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, transition: quickSpring }}
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
-            className="space-y-4"
-          >
-            <p className="text-2xs leading-relaxed text-theme-muted-foreground">
-              Scrubs the active layer back to transparent — revealing whatever is
-              beneath it. Lower opacity erases gradually.
-            </p>
-
-            {/* Eraser footprint */}
-            <SizeSlider
-              label="Eraser Size"
-              value={settings.eraserSize}
-              min={1}
-              max={100}
-              onChange={(v) => onChange({ ...settings, eraserSize: v })}
-              presets={ERASER_SIZE_PRESETS}
-            />
-
-            {/* Strength — how much alpha a pass removes. */}
-            <SizeSlider
-              label="Opacity"
-              value={settings.eraserOpacity}
-              min={0}
-              max={100}
-              onChange={(v) => onChange({ ...settings, eraserOpacity: v })}
-              presets={OPACITY_PRESETS}
-              variant="numbers"
-              unit="%"
-            />
-
-            {/* Edge hardness of the eraser dab. */}
-            <SizeSlider
-              label="Hardness"
-              value={settings.eraserHardness}
-              min={0}
-              max={100}
-              onChange={(v) => onChange({ ...settings, eraserHardness: v })}
-              presets={HARDNESS_PRESETS}
-              variant="numbers"
-              unit="%"
-            />
-
-            {/* Stroke Stabilizer — shared with the Paint brush. */}
-            <div className="space-y-2">
-              <label className="text-2xs text-theme-muted-foreground">
-                Stroke Stabilizer
-              </label>
-              <ToolButtonGroup
-                options={STABILIZER_LEVELS}
-                value={settings.paintStabilizer ?? "off"}
-                onChange={(id) =>
-                  onChange({
-                    ...settings,
-                    paintStabilizer: id as ToolSettings["paintStabilizer"],
-                  })
-                }
-              />
             </div>
           </motion.div>
         )}

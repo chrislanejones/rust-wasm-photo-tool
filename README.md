@@ -801,6 +801,17 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 4   | **UI** — Layers panel: an Aperture button adds a mask / toggles Edit-mask mode (auto-selects the layer + switches to the Paint brush so strokes hit the mask); a control bar on the active masked layer gives a Hide/Reveal brush-value toggle plus Invert / Apply / Remove. Where a mask hides pixels, the transparency checkerboard shows through (matches the eraser) | Complete |
 | 5   | **Docs** — README this summary; Trail Log **v0.9.31**. Known gap: masks aren't persisted yet — `get_layer_png` serializes raw pixels only and the Convex archive is still single-layer, so masks survive undo/redo but not reload | Complete |
 
+## v5.0 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Tool reorg** — "Edit and Move" → **Edit and Transform**; the **Eraser** moved out of the Paint tabs to the bottom of Edit & Transform as a toggle + Size/Opacity/Hardness sliders (canvas strokes erase the active layer while on). "Move" → **Layer Settings** (Layers icon) with two mutually-exclusive toggles: **Move** (drag the active layer, **Ctrl+M**) and the **Selection Marker** (magic-wand, moved here from Edit & Move). Paint sub-modes are now Paint \| Blur \| Pen | Complete |
+| 2   | **Drag & paste image import** — dragging an image anywhere over the app shows a full-window drop affordance (animated gradient ring, à la Claude-in-Chrome); dropping OR pasting (Ctrl+V) opens a Download-style choice dialog — **New layer** (gated login/paid) \| **Onto image** \| **To gallery** — instead of pasting blindly. Window-level drag listeners + a decode-once helper; `usePaintTool` reused for the new-layer paste | Complete |
+| 3   | **Histogram drop/raise — real fix** — `HistogramView` split into two effects: `photoKey` change drops the bars to the baseline (no placeholder data), and `signature` change retries the Rust `calculate_histogram` until it returns real data, then raises. `histogramSignature` now includes `isImageLoading` so the raise fires exactly when the new image is ready (kills the flash / stale-data race) | Complete |
+| 4   | **Download dialog** — primary button now reads **"Download & Share {FORMAT}"**, tracking the selected format live | Complete |
+| 5   | **Ctrl+\ easter egg** — a confetti popper dialog celebrating the month's shipped features (67 in June, 90 lifetime, 24 releases) with highlighted feature icons | Complete |
+| 6   | **Docs** — README this summary; Trail Log **v0.9.32** | Complete |
+
 ## License
 
 MIT

@@ -21,11 +21,12 @@ import type { ShapesMode } from "./settings/ShapeSettings";
 import { ToolGrid } from "./ToolGrid";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
-import type { SelectionControls } from "./settings/TransformCropSettings";
+import type { EraserControls } from "./settings/TransformCropSettings";
+import { LayerSettings } from "./settings/LayerSettings";
+import type { SelectionControls } from "./settings/LayerSettings";
 import type { PlacementCell } from "@/components/PlacementGrid";
 import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
-import { ArrowSettings } from "./settings/ArrowSettings";
 import { ShapesSettings } from "./settings/ShapeSettings";
 import { BatchSettings } from "./settings/BatchSettings";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
@@ -47,8 +48,13 @@ interface ToolsSidebarProps {
   /** Kind of the currently-selected object — gates the placement grid to the
    *  matching panel (text grid only when a text is selected, etc.). */
   selectedKind?: "text" | "shape" | null;
-  /** Selection Marker (magic-wand) controls. */
+  /** Selection Marker (magic-wand) controls — Layer Settings tool. */
   selection?: SelectionControls;
+  /** Eraser controls — Edit & Transform tool (bottom of the panel). */
+  eraser?: EraserControls;
+  /** Move-layer toggle — Layer Settings tool. */
+  moveActive?: boolean;
+  onToggleMove?: () => void;
   /** Download button: exports the single photo, or opens the chooser dialog
    *  when the gallery holds more than one. */
   onExport: () => void;
@@ -94,9 +100,9 @@ interface ToolsSidebarProps {
   onCropRatioChange?: (lock: [number, number] | null) => void;
   toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
-  // Paint sub-mode (paint / blur / pen / eraser)
-  brushMode?: "paint" | "blur" | "pen" | "eraser";
-  onBrushModeChange?: (mode: "paint" | "blur" | "pen" | "eraser") => void;
+  // Paint sub-mode (paint / blur / pen)
+  brushMode?: "paint" | "blur" | "pen";
+  onBrushModeChange?: (mode: "paint" | "blur" | "pen") => void;
   // Effects sub-mode + color picker
   effectsMode?: EffectsMode;
   onEffectsModeChange?: (mode: EffectsMode) => void;
@@ -135,6 +141,9 @@ export function ToolsSidebar({
   onPlace,
   selectedKind,
   selection,
+  eraser,
+  moveActive,
+  onToggleMove,
   onExport,
   canExport,
   photoCount,
@@ -258,7 +267,7 @@ export function ToolsSidebar({
             onSetCropSelection={onSetCropSelection}
             cropRatio={cropRatio ?? null}
             onCropRatioChange={onCropRatioChange ?? (() => {})}
-            selection={selection}
+            eraser={eraser}
           />
         )}
 
@@ -294,10 +303,12 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "arrow" && (
-          <ArrowSettings
-            settings={toolSettings}
-            onChange={onToolSettingsChange}
+        {activeTool === "arrow" && selection && (
+          <LayerSettings
+            disabled={!imageReady}
+            moveActive={moveActive ?? false}
+            onToggleMove={onToggleMove ?? (() => {})}
+            selection={selection}
           />
         )}
 

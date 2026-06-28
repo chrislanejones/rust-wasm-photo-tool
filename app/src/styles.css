@@ -637,6 +637,132 @@ textarea:focus-visible {
   margin-left: auto;
 }
 
+/* ── Full-window image-drop affordance (drag an image anywhere over the app) ──
+   A dimmed scrim with a spinning gradient border ring around the viewport (the
+   "Claude in Chrome" glow) and a centered prompt. Non-interactive. */
+.image-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgba(10, 12, 16, 0.42);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+@property --drop-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.image-drop-ring {
+  position: absolute;
+  inset: 0;
+  padding: 4px; /* ring thickness */
+  background: conic-gradient(
+    from var(--drop-angle),
+    var(--color-theme-accent, #b6764e),
+    #e9c69e,
+    var(--color-theme-accent, #b6764e),
+    #8a5a39,
+    var(--color-theme-accent, #b6764e)
+  );
+  /* Punch out the center so only the border shows. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: drop-ring-spin 4s linear infinite;
+  opacity: 0.95;
+}
+
+@keyframes drop-ring-spin {
+  to {
+    --drop-angle: 360deg;
+  }
+}
+
+.image-drop-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 44px;
+  border-radius: 16px;
+  text-align: center;
+  background: var(--bg-elevated, #1b1b1b);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.14));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.image-drop-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+  color: var(--color-theme-accent, #b6764e);
+}
+
+.image-drop-title {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text-primary, #fff);
+}
+
+.image-drop-sub {
+  font-size: 12px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+}
+
+/* Honour reduced motion — drop the spin (the ring still shows, just static). */
+.reduce-motion .image-drop-ring {
+  animation: none;
+}
+
+/* Import-dialog preview thumbnail. */
+.import-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background:
+    linear-gradient(45deg, #999 25%, transparent 25%),
+    linear-gradient(-45deg, #999 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #999 75%),
+    linear-gradient(-45deg, transparent 75%, #999 75%);
+  background-size: 12px 12px;
+  background-position:
+    0 0,
+    0 6px,
+    6px -6px,
+    -6px 0;
+  background-color: #d0d0d0;
+}
+.import-preview img {
+  max-height: 140px;
+  max-width: 100%;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.import-preview-dims {
+  margin-left: auto;
+  font: 600 11px var(--font-mono, ui-monospace, monospace);
+  color: var(--text-secondary, #333);
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.9));
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
 .history-list::-webkit-scrollbar {
   width: 4px;
 }

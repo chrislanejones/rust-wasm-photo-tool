@@ -61,6 +61,10 @@ interface KeyboardShortcutOptions {
   onFlipV?: () => void;
   onRotateCw?: () => void;
   onCopyToClipboard?: () => void;
+  /** Ctrl/Cmd+M — toggle the Move-layer mode (Layer Settings tool). */
+  onToggleMove?: () => void;
+  /** Ctrl/Cmd+\ — pop the feature-celebration dialog (easter egg). */
+  onShowCelebration?: () => void;
   // Item 4: Gallery cycling
   onNextPhoto?: () => void;
   onPrevPhoto?: () => void;
@@ -78,6 +82,8 @@ export function useKeyboardShortcuts({
   onSelectAll,
   onDeselect,
   hasSelection,
+  onToggleMove,
+  onShowCelebration,
   onAdjustBrushSize,
   setShowUpload,
   setShowTools,
@@ -166,6 +172,18 @@ export function useKeyboardShortcuts({
         if (e.shiftKey && e.code === "KeyC") {
           e.preventDefault();
           onCopyToClipboard?.();
+          return;
+        }
+        // Ctrl/Cmd + M → toggle Move-layer (Layer Settings tool).
+        if (e.code === "KeyM") {
+          e.preventDefault();
+          onToggleMove?.();
+          return;
+        }
+        // Ctrl/Cmd + \ → feature-celebration popper (easter egg).
+        if (e.code === "Backslash") {
+          e.preventDefault();
+          onShowCelebration?.();
           return;
         }
         // Ctrl/Cmd + [ or ] → shrink / grow the active brush (any brush tool).

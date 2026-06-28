@@ -4,10 +4,7 @@ import {
   FlipHorizontal,
   FlipVertical,
   Crop,
-  BoxSelect,
-  MousePointerClick,
-  SquareDashed,
-  Trash2,
+  Eraser,
   Maximize,
   Square,
   RectangleHorizontal,
@@ -20,18 +17,17 @@ import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SizeSlider } from "@/components/SizeSlider";
 import type { CropSelection } from "@/hooks/useDrawingTools";
 
-/** Controls for the Selection Marker (magic-wand) — Edit & Move → Selection. */
-export interface SelectionControls {
-  tolerance: number;
-  onToleranceChange: (v: number) => void;
-  /** Whether click-to-select mode is on (canvas clicks flood-select). */
-  mode: boolean;
-  onToggleMode: () => void;
-  onSelectAll: () => void;
-  onDeselect: () => void;
-  onDelete: () => void;
-  /** Whether something is currently selected (enables Deselect / Delete). */
+/** Eraser controls — the Eraser lives at the bottom of Edit & Transform. While
+ *  `active`, canvas strokes erase the active layer to transparent. */
+export interface EraserControls {
   active: boolean;
+  onToggle: () => void;
+  size: number;
+  onSizeChange: (v: number) => void;
+  opacity: number;
+  onOpacityChange: (v: number) => void;
+  hardness: number;
+  onHardnessChange: (v: number) => void;
 }
 
 /* ── Aspect-ratio presets ─────────────────────────────────────────────
@@ -90,8 +86,8 @@ interface TransformCropSettingsProps {
   /** Currently-locked aspect ratio as `[w, h]`. `null` = Free. */
   cropRatio: [number, number] | null;
   onCropRatioChange: (lock: [number, number] | null) => void;
-  /** Selection Marker (magic-wand) controls. */
-  selection?: SelectionControls;
+  /** Eraser controls (bottom of the panel). */
+  eraser?: EraserControls;
 }
 
 export function TransformCropSettings({
@@ -105,7 +101,7 @@ export function TransformCropSettings({
   onSetCropSelection,
   cropRatio,
   onCropRatioChange,
-  selection,
+  eraser,
 }: TransformCropSettingsProps) {
   const ratio = ratioIdFromLock(cropRatio);
 
@@ -201,58 +197,58 @@ export function TransformCropSettings({
         </div>
       </div>
 
-      {/* ── Selection Marker (magic-wand) — Rust flood-fill ─────────────── */}
-      {selection && (
+      {/* ── Eraser — scrubs the active layer to transparent ─────────────── */}
+      {eraser && (
         <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
           <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-            Selection Marker
+            Eraser
           </span>
           <ToolButton
-            active={selection.mode}
+            active={eraser.active}
             disabled={disabled}
-            onClick={selection.onToggleMode}
+            onClick={eraser.onToggle}
             className="w-full"
           >
-            <MousePointerClick />{" "}
-            {selection.mode ? "Click-to-select: on" : "Click-to-select"}
+            <Eraser /> {eraser.active ? "Erasing: on" : "Eraser"}
           </ToolButton>
-          <SizeSlider
-            label="Tolerance"
-            value={selection.tolerance}
-            min={0}
-            max={120}
-            onChange={selection.onToleranceChange}
-          />
-          <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
-            <ToolButton
-              disabled={disabled}
-              onClick={selection.onSelectAll}
-              title="Select all (Alt+A)"
-            >
-              <BoxSelect /> All
-            </ToolButton>
-            <ToolButton
-              disabled={disabled || !selection.active}
-              onClick={selection.onDeselect}
-              title="Deselect (Alt+D)"
-            >
-              <SquareDashed /> None
-            </ToolButton>
-            <ToolButton
-              disabled={disabled || !selection.active}
-              onClick={selection.onDelete}
-              title="Delete selection"
-            >
-              <Trash2 /> Delete
-            </ToolButton>
-          </div>
+          {eraser.active && (
+            <>
+              <SizeSlider
+                label="Size"
+                value={eraser.size}
+                min={1}
+                max={100}
+                onChange={eraser.onSizeChange}
+              />
+              <SizeSlider
+                label="Opacity"
+                value={eraser.opacity}
+                min={0}
+                max={100}
+                variant="numbers"
+                unit="%"
+                presets={[25, 50, 75, 100]}
+                onChange={eraser.onOpacityChange}
+              />
+              <SizeSlider
+                label="Hardness"
+                value={eraser.hardness}
+                min={0}
+                max={100}
+                variant="numbers"
+                unit="%"
+                presets={[25, 50, 75, 100]}
+                onChange={eraser.onHardnessChange}
+              />
+            </>
+          )}
           <p className="text-2xs text-theme-muted-foreground leading-relaxed">
-            Turn on click-to-select, then click a region to flood-select similar
-            colors. Alt+A selects all, Alt+D deselects.
+            Turn on the eraser, then drag on the canvas to scrub the active layer
+            to transparent — revealing whatever&rsquo;s beneath it. Lower opacity
+            erases gradually.
           </p>
         </div>
       )}
-
     </div>
   );
 }

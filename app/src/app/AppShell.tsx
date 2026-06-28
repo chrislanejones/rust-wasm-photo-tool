@@ -24,6 +24,7 @@ import { SmallWindowNotice } from "@/components/SmallWindowNotice";
 import { TopBar } from "@/components/TopBar";
 import { StatusBar, type UserMode, type ShortcutHint } from "@/components/StatusBar";
 import { ShortcutModal } from "@/components/ShortcutModal";
+import { CelebrationDialog } from "@/components/CelebrationDialog";
 import { ADMIN_EMAIL } from "@/lib/superuser";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
@@ -40,6 +41,8 @@ import { ReviewPanel } from "@/features/canvas/ReviewPanel";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
+import { ImageDropOverlay } from "@/features/upload/ImageDropOverlay";
+import { ImportImageDialog } from "@/features/upload/ImportImageDialog";
 import { FirstRunScreen } from "@/features/upload/FirstRunScreen";
 import { NewActions } from "@/features/upload/NewActions";
 import { ResumeContent } from "@/features/upload/ResumeContent";
@@ -50,7 +53,7 @@ import {
   type GalleryManifest,
 } from "@/lib/galleryManifest";
 import { getPhotoLimit, DEFAULT_PHOTO_LIMIT } from "@/lib/photoLimits";
-import { hasReplicateAI } from "@/lib/tiers";
+import { hasReplicateAI, TIERS } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
@@ -145,6 +148,22 @@ const DOWNLOAD_FORMATS: { value: ExportFormat; label: string; hint: string }[] =
   { value: "avif", label: "AVIF", hint: "Smallest · modern" },
 ];
 
+/** Decode an image Blob to RGBA pixels (off the main canvas). Used by the
+ *  drag/paste import flow before the user picks where the image should land. */
+async function decodeImageSource(
+  source: Blob,
+): Promise<{ pixels: Uint8ClampedArray; w: number; h: number }> {
+  const bitmap = await createImageBitmap(source);
+  const w = bitmap.width;
+  const h = bitmap.height;
+  const oc = new OffscreenCanvas(w, h);
+  const ctx = oc.getContext("2d")!;
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const rgba = ctx.getImageData(0, 0, w, h).data;
+  return { pixels: new Uint8ClampedArray(rgba.buffer as ArrayBuffer), w, h };
+}
+
 function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
   const { isLoaded, isSignedIn } = useUser();
   // Create/refresh the Convex users row on sign-in (tier lives there).
@@ -217,9 +236,11 @@ export function AppShell() {
   // Item 2: Pan mode state
   const [isPanning, setIsPanning] = useState(false);
 
-  const [brushMode, setBrushMode] = useState<
-    "paint" | "blur" | "pen" | "eraser"
-  >("paint");
+  const [brushMode, setBrushMode] = useState<"paint" | "blur" | "pen">("paint");
+  // Edit & Transform → Eraser toggle (canvas strokes erase while on).
+  const [cropEraserActive, setCropEraserActive] = useState(false);
+  // Layer Settings → Move-layer toggle (canvas drags reposition the layer).
+  const [moveActive, setMoveActive] = useState(false);
   // Layer-mask editing: when on, the Paint brush paints the active layer's mask
   // (maskPaintValue 0 = hide / black, 255 = reveal / white) instead of pixels.
   const [maskEditing, setMaskEditing] = useState(false);
@@ -736,6 +757,7 @@ export function AppShell() {
   // Most-recently-opened side panel — narrow mode closes the *other* one.
   const lastPanelRef = useRef<"tools" | "history" | null>(null);
   const [showShortcutModal, setShowShortcutModal] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // ── Narrow-window (overlay-drawer) bookkeeping ──────────────────────────
@@ -862,8 +884,10 @@ export function AppShell() {
       case "brush":
         if (maskEditing) return toolSettings.brushSize / 2;
         if (brushMode === "blur") return toolSettings.blurSize / 2;
-        if (brushMode === "eraser") return toolSettings.eraserSize / 2;
         return toolSettings.brushSize / 2;
+      case "crop":
+        // Eraser now lives in Edit & Transform — show its ring while active.
+        return cropEraserActive ? toolSettings.eraserSize / 2 : 0;
       case "stamp":
         if (stampSubMode === "emojis") return (toolSettings.emojiSize * 1.2) / 2;
         return stampSettings.brushSize;
@@ -1130,10 +1154,27 @@ export function AppShell() {
     }
     setSelectionMask(null);
   }, [stamp]);
+  // Move-layer toggle (Layer Settings + Ctrl+M). Switches to the Layer Settings
+  // tool and is mutually exclusive with the Selection marker.
+  const handleToggleMove = useCallback(() => {
+    setActiveTool("arrow");
+    setSelectionMode(false);
+    setMoveActive((m) => !m);
+  }, []);
+  // Selection toggle — mutually exclusive with Move.
+  const handleToggleSelectionMode = useCallback(() => {
+    setMoveActive(false);
+    setSelectionMode((m) => !m);
+  }, []);
 
-  // Leaving the Edit & Move tool exits selection mode (the overlay is hidden too).
+  // Selection + Move now live on the Layer Settings ("arrow") tool; leaving it
+  // clears both toggles. Leaving Edit & Transform ("crop") clears the eraser.
   useEffect(() => {
-    if (activeTool !== "crop") setSelectionMode(false);
+    if (activeTool !== "arrow") {
+      setSelectionMode(false);
+      setMoveActive(false);
+    }
+    if (activeTool !== "crop") setCropEraserActive(false);
   }, [activeTool]);
 
   const blurDown = useCallback(
@@ -1483,14 +1524,36 @@ export function AppShell() {
       }
       return idle;
     }
-    if (activeTool === "arrow")
+    // Layer Settings tool: Move drags the layer (when its toggle is on);
+    // otherwise idle so canvas clicks fall through to the Selection marker.
+    if (activeTool === "arrow") {
+      if (moveActive)
+        return {
+          ...stamp,
+          onMouseDown: moveLayerTool.onMouseDown as typeof stamp.onMouseDown,
+          onMouseMove: moveLayerTool.onMouseMove as typeof stamp.onMouseMove,
+          onMouseUp: moveLayerTool.onMouseUp as typeof stamp.onMouseUp,
+        };
+      return idle;
+    }
+    // Edit & Transform: the Eraser toggle takes over the canvas while on;
+    // otherwise the crop-rectangle drag (drawingTools).
+    if (activeTool === "crop") {
+      if (cropEraserActive)
+        return {
+          ...stamp,
+          onMouseDown: eraserTool.onMouseDown as typeof stamp.onMouseDown,
+          onMouseMove: eraserTool.onMouseMove as typeof stamp.onMouseMove,
+          onMouseUp: eraserTool.onMouseUp as typeof stamp.onMouseUp,
+        };
       return {
         ...stamp,
-        onMouseDown: moveLayerTool.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: moveLayerTool.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: moveLayerTool.onMouseUp as typeof stamp.onMouseUp,
+        onMouseDown: drawingTools.onMouseDown as typeof stamp.onMouseDown,
+        onMouseMove: drawingTools.onMouseMove as typeof stamp.onMouseMove,
+        onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
       };
-    if (["shapes", "crop"].includes(activeTool))
+    }
+    if (activeTool === "shapes")
       return {
         ...stamp,
         onMouseDown: drawingTools.onMouseDown as typeof stamp.onMouseDown,
@@ -1512,14 +1575,6 @@ export function AppShell() {
           onMouseDown: blurDown,
           onMouseMove: blurMove,
           onMouseUp: blurUp,
-        };
-      }
-      if (brushMode === "eraser") {
-        return {
-          ...stamp,
-          onMouseDown: eraserTool.onMouseDown as typeof stamp.onMouseDown,
-          onMouseMove: eraserTool.onMouseMove as typeof stamp.onMouseMove,
-          onMouseUp: eraserTool.onMouseUp as typeof stamp.onMouseUp,
         };
       }
       // "pen" mode draws via the PenOverlay; the canvas itself uses the paint
@@ -1613,15 +1668,53 @@ export function AppShell() {
    * explicit button/menu invocation). Decodes the image to RGBA and composites
    * it via the active-layer `paste_region` (one "Paste" history entry in Rust).
    */
+  // ── Drag / paste image import ────────────────────────────────────────────
+  // A dropped or pasted image doesn't act immediately — it opens a choice
+  // dialog (New layer / Onto image / To gallery). `isDraggingImage` drives the
+  // full-window drop affordance; `importImage` holds the decoded image + a File
+  // (for the gallery path) + a preview URL while the dialog is open.
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const [importImage, setImportImage] = useState<{
+    pixels: Uint8ClampedArray;
+    w: number;
+    h: number;
+    file: File;
+    previewUrl: string;
+  } | null>(null);
+
+  const closeImportDialog = useCallback(() => {
+    setImportImage((prev) => {
+      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+      return null;
+    });
+  }, []);
+
+  const openImportDialog = useCallback(async (source: Blob, file: File) => {
+    try {
+      const { pixels, w, h } = await decodeImageSource(source);
+      const previewUrl = URL.createObjectURL(source);
+      setImportImage((prev) => {
+        if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+        return { pixels, w, h, file, previewUrl };
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Couldn't read image: ${msg}`);
+    }
+  }, []);
+
   const handlePasteFromClipboard = useCallback(
     async (items?: DataTransferItemList | null) => {
-      const tool = stamp.toolRef.current;
-      if (!tool || !activePhotoId) return;
       let source: Blob | null = null;
+      let fileName = "pasted.png";
       if (items) {
         for (const it of Array.from(items)) {
           if (it.kind === "file" && it.type.startsWith("image/")) {
-            source = it.getAsFile();
+            const f = it.getAsFile();
+            if (f) {
+              source = f;
+              if (f.name) fileName = f.name;
+            }
             break;
           }
         }
@@ -1641,36 +1734,18 @@ export function AppShell() {
         }
       }
       if (!source) return;
-      try {
-        const bitmap = await createImageBitmap(source);
-        const w = bitmap.width;
-        const h = bitmap.height;
-        const oc = new OffscreenCanvas(w, h);
-        const ctx = oc.getContext("2d")!;
-        ctx.drawImage(bitmap, 0, 0);
-        bitmap.close();
-        const rgba = ctx.getImageData(0, 0, w, h).data;
-        const cw = stamp.state.width || w;
-        const ch = stamp.state.height || h;
-        const destX = Math.round((cw - w) / 2);
-        const destY = Math.round((ch - h) / 2);
-        stamp.pasteRegion(
-          new Uint8ClampedArray(rgba.buffer as ArrayBuffer),
-          w,
-          h,
-          destX,
-          destY,
-        );
-        toast.success("Pasted into active layer");
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Unknown error";
-        toast.error(`Couldn't paste image: ${msg}`);
-      }
+      const file =
+        source instanceof File
+          ? source
+          : new File([source], fileName, {
+              type: source.type || "image/png",
+            });
+      await openImportDialog(source, file);
     },
-    [stamp, activePhotoId],
+    [openImportDialog],
   );
 
-  // Native Ctrl/Cmd+V paste → drop the clipboard image into the active layer.
+  // Native Ctrl/Cmd+V paste of an image → open the import choice dialog.
   // Skipped while the upload dialog is open (it imports pastes as new photos)
   // or when focus is in a text field (text tool, layer rename, etc.).
   useEffect(() => {
@@ -1697,6 +1772,91 @@ export function AppShell() {
     window.addEventListener("paste", handler);
     return () => window.removeEventListener("paste", handler);
   }, [showUpload, handlePasteFromClipboard]);
+
+  // Drag an image anywhere over the app → show the full-window drop affordance;
+  // on drop, open the import choice dialog (NOT the New/upload dialog). A depth
+  // counter keeps the overlay steady as the drag crosses child elements.
+  useEffect(() => {
+    if (showUpload) return; // let the upload dialog own drops while it's open
+    const isFileDrag = (e: DragEvent) =>
+      !!e.dataTransfer &&
+      Array.from(e.dataTransfer.types || []).includes("Files");
+    let depth = 0;
+    const onEnter = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      depth += 1;
+      setIsDraggingImage(true);
+    };
+    const onOver = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault(); // required so the browser fires `drop`
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+    const onLeave = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setIsDraggingImage(false);
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault(); // stop the browser from navigating to the image
+      depth = 0;
+      setIsDraggingImage(false);
+      const file = Array.from(e.dataTransfer?.files ?? []).find((f) =>
+        f.type.startsWith("image/"),
+      );
+      if (!file) {
+        toast.error("That doesn't look like an image");
+        return;
+      }
+      void openImportDialog(file, file);
+    };
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDrop);
+      setIsDraggingImage(false);
+    };
+  }, [showUpload, openImportDialog]);
+
+  // ── Import choice actions ──
+  /** Center the imported image over the canvas. */
+  const importDest = useCallback(
+    (w: number, h: number) => {
+      const cw = stamp.state.width || w;
+      const ch = stamp.state.height || h;
+      return { x: Math.round((cw - w) / 2), y: Math.round((ch - h) / 2) };
+    },
+    [stamp.state.width, stamp.state.height],
+  );
+  const importToNewLayer = useCallback(() => {
+    const img = importImage;
+    if (!img) return;
+    const { x, y } = importDest(img.w, img.h);
+    stamp.addLayer("Pasted Image"); // creates + activates a fresh layer
+    stamp.pasteRegion(img.pixels, img.w, img.h, x, y);
+    toast.success("Added as a new layer");
+    closeImportDialog();
+  }, [importImage, importDest, stamp, closeImportDialog]);
+  const importOntoLayer = useCallback(() => {
+    const img = importImage;
+    if (!img) return;
+    const { x, y } = importDest(img.w, img.h);
+    stamp.pasteRegion(img.pixels, img.w, img.h, x, y);
+    toast.success("Added onto the image");
+    closeImportDialog();
+  }, [importImage, importDest, stamp, closeImportDialog]);
+  const importToGallery = useCallback(() => {
+    const img = importImage;
+    if (!img) return;
+    void handleAddPhotos([img.file]);
+    closeImportDialog();
+  }, [importImage, handleAddPhotos, closeImportDialog]);
 
   const handleToggleCompare = useCallback(() => {
     setCompareActive((v) => !v);
@@ -2074,10 +2234,11 @@ export function AppShell() {
           setToolSettings((p) => ({ ...p, brushSize: clamp(p.brushSize + step, 1, 50) }));
         } else if (brushMode === "blur") {
           setToolSettings((p) => ({ ...p, blurSize: clamp(p.blurSize + step, 4, 128) }));
-        } else if (brushMode === "eraser") {
-          setToolSettings((p) => ({ ...p, eraserSize: clamp(p.eraserSize + step, 1, 100) }));
         }
         // pen mode draws vector paths — no brush size
+      } else if (activeTool === "crop" && cropEraserActive) {
+        // Eraser now lives in Edit & Transform.
+        setToolSettings((p) => ({ ...p, eraserSize: clamp(p.eraserSize + step, 1, 100) }));
       } else if (activeTool === "stamp") {
         if (stampSubMode === "emojis") {
           setToolSettings((p) => ({ ...p, emojiSize: clamp(p.emojiSize + step, 16, 128) }));
@@ -2091,7 +2252,7 @@ export function AppShell() {
         }
       }
     },
-    [activeTool, brushMode, stampSubMode, setToolSettings, setStampSettings, stamp],
+    [activeTool, brushMode, cropEraserActive, stampSubMode, setToolSettings, setStampSettings, stamp],
   );
 
   useKeyboardShortcuts({
@@ -2103,6 +2264,8 @@ export function AppShell() {
     onSelectAll: handleSelectAll,
     onDeselect: handleDeselect,
     hasSelection: selectionMask !== null,
+    onToggleMove: handleToggleMove,
+    onShowCelebration: () => setShowCelebration(true),
     onAdjustBrushSize: adjustBrushSize,
     setShowUpload,
     setShowTools,
@@ -2227,9 +2390,31 @@ export function AppShell() {
         canClose={photos.length > 0}
       />
 
+      {/* Drag-an-image-anywhere affordance + the import choice dialog. */}
+      <ImageDropOverlay show={isDraggingImage} />
+      <ImportImageDialog
+        open={importImage !== null}
+        onOpenChange={(o) => {
+          if (!o) closeImportDialog();
+        }}
+        previewUrl={importImage?.previewUrl ?? null}
+        width={importImage?.w ?? 0}
+        height={importImage?.h ?? 0}
+        canUseLayers={TIERS[effectiveUserMode].layersPerImage > 0}
+        hasActivePhoto={activePhotoId !== null}
+        onNewLayer={importToNewLayer}
+        onOntoLayer={importOntoLayer}
+        onAddToGallery={importToGallery}
+      />
+
       <ShortcutModal
         open={showShortcutModal}
         onClose={() => setShowShortcutModal(false)}
+      />
+
+      <CelebrationDialog
+        open={showCelebration}
+        onOpenChange={setShowCelebration}
       />
 
       <IdleScreen open={idle} onContinue={wake} reduceMotion={prefs.reduceMotion} />
@@ -2402,7 +2587,7 @@ export function AppShell() {
           <DialogFooter className="flex-row gap-2">
             <ActionTile
               icon={ImageIcon}
-              label="Canvas Image"
+              label={`Download & Share ${exportFormat.toUpperCase()}`}
               onClick={() => {
                 setExportDialogOpen(false);
                 void handleExport();
@@ -2513,11 +2698,26 @@ export function AppShell() {
               tolerance: selectionTolerance,
               onToleranceChange: setSelectionTolerance,
               mode: selectionMode,
-              onToggleMode: () => setSelectionMode((m) => !m),
+              onToggleMode: handleToggleSelectionMode,
               onSelectAll: handleSelectAll,
               onDeselect: handleDeselect,
               onDelete: handleDeleteSelection,
               active: selectionMask !== null,
+            }}
+            moveActive={moveActive}
+            onToggleMove={handleToggleMove}
+            eraser={{
+              active: cropEraserActive,
+              onToggle: () => setCropEraserActive((v) => !v),
+              size: toolSettings.eraserSize,
+              onSizeChange: (v) =>
+                setToolSettings((p) => ({ ...p, eraserSize: v })),
+              opacity: toolSettings.eraserOpacity,
+              onOpacityChange: (v) =>
+                setToolSettings((p) => ({ ...p, eraserOpacity: v })),
+              hardness: toolSettings.eraserHardness,
+              onHardnessChange: (v) =>
+                setToolSettings((p) => ({ ...p, eraserHardness: v })),
             }}
             toolSettings={toolSettings}
             onToolSettingsChange={handleToolSettingsChange}
@@ -2714,9 +2914,9 @@ export function AppShell() {
                       textInput={textTool.textInput}
                       textareaRef={textTool.textareaRef}
                       onCanvasClick={textTool.onCanvasClick}
-                      selectionActive={activeTool === "crop" && selectionMode}
+                      selectionActive={activeTool === "arrow" && selectionMode}
                       onSelectionClick={handleSelectionClick}
-                      selectionMask={activeTool === "crop" ? selectionMask : null}
+                      selectionMask={activeTool === "arrow" ? selectionMask : null}
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
                       onTextKeyDown={textTool.onTextKeyDown}
@@ -2895,7 +3095,7 @@ export function AppShell() {
               onSetValue: setMaskPaintValue,
             }}
             getHistogram={getHistogram}
-            histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}`}
+            histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}:${isImageLoading ? "loading" : "ready"}`}
             histogramPhotoKey={activePhotoId ?? ""}
           />
         )}
@@ -2921,7 +3121,8 @@ export function AppShell() {
         !colorPickerActive &&
         (activeTool === "stamp" ||
           activeTool === "brush" ||
-          activeTool === "emoji") && (
+          activeTool === "emoji" ||
+          (activeTool === "crop" && cropEraserActive)) && (
           <div
             className="brush-cursor"
             style={{

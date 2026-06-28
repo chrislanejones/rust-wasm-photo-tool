@@ -27,6 +27,18 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.32",
+    date: "2026-06-27",
+    headline: "Tool shelf reshuffle, drag-and-drop import, and a snappier histogram",
+    entries: [
+      { tag: "feature", text: "Drag an image anywhere onto the app — or paste it (Ctrl+V) — and a full-window glow frames the window, then a dialog asks where it should go: its own new layer, on top of the image you're editing, or as a new image in the gallery." },
+      { tag: "ui", text: "Tool shelf reshuffle: “Edit and Move” is now “Edit and Transform”, and the Eraser moved out of Paint to the bottom of it. “Move” became “Layer Settings” — a Move-layer toggle (Ctrl+M) plus the magic-wand Selection marker, together in one place." },
+      { tag: "fix", text: "The histogram now drops cleanly when you switch photos and rises only once the new image is actually ready — no more flashing or stale graphs mid-load." },
+      { tag: "ui", text: "The download dialog’s main button now says exactly what it’ll do — “Download & Share JPEG/PNG/WEBP” — tracking your chosen format." },
+      { tag: "feature", text: "A little confetti: press Ctrl+\\ for a popper celebrating the month’s shipped features (67 in June, 90 all-time). 🐎" },
+    ],
+  },
+  {
     version: "v0.9.31",
     date: "2026-06-27",
     headline: "Non-destructive layer masks",
