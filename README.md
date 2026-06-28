@@ -26,15 +26,21 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 │  │  stamp_tool.wasm  (ImageHorseTool, ~80KB gzipped)        │   │
 │  │                                                          │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐   │   │
-│  │  │  core    │ │  stamp   │ │ transform │ │ filters  │   │   │
-│  │  │ ImageBuf │ │ Brush    │ │ Flip/Rot  │ │ Bright   │   │   │
-│  │  │ Bilinear │ │ Dab/Strk │ │ Copy/Pste │ │ Contrast │   │   │
+│  │  │  core    │ │  layer   │ │   paint   │ │ effects  │   │   │
+│  │  │ ImageBuf │ │ Stack &  │ │ Brush/Era │ │ Blur/Pix │   │   │
+│  │  │ Bilinear │ │ Composit │ │ Mask/Stab │ │ Redact   │   │   │
 │  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘   │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐                │   │
-│  │  │  codec   │ │ history  │ │ drawing   │ All share one  │   │
-│  │  │ PNG enc  │ │ Undo/Redo│ │ Arrows    │ pixel buffer   │   │
-│  │  │ Thumbnail│ │ Snapshot │ │ Shapes    │ in WASM linear │   │
-│  │  └──────────┘ └──────────┘ └───────────┘ memory.        │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐   │   │
+│  │  │  annot   │ │  select  │ │   stamp   │ │ transfrm │   │   │
+│  │  │ Text &   │ │ Magic-   │ │ Clone Br  │ │ Flip/Rot │   │   │
+│  │  │ Shapes   │ │ Wand     │ │ Dab/Strok │ │ Resize   │   │   │
+│  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘   │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐   │   │
+│  │  │ filters  │ │ drawing  │ │   text    │ │ codec/   │   │   │
+│  │  │ Bright/  │ │ Arrows/  │ │ Fonts/    │ │ history  │   │   │
+│  │  │ Contrast │ │ Shapes   │ │ Bezier    │ │ Undo/PNG │   │   │
+│  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘   │   │
+│  │  utils · shared leaf helpers — all share one pixel buffer│   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                       │                                         │
 │                       ▼                                         │
@@ -80,22 +86,37 @@ The `image` crate with all codec features adds ~800KB to the WASM binary. The br
 
 ```
 src/
-├── lib.rs          #[wasm_bindgen] glue — ImageHorseTool struct (was CloneStampTool);
-│                   Layer stack (Vec<Layer> + active index): each Layer owns its RGBA buffer
-│                   plus its own TextAnnotation + ShapeAnnotation overlays. Layer API:
-│                   add / duplicate / remove / set_active / move / merge_down / flatten_all /
-│                   set_layer_visible / set_layer_opacity / rename / get_layers / recomposite;
-│                   composite_layers(_into) blends visible layers source-over by opacity into a
-│                   reusable cache (single-opaque-layer fast path); export/thumbnail composite
-│                   the whole stack. Layer persistence: get_layer_png / get_layer_*_annotations
-│                   (serialize) and begin/push_restored_layer/restore_text_annotation/finish (restore).
-│                   set_editing_shape + set_editing_text suppress the in-edit overlay so the JS
-│                   preview isn't doubled. Also: get_pixel(x,y) / get_pixel_region(cx,cy,radius);
+├── lib.rs          #[wasm_bindgen] coordinator (v0.9.34: the former ~4,760-line god-object was
+│                   split into the focused modules below — behaviour-identical, identical WASM API).
+│                   Holds the ImageHorseTool struct + all fields; constructor/dimensions;
+│                   load_image / get_image_data / has_transparency / data_ptr / data_len;
+│                   calculate_histogram; zoom; history wrappers (undo/redo/jump, snapshot
+│                   inject/labels, make_snapshot/snap/restore_snapshot); clone-stamp setters +
+│                   begin/continue/end_stroke; export_png / thumbnail; flip/rotate/crop/copy/paste/
+│                   resize_with_filter; adjust_brightness/contrast; stamp_pixels / stamp_red /
+│                   commit_text / measure_text / commit_red_stamp; get_pixel / get_pixel_region;
 │                   stateless free fns composite_pixels, resize_pixels, encode_png_pixels,
-│                   blank_png (solid/transparent RGBA fill → PNG, backs the Blank Canvas),
-│                   parse_color, photo_limit;
-│                   resize_with_filter (Lanczos3 / Catmull-Rom / Nearest / bilinear),
-│                   web_perf_metrics (PSI-faithful score), push_compress_marker
+│                   blank_png (solid/transparent RGBA fill → PNG), parse_color, photo_limit,
+│                   grid_lines, web_perf_metrics (PSI-faithful score)
+├── layer.rs        Layer type + composite/render pipeline (render_layer, blend_over,
+│                   composite_layers(_into) — visible layers source-over by opacity into a reusable
+│                   cache, single-opaque-layer fast path — composite_drop_shadow, build_annotation_tile)
+│                   and the layer CRUD/mask/merge impl: add / duplicate / remove / set_active / move /
+│                   merge_down / flatten_all / visibility / opacity / rename / get_layers / recomposite;
+│                   add/remove/apply/invert/has_layer_mask; move_preview + translate_active_layer;
+│                   layer persistence get_layer_png / get_layer_*_annotations + begin/push_restored_layer/finish
+├── annotations.rs  Live (non-destructive) overlays: TextAnnotation + ShapeAnnotation types,
+│                   build_text_annotation, JSON (de)serialise, render_shape_into / render_pin, and the
+│                   text + shape CRUD impls (add/update/remove/get/at/restore, draw_arrow / draw_shape,
+│                   align_annotation, bézier + polyline + pin, set_editing_*, render_with_annotations,
+│                   flatten_text_annotations)
+├── paint.rs        Paint / brush engine — the paint / erase / mask / stabiliser stroke state machine
+│                   (paint_begin, accumulate_dab, recomposite_stroke_bbox, paint_dab/stroke_to/down/
+│                   move/up, erase_*, mask_paint_*, paint_stab_*)
+├── effects.rs      Effects brush — Gaussian blur, pixelate, redaction strokes (blur_region,
+│                   pixelate_region, redact_region, begin_*_stroke, effect_down/move/up, apply_effect_dab)
+├── selection.rs    Magic-wand flood fill + marching-ants overlay (magic_wand_select, select_all,
+│                   selection_overlay(_rgba), has/clear/delete_selection)
 ├── core.rs         ImageBuffer — width, height, data, load, bilinear sampling (now #[derive(Clone)]
 │                   so layers + history snapshots clone cheaply); zero-size guard returns [0,0,0,0]
 ├── history.rs      Snapshot now captures the FULL layer stack (Vec<Layer> + active index + dims),
@@ -119,8 +140,10 @@ src/
 ├── text.rs         Liberation Sans font embedded at compile time (subset to Latin-1 + Extended-A
 │                   for a 60% WASM size cut); renders text → pixel buffer; rotate_pixels for
 │                   annotation tiles
-└── codec.rs        PNG encoding, thumbnail generation with bilinear scaling;
-                    history snapshot serialization (get/inject undo/redo PNG blobs)
+├── codec.rs        PNG encoding, thumbnail generation with bilinear scaling;
+│                   history snapshot serialization (get/inject undo/redo PNG blobs)
+└── utils.rs        Shared leaf helpers — json_escape, flat_to_points, points_bbox,
+                    point_segment_distance, pin_label, ink_bounds
 ```
 
 ## Frontend Structure

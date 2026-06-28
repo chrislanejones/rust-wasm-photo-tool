@@ -13,7 +13,7 @@
 use std::collections::VecDeque;
 
 use crate::settings;
-use crate::Layer;
+use crate::layer::Layer;
 
 pub struct Snapshot {
     pub label: String,

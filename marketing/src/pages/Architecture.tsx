@@ -259,10 +259,14 @@ export default function Architecture() {
         {/* ROW 2: WASM + Rust Layer — ONE binary, internal modules */}
         <Label color="orange">WASM Processing Layer (Client-Side Rust · single binary)</Label>
         <div className="grid grid-cols-4 gap-4 mb-4 mt-2">
-          <Node title="core · stamp" subtitle="ImageBuffer · Clone Brush · Paint" color="orange" />
-          <Node title="transform · filters" subtitle="Resize (Lanczos3 / Catmull-Rom / Nearest) · Blur · Levels" color="orange" badge="new" />
-          <Node title="text · drawing" subtitle="Liberation Sans · Bubbles · Shapes" color="orange" />
-          <Node title="codec · history" subtitle="PNG Encode · Undo Snapshots" color="orange" />
+          <Node title="core · layer" subtitle="ImageBuffer · layer stack · composite / mask" color="orange" badge="new" />
+          <Node title="paint · effects" subtitle="Brush / eraser / mask · blur / pixelate / redact" color="orange" badge="new" />
+          <Node title="annotations · selection" subtitle="Live text & shape overlays · magic-wand" color="orange" badge="new" />
+          <Node title="stamp · transform" subtitle="Clone brush · flip / rotate / resize / crop" color="orange" />
+          <Node title="filters" subtitle="Brightness · contrast · gaussian blur" color="orange" />
+          <Node title="drawing · text" subtitle="Arrows / shapes / bézier · embedded fonts" color="orange" />
+          <Node title="codec · history" subtitle="PNG encode · thumbnails · undo snapshots" color="orange" />
+          <Node title="utils" subtitle="json · point math · pin / ink helpers" color="orange" badge="new" />
         </div>
 
         {/* WASM detail callout */}

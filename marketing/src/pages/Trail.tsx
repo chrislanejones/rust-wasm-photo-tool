@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.34",
+    date: "2026-06-28",
+    headline: "A big engine cleanup so features ship faster",
+    entries: [
+      { tag: "rust", text: "The WASM image engine had grown into one ~4,800-line file — a single object with ~150 methods piled together. It's now split into focused modules (layers, annotations, paint, effects, selection, and shared helpers), shrinking the main file by about 60%. Not a single pixel changes — same tools, same speed — but the code is far easier to work in, which means new features land faster and with fewer bugs." },
+      { tag: "perf", text: "Smaller, focused modules let the Rust compiler and editor tooling keep up, so each change is quicker to build and check." },
+    ],
+  },
+  {
     version: "v0.9.33",
     date: "2026-06-28",
     headline: "A compact master bar for narrow & split-screen windows",

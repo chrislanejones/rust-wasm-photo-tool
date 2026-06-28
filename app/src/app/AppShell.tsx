@@ -1767,12 +1767,19 @@ export function AppShell() {
     [openImportDialog],
   );
 
+  // A "New"/start surface is up: the upload dialog, the boot splash, or the
+  // first-run start screen (New actions / Welcome-back). Drag-drop & paste
+  // image-import stay dormant under any of these — the surface owns the image
+  // (or there's no workspace yet). "Add this image" is only for dropping/pasting
+  // onto the live editor when no dialog/start screen is open.
+  const newSurfaceOpen =
+    showUpload || booting || (firstRun && !!resumeManifest);
+
   // Native Ctrl/Cmd+V paste of an image → open the import choice dialog.
-  // Skipped while the upload dialog is open (it imports pastes as new photos)
-  // or when focus is in a text field (text tool, layer rename, etc.).
+  // Skipped while a New/start surface is up, or focus is in a text field.
   useEffect(() => {
     const handler = (e: ClipboardEvent) => {
-      if (showUpload) return;
+      if (newSurfaceOpen) return;
       const target = e.target as HTMLElement | null;
       if (
         target &&
@@ -1793,13 +1800,13 @@ export function AppShell() {
     };
     window.addEventListener("paste", handler);
     return () => window.removeEventListener("paste", handler);
-  }, [showUpload, handlePasteFromClipboard]);
+  }, [newSurfaceOpen, handlePasteFromClipboard]);
 
   // Drag an image anywhere over the app → show the full-window drop affordance;
   // on drop, open the import choice dialog (NOT the New/upload dialog). A depth
   // counter keeps the overlay steady as the drag crosses child elements.
   useEffect(() => {
-    if (showUpload) return; // let the upload dialog own drops while it's open
+    if (newSurfaceOpen) return; // a New/start surface owns drops while it's up
     const isFileDrag = (e: DragEvent) =>
       !!e.dataTransfer &&
       Array.from(e.dataTransfer.types || []).includes("Files");
@@ -1844,7 +1851,7 @@ export function AppShell() {
       window.removeEventListener("drop", onDrop);
       setIsDraggingImage(false);
     };
-  }, [showUpload, openImportDialog]);
+  }, [newSurfaceOpen, openImportDialog]);
 
   // ── Import choice actions ──
   /** Center the imported image over the canvas. */
@@ -2618,7 +2625,7 @@ export function AppShell() {
           <DialogFooter className="flex-row gap-2">
             <ActionTile
               icon={ImageIcon}
-              label={`Download & Share ${exportFormat.toUpperCase()}`}
+              label={`Download ${exportFormat.toUpperCase()}`}
               onClick={() => {
                 setExportDialogOpen(false);
                 void handleExport();

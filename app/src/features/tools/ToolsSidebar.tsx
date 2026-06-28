@@ -390,7 +390,7 @@ export function ToolsSidebar({
                 className="w-full"
               >
                 <Download className="h-4 w-4" />
-                Download {exportFormat.toUpperCase()}
+                Download &amp; Share {exportFormat.toUpperCase()}
                 {photoCount > 1 ? "s" : ""}
               </LargeButton>
             </div>
