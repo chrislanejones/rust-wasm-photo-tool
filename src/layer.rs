@@ -1,12 +1,15 @@
 //! Layer stack: the `Layer` type, the composite/render pipeline, and the layer
 //! CRUD / mask / merge impl block. Split out of `lib.rs`; behaviour is unchanged.
 
-use wasm_bindgen::prelude::*;
-use crate::ImageHorseTool;
+use crate::annotations::{
+    annotations_to_json, build_text_annotation, render_shape_into, shapes_to_json, ShapeAnnotation,
+    TextAnnotation,
+};
 use crate::core::ImageBuffer;
-use crate::annotations::{TextAnnotation, ShapeAnnotation, render_shape_into, build_text_annotation, annotations_to_json, shapes_to_json};
 use crate::utils::json_escape;
-use crate::{transform, codec};
+use crate::ImageHorseTool;
+use crate::{codec, transform};
+use wasm_bindgen::prelude::*;
 
 /// A single Photoshop-style layer: an independent RGBA pixel buffer plus its
 /// own live (non-destructive) text and shape annotations. Layers share the
@@ -205,7 +208,15 @@ pub(crate) fn composite_layers(
     editing_text_id: Option<u32>,
 ) -> Vec<u8> {
     let mut out = Vec::new();
-    composite_layers_into(&mut out, layers, w, h, editing_shape_id, editing_text_id, None);
+    composite_layers_into(
+        &mut out,
+        layers,
+        w,
+        h,
+        editing_shape_id,
+        editing_text_id,
+        None,
+    );
     out
 }
 
@@ -229,8 +240,13 @@ pub(crate) fn composite_drop_shadow(
     tile_h: u32,
     box_cov: Option<&[f32]>,
     text_src: Option<(&[u8], u32, u32, i32, i32)>, // pixels, w, h, paste_x, paste_y
-    dx: i32, dy: i32, blur: u32,
-    sr: u8, sg: u8, sb: u8, sa: u8,
+    dx: i32,
+    dy: i32,
+    blur: u32,
+    sr: u8,
+    sg: u8,
+    sb: u8,
+    sa: u8,
 ) {
     if sa == 0 {
         return;
@@ -281,18 +297,28 @@ pub(crate) fn composite_drop_shadow(
 pub(crate) fn build_annotation_tile(
     text: &str,
     font_size: f32,
-    r: u8, g: u8, b: u8,
+    r: u8,
+    g: u8,
+    b: u8,
     bold: bool,
     rotation_deg: f64,
     background_kind: u8,
-    bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+    bg_r: u8,
+    bg_g: u8,
+    bg_b: u8,
+    bg_a: u8,
     bg_padding: u32,
     bg_corner_radius: u32,
     bg_tail: u32,
     shadow_box: bool,
     shadow_text: bool,
-    shadow_r: u8, shadow_g: u8, shadow_b: u8, shadow_a: u8,
-    shadow_dx: i32, shadow_dy: i32, shadow_blur: u32,
+    shadow_r: u8,
+    shadow_g: u8,
+    shadow_b: u8,
+    shadow_a: u8,
+    shadow_dx: i32,
+    shadow_dy: i32,
+    shadow_blur: u32,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
     let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
     let raw_w = rendered.width;
@@ -321,15 +347,29 @@ pub(crate) fn build_annotation_tile(
         // Only the text can cast a shadow when there's no background box.
         if any_shadow && shadow_text {
             composite_drop_shadow(
-                &mut tile, tile_w, tile_h, None,
+                &mut tile,
+                tile_w,
+                tile_h,
+                None,
                 Some((&rendered.pixels, raw_w, raw_h, tx, ty)),
-                shadow_dx, shadow_dy, shadow_blur,
-                shadow_r, shadow_g, shadow_b, shadow_a,
+                shadow_dx,
+                shadow_dy,
+                shadow_blur,
+                shadow_r,
+                shadow_g,
+                shadow_b,
+                shadow_a,
             );
         }
         crate::transform::paste_region(
-            &mut tile, tile_w as i32, tile_h as i32,
-            &rendered.pixels, raw_w, raw_h, tx, ty,
+            &mut tile,
+            tile_w as i32,
+            tile_h as i32,
+            &rendered.pixels,
+            raw_w,
+            raw_h,
+            tx,
+            ty,
         );
         if rotation_deg.abs() < 0.5 {
             return (tile, tile_w, tile_h, 0, 0);
@@ -347,8 +387,8 @@ pub(crate) fn build_annotation_tile(
     // speech-bubble tail can point in any direction (`bg_tail` is an angle in
     // degrees), so reserve a uniform `TAIL_MARGIN` on every side — the tail
     // apex lands inside that margin no matter the angle.
-    const TAIL_LEN: f64 = 46.0;    // how far the apex sticks out past the rect edge
-    const TAIL_HALF: f64 = 16.0;   // half-width of the tail base
+    const TAIL_LEN: f64 = 46.0; // how far the apex sticks out past the rect edge
+    const TAIL_HALF: f64 = 16.0; // half-width of the tail base
     let tail_margin: u32 = if background_kind == 2 {
         (TAIL_LEN.ceil() as u32) + (TAIL_HALF.ceil() as u32)
     } else {
@@ -372,8 +412,13 @@ pub(crate) fn build_annotation_tile(
     // the join, and translucent fills don't double up where the two overlap.
     let mut cov = vec![0f32; (tile_w * tile_h) as usize];
     crate::drawing::rounded_rect_coverage(
-        &mut cov, tile_w, tile_h,
-        rect_x0, rect_y0, rect_x1, rect_y1,
+        &mut cov,
+        tile_w,
+        tile_h,
+        rect_x0,
+        rect_y0,
+        rect_x1,
+        rect_y1,
         bg_corner_radius,
     );
 
@@ -396,8 +441,16 @@ pub(crate) fn build_annotation_tile(
         let dx = theta.cos();
         let dy = theta.sin();
 
-        let tx = if dx.abs() > 1e-6 { hw / dx.abs() } else { f64::INFINITY };
-        let ty = if dy.abs() > 1e-6 { hh / dy.abs() } else { f64::INFINITY };
+        let tx = if dx.abs() > 1e-6 {
+            hw / dx.abs()
+        } else {
+            f64::INFINITY
+        };
+        let ty = if dy.abs() > 1e-6 {
+            hh / dy.abs()
+        } else {
+            f64::INFINITY
+        };
         let t = tx.min(ty);
         let ex = cx + dx * t;
         let ey = cy + dy * t;
@@ -411,7 +464,11 @@ pub(crate) fn build_annotation_tile(
             let lo = rect_y0 as f64 + rad_eff + TAIL_HALF;
             let hi = rect_y1 as f64 - rad_eff - TAIL_HALF;
             let yc = if lo <= hi { ey.clamp(lo, hi) } else { cy };
-            let inward = if dx >= 0.0 { -TAIL_OVERLAP } else { TAIL_OVERLAP };
+            let inward = if dx >= 0.0 {
+                -TAIL_OVERLAP
+            } else {
+                TAIL_OVERLAP
+            };
             let bx = ex + inward;
             b1 = (bx, yc - TAIL_HALF);
             b2 = (bx, yc + TAIL_HALF);
@@ -421,17 +478,18 @@ pub(crate) fn build_annotation_tile(
             let lo = rect_x0 as f64 + rad_eff + TAIL_HALF;
             let hi = rect_x1 as f64 - rad_eff - TAIL_HALF;
             let xc = if lo <= hi { ex.clamp(lo, hi) } else { cx };
-            let inward = if dy >= 0.0 { -TAIL_OVERLAP } else { TAIL_OVERLAP };
+            let inward = if dy >= 0.0 {
+                -TAIL_OVERLAP
+            } else {
+                TAIL_OVERLAP
+            };
             let by = ey + inward;
             b1 = (xc - TAIL_HALF, by);
             b2 = (xc + TAIL_HALF, by);
             apex = (xc + dx * TAIL_LEN, ey + dy * TAIL_LEN);
         }
 
-        crate::drawing::triangle_coverage(
-            &mut cov, tile_w as i32, tile_h as i32,
-            b1, b2, apex,
-        );
+        crate::drawing::triangle_coverage(&mut cov, tile_w as i32, tile_h as i32, b1, b2, apex);
     }
 
     // Text sits inside the rect with `pad` margin (origin already folds in the
@@ -446,7 +504,11 @@ pub(crate) fn build_annotation_tile(
             &mut tile,
             tile_w,
             tile_h,
-            if shadow_box { Some(cov.as_slice()) } else { None },
+            if shadow_box {
+                Some(cov.as_slice())
+            } else {
+                None
+            },
             if shadow_text {
                 Some((&rendered.pixels, raw_w, raw_h, text_dx, text_dy))
             } else {
@@ -931,30 +993,61 @@ impl ImageHorseTool {
         &mut self,
         text: &str,
         font_size: f32,
-        r: u8, g: u8, b: u8,
+        r: u8,
+        g: u8,
+        b: u8,
         bold: bool,
         x: i32,
         y: i32,
         rotation_deg: f64,
         background_kind: u8,
-        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_r: u8,
+        bg_g: u8,
+        bg_b: u8,
+        bg_a: u8,
         bg_padding: u32,
         bg_corner_radius: u32,
         bg_tail: u32,
         shadow_box: bool,
         shadow_text: bool,
-        shadow_r: u8, shadow_g: u8, shadow_b: u8, shadow_a: u8,
-        shadow_dx: i32, shadow_dy: i32, shadow_blur: u32,
+        shadow_r: u8,
+        shadow_g: u8,
+        shadow_b: u8,
+        shadow_a: u8,
+        shadow_dx: i32,
+        shadow_dy: i32,
+        shadow_blur: u32,
     ) -> u32 {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
         let ann = build_text_annotation(
-            id, text, font_size, r, g, b, bold, x, y, rotation_deg,
-            background_kind, bg_r, bg_g, bg_b, bg_a,
-            bg_padding, bg_corner_radius, bg_tail,
-            shadow_box, shadow_text,
-            shadow_r, shadow_g, shadow_b, shadow_a,
-            shadow_dx, shadow_dy, shadow_blur,
+            id,
+            text,
+            font_size,
+            r,
+            g,
+            b,
+            bold,
+            x,
+            y,
+            rotation_deg,
+            background_kind,
+            bg_r,
+            bg_g,
+            bg_b,
+            bg_a,
+            bg_padding,
+            bg_corner_radius,
+            bg_tail,
+            shadow_box,
+            shadow_text,
+            shadow_r,
+            shadow_g,
+            shadow_b,
+            shadow_a,
+            shadow_dx,
+            shadow_dy,
+            shadow_blur,
         );
         let active = self.active;
         if let Some(layer) = self.layers.get_mut(active) {
@@ -967,8 +1060,12 @@ impl ImageHorseTool {
     /// guarantee a non-empty stack, and rebuild the composite cache.
     pub fn finish_layer_restore(&mut self, active_index: usize) {
         if self.layers.is_empty() {
-            self.layers
-                .push(Layer::new(1, "Background".to_string(), self.width, self.height));
+            self.layers.push(Layer::new(
+                1,
+                "Background".to_string(),
+                self.width,
+                self.height,
+            ));
             self.next_layer_id = 2;
         }
         self.active = active_index.min(self.layers.len() - 1);

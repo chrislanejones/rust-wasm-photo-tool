@@ -3,7 +3,6 @@
 /// PNG encoding uses the `png` crate. JPEG/WebP/AVIF encoding is handled
 /// on the JS side via `canvas.toBlob()` — no need to ship those encoders
 /// in the WASM binary.
-
 use crate::core::ImageBuffer;
 
 /// Encode the image buffer as PNG bytes.
@@ -45,7 +44,7 @@ pub fn thumbnail_data(buf: &ImageBuffer, max_px: u32) -> (Vec<u8>, u32, u32) {
             let fy = (ty as f64 + 0.5) * sy - 0.5;
             let [r, g, b, a] = buf.sample_bilinear(fx, fy);
             let di = ((ty * tw + tx) * 4) as usize;
-            out[di]     = r;
+            out[di] = r;
             out[di + 1] = g;
             out[di + 2] = b;
             out[di + 3] = a;

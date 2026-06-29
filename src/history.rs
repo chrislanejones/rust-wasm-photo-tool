@@ -9,11 +9,10 @@
 /// Storing dimensions is necessary because some operations (crop, resize,
 /// rotate) change the canvas size — without restoring width/height, undo would
 /// put the wrong dimensions back and corrupt the display.
-
 use std::collections::VecDeque;
 
-use crate::settings;
 use crate::layer::Layer;
+use crate::settings;
 
 pub struct Snapshot {
     pub label: String,

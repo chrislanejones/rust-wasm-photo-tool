@@ -27,12 +27,23 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.37",
+    date: "2026-06-28",
+    headline: "Behind the scenes — docs, CI safety nets, faster checks",
+    entries: [
+      { tag: "infra", text: "Reorganized the project documentation into a docs/ folder (Architecture, File Map, Features, Getting Started, Keyboard Shortcuts, CI, and one dated Change Summary) and slimmed the README down to the essentials." },
+      { tag: "infra", text: "Added a CI pipeline — build, security, and dependency-audit jobs — plus an advisory “guardrails” pass that flags design-token drift (raw colors, off-scale type, stray z-index) without blocking the build." },
+      { tag: "infra", text: "Added native git hooks that run formatting, lint, and type checks before every push, so a change can’t quietly break the build." },
+    ],
+  },
+  {
     version: "v0.9.36",
     date: "2026-06-28",
     headline: "WASM SIMD128 — the heavy pixel ops got faster",
     entries: [
       { tag: "perf", text: "The image engine's hottest pixel loops now use explicit WebAssembly SIMD128 (processing four channels at once): Gaussian blur, brightness, contrast, pixelate, and image resize (bilinear / Lanczos / Catmull-Rom). Measured in-browser, resize runs ~1.6× faster (bilinear) up to ~3.9× (Lanczos) — and the output is bit-for-bit identical, so nothing about your edits changes; they just land quicker." },
       { tag: "rust", text: "Every kernel keeps a matching scalar fallback (used where SIMD isn't available) and shares one set of load/store helpers, all consolidated under a new src/simd/ module." },
+      { tag: "infra", text: "Scoped the marketing deploy to the marketing/ workspace — removed the stale root vercel.json and pointed the Vercel project at marketing/ (Root Directory), so it no longer tries to build the whole monorepo." },
     ],
   },
   {

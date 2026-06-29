@@ -2,11 +2,13 @@
 //! JSON (de)serialisation, rasterisation helpers, and the annotation CRUD impl
 //! blocks. Split out of `lib.rs`; behaviour is unchanged.
 
-use wasm_bindgen::prelude::*;
-use crate::ImageHorseTool;
-use crate::utils::{json_escape, flat_to_points, points_bbox, point_segment_distance, pin_label, ink_bounds};
 use crate::layer::build_annotation_tile;
+use crate::utils::{
+    flat_to_points, ink_bounds, json_escape, pin_label, point_segment_distance, points_bbox,
+};
+use crate::ImageHorseTool;
 use crate::{drawing, transform};
+use wasm_bindgen::prelude::*;
 
 /// A live (non-destructive) text annotation that sits in an overlay
 /// composited over the main pixel buffer on render. Annotations are
@@ -19,10 +21,12 @@ use crate::{drawing, transform};
 pub struct TextAnnotation {
     pub id: u32,
     pub text: String,
-    pub x: i32,       // unrotated top-left in canvas coords
+    pub x: i32, // unrotated top-left in canvas coords
     pub y: i32,
     pub font_size: f32,
-    pub r: u8, pub g: u8, pub b: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
     pub bold: bool,
     pub rotation_deg: f64,
     // cached pre-rendered tile (rotated): updated whenever the annotation changes.
@@ -31,21 +35,28 @@ pub struct TextAnnotation {
     pub tile_pixels: std::sync::Arc<Vec<u8>>,
     pub tile_w: u32,
     pub tile_h: u32,
-    pub tile_offset_x: i32,  // offset of tile origin from (x,y) due to rotation expanding bounds
+    pub tile_offset_x: i32, // offset of tile origin from (x,y) due to rotation expanding bounds
     pub tile_offset_y: i32,
     // Text background (optional fill behind the text)
-    pub background_kind: u8,   // 0 = None, 1 = Rect, 2 = SpeechBubble
-    pub bg_r: u8, pub bg_g: u8, pub bg_b: u8, pub bg_a: u8,
+    pub background_kind: u8, // 0 = None, 1 = Rect, 2 = SpeechBubble
+    pub bg_r: u8,
+    pub bg_g: u8,
+    pub bg_b: u8,
+    pub bg_a: u8,
     pub bg_padding: u32,
     pub bg_corner_radius: u32,
-    pub bg_tail: u32,          // speech-bubble tail angle in degrees (0-359, CW from +x / east); only used when background_kind == 2
+    pub bg_tail: u32, // speech-bubble tail angle in degrees (0-359, CW from +x / east); only used when background_kind == 2
     // Soft drop shadow — shared color/offset/blur with independent box/text
     // toggles. Cast from the selected silhouette(s), offset, blurred, and painted
     // behind everything when the tile is built. All-zero / both-false = no shadow.
     pub shadow_box: bool,
     pub shadow_text: bool,
-    pub shadow_r: u8, pub shadow_g: u8, pub shadow_b: u8, pub shadow_a: u8,
-    pub shadow_dx: i32, pub shadow_dy: i32,
+    pub shadow_r: u8,
+    pub shadow_g: u8,
+    pub shadow_b: u8,
+    pub shadow_a: u8,
+    pub shadow_dx: i32,
+    pub shadow_dy: i32,
     pub shadow_blur: u32,
 }
 /// A live (non-destructive) shape/arrow annotation. Mirrors `TextAnnotation`:
@@ -64,9 +75,13 @@ pub struct ShapeAnnotation {
     /// 0=rect, 1=circle, 2=line, 3=handCircle, 4=arrow, 5=pin, 6=polyline,
     /// 7=bezier (cubic pen path; `points` holds the flat control sequence).
     pub kind: u8,
-    pub x0: f64, pub y0: f64,   // start point / bbox corner (canvas coords)
-    pub x1: f64, pub y1: f64,   // end point / opposite bbox corner
-    pub r: u8, pub g: u8, pub b: u8,
+    pub x0: f64,
+    pub y0: f64, // start point / bbox corner (canvas coords)
+    pub x1: f64,
+    pub y1: f64, // end point / opposite bbox corner
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
     pub stroke_width: f64,
     /// Arrows only: 0=single-headed, 1=double-headed. Ignored for shapes.
     pub arrow_style: u8,
@@ -82,9 +97,15 @@ pub struct ShapeAnnotation {
     /// fill is painted BEFORE the stroke so the outline sits on top.
     pub fill_kind: u8,
     /// Solid fill colour, or gradient stop 0 (RGBA, straight alpha).
-    pub fill_r: u8, pub fill_g: u8, pub fill_b: u8, pub fill_a: u8,
+    pub fill_r: u8,
+    pub fill_g: u8,
+    pub fill_b: u8,
+    pub fill_a: u8,
     /// Gradient stop 1 (RGBA). Used only when `fill_kind == 2`.
-    pub fill2_r: u8, pub fill2_g: u8, pub fill2_b: u8, pub fill2_a: u8,
+    pub fill2_r: u8,
+    pub fill2_g: u8,
+    pub fill2_b: u8,
+    pub fill2_a: u8,
     /// Linear-gradient direction in degrees (0 = →, 90 = ↓, …). `fill_kind == 2`.
     pub fill_angle: u16,
     /// Mosaic block size in px for `fill_kind == 3` (pixelate). 0 → default 16.
@@ -99,50 +120,90 @@ pub(crate) fn build_text_annotation(
     id: u32,
     text: &str,
     font_size: f32,
-    r: u8, g: u8, b: u8,
+    r: u8,
+    g: u8,
+    b: u8,
     bold: bool,
     x: i32,
     y: i32,
     rotation_deg: f64,
     background_kind: u8,
-    bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+    bg_r: u8,
+    bg_g: u8,
+    bg_b: u8,
+    bg_a: u8,
     bg_padding: u32,
     bg_corner_radius: u32,
     bg_tail: u32,
     shadow_box: bool,
     shadow_text: bool,
-    shadow_r: u8, shadow_g: u8, shadow_b: u8, shadow_a: u8,
-    shadow_dx: i32, shadow_dy: i32, shadow_blur: u32,
+    shadow_r: u8,
+    shadow_g: u8,
+    shadow_b: u8,
+    shadow_a: u8,
+    shadow_dx: i32,
+    shadow_dy: i32,
+    shadow_blur: u32,
 ) -> TextAnnotation {
-    let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
-        build_annotation_tile(
-            text, font_size, r, g, b, bold, rotation_deg,
-            background_kind,
-            bg_r, bg_g, bg_b, bg_a,
-            bg_padding, bg_corner_radius, bg_tail,
-            shadow_box, shadow_text,
-            shadow_r, shadow_g, shadow_b, shadow_a,
-            shadow_dx, shadow_dy, shadow_blur,
-        );
-    TextAnnotation {
-        id,
-        text: text.to_string(),
-        x, y,
+    let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
+        text,
         font_size,
-        r, g, b,
+        r,
+        g,
+        b,
         bold,
         rotation_deg,
-        tile_pixels: std::sync::Arc::new(tile_pixels),
-        tile_w, tile_h,
-        tile_offset_x, tile_offset_y,
         background_kind,
-        bg_r, bg_g, bg_b, bg_a,
+        bg_r,
+        bg_g,
+        bg_b,
+        bg_a,
         bg_padding,
         bg_corner_radius,
         bg_tail,
-        shadow_box, shadow_text,
-        shadow_r, shadow_g, shadow_b, shadow_a,
-        shadow_dx, shadow_dy, shadow_blur,
+        shadow_box,
+        shadow_text,
+        shadow_r,
+        shadow_g,
+        shadow_b,
+        shadow_a,
+        shadow_dx,
+        shadow_dy,
+        shadow_blur,
+    );
+    TextAnnotation {
+        id,
+        text: text.to_string(),
+        x,
+        y,
+        font_size,
+        r,
+        g,
+        b,
+        bold,
+        rotation_deg,
+        tile_pixels: std::sync::Arc::new(tile_pixels),
+        tile_w,
+        tile_h,
+        tile_offset_x,
+        tile_offset_y,
+        background_kind,
+        bg_r,
+        bg_g,
+        bg_b,
+        bg_a,
+        bg_padding,
+        bg_corner_radius,
+        bg_tail,
+        shadow_box,
+        shadow_text,
+        shadow_r,
+        shadow_g,
+        shadow_b,
+        shadow_a,
+        shadow_dx,
+        shadow_dy,
+        shadow_blur,
     }
 }
 
@@ -152,7 +213,9 @@ pub(crate) fn build_text_annotation(
 pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
     let mut out = String::from("[");
     for (i, a) in anns.iter().enumerate() {
-        if i > 0 { out.push(','); }
+        if i > 0 {
+            out.push(',');
+        }
         out.push_str(&format!(
             "{{\"id\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{}}}",
             a.id,
@@ -182,10 +245,14 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
 pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
     let mut out = String::from("[");
     for (i, s) in shapes.iter().enumerate() {
-        if i > 0 { out.push(','); }
+        if i > 0 {
+            out.push(',');
+        }
         let mut pts = String::from("[");
         for (j, (x, y)) in s.points.iter().enumerate() {
-            if j > 0 { pts.push(','); }
+            if j > 0 {
+                pts.push(',');
+            }
             pts.push_str(&format!("[{},{}]", x, y));
         }
         pts.push(']');
@@ -218,8 +285,14 @@ pub(crate) fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnota
     // outline sits on top. fill_kind: 1 = solid, 2 = linear gradient.
     if (s.kind == 0 || s.kind == 1) && s.fill_kind != 0 {
         crate::drawing::fill_shape(
-            data, w, h, s.kind,
-            s.x0, s.y0, s.x1, s.y1,
+            data,
+            w,
+            h,
+            s.kind,
+            s.x0,
+            s.y0,
+            s.x1,
+            s.y1,
             s.fill_kind,
             [s.fill_r, s.fill_g, s.fill_b, s.fill_a],
             [s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a],
@@ -229,9 +302,16 @@ pub(crate) fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnota
     }
     match s.kind {
         4 => crate::drawing::draw_arrow(
-            data, w, h,
-            s.x0, s.y0, s.x1, s.y1,
-            color, s.stroke_width, s.arrow_style as u32,
+            data,
+            w,
+            h,
+            s.x0,
+            s.y0,
+            s.x1,
+            s.y1,
+            color,
+            s.stroke_width,
+            s.arrow_style as u32,
         ),
         5 => render_pin(data, w, h, s),
         6 => crate::drawing::draw_polyline(data, w, h, &s.points, color, s.stroke_width),
@@ -239,16 +319,26 @@ pub(crate) fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnota
             let pts = crate::drawing::flatten_cubic_path(&s.points);
             if s.fill_kind != 0 {
                 crate::drawing::fill_polygon(
-                    data, w, h, &pts,
+                    data,
+                    w,
+                    h,
+                    &pts,
                     [s.fill_r, s.fill_g, s.fill_b, s.fill_a],
                 );
             }
             crate::drawing::draw_polyline(data, w, h, &pts, color, s.stroke_width);
         }
         _ => crate::drawing::draw_shape(
-            data, w, h,
-            s.x0, s.y0, s.x1, s.y1,
-            s.kind as u32, color, s.stroke_width,
+            data,
+            w,
+            h,
+            s.x0,
+            s.y0,
+            s.x1,
+            s.y1,
+            s.kind as u32,
+            color,
+            s.stroke_width,
         ),
     }
 }
@@ -259,12 +349,18 @@ pub(crate) fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let cx = (s.x0 + s.x1) * 0.5;
     let cy = (s.y0 + s.y1) * 0.5;
     let radius = (s.x1 - s.x0).abs().min((s.y1 - s.y0).abs()) * 0.5;
-    if radius < 1.0 { return; }
+    if radius < 1.0 {
+        return;
+    }
     crate::drawing::fill_circle(data, w, h, cx, cy, radius, [s.r, s.g, s.b, 255]);
 
     // Black or white label depending on fill luminance.
     let lum = 0.299 * s.r as f64 + 0.587 * s.g as f64 + 0.114 * s.b as f64;
-    let (nr, ng, nb) = if lum > 140.0 { (20u8, 20u8, 20u8) } else { (255u8, 255u8, 255u8) };
+    let (nr, ng, nb) = if lum > 140.0 {
+        (20u8, 20u8, 20u8)
+    } else {
+        (255u8, 255u8, 255u8)
+    };
     let label = pin_label(s.number, s.label_kind);
     // Shrink multi-character labels ("10", "AA") so they stay inside the disc.
     let chars = label.chars().count().max(1) as f64;
@@ -284,27 +380,34 @@ pub(crate) fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
         ),
     };
     crate::transform::paste_region(
-        data, w as i32, h as i32,
-        &rendered.pixels, rendered.width, rendered.height,
-        dx, dy,
+        data,
+        w as i32,
+        h as i32,
+        &rendered.pixels,
+        rendered.width,
+        rendered.height,
+        dx,
+        dy,
     );
 }
 #[wasm_bindgen]
 impl ImageHorseTool {
-     // ── Drawing: Arrows ─────────────────────────────────────────
+    // ── Drawing: Arrows ─────────────────────────────────────────
     /// Save undo snapshot before drawing an arrow/shape.
     /// Call once on mousedown, then draw_arrow/draw_shape on mouseup.
     pub fn begin_draw_stroke(&mut self, label: &str) {
         self.snap(label);
     }
- 
+
     /// Draw an arrow onto the image buffer.
     /// style: 0 = single-headed, 1 = double-headed
     /// color_hex: CSS hex like "#ef4444"
     pub fn draw_arrow(
         &mut self,
-        from_x: f64, from_y: f64,
-        to_x: f64, to_y: f64,
+        from_x: f64,
+        from_y: f64,
+        to_x: f64,
+        to_y: f64,
         color_hex: &str,
         stroke_width: f64,
         style: u32,
@@ -312,20 +415,28 @@ impl ImageHorseTool {
         let color = drawing::parse_hex_color(color_hex);
         drawing::draw_arrow(
             &mut self.layers[self.active].buf.data,
-            self.width, self.height,
-            from_x, from_y, to_x, to_y,
-            color, stroke_width, style,
+            self.width,
+            self.height,
+            from_x,
+            from_y,
+            to_x,
+            to_y,
+            color,
+            stroke_width,
+            style,
         );
     }
- 
+
     // ── Drawing: Shapes ─────────────────────────────────────────
     /// Draw a shape onto the image buffer.
     /// shape: 0=rect, 1=circle, 2=line
     /// color_hex: CSS hex like "#ef4444"
     pub fn draw_shape(
         &mut self,
-        from_x: f64, from_y: f64,
-        to_x: f64, to_y: f64,
+        from_x: f64,
+        from_y: f64,
+        to_x: f64,
+        to_y: f64,
         shape: u32,
         color_hex: &str,
         stroke_width: f64,
@@ -333,9 +444,15 @@ impl ImageHorseTool {
         let color = drawing::parse_hex_color(color_hex);
         drawing::draw_shape(
             &mut self.layers[self.active].buf.data,
-            self.width, self.height,
-            from_x, from_y, to_x, to_y,
-            shape, color, stroke_width,
+            self.width,
+            self.height,
+            from_x,
+            from_y,
+            to_x,
+            to_y,
+            shape,
+            color,
+            stroke_width,
         );
     }
 
@@ -354,8 +471,10 @@ impl ImageHorseTool {
     pub fn add_shape_annotation(
         &mut self,
         kind: u8,
-        x0: f64, y0: f64,
-        x1: f64, y1: f64,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
         color_hex: &str,
         stroke_width: f64,
         arrow_style: u8,
@@ -371,22 +490,35 @@ impl ImageHorseTool {
         let f2 = drawing::parse_hex_color(fill2_hex);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
-            id,
-            kind,
-            x0, y0, x1, y1,
-            r: c[0], g: c[1], b: c[2],
-            stroke_width,
-            arrow_style,
-            number: 0,
-            label_kind: 0,
-            points: Vec::new(),
-            fill_kind,
-            fill_r: f[0], fill_g: f[1], fill_b: f[2], fill_a: f[3],
-            fill2_r: f2[0], fill2_g: f2[1], fill2_b: f2[2], fill2_a: f2[3],
-            fill_angle,
-            fill_block,
-        });
+        self.layers[self.active]
+            .shape_annotations
+            .push(ShapeAnnotation {
+                id,
+                kind,
+                x0,
+                y0,
+                x1,
+                y1,
+                r: c[0],
+                g: c[1],
+                b: c[2],
+                stroke_width,
+                arrow_style,
+                number: 0,
+                label_kind: 0,
+                points: Vec::new(),
+                fill_kind,
+                fill_r: f[0],
+                fill_g: f[1],
+                fill_b: f[2],
+                fill_a: f[3],
+                fill2_r: f2[0],
+                fill2_g: f2[1],
+                fill2_b: f2[2],
+                fill2_a: f2[3],
+                fill_angle,
+                fill_block,
+            });
         id
     }
 
@@ -397,28 +529,58 @@ impl ImageHorseTool {
     pub fn restore_shape_annotation(
         &mut self,
         kind: u8,
-        x0: f64, y0: f64,
-        x1: f64, y1: f64,
-        r: u8, g: u8, b: u8,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        r: u8,
+        g: u8,
+        b: u8,
         stroke_width: f64,
         arrow_style: u8,
         fill_kind: u8,
-        fill_r: u8, fill_g: u8, fill_b: u8, fill_a: u8,
-        fill2_r: u8, fill2_g: u8, fill2_b: u8, fill2_a: u8,
+        fill_r: u8,
+        fill_g: u8,
+        fill_b: u8,
+        fill_a: u8,
+        fill2_r: u8,
+        fill2_g: u8,
+        fill2_b: u8,
+        fill2_a: u8,
         fill_angle: u16,
         fill_block: u32,
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
-            id, kind, x0, y0, x1, y1, r, g, b, stroke_width, arrow_style,
-            number: 0, label_kind: 0, points: Vec::new(),
-            fill_kind,
-            fill_r, fill_g, fill_b, fill_a,
-            fill2_r, fill2_g, fill2_b, fill2_a,
-            fill_angle,
-            fill_block,
-        });
+        self.layers[self.active]
+            .shape_annotations
+            .push(ShapeAnnotation {
+                id,
+                kind,
+                x0,
+                y0,
+                x1,
+                y1,
+                r,
+                g,
+                b,
+                stroke_width,
+                arrow_style,
+                number: 0,
+                label_kind: 0,
+                points: Vec::new(),
+                fill_kind,
+                fill_r,
+                fill_g,
+                fill_b,
+                fill_a,
+                fill2_r,
+                fill2_g,
+                fill2_b,
+                fill2_a,
+                fill_angle,
+                fill_block,
+            });
         id
     }
 
@@ -426,7 +588,10 @@ impl ImageHorseTool {
     /// stored as a circle-style bbox plus its label. Pushes "Add Pin".
     pub fn add_pin_annotation(
         &mut self,
-        x0: f64, y0: f64, x1: f64, y1: f64,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
         number: u32,
         color_hex: &str,
         label_kind: u8,
@@ -435,31 +600,62 @@ impl ImageHorseTool {
         let c = drawing::parse_hex_color(color_hex);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
-            id, kind: 5, x0, y0, x1, y1,
-            r: c[0], g: c[1], b: c[2],
-            stroke_width: 0.0, arrow_style: 0,
-            number, label_kind, points: Vec::new(),
-            ..Default::default()
-        });
+        self.layers[self.active]
+            .shape_annotations
+            .push(ShapeAnnotation {
+                id,
+                kind: 5,
+                x0,
+                y0,
+                x1,
+                y1,
+                r: c[0],
+                g: c[1],
+                b: c[2],
+                stroke_width: 0.0,
+                arrow_style: 0,
+                number,
+                label_kind,
+                points: Vec::new(),
+                ..Default::default()
+            });
         id
     }
 
     /// Restore a persisted pin WITHOUT pushing history. Colour is raw r,g,b.
     pub fn restore_pin_annotation(
         &mut self,
-        x0: f64, y0: f64, x1: f64, y1: f64,
-        number: u32, r: u8, g: u8, b: u8,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        number: u32,
+        r: u8,
+        g: u8,
+        b: u8,
         label_kind: u8,
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
-            id, kind: 5, x0, y0, x1, y1, r, g, b,
-            stroke_width: 0.0, arrow_style: 0,
-            number, label_kind, points: Vec::new(),
-            ..Default::default()
-        });
+        self.layers[self.active]
+            .shape_annotations
+            .push(ShapeAnnotation {
+                id,
+                kind: 5,
+                x0,
+                y0,
+                x1,
+                y1,
+                r,
+                g,
+                b,
+                stroke_width: 0.0,
+                arrow_style: 0,
+                number,
+                label_kind,
+                points: Vec::new(),
+                ..Default::default()
+            });
         id
     }
 
@@ -478,13 +674,24 @@ impl ImageHorseTool {
         let (x0, y0, x1, y1) = points_bbox(&pts);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
-            id, kind: 6, x0, y0, x1, y1,
-            r: c[0], g: c[1], b: c[2],
-            stroke_width, arrow_style: 0,
-            number: 0, points: pts,
-            ..Default::default()
-        });
+        self.layers[self.active]
+            .shape_annotations
+            .push(ShapeAnnotation {
+                id,
+                kind: 6,
+                x0,
+                y0,
+                x1,
+                y1,
+                r: c[0],
+                g: c[1],
+                b: c[2],
+                stroke_width,
+                arrow_style: 0,
+                number: 0,
+                points: pts,
+                ..Default::default()
+            });
         id
     }
 
@@ -492,19 +699,33 @@ impl ImageHorseTool {
     pub fn restore_polyline_annotation(
         &mut self,
         points: &[f64],
-        r: u8, g: u8, b: u8,
+        r: u8,
+        g: u8,
+        b: u8,
         stroke_width: f64,
     ) -> u32 {
         let pts = flat_to_points(points);
         let (x0, y0, x1, y1) = points_bbox(&pts);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
-            id, kind: 6, x0, y0, x1, y1, r, g, b,
-            stroke_width, arrow_style: 0,
-            number: 0, points: pts,
-            ..Default::default()
-        });
+        self.layers[self.active]
+            .shape_annotations
+            .push(ShapeAnnotation {
+                id,
+                kind: 6,
+                x0,
+                y0,
+                x1,
+                y1,
+                r,
+                g,
+                b,
+                stroke_width,
+                arrow_style: 0,
+                number: 0,
+                points: pts,
+                ..Default::default()
+            });
         id
     }
 
@@ -525,15 +746,29 @@ impl ImageHorseTool {
         let (x0, y0, x1, y1) = points_bbox(&pts);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
-            id, kind: 7, x0, y0, x1, y1,
-            r: c[0], g: c[1], b: c[2],
-            stroke_width, arrow_style: 0,
-            number: 0, points: pts,
-            fill_kind,
-            fill_r: fc[0], fill_g: fc[1], fill_b: fc[2], fill_a: fc[3],
-            ..Default::default()
-        });
+        self.layers[self.active]
+            .shape_annotations
+            .push(ShapeAnnotation {
+                id,
+                kind: 7,
+                x0,
+                y0,
+                x1,
+                y1,
+                r: c[0],
+                g: c[1],
+                b: c[2],
+                stroke_width,
+                arrow_style: 0,
+                number: 0,
+                points: pts,
+                fill_kind,
+                fill_r: fc[0],
+                fill_g: fc[1],
+                fill_b: fc[2],
+                fill_a: fc[3],
+                ..Default::default()
+            });
         id
     }
 
@@ -541,22 +776,43 @@ impl ImageHorseTool {
     pub fn restore_bezier_annotation(
         &mut self,
         points: &[f64],
-        r: u8, g: u8, b: u8,
+        r: u8,
+        g: u8,
+        b: u8,
         stroke_width: f64,
         fill_kind: u8,
-        fill_r: u8, fill_g: u8, fill_b: u8, fill_a: u8,
+        fill_r: u8,
+        fill_g: u8,
+        fill_b: u8,
+        fill_a: u8,
     ) -> u32 {
         let pts = flat_to_points(points);
         let (x0, y0, x1, y1) = points_bbox(&pts);
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
-        self.layers[self.active].shape_annotations.push(ShapeAnnotation {
-            id, kind: 7, x0, y0, x1, y1, r, g, b,
-            stroke_width, arrow_style: 0,
-            number: 0, points: pts,
-            fill_kind, fill_r, fill_g, fill_b, fill_a,
-            ..Default::default()
-        });
+        self.layers[self.active]
+            .shape_annotations
+            .push(ShapeAnnotation {
+                id,
+                kind: 7,
+                x0,
+                y0,
+                x1,
+                y1,
+                r,
+                g,
+                b,
+                stroke_width,
+                arrow_style: 0,
+                number: 0,
+                points: pts,
+                fill_kind,
+                fill_r,
+                fill_g,
+                fill_b,
+                fill_a,
+                ..Default::default()
+            });
         id
     }
 
@@ -572,7 +828,10 @@ impl ImageHorseTool {
             .find(|s| s.id == id)
         {
             s.points = pts;
-            s.x0 = x0; s.y0 = y0; s.x1 = x1; s.y1 = y1;
+            s.x0 = x0;
+            s.y0 = y0;
+            s.x1 = x1;
+            s.y1 = y1;
         }
     }
 
@@ -589,7 +848,10 @@ impl ImageHorseTool {
             .find(|s| s.id == id)
         {
             s.points = pts;
-            s.x0 = x0; s.y0 = y0; s.x1 = x1; s.y1 = y1;
+            s.x0 = x0;
+            s.y0 = y0;
+            s.x1 = x1;
+            s.y1 = y1;
         }
     }
 
@@ -600,8 +862,10 @@ impl ImageHorseTool {
         &mut self,
         id: u32,
         kind: u8,
-        x0: f64, y0: f64,
-        x1: f64, y1: f64,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
         color_hex: &str,
         stroke_width: f64,
         arrow_style: u8,
@@ -611,22 +875,41 @@ impl ImageHorseTool {
         fill_angle: u16,
         fill_block: u32,
     ) -> bool {
-        if !self.layers[self.active].shape_annotations.iter().any(|s| s.id == id) {
+        if !self.layers[self.active]
+            .shape_annotations
+            .iter()
+            .any(|s| s.id == id)
+        {
             return false;
         }
         self.snap("Edit Shape");
         let c = drawing::parse_hex_color(color_hex);
         let f = drawing::parse_hex_color(fill_hex);
         let f2 = drawing::parse_hex_color(fill2_hex);
-        if let Some(s) = self.layers[self.active].shape_annotations.iter_mut().find(|s| s.id == id) {
+        if let Some(s) = self.layers[self.active]
+            .shape_annotations
+            .iter_mut()
+            .find(|s| s.id == id)
+        {
             s.kind = kind;
-            s.x0 = x0; s.y0 = y0; s.x1 = x1; s.y1 = y1;
-            s.r = c[0]; s.g = c[1]; s.b = c[2];
+            s.x0 = x0;
+            s.y0 = y0;
+            s.x1 = x1;
+            s.y1 = y1;
+            s.r = c[0];
+            s.g = c[1];
+            s.b = c[2];
             s.stroke_width = stroke_width;
             s.arrow_style = arrow_style;
             s.fill_kind = fill_kind;
-            s.fill_r = f[0]; s.fill_g = f[1]; s.fill_b = f[2]; s.fill_a = f[3];
-            s.fill2_r = f2[0]; s.fill2_g = f2[1]; s.fill2_b = f2[2]; s.fill2_a = f2[3];
+            s.fill_r = f[0];
+            s.fill_g = f[1];
+            s.fill_b = f[2];
+            s.fill_a = f[3];
+            s.fill2_r = f2[0];
+            s.fill2_g = f2[1];
+            s.fill2_b = f2[2];
+            s.fill2_a = f2[3];
             s.fill_angle = fill_angle;
             s.fill_block = fill_block;
         }
@@ -662,7 +945,14 @@ impl ImageHorseTool {
                 .shape_annotations
                 .iter()
                 .find(|s| s.id == id)
-                .map(|s| (s.x0.min(s.x1), s.y0.min(s.y1), s.x0.max(s.x1), s.y0.max(s.y1)))
+                .map(|s| {
+                    (
+                        s.x0.min(s.x1),
+                        s.y0.min(s.y1),
+                        s.x0.max(s.x1),
+                        s.y0.max(s.y1),
+                    )
+                })
         };
         let Some((minx, miny, maxx, maxy)) = bbox else {
             return false;
@@ -726,11 +1016,17 @@ impl ImageHorseTool {
     /// Remove a shape annotation. Pushes a "Delete Shape" snapshot so undo
     /// restores it. Returns true if found.
     pub fn remove_shape_annotation(&mut self, id: u32) -> bool {
-        if !self.layers[self.active].shape_annotations.iter().any(|s| s.id == id) {
+        if !self.layers[self.active]
+            .shape_annotations
+            .iter()
+            .any(|s| s.id == id)
+        {
             return false;
         }
         self.snap("Delete Shape");
-        self.layers[self.active].shape_annotations.retain(|s| s.id != id);
+        self.layers[self.active]
+            .shape_annotations
+            .retain(|s| s.id != id);
         if self.editing_shape_id == Some(id) {
             self.editing_shape_id = None;
         }
@@ -805,13 +1101,18 @@ impl ImageHorseTool {
         &mut self,
         text: &str,
         font_size: f32,
-        r: u8, g: u8, b: u8,
+        r: u8,
+        g: u8,
+        b: u8,
         bold: bool,
         x: i32,
         y: i32,
         rotation_deg: f64,
         background_kind: u8,
-        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_r: u8,
+        bg_g: u8,
+        bg_b: u8,
+        bg_a: u8,
         bg_padding: u32,
         bg_corner_radius: u32,
         bg_tail: u32,
@@ -820,10 +1121,33 @@ impl ImageHorseTool {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
         let ann = build_text_annotation(
-            id, text, font_size, r, g, b, bold, x, y, rotation_deg,
-            background_kind, bg_r, bg_g, bg_b, bg_a,
-            bg_padding, bg_corner_radius, bg_tail,
-            false, false, 0, 0, 0, 0, 0, 0, 0, // shadow off; set via set_text_shadow
+            id,
+            text,
+            font_size,
+            r,
+            g,
+            b,
+            bold,
+            x,
+            y,
+            rotation_deg,
+            background_kind,
+            bg_r,
+            bg_g,
+            bg_b,
+            bg_a,
+            bg_padding,
+            bg_corner_radius,
+            bg_tail,
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0, // shadow off; set via set_text_shadow
         );
         self.layers[self.active].text_annotations.push(ann);
         id
@@ -836,18 +1160,27 @@ impl ImageHorseTool {
         id: u32,
         text: &str,
         font_size: f32,
-        r: u8, g: u8, b: u8,
+        r: u8,
+        g: u8,
+        b: u8,
         bold: bool,
         x: i32,
         y: i32,
         rotation_deg: f64,
         background_kind: u8,
-        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_r: u8,
+        bg_g: u8,
+        bg_b: u8,
+        bg_a: u8,
         bg_padding: u32,
         bg_corner_radius: u32,
         bg_tail: u32,
     ) -> bool {
-        let Some(idx) = self.layers[self.active].text_annotations.iter().position(|a| a.id == id) else {
+        let Some(idx) = self.layers[self.active]
+            .text_annotations
+            .iter()
+            .position(|a| a.id == id)
+        else {
             return false;
         };
         self.snap("Edit Text");
@@ -855,25 +1188,52 @@ impl ImageHorseTool {
         let sh = {
             let a = &self.layers[self.active].text_annotations[idx];
             (
-                a.shadow_box, a.shadow_text,
-                a.shadow_r, a.shadow_g, a.shadow_b, a.shadow_a,
-                a.shadow_dx, a.shadow_dy, a.shadow_blur,
+                a.shadow_box,
+                a.shadow_text,
+                a.shadow_r,
+                a.shadow_g,
+                a.shadow_b,
+                a.shadow_a,
+                a.shadow_dx,
+                a.shadow_dy,
+                a.shadow_blur,
             )
         };
-        let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
-            build_annotation_tile(
-                text, font_size, r, g, b, bold, rotation_deg,
-                background_kind,
-                bg_r, bg_g, bg_b, bg_a,
-                bg_padding, bg_corner_radius, bg_tail,
-                sh.0, sh.1, sh.2, sh.3, sh.4, sh.5, sh.6, sh.7, sh.8,
-            );
+        let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
+            text,
+            font_size,
+            r,
+            g,
+            b,
+            bold,
+            rotation_deg,
+            background_kind,
+            bg_r,
+            bg_g,
+            bg_b,
+            bg_a,
+            bg_padding,
+            bg_corner_radius,
+            bg_tail,
+            sh.0,
+            sh.1,
+            sh.2,
+            sh.3,
+            sh.4,
+            sh.5,
+            sh.6,
+            sh.7,
+            sh.8,
+        );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.text = text.to_string();
         a.font_size = font_size;
-        a.r = r; a.g = g; a.b = b;
+        a.r = r;
+        a.g = g;
+        a.b = b;
         a.bold = bold;
-        a.x = x; a.y = y;
+        a.x = x;
+        a.y = y;
         a.rotation_deg = rotation_deg;
         a.tile_pixels = std::sync::Arc::new(tile_pixels);
         a.tile_w = tile_w;
@@ -881,7 +1241,10 @@ impl ImageHorseTool {
         a.tile_offset_x = tile_offset_x;
         a.tile_offset_y = tile_offset_y;
         a.background_kind = background_kind;
-        a.bg_r = bg_r; a.bg_g = bg_g; a.bg_b = bg_b; a.bg_a = bg_a;
+        a.bg_r = bg_r;
+        a.bg_g = bg_g;
+        a.bg_b = bg_b;
+        a.bg_a = bg_a;
         a.bg_padding = bg_padding;
         a.bg_corner_radius = bg_corner_radius;
         a.bg_tail = bg_tail;
@@ -916,9 +1279,14 @@ impl ImageHorseTool {
         // this on every text commit cheaply.
         {
             let a = &self.layers[self.active].text_annotations[idx];
-            if a.shadow_box == on_box && a.shadow_text == on_text
-                && a.shadow_r == c[0] && a.shadow_g == c[1] && a.shadow_b == c[2]
-                && a.shadow_a == alpha && a.shadow_dx == dx && a.shadow_dy == dy
+            if a.shadow_box == on_box
+                && a.shadow_text == on_text
+                && a.shadow_r == c[0]
+                && a.shadow_g == c[1]
+                && a.shadow_b == c[2]
+                && a.shadow_a == alpha
+                && a.shadow_dx == dx
+                && a.shadow_dy == dy
                 && a.shadow_blur == blur
             {
                 return true;
@@ -930,22 +1298,37 @@ impl ImageHorseTool {
         let (text, fs, r, g, b, bold, rot, bk, br, bgc, bb, ba, bpad, brad, btail) = {
             let a = &self.layers[self.active].text_annotations[idx];
             (
-                a.text.clone(), a.font_size, a.r, a.g, a.b, a.bold, a.rotation_deg,
-                a.background_kind, a.bg_r, a.bg_g, a.bg_b, a.bg_a,
-                a.bg_padding, a.bg_corner_radius, a.bg_tail,
+                a.text.clone(),
+                a.font_size,
+                a.r,
+                a.g,
+                a.b,
+                a.bold,
+                a.rotation_deg,
+                a.background_kind,
+                a.bg_r,
+                a.bg_g,
+                a.bg_b,
+                a.bg_a,
+                a.bg_padding,
+                a.bg_corner_radius,
+                a.bg_tail,
             )
         };
-        let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
-            build_annotation_tile(
-                &text, fs, r, g, b, bold, rot,
-                bk, br, bgc, bb, ba, bpad, brad, btail,
-                on_box, on_text, c[0], c[1], c[2], alpha, dx, dy, blur,
-            );
+        let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
+            &text, fs, r, g, b, bold, rot, bk, br, bgc, bb, ba, bpad, brad, btail, on_box, on_text,
+            c[0], c[1], c[2], alpha, dx, dy, blur,
+        );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.shadow_box = on_box;
         a.shadow_text = on_text;
-        a.shadow_r = c[0]; a.shadow_g = c[1]; a.shadow_b = c[2]; a.shadow_a = alpha;
-        a.shadow_dx = dx; a.shadow_dy = dy; a.shadow_blur = blur;
+        a.shadow_r = c[0];
+        a.shadow_g = c[1];
+        a.shadow_b = c[2];
+        a.shadow_a = alpha;
+        a.shadow_dx = dx;
+        a.shadow_dy = dy;
+        a.shadow_blur = blur;
         a.tile_pixels = std::sync::Arc::new(tile_pixels);
         a.tile_w = tile_w;
         a.tile_h = tile_h;
@@ -957,11 +1340,17 @@ impl ImageHorseTool {
     /// Remove an annotation. Returns true if found. Pushes a "Delete Text"
     /// history snapshot so undo restores the removed annotation.
     pub fn remove_text_annotation(&mut self, id: u32) -> bool {
-        if !self.layers[self.active].text_annotations.iter().any(|a| a.id == id) {
+        if !self.layers[self.active]
+            .text_annotations
+            .iter()
+            .any(|a| a.id == id)
+        {
             return false;
         }
         self.snap("Delete Text");
-        self.layers[self.active].text_annotations.retain(|a| a.id != id);
+        self.layers[self.active]
+            .text_annotations
+            .retain(|a| a.id != id);
         true
     }
 
@@ -979,10 +1368,7 @@ impl ImageHorseTool {
         for a in self.layers[self.active].text_annotations.iter().rev() {
             let tx = a.x + a.tile_offset_x;
             let ty = a.y + a.tile_offset_y;
-            if x >= tx && y >= ty
-                && x < tx + a.tile_w as i32
-                && y < ty + a.tile_h as i32
-            {
+            if x >= tx && y >= ty && x < tx + a.tile_w as i32 && y < ty + a.tile_h as i32 {
                 return a.id as i32;
             }
         }

@@ -34,8 +34,10 @@ pub(crate) fn points_bbox(pts: &[(f64, f64)]) -> (f64, f64, f64, f64) {
     let (mut minx, mut miny) = pts[0];
     let (mut maxx, mut maxy) = pts[0];
     for &(x, y) in pts {
-        minx = minx.min(x); maxx = maxx.max(x);
-        miny = miny.min(y); maxy = maxy.max(y);
+        minx = minx.min(x);
+        maxx = maxx.max(x);
+        miny = miny.min(y);
+        maxy = maxy.max(y);
     }
     (minx, miny, maxx, maxy)
 }
@@ -83,12 +85,24 @@ pub(crate) fn ink_bounds(pixels: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32
             let a = pixels[((y * w + x) * 4 + 3) as usize];
             if a > 16 {
                 found = true;
-                if x < min_x { min_x = x; }
-                if y < min_y { min_y = y; }
-                if x > max_x { max_x = x; }
-                if y > max_y { max_y = y; }
+                if x < min_x {
+                    min_x = x;
+                }
+                if y < min_y {
+                    min_y = y;
+                }
+                if x > max_x {
+                    max_x = x;
+                }
+                if y > max_y {
+                    max_y = y;
+                }
             }
         }
     }
-    if found { Some((min_x, min_y, max_x, max_y)) } else { None }
+    if found {
+        Some((min_x, min_y, max_x, max_y))
+    } else {
+        None
+    }
 }

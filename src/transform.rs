@@ -1,7 +1,7 @@
-/// Geometric transforms — flip, rotate, copy/paste regions.
-///
-/// All functions operate on raw RGBA pixel buffers. The `push_snapshot`
-/// calls happen in the lib.rs glue layer before calling these.
+//! Geometric transforms — flip, rotate, copy/paste regions.
+//!
+//! All functions operate on raw RGBA pixel buffers. The `push_snapshot`
+//! calls happen in the lib.rs glue layer before calling these.
 
 /// Flip the image horizontally (mirror left↔right) in-place.
 /// Swaps a 4-byte RGBA pixel as a single 32-bit unit rather than four
@@ -79,7 +79,15 @@ pub fn rotate_90_ccw(data: &[u8], old_w: usize, old_h: usize) -> (Vec<u8>, u32, 
 
 /// Crop the image to a rectangle. Returns (new_data, crop_w, crop_h).
 /// Clamps to image bounds.
-pub fn crop(data: &[u8], img_w: u32, img_h: u32, x: u32, y: u32, w: u32, h: u32) -> (Vec<u8>, u32, u32) {
+pub fn crop(
+    data: &[u8],
+    img_w: u32,
+    img_h: u32,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+) -> (Vec<u8>, u32, u32) {
     if img_w == 0 || img_h == 0 {
         return (Vec::new(), 0, 0);
     }
@@ -92,8 +100,7 @@ pub fn crop(data: &[u8], img_w: u32, img_h: u32, x: u32, y: u32, w: u32, h: u32)
         let src_row = ((y + ry) * img_w + x) as usize * 4;
         let dst_row = (ry * w) as usize * 4;
         let row_bytes = w as usize * 4;
-        out[dst_row..dst_row + row_bytes]
-            .copy_from_slice(&data[src_row..src_row + row_bytes]);
+        out[dst_row..dst_row + row_bytes].copy_from_slice(&data[src_row..src_row + row_bytes]);
     }
     (out, w, h)
 }
@@ -261,8 +268,9 @@ fn precompute_weights(
     for i in 0..new_size {
         let center = (i as f32 + 0.5) * ratio - 0.5;
         let start = ((center - scaled_support).floor() as i64).max(0) as usize;
-        let end =
-            ((center + scaled_support).ceil() as i64).min(old_size as i64 - 1).max(0) as usize;
+        let end = ((center + scaled_support).ceil() as i64)
+            .min(old_size as i64 - 1)
+            .max(0) as usize;
         let mut weights = Vec::with_capacity(end - start + 1);
         let mut sum = 0.0f32;
         for j in start..=end {
@@ -356,10 +364,10 @@ pub fn apply_crop_overlay(
 ) {
     let alpha = opacity.clamp(0.0, 1.0);
     let inv = 1.0 - alpha;
- 
+
     let cx_end = (crop_x + crop_w).min(img_w);
     let cy_end = (crop_y + crop_h).min(img_h);
- 
+
     for y in 0..img_h {
         for x in 0..img_w {
             // Skip pixels inside the crop rectangle
@@ -369,7 +377,7 @@ pub fn apply_crop_overlay(
             let idx = ((y * img_w + x) * 4) as usize;
             if idx + 2 < data.len() {
                 // Darken RGB channels, preserve alpha
-                data[idx]     = (data[idx]     as f64 * inv).round() as u8;
+                data[idx] = (data[idx] as f64 * inv).round() as u8;
                 data[idx + 1] = (data[idx + 1] as f64 * inv).round() as u8;
                 data[idx + 2] = (data[idx + 2] as f64 * inv).round() as u8;
             }
@@ -394,20 +402,24 @@ pub fn draw_crop_border(
     let cx_end = (crop_x + crop_w).min(img_w);
     let cy_end = (crop_y + crop_h).min(img_h);
     let pattern = dash_len + gap_len;
- 
+
     // Helper: set pixel if in bounds and on a dash
     let set_pixel = |data: &mut [u8], x: u32, y: u32, pos: u32| {
-        if x >= img_w || y >= img_h { return; }
-        if pos % pattern >= dash_len { return; } // in gap
+        if x >= img_w || y >= img_h {
+            return;
+        }
+        if pos % pattern >= dash_len {
+            return;
+        } // in gap
         let idx = ((y * img_w + x) * 4) as usize;
         if idx + 3 < data.len() {
-            data[idx]     = color[0];
+            data[idx] = color[0];
             data[idx + 1] = color[1];
             data[idx + 2] = color[2];
             data[idx + 3] = color[3];
         }
     };
- 
+
     // Top edge
     for x in crop_x..cx_end {
         set_pixel(data, x, crop_y, x - crop_x);

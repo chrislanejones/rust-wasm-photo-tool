@@ -59,9 +59,9 @@ pub fn gaussian_blur_region(
 
     // Bounding box of the brush circle
     let min_x = ((cx - brush_radius).floor() as i32).max(0);
-    let max_x = ((cx + brush_radius).ceil()  as i32).min(w - 1);
+    let max_x = ((cx + brush_radius).ceil() as i32).min(w - 1);
     let min_y = ((cy - brush_radius).floor() as i32).max(0);
-    let max_y = ((cy + brush_radius).ceil()  as i32).min(h - 1);
+    let max_y = ((cy + brush_radius).ceil() as i32).min(h - 1);
 
     let bw = (max_x - min_x + 1) as usize;
     let bh = (max_y - min_y + 1) as usize;
@@ -215,4 +215,3 @@ pub fn redact_region(
         }
     }
 }
-

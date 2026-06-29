@@ -11,30 +11,35 @@
 //!
 //! The JS side imports `ImageHorseTool` — the API surface is unchanged.
 
+// Several drawing / annotation / composite functions take many positional
+// params (colours, coords, flags) by design; grouping them into structs would
+// obscure the call sites more than it helps. Allow the lint crate-wide.
+#![allow(clippy::too_many_arguments)]
+
 use wasm_bindgen::prelude::*;
 
-mod core;
-mod history;
-mod settings;
-mod stamp;
-mod transform;
-mod filters;
-mod simd;
-mod codec;
-mod drawing;
-mod text;
-mod utils;
 mod annotations;
+mod codec;
+mod core;
+mod drawing;
+mod effects;
+mod filters;
+mod history;
 mod layer;
 mod paint;
-mod effects;
 mod selection;
+mod settings;
+mod simd;
+mod stamp;
+mod text;
+mod transform;
+mod utils;
 
+use crate::annotations::{annotations_to_json, build_text_annotation};
 use crate::core::ImageBuffer;
 use crate::history::{History, Snapshot};
+use crate::layer::{composite_layers, composite_layers_into, Layer};
 use crate::stamp::StampState;
-use crate::layer::{Layer, composite_layers, composite_layers_into};
-use crate::annotations::{build_text_annotation, annotations_to_json};
 
 /// Module-init hook: route Rust panics to `console.error` with a readable
 /// message + stack (instead of the opaque "unreachable executed" RuntimeError).
@@ -189,7 +194,11 @@ pub fn web_perf_metrics(
 ) -> Vec<f64> {
     let cur_area = (cur_w as f64) * (cur_h as f64);
     let new_area = (new_w as f64) * (new_h as f64);
-    let area_ratio = if cur_area > 0.0 { new_area / cur_area } else { 1.0 };
+    let area_ratio = if cur_area > 0.0 {
+        new_area / cur_area
+    } else {
+        1.0
+    };
     let quality_ratio = (quality as f64 / 100.0).clamp(0.0, 1.0);
 
     // Typical photographic bytes-per-pixel relative to JPEG at equal visual
@@ -198,19 +207,18 @@ pub fn web_perf_metrics(
     // photos.
     fn format_weight(code: u8) -> f64 {
         match code {
-            0 => 2.6,  // PNG
-            1 => 1.0,  // JPEG
-            2 => 0.8,  // WebP
-            3 => 0.6,  // AVIF
-            _ => 1.0,  // unknown
+            0 => 2.6, // PNG
+            1 => 1.0, // JPEG
+            2 => 0.8, // WebP
+            3 => 0.6, // AVIF
+            _ => 1.0, // unknown
         }
     }
     let format_ratio = format_weight(new_format) / format_weight(cur_format);
 
     // Estimated delivered size after the pending resize + re-encode, on top of
     // whatever the current file already is (e.g. after Auto Compress).
-    let projected_bytes =
-        (cur_bytes * area_ratio * quality_ratio * format_ratio).max(0.0);
+    let projected_bytes = (cur_bytes * area_ratio * quality_ratio * format_ratio).max(0.0);
 
     // "Properly size images": pixels beyond a 1920px-wide display are waste.
     // Score-only penalty (the bytes still ship, so savings stays honest).
@@ -248,8 +256,8 @@ fn lighthouse_score(bytes: f64) -> f64 {
     // Control points: a well-optimized web image vs. a heavy one.
     const GOOD: f64 = 100_000.0; // ~100 KB → score ~90
     const MEDIAN: f64 = 500_000.0; // ~500 KB → score 50
-    // erfc(-Z_P90)/2 = 0.9, i.e. Z_P90 = -erfc⁻¹(1.8); sigma is chosen so that
-    // score(GOOD) lands on 0.9 and score(MEDIAN) on 0.5.
+                                   // erfc(-Z_P90)/2 = 0.9, i.e. Z_P90 = -erfc⁻¹(1.8); sigma is chosen so that
+                                   // score(GOOD) lands on 0.9 and score(MEDIAN) on 0.5.
     const Z_P90: f64 = 0.906_193_802_436_823_2;
 
     if bytes <= 0.0 {
@@ -278,9 +286,6 @@ fn erf(x: f64) -> f64 {
             * (-x * x).exp();
     sign * y
 }
-
-
-
 
 #[wasm_bindgen]
 pub struct ImageHorseTool {
@@ -371,16 +376,6 @@ pub struct ImageHorseTool {
     effect_last: Option<(f64, f64)>,
 }
 
-
-
-
-
-
-
-
-
-
-
 impl ImageHorseTool {
     /// Build a history snapshot of the entire current layer stack.
     fn make_snapshot(&self, label: &str) -> Snapshot {
@@ -412,7 +407,6 @@ impl ImageHorseTool {
         self.stamp.source_y = None;
     }
 }
-
 
 #[wasm_bindgen]
 impl ImageHorseTool {
@@ -516,9 +510,7 @@ impl ImageHorseTool {
         // Reuse the cache allocation across frames; take it out so we can pass
         // it as `&mut` alongside the immutable layer borrow.
         let mut cache = std::mem::take(&mut self.composite_cache);
-        let move_preview = self
-            .move_preview
-            .map(|(dx, dy)| (self.active, dx, dy));
+        let move_preview = self.move_preview.map(|(dx, dy)| (self.active, dx, dy));
         composite_layers_into(
             &mut cache,
             &self.layers,
@@ -564,7 +556,6 @@ impl ImageHorseTool {
     }
 
     // ── Selection Marker (magic-wand) ────────────────────────────────────
-
 
     // ── Zoom ────────────────────────────────────────────────────────────
 
@@ -726,14 +717,22 @@ impl ImageHorseTool {
             None => Vec::new(),
             Some(snap) => {
                 let data = composite_layers(&snap.layers, snap.width, snap.height, None, None);
-                let tmp = ImageBuffer { width: snap.width, height: snap.height, data };
+                let tmp = ImageBuffer {
+                    width: snap.width,
+                    height: snap.height,
+                    data,
+                };
                 codec::export_png(&tmp)
             }
         }
     }
 
     pub fn get_undo_snapshot_label(&self, index: usize) -> String {
-        self.hist.undo_stack.get(index).map(|s| s.label.clone()).unwrap_or_default()
+        self.hist
+            .undo_stack
+            .get(index)
+            .map(|s| s.label.clone())
+            .unwrap_or_default()
     }
 
     pub fn get_redo_snapshot_png(&self, index: usize) -> Vec<u8> {
@@ -741,14 +740,22 @@ impl ImageHorseTool {
             None => Vec::new(),
             Some(snap) => {
                 let data = composite_layers(&snap.layers, snap.width, snap.height, None, None);
-                let tmp = ImageBuffer { width: snap.width, height: snap.height, data };
+                let tmp = ImageBuffer {
+                    width: snap.width,
+                    height: snap.height,
+                    data,
+                };
                 codec::export_png(&tmp)
             }
         }
     }
 
     pub fn get_redo_snapshot_label(&self, index: usize) -> String {
-        self.hist.redo_stack.get(index).map(|s| s.label.clone()).unwrap_or_default()
+        self.hist
+            .redo_stack
+            .get(index)
+            .map(|s| s.label.clone())
+            .unwrap_or_default()
     }
 
     /// Append a raw-RGBA snapshot to the undo stack (used when restoring a
@@ -762,7 +769,11 @@ impl ImageHorseTool {
             name: "Background".to_string(),
             visible: true,
             opacity: 1.0,
-            buf: ImageBuffer { width: w, height: h, data: data.to_vec() },
+            buf: ImageBuffer {
+                width: w,
+                height: h,
+                data: data.to_vec(),
+            },
             mask: None,
             text_annotations: Vec::new(),
             shape_annotations: Vec::new(),
@@ -783,7 +794,11 @@ impl ImageHorseTool {
             name: "Background".to_string(),
             visible: true,
             opacity: 1.0,
-            buf: ImageBuffer { width: w, height: h, data: data.to_vec() },
+            buf: ImageBuffer {
+                width: w,
+                height: h,
+                data: data.to_vec(),
+            },
             mask: None,
             text_annotations: Vec::new(),
             shape_annotations: Vec::new(),
@@ -801,14 +816,24 @@ impl ImageHorseTool {
     /// Mirrors `get_text_annotations` so JS can read snapshot overlays with the
     /// same parser. Used by the persistence layer for round-trip saves.
     pub fn get_undo_snapshot_annotations(&self, index: usize) -> String {
-        match self.hist.undo_stack.get(index).and_then(|s| s.layers.get(s.active)) {
+        match self
+            .hist
+            .undo_stack
+            .get(index)
+            .and_then(|s| s.layers.get(s.active))
+        {
             None => String::from("[]"),
             Some(layer) => annotations_to_json(&layer.text_annotations),
         }
     }
 
     pub fn get_redo_snapshot_annotations(&self, index: usize) -> String {
-        match self.hist.redo_stack.get(index).and_then(|s| s.layers.get(s.active)) {
+        match self
+            .hist
+            .redo_stack
+            .get(index)
+            .and_then(|s| s.layers.get(s.active))
+        {
             None => String::from("[]"),
             Some(layer) => annotations_to_json(&layer.text_annotations),
         }
@@ -822,13 +847,18 @@ impl ImageHorseTool {
         snap_idx: usize,
         text: &str,
         font_size: f32,
-        r: u8, g: u8, b: u8,
+        r: u8,
+        g: u8,
+        b: u8,
         bold: bool,
         x: i32,
         y: i32,
         rotation_deg: f64,
         background_kind: u8,
-        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_r: u8,
+        bg_g: u8,
+        bg_b: u8,
+        bg_a: u8,
         bg_padding: u32,
         bg_corner_radius: u32,
         bg_tail: u32,
@@ -836,17 +866,43 @@ impl ImageHorseTool {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
         let ann = build_text_annotation(
-            id, text, font_size, r, g, b, bold, x, y, rotation_deg,
-            background_kind, bg_r, bg_g, bg_b, bg_a,
-            bg_padding, bg_corner_radius, bg_tail,
-            false, false, 0, 0, 0, 0, 0, 0, 0, // shadow off; set via set_text_shadow
+            id,
+            text,
+            font_size,
+            r,
+            g,
+            b,
+            bold,
+            x,
+            y,
+            rotation_deg,
+            background_kind,
+            bg_r,
+            bg_g,
+            bg_b,
+            bg_a,
+            bg_padding,
+            bg_corner_radius,
+            bg_tail,
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0, // shadow off; set via set_text_shadow
         );
         match self.hist.undo_stack.get_mut(snap_idx) {
             None => false,
             Some(snap) => {
                 let a = snap.active;
                 match snap.layers.get_mut(a) {
-                    Some(layer) => { layer.text_annotations.push(ann); true }
+                    Some(layer) => {
+                        layer.text_annotations.push(ann);
+                        true
+                    }
                     None => false,
                 }
             }
@@ -858,13 +914,18 @@ impl ImageHorseTool {
         snap_idx: usize,
         text: &str,
         font_size: f32,
-        r: u8, g: u8, b: u8,
+        r: u8,
+        g: u8,
+        b: u8,
         bold: bool,
         x: i32,
         y: i32,
         rotation_deg: f64,
         background_kind: u8,
-        bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8,
+        bg_r: u8,
+        bg_g: u8,
+        bg_b: u8,
+        bg_a: u8,
         bg_padding: u32,
         bg_corner_radius: u32,
         bg_tail: u32,
@@ -872,17 +933,43 @@ impl ImageHorseTool {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
         let ann = build_text_annotation(
-            id, text, font_size, r, g, b, bold, x, y, rotation_deg,
-            background_kind, bg_r, bg_g, bg_b, bg_a,
-            bg_padding, bg_corner_radius, bg_tail,
-            false, false, 0, 0, 0, 0, 0, 0, 0, // shadow off; set via set_text_shadow
+            id,
+            text,
+            font_size,
+            r,
+            g,
+            b,
+            bold,
+            x,
+            y,
+            rotation_deg,
+            background_kind,
+            bg_r,
+            bg_g,
+            bg_b,
+            bg_a,
+            bg_padding,
+            bg_corner_radius,
+            bg_tail,
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0, // shadow off; set via set_text_shadow
         );
         match self.hist.redo_stack.get_mut(snap_idx) {
             None => false,
             Some(snap) => {
                 let a = snap.active;
                 match snap.layers.get_mut(a) {
-                    Some(layer) => { layer.text_annotations.push(ann); true }
+                    Some(layer) => {
+                        layer.text_annotations.push(ann);
+                        true
+                    }
                     None => false,
                 }
             }
@@ -999,14 +1086,20 @@ impl ImageHorseTool {
             &mut self.layers[self.active].buf.data,
             self.width,
             self.height,
-            x, y, w, h,
+            x,
+            y,
+            w,
+            h,
             0.5,
         );
         transform::draw_crop_border(
             &mut self.layers[self.active].buf.data,
             self.width,
             self.height,
-            x, y, w, h,
+            x,
+            y,
+            w,
+            h,
             [255, 255, 255, 200],
             5,
             5,
@@ -1026,7 +1119,15 @@ impl ImageHorseTool {
     }
 
     pub fn copy_region(&self, x: i32, y: i32, w: u32, h: u32) -> Vec<u8> {
-        transform::copy_region(&self.layers[self.active].buf.data, self.width as i32, self.height as i32, x, y, w, h)
+        transform::copy_region(
+            &self.layers[self.active].buf.data,
+            self.width as i32,
+            self.height as i32,
+            x,
+            y,
+            w,
+            h,
+        )
     }
 
     pub fn paste_region(
@@ -1103,7 +1204,6 @@ impl ImageHorseTool {
         filters::adjust_contrast(&mut self.layers[self.active].buf.data, factor);
     }
 
-
     /// Stamp raw RGBA emoji pixels onto the image buffer at (dest_x, dest_y).
     /// The JS side renders the emoji to an OffscreenCanvas, extracts the pixels,
     /// and passes them here for alpha-compositing onto the WASM buffer.
@@ -1175,7 +1275,9 @@ impl ImageHorseTool {
         &mut self,
         text: &str,
         font_size: f32,
-        r: u8, g: u8, b: u8,
+        r: u8,
+        g: u8,
+        b: u8,
         bold: bool,
         dest_x: i32,
         dest_y: i32,
@@ -1200,7 +1302,12 @@ impl ImageHorseTool {
             // matching the CSS `rotate(${angle}deg)` preview, so pass as-is.
             let cx = dest_x + rendered.width as i32 / 2;
             let cy = dest_y + rendered.height as i32 / 2;
-            let rotated = crate::text::rotate_pixels(&rendered.pixels, rendered.width, rendered.height, angle_deg);
+            let rotated = crate::text::rotate_pixels(
+                &rendered.pixels,
+                rendered.width,
+                rendered.height,
+                angle_deg,
+            );
             let paste_x = cx - rotated.width as i32 / 2;
             let paste_y = cy - rotated.height as i32 / 2;
             transform::paste_region(
@@ -1229,7 +1336,9 @@ impl ImageHorseTool {
     pub fn commit_red_stamp(
         &mut self,
         label: &str,
-        r: u8, g: u8, b: u8,
+        r: u8,
+        g: u8,
+        b: u8,
         dest_x: i32,
         dest_y: i32,
         target_size: u32,
@@ -1241,7 +1350,13 @@ impl ImageHorseTool {
         let scale = target_size as f64 / rendered.width.max(rendered.height) as f64;
         let new_w = ((rendered.width as f64 * scale).round() as u32).max(1);
         let new_h = ((rendered.height as f64 * scale).round() as u32).max(1);
-        let scaled = transform::resize_bilinear(&rendered.pixels, rendered.width, rendered.height, new_w, new_h);
+        let scaled = transform::resize_bilinear(
+            &rendered.pixels,
+            rendered.width,
+            rendered.height,
+            new_w,
+            new_h,
+        );
         self.snap("Red Stamp");
         transform::paste_region(
             &mut self.layers[self.active].buf.data,
@@ -1254,7 +1369,6 @@ impl ImageHorseTool {
             dest_y - new_h as i32 / 2,
         );
     }
-
 
     // ── Color picker helpers ─────────────────────────────────────────────
 
@@ -1290,8 +1404,6 @@ impl ImageHorseTool {
         }
         out
     }
-
-
 }
 
 /// Stateless: composite `src` onto a copy of `target` at (dx, dy) with `opacity` (0.0..=1.0).
@@ -1340,13 +1452,7 @@ pub fn composite_pixels(
 /// Stateless bilinear resize of an RGBA buffer. Used by the batch-logo feature
 /// to scale logos to a target width without round-tripping through OffscreenCanvas.
 #[wasm_bindgen]
-pub fn resize_pixels(
-    pixels: &[u8],
-    old_w: u32,
-    old_h: u32,
-    new_w: u32,
-    new_h: u32,
-) -> Vec<u8> {
+pub fn resize_pixels(pixels: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
     transform::resize_bilinear(pixels, old_w, old_h, new_w, new_h)
 }
 
@@ -1571,8 +1677,12 @@ pub fn constrain_crop_to_ratio(
     // Anchor at start, extend in cursor's direction.
     let mut x0 = start_x as f64;
     let mut y0 = start_y as f64;
-    if sign_x < 0.0 { x0 -= w; }
-    if sign_y < 0.0 { y0 -= h; }
+    if sign_x < 0.0 {
+        x0 -= w;
+    }
+    if sign_y < 0.0 {
+        y0 -= h;
+    }
 
     // Clip to image: if the rect runs off the edge, scale uniformly so the
     // ratio is preserved instead of letting one side get cut.
@@ -1587,13 +1697,17 @@ pub fn constrain_crop_to_ratio(
         let scale = avail_w / w;
         w *= scale;
         h *= scale;
-        if sign_x < 0.0 { x0 = start_x as f64 - w; }
+        if sign_x < 0.0 {
+            x0 = start_x as f64 - w;
+        }
     }
     if h > avail_h {
         let scale = avail_h / h;
         w *= scale;
         h *= scale;
-        if sign_y < 0.0 { y0 = start_y as f64 - h; }
+        if sign_y < 0.0 {
+            y0 = start_y as f64 - h;
+        }
     }
     // Final hard clamp (handles negative start positions).
     let x = x0.max(0.0).min(iw - 1.0);
@@ -1689,9 +1803,15 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(20, 20);
         t.load_image(&solid(20, 20, [255, 255, 255, 255]));
         // Rect (4,4)-(16,16), solid blue fill (kind 1), thin black stroke.
-        t.add_shape_annotation(0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 1, "#0000ff", "#000000", 0, 0);
+        t.add_shape_annotation(
+            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 1, "#0000ff", "#000000", 0, 0,
+        );
         let p = px(&t, 10, 10); // interior centre
-        assert_eq!([p[0], p[1], p[2]], [0, 0, 255], "interior should be blue fill, got {p:?}");
+        assert_eq!(
+            [p[0], p[1], p[2]],
+            [0, 0, 255],
+            "interior should be blue fill, got {p:?}"
+        );
     }
 
     #[test]
@@ -1699,7 +1819,9 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(20, 20);
         t.load_image(&solid(20, 20, [255, 255, 255, 255]));
         // fill_kind 0 = none → interior stays white.
-        t.add_shape_annotation(0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0);
+        t.add_shape_annotation(
+            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0,
+        );
         assert_eq!(px(&t, 10, 10), [255, 255, 255, 255]);
     }
 
@@ -1709,11 +1831,16 @@ mod layer_tests {
         t.load_image(&solid(40, 40, [255, 255, 255, 255]));
         // Horizontal (angle 0) gradient red→green across a wide rect; no stroke
         // bleed in the centre band we sample.
-        t.add_shape_annotation(0, 2.0, 2.0, 38.0, 38.0, "#000000", 1.0, 0, 2, "#ff0000", "#00ff00", 0, 0);
+        t.add_shape_annotation(
+            0, 2.0, 2.0, 38.0, 38.0, "#000000", 1.0, 0, 2, "#ff0000", "#00ff00", 0, 0,
+        );
         let left = px(&t, 6, 20);
         let right = px(&t, 34, 20);
         assert!(left[0] > left[1], "left end should be redder, got {left:?}");
-        assert!(right[1] > right[0], "right end should be greener, got {right:?}");
+        assert!(
+            right[1] > right[0],
+            "right end should be greener, got {right:?}"
+        );
     }
 
     #[test]
@@ -1722,8 +1849,16 @@ mod layer_tests {
         t.load_image(&solid(20, 20, [255, 255, 255, 255]));
         t.begin_redact_stroke();
         t.redact_region(10.0, 10.0, 5.0, 0, 0, 0);
-        assert_eq!(px(&t, 10, 10), [0, 0, 0, 255], "brush centre redacted to black");
-        assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "corner outside brush untouched");
+        assert_eq!(
+            px(&t, 10, 10),
+            [0, 0, 0, 255],
+            "brush centre redacted to black"
+        );
+        assert_eq!(
+            px(&t, 0, 0),
+            [255, 255, 255, 255],
+            "corner outside brush untouched"
+        );
     }
 
     #[test]
@@ -1749,17 +1884,24 @@ mod layer_tests {
         }
         t.load_image(&data);
         // Whole-image rect, pixelate fill (kind 3), one 16px block → one cell.
-        t.add_shape_annotation(0, 0.0, 0.0, 15.0, 15.0, "#000000", 0.0, 0, 3, "#000000", "#000000", 0, 16);
+        t.add_shape_annotation(
+            0, 0.0, 0.0, 15.0, 15.0, "#000000", 0.0, 0, 3, "#000000", "#000000", 0, 16,
+        );
         let a = px(&t, 2, 8);
         let b = px(&t, 13, 8);
-        assert_eq!(a, b, "a single mosaic block must be uniform, {a:?} vs {b:?}");
+        assert_eq!(
+            a, b,
+            "a single mosaic block must be uniform, {a:?} vs {b:?}"
+        );
     }
 
     #[test]
     fn shape_json_includes_fill_block() {
         let mut t = ImageHorseTool::new(16, 16);
         t.load_image(&solid(16, 16, [0, 0, 0, 255]));
-        t.add_shape_annotation(0, 1.0, 1.0, 10.0, 10.0, "#000000", 1.0, 0, 3, "#000000", "#000000", 0, 24);
+        t.add_shape_annotation(
+            0, 1.0, 1.0, 10.0, 10.0, "#000000", 1.0, 0, 3, "#000000", "#000000", 0, 24,
+        );
         let json = t.get_layer_shape_annotations(0);
         assert!(json.contains("\"fill_block\":24"), "got {json}");
     }
@@ -1882,7 +2024,14 @@ mod layer_persistence_tests {
     fn restore_rebuilds_stack_and_active() {
         let mut t = ImageHorseTool::new(2, 2);
         t.begin_layer_restore();
-        let id0 = t.push_restored_layer(&solid(2, 2, [10, 20, 30, 255]), 2, 2, "Background", true, 1.0);
+        let id0 = t.push_restored_layer(
+            &solid(2, 2, [10, 20, 30, 255]),
+            2,
+            2,
+            "Background",
+            true,
+            1.0,
+        );
         let id1 = t.push_restored_layer(&solid(2, 2, [0, 0, 0, 0]), 2, 2, "Top", true, 0.5);
         t.finish_layer_restore(1);
         assert_eq!(t.layer_count(), 2);
@@ -1900,12 +2049,17 @@ mod layer_persistence_tests {
         let mut t = ImageHorseTool::new(16, 16);
         t.load_image(&solid(16, 16, [0, 0, 0, 255]));
         // Shape on the base layer (active = 0).
-        t.add_shape_annotation(0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0);
+        t.add_shape_annotation(
+            0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        );
         // New empty top layer.
         t.add_layer("top");
         let s0 = t.get_layer_shape_annotations(0);
         let s1 = t.get_layer_shape_annotations(1);
-        assert!(s0.contains("\"kind\":0"), "base layer should carry the shape: {s0}");
+        assert!(
+            s0.contains("\"kind\":0"),
+            "base layer should carry the shape: {s0}"
+        );
         assert_eq!(s1, "[]", "top layer should have no shapes");
     }
 
@@ -1915,19 +2069,23 @@ mod layer_persistence_tests {
         // Paint a single opaque red pixel at (1,1) on the background layer.
         {
             let buf = &mut t.layers[t.active].buf.data;
-            let i = ((1 * 4 + 1) * 4) as usize;
+            let i = ((4 + 1) * 4) as usize;
             buf[i] = 255;
             buf[i + 3] = 255;
         }
         let undo_before = t.undo_count();
         t.translate_active_layer(1, 2); // → should land at (2,3)
         let buf = &t.layers[t.active].buf.data;
-        let src = ((1 * 4 + 1) * 4) as usize;
+        let src = ((4 + 1) * 4) as usize;
         let dst = ((3 * 4 + 2) * 4) as usize;
         assert_eq!(buf[src + 3], 0, "original pixel cleared (now transparent)");
         assert_eq!(buf[dst], 255, "red moved to the shifted position");
         assert_eq!(buf[dst + 3], 255, "alpha moved with it");
-        assert_eq!(t.undo_count(), undo_before + 1, "one Move Layer history step");
+        assert_eq!(
+            t.undo_count(),
+            undo_before + 1,
+            "one Move Layer history step"
+        );
     }
 
     #[test]
@@ -1944,7 +2102,14 @@ mod layer_persistence_tests {
     fn restore_text_annotation_attaches_to_active_layer() {
         let mut t = ImageHorseTool::new(32, 32);
         t.begin_layer_restore();
-        t.push_restored_layer(&solid(32, 32, [255, 255, 255, 255]), 32, 32, "bg", true, 1.0);
+        t.push_restored_layer(
+            &solid(32, 32, [255, 255, 255, 255]),
+            32,
+            32,
+            "bg",
+            true,
+            1.0,
+        );
         t.restore_text_annotation(
             "hi", 16.0, 0, 0, 0, false, 2, 2, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
             // shadow params (box, text, r, g, b, a, dx, dy, blur)

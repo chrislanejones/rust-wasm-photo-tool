@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Native git hook — enabled via: git config core.hooksPath .githooks
+# Bypass once: git push --no-verify
+#
+# Mirrors the *blocking* CI jobs in .github/workflows/ci.yml so a push can't go
+# red on the basics. Uses only local tools (cargo, pnpm/tsc, grep) — no ripgrep.
+# The advisory static guardrails (raw colors, z-index, `as any`, unsafe, …) are
+# NOT run here — they're advisory in CI only. See docs/CI-Guardrails.md.
+set -e
+
+echo "• cargo fmt --check"
+cargo fmt --all --check || { echo "✗ run: cargo fmt"; exit 1; }
+
+echo "• cargo clippy -D warnings"
+cargo clippy --all-targets -- -D warnings
+
+echo "• tsc typecheck (stamp-tool)"
+pnpm --filter stamp-tool exec tsc -b
+
+echo "• UploadThing secret-leak guard"
+if grep -rniE "VITE_UPLOADTHING|import\.meta\.env\.[A-Za-z_]*UPLOADTHING" app/src marketing/src; then
+  echo "✗ client source references an UploadThing secret — keep it server-side"; exit 1
+fi
+
+echo "✓ pre-push checks passed"

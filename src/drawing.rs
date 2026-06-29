@@ -4,15 +4,19 @@ fn draw_line_thick(
     data: &mut [u8],
     w: i32,
     h: i32,
-    x0: f64, y0: f64,
-    x1: f64, y1: f64,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
     color: [u8; 4],
     width: f64,
 ) {
     let dx = x1 - x0;
     let dy = y1 - y0;
     let dist = (dx * dx + dy * dy).sqrt();
-    if dist < 0.5 { return; }
+    if dist < 0.5 {
+        return;
+    }
     let steps = (dist * 2.0).ceil() as i32;
     let half_w = width / 2.0;
     for i in 0..=steps {
@@ -40,13 +44,7 @@ fn draw_line_thick(
 
 /// Anti-aliased filled disc (Porter-Duff source-over). Used for numbered
 /// callout pins.
-pub fn fill_circle(
-    data: &mut [u8],
-    w: u32, h: u32,
-    cx: f64, cy: f64,
-    radius: f64,
-    color: [u8; 4],
-) {
+pub fn fill_circle(data: &mut [u8], w: u32, h: u32, cx: f64, cy: f64, radius: f64, color: [u8; 4]) {
     let wi = w as i32;
     let hi = h as i32;
     let r = radius.max(0.0);
@@ -59,12 +57,20 @@ pub fn fill_circle(
             let dx = px as f64 + 0.5 - cx;
             let dy = py as f64 + 0.5 - cy;
             let dist = (dx * dx + dy * dy).sqrt();
-            let cov = if dist <= r - 0.5 { 1.0 }
-                      else if dist >= r + 0.5 { 0.0 }
-                      else { (r + 0.5 - dist).clamp(0.0, 1.0) };
-            if cov <= 0.0 { continue; }
+            let cov = if dist <= r - 0.5 {
+                1.0
+            } else if dist >= r + 0.5 {
+                0.0
+            } else {
+                (r + 0.5 - dist).clamp(0.0, 1.0)
+            };
+            if cov <= 0.0 {
+                continue;
+            }
             let idx = ((py * wi + px) * 4) as usize;
-            if idx + 3 >= data.len() { continue; }
+            if idx + 3 >= data.len() {
+                continue;
+            }
             let mut c = color;
             c[3] = (color[3] as f64 * cov).round().clamp(0.0, 255.0) as u8;
             blend_pixel(data, idx, c);
@@ -122,14 +128,25 @@ pub fn fill_polygon(data: &mut [u8], w: u32, h: u32, points: &[(f64, f64)], colo
 /// vertices. A single point renders as a dot.
 pub fn draw_polyline(
     data: &mut [u8],
-    w: u32, h: u32,
+    w: u32,
+    h: u32,
     points: &[(f64, f64)],
     color: [u8; 4],
     width: f64,
 ) {
-    if points.is_empty() { return; }
+    if points.is_empty() {
+        return;
+    }
     if points.len() == 1 {
-        fill_circle(data, w, h, points[0].0, points[0].1, (width / 2.0).max(0.5), color);
+        fill_circle(
+            data,
+            w,
+            h,
+            points[0].0,
+            points[0].1,
+            (width / 2.0).max(0.5),
+            color,
+        );
         return;
     }
     let wi = w as i32;
@@ -197,11 +214,17 @@ fn cubic_point(
 #[allow(dead_code)]
 pub fn fill_rounded_rect(
     out: &mut [u8],
-    w: u32, h: u32,
-    x0: i32, y0: i32,
-    x1: i32, y1: i32,
+    w: u32,
+    h: u32,
+    x0: i32,
+    y0: i32,
+    x1: i32,
+    y1: i32,
     radius: u32,
-    r: u8, g: u8, b: u8, a: u8,
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
 ) {
     let wi = w as i32;
     let hi = h as i32;
@@ -209,11 +232,13 @@ pub fn fill_rounded_rect(
     let y0c = y0.max(0);
     let x1c = x1.min(wi);
     let y1c = y1.min(hi);
-    if x0c >= x1c || y0c >= y1c { return; }
+    if x0c >= x1c || y0c >= y1c {
+        return;
+    }
 
     let rw = (x1 - x0).max(0) as u32;
     let rh = (y1 - y0).max(0) as u32;
-    let max_r = (rw.min(rh) / 2).max(0);
+    let max_r = rw.min(rh) / 2;
     let rad = radius.min(max_r);
     let radf = rad as f64;
 
@@ -225,25 +250,35 @@ pub fn fill_rounded_rect(
             let rx = (x1 - rad as i32 - 1) as f64;
             let ty = (y0 + rad as i32) as f64;
             let by = (y1 - rad as i32 - 1) as f64;
-            let dx = if (px as f64) < lx { (px as f64) - lx }
-                     else if (px as f64) > rx { (px as f64) - rx }
-                     else { 0.0 };
-            let dy = if (py as f64) < ty { (py as f64) - ty }
-                     else if (py as f64) > by { (py as f64) - by }
-                     else { 0.0 };
+            let dx = if (px as f64) < lx {
+                (px as f64) - lx
+            } else if (px as f64) > rx {
+                (px as f64) - rx
+            } else {
+                0.0
+            };
+            let dy = if (py as f64) < ty {
+                (py as f64) - ty
+            } else if (py as f64) > by {
+                (py as f64) - by
+            } else {
+                0.0
+            };
             let dist = (dx * dx + dy * dy).sqrt();
-            let cov = if rad == 0 {
-                1.0
-            } else if dist <= radf - 0.5 {
+            let cov = if rad == 0 || dist <= radf - 0.5 {
                 1.0
             } else if dist >= radf + 0.5 {
                 0.0
             } else {
                 (radf + 0.5 - dist).clamp(0.0, 1.0)
             };
-            if cov <= 0.0 { continue; }
+            if cov <= 0.0 {
+                continue;
+            }
             let idx = ((py * wi + px) * 4) as usize;
-            if idx + 3 >= out.len() { continue; }
+            if idx + 3 >= out.len() {
+                continue;
+            }
             let mut c = color;
             c[3] = (a as f64 * cov).round().clamp(0.0, 255.0) as u8;
             blend_pixel(out, idx, c);
@@ -258,9 +293,12 @@ pub fn fill_rounded_rect(
 /// overlap. Mirrors the AA math in `fill_rounded_rect`.
 pub fn rounded_rect_coverage(
     cov: &mut [f32],
-    w: u32, h: u32,
-    x0: i32, y0: i32,
-    x1: i32, y1: i32,
+    w: u32,
+    h: u32,
+    x0: i32,
+    y0: i32,
+    x1: i32,
+    y1: i32,
     radius: u32,
 ) {
     let wi = w as i32;
@@ -269,7 +307,9 @@ pub fn rounded_rect_coverage(
     let y0c = y0.max(0);
     let x1c = x1.min(wi);
     let y1c = y1.min(hi);
-    if x0c >= x1c || y0c >= y1c { return; }
+    if x0c >= x1c || y0c >= y1c {
+        return;
+    }
 
     let rw = (x1 - x0).max(0) as u32;
     let rh = (y1 - y0).max(0) as u32;
@@ -284,26 +324,36 @@ pub fn rounded_rect_coverage(
 
     for py in y0c..y1c {
         for px in x0c..x1c {
-            let dx = if (px as f64) < lx { (px as f64) - lx }
-                     else if (px as f64) > rx { (px as f64) - rx }
-                     else { 0.0 };
-            let dy = if (py as f64) < ty { (py as f64) - ty }
-                     else if (py as f64) > by { (py as f64) - by }
-                     else { 0.0 };
+            let dx = if (px as f64) < lx {
+                (px as f64) - lx
+            } else if (px as f64) > rx {
+                (px as f64) - rx
+            } else {
+                0.0
+            };
+            let dy = if (py as f64) < ty {
+                (py as f64) - ty
+            } else if (py as f64) > by {
+                (py as f64) - by
+            } else {
+                0.0
+            };
             let dist = (dx * dx + dy * dy).sqrt();
-            let c = if rad == 0 {
-                1.0
-            } else if dist <= radf - 0.5 {
+            let c = if rad == 0 || dist <= radf - 0.5 {
                 1.0
             } else if dist >= radf + 0.5 {
                 0.0
             } else {
                 (radf + 0.5 - dist).clamp(0.0, 1.0)
             };
-            if c <= 0.0 { continue; }
+            if c <= 0.0 {
+                continue;
+            }
             let cf = c as f32;
             let i = (py * wi + px) as usize;
-            if i < cov.len() && cf > cov[i] { cov[i] = cf; }
+            if i < cov.len() && cf > cov[i] {
+                cov[i] = cf;
+            }
         }
     }
 }
@@ -312,7 +362,8 @@ pub fn rounded_rect_coverage(
 /// speech-bubble tail so it unions with the body before a single composite.
 pub fn triangle_coverage(
     cov: &mut [f32],
-    w: i32, h: i32,
+    w: i32,
+    h: i32,
     p0: (f64, f64),
     p1: (f64, f64),
     p2: (f64, f64),
@@ -326,23 +377,25 @@ pub fn triangle_coverage(
             let p = (px as f64 + 0.5, py as f64 + 0.5);
             if point_in_triangle(p, p0, p1, p2) {
                 let i = (py * w + px) as usize;
-                if i < cov.len() { cov[i] = 1.0; }
+                if i < cov.len() {
+                    cov[i] = 1.0;
+                }
             }
         }
     }
 }
 
 /// Composite a flat color into `out` using a coverage mask, once per pixel.
-pub fn blend_coverage(
-    out: &mut [u8],
-    cov: &[f32],
-    r: u8, g: u8, b: u8, a: u8,
-) {
+pub fn blend_coverage(out: &mut [u8], cov: &[f32], r: u8, g: u8, b: u8, a: u8) {
     for (i, &c) in cov.iter().enumerate() {
         let c = c.clamp(0.0, 1.0);
-        if c <= 0.0 { continue; }
+        if c <= 0.0 {
+            continue;
+        }
         let idx = i * 4;
-        if idx + 3 >= out.len() { continue; }
+        if idx + 3 >= out.len() {
+            continue;
+        }
         let col = [r, g, b, (a as f32 * c).round().clamp(0.0, 255.0) as u8];
         blend_pixel(out, idx, col);
     }
@@ -353,11 +406,15 @@ pub fn blend_coverage(
 #[allow(dead_code)]
 pub fn fill_triangle_public(
     out: &mut [u8],
-    w: u32, h: u32,
+    w: u32,
+    h: u32,
     p1: (f64, f64),
     p2: (f64, f64),
     p3: (f64, f64),
-    r: u8, g: u8, b: u8, a: u8,
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
 ) {
     fill_triangle(out, w as i32, h as i32, p1, p2, p3, [r, g, b, a]);
 }
@@ -424,7 +481,8 @@ fn blend_pixel(data: &mut [u8], idx: usize, color: [u8; 4]) {
 
 fn fill_triangle(
     data: &mut [u8],
-    w: i32, h: i32,
+    w: i32,
+    h: i32,
     p0: (f64, f64),
     p1: (f64, f64),
     p2: (f64, f64),
@@ -462,7 +520,9 @@ fn sign(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64)) -> f64 {
 
 pub fn parse_hex_color(hex: &str) -> [u8; 4] {
     let hex = hex.trim_start_matches('#');
-    if hex.len() < 6 { return [0, 0, 0, 255]; }
+    if hex.len() < 6 {
+        return [0, 0, 0, 255];
+    }
     let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
     let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
     let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
@@ -471,9 +531,12 @@ pub fn parse_hex_color(hex: &str) -> [u8; 4] {
 
 pub fn draw_arrow(
     data: &mut [u8],
-    w: u32, h: u32,
-    from_x: f64, from_y: f64,
-    to_x: f64, to_y: f64,
+    w: u32,
+    h: u32,
+    from_x: f64,
+    from_y: f64,
+    to_x: f64,
+    to_y: f64,
     color: [u8; 4],
     stroke_width: f64,
     style: u32,
@@ -493,7 +556,17 @@ pub fn draw_arrow(
     } else {
         (from_x, from_y)
     };
-    draw_line_thick(data, wi, hi, start_x, start_y, end_x, end_y, color, stroke_width);
+    draw_line_thick(
+        data,
+        wi,
+        hi,
+        start_x,
+        start_y,
+        end_x,
+        end_y,
+        color,
+        stroke_width,
+    );
     let h1 = (
         to_x - head_length * (angle - head_width).cos(),
         to_y - head_length * (angle - head_width).sin(),
@@ -519,7 +592,11 @@ pub fn draw_arrow(
 
 /// Per-channel linear interpolation of two straight-alpha RGBA colours.
 fn lerp_rgba(a: [u8; 4], b: [u8; 4], t: f64) -> [u8; 4] {
-    let l = |x: u8, y: u8| (x as f64 + (y as f64 - x as f64) * t).round().clamp(0.0, 255.0) as u8;
+    let l = |x: u8, y: u8| {
+        (x as f64 + (y as f64 - x as f64) * t)
+            .round()
+            .clamp(0.0, 255.0) as u8
+    };
     [l(a[0], b[0]), l(a[1], b[1]), l(a[2], b[2]), l(a[3], b[3])]
 }
 
@@ -531,11 +608,16 @@ fn lerp_rgba(a: [u8; 4], b: [u8; 4], t: f64) -> [u8; 4] {
 /// on top afterwards.
 pub fn fill_shape(
     data: &mut [u8],
-    w: u32, h: u32,
+    w: u32,
+    h: u32,
     shape: u8,
-    x0: f64, y0: f64, x1: f64, y1: f64,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
     fill_kind: u8,
-    c0: [u8; 4], c1: [u8; 4],
+    c0: [u8; 4],
+    c1: [u8; 4],
     angle_deg: u16,
     fill_block: u32,
 ) {
@@ -554,13 +636,19 @@ pub fn fill_shape(
     let py0 = (miny.floor() as i32).max(0);
     let px1 = (maxx.ceil() as i32).min(wi - 1);
     let py1 = (maxy.ceil() as i32).min(hi - 1);
-    if px0 > px1 || py0 > py1 { return; }
+    if px0 > px1 || py0 > py1 {
+        return;
+    }
 
     // Pixelate/mosaic fill: average grid-aligned cells of the pixels already in
     // `data` (this layer + earlier-rendered shapes) and overwrite them, clipped
     // to the shape. Block size falls back to 16 and is clamped to 2..=128.
     if fill_kind == 3 {
-        let block = (if fill_block == 0 { 16 } else { fill_block.clamp(2, 128) }) as i32;
+        let block = (if fill_block == 0 {
+            16
+        } else {
+            fill_block.clamp(2, 128)
+        }) as i32;
         let mut by = (py0 / block) * block;
         while by <= py1 {
             let mut bx = (px0 / block) * block;
@@ -581,14 +669,23 @@ pub fn fill_shape(
                     }
                 }
                 if n > 0 {
-                    let avg = [(sr / n) as u8, (sg / n) as u8, (sb / n) as u8, (sa / n) as u8];
+                    let avg = [
+                        (sr / n) as u8,
+                        (sg / n) as u8,
+                        (sb / n) as u8,
+                        (sa / n) as u8,
+                    ];
                     for yy in cy0..=cy1 {
                         for xx in cx0..=cx1 {
-                            if xx < px0 || xx > px1 || yy < py0 || yy > py1 { continue; }
+                            if xx < px0 || xx > px1 || yy < py0 || yy > py1 {
+                                continue;
+                            }
                             if shape == 1 {
                                 let dx = xx as f64 + 0.5 - cx;
                                 let dy = yy as f64 + 0.5 - cy;
-                                if (dx * dx + dy * dy).sqrt() > radius { continue; }
+                                if (dx * dx + dy * dy).sqrt() > radius {
+                                    continue;
+                                }
                             }
                             let i = ((yy * wi + xx) * 4) as usize;
                             data[i..i + 4].copy_from_slice(&avg);
@@ -624,7 +721,9 @@ pub fn fill_shape(
             if shape == 1 {
                 let dx = fx - cx;
                 let dy = fy - cy;
-                if (dx * dx + dy * dy).sqrt() > radius { continue; }
+                if (dx * dx + dy * dy).sqrt() > radius {
+                    continue;
+                }
             }
             let col = if fill_kind == 2 {
                 let t = ((proj(fx, fy) - pmin) / span).clamp(0.0, 1.0);
@@ -640,9 +739,12 @@ pub fn fill_shape(
 
 pub fn draw_shape(
     data: &mut [u8],
-    w: u32, h: u32,
-    from_x: f64, from_y: f64,
-    to_x: f64, to_y: f64,
+    w: u32,
+    h: u32,
+    from_x: f64,
+    from_y: f64,
+    to_x: f64,
+    to_y: f64,
     shape: u32,
     color: [u8; 4],
     stroke_width: f64,
@@ -681,7 +783,17 @@ pub fn draw_shape(
         }
         // 2 = Line
         2 => {
-            draw_line_thick(data, wi, hi, from_x, from_y, to_x, to_y, color, stroke_width);
+            draw_line_thick(
+                data,
+                wi,
+                hi,
+                from_x,
+                from_y,
+                to_x,
+                to_y,
+                color,
+                stroke_width,
+            );
         }
         // 3 = Hand-drawn circle
         //
@@ -694,7 +806,17 @@ pub fn draw_shape(
         // the bounding box coordinates so each position produces
         // a unique but deterministic shape.
         3 => {
-            draw_hand_circle(data, wi, hi, from_x, from_y, to_x, to_y, color, stroke_width);
+            draw_hand_circle(
+                data,
+                wi,
+                hi,
+                from_x,
+                from_y,
+                to_x,
+                to_y,
+                color,
+                stroke_width,
+            );
         }
         _ => {}
     }
@@ -708,15 +830,20 @@ pub fn draw_shape(
 /// Uses a basic hash to get variety without pulling in a crate.
 fn pseudo_rand(seed: f64) -> f64 {
     let bits = (seed * 1000.0 + 0.5).to_bits();
-    let mixed = bits.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let mixed = bits
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (mixed >> 33) as f64 / (1u64 << 31) as f64
 }
 
 fn draw_hand_circle(
     data: &mut [u8],
-    w: i32, h: i32,
-    from_x: f64, from_y: f64,
-    to_x: f64, to_y: f64,
+    w: i32,
+    h: i32,
+    from_x: f64,
+    from_y: f64,
+    to_x: f64,
+    to_y: f64,
     color: [u8; 4],
     stroke_width: f64,
 ) {
@@ -724,7 +851,9 @@ fn draw_hand_circle(
     let y = from_y.min(to_y);
     let bw = (to_x - from_x).abs();
     let bh = (to_y - from_y).abs();
-    if bw < 4.0 || bh < 4.0 { return; }
+    if bw < 4.0 || bh < 4.0 {
+        return;
+    }
 
     let cx = x + bw / 2.0;
     let cy = y + bh / 2.0;
@@ -790,7 +919,17 @@ fn draw_hand_circle(
 
     // Connect tail end to circle start
     if let (Some(&tail_last), Some(&circle_first)) = (tail_points.last(), path_points.first()) {
-        draw_line_thick(data, w, h, tail_last.0, tail_last.1, circle_first.0, circle_first.1, color, stroke_width);
+        draw_line_thick(
+            data,
+            w,
+            h,
+            tail_last.0,
+            tail_last.1,
+            circle_first.0,
+            circle_first.1,
+            color,
+            stroke_width,
+        );
     }
 
     // --- Draw main circle with smooth interpolation ---

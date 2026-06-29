@@ -171,3 +171,73 @@ jobs:
         with:
           language: javascript-typescript
       - uses: github/codeql-action/analyze@v3
+
+  # ---------- Static guardrails (from docs/ci-guardrails.md) ----------
+  # ADVISORY for now: the codebase isn't clean against these yet (raw colors,
+  # raw z-index, faux weights, `as any`, Rust unwrap/expect/unsafe). The job
+  # reports violations but does NOT fail the build — `continue-on-error: true`
+  # on the job and on each step lets every check run and surface its hits.
+  # To ENFORCE once a check's baseline is green: remove its step-level
+  # `continue-on-error` (and the job-level one when all are clean). Silence a
+  # legitimate single site with an `# allow: <tag>` comment instead of widening
+  # the exclude globs (the ratchet anti-pattern).
+  guardrails:
+    name: Static guardrails (advisory)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Raw Tailwind grays / white (use design tokens)
+        continue-on-error: true
+        run: |
+          hits=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-9]{2,3}\b|\btext-white\b|\bbg-white\b' \
+                   app/src -g '*.tsx' -g '*.ts' \
+                   -g '!**/CanvasArea.tsx' -g '!**/PenOverlay.tsx' -g '!**/CompareSlider.tsx' \
+                   -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' -g '!**/colors.ts' -g '!**/toolConfig.ts' \
+                 | rg -v 'allow: raw-color' || true)
+          if [ -n "$hits" ]; then echo "$hits"; echo "::error::raw colors — use design tokens (docs/ci-guardrails.md §2)"; exit 1; fi
+          echo "OK: no raw colors"
+
+      - name: Off-scale type / faux weights
+        continue-on-error: true
+        run: |
+          if rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx'; then
+            echo "::error::off-scale type / faux weights (docs/ci-guardrails.md §4)"; exit 1
+          fi
+          echo "OK: type scale clean"
+
+      - name: Raw z-index (use z-[var(--z-*)])
+        continue-on-error: true
+        run: |
+          if rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
+               -g '!**/GalleryBar.tsx' -g '!**/AppShell.tsx'; then
+            echo "::error::raw z-index — use z-[var(--z-*)] (docs/ci-guardrails.md §3)"; exit 1
+          fi
+          echo "OK: z-index clean"
+
+      - name: as any
+        continue-on-error: true
+        run: |
+          if rg -n '\bas any\b' app/src -g '*.ts' -g '*.tsx' -g '!*.d.ts'; then
+            echo "::error::'as any' — import real types (docs/ci-guardrails.md R7)"; exit 1
+          fi
+          echo "OK: no 'as any'"
+
+      - name: Rust panics / unsafe
+        continue-on-error: true
+        run: |
+          if rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs'; then
+            echo "::error::Rust panic/unsafe in the engine (docs/ci-guardrails.md §6) — SIMD unsafe is expected; annotate with '// allow:' once reviewed"; exit 1
+          fi
+          echo "OK: no Rust panics/unsafe"
+
+      - name: a11y — role=button needs aria-label
+        continue-on-error: true
+        run: |
+          hits=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' || true)
+          if [ -n "$hits" ]; then echo "$hits"; echo "::error::role=button without aria-label (docs/ci-guardrails.md §8)"; exit 1; fi
+          echo "OK: role=button usages labelled"

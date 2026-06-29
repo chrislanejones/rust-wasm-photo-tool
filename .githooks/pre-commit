@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Native git hook — enabled via: git config core.hooksPath .githooks
+# Bypass once: git commit --no-verify
+#
+# Fast, auto-fixable, and a CI blocker — worth catching at commit time.
+set -e
+
+if git diff --cached --name-only --diff-filter=ACM | grep -q '\.rs$'; then
+  echo "• cargo fmt --check (staged Rust)"
+  cargo fmt --check || {
+    echo "✗ Rust not formatted — run: cargo fmt"; exit 1
+  }
+fi

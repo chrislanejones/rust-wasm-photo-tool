@@ -22,23 +22,51 @@
 /// Horizontal blur pass: convolve `region` (bw×bh RGBA) along x into `h_pass`.
 /// `kr` is the kernel radius; `kernel` holds `2*kr+1` normalized weights.
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-pub fn blur_horizontal(region: &[u8], h_pass: &mut [u8], bw: usize, bh: usize, kr: i32, kernel: &[f32]) {
+pub fn blur_horizontal(
+    region: &[u8],
+    h_pass: &mut [u8],
+    bw: usize,
+    bh: usize,
+    kr: i32,
+    kernel: &[f32],
+) {
     unsafe { simd::blur_horizontal(region, h_pass, bw, bh, kr, kernel) }
 }
 
 /// Vertical blur pass: convolve `h_pass` (bw×bh RGBA) along y into `region`.
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-pub fn blur_vertical(h_pass: &[u8], region: &mut [u8], bw: usize, bh: usize, kr: i32, kernel: &[f32]) {
+pub fn blur_vertical(
+    h_pass: &[u8],
+    region: &mut [u8],
+    bw: usize,
+    bh: usize,
+    kr: i32,
+    kernel: &[f32],
+) {
     unsafe { simd::blur_vertical(h_pass, region, bw, bh, kr, kernel) }
 }
 
 #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
-pub fn blur_horizontal(region: &[u8], h_pass: &mut [u8], bw: usize, bh: usize, kr: i32, kernel: &[f32]) {
+pub fn blur_horizontal(
+    region: &[u8],
+    h_pass: &mut [u8],
+    bw: usize,
+    bh: usize,
+    kr: i32,
+    kernel: &[f32],
+) {
     scalar::blur_horizontal(region, h_pass, bw, bh, kr, kernel)
 }
 
 #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
-pub fn blur_vertical(h_pass: &[u8], region: &mut [u8], bw: usize, bh: usize, kr: i32, kernel: &[f32]) {
+pub fn blur_vertical(
+    h_pass: &[u8],
+    region: &mut [u8],
+    bw: usize,
+    bh: usize,
+    kr: i32,
+    kernel: &[f32],
+) {
     scalar::blur_vertical(h_pass, region, bw, bh, kr, kernel)
 }
 
@@ -46,7 +74,14 @@ pub fn blur_vertical(h_pass: &[u8], region: &mut [u8], bw: usize, bh: usize, kr:
 
 #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
 mod scalar {
-    pub fn blur_horizontal(region: &[u8], h_pass: &mut [u8], bw: usize, bh: usize, kr: i32, kernel: &[f32]) {
+    pub fn blur_horizontal(
+        region: &[u8],
+        h_pass: &mut [u8],
+        bw: usize,
+        bh: usize,
+        kr: i32,
+        kernel: &[f32],
+    ) {
         for ry in 0..bh {
             for rx in 0..bw {
                 let (mut r, mut g, mut b, mut a) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
@@ -68,7 +103,14 @@ mod scalar {
         }
     }
 
-    pub fn blur_vertical(h_pass: &[u8], region: &mut [u8], bw: usize, bh: usize, kr: i32, kernel: &[f32]) {
+    pub fn blur_vertical(
+        h_pass: &[u8],
+        region: &mut [u8],
+        bw: usize,
+        bh: usize,
+        kr: i32,
+        kernel: &[f32],
+    ) {
         for ry in 0..bh {
             for rx in 0..bw {
                 let (mut r, mut g, mut b, mut a) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
@@ -98,7 +140,14 @@ mod simd {
     use super::super::pixel::{load_px, store_px};
     use core::arch::wasm32::*;
 
-    pub unsafe fn blur_horizontal(region: &[u8], h_pass: &mut [u8], bw: usize, bh: usize, kr: i32, kernel: &[f32]) {
+    pub unsafe fn blur_horizontal(
+        region: &[u8],
+        h_pass: &mut [u8],
+        bw: usize,
+        bh: usize,
+        kr: i32,
+        kernel: &[f32],
+    ) {
         for ry in 0..bh {
             for rx in 0..bw {
                 let mut acc = f32x4_splat(0.0);
@@ -113,7 +162,14 @@ mod simd {
         }
     }
 
-    pub unsafe fn blur_vertical(h_pass: &[u8], region: &mut [u8], bw: usize, bh: usize, kr: i32, kernel: &[f32]) {
+    pub unsafe fn blur_vertical(
+        h_pass: &[u8],
+        region: &mut [u8],
+        bw: usize,
+        bh: usize,
+        kr: i32,
+        kernel: &[f32],
+    ) {
         for ry in 0..bh {
             for rx in 0..bw {
                 let mut acc = f32x4_splat(0.0);

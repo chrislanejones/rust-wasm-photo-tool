@@ -1,9 +1,9 @@
 //! Paint / brush engine: the paint, eraser, mask-paint and stabiliser-stab
 //! state machine. Split out of `lib.rs`; behaviour is unchanged.
 
-use wasm_bindgen::prelude::*;
-use crate::ImageHorseTool;
 use crate::parse_hex;
+use crate::ImageHorseTool;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 impl ImageHorseTool {
@@ -178,11 +178,7 @@ impl ImageHorseTool {
     }
 
     /// Single dab (the stroke's first touch). Accumulates coverage + recomposites.
-    pub fn paint_dab(
-        &mut self,
-        cx: f64, cy: f64, radius: f64,
-        r: u8, g: u8, b: u8, opacity: f64,
-    ) {
+    pub fn paint_dab(&mut self, cx: f64, cy: f64, radius: f64, r: u8, g: u8, b: u8, opacity: f64) {
         self.paint_color = (r, g, b);
         self.paint_opacity = opacity.clamp(0.0, 1.0) as f32;
         if let Some((min_x, min_y, max_x, max_y)) = self.accumulate_dab(cx, cy, radius) {
@@ -192,8 +188,15 @@ impl ImageHorseTool {
 
     pub fn paint_stroke_to(
         &mut self,
-        x0: f64, y0: f64, x1: f64, y1: f64,
-        radius: f64, r: u8, g: u8, b: u8, opacity: f64,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        radius: f64,
+        r: u8,
+        g: u8,
+        b: u8,
+        opacity: f64,
     ) {
         self.paint_color = (r, g, b);
         self.paint_opacity = opacity.clamp(0.0, 1.0) as f32;
@@ -206,7 +209,11 @@ impl ImageHorseTool {
         // once — correct per-stroke opacity, and far fewer recomposites per move.
         let mut bbox: Option<(i32, i32, i32, i32)> = None;
         for i in 0..=steps {
-            let t = if steps == 0 { 1.0 } else { i as f64 / steps as f64 };
+            let t = if steps == 0 {
+                1.0
+            } else {
+                i as f64 / steps as f64
+            };
             if let Some(bb) = self.accumulate_dab(x0 + dx * t, y0 + dy * t, radius) {
                 bbox = Some(match bbox {
                     None => bb,
@@ -239,8 +246,13 @@ impl ImageHorseTool {
 
     pub fn paint_down(
         &mut self,
-        x: f64, y: f64, size: f64,
-        color: &str, opacity: f64, hardness: f64, stab: &str,
+        x: f64,
+        y: f64,
+        size: f64,
+        color: &str,
+        opacity: f64,
+        hardness: f64,
+        stab: &str,
     ) {
         let [r, g, b, _] = parse_hex(color.trim_start_matches('#')).unwrap_or([0, 0, 0, 255]);
         self.paint_begin("Paint");
@@ -266,8 +278,12 @@ impl ImageHorseTool {
     /// (the erase semantics live entirely in the recomposite step).
     pub fn erase_down(
         &mut self,
-        x: f64, y: f64, size: f64,
-        opacity: f64, hardness: f64, stab: &str,
+        x: f64,
+        y: f64,
+        size: f64,
+        opacity: f64,
+        hardness: f64,
+        stab: &str,
     ) {
         self.paint_begin("Erase");
         self.paint_erase = true;
@@ -303,8 +319,13 @@ impl ImageHorseTool {
     /// `mask_paint_move` / `mask_paint_up` continue / end the stroke.
     pub fn mask_paint_down(
         &mut self,
-        x: f64, y: f64, size: f64,
-        value: u8, opacity: f64, hardness: f64, stab: &str,
+        x: f64,
+        y: f64,
+        size: f64,
+        value: u8,
+        opacity: f64,
+        hardness: f64,
+        stab: &str,
     ) {
         let n = (self.width * self.height) as usize;
         if n == 0 {
@@ -315,7 +336,7 @@ impl ImageHorseTool {
         if self.layers[self.active]
             .mask
             .as_ref()
-            .map_or(true, |m| m.len() != n)
+            .is_none_or(|m| m.len() != n)
         {
             self.layers[self.active].mask = Some(vec![255u8; n]);
         }
@@ -377,8 +398,15 @@ impl ImageHorseTool {
         if self.paint_leash > 0.0 {
             let (rx, ry) = self.paint_raw;
             let (r, g, b) = self.paint_color;
-            painted =
-                self.paint_stab_flush(rx, ry, self.paint_radius, r, g, b, self.paint_opacity as f64);
+            painted = self.paint_stab_flush(
+                rx,
+                ry,
+                self.paint_radius,
+                r,
+                g,
+                b,
+                self.paint_opacity as f64,
+            );
         }
         self.paint_last = None;
         self.paint_leash = 0.0;
@@ -404,8 +432,14 @@ impl ImageHorseTool {
     /// segment if it cleared the leash. Returns true when something was painted.
     pub fn paint_stab_to(
         &mut self,
-        raw_x: f64, raw_y: f64, leash: f64,
-        radius: f64, r: u8, g: u8, b: u8, opacity: f64,
+        raw_x: f64,
+        raw_y: f64,
+        leash: f64,
+        radius: f64,
+        r: u8,
+        g: u8,
+        b: u8,
+        opacity: f64,
     ) -> bool {
         let (tx, ty) = match self.paint_stab_tip {
             Some(t) => t,
@@ -433,8 +467,13 @@ impl ImageHorseTool {
     /// cursor so the stroke ends under the pointer, then clear the stabilizer.
     pub fn paint_stab_flush(
         &mut self,
-        raw_x: f64, raw_y: f64,
-        radius: f64, r: u8, g: u8, b: u8, opacity: f64,
+        raw_x: f64,
+        raw_y: f64,
+        radius: f64,
+        r: u8,
+        g: u8,
+        b: u8,
+        opacity: f64,
     ) -> bool {
         let painted = if let Some((tx, ty)) = self.paint_stab_tip {
             if (tx - raw_x).abs() > 0.001 || (ty - raw_y).abs() > 0.001 {

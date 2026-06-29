@@ -26,12 +26,24 @@ pub fn resize_bilinear(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u
 /// per-output-column source-window start + normalized kernel weights. Shared by
 /// `transform::resize_lanczos3` / `resize_catmull_rom`.
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-pub fn sep_horizontal(data: &[u8], ow: usize, oh: usize, nw: usize, windows: &[(usize, Vec<f32>)]) -> Vec<f32> {
+pub fn sep_horizontal(
+    data: &[u8],
+    ow: usize,
+    oh: usize,
+    nw: usize,
+    windows: &[(usize, Vec<f32>)],
+) -> Vec<f32> {
     unsafe { simd::sep_horizontal(data, ow, oh, nw, windows) }
 }
 
 #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
-pub fn sep_horizontal(data: &[u8], ow: usize, oh: usize, nw: usize, windows: &[(usize, Vec<f32>)]) -> Vec<f32> {
+pub fn sep_horizontal(
+    data: &[u8],
+    ow: usize,
+    oh: usize,
+    nw: usize,
+    windows: &[(usize, Vec<f32>)],
+) -> Vec<f32> {
     scalar::sep_horizontal(data, ow, oh, nw, windows)
 }
 
@@ -97,7 +109,13 @@ mod scalar {
         out
     }
 
-    pub fn sep_horizontal(data: &[u8], ow: usize, oh: usize, nw: usize, windows: &[(usize, Vec<f32>)]) -> Vec<f32> {
+    pub fn sep_horizontal(
+        data: &[u8],
+        ow: usize,
+        oh: usize,
+        nw: usize,
+        windows: &[(usize, Vec<f32>)],
+    ) -> Vec<f32> {
         let mut mid = vec![0f32; oh * nw * 4];
         for y in 0..oh {
             let row = &data[y * ow * 4..(y + 1) * ow * 4];
@@ -117,7 +135,12 @@ mod scalar {
         mid
     }
 
-    pub fn sep_vertical(mid: &[f32], nw: usize, nh: usize, windows: &[(usize, Vec<f32>)]) -> Vec<u8> {
+    pub fn sep_vertical(
+        mid: &[f32],
+        nw: usize,
+        nh: usize,
+        windows: &[(usize, Vec<f32>)],
+    ) -> Vec<u8> {
         let mut out = vec![0u8; nh * nw * 4];
         for (ty, (start, weights)) in windows.iter().enumerate() {
             for tx in 0..nw {
@@ -146,7 +169,13 @@ mod simd {
     use super::super::pixel::{load_px, store_px};
     use core::arch::wasm32::*;
 
-    pub unsafe fn resize_bilinear(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
+    pub unsafe fn resize_bilinear(
+        data: &[u8],
+        old_w: u32,
+        old_h: u32,
+        new_w: u32,
+        new_h: u32,
+    ) -> Vec<u8> {
         let nw = new_w.max(1);
         let nh = new_h.max(1);
         let mut out = vec![0u8; (nw * nh * 4) as usize];
@@ -189,7 +218,13 @@ mod simd {
         out
     }
 
-    pub unsafe fn sep_horizontal(data: &[u8], ow: usize, oh: usize, nw: usize, windows: &[(usize, Vec<f32>)]) -> Vec<f32> {
+    pub unsafe fn sep_horizontal(
+        data: &[u8],
+        ow: usize,
+        oh: usize,
+        nw: usize,
+        windows: &[(usize, Vec<f32>)],
+    ) -> Vec<f32> {
         let mut mid = vec![0f32; oh * nw * 4];
         for y in 0..oh {
             let row = &data[y * ow * 4..(y + 1) * ow * 4];
@@ -207,7 +242,12 @@ mod simd {
         mid
     }
 
-    pub unsafe fn sep_vertical(mid: &[f32], nw: usize, nh: usize, windows: &[(usize, Vec<f32>)]) -> Vec<u8> {
+    pub unsafe fn sep_vertical(
+        mid: &[f32],
+        nw: usize,
+        nh: usize,
+        windows: &[(usize, Vec<f32>)],
+    ) -> Vec<u8> {
         let mut out = vec![0u8; nh * nw * 4];
         for (ty, (start, weights)) in windows.iter().enumerate() {
             for tx in 0..nw {

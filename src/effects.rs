@@ -1,9 +1,9 @@
 //! Effects brush: Gaussian blur, pixelate, and redaction strokes. Split out of
 //! `lib.rs`; behaviour is unchanged.
 
-use wasm_bindgen::prelude::*;
 use crate::ImageHorseTool;
 use crate::{filters, parse_hex};
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 impl ImageHorseTool {
@@ -11,13 +11,7 @@ impl ImageHorseTool {
     // Call from JS:  tool.blur_region(cx, cy, brush_radius, intensity)
     // brush_radius = half the brush-size slider value
     // intensity    = the blur-intensity slider value (1..20)
-    pub fn blur_region(
-        &mut self,
-        cx: f64,
-        cy: f64,
-        brush_radius: f64,
-        intensity: u32,
-    ) {
+    pub fn blur_region(&mut self, cx: f64, cy: f64, brush_radius: f64, intensity: u32) {
         let clamped = intensity.clamp(1, 30);
         // Cache the Gaussian kernel keyed on intensity — a single blur stroke
         // hits this many times per second with the same intensity.
@@ -26,8 +20,7 @@ impl ImageHorseTool {
             None => true,
         };
         if needs_rebuild {
-            self.blur_kernel_cache =
-                Some((clamped, filters::build_gaussian_kernel(clamped)));
+            self.blur_kernel_cache = Some((clamped, filters::build_gaussian_kernel(clamped)));
         }
         let kernel = &self.blur_kernel_cache.as_ref().unwrap().1;
         filters::gaussian_blur_region(
@@ -43,7 +36,7 @@ impl ImageHorseTool {
             kernel,
         );
     }
- 
+
     /// Begin a blur stroke — saves undo snapshot once
     pub fn begin_blur_stroke(&mut self) {
         self.snap("Blur");
@@ -101,8 +94,13 @@ impl ImageHorseTool {
 
     pub fn effect_down(
         &mut self,
-        x: f64, y: f64, size: f64,
-        mode: &str, intensity: u32, pixel_size: u32, color: &str,
+        x: f64,
+        y: f64,
+        size: f64,
+        mode: &str,
+        intensity: u32,
+        pixel_size: u32,
+        color: &str,
     ) {
         self.effect_mode = match mode {
             "pixelate" => 1,
@@ -162,7 +160,7 @@ impl ImageHorseTool {
     pub fn effect_up(&mut self) {
         self.effect_last = None;
     }
- 
+
     // Note: No end_blur_stroke needed — the snapshot is already saved.
     // Just call blur_region() repeatedly during the stroke, then
     // the next begin_blur_stroke() or other action creates a new snapshot.

@@ -1,8 +1,8 @@
 //! Selection tool: magic-wand flood fill, select-all, and the marching-ants
 //! overlay. Split out of `lib.rs`; behaviour is unchanged.
 
-use wasm_bindgen::prelude::*;
 use crate::ImageHorseTool;
+use wasm_bindgen::prelude::*;
 
 /// Build a canvas-sized RGBA overlay from a selection mask — the selection
 /// *marker*. Rather than a flat translucent fill (which buried the pixels under
@@ -37,7 +37,7 @@ pub(crate) fn selection_overlay_rgba(mask: &[bool], w: usize, h: usize) -> Vec<u
                 || !sel(x, y - 1)
                 || !sel(x, y + 1);
             let px = if boundary {
-                if ((x + y) / DASH_PX) % 2 == 0 {
+                if ((x + y) / DASH_PX).is_multiple_of(2) {
                     [255, 255, 255, 255]
                 } else {
                     [0, 0, 0, 255]
@@ -131,7 +131,9 @@ impl ImageHorseTool {
     }
 
     pub fn has_selection(&self) -> bool {
-        self.selection.as_ref().is_some_and(|m| m.iter().any(|&b| b))
+        self.selection
+            .as_ref()
+            .is_some_and(|m| m.iter().any(|&b| b))
     }
 
     /// Deselect (Alt+D). No history.

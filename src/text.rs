@@ -7,7 +7,6 @@
 /// Two public entry points:
 ///   render_text       — plain multi-line text (text tool)
 ///   render_stamp_label — bordered, slightly-rotated stamp label (red stamps)
-
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 
 // Embedded fonts — compiled into the WASM binary.
@@ -47,9 +46,11 @@ fn rasterise_line(
     baseline_y: f32,
     canvas_w: u32,
     canvas_h: u32,
-    r: u8, g: u8, b: u8,
+    r: u8,
+    g: u8,
+    b: u8,
     alpha_mul: f32, // 0.0–1.0
-    pixels: &mut Vec<u8>,
+    pixels: &mut [u8],
 ) {
     use ab_glyph::point;
     let sf = font.as_scaled(scale);
@@ -78,9 +79,17 @@ fn rasterise_line(
                         let na = a as f32 / 255.0;
                         let out_a = na + ea * (1.0 - na);
                         if out_a > 0.0 {
-                            pixels[idx]     = ((r as f32 * na + pixels[idx] as f32 * ea * (1.0 - na)) / out_a).round() as u8;
-                            pixels[idx + 1] = ((g as f32 * na + pixels[idx + 1] as f32 * ea * (1.0 - na)) / out_a).round() as u8;
-                            pixels[idx + 2] = ((b as f32 * na + pixels[idx + 2] as f32 * ea * (1.0 - na)) / out_a).round() as u8;
+                            pixels[idx] = ((r as f32 * na + pixels[idx] as f32 * ea * (1.0 - na))
+                                / out_a)
+                                .round() as u8;
+                            pixels[idx + 1] = ((g as f32 * na
+                                + pixels[idx + 1] as f32 * ea * (1.0 - na))
+                                / out_a)
+                                .round() as u8;
+                            pixels[idx + 2] = ((b as f32 * na
+                                + pixels[idx + 2] as f32 * ea * (1.0 - na))
+                                / out_a)
+                                .round() as u8;
                             pixels[idx + 3] = (out_a * 255.0).round() as u8;
                         }
                     }
@@ -96,12 +105,7 @@ fn rasterise_line(
 
 /// Render multi-line text into an RGBA pixel buffer.
 /// `dest_x/dest_y` in the caller is the top-left corner of the rendered block.
-pub fn render_text(
-    text: &str,
-    font_size: f32,
-    r: u8, g: u8, b: u8,
-    bold: bool,
-) -> RenderedText {
+pub fn render_text(text: &str, font_size: f32, r: u8, g: u8, b: u8, bold: bool) -> RenderedText {
     let font_data = if bold { FONT_BOLD } else { FONT_REGULAR };
     let font = FontRef::try_from_slice(font_data).expect("embedded font is valid");
     let scale = PxScale::from(font_size);
@@ -111,7 +115,10 @@ pub fn render_text(
     let line_height = font_size * 1.3;
     let ascent = sf.ascent();
 
-    let max_w = lines.iter().map(|l| line_width(l, &font, scale)).fold(0.0f32, f32::max);
+    let max_w = lines
+        .iter()
+        .map(|l| line_width(l, &font, scale))
+        .fold(0.0f32, f32::max);
     let pad = (font_size * 0.25).ceil() as u32;
 
     let canvas_w = (max_w.ceil() as u32 + pad * 2).max(1);
@@ -122,15 +129,26 @@ pub fn render_text(
     for (i, line) in lines.iter().enumerate() {
         let baseline_y = pad as f32 + i as f32 * line_height + ascent;
         rasterise_line(
-            line, &font, scale,
-            pad as f32, baseline_y,
-            canvas_w, canvas_h,
-            r, g, b, 1.0,
+            line,
+            &font,
+            scale,
+            pad as f32,
+            baseline_y,
+            canvas_w,
+            canvas_h,
+            r,
+            g,
+            b,
+            1.0,
             &mut pixels,
         );
     }
 
-    RenderedText { pixels, width: canvas_w, height: canvas_h }
+    RenderedText {
+        pixels,
+        width: canvas_w,
+        height: canvas_h,
+    }
 }
 
 /// Render a stamp label (e.g. "REJECTED") with a border rect, at `font_size`,
@@ -139,7 +157,9 @@ pub fn render_text(
 pub fn render_stamp_label(
     label: &str,
     font_size: f32,
-    r: u8, g: u8, b: u8,
+    r: u8,
+    g: u8,
+    b: u8,
     angle_deg: f32,
 ) -> RenderedText {
     let font = FontRef::try_from_slice(FONT_BOLD).expect("embedded font is valid");
@@ -160,11 +180,11 @@ pub fn render_stamp_label(
     let border = 3u32;
     for y in 0..canvas_h {
         for x in 0..canvas_w {
-            let on_border = x < border || x >= canvas_w - border
-                || y < border || y >= canvas_h - border;
+            let on_border =
+                x < border || x >= canvas_w - border || y < border || y >= canvas_h - border;
             if on_border {
                 let idx = ((y * canvas_w + x) * 4) as usize;
-                pixels[idx]     = r;
+                pixels[idx] = r;
                 pixels[idx + 1] = g;
                 pixels[idx + 2] = b;
                 pixels[idx + 3] = 220; // ~86% opacity
@@ -176,10 +196,17 @@ pub fn render_stamp_label(
     let text_start_x = pad as f32;
     let baseline_y = pad as f32 + ascent;
     rasterise_line(
-        label, &font, scale,
-        text_start_x, baseline_y,
-        canvas_w, canvas_h,
-        r, g, b, 0.85,
+        label,
+        &font,
+        scale,
+        text_start_x,
+        baseline_y,
+        canvas_w,
+        canvas_h,
+        r,
+        g,
+        b,
+        0.85,
         &mut pixels,
     );
 
@@ -261,12 +288,17 @@ pub(crate) fn rotate_pixels(data: &[u8], w: u32, h: u32, angle_deg: f32) -> Rend
 
             let sample = |x: u32, y: u32| -> [f32; 4] {
                 let i = ((y * w + x) * 4) as usize;
-                [data[i] as f32, data[i+1] as f32, data[i+2] as f32, data[i+3] as f32]
+                [
+                    data[i] as f32,
+                    data[i + 1] as f32,
+                    data[i + 2] as f32,
+                    data[i + 3] as f32,
+                ]
             };
             let p00 = sample(x0, y0);
-            let p10 = sample(x0+1, y0);
-            let p01 = sample(x0, y0+1);
-            let p11 = sample(x0+1, y0+1);
+            let p10 = sample(x0 + 1, y0);
+            let p01 = sample(x0, y0 + 1);
+            let p11 = sample(x0 + 1, y0 + 1);
 
             let lerp = |a: f32, b: f32, t: f32| a + (b - a) * t;
             let blerp = |a: f32, b: f32, c: f32, d: f32| lerp(lerp(a, b, fx), lerp(c, d, fx), fy);
@@ -278,5 +310,9 @@ pub(crate) fn rotate_pixels(data: &[u8], w: u32, h: u32, angle_deg: f32) -> Rend
         }
     }
 
-    RenderedText { pixels: out, width: new_w, height: new_h }
+    RenderedText {
+        pixels: out,
+        width: new_w,
+        height: new_h,
+    }
 }

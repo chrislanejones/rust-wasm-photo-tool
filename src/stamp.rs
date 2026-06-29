@@ -2,7 +2,6 @@
 ///
 /// Source point, offset tracking, stroke lifecycle (begin / continue / end),
 /// spacing-based interpolation, and the per-pixel dab blending kernel.
-
 use crate::history::{History, Snapshot};
 
 pub struct StampState {
@@ -103,14 +102,7 @@ impl StampState {
         true
     }
 
-    pub fn continue_stroke(
-        &mut self,
-        data: &mut [u8],
-        w: i32,
-        h: i32,
-        dest_x: f64,
-        dest_y: f64,
-    ) {
+    pub fn continue_stroke(&mut self, data: &mut [u8], w: i32, h: i32, dest_x: f64, dest_y: f64) {
         if !self.stroke_active {
             return;
         }
@@ -164,8 +156,19 @@ impl StampState {
         let brush_size = self.brush_size;
         let hardness = self.hardness;
         let opacity = self.opacity;
-        apply_dab(&self.stroke_src_data, data, w, h, brush_size, hardness, opacity,
-                  dest_x, dest_y, src_cx, src_cy);
+        apply_dab(
+            &self.stroke_src_data,
+            data,
+            w,
+            h,
+            brush_size,
+            hardness,
+            opacity,
+            dest_x,
+            dest_y,
+            src_cx,
+            src_cy,
+        );
         self.last_stamp_x = Some(dest_x);
         self.last_stamp_y = Some(dest_y);
     }
@@ -179,9 +182,15 @@ impl StampState {
 fn apply_dab(
     src: &[u8],
     dst: &mut [u8],
-    w: i32, h: i32,
-    brush_size: u32, hardness: f64, opacity: f64,
-    cx: f64, cy: f64, src_cx: f64, src_cy: f64,
+    w: i32,
+    h: i32,
+    brush_size: u32,
+    hardness: f64,
+    opacity: f64,
+    cx: f64,
+    cy: f64,
+    src_cx: f64,
+    src_cy: f64,
 ) {
     let r = brush_size as f32;
     let r_sq = r * r;

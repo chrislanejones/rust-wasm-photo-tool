@@ -119,7 +119,10 @@ mod core_tests {
             data: vec![0, 0, 0, 255, 255, 255, 255, 255],
         };
         let [r, g, b, a] = buf.sample_bilinear(0.5, 0.0);
-        assert!((185..=190).contains(&r), "r={r} (expected ~188, gamma-correct)");
+        assert!(
+            (185..=190).contains(&r),
+            "r={r} (expected ~188, gamma-correct)"
+        );
         assert_eq!([g, b, a], [r, r, 255]);
     }
 

@@ -47,12 +47,26 @@ pub fn adjust_contrast(data: &mut [u8], factor: f64) {
 /// the four channels in a `u32x4` (sums stay < u32::MAX for the ≤128² cells the
 /// caller produces), so the `sum / n` average is bit-identical to the u64 scalar.
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-pub fn cell_channel_sums(data: &[u8], w: usize, cx0: usize, cy0: usize, cx1: usize, cy1: usize) -> ([u64; 4], u64) {
+pub fn cell_channel_sums(
+    data: &[u8],
+    w: usize,
+    cx0: usize,
+    cy0: usize,
+    cx1: usize,
+    cy1: usize,
+) -> ([u64; 4], u64) {
     unsafe { simd::cell_channel_sums(data, w, cx0, cy0, cx1, cy1) }
 }
 
 #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
-pub fn cell_channel_sums(data: &[u8], w: usize, cx0: usize, cy0: usize, cx1: usize, cy1: usize) -> ([u64; 4], u64) {
+pub fn cell_channel_sums(
+    data: &[u8],
+    w: usize,
+    cx0: usize,
+    cy0: usize,
+    cx1: usize,
+    cy1: usize,
+) -> ([u64; 4], u64) {
     scalar::cell_channel_sums(data, w, cx0, cy0, cx1, cy1)
 }
 
@@ -93,7 +107,14 @@ mod scalar {
         }
     }
 
-    pub fn cell_channel_sums(data: &[u8], w: usize, cx0: usize, cy0: usize, cx1: usize, cy1: usize) -> ([u64; 4], u64) {
+    pub fn cell_channel_sums(
+        data: &[u8],
+        w: usize,
+        cx0: usize,
+        cy0: usize,
+        cx1: usize,
+        cy1: usize,
+    ) -> ([u64; 4], u64) {
         let (mut sr, mut sg, mut sb, mut sa, mut n) = (0u64, 0u64, 0u64, 0u64, 0u64);
         for yy in cy0..=cy1 {
             for xx in cx0..=cx1 {
@@ -141,8 +162,10 @@ mod simd {
         // Tail: fewer than 4 pixels left — scalar, identical math.
         while i + 4 <= len {
             *data.get_unchecked_mut(i) = (*data.get_unchecked(i) as i32 + d).clamp(0, 255) as u8;
-            *data.get_unchecked_mut(i + 1) = (*data.get_unchecked(i + 1) as i32 + d).clamp(0, 255) as u8;
-            *data.get_unchecked_mut(i + 2) = (*data.get_unchecked(i + 2) as i32 + d).clamp(0, 255) as u8;
+            *data.get_unchecked_mut(i + 1) =
+                (*data.get_unchecked(i + 1) as i32 + d).clamp(0, 255) as u8;
+            *data.get_unchecked_mut(i + 2) =
+                (*data.get_unchecked(i + 2) as i32 + d).clamp(0, 255) as u8;
             i += 4;
         }
     }
@@ -159,7 +182,7 @@ mod simd {
         let mut i = 0;
         while i + 4 <= len {
             let px = load_px(data, i); // [r, g, b, a] as f32x4
-            // adj = clamp((v/255 - 0.5) * f + 0.5, 0, 1)
+                                       // adj = clamp((v/255 - 0.5) * f + 0.5, 0, 1)
             let v = f32x4_mul(px, inv255);
             let adj = f32x4_add(f32x4_mul(f32x4_sub(v, half), fv), half);
             let adj = f32x4_pmin(one, f32x4_pmax(zero, adj));
@@ -175,7 +198,14 @@ mod simd {
     /// `u32x4` per-pixel accumulation of a cell's channel sums. Each pixel widens
     /// u8→u32 ([r,g,b,a]) and adds into the accumulator; ≤128² cells keep every
     /// lane < u32::MAX, so the extracted sums equal the u64 scalar sums exactly.
-    pub unsafe fn cell_channel_sums(data: &[u8], w: usize, cx0: usize, cy0: usize, cx1: usize, cy1: usize) -> ([u64; 4], u64) {
+    pub unsafe fn cell_channel_sums(
+        data: &[u8],
+        w: usize,
+        cx0: usize,
+        cy0: usize,
+        cx1: usize,
+        cy1: usize,
+    ) -> ([u64; 4], u64) {
         let mut acc = u32x4_splat(0);
         let mut n = 0u64;
         for yy in cy0..=cy1 {
