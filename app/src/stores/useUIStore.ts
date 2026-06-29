@@ -53,59 +53,60 @@ interface UIState {
 export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
-  showUpload: false,
-  showTopBar: false,
-  masterTab: "tools",
-  showTools: false,
-  showGallery: false,
-  showHistory: false,
-  smallNoticeDismissed: false,
-  tabletNoticeDismissed: false,
-  showShortcutModal: false,
-  showCelebration: false,
-  showDiagnostics: false,
-  deleteAllOpen: false,
-  deletePhotoId: null,
-  deleteSelectedOpen: false,
-  exportDialogOpen: false,
+      showUpload: false,
+      showTopBar: false,
+      masterTab: "tools",
+      showTools: false,
+      showGallery: false,
+      showHistory: false,
+      smallNoticeDismissed: false,
+      tabletNoticeDismissed: false,
+      showShortcutModal: false,
+      showCelebration: false,
+      showDiagnostics: false,
+      deleteAllOpen: false,
+      deletePhotoId: null,
+      deleteSelectedOpen: false,
+      exportDialogOpen: false,
 
-  setShowUpload: (v) => set((s) => ({ showUpload: resolveSet(v, s.showUpload) })),
-  setShowTopBar: (v) => set((s) => ({ showTopBar: resolveSet(v, s.showTopBar) })),
-  setMasterTab: (v) => set((s) => ({ masterTab: resolveSet(v, s.masterTab) })),
-  setShowTools: (v) => set((s) => ({ showTools: resolveSet(v, s.showTools) })),
-  setShowGallery: (v) => set((s) => ({ showGallery: resolveSet(v, s.showGallery) })),
-  setShowHistory: (v) => set((s) => ({ showHistory: resolveSet(v, s.showHistory) })),
-  setSmallNoticeDismissed: (v) =>
-    set((s) => ({ smallNoticeDismissed: resolveSet(v, s.smallNoticeDismissed) })),
-  setTabletNoticeDismissed: (v) =>
-    set((s) => ({ tabletNoticeDismissed: resolveSet(v, s.tabletNoticeDismissed) })),
-  setShowShortcutModal: (v) =>
-    set((s) => ({ showShortcutModal: resolveSet(v, s.showShortcutModal) })),
-  setShowCelebration: (v) =>
-    set((s) => ({ showCelebration: resolveSet(v, s.showCelebration) })),
-  setShowDiagnostics: (v) =>
-    set((s) => ({ showDiagnostics: resolveSet(v, s.showDiagnostics) })),
-  setDeleteAllOpen: (v) =>
-    set((s) => ({ deleteAllOpen: resolveSet(v, s.deleteAllOpen) })),
-  setDeletePhotoId: (v) =>
-    set((s) => ({ deletePhotoId: resolveSet(v, s.deletePhotoId) })),
-  setDeleteSelectedOpen: (v) =>
-    set((s) => ({ deleteSelectedOpen: resolveSet(v, s.deleteSelectedOpen) })),
-  setExportDialogOpen: (v) =>
-    set((s) => ({ exportDialogOpen: resolveSet(v, s.exportDialogOpen) })),
+      setShowUpload: (v) => set((s) => ({ showUpload: resolveSet(v, s.showUpload) })),
+      setShowTopBar: (v) => set((s) => ({ showTopBar: resolveSet(v, s.showTopBar) })),
+      setMasterTab: (v) => set((s) => ({ masterTab: resolveSet(v, s.masterTab) })),
+      setShowTools: (v) => set((s) => ({ showTools: resolveSet(v, s.showTools) })),
+      setShowGallery: (v) => set((s) => ({ showGallery: resolveSet(v, s.showGallery) })),
+      setShowHistory: (v) => set((s) => ({ showHistory: resolveSet(v, s.showHistory) })),
+      setSmallNoticeDismissed: (v) =>
+        set((s) => ({ smallNoticeDismissed: resolveSet(v, s.smallNoticeDismissed) })),
+      setTabletNoticeDismissed: (v) =>
+        set((s) => ({ tabletNoticeDismissed: resolveSet(v, s.tabletNoticeDismissed) })),
+      setShowShortcutModal: (v) =>
+        set((s) => ({ showShortcutModal: resolveSet(v, s.showShortcutModal) })),
+      setShowCelebration: (v) =>
+        set((s) => ({ showCelebration: resolveSet(v, s.showCelebration) })),
+      setShowDiagnostics: (v) =>
+        set((s) => ({ showDiagnostics: resolveSet(v, s.showDiagnostics) })),
+      setDeleteAllOpen: (v) =>
+        set((s) => ({ deleteAllOpen: resolveSet(v, s.deleteAllOpen) })),
+      setDeletePhotoId: (v) =>
+        set((s) => ({ deletePhotoId: resolveSet(v, s.deletePhotoId) })),
+      setDeleteSelectedOpen: (v) =>
+        set((s) => ({ deleteSelectedOpen: resolveSet(v, s.deleteSelectedOpen) })),
+      setExportDialogOpen: (v) =>
+        set((s) => ({ exportDialogOpen: resolveSet(v, s.exportDialogOpen) })),
     }),
     {
       name: "image-horse-ui-v1",
       storage: createJSONStorage(() => idbStorage),
       version: 1,
-      // Persist only durable "remember my choice" prefs. Transient flags
-      // (dialogs, celebration, diagnostics, upload) are deliberately excluded —
-      // persisting them would re-open a modal on reload. See
+      // Persist ONLY the master-bar tab — a pure "remember my last view" pref.
+      // The notice-dismissed flags are deliberately NOT persisted: they're
+      // session/stretch-scoped by design (re-armed on resize — see the bp
+      // effects in AppShell), so persisting them would contradict that intent.
+      // Transient dialog / celebration / diagnostics / upload flags are excluded
+      // for the obvious reason (they'd re-open on reload). See
       // docs/State-Management.md §6.
       partialize: (s): Partial<UIState> => ({
         masterTab: s.masterTab,
-        smallNoticeDismissed: s.smallNoticeDismissed,
-        tabletNoticeDismissed: s.tabletNoticeDismissed,
       }),
     },
   ),

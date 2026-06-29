@@ -180,9 +180,10 @@ IndexedDB is async, so a `persist`-backed store **hydrates after first paint**. 
 
 - [x] Three content databases live (`originals` / `edits` / `gallery`).
 - [x] `localStorage` + Convex preferences sync live.
-- [x] Hand-rolled Zustand IndexedDB adapter (`app/src/stores/storage/idbStorage.ts`).
-- [x] `useUIStore` persisted (durable prefs only) via the adapter.
+- [x] Hand-rolled Zustand IndexedDB adapter (`app/src/stores/storage/idbStorage.ts`), with write de-duplication (skips identical consecutive writes).
+- [x] `useUIStore` persisted via the adapter — `masterTab` only.
+- [x] `useToolStore` persisted via the adapter — pure sub-mode prefs (`brushMode` / `effectsMode` / `stampSubMode` / `shapesMode`).
 - [x] Dexie content-layer module (`app/src/lib/dexie/db.ts` + `USAGE.md`) — parallel `image-horse-dexie` DB, not yet wired into call sites.
 - [ ] Backfill + cut the four `originalsStore` call sites over to Dexie (see USAGE.md migration path).
-- [ ] Selectively persist last-used `useToolStore` settings (brush size, last effect) — candidate follow-up.
+- [ ] Persist the engine-coupled `useToolStore` settings (`stampSettings` / `toolSettings`) — needs a rehydrate→WASM sync; do it with the AppShell wiring.
 - [ ] Service-worker caching of the app shell + WASM binary — see [Service Workers & Caching](Service-Workers-Caching.md).

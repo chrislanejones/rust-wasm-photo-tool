@@ -27,6 +27,17 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.40",
+    date: "2026-06-29",
+    headline: "Snappier photo switching, privacy + safer share links",
+    entries: [
+      { tag: "perf", text: "Switching between photos is now near-instant. The app used to re-read each photo from local storage and fully re-decode it every time you clicked it; it now keeps recently-viewed photos decoded in memory, so jumping around the gallery feels immediate." },
+      { tag: "feature", text: "Privacy by default: exported images now strip camera metadata (EXIF — GPS location, capture time, device) unless you turn it back on in Settings → Security." },
+      { tag: "fix", text: "Share links are harder to guess — view tokens now come from a cryptographically-secure generator instead of a basic random function. Existing links keep working." },
+      { tag: "infra", text: "Added an image-upload safety check (validates real file bytes, caps absurd sizes, rejects scriptable SVGs) plus more behind-the-scenes state and storage groundwork." },
+    ],
+  },
+  {
     version: "v0.9.39",
     date: "2026-06-29",
     headline: "Behind the scenes — state-management foundation + storage groundwork",

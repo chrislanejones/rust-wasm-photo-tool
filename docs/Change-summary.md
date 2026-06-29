@@ -464,3 +464,18 @@ builds on.
 | 5   | **Dexie content layer** (`lib/dexie/db.ts` + `USAGE.md`) — typed declarative schema `originals` / `workingCopies` / `photos` in a parallel `image-horse-dexie` DB. Public API mirrors the legacy `originalsStore` names so a future cutover is an import-path swap; cascade delete + content-address dedupe preserved. The three live hand-rolled stores are untouched | Module landed (not yet wired) |
 | 6   | **Docs** — `State-Management.md`, `IndexedDB-Investigation.md`, `Service-Workers-Caching.md` (the SW one is investigation-only; no service worker ships yet). README docs index + Tech Stack updated | Complete |
 | 7   | **Deps** — `zustand@5` + `dexie@4` added to the `app` package (via the corepack `pnpm@11.7.0` workaround for the store-v11 lockfile) | Complete |
+
+## v5.7 Change Summary — 2026-06-29
+
+Photo-switch performance fix (the user-reported bug) + a security/perf pass and
+planning docs. The performance fix and EXIF/share changes are user-visible; the
+Zustand persistence + docs are groundwork.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Faster photo switching** — `loadPhotoFromEntry` re-read the original bytes from IndexedDB and ran two full-res `createImageBitmap` decodes (probe + downscale) on EVERY select, even when revisiting a just-seen photo. New `lib/workingCopyCache.ts` is a byte-budget LRU (≈160 MB) of decoded working copies keyed by the **content hash** — immutable bytes ⇒ a deterministic decode, so the cache is always valid (no invalidation). Cache hit skips the IDB read + both decodes; uploads seed it; "Delete all" clears it. Buffers are read-only (canvas + a WASM `load_image` copy), so one buffer safely backs many selections | Complete |
+| 2   | **EXIF privacy-by-default** — `DEFAULT_PREFERENCES.exifKeep` flipped `true → false`; export strips GPS / capture-time / device unless re-enabled in Settings → Security. Existing users keep their stored choice | Complete |
+| 3   | **Share-token hardening** — `convex/shares.ts` `makeToken()` used `Math.random()` (~72 bits, non-crypto) to gate the PUBLIC, unauthenticated `get` endpoint (the token IS the access control). Now `crypto.randomUUID()` (122-bit CSPRNG, Convex-seeded/replay-safe). Backward-compatible — existing tokens still resolve via the `by_token` index | Complete |
+| 4   | **Image-upload firewall** (`lib/security/imageFirewall.ts`) — magic-byte sniff (never trusts `file.type`/`file.name`), size / pixel-count / dimension caps (decompression-bomb guard), explicit SVG rejection. Plus `lib/security/sanitizeFilename.ts` for ZIP/download names. Utilities landed; wiring into the upload path is a supervised follow-up (format allowlist must be confirmed) | Utilities complete |
+| 5   | **Zustand persistence + perf** — `useToolStore` now persists its pure sub-mode prefs (brush/effects/stamp/shapes mode); `useUIStore` persists only the master-bar tab (notice flags are session-scoped by design); the IndexedDB adapter de-dupes identical writes so dialog toggles don't churn the prefs blob. Performance playbook added to State-Management §7 | Complete |
+| 6   | **Docs** — `Architecture-Roadmap.md` (document-based-editor direction, prioritized, mapped onto the real repo — noting Rust already owns the document model), `Security-Hardening.md` (audit → repo), `OpenRaster-Export-Import.md` (grounded `.ora` plan) | Complete |

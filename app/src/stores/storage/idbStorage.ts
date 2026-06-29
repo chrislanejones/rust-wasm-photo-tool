@@ -63,6 +63,14 @@ async function idbDel(key: string): Promise<void> {
   });
 }
 
+// Last value written per key, in-memory. `persist` subscribes to the WHOLE
+// store and calls setItem on EVERY state change — so every dialog open/close in
+// useUIStore would otherwise re-write the (unchanged) partialized prefs blob to
+// IndexedDB. Short-circuiting identical writes turns that churn into one write
+// per actual pref change. Primed by getItem so the first post-hydration change
+// to a non-persisted field doesn't write either.
+const lastWritten = new Map<string, string>();
+
 /**
  * Zustand persist storage backed by IndexedDB. Wrap with `createJSONStorage`:
  *
@@ -71,9 +79,22 @@ async function idbDel(key: string): Promise<void> {
  * All three methods are async — `persist` hydrates the store after first paint,
  * so only persist small, cosmetic "remember my choice" prefs (never transient
  * dialog flags or heavy data). See docs/State-Management.md §6.
+ *
+ * setItem de-dupes: identical consecutive writes are skipped (see `lastWritten`).
  */
 export const idbStorage: StateStorage = {
-  getItem: (name) => idbGet(name),
-  setItem: (name, value) => idbSet(name, value),
-  removeItem: (name) => idbDel(name),
+  getItem: async (name) => {
+    const value = await idbGet(name);
+    if (value !== null) lastWritten.set(name, value);
+    return value;
+  },
+  setItem: async (name, value) => {
+    if (lastWritten.get(name) === value) return; // no-op: unchanged
+    lastWritten.set(name, value);
+    await idbSet(name, value);
+  },
+  removeItem: async (name) => {
+    lastWritten.delete(name);
+    await idbDel(name);
+  },
 };

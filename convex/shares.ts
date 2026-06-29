@@ -8,11 +8,15 @@ import { getUser, requireUser } from "./users";
 // `token` rather than by (userId, photoKey). The `get`/`recordView` endpoints
 // are intentionally public so a recipient who isn't signed in can still view it.
 
-/** Generate a URL-safe, unguessable token. ~72 bits of entropy across two
- *  base-36 chunks — plenty for a share slug that isn't a security boundary. */
+/** Generate a URL-safe, unguessable share token. These tokens ARE the only
+ *  access control on the PUBLIC `get` endpoint (it's a capability URL), so they
+ *  must be unguessable — `Math.random()` is a non-cryptographic PRNG and must
+ *  not gate access. A v4 UUID gives 122 bits of CSPRNG entropy; Convex seeds
+ *  `crypto` deterministically per execution, so this is replay-safe. Dashes
+ *  stripped → 32 URL-safe hex chars. Existing shorter tokens still resolve via
+ *  the `by_token` index. */
 function makeToken(): string {
-  const chunk = () => Math.random().toString(36).slice(2, 10);
-  return (chunk() + chunk()).slice(0, 14);
+  return crypto.randomUUID().replace(/-/g, "");
 }
 
 /** Short-lived upload URL for the snapshot PNG. Auth-gated so anonymous clients

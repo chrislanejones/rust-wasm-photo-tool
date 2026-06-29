@@ -85,15 +85,77 @@ These come **after** the store migration: once state lives in stores, the big ef
 
 ## 6. Persistence
 
-Stores that hold "remember my choice" preferences are backed by **IndexedDB** via a hand-rolled Zustand adapter — see [IndexedDB Investigation](IndexedDB-Investigation.md).
+Stores that hold "remember my choice" preferences are backed by **IndexedDB** via a hand-rolled Zustand adapter (`app/src/stores/storage/idbStorage.ts`, DB `image-horse-zustand`) — see [IndexedDB Investigation](IndexedDB-Investigation.md). The adapter de-dupes writes (§7.5).
 
-- `useUIStore` persists a **`partialize`d** subset (`masterTab`, the notice-dismissed flags) through `app/src/stores/storage/idbStorage.ts` (DB `image-horse-zustand`).
-- Transient flags (dialog open/closed, celebration, diagnostics) are **never** persisted — they'd re-open on reload.
-- Heavy data (photos, edit history) is **never** persisted through Zustand; it lives in the dedicated content databases / WASM memory.
+- **`useUIStore`** persists **only `masterTab`** — a pure "remember my last view" pref. The notice-dismissed flags are **not** persisted: they're session/stretch-scoped by design (re-armed on resize), so persisting them would contradict that. Transient flags (dialogs, celebration, diagnostics, upload) are never persisted — they'd re-open on reload.
+- **`useToolStore`** persists only the **pure sub-mode prefs** (`brushMode`, `effectsMode`, `stampSubMode`, `shapesMode`) — UI routing flags with no engine coupling, so no rehydrate→WASM sync is needed.
+  - **Not yet persisted (engine-coupled):** `stampSettings` / `toolSettings` push into the WASM engine (`stamp.setBrushSize/…`), so persisting them needs a one-time sync of the rehydrated value into the engine (via `persist`'s `onRehydrateStorage`, or an effect after hydration). Deferred to the AppShell wiring.
+  - **Never persisted:** `activeTool` (start on the default tool, not mid-edit), `selectionMask` / `selectionMode` (transient).
+- **`useGalleryStore`** is **not** persisted through Zustand at all — the gallery is large and dynamic; its data lives in the dedicated content databases (and, going forward, the [Dexie](IndexedDB-Investigation.md) `photos` table) / WASM memory.
 
 ---
 
-## 7. Status
+## 7. Performance
+
+Zustand is the performance play here, not just a tidiness one. The wins, in order of impact:
+
+### 7.1 Atomic selectors are the headline win
+
+Today a single `useState` change anywhere in AppShell re-renders the **entire ~3,245-line component** and everything it returns. Replacing those with **atomic selectors** means a component only re-renders when the *one field it reads* changes:
+
+```ts
+// ✅ atomic — re-renders only when showTools flips
+const showTools = useUIStore((s) => s.showTools);
+
+// ❌ object selector — new object every render → re-renders on EVERY store change
+const { showTools, showGallery } = useUIStore((s) => ({
+  showTools: s.showTools,
+  showGallery: s.showGallery,
+}));
+```
+
+The migration in §3 binds one selector per field, so it gets this for free. **Keep it that way** — don't collapse multiple fields into an object selector.
+
+### 7.2 `useShallow` when you genuinely need several fields
+
+If a component truly needs a handful of fields together, wrap the object selector in `useShallow` so it re-renders only when one of those values changes (shallow-compared), not on every store write:
+
+```ts
+import { useShallow } from "zustand/react/shallow";
+
+const { brushMode, effectsMode } = useToolStore(
+  useShallow((s) => ({ brushMode: s.brushMode, effectsMode: s.effectsMode })),
+);
+```
+
+### 7.3 Transient updates for hot paths (no re-render at all)
+
+For continuous, high-frequency state — pan offset, brush cursor position, live stroke — **don't** drive React state per pointer-move. Read/write through the store imperatively and let the canvas/WASM consume it without re-rendering React:
+
+```ts
+// write without subscribing: no re-render
+useToolStore.getState().setToolSettings(next);
+
+// subscribe imperatively (e.g. push to the WASM engine) — also no re-render
+const unsub = useToolStore.subscribe((s) => s.toolSettings, syncToWasm);
+```
+
+`store.subscribe(selector, cb)` needs the `subscribeWithSelector` middleware; add it to a store only when a hot path actually wants it (don't add speculatively). This is how the WASM sync in `handleStampSettingsChange` (which today calls both `setStampSettings` *and* `stamp.setBrushSize/...`) can become a single subscription.
+
+### 7.4 Stable setters = free
+
+Store actions are created once, so binding `setShowTools` via selector never changes identity — passing it to children adds no re-renders and needs no `useCallback`. (Several `useCallback`s in AppShell that only exist to stabilize a setState wrapper can be deleted as the wiring lands.)
+
+### 7.5 Persistence write-cost
+
+`persist` subscribes to the **whole** store and writes on every state change, so a store that mixes frequently-toggling flags with rarely-changing prefs (exactly `useUIStore`) would hammer IndexedDB. Two guards:
+
+- **`partialize`** to the durable prefs only (done) — keeps the serialized blob tiny.
+- **Write de-dup** in the adapter (`idbStorage.ts`) — identical consecutive writes are skipped, so toggling a (non-persisted) dialog flag no longer re-writes the unchanged prefs blob. Net: one IDB write per *actual* pref change.
+
+If a persisted store ever needs to persist a frequently-changing field, split that field into its own small store rather than debouncing — the subscription cost is per-store.
+
+## 8. Status
 
 - [x] `zustand@5` added to the `app` (`stamp-tool`) package.
 - [x] `useUIStore` / `useToolStore` / `useGalleryStore` + `_shared.ts` created, types mined from the real AppShell.

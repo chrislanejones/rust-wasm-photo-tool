@@ -84,6 +84,7 @@ import {
 import { pinLabelText } from "@/lib/pinLabel";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels, ImageTooLargeError } from "@/lib/workingCopy";
+import { getWorkingCopy, putWorkingCopy, clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
 import { logDiagnostic, installConsoleCapture } from "@/lib/diagnosticsLog";
 import {
@@ -413,11 +414,19 @@ export function AppShell() {
 
   const loadPhotoFromEntry = useCallback(
     async (entry: PhotoEntry, isCurrent?: () => boolean) => {
-      const original = await getOriginal(entry.originalKey);
-      if (!original) return;
-      if (isCurrent && !isCurrent()) return;
-      const file = new File([original.bytes], original.name, { type: original.mimeType });
-      const working = await makeWorkingCopy(file);
+      // Fast path: a previously-decoded working copy. Keyed by the original's
+      // content hash (immutable → always valid), so revisiting a photo skips the
+      // IndexedDB read AND both createImageBitmap decodes — the slow part of a
+      // photo switch. See lib/workingCopyCache.ts.
+      let working = getWorkingCopy(entry.originalKey);
+      if (!working) {
+        const original = await getOriginal(entry.originalKey);
+        if (!original) return;
+        if (isCurrent && !isCurrent()) return;
+        const file = new File([original.bytes], original.name, { type: original.mimeType });
+        working = await makeWorkingCopy(file);
+        putWorkingCopy(entry.originalKey, working);
+      }
       if (isCurrent && !isCurrent()) return;
       loadImageFromPixels(working.pixels, working.width, working.height);
     },
@@ -517,6 +526,9 @@ export function AppShell() {
               mod.resize_pixels,
             ),
           ]);
+          // Seed the decode cache so re-selecting this photo later is instant
+          // (no IndexedDB read + re-decode). Keyed by content hash.
+          putWorkingCopy(originalKey, working);
           const entry: PhotoEntry = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             name: f.name.replace(/\.[^.]+$/, ""),
@@ -1125,6 +1137,7 @@ export function AppShell() {
   const confirmDeleteAll = useCallback(() => {
     setDeleteAllOpen(false);
     clearAllEdits().catch(() => {});
+    clearWorkingCopyCache(); // free the decoded-photo cache (all photos gone)
     setImageSavings({});
     setModifiedPhotos(new Set());
     // Blank the canvas + drop the WASM tool immediately (the empty-gallery

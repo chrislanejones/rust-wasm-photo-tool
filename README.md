@@ -22,6 +22,9 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 - **[State Management](docs/State-Management.md)** — the Zustand stores, the `SetArg` drop-in migration off AppShell's `useState`, and what stays local.
 - **[IndexedDB Investigation](docs/IndexedDB-Investigation.md)** — why IndexedDB, the live content databases, the Zustand persist adapter, and the Dexie content layer.
 - **[Service Workers & Caching](docs/Service-Workers-Caching.md)** — investigation: caching the WASM binary + app shell, the never-cache deny-list, and a phased PWA rollout.
+- **[OpenRaster (.ora) Export/Import](docs/OpenRaster-Export-Import.md)** — plan for layered `.ora` interchange, grounded in the existing Rust layer API.
+- **[Architecture Roadmap](docs/Architecture-Roadmap.md)** — the document-based-editor direction, prioritized and mapped onto the real repo (AppShell split, Zustand, workers, GPU).
+- **[Security Hardening](docs/Security-Hardening.md)** — audit + roadmap: share-token CSPRNG, the image-upload firewall, EXIF-by-default, and the supervised items (CSP, COEP, encryption).
 
 ## Tech Stack
 
@@ -47,14 +50,16 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v5.6 — 2026-06-29
+### v5.7 — 2026-06-29
 
 | # | Change | Status |
 | --- | --- | --- |
-| 1 | **State-management foundation (Zustand)** — `useUIStore` / `useToolStore` / `useGalleryStore` extracted from the 3,245-line AppShell, with a `SetArg` drop-in so call sites migrate untouched (`@stores` alias; AppShell wiring is the next step) | Foundation complete |
-| 2 | **Zustand → IndexedDB persist adapter** — hand-rolled `StateStorage` (no new dep) backing durable UI prefs in a dedicated `image-horse-zustand` DB | Complete |
-| 3 | **Dexie content layer** — typed, declarative `originals` / `workingCopies` / `photos` schema (`@/lib/dexie/db`) as a parallel, reversible migration target for the heavy data | Module landed |
-| 4 | **Docs** — [State Management](docs/State-Management.md), [IndexedDB Investigation](docs/IndexedDB-Investigation.md), [Service Workers & Caching](docs/Service-Workers-Caching.md) | Complete |
+| 1 | **Faster photo switching** — decoded working copies are cached (content-addressed LRU), so revisiting a photo skips the IndexedDB read + both `createImageBitmap` decodes; uploads seed the cache, so switching is near-instant | Complete |
+| 2 | **Privacy: EXIF stripped by default** on export (was kept) — opt back in via Settings → Security | Complete |
+| 3 | **Hardened share links** — tokens now use a 122-bit CSPRNG (`crypto.randomUUID`), not `Math.random()`; existing links keep working | Complete |
+| 4 | **Image-upload firewall + filename sanitizer** utilities (magic-byte validation, size/pixel caps, SVG rejection) — ready to wire | Complete |
+| 5 | **More Zustand persistence** — tool sub-modes + master-bar tab, via a write-deduped IndexedDB adapter | Complete |
+| 6 | **New docs** — [Architecture Roadmap](docs/Architecture-Roadmap.md), [Security Hardening](docs/Security-Hardening.md), [OpenRaster (.ora) plan](docs/OpenRaster-Export-Import.md) | Complete |
 
 ## License
 

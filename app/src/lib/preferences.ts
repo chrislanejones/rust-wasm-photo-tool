@@ -62,7 +62,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   gridOpacity: 40,
   reopenLastSession: true,
   reduceMotion: false,
-  exifKeep: true,
+  // Privacy-by-default: strip EXIF (GPS, capture time, lens, device serial) on
+  // export unless the user explicitly opts in via Settings → Security.
+  exifKeep: false,
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];
