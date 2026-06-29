@@ -43,7 +43,7 @@ const RELEASES: Release[] = [
     entries: [
       { tag: "perf", text: "The image engine's hottest pixel loops now use explicit WebAssembly SIMD128 (processing four channels at once): Gaussian blur, brightness, contrast, pixelate, and image resize (bilinear / Lanczos / Catmull-Rom). Measured in-browser, resize runs ~1.6× faster (bilinear) up to ~3.9× (Lanczos) — and the output is bit-for-bit identical, so nothing about your edits changes; they just land quicker." },
       { tag: "rust", text: "Every kernel keeps a matching scalar fallback (used where SIMD isn't available) and shares one set of load/store helpers, all consolidated under a new src/simd/ module." },
-      { tag: "infra", text: "Scoped the marketing deploy to the marketing/ workspace — removed the stale root vercel.json and pointed the Vercel project at marketing/ (Root Directory), so it no longer tries to build the whole monorepo." },
+      { tag: "infra", text: "Fixed the marketing deploy: a root vercel.json now pins Vercel to build only the marketing site — previously it ran the app build, which needs a WebAssembly step Vercel doesn’t perform, so the deploy kept failing." },
     ],
   },
   {

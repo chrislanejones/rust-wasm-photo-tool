@@ -52,7 +52,7 @@ Latest release below. Full dated history → **[docs/Change-summary.md](docs/Cha
 | 2 | **CI workflow** — `rust` / `web` / `marketing` / `convex` / security jobs + an advisory **`guardrails`** pass (design-token drift) | Complete |
 | 3 | **Native git hooks** (`.githooks/`) — pre-commit Rust-fmt; pre-push fmt + clippy + tsc + secret-leak guard | Complete |
 | 4 | **Strict-CI green-up** — `cargo fmt` + `clippy -D warnings` across the modularized + SIMD sources | Complete |
-| 5 | **Marketing deploy** scoped to `marketing/` (Vercel Root Directory); stale root `vercel.json` removed | Complete |
+| 5 | **Marketing deploy fix** — a root `vercel.json` pins Vercel to build only marketing (`build:marketing` → `marketing/dist`); without it the repo-root `pnpm build` ran the app and failed on the WASM `pkg/` | Complete |
 
 ## License
 

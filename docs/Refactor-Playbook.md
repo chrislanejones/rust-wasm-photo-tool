@@ -95,7 +95,7 @@ a tracked symlink into a gitignored dir.
 4. Root `package.json` → orchestrator only; scripts delegate via `--filter`; keep just `"devDependencies": { "convex": "catalog:" }`.
 5. `app/` + `marketing/` package.json → shared deps become `"catalog:"`; app-specific deps stay literal; drop marketing's local `pnpm` block.
 6. WASM SSOT: `git rm app/pkg`; in `app/vite.config.ts` alias `stamp_tool` → `../pkg/stamp_tool.js`.
-7. Deploy: `git rm vercel.json` (root stale; Vercel rooted at `marketing/`); `netlify.toml` installs at workspace root, builds `pnpm --filter stamp-tool build`.
+7. Deploy: **KEEP** the root `vercel.json` — it pins Vercel to `build:marketing` → `marketing/dist`. Do NOT delete it: the Root-Directory-only approach is unreliable, and without the root config Vercel runs the repo-root `pnpm build` (the app) and fails on the gitignored WASM `pkg/`; `netlify.toml` installs at workspace root, builds `pnpm --filter stamp-tool build`.
 8. `rm -rf node_modules app/node_modules marketing/node_modules && pnpm install`
 9. Verify both builds.
 
