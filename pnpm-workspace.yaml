@@ -15,7 +15,7 @@ catalog:
   '@types/react-dom': ^19.0.0
   '@vitejs/plugin-react': ^4.3.4
   vite: ^6.0.5
-  typescript: ^5.7.2
+  typescript: ^6.0.3
   tailwindcss: ^4.0.6
   '@tailwindcss/vite': ^4.0.6
   convex: ^1.41.0
