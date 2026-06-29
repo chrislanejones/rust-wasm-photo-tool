@@ -4,7 +4,7 @@ Image Horse
 
 **Live:** [rust-wasm-photo-tool.netlify.app](https://rust-wasm-photo-tool.netlify.app/) &nbsp;·&nbsp; [![CI](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml)
 
-A browser-based image annotation and editing tool powered by **Rust/WASM** for pixel-level operations, **React + TypeScript** for the UI, and **Convex** for persistent storage. Edits run locally in WebAssembly — your pixels never leave the tab unless you sign in for persistence or AI features. Includes a **Batch Image Editor** for applying a logo to many photos in one pass, with a grid mosaic view of the gallery.
+A browser-based image annotation and editing tool powered by **Rust/WASM** for pixel-level operations, **React + TypeScript** with **Zustand** state stores for the UI, and **Convex** for optional cloud persistence. Edits run locally in WebAssembly and your originals + edits live in the browser's **IndexedDB** — your pixels never leave the tab unless you sign in for persistence or AI features. Includes a **Batch Image Editor** for applying a logo to many photos in one pass, with a grid mosaic view of the gallery.
 
 > Previously called **Clone Stamp App** — the app grew well beyond its origins as a single clone stamp tool.
 
@@ -50,16 +50,15 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v5.7 — 2026-06-29
+### v5.8 — 2026-06-29
 
 | # | Change | Status |
 | --- | --- | --- |
-| 1 | **Faster photo switching** — decoded working copies are cached (content-addressed LRU), so revisiting a photo skips the IndexedDB read + both `createImageBitmap` decodes; uploads seed the cache, so switching is near-instant | Complete |
-| 2 | **Privacy: EXIF stripped by default** on export (was kept) — opt back in via Settings → Security | Complete |
-| 3 | **Hardened share links** — tokens now use a 122-bit CSPRNG (`crypto.randomUUID`), not `Math.random()`; existing links keep working | Complete |
-| 4 | **Image-upload firewall + filename sanitizer** utilities (magic-byte validation, size/pixel caps, SVG rejection) — ready to wire | Complete |
-| 5 | **More Zustand persistence** — tool sub-modes + master-bar tab, via a write-deduped IndexedDB adapter | Complete |
-| 6 | **New docs** — [Architecture Roadmap](docs/Architecture-Roadmap.md), [Security Hardening](docs/Security-Hardening.md), [OpenRaster (.ora) plan](docs/OpenRaster-Export-Import.md) | Complete |
+| 1 | **AppShell on Zustand** — all 38 UI / tool / gallery state fields moved from local `useState` into `useUIStore` / `useToolStore` / `useGalleryStore` (atomic selectors, drop-in via `SetArg`). Behaviour-preserving; trims re-renders and shrinks the 3k-line component's state surface | Complete |
+| 2 | **Faster switching when signed in** — only re-save a photo's edit on switch when it was actually modified (previously uploaded the full edit archive to Convex on every switch) | Complete |
+| 3 | **CI fix** — `checked_div` for the pixelate / mosaic cell-average (Rust 1.96 clippy `manual_checked_ops`) so `cargo clippy -D warnings` stays green | Complete |
+
+> **About this release — state management.** The editor's UI, tool, and gallery state (panel/dialog visibility, the active tool and its settings, the photo list and selection) used to be ~40 `useState`s inside a single 3,000-line `AppShell` component, prop-drilled throughout. It now lives in three focused [Zustand](https://github.com/pmndrs/zustand) stores — `useUIStore`, `useToolStore`, `useGalleryStore` — so each component subscribes (via atomic selectors) only to the slice it needs: fewer re-renders, no prop-drilling, and a far smaller component to reason about. The change is **behaviour-preserving** (the app works exactly as before) and is the groundwork for splitting `AppShell` into per-feature modules. Durable preferences (last master-bar tab, tool sub-modes) persist to IndexedDB. Details: [State Management](docs/State-Management.md) · [Architecture](docs/Architecture.md) · [Architecture Roadmap](docs/Architecture-Roadmap.md).
 
 ## License
 

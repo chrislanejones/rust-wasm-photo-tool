@@ -668,13 +668,15 @@ pub fn fill_shape(
                         n += 1;
                     }
                 }
-                if n > 0 {
-                    let avg = [
-                        (sr / n) as u8,
-                        (sg / n) as u8,
-                        (sb / n) as u8,
-                        (sa / n) as u8,
-                    ];
+                // checked_div folds the `n != 0` guard into the division so an
+                // empty cell is skipped (clippy::manual_checked_ops).
+                if let (Some(r), Some(g), Some(b), Some(a)) = (
+                    sr.checked_div(n),
+                    sg.checked_div(n),
+                    sb.checked_div(n),
+                    sa.checked_div(n),
+                ) {
+                    let avg = [r as u8, g as u8, b as u8, a as u8];
                     for yy in cy0..=cy1 {
                         for xx in cx0..=cx1 {
                             if xx < px0 || xx > px1 || yy < py0 || yy > py1 {

@@ -17,7 +17,6 @@ import { usePaintTool } from "@/hooks/usePaintTool";
 import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
-import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { panelSpacingTransition, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
 import { SmallWindowNotice } from "@/components/SmallWindowNotice";
@@ -61,14 +60,12 @@ import {
   loadGalleryManifest,
   saveGalleryManifest,
   clearGalleryManifest,
-  type GalleryManifest,
 } from "@/lib/galleryManifest";
-import { getPhotoLimit, DEFAULT_PHOTO_LIMIT } from "@/lib/photoLimits";
+import { getPhotoLimit } from "@/lib/photoLimits";
 import { hasReplicateAI, TIERS } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
-import type { EffectsMode } from "@/features/tools/settings/EffectsSettings";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
 import { useRecentTexts } from "@/hooks/useRecentTexts";
@@ -85,6 +82,9 @@ import { pinLabelText } from "@/lib/pinLabel";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels, ImageTooLargeError } from "@/lib/workingCopy";
 import { getWorkingCopy, putWorkingCopy, clearWorkingCopyCache } from "@/lib/workingCopyCache";
+import { useUIStore } from "@/stores/useUIStore";
+import { useToolStore } from "@/stores/useToolStore";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
 import { logDiagnostic, installConsoleCapture } from "@/lib/diagnosticsLog";
 import {
@@ -203,11 +203,8 @@ export function AppShell() {
   const { savePhotoEdit, loadPhotoEdit, deletePhotoEdit, duplicatePhotoEdit, clearAllEdits } = useEditPersistence();
   const { addRecentText } = useRecentTexts();
 
-  const [stampSettings, setStampSettings] = useState<StampSettings>({
-    brushSize: 20,
-    hardness: 0.8,
-    opacity: 1.0,
-  });
+  const stampSettings = useToolStore((s) => s.stampSettings);
+  const setStampSettings = useToolStore((s) => s.setStampSettings);
 
   const handleStampSettingsChange = useCallback(
     (s: StampSettings) => {
@@ -219,12 +216,15 @@ export function AppShell() {
     [stamp],
   );
 
-  const [toolSettings, setToolSettings] =
-    useState<ToolSettings>(defaultToolSettings);
+  const toolSettings = useToolStore((s) => s.toolSettings);
+  const setToolSettings = useToolStore((s) => s.setToolSettings);
 
-  const [photos, setPhotos] = useState<PhotoEntry[]>([]);
-  const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
-  const [resumeManifest, setResumeManifest] = useState<GalleryManifest | null>(null);
+  const photos = useGalleryStore((s) => s.photos);
+  const setPhotos = useGalleryStore((s) => s.setPhotos);
+  const activePhotoId = useGalleryStore((s) => s.activePhotoId);
+  const setActivePhotoId = useGalleryStore((s) => s.setActivePhotoId);
+  const resumeManifest = useGalleryStore((s) => s.resumeManifest);
+  const setResumeManifest = useGalleryStore((s) => s.setResumeManifest);
   // Cold-start boot splash (logo + spinner). True until WASM is up and the
   // IndexedDB session check has resolved, so we route to New vs Resume without a
   // flash.
@@ -236,8 +236,10 @@ export function AppShell() {
   useEffect(() => {
     if (photos.length > 0) setFirstRun(false); // latches false for the session
   }, [photos.length]);
-  const [imageSavings, setImageSavings] = useState<Record<string, { savingsPercent: number }>>({});
-  const [modifiedPhotos, setModifiedPhotos] = useState<Set<string>>(new Set());
+  const imageSavings = useGalleryStore((s) => s.imageSavings);
+  const setImageSavings = useGalleryStore((s) => s.setImageSavings);
+  const modifiedPhotos = useGalleryStore((s) => s.modifiedPhotos);
+  const setModifiedPhotos = useGalleryStore((s) => s.setModifiedPhotos);
   // originalUrl is populated by the compare effect; not set on photo select
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [compareActive, setCompareActive] = useState(false);
@@ -249,22 +251,32 @@ export function AppShell() {
   // Item 2: Pan mode state
   const [isPanning, setIsPanning] = useState(false);
 
-  const [brushMode, setBrushMode] = useState<"paint" | "blur" | "pen">("paint");
+  const brushMode = useToolStore((s) => s.brushMode);
+  const setBrushMode = useToolStore((s) => s.setBrushMode);
   // Edit & Transform → Eraser toggle (canvas strokes erase while on).
-  const [cropEraserActive, setCropEraserActive] = useState(false);
+  const cropEraserActive = useToolStore((s) => s.cropEraserActive);
+  const setCropEraserActive = useToolStore((s) => s.setCropEraserActive);
   // Layer Settings → Move-layer toggle (canvas drags reposition the layer).
-  const [moveActive, setMoveActive] = useState(false);
+  const moveActive = useToolStore((s) => s.moveActive);
+  const setMoveActive = useToolStore((s) => s.setMoveActive);
   // Layer-mask editing: when on, the Paint brush paints the active layer's mask
   // (maskPaintValue 0 = hide / black, 255 = reveal / white) instead of pixels.
-  const [maskEditing, setMaskEditing] = useState(false);
-  const [maskPaintValue, setMaskPaintValue] = useState(0);
-  const [effectsMode, setEffectsMode] = useState<EffectsMode>("levels");
-  const [colorPickerActive, setColorPickerActive] = useState(false);
-  const [stampSubMode, setStampSubMode] = useState<"clone" | "red" | "emojis">("clone");
-  const [shapesMode, setShapesMode] = useState<"shapes" | "pens" | "arrows">("shapes");
+  const maskEditing = useToolStore((s) => s.maskEditing);
+  const setMaskEditing = useToolStore((s) => s.setMaskEditing);
+  const maskPaintValue = useToolStore((s) => s.maskPaintValue);
+  const setMaskPaintValue = useToolStore((s) => s.setMaskPaintValue);
+  const effectsMode = useToolStore((s) => s.effectsMode);
+  const setEffectsMode = useToolStore((s) => s.setEffectsMode);
+  const colorPickerActive = useToolStore((s) => s.colorPickerActive);
+  const setColorPickerActive = useToolStore((s) => s.setColorPickerActive);
+  const stampSubMode = useToolStore((s) => s.stampSubMode);
+  const setStampSubMode = useToolStore((s) => s.setStampSubMode);
+  const shapesMode = useToolStore((s) => s.shapesMode);
+  const setShapesMode = useToolStore((s) => s.setShapesMode);
   /** Active Crop-tool aspect ratio. `null` ≡ "Free" (no constraint).
    *  Drags in useDrawingTools snap to this ratio via Rust when set. */
-  const [cropRatio, setCropRatio] = useState<[number, number] | null>(null);
+  const cropRatio = useToolStore((s) => s.cropRatio);
+  const setCropRatio = useToolStore((s) => s.setCropRatio);
   const [userMode, setUserMode] = useState<UserMode>("demo");
   const [authResolved, setAuthResolved] = useState(false);
   const handleAuthMode = useCallback((m: UserMode) => {
@@ -342,7 +354,8 @@ export function AppShell() {
   // Gallery photo cap for the current tier. Resolved from Rust (`photo_limit`)
   // so the WASM layer is the single source of truth. Starts at the most
   // restrictive limit until the wasm lookup resolves.
-  const [maxPhotos, setMaxPhotos] = useState(DEFAULT_PHOTO_LIMIT);
+  const maxPhotos = useGalleryStore((s) => s.maxPhotos);
+  const setMaxPhotos = useGalleryStore((s) => s.setMaxPhotos);
   useEffect(() => {
     let alive = true;
     void getPhotoLimit(effectiveUserMode).then((n) => {
@@ -578,17 +591,21 @@ export function AppShell() {
       const isCurrent = () => seq === selectSeqRef.current;
       activeIdRef.current = entry.id; // advance synchronously so cycling sees it
 
+      // Persist the OUTGOING photo only if it was actually modified. This used
+      // to save on EVERY switch — and when signed in, savePhotoEdit uploads the
+      // full edit archive to Convex, so just browsing the gallery re-uploaded
+      // each photo and made switching slow ("only when logged in").
       if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
+        const outgoing = activePhotoId;
         setModifiedPhotos((prev) => {
-          if (prev.has(activePhotoId)) return prev;
+          if (prev.has(outgoing)) return prev;
           const next = new Set(prev);
-          next.add(activePhotoId);
+          next.add(outgoing);
           return next;
         });
-      }
-
-      if (activePhotoId && stamp.toolRef.current) {
-        await savePhotoEdit(activePhotoId, stamp.toolRef);
+        if (stamp.toolRef.current) {
+          await savePhotoEdit(outgoing, stamp.toolRef);
+        }
       }
       if (!isCurrent()) return; // a newer selection superseded this one
 
@@ -683,7 +700,8 @@ export function AppShell() {
 
   // Bulk delete from the gallery multi-select.
   // ── Gallery multi-select (lifted here so Compress/Export can use it) ────────
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectedIds = useGalleryStore((s) => s.selectedIds);
+  const setSelectedIds = useGalleryStore((s) => s.setSelectedIds);
   const toggleSelectPhoto = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -803,26 +821,35 @@ export function AppShell() {
 
   // Starts false: the boot splash covers the first paint, and the boot effect
   // opens this (the "New" dialog) only if there's no prior session to resume.
-  const [showUpload, setShowUpload] = useState(false);
-  const [showTopBar, setShowTopBar] = useState(false);
+  const showUpload = useUIStore((s) => s.showUpload);
+  const setShowUpload = useUIStore((s) => s.setShowUpload);
+  const showTopBar = useUIStore((s) => s.showTopBar);
+  const setShowTopBar = useUIStore((s) => s.setShowTopBar);
   // Compact master-bar active tab (≤1000px). Tools is the default view.
-  const [masterTab, setMasterTab] = useState<"tools" | "gallery" | "review">(
-    "tools",
-  );
-  const [showTools, setShowTools] = useState(false);
-  const [showGallery, setShowGallery] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const masterTab = useUIStore((s) => s.masterTab);
+  const setMasterTab = useUIStore((s) => s.setMasterTab);
+  const showTools = useUIStore((s) => s.showTools);
+  const setShowTools = useUIStore((s) => s.setShowTools);
+  const showGallery = useUIStore((s) => s.showGallery);
+  const setShowGallery = useUIStore((s) => s.setShowGallery);
+  const showHistory = useUIStore((s) => s.showHistory);
+  const setShowHistory = useUIStore((s) => s.setShowHistory);
   // Small-window notice: dismissed for this stretch of being too-small; reset
   // once the window grows back so it re-appears if they snap small again.
-  const [smallNoticeDismissed, setSmallNoticeDismissed] = useState(false);
+  const smallNoticeDismissed = useUIStore((s) => s.smallNoticeDismissed);
+  const setSmallNoticeDismissed = useUIStore((s) => s.setSmallNoticeDismissed);
   // "Use split screen / tablet version" nudge: dismissed for this stretch of
   // being snapped narrow; re-armed once the window grows back wide.
-  const [tabletNoticeDismissed, setTabletNoticeDismissed] = useState(false);
+  const tabletNoticeDismissed = useUIStore((s) => s.tabletNoticeDismissed);
+  const setTabletNoticeDismissed = useUIStore((s) => s.setTabletNoticeDismissed);
   // Most-recently-opened side panel — narrow mode closes the *other* one.
   const lastPanelRef = useRef<"tools" | "history" | null>(null);
-  const [showShortcutModal, setShowShortcutModal] = useState(false);
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const showShortcutModal = useUIStore((s) => s.showShortcutModal);
+  const setShowShortcutModal = useUIStore((s) => s.setShowShortcutModal);
+  const showCelebration = useUIStore((s) => s.showCelebration);
+  const setShowCelebration = useUIStore((s) => s.setShowCelebration);
+  const showDiagnostics = useUIStore((s) => s.showDiagnostics);
+  const setShowDiagnostics = useUIStore((s) => s.setShowDiagnostics);
 
   // ── Narrow-window (overlay-drawer) bookkeeping ──────────────────────────
   useEffect(() => {
@@ -850,14 +877,19 @@ export function AppShell() {
   useEffect(() => {
     installConsoleCapture();
   }, []);
-  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const deleteAllOpen = useUIStore((s) => s.deleteAllOpen);
+  const setDeleteAllOpen = useUIStore((s) => s.setDeleteAllOpen);
   // Per-image + selected delete confirmations (mirror the Delete All dialog).
   // `deletePhotoId` holds the id awaiting confirmation (null = closed).
-  const [deletePhotoId, setDeletePhotoId] = useState<string | null>(null);
-  const [deleteSelectedOpen, setDeleteSelectedOpen] = useState(false);
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const deletePhotoId = useUIStore((s) => s.deletePhotoId);
+  const setDeletePhotoId = useUIStore((s) => s.setDeletePhotoId);
+  const deleteSelectedOpen = useUIStore((s) => s.deleteSelectedOpen);
+  const setDeleteSelectedOpen = useUIStore((s) => s.setDeleteSelectedOpen);
+  const exportDialogOpen = useUIStore((s) => s.exportDialogOpen);
+  const setExportDialogOpen = useUIStore((s) => s.setExportDialogOpen);
 
-  const [activeTool, setActiveTool] = useState<ToolType>("compress");
+  const activeTool = useToolStore((s) => s.activeTool);
+  const setActiveTool = useToolStore((s) => s.setActiveTool);
 
   // Bézier pen (Paint → Pen sub-mode): the PenOverlay captures the canvas and
   // commits finished paths as live kind-7 annotations.
@@ -1191,9 +1223,12 @@ export function AppShell() {
 
   // ── Selection Marker (magic-wand) — Edit & Move → Selection (above Align) ──
   // All masking math is Rust; JS just stores the returned overlay + routes ops.
-  const [selectionTolerance, setSelectionTolerance] = useState(24);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectionMask, setSelectionMask] = useState<Uint8Array | null>(null);
+  const selectionTolerance = useToolStore((s) => s.selectionTolerance);
+  const setSelectionTolerance = useToolStore((s) => s.setSelectionTolerance);
+  const selectionMode = useToolStore((s) => s.selectionMode);
+  const setSelectionMode = useToolStore((s) => s.setSelectionMode);
+  const selectionMask = useToolStore((s) => s.selectionMask);
+  const setSelectionMask = useToolStore((s) => s.setSelectionMask);
 
   const handleSelectionClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {

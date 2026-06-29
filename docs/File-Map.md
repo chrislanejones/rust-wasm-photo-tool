@@ -89,15 +89,29 @@ app/src/
 ├── styles.css                        Design tokens + component styles
 ├── app/
 │   ├── App.tsx                       Root
-│   ├── AppShell.tsx                  Master orchestrator — state, panels, WASM bridge; layer-panel
-│   │                                 handlers; Ctrl/Cmd+V pastes a clipboard image into the active
-│   │                                 layer (guarded against the upload dialog's paste path)
+│   ├── AppShell.tsx                  Master orchestrator — panels, WASM bridge, layer-panel handlers;
+│   │                                 reads its UI / tool / gallery state from the Zustand stores (see
+│   │                                 stores/) via atomic selectors rather than local useState; Ctrl/Cmd+V
+│   │                                 pastes a clipboard image into the active layer (guarded against the
+│   │                                 upload dialog's paste path)
 │   └── useKeyboardShortcuts.ts       Centralized keyboard handler — panel toggles (Alt+U Upload,
 │                                     Alt+T Tools, Alt+G Gallery, Alt+R Review), transforms (Alt+F/V
 │                                     flip, Alt+S rotate), zoom, export. Enter always activates a
 │                                     focused control; Space only defers to one when it's
 │                                     :focus-visible (keyboard focus) so a mouse-clicked tool button
 │                                     doesn't swallow Space-to-pan
+├── stores/                          Zustand stores — AppShell reads these via atomic selectors
+│   ├── _shared.ts                    SetArg + resolveSet: store setters accept React's
+│   │                                 `value | (prev => next)`, so AppShell's functional-updater
+│   │                                 call sites migrated untouched
+│   ├── useUIStore.ts                 Panel/dialog visibility + compact master-bar tab; persists the
+│   │                                 master-bar tab to IndexedDB (partialize)
+│   ├── useToolStore.ts               Active tool + every tool-mode flag/settings blob; persists the
+│   │                                 sub-mode prefs (brush / effects / stamp / shapes mode)
+│   ├── useGalleryStore.ts            Photo list, selection, per-photo savings/modified, tier cap,
+│   │                                 resume manifest (heavy/dynamic — NOT persisted via Zustand)
+│   └── storage/idbStorage.ts         Hand-rolled IndexedDB StateStorage adapter for `persist`
+│                                     (own DB image-horse-zustand; de-dupes identical writes)
 ├── hooks/
 │   ├── useCloneStamp.ts              React hook wrapping the WASM ImageHorseTool; includes
 │   │                                 loadImage(), loadImageFromPixels() (pre-decoded, 2048-capped),
@@ -235,5 +249,14 @@ app/src/
     │                                 256px WebP thumb from those already-decoded pixels (Rust
     │                                 resize_pixels) so uploads decode once, not twice. makeThumbnail()
     │                                 (file → thumb) stays for the compress / batch paths
+    ├── workingCopyCache.ts           In-memory LRU (~160 MB byte budget) of decoded working copies,
+    │                                 keyed by the original's content hash — revisiting a photo skips
+    │                                 the IndexedDB read + re-decode (the slow part of a switch)
+    ├── dexie/db.ts                   Dexie content-layer (typed originals/workingCopies/photos schema,
+    │                                 parallel image-horse-dexie DB) — staged migration target for the
+    │                                 three hand-rolled stores; not yet wired (see dexie/USAGE.md)
+    ├── security/imageFirewall.ts     Upload validation — magic-byte sniff, size/pixel/dimension caps,
+    │                                 SVG rejection (staged; wire before decode)
+    ├── security/sanitizeFilename.ts  Path-traversal-safe basename for ZIP / download names (staged)
     └── utils.ts                      cn() utility
 ```

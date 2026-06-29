@@ -479,3 +479,20 @@ Zustand persistence + docs are groundwork.
 | 4   | **Image-upload firewall** (`lib/security/imageFirewall.ts`) — magic-byte sniff (never trusts `file.type`/`file.name`), size / pixel-count / dimension caps (decompression-bomb guard), explicit SVG rejection. Plus `lib/security/sanitizeFilename.ts` for ZIP/download names. Utilities landed; wiring into the upload path is a supervised follow-up (format allowlist must be confirmed) | Utilities complete |
 | 5   | **Zustand persistence + perf** — `useToolStore` now persists its pure sub-mode prefs (brush/effects/stamp/shapes mode); `useUIStore` persists only the master-bar tab (notice flags are session-scoped by design); the IndexedDB adapter de-dupes identical writes so dialog toggles don't churn the prefs blob. Performance playbook added to State-Management §7 | Complete |
 | 6   | **Docs** — `Architecture-Roadmap.md` (document-based-editor direction, prioritized, mapped onto the real repo — noting Rust already owns the document model), `Security-Hardening.md` (audit → repo), `OpenRaster-Export-Import.md` (grounded `.ora` plan) | Complete |
+
+## v5.8 Change Summary — 2026-06-29
+
+The Zustand migration's payoff: `AppShell` now reads its UI / tool / gallery state
+from the stores instead of ~38 local `useState`s — plus a logged-in photo-switch
+speedup and a CI clippy fix. **Behaviour-preserving** (the app works exactly as
+before); verified by `tsc -b` + `vite build` and in-browser including persist
+hydration on refresh. fallow's unused-files count dropped 10 → 5 (the 5 store files
+are now reachable). This is the groundwork for splitting the 3k-line `AppShell` into
+per-feature modules (see [Architecture Roadmap](Architecture-Roadmap.md)).
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **AppShell wired to Zustand** — every store-bound `useState` (UI panel/dialog flags + master-bar tab; active tool + all tool-mode flags/settings; photos / selection / savings / modified / manifest / cap) replaced with same-name atomic selector bindings from `useUIStore` / `useToolStore` / `useGalleryStore`. `SetArg` keeps the ~30 functional-updater call sites working untouched; setters are stable refs (no extra re-renders). Now-unused imports (`defaultToolSettings`, `DEFAULT_PHOTO_LIMIT`, `GalleryManifest`, `EffectsMode`) pruned | Complete |
+| 2   | **Logged-in switch speedup** — `handleSelectPhoto` re-saved the outgoing photo on every switch, and when signed in `savePhotoEdit` uploads the full edit archive to Convex; now it saves only when the photo was actually modified | Complete |
+| 3   | **clippy CI fix** — the `if n > 0 { sum / n }` cell-average guards in `drawing.rs` (pixelate) + `filters.rs` (mosaic) tripped Rust 1.96's `manual_checked_ops`; folded into `checked_div` (behaviour-identical, works on the older local clippy too — no `#[allow]`) | Complete |
+| 4   | **Docs** — README intro + a "state management" release note; `Architecture.md` "Client state (Zustand)" section; `Features.md` state bullet; `File-Map.md` `stores/` tree + `lib/` additions; marketing Hero copy | Complete |

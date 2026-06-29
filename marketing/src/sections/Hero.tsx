@@ -29,9 +29,10 @@ export default function Hero() {
           <span className="gradient-text">at native speed</span>
         </h1>
         <p className="mt-6 text-lg text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-          A browser-based photo studio that crops, filters, draws, and
-          re-encodes on your own machine. Built in Rust, shipped as WASM — your
-          pixels never leave the tab.
+          A browser-based photo studio — crop, filter, draw, annotate, and
+          re-encode on your own machine. Built in Rust, shipped as WebAssembly,
+          with a layered editor and an instant local gallery — your pixels never
+          leave the tab.
         </p>
         <div className="mt-9 flex items-center justify-center gap-3 flex-wrap">
           <a

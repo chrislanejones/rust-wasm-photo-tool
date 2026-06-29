@@ -158,13 +158,15 @@ pub fn pixelate_region(
                 cx1 as usize,
                 cy1 as usize,
             );
-            if n > 0 {
-                let avg = [
-                    (sums[0] / n) as u8,
-                    (sums[1] / n) as u8,
-                    (sums[2] / n) as u8,
-                    (sums[3] / n) as u8,
-                ];
+            // checked_div folds the `n != 0` guard into the division
+            // (clippy::manual_checked_ops); empty cells are skipped.
+            if let (Some(r), Some(g), Some(b), Some(a)) = (
+                sums[0].checked_div(n),
+                sums[1].checked_div(n),
+                sums[2].checked_div(n),
+                sums[3].checked_div(n),
+            ) {
+                let avg = [r as u8, g as u8, b as u8, a as u8];
                 for yy in cy0..=cy1 {
                     for xx in cx0..=cx1 {
                         let dx = xx as f64 - cx;

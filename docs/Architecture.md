@@ -58,6 +58,12 @@ As of v3.5 the WASM core is no longer a single pixel buffer — `ImageHorseTool`
 
 A reusable `composite_cache` is rebuilt by `recomposite()` and exposed through `data_ptr()/data_len()` for the zero-copy blit; a fast path copies straight through when there's a single fully-opaque layer with no overlays (so simple single-layer edits stay allocation-free). `export_png`, `get_image_data`, and the thumbnail path all composite the full stack, so export always matches what's on screen. History snapshots capture the **entire stack** (layers + active index + dimensions), making add / delete / reorder / merge undoable alongside pixel edits.
 
+### Client state (Zustand)
+
+The React side keeps its cross-cutting state in three [Zustand](https://github.com/pmndrs/zustand) stores instead of `AppShell` local state: **`useUIStore`** (panel/dialog visibility + the compact master-bar tab), **`useToolStore`** (the active tool and every tool-mode flag/settings blob), and **`useGalleryStore`** (the photo list, selection, and per-photo bookkeeping). Components subscribe with **atomic selectors** — one field each — so a panel toggle re-renders only what reads it, not the whole shell. Setters accept React's `value | (prev => next)` (via a `SetArg` helper), so the migration off `useState` was a drop-in.
+
+Durable "remember my choice" prefs (master-bar tab, tool sub-modes) persist to IndexedDB through a small `StateStorage` adapter (`stores/storage/idbStorage.ts`) in its own `image-horse-zustand` database, kept separate from the content stores and de-duping identical writes. Heavy data — originals, per-photo edits, the gallery manifest — stays in dedicated IndexedDB databases and WASM memory, **never** in Zustand. See [State Management](State-Management.md) and the [Architecture Roadmap](Architecture-Roadmap.md).
+
 ### Why one WASM binary?
 
 Separate `.wasm` modules (image-core.wasm, filters.wasm, etc.) would require copying the full pixel buffer across WASM memory boundaries on every operation — a 3.2MB copy for a 896×896 image, per handoff. A single binary with Rust modules shares one `Vec<u8>` in linear memory. Zero-copy, zero overhead.
