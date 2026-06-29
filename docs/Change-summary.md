@@ -440,3 +440,10 @@
 | 5   | **SSOT Refactor Playbook** (`docs/Refactor-Playbook.md`) — color / type / z-index token conventions, React + Rust health backlog, target folder structures, and the reusable guardrail bundle | Complete |
 | 6   | **Marketing deploy fix** — a repo-root `vercel.json` pins Vercel to `pnpm run build:marketing` → `marketing/dist`. The root `pnpm build` resolves to the app build (needs a WASM `pkg/` step Vercel doesn't run), so the root config overrides it to build only the marketing site | Complete |
 | 7   | **Docs sync** — README Tech Stack expanded (Zustand *coming soon*, Radix UI, Sonner, emoji-mart, JSZip, IndexedDB, Stripe, Replicate); File-Map adds `src/simd/` + `settings.rs`; the git-routine now tracks README + Change-summary + Trail | Complete |
+
+## v5.5 Change Summary — 2026-06-28
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Gallery photo-switch race fix** — `handleSelectPhoto` ran three sequential awaits (save → loadPhotoEdit → loadFromSaved) with no concurrency guard, so overlapping selections could blit a stale photo to the canvas while the gallery highlighted another. A `selectSeqRef` latest-wins token, checked after every await (incl. inside `loadPhotoFromEntry`), now lets only the newest selection touch the canvas | Complete |
+| 2   | **PgUp/PgDn cycling fix** — `handleNext/PrevPhoto` computed the index from `activePhotoId` (React state, which lags the async image load), so repeated presses recomputed "next" from a stale current and stuck. A synchronous `activeIdRef` (advanced on every selection; kept in sync at select / add / delete / initial-load) now drives cycling | Complete |

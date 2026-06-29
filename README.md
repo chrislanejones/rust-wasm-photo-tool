@@ -44,15 +44,12 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v5.4 — 2026-06-28
+### v5.5 — 2026-06-28
 
 | # | Change | Status |
 | --- | --- | --- |
-| 1 | **Docs restructure** — README slimmed to essentials (latest version + doc links); full dated history → [`docs/Change-summary.md`](docs/Change-summary.md); new `docs/` set incl. the **[Refactor Playbook](docs/Refactor-Playbook.md)** + **[CI Guardrails](docs/CI-Guardrails.md)** | Complete |
-| 2 | **CI workflow** — `rust` / `web` / `marketing` / `convex` / security jobs + an advisory **`guardrails`** pass (design-token drift) | Complete |
-| 3 | **Native git hooks** (`.githooks/`) — pre-commit Rust-fmt; pre-push fmt + clippy + tsc + secret-leak guard | Complete |
-| 4 | **Strict-CI green-up** — `cargo fmt` + `clippy -D warnings` across the modularized + SIMD sources | Complete |
-| 5 | **Marketing deploy fix** — a root `vercel.json` pins Vercel to build only marketing (`build:marketing` → `marketing/dist`); without it the repo-root `pnpm build` ran the app and failed on the WASM `pkg/` | Complete |
+| 1 | **Gallery photo-switch race fix** — latest-wins `selectSeqRef` guard so the canvas always matches the highlighted thumbnail (rapid clicks / PgUp-PgDn no longer desync) | Complete |
+| 2 | **PgUp/PgDn cycling fix** — synchronous `activeIdRef` so repeated presses advance through every photo instead of sticking on a stale current | Complete |
 
 ## License
 

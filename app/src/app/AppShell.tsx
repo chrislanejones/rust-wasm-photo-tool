@@ -400,12 +400,25 @@ export function AppShell() {
   );
 
   /** Load a photo entry from IndexedDB → downscale → hand to the tool. */
+  // Monotonic token for photo selection. Each handleSelectPhoto call claims the
+  // next value; any async load whose token is no longer current aborts before
+  // blitting, so rapid gallery clicks / PgUp-PgDn can't leave the canvas showing
+  // one photo while the gallery highlights another (latest selection wins).
+  const selectSeqRef = useRef(0);
+  // The current photo id tracked synchronously — React state `activePhotoId`
+  // lags behind the async image load, so gallery cycling reads this instead and
+  // repeated PgUp/PgDn advance correctly rather than recomputing "next" from a
+  // stale id. Kept in sync at every place activePhotoId is set.
+  const activeIdRef = useRef<string | null>(null);
+
   const loadPhotoFromEntry = useCallback(
-    async (entry: PhotoEntry) => {
+    async (entry: PhotoEntry, isCurrent?: () => boolean) => {
       const original = await getOriginal(entry.originalKey);
       if (!original) return;
+      if (isCurrent && !isCurrent()) return;
       const file = new File([original.bytes], original.name, { type: original.mimeType });
       const working = await makeWorkingCopy(file);
+      if (isCurrent && !isCurrent()) return;
       loadImageFromPixels(working.pixels, working.width, working.height);
     },
     [loadImageFromPixels],
@@ -525,6 +538,7 @@ export function AppShell() {
             firstLoaded = true;
             loadImageFromPixels(working.pixels, working.width, working.height);
             setHasBeenModified(false);
+            activeIdRef.current = entry.id;
             setActivePhotoId(entry.id);
             setCompareActive(false);
           }
@@ -546,6 +560,12 @@ export function AppShell() {
     async (entry: PhotoEntry) => {
       if (entry.id === activePhotoId) return;
 
+      // Claim the latest selection. Any await below that resolves after a newer
+      // click bails before touching the canvas, so highlight and pixels stay in sync.
+      const seq = ++selectSeqRef.current;
+      const isCurrent = () => seq === selectSeqRef.current;
+      activeIdRef.current = entry.id; // advance synchronously so cycling sees it
+
       if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
         setModifiedPhotos((prev) => {
           if (prev.has(activePhotoId)) return prev;
@@ -558,6 +578,7 @@ export function AppShell() {
       if (activePhotoId && stamp.toolRef.current) {
         await savePhotoEdit(activePhotoId, stamp.toolRef);
       }
+      if (!isCurrent()) return; // a newer selection superseded this one
 
       setHasBeenModified(false);
       setActivePhotoId(entry.id);
@@ -569,13 +590,19 @@ export function AppShell() {
       setIsImageLoading(true);
 
       const saved = await loadPhotoEdit(entry.id);
+      if (!isCurrent()) return;
       if (saved) {
         setLoadProgress(20);
         await stamp.loadFromSaved(saved);
+        if (!isCurrent()) return;
         setLoadProgress(100);
-        setTimeout(() => { setIsImageLoading(false); setLoadProgress(0); }, 400);
+        setTimeout(() => {
+          if (!isCurrent()) return;
+          setIsImageLoading(false);
+          setLoadProgress(0);
+        }, 400);
       } else {
-        void loadPhotoFromEntry(entry);
+        void loadPhotoFromEntry(entry, isCurrent);
       }
     },
     [activePhotoId, hasBeenModified, stamp, loadPhotoFromEntry, savePhotoEdit, loadPhotoEdit],
@@ -593,14 +620,16 @@ export function AppShell() {
   // Item 4: PgUp/PgDn gallery cycling
   const handleNextPhoto = useCallback(() => {
     if (photos.length === 0) return;
-    const idx = photos.findIndex((p) => p.id === activePhotoId);
+    const curId = activeIdRef.current ?? activePhotoId;
+    const idx = photos.findIndex((p) => p.id === curId);
     const next = photos[(idx + 1) % photos.length];
     if (next) void handleSelectPhoto(next);
   }, [photos, activePhotoId, handleSelectPhoto]);
 
   const handlePrevPhoto = useCallback(() => {
     if (photos.length === 0) return;
-    const idx = photos.findIndex((p) => p.id === activePhotoId);
+    const curId = activeIdRef.current ?? activePhotoId;
+    const idx = photos.findIndex((p) => p.id === curId);
     const prev = photos[(idx - 1 + photos.length) % photos.length];
     if (prev) void handleSelectPhoto(prev);
   }, [photos, activePhotoId, handleSelectPhoto]);
@@ -624,10 +653,12 @@ export function AppShell() {
         if (id === activePhotoId && next.length > 0) {
           const na = next[Math.min(idx, next.length - 1)]!;
           void loadPhotoFromEntry(na);
+          activeIdRef.current = na.id;
           setActivePhotoId(na.id);
           setHasBeenModified(false);
           setCompareActive(false);
         } else if (next.length === 0) {
+          activeIdRef.current = null;
           setActivePhotoId(null);
           setHasBeenModified(false);
           setCompareActive(false);
@@ -686,8 +717,10 @@ export function AppShell() {
         if (next.length > 0) {
           const na = next[0]!;
           void loadPhotoFromEntry(na);
+          activeIdRef.current = na.id;
           setActivePhotoId(na.id);
         } else {
+          activeIdRef.current = null;
           setActivePhotoId(null);
         }
         setHasBeenModified(false);

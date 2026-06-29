@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.38",
+    date: "2026-06-28",
+    headline: "Gallery selection + PgUp/PgDn fixes",
+    entries: [
+      { tag: "fix", text: "Switching photos quickly — rapid thumbnail clicks, or holding PgUp/PgDn — could leave the canvas showing one photo while the gallery highlighted another. The displayed image now always matches the selected thumbnail (a latest-wins guard makes the most recent selection win)." },
+      { tag: "fix", text: "PgUp/PgDn now step through every photo reliably and wrap around — they advance from the truly-current photo instead of a value that lagged behind the image load, so repeated presses no longer get stuck on one." },
+    ],
+  },
+  {
     version: "v0.9.37",
     date: "2026-06-28",
     headline: "Behind the scenes — docs, CI safety nets, faster checks",
