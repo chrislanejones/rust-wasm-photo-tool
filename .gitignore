@@ -37,3 +37,6 @@ www-dist
 
 # Local planning / action-plan docs (not for the repo)
 action-plan.md
+
+# Scalar wasm build for the SIMD benchmark (rebuild on demand — see bench.html)
+pkg-scalar/

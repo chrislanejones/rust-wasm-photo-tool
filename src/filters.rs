@@ -1,23 +1,14 @@
 // src/filters.rs
 
+// Brightness / contrast are SIMD128-accelerated (with a bit-/visually-identical
+// scalar fallback) in `simd_color`; these are thin delegators so existing call
+// sites (`filters::adjust_brightness` / `adjust_contrast`) are unchanged.
 pub fn adjust_brightness(data: &mut [u8], delta: f64) {
-    let d = (delta.clamp(-1.0, 1.0) * 255.0).round() as i32;
-    for i in (0..data.len()).step_by(4) {
-        data[i]     = (data[i]     as i32 + d).clamp(0, 255) as u8;
-        data[i + 1] = (data[i + 1] as i32 + d).clamp(0, 255) as u8;
-        data[i + 2] = (data[i + 2] as i32 + d).clamp(0, 255) as u8;
-    }
+    crate::simd::color::adjust_brightness(data, delta);
 }
 
 pub fn adjust_contrast(data: &mut [u8], factor: f64) {
-    let f = factor.clamp(0.0, 4.0);
-    for i in (0..data.len()).step_by(4) {
-        for c in 0..3 {
-            let v = data[i + c] as f64 / 255.0;
-            let adj = ((v - 0.5) * f + 0.5).clamp(0.0, 1.0);
-            data[i + c] = (adj * 255.0).round() as u8;
-        }
-    }
+    crate::simd::color::adjust_contrast(data, factor);
 }
 
 /// Build a 1D Gaussian kernel of the given radius.
@@ -94,58 +85,12 @@ pub fn gaussian_blur_region(
         }
     }
 
-    // Pass 1: Horizontal blur into a temp buffer
+    // Pass 1: Horizontal blur region → h_pass. Pass 2: vertical h_pass → region.
+    // Both passes are SIMD128-accelerated on wasm (one f32x4 multiply-add per RGBA
+    // pixel) with a bit-identical scalar fallback on other targets. See simd_blur.
     let h_pass = &mut scratch_b[..needed];
-    for ry in 0..bh {
-        for rx in 0..bw {
-            let mut r = 0.0f32;
-            let mut g = 0.0f32;
-            let mut b = 0.0f32;
-            let mut a = 0.0f32;
-
-            for ki in -kr..=kr {
-                let sx = (rx as i32 + ki).clamp(0, bw as i32 - 1) as usize;
-                let si = (ry * bw + sx) * 4;
-                let weight = kernel[(ki + kr) as usize];
-                r += region[si]     as f32 * weight;
-                g += region[si + 1] as f32 * weight;
-                b += region[si + 2] as f32 * weight;
-                a += region[si + 3] as f32 * weight;
-            }
-
-            let di = (ry * bw + rx) * 4;
-            h_pass[di]     = r.round().clamp(0.0, 255.0) as u8;
-            h_pass[di + 1] = g.round().clamp(0.0, 255.0) as u8;
-            h_pass[di + 2] = b.round().clamp(0.0, 255.0) as u8;
-            h_pass[di + 3] = a.round().clamp(0.0, 255.0) as u8;
-        }
-    }
-
-    // Pass 2: Vertical blur from h_pass into region
-    for ry in 0..bh {
-        for rx in 0..bw {
-            let mut r = 0.0f32;
-            let mut g = 0.0f32;
-            let mut b = 0.0f32;
-            let mut a = 0.0f32;
-
-            for ki in -kr..=kr {
-                let sy = (ry as i32 + ki).clamp(0, bh as i32 - 1) as usize;
-                let si = (sy * bw + rx) * 4;
-                let weight = kernel[(ki + kr) as usize];
-                r += h_pass[si]     as f32 * weight;
-                g += h_pass[si + 1] as f32 * weight;
-                b += h_pass[si + 2] as f32 * weight;
-                a += h_pass[si + 3] as f32 * weight;
-            }
-
-            let di = (ry * bw + rx) * 4;
-            region[di]     = r.round().clamp(0.0, 255.0) as u8;
-            region[di + 1] = g.round().clamp(0.0, 255.0) as u8;
-            region[di + 2] = b.round().clamp(0.0, 255.0) as u8;
-            region[di + 3] = a.round().clamp(0.0, 255.0) as u8;
-        }
-    }
+    crate::simd::blur::blur_horizontal(region, h_pass, bw, bh, kr, kernel);
+    crate::simd::blur::blur_vertical(h_pass, region, bw, bh, kr, kernel);
 
     // Write back only pixels inside the circular brush
     let br_sq = brush_radius * brush_radius;
@@ -202,19 +147,24 @@ pub fn pixelate_region(
             let cx1 = (bx + block - 1).min(w - 1);
             let cy1 = (by + block - 1).min(h - 1);
 
-            let (mut sr, mut sg, mut sb, mut sa, mut n) = (0u64, 0u64, 0u64, 0u64, 0u64);
-            for yy in cy0..=cy1 {
-                for xx in cx0..=cx1 {
-                    let i = ((yy * w + xx) * 4) as usize;
-                    sr += data[i] as u64;
-                    sg += data[i + 1] as u64;
-                    sb += data[i + 2] as u64;
-                    sa += data[i + 3] as u64;
-                    n += 1;
-                }
-            }
+            // SIMD-accelerated per-cell channel accumulation (bit-identical
+            // scalar fallback in simd_color); the average + circle writeback stay
+            // here.
+            let (sums, n) = crate::simd::color::cell_channel_sums(
+                data,
+                w as usize,
+                cx0 as usize,
+                cy0 as usize,
+                cx1 as usize,
+                cy1 as usize,
+            );
             if n > 0 {
-                let avg = [(sr / n) as u8, (sg / n) as u8, (sb / n) as u8, (sa / n) as u8];
+                let avg = [
+                    (sums[0] / n) as u8,
+                    (sums[1] / n) as u8,
+                    (sums[2] / n) as u8,
+                    (sums[3] / n) as u8,
+                ];
                 for yy in cy0..=cy1 {
                     for xx in cx0..=cx1 {
                         let dx = xx as f64 - cx;

@@ -190,50 +190,11 @@ pub fn translate(data: &[u8], img_w: i32, img_h: i32, dx: i32, dy: i32) -> Vec<u
 
 /// Resize the image using bilinear interpolation.
 /// Returns (new_data, new_w, new_h). Minimum dimension is 1×1.
+// SIMD128-accelerated (with a bit-identical scalar fallback) in `simd_resize`;
+// thin delegator so existing call sites (`transform::resize_bilinear`) are
+// unchanged.
 pub fn resize_bilinear(data: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
-    let nw = new_w.max(1);
-    let nh = new_h.max(1);
-    let mut out = vec![0u8; (nw * nh * 4) as usize];
-    let sx = old_w as f32 / nw as f32;
-    let sy = old_h as f32 / nh as f32;
-
-    for ty in 0..nh {
-        for tx in 0..nw {
-            let fx = (tx as f32 + 0.5) * sx - 0.5;
-            let fy = (ty as f32 + 0.5) * sy - 0.5;
-
-            let x0 = fx.floor() as i32;
-            let y0 = fy.floor() as i32;
-            let frac_x = fx - fx.floor();
-            let frac_y = fy - fy.floor();
-
-            let sample = |xi: i32, yi: i32| -> [f32; 4] {
-                let xi = xi.clamp(0, old_w as i32 - 1) as usize;
-                let yi = yi.clamp(0, old_h as i32 - 1) as usize;
-                let idx = (yi * old_w as usize + xi) * 4;
-                [
-                    data[idx] as f32,
-                    data[idx + 1] as f32,
-                    data[idx + 2] as f32,
-                    data[idx + 3] as f32,
-                ]
-            };
-
-            let p00 = sample(x0, y0);
-            let p10 = sample(x0 + 1, y0);
-            let p01 = sample(x0, y0 + 1);
-            let p11 = sample(x0 + 1, y0 + 1);
-
-            let di = ((ty * nw + tx) * 4) as usize;
-            for c in 0..4 {
-                let top = p00[c] + (p10[c] - p00[c]) * frac_x;
-                let bot = p01[c] + (p11[c] - p01[c]) * frac_x;
-                let val = top + (bot - top) * frac_y;
-                out[di + c] = val.round().clamp(0.0, 255.0) as u8;
-            }
-        }
-    }
-    out
+    crate::simd::resize::resize_bilinear(data, old_w, old_h, new_w, new_h)
 }
 
 // ── Resampling filters (Squoosh-style separable two-pass) ──────────────────
@@ -334,45 +295,15 @@ fn resize_separable(
     let ow = old_w as usize;
     let oh = old_h as usize;
 
-    // ── Horizontal pass: (old_h × new_w), kept in f32 to avoid double rounding.
+    // Both passes (the per-output weighted sums) are SIMD128-accelerated, with a
+    // bit-identical scalar fallback, in `simd_resize`. Weight precompute + the
+    // kernel stay here. Horizontal: u8 rows → f32 intermediate (no rounding).
+    // Vertical: f32 intermediate → u8 with the [0,255] round+clamp.
     let h_windows = precompute_weights(old_w, nw as u32, support, kernel);
-    let mut mid = vec![0f32; oh * nw * 4];
-    for y in 0..oh {
-        let row = &data[y * ow * 4..(y + 1) * ow * 4];
-        let out_row = &mut mid[y * nw * 4..(y + 1) * nw * 4];
-        for (tx, (start, weights)) in h_windows.iter().enumerate() {
-            let mut acc = [0f32; 4];
-            for (k, &w) in weights.iter().enumerate() {
-                let si = (start + k) * 4;
-                acc[0] += row[si] as f32 * w;
-                acc[1] += row[si + 1] as f32 * w;
-                acc[2] += row[si + 2] as f32 * w;
-                acc[3] += row[si + 3] as f32 * w;
-            }
-            out_row[tx * 4..tx * 4 + 4].copy_from_slice(&acc);
-        }
-    }
+    let mid = crate::simd::resize::sep_horizontal(data, ow, oh, nw, &h_windows);
 
-    // ── Vertical pass: (new_h × new_w) → u8 with a [0, 255] clamp.
     let v_windows = precompute_weights(old_h, nh as u32, support, kernel);
-    let mut out = vec![0u8; nh * nw * 4];
-    for (ty, (start, weights)) in v_windows.iter().enumerate() {
-        for tx in 0..nw {
-            let mut acc = [0f32; 4];
-            for (k, &w) in weights.iter().enumerate() {
-                let si = ((start + k) * nw + tx) * 4;
-                acc[0] += mid[si] * w;
-                acc[1] += mid[si + 1] * w;
-                acc[2] += mid[si + 2] * w;
-                acc[3] += mid[si + 3] * w;
-            }
-            let di = (ty * nw + tx) * 4;
-            for c in 0..4 {
-                out[di + c] = acc[c].round().clamp(0.0, 255.0) as u8;
-            }
-        }
-    }
-    out
+    crate::simd::resize::sep_vertical(&mid, nw, nh, &v_windows)
 }
 
 /// Resize using nearest-neighbor sampling. Returns the new RGBA buffer.

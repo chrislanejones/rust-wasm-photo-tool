@@ -827,9 +827,7 @@ impl ImageHorseTool {
         }
         self.snap("Invert Mask");
         if let Some(mask) = self.layers[idx].mask.as_mut() {
-            for m in mask.iter_mut() {
-                *m = 255 - *m;
-            }
+            crate::simd::color::invert_u8(mask); // SIMD 255−x (scalar fallback)
         }
         self.recomposite();
         true

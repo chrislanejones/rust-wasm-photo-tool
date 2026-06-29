@@ -1,0 +1,55 @@
+<!doctype html>
+<!--
+  SIMD128 vs scalar resize benchmark. To run:
+    wasm-pack build --target web --out-dir pkg
+    RUSTFLAGS="-C target-feature=-simd128" wasm-pack build --target web --out-dir pkg-scalar
+    python3 -m http.server 8099    # then open http://localhost:8099/bench.html
+  pkg-scalar/ is gitignored — rebuild it on demand with the command above.
+-->
+<html>
+<head><meta charset="utf-8"><title>SIMD vs scalar — resize bench</title>
+<style>body{font:14px/1.5 monospace;background:#111;color:#eee;padding:20px}pre{white-space:pre-wrap}</style>
+</head>
+<body>
+<h3>WASM SIMD128 vs scalar — resize_pixels_filter</h3>
+<pre id="out">running…</pre>
+<script type="module">
+  import initSimd, { resize_pixels_filter as rzSimd } from './pkg/stamp_tool.js';
+  import initScalar, { resize_pixels_filter as rzScalar } from './pkg-scalar/stamp_tool.js';
+
+  const out = document.getElementById('out');
+  out.textContent = '';
+  const log = (s) => { out.textContent += s + '\n'; };
+
+  await initSimd();
+  await initScalar();
+
+  const W = 2048, H = 2048, NW = 1024, NH = 1024, ITERS = 8;
+  // Deterministic pseudo-random RGBA so both modules see identical input.
+  const px = new Uint8Array(W * H * 4);
+  let s = 123456789 >>> 0;
+  for (let i = 0; i < px.length; i++) { s = (s * 1103515245 + 12345) >>> 0; px[i] = s & 255; }
+
+  const bench = (fn) => {
+    fn(); // warmup (JIT + alloc)
+    const t0 = performance.now();
+    for (let k = 0; k < ITERS; k++) fn();
+    return (performance.now() - t0) / ITERS;
+  };
+
+  log(`resize ${W}×${H} → ${NW}×${NH}  ·  ${ITERS} iters (mean ms)\n`);
+  log('filter      scalar   simd   speedup');
+  log('---------------------------------------');
+  const filters = [[1, 'bilinear'], [3, 'lanczos3'], [2, 'catmull']];
+  const results = {};
+  for (const [f, name] of filters) {
+    const sc = bench(() => rzScalar(px, W, H, NW, NH, f));
+    const sv = bench(() => rzSimd(px, W, H, NW, NH, f));
+    results[name] = { scalar: sc, simd: sv, speedup: sc / sv };
+    log(`${name.padEnd(10)} ${sc.toFixed(1).padStart(7)} ${sv.toFixed(1).padStart(7)}   ${(sc / sv).toFixed(2)}×`);
+  }
+  log('\nDONE');
+  window.__bench = results; // for headless read-back
+</script>
+</body>
+</html>

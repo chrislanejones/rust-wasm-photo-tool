@@ -1,0 +1,24 @@
+version: 2
+# Dependabot opens PRs for outdated/vulnerable deps. Security fixes are filed
+# immediately regardless of the schedule below; the schedule governs routine
+# version bumps. open-pull-requests-limit caps noise.
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # Single pnpm workspace lockfile lives at the repo root; Dependabot updates
+  # the root lockfile and the package.json files across the workspace from here.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # Keeps the `uses:` action versions in the workflows above current.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

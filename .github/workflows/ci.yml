@@ -1,0 +1,173 @@
+name: CI
+
+# One workflow, all checks. Build/quality jobs run on push + PR; the security
+# jobs (audits, secret scan, CodeQL) also run on a weekly cron, because new CVEs
+# are disclosed independent of your commits.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    - cron: "0 9 * * 1" # Mondays 09:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------- Quality / build ----------
+  rust:
+    name: Rust / WASM
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' # no point rebuilding on the cron
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - run: wasm-pack build --target web --out-dir pkg
+
+  web:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    needs: rust
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter stamp-tool exec tsc -b --noEmit
+      - run: pnpm run build:all
+
+  marketing:
+    name: Marketing build (mirrors Vercel /marketing root)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    # Vercel's Root Directory is /marketing, so it reads marketing/vercel.json
+    # and runs install+build FROM there. Mirror that exactly rather than driving
+    # it from the repo root, so CI fails the same way Vercel would.
+    defaults:
+      run:
+        working-directory: marketing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      # marketing/vercel.json -> installCommand "pnpm install", buildCommand
+      # "pnpm build" (= tsc -b && vite build). pnpm resolves the workspace root
+      # for install even when invoked from the subdir.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  convex:
+    name: Convex (codegen + typecheck + drift)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    env:
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # `convex codegen` runs Convex's OWN TypeScript check (correct runtime type
+      # environment — plain `tsc` falsely reports `process`/global errors on
+      # backend code) AND regenerates convex/_generated. It connects to the
+      # deployment, so it needs CONVEX_DEPLOY_KEY; the step is skipped on fork
+      # PRs where the secret isn't available.
+      - name: Convex codegen + typecheck + drift
+        if: env.CONVEX_DEPLOY_KEY != ''
+        run: |
+          pnpm exec convex codegen
+          git diff --exit-code convex/_generated \
+            || { echo "::error::convex/_generated is stale — run 'npx convex codegen' and commit"; exit 1; }
+      - name: Skipped (no CONVEX_DEPLOY_KEY)
+        if: env.CONVEX_DEPLOY_KEY == ''
+        run: echo "Skipping Convex checks — add the CONVEX_DEPLOY_KEY repo secret to enable."
+
+  uploadthing-leak-guard:
+    name: UploadThing secret-leak guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # UPLOADTHING_TOKEN is server-only by design (no VITE_ prefix, see
+      # .env.local). This fails the build if client source ever references the
+      # token or a VITE_-exposed UploadThing var, which would bundle the secret.
+      - name: Assert no client-side UploadThing secret usage
+        run: |
+          # Only flags patterns that would actually BUNDLE the secret into the
+          # client: a VITE_-exposed var or import.meta.env read. A bare mention
+          # of UPLOADTHING_TOKEN in a comment is fine, so it's not matched.
+          if grep -rniE "VITE_UPLOADTHING|import\.meta\.env\.[A-Za-z_]*UPLOADTHING" \
+               app/src marketing/src; then
+            echo "::error::Client source references an UploadThing secret — it must stay server-side."
+            exit 1
+          fi
+          echo "OK: no client-side UploadThing secret references."
+
+  # ---------- Security ----------
+  cargo-audit:
+    name: cargo audit (Rust deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  pnpm-audit:
+    name: pnpm audit (npm deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Non-blocking: transitive npm advisories are often unfixable noise for a
+      # browser app. Drop the `|| true` once the tree is clean to make it gate.
+      - run: pnpm audit --audit-level=high || true
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so a secret committed earlier is caught
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: CodeQL (TS/React)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          language: javascript-typescript
+      - uses: github/codeql-action/analyze@v3

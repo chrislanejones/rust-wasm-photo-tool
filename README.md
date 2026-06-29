@@ -856,6 +856,16 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_...
 | 3   | **Cursor fix** — the brush-size ring is gated to the brush-family tools (`brush` + `effects`); `compress` (Resize), `arrow` (Layer Settings), and `ai` now keep the standard default arrow on the canvas and over the panels (no stray paint ring, including when the pointer is idle) | Complete |
 | 4   | **Docs** — README this summary; Trail Log **v0.9.35** | Complete |
 
+## v5.3 Change Summary
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **WASM SIMD128 kernels** — explicit `core::arch::wasm32` SIMD (each with a bit-identical scalar fallback) for the hot pixel paths: Gaussian blur, brightness, contrast (`simd/color.rs`), pixelate cell-sums, mask invert, and resize bilinear + Lanczos3 + Catmull-Rom (`simd/resize.rs`). Shared `load_px`/`store_px` in `simd/pixel.rs`; all under a new `src/simd/` module | Complete |
+| 2   | **Measured** (Chrome, 2048²→1024², SIMD vs scalar build): resize bilinear **1.60×**, Lanczos3 **3.90×**, Catmull-Rom **3.65×**. Bench harness in `bench.html` | Complete |
+| 3   | **Deferred (documented):** the alpha-blend kernels (layer composite, brush, eraser, clone stamp) — per-pixel integer divide can't be bit-identical in wasm SIMD, so they stay scalar (`SIMD_PLAN.md`) | Complete |
+| 4   | **`resize_pixels_filter`** — new stateless WASM export (nearest / bilinear / Catmull / Lanczos); used by the bench + as a general utility | Complete |
+| 5   | **Docs** — README this summary; Trail Log **v0.9.36**; `SIMD_PLAN.md` annotated with status + measured speedups | Complete |
+
 ## License
 
 MIT

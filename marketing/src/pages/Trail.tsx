@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.36",
+    date: "2026-06-28",
+    headline: "WASM SIMD128 — the heavy pixel ops got faster",
+    entries: [
+      { tag: "perf", text: "The image engine's hottest pixel loops now use explicit WebAssembly SIMD128 (processing four channels at once): Gaussian blur, brightness, contrast, pixelate, and image resize (bilinear / Lanczos / Catmull-Rom). Measured in-browser, resize runs ~1.6× faster (bilinear) up to ~3.9× (Lanczos) — and the output is bit-for-bit identical, so nothing about your edits changes; they just land quicker." },
+      { tag: "rust", text: "Every kernel keeps a matching scalar fallback (used where SIMD isn't available) and shares one set of load/store helpers, all consolidated under a new src/simd/ module." },
+    ],
+  },
+  {
     version: "v0.9.35",
     date: "2026-06-28",
     headline: "Tidier notice dialogs and a calmer cursor",
