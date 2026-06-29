@@ -167,10 +167,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           language: javascript-typescript
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
 
   # ---------- Static guardrails (from docs/ci-guardrails.md) ----------
   # ADVISORY for now: the codebase isn't clean against these yet (raw colors,
