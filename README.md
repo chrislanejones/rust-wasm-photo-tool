@@ -19,13 +19,16 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 - **[GitHub Actions (CI)](docs/GitHub-Actions.md)** — the CI workflow jobs (build, security, audits) and Dependabot.
 - **[CI Guardrails](docs/CI-Guardrails.md)** — the advisory `guardrails` job, flipping checks to blocking, and the local hook mirror.
 - **[Refactor Playbook](docs/Refactor-Playbook.md)** — single-source-of-truth conventions (color / type / z-index tokens, React + Rust health, target folder structures) and the reusable guardrail bundle.
+- **[State Management](docs/State-Management.md)** — the Zustand stores, the `SetArg` drop-in migration off AppShell's `useState`, and what stays local.
+- **[IndexedDB Investigation](docs/IndexedDB-Investigation.md)** — why IndexedDB, the live content databases, the Zustand persist adapter, and the Dexie content layer.
+- **[Service Workers & Caching](docs/Service-Workers-Caching.md)** — investigation: caching the WASM binary + app shell, the never-cache deny-list, and a phased PWA rollout.
 
 ## Tech Stack
 
 - **Rust** — WASM processing layer (`wasm-bindgen`, `png` crate, `ab_glyph` fonts, SIMD128 kernels)
 - **React 19** — UI framework
 - **TypeScript** — Type safety
-- **Zustand** — Client state management *(coming soon)*
+- **Zustand** — Client state management (UI / tool / gallery stores; IndexedDB-persisted prefs)
 - **Vite** — Build tool with WASM support (`vite-plugin-wasm` + top-level await)
 - **Tailwind CSS** — Utility styling (semantic design tokens)
 - **Radix UI** — Accessible primitives (Dialog, Tooltip, Context Menu)
@@ -34,7 +37,7 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 - **Sonner** — Toast notifications
 - **emoji-mart** — Emoji picker (stamp tool)
 - **JSZip** — Client-side ZIP (batch export)
-- **IndexedDB** — Local-first storage (originals, edits, gallery)
+- **IndexedDB** — Local-first storage (originals, edits, gallery); **Dexie** content layer + Zustand persist adapter
 - **Convex** — Real-time database + auth + serverless functions
 - **Clerk** — Authentication (via `@convex-dev/auth`)
 - **Stripe** — Payments / billing
@@ -44,12 +47,14 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v5.5 — 2026-06-28
+### v5.6 — 2026-06-29
 
 | # | Change | Status |
 | --- | --- | --- |
-| 1 | **Gallery photo-switch race fix** — latest-wins `selectSeqRef` guard so the canvas always matches the highlighted thumbnail (rapid clicks / PgUp-PgDn no longer desync) | Complete |
-| 2 | **PgUp/PgDn cycling fix** — synchronous `activeIdRef` so repeated presses advance through every photo instead of sticking on a stale current | Complete |
+| 1 | **State-management foundation (Zustand)** — `useUIStore` / `useToolStore` / `useGalleryStore` extracted from the 3,245-line AppShell, with a `SetArg` drop-in so call sites migrate untouched (`@stores` alias; AppShell wiring is the next step) | Foundation complete |
+| 2 | **Zustand → IndexedDB persist adapter** — hand-rolled `StateStorage` (no new dep) backing durable UI prefs in a dedicated `image-horse-zustand` DB | Complete |
+| 3 | **Dexie content layer** — typed, declarative `originals` / `workingCopies` / `photos` schema (`@/lib/dexie/db`) as a parallel, reversible migration target for the heavy data | Module landed |
+| 4 | **Docs** — [State Management](docs/State-Management.md), [IndexedDB Investigation](docs/IndexedDB-Investigation.md), [Service Workers & Caching](docs/Service-Workers-Caching.md) | Complete |
 
 ## License
 

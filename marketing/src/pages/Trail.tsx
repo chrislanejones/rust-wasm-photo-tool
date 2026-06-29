@@ -27,6 +27,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.39",
+    date: "2026-06-29",
+    headline: "Behind the scenes — state-management foundation + storage groundwork",
+    entries: [
+      { tag: "infra", text: "Began lifting the editor's UI, tool, and gallery state into dedicated Zustand stores, untangling a single 3,000-line component. This is plumbing — nothing changes in how the app looks or behaves yet — but it's the groundwork that makes future features quicker and safer to build." },
+      { tag: "infra", text: "Added a tidy IndexedDB layer (via Dexie) for the heavy data — your original images, edited versions, and gallery list — alongside a small adapter that remembers UI preferences locally. Your photos still never leave your device." },
+      { tag: "infra", text: "Wrote up three engineering notes — on state management, on why we use IndexedDB, and on a future service-worker that would cache the app for instant repeat loads and offline editing." },
+    ],
+  },
+  {
     version: "v0.9.38",
     date: "2026-06-28",
     headline: "Gallery selection + PgUp/PgDn fixes",

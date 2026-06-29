@@ -20,6 +20,7 @@
       "@/*": ["./src/*"],
       "@lib/*": ["./src/lib/*.ts"],
       "@hooks/*": ["./src/hooks/*.ts"],
+      "@stores/*": ["./src/stores/*.ts"],
       "@features/*": ["./src/features/*.tsx"],
       "@components/*": ["./src/components/*.tsx"],
       "@app/*": ["./src/app/*.tsx"]

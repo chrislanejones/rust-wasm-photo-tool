@@ -447,3 +447,20 @@
 | --- | ------ | ------ |
 | 1   | **Gallery photo-switch race fix** — `handleSelectPhoto` ran three sequential awaits (save → loadPhotoEdit → loadFromSaved) with no concurrency guard, so overlapping selections could blit a stale photo to the canvas while the gallery highlighted another. A `selectSeqRef` latest-wins token, checked after every await (incl. inside `loadPhotoFromEntry`), now lets only the newest selection touch the canvas | Complete |
 | 2   | **PgUp/PgDn cycling fix** — `handleNext/PrevPhoto` computed the index from `activePhotoId` (React state, which lags the async image load), so repeated presses recomputed "next" from a stale current and stuck. A synchronous `activeIdRef` (advanced on every selection; kept in sync at select / add / delete / initial-load) now drives cycling | Complete |
+
+## v5.6 Change Summary — 2026-06-29
+
+State-management foundation + storage investigation. All additive — the new
+Zustand stores are not yet consumed by AppShell, so this release changes no
+runtime behaviour; it lands the plumbing and the docs that the AppShell wiring
+builds on.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Zustand stores** — `useUIStore` (panel/dialog flags + master-bar tab), `useToolStore` (active tool + every tool-mode flag/settings blob), `useGalleryStore` (photos / selection / per-photo bookkeeping) extracted from the ~3,245-line `AppShell.tsx`. Types mined from the real AppShell state, not guessed | Foundation complete |
+| 2   | **`SetArg` drop-in helper** (`stores/_shared.ts`) — store setters accept React's `value \| (prev => next)` arg so the ~30 functional-updater call sites (`setShowTools(v => !v)`, `setToolSettings(p => …)`) migrate untouched. Setters are stable refs (no extra re-renders); action names mirror AppShell's exact setter names | Complete |
+| 3   | **`@stores` path alias** added to `app/tsconfig.json` + `app/vite.config.ts` | Complete |
+| 4   | **Zustand → IndexedDB persist adapter** (`stores/storage/idbStorage.ts`) — hand-rolled native-IDB `StateStorage` (no new dependency; matches the existing three stores) in its own `image-horse-zustand` DB. `useUIStore` persists a `partialize`d subset (master-bar tab + notice-dismissed flags); transient dialog flags are never persisted | Complete |
+| 5   | **Dexie content layer** (`lib/dexie/db.ts` + `USAGE.md`) — typed declarative schema `originals` / `workingCopies` / `photos` in a parallel `image-horse-dexie` DB. Public API mirrors the legacy `originalsStore` names so a future cutover is an import-path swap; cascade delete + content-address dedupe preserved. The three live hand-rolled stores are untouched | Module landed (not yet wired) |
+| 6   | **Docs** — `State-Management.md`, `IndexedDB-Investigation.md`, `Service-Workers-Caching.md` (the SW one is investigation-only; no service worker ships yet). README docs index + Tech Stack updated | Complete |
+| 7   | **Deps** — `zustand@5` + `dexie@4` added to the `app` package (via the corepack `pnpm@11.7.0` workaround for the store-v11 lockfile) | Complete |
