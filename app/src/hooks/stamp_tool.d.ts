@@ -129,6 +129,16 @@ declare module "stamp_tool" {
     constructor(width: number, height: number);
     free(): void;
     load_image(pixels: Uint8Array): void;
+    load_image_artboard(
+      pixels: Uint8Array,
+      img_w: number,
+      img_h: number,
+      pad: number,
+      bg_r: number,
+      bg_g: number,
+      bg_b: number,
+      bg_a: number,
+    ): void;
     set_source(x: number, y: number): void;
     has_source(): boolean;
     set_brush_size(size: number): void;

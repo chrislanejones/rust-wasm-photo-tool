@@ -487,6 +487,75 @@ impl ImageHorseTool {
         self.editing_text_id = None;
     }
 
+    /// Load an image as a two-layer "artboard" (Photoshop-style New Document with
+    /// the photo placed on a canvas). The document grows to
+    /// `(img_w + 2*pad) × (img_h + 2*pad)`, and the stack becomes:
+    ///   • a **Background** layer — a solid `bg_*` fill (`bg_a = 0` ⇒ transparent
+    ///     canvas), sized to the whole document, and
+    ///   • a **Photo** layer — the incoming RGBA `pixels` pasted centred at
+    ///     `(pad, pad)`, transparent elsewhere.
+    /// The Photo layer is left active so the first edit targets the image, not
+    /// the backing canvas. Otherwise mirrors `load_image` (clears history,
+    /// stamp source, annotation counters, edit state). A `pad` of 0 yields the
+    /// same document size as `load_image` but still as two layers.
+    #[allow(clippy::too_many_arguments)]
+    pub fn load_image_artboard(
+        &mut self,
+        pixels: &[u8],
+        img_w: u32,
+        img_h: u32,
+        pad: u32,
+        bg_r: u8,
+        bg_g: u8,
+        bg_b: u8,
+        bg_a: u8,
+    ) {
+        if pixels.len() != (img_w as usize) * (img_h as usize) * 4 {
+            return;
+        }
+        let doc_w = img_w + 2 * pad;
+        let doc_h = img_h + 2 * pad;
+        self.width = doc_w;
+        self.height = doc_h;
+
+        // Background canvas: solid fill (skip the write when transparent — the
+        // buffer is already zero-filled).
+        let mut bg = Layer::new(1, "Background".to_string(), doc_w, doc_h);
+        if bg_a != 0 {
+            for px in bg.buf.data.chunks_exact_mut(4) {
+                px[0] = bg_r;
+                px[1] = bg_g;
+                px[2] = bg_b;
+                px[3] = bg_a;
+            }
+        }
+
+        // Photo layer: paste the image into a transparent full-document buffer.
+        let mut photo = Layer::new(2, "Photo".to_string(), doc_w, doc_h);
+        crate::transform::paste_region(
+            &mut photo.buf.data,
+            doc_w as i32,
+            doc_h as i32,
+            pixels,
+            img_w,
+            img_h,
+            pad as i32,
+            pad as i32,
+        );
+
+        self.layers = vec![bg, photo];
+        self.active = 1;
+        self.next_layer_id = 3;
+        self.hist.clear();
+        self.stamp.stroke_counter = 0;
+        self.stamp.source_x = None;
+        self.stamp.source_y = None;
+        self.next_text_id = 1;
+        self.next_shape_id = 1;
+        self.editing_shape_id = None;
+        self.editing_text_id = None;
+    }
+
     /// Flattened composite of all visible layers (RGBA).
     pub fn get_image_data(&self) -> Vec<u8> {
         composite_layers(
@@ -1773,6 +1842,28 @@ mod layer_tests {
         let t = ImageHorseTool::new(4, 4);
         assert_eq!(t.layer_count(), 1);
         assert_eq!(t.active, 0);
+    }
+
+    #[test]
+    fn artboard_load_pads_and_makes_two_layers() {
+        // 4×4 red photo, 2px white canvas border → 8×8 document, two layers,
+        // photo active. Corner is the white canvas; centre is the red photo.
+        let mut t = ImageHorseTool::new(8, 8);
+        t.load_image_artboard(&solid(4, 4, [255, 0, 0, 255]), 4, 4, 2, 255, 255, 255, 255);
+        assert_eq!((t.width, t.height), (8, 8));
+        assert_eq!(t.layer_count(), 2);
+        assert_eq!(t.active, 1, "photo layer is active");
+        assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "corner = canvas");
+        assert_eq!(px(&t, 4, 4), [255, 0, 0, 255], "centre = photo");
+    }
+
+    #[test]
+    fn artboard_transparent_canvas_shows_through_border() {
+        // bg_a = 0 → the border is transparent, the photo region opaque.
+        let mut t = ImageHorseTool::new(8, 8);
+        t.load_image_artboard(&solid(4, 4, [0, 128, 0, 255]), 4, 4, 2, 0, 0, 0, 0);
+        assert_eq!(px(&t, 0, 0)[3], 0, "border transparent");
+        assert_eq!(px(&t, 4, 4), [0, 128, 0, 255], "photo opaque");
     }
 
     #[test]

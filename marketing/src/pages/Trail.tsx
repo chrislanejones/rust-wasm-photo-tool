@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.41",
+    date: "2026-06-29",
+    headline: "Start a canvas your way",
+    entries: [
+      { tag: "ui", text: "The Blank Canvas / “New Document” screen is now organized by what you're making — Social, Web, Video, and Paper tabs each offer ready-made sizes. Instagram, LinkedIn, Facebook, YouTube thumbnails and banners, FHD and 4K, A4 and Letter, photo prints, and more. Pick a tab, pick a size, start designing." },
+      { tag: "feature", text: "New “Canvas on import” setting (Settings → General) can open each photo Photoshop-style — on a slightly larger backing canvas, split into a Background and a Photo layer, so you have room to work around the image. It's optional and off by default, which keeps the classic exact-size load." },
+    ],
+  },
+  {
     version: "v0.9.40",
     date: "2026-06-29",
     headline: "Snappier photo switching, privacy + safer share links",

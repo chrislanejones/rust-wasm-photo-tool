@@ -46,6 +46,14 @@ export interface Preferences {
   /** Keep camera metadata (EXIF — GPS, capture time, lens) on JPEG/WebP export,
    *  or strip it for privacy. Applies to all export paths. */
   exifKeep: boolean;
+  /** When a freshly-imported photo loads, place it on a slightly larger backing
+   *  canvas as TWO layers — a "Background" canvas + the "Photo" on top —
+   *  Photoshop-style. Off ⇒ the classic single full-bleed "Background" layer at
+   *  the exact photo size. Applies to new imports only ("at least initially"). */
+  canvasArtboard: boolean;
+  /** Border (in image px) added on every side when `canvasArtboard` is on, i.e.
+   *  the document is `photo + 2 × canvasPadding`. */
+  canvasPadding: number;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -65,6 +73,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // Privacy-by-default: strip EXIF (GPS, capture time, lens, device serial) on
   // export unless the user explicitly opts in via Settings → Security.
   exifKeep: false,
+  // Opt-in: keep the classic single-layer full-bleed load by default; users who
+  // want the Photoshop-style canvas + photo split enable it in Settings.
+  canvasArtboard: false,
+  canvasPadding: 10,
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];
@@ -125,6 +137,11 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
         : DEFAULT_PREFERENCES.reduceMotion,
     exifKeep:
       typeof p?.exifKeep === "boolean" ? p.exifKeep : DEFAULT_PREFERENCES.exifKeep,
+    canvasArtboard:
+      typeof p?.canvasArtboard === "boolean"
+        ? p.canvasArtboard
+        : DEFAULT_PREFERENCES.canvasArtboard,
+    canvasPadding: clampInt(p?.canvasPadding, 0, 200, DEFAULT_PREFERENCES.canvasPadding),
   };
 }
 
@@ -145,6 +162,8 @@ export function serializePreferences(p: Preferences): string {
     reopenLastSession: p.reopenLastSession,
     reduceMotion: p.reduceMotion,
     exifKeep: p.exifKeep,
+    canvasArtboard: p.canvasArtboard,
+    canvasPadding: p.canvasPadding,
   });
 }
 

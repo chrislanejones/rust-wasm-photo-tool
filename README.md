@@ -50,15 +50,15 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v5.8 — 2026-06-29
+### v5.9 — 2026-06-29
 
 | # | Change | Status |
 | --- | --- | --- |
-| 1 | **AppShell on Zustand** — all 38 UI / tool / gallery state fields moved from local `useState` into `useUIStore` / `useToolStore` / `useGalleryStore` (atomic selectors, drop-in via `SetArg`). Behaviour-preserving; trims re-renders and shrinks the 3k-line component's state surface | Complete |
-| 2 | **Faster switching when signed in** — only re-save a photo's edit on switch when it was actually modified (previously uploaded the full edit archive to Convex on every switch) | Complete |
-| 3 | **CI fix** — `checked_div` for the pixelate / mosaic cell-average (Rust 1.96 clippy `manual_checked_ops`) so `cargo clippy -D warnings` stays green | Complete |
+| 1 | **New-Document presets by use-case** — the Blank Canvas panel now has **Social / Web / Video / Paper** tabs, each offering ready sizes (Instagram, LinkedIn, Facebook, YouTube thumbnail/banner, FHD/4K, A4/Letter, 4×6…). Pick a tab, pick a size, create. The logo/title is hidden while the panel is open for an uncluttered "New Document" view | Complete |
+| 2 | **Canvas-on-import setting** — Settings → General → *Canvas on import* lets a freshly-opened photo land Photoshop-style on a slightly larger backing canvas as **two layers** (a Background canvas + the Photo on top), with a configurable border. Defaults to the classic single full-bleed layer (off). Backed by a new Rust `load_image_artboard` | Complete |
+| 3 | **Lacey QC agent** — a committed `lacey` subagent that gates UI work by verifying every OK / Apply / Create / Save button is wired to a real handler and commits/closes as expected | Complete |
 
-> **About this release — state management.** The editor's UI, tool, and gallery state (panel/dialog visibility, the active tool and its settings, the photo list and selection) used to be ~40 `useState`s inside a single 3,000-line `AppShell` component, prop-drilled throughout. It now lives in three focused [Zustand](https://github.com/pmndrs/zustand) stores — `useUIStore`, `useToolStore`, `useGalleryStore` — so each component subscribes (via atomic selectors) only to the slice it needs: fewer re-renders, no prop-drilling, and a far smaller component to reason about. The change is **behaviour-preserving** (the app works exactly as before) and is the groundwork for splitting `AppShell` into per-feature modules. Durable preferences (last master-bar tab, tool sub-modes) persist to IndexedDB. Details: [State Management](docs/State-Management.md) · [Architecture](docs/Architecture.md) · [Architecture Roadmap](docs/Architecture-Roadmap.md).
+> **About this release — starting a canvas.** Two improvements to how an image session begins. The **Blank Canvas** panel is now organized by what you're making: a **Social / Web / Video / Paper** toggle swaps the offered sizes so a LinkedIn post, a YouTube thumbnail, or an A4 page is one click away — and the dialog drops its logo/title in that mode to give the setup the full panel. Separately, an opt-in **Canvas on import** preference loads a new photo onto a slightly larger backing canvas split into a *Background* and a *Photo* layer (Photoshop-style), so there's room to work around the image from the start; it's off by default, keeping the classic exact-size single-layer load. The two-layer artboard is rendered entirely in Rust (`load_image_artboard`) — the photo is pasted onto a transparent full-document layer over a solid canvas layer, with the photo layer active so the first edit targets the image.
 
 ## License
 

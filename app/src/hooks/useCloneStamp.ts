@@ -242,9 +242,19 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [canvasRef, syncState],
   );
 
-  /** Load pre-decoded RGBA pixels directly — skips a second decode and respects the 2048 cap. */
+  /**
+   * Load pre-decoded RGBA pixels directly — skips a second decode and respects
+   * the 2048 cap. Pass `artboard` (Settings → Canvas on import) to land the
+   * photo on a larger backing canvas as two layers (Background + Photo); omit
+   * it for the classic single full-bleed Background layer.
+   */
   const loadImageFromPixels = useCallback(
-    async (pixels: Uint8ClampedArray, width: number, height: number) => {
+    async (
+      pixels: Uint8ClampedArray,
+      width: number,
+      height: number,
+      artboard?: { pad: number; r: number; g: number; b: number; a: number },
+    ) => {
       const { default: init, ImageHorseTool: Tool } = await import("stamp_tool");
       const wasmExports = (await init()) as unknown as {
         memory: WebAssembly.Memory;
@@ -253,18 +263,45 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       registerWasmMemory(wasmExports.memory);
       const canvas = canvasRef.current;
       if (!canvas) return;
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d", { desynchronized: true })!;
-      const clamped = new Uint8ClampedArray(pixels.buffer as ArrayBuffer);
-      ctx.putImageData(new ImageData(clamped, width, height), 0, 0);
-      const tool = new Tool(width, height);
-      tool.load_image(new Uint8Array(pixels.buffer as ArrayBuffer));
-      toolRef.current = tool;
+      const src = new Uint8Array(pixels.buffer as ArrayBuffer);
+      if (artboard) {
+        // Two-layer artboard (Background canvas + Photo): the document is
+        // photo + 2×pad. A pad of 0 still yields the two-layer structure (same
+        // doc size), matching the "Canvas + photo" intent. Size the tool at the
+        // document dimensions; the flush effect blits the composite.
+        const docW = width + artboard.pad * 2;
+        const docH = height + artboard.pad * 2;
+        const tool = new Tool(docW, docH);
+        tool.load_image_artboard(
+          src,
+          width,
+          height,
+          artboard.pad,
+          artboard.r,
+          artboard.g,
+          artboard.b,
+          artboard.a,
+        );
+        toolRef.current = tool;
+        canvas.width = docW;
+        canvas.height = docH;
+        // No raw putImageData here (the composite differs from the photo
+        // pixels), so paint the layer composite straight away.
+        flushToCanvas();
+      } else {
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d", { desynchronized: true })!;
+        const clamped = new Uint8ClampedArray(pixels.buffer as ArrayBuffer);
+        ctx.putImageData(new ImageData(clamped, width, height), 0, 0);
+        const tool = new Tool(width, height);
+        tool.load_image(src);
+        toolRef.current = tool;
+      }
       sourcePosRef.current = null;
       syncState();
     },
-    [canvasRef, syncState],
+    [canvasRef, syncState, flushToCanvas],
   );
 
   /**

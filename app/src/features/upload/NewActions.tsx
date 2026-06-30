@@ -25,16 +25,85 @@ import { TEXT_COLORS } from "@/lib/colors";
 import { parseColor } from "@/lib/colorParser";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
 
-/** Common screen / photo / print sizes for the Blank Canvas panel (px; print
- *  sizes assume ~300 DPI). Selecting one fills the width/height fields. */
-const PAGE_PRESETS: { id: string; label: string; w: number; h: number }[] = [
-  { id: "fhd", label: "FHD", w: 1920, h: 1080 },
-  { id: "square", label: "Square", w: 1080, h: 1080 },
-  { id: "story", label: "Story", w: 1080, h: 1920 },
-  { id: "4x6", label: "4×6", w: 1200, h: 1800 },
-  { id: "5x7", label: "5×7", w: 1500, h: 2100 },
-  { id: "8x10", label: "8×10", w: 2400, h: 3000 },
+interface SizePreset {
+  id: string;
+  label: string;
+  w: number;
+  h: number;
+}
+
+/** Blank-canvas size presets grouped by use-case. The category toggle
+ *  (Social / Web / Video / Paper) swaps which set of sizes is shown so people
+ *  can start a LinkedIn post, a YouTube thumbnail, or an A4 page in one click.
+ *  Print sizes assume ~300 DPI. Selecting one fills the width/height fields. */
+const PRESET_CATEGORIES: {
+  id: string;
+  label: string;
+  presets: SizePreset[];
+}[] = [
+  {
+    id: "social",
+    label: "Social",
+    presets: [
+      { id: "ig-square", label: "Instagram", w: 1080, h: 1080 },
+      { id: "ig-portrait", label: "IG Portrait", w: 1080, h: 1350 },
+      { id: "ig-story", label: "Story / Reel", w: 1080, h: 1920 },
+      { id: "fb-post", label: "Facebook", w: 1200, h: 630 },
+      { id: "fb-cover", label: "FB Cover", w: 820, h: 312 },
+      { id: "li-post", label: "LinkedIn", w: 1200, h: 1200 },
+      { id: "li-cover", label: "LI Banner", w: 1584, h: 396 },
+      { id: "x-post", label: "X / Twitter", w: 1600, h: 900 },
+      { id: "pin", label: "Pinterest", w: 1000, h: 1500 },
+    ],
+  },
+  {
+    id: "web",
+    label: "Web",
+    presets: [
+      { id: "fhd", label: "FHD 1080p", w: 1920, h: 1080 },
+      { id: "hd", label: "HD 720p", w: 1280, h: 720 },
+      { id: "4k", label: "4K", w: 3840, h: 2160 },
+      { id: "og", label: "OG / Share", w: 1200, h: 630 },
+      { id: "leaderboard", label: "Leaderboard", w: 728, h: 90 },
+      { id: "banner", label: "Billboard", w: 970, h: 250 },
+      { id: "mrec", label: "Med. Rect.", w: 300, h: 250 },
+      { id: "favicon", label: "Favicon", w: 512, h: 512 },
+    ],
+  },
+  {
+    id: "video",
+    label: "Video",
+    presets: [
+      { id: "yt-thumb", label: "YT Thumb", w: 1280, h: 720 },
+      { id: "yt-banner", label: "YT Banner", w: 2560, h: 1440 },
+      { id: "v-1080p", label: "1080p", w: 1920, h: 1080 },
+      { id: "v-4k", label: "4K UHD", w: 3840, h: 2160 },
+      { id: "v-vertical", label: "Vertical", w: 1080, h: 1920 },
+      { id: "v-square", label: "Square", w: 1080, h: 1080 },
+      { id: "tiktok", label: "TikTok", w: 1080, h: 1920 },
+    ],
+  },
+  {
+    id: "paper",
+    label: "Paper",
+    presets: [
+      { id: "a3", label: "A3", w: 3508, h: 4961 },
+      { id: "a4", label: "A4", w: 2480, h: 3508 },
+      { id: "a5", label: "A5", w: 1748, h: 2480 },
+      { id: "letter", label: "Letter", w: 2550, h: 3300 },
+      { id: "legal", label: "Legal", w: 2550, h: 4200 },
+      { id: "4x6", label: "4×6", w: 1200, h: 1800 },
+      { id: "5x7", label: "5×7", w: 1500, h: 2100 },
+      { id: "8x10", label: "8×10", w: 2400, h: 3000 },
+    ],
+  },
 ];
+
+/** Flat id → preset lookup so a chosen size can be resolved regardless of which
+ *  category tab it came from. */
+const PRESET_BY_ID = new Map<string, SizePreset>(
+  PRESET_CATEGORIES.flatMap((c) => c.presets).map((p) => [p.id, p]),
+);
 
 /** Codeberg's mountain mark — lucide ships no brand icon for it, so inline the
  *  simple-icons path. `.btn-icon svg` sizes it to 14px to match lucide icons. */
@@ -59,6 +128,9 @@ interface Props {
   autoFocusFirst?: boolean;
   /** Hide the website/GitHub/Codeberg row. */
   showLinks?: boolean;
+  /** Notified whenever the Blank Canvas ("New Document") panel opens/closes, so
+   *  the wrapper can drop its logo/title header for the uncluttered setup view. */
+  onBlankModeChange?: (active: boolean) => void;
 }
 
 export function NewActions({
@@ -69,6 +141,7 @@ export function NewActions({
   loadProgress = 0,
   autoFocusFirst = false,
   showLinks = true,
+  onBlankModeChange,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const firstButtonRef = useRef<HTMLButtonElement>(null);
@@ -81,6 +154,14 @@ export function NewActions({
   const [bgColor, setBgColor] = useState("#ffffff");
   const [transparent, setTransparent] = useState(false);
   const [blankPreset, setBlankPreset] = useState("");
+  // Which size-preset category tab is showing (Social / Web / Video / Paper).
+  const [blankCat, setBlankCat] = useState(PRESET_CATEGORIES[0].id);
+
+  // Let the wrapper drop its logo/title header while the Blank Canvas panel is
+  // open. Fires on mount (false) too, so reopening the dialog restores it.
+  useEffect(() => {
+    onBlankModeChange?.(blankMode);
+  }, [blankMode, onBlankModeChange]);
 
   const processFiles = useCallback(
     (files: File[]) => {
@@ -118,7 +199,7 @@ export function NewActions({
 
   // Apply a page-size preset to the width/height fields.
   const applyPreset = useCallback((id: string) => {
-    const p = PAGE_PRESETS.find((x) => x.id === id);
+    const p = PRESET_BY_ID.get(id);
     if (!p) return;
     setBlankPreset(id);
     setBlankW(String(p.w));
@@ -265,9 +346,26 @@ export function NewActions({
                   </div>
                 </div>
 
+                {/* Use-case tabs — swap which preset sizes are offered. */}
+                <ToolButtonGroup
+                  label="Canvas type"
+                  options={PRESET_CATEGORIES.map((c) => ({
+                    id: c.id,
+                    label: c.label,
+                  }))}
+                  value={blankCat}
+                  onChange={setBlankCat}
+                  columns={4}
+                />
+
                 <ToolButtonGroup
                   label="Page size"
-                  options={PAGE_PRESETS}
+                  options={
+                    (
+                      PRESET_CATEGORIES.find((c) => c.id === blankCat) ??
+                      PRESET_CATEGORIES[0]
+                    ).presets
+                  }
                   value={blankPreset}
                   onChange={applyPreset}
                   columns={3}

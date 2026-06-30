@@ -2,7 +2,7 @@
 // cold start the same actions render full-page via FirstRunScreen instead — both
 // share <NewActions/>. This wrapper owns the modal chrome: backdrop, logo/title
 // header, sign-in, close button, and the shake when close is blocked.
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { X } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
@@ -30,6 +30,9 @@ export function UploadDialog({
   canClose = true,
 }: Props) {
   const controls = useAnimation();
+  // The Blank Canvas ("New Document") panel hides the logo/title header for an
+  // uncluttered setup view. NewActions reports its state up to us.
+  const [blankMode, setBlankMode] = useState(false);
 
   const triggerShake = useCallback(async () => {
     await controls.start({
@@ -77,17 +80,23 @@ export function UploadDialog({
               animate={controls}
               className="bg-bg-secondary rounded-2xl border border-border shadow-2xl overflow-hidden"
             >
-              {/* Logo + Title — top center */}
-              <div className="flex flex-col items-center pt-6 pb-2">
-                <img
-                  src={horseLogo}
-                  alt="Image Horse"
-                  className="w-30 h-30 mb-2 drop-shadow-lg"
-                />
-                <h1 className="text-lg font-bold text-text-primary tracking-wide">
-                  Image Horse
-                </h1>
-              </div>
+              {/* Logo + Title — top center. Hidden in Blank Canvas mode so the
+                  "New Document" setup gets the full panel. A short top pad keeps
+                  the sign-in / close buttons clear of the content. */}
+              {blankMode ? (
+                <div className="pt-6" />
+              ) : (
+                <div className="flex flex-col items-center pt-6 pb-2">
+                  <img
+                    src={horseLogo}
+                    alt="Image Horse"
+                    className="w-30 h-30 mb-2 drop-shadow-lg"
+                  />
+                  <h1 className="text-lg font-bold text-text-primary tracking-wide">
+                    Image Horse
+                  </h1>
+                </div>
+              )}
 
               {/* Sign-in — top-left, mirroring the close button's spot */}
               <div className="absolute top-4 left-4">
@@ -106,6 +115,7 @@ export function UploadDialog({
                 isLoading={isLoading}
                 loadProgress={loadProgress}
                 autoFocusFirst
+                onBlankModeChange={setBlankMode}
               />
             </motion.div>
           </motion.div>

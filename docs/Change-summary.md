@@ -496,3 +496,26 @@ per-feature modules (see [Architecture Roadmap](Architecture-Roadmap.md)).
 | 2   | **Logged-in switch speedup** — `handleSelectPhoto` re-saved the outgoing photo on every switch, and when signed in `savePhotoEdit` uploads the full edit archive to Convex; now it saves only when the photo was actually modified | Complete |
 | 3   | **clippy CI fix** — the `if n > 0 { sum / n }` cell-average guards in `drawing.rs` (pixelate) + `filters.rs` (mosaic) tripped Rust 1.96's `manual_checked_ops`; folded into `checked_div` (behaviour-identical, works on the older local clippy too — no `#[allow]`) | Complete |
 | 4   | **Docs** — README intro + a "state management" release note; `Architecture.md` "Client state (Zustand)" section; `Features.md` state bullet; `File-Map.md` `stores/` tree + `lib/` additions; marketing Hero copy | Complete |
+
+## v5.9 Change Summary — 2026-06-29
+
+Two improvements to how an image session begins, plus the project's second
+committed subagent. The **Blank Canvas / New Document** panel is now organized by
+use-case, and an opt-in preference can load photos onto a Photoshop-style two-layer
+canvas. Verified by `cargo check`/`cargo test` (28 lib tests incl. two new artboard
+tests), `tsc --noEmit`, and `vite build` (all green).
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **New-Document category tabs** — `NewActions.tsx`'s flat `PAGE_PRESETS` became `PRESET_CATEGORIES` (Social / Web / Video / Paper) with a `PRESET_BY_ID` lookup. A "Canvas type" `ToolButtonGroup` (4-col) swaps which "Page size" presets show; picking one fills width/height as before. Sizes: Instagram/IG-portrait/Story, Facebook + cover, LinkedIn + banner, X, Pinterest; FHD/HD/4K, OG, ad units, favicon; YouTube thumb/banner, 1080p/4K/vertical/square/TikTok; A3/A4/A5, Letter/Legal, 4×6/5×7/8×10 | Complete |
+| 2   | **Logo/title hidden in blank mode** — `NewActions` gained an `onBlankModeChange` prop (fired from a `useEffect` on `blankMode`); `UploadDialog` drops its logo + "Image Horse" header while the Blank Canvas panel is open, restoring it on close/reopen. Sign-in + close (X/Escape) unaffected | Complete |
+| 3   | **Two-layer "artboard" on import** — new Rust `ImageHorseTool::load_image_artboard(pixels, img_w, img_h, pad, bg_rgba)`: grows the document to `photo + 2·pad`, builds a solid **Background** layer + a transparent **Photo** layer with the image pasted centred at `(pad, pad)`, photo layer active. Mirrors `load_image` otherwise (clears history/overlays). Two unit tests (opaque + transparent canvas) | Complete |
+| 4   | **Canvas-on-import preference** — `canvasArtboard` (bool) + `canvasPadding` (px, 0–200, default 10) added to `Preferences` (interface, defaults, `normalize`, `serialize`). Settings → General → *Canvas on import* toggle (Canvas+photo / Photo-only) + a conditional border slider. Default **off** = classic single full-bleed `load_image`. Wired through `useCloneStamp.loadImageFromPixels`'s new optional `artboard` arg; AppShell passes it **only** on fresh import (`handleAddPhotos`), not on photo-switch / restore / AI-result, so an already-loaded photo isn't re-padded | Complete |
+| 5   | **Lacey QC subagent** — `.claude/agents/lacey.md` (`lacey`): a QC & approval gate that verifies OK/Apply/Create/Save buttons are wired to real handlers, enabled/disabled correctly, and commit/close as expected; gives a pass/fail verdict and may apply small wiring fixes. Added to the agents roster | Complete |
+
+> **Known follow-ups (artboard).** The two-layer artboard applies on **fresh import
+> only** ("at least initially"): switching away and back reloads the cached working
+> copy as a single layer, and the Convex edit archive is still single-layer, so the
+> split isn't yet persisted. The backing canvas is opaque white; export includes the
+> border. These are acceptable for the opt-in v1 and tracked for a follow-up alongside
+> multi-layer persistence.

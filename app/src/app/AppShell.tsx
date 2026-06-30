@@ -391,14 +391,19 @@ export function AppShell() {
 
   // ── Pixel-based loading (downscaled working copy) ──────────────────────────
   const loadImageFromPixels = useCallback(
-    (pixels: Uint8ClampedArray, width: number, height: number) => {
+    (
+      pixels: Uint8ClampedArray,
+      width: number,
+      height: number,
+      artboard?: { pad: number; r: number; g: number; b: number; a: number },
+    ) => {
       setIsImageLoading(true);
       setLoadProgress(0);
       if (loadIntervalRef.current) clearInterval(loadIntervalRef.current);
       loadIntervalRef.current = setInterval(() => {
         setLoadProgress((prev) => (prev >= 90 ? 90 : prev + Math.random() * 15));
       }, 100);
-      void stamp.loadImageFromPixels(pixels, width, height);
+      void stamp.loadImageFromPixels(pixels, width, height, artboard);
     },
     [stamp],
   );
@@ -561,7 +566,18 @@ export function AppShell() {
 
           if (!firstLoaded) {
             firstLoaded = true;
-            loadImageFromPixels(working.pixels, working.width, working.height);
+            // Fresh import only: honor the "Canvas on import" setting and land
+            // the photo on a two-layer padded artboard (white backing canvas).
+            // Photo-switch / restore / AI-result paths deliberately skip this so
+            // an already-loaded photo isn't re-padded.
+            loadImageFromPixels(
+              working.pixels,
+              working.width,
+              working.height,
+              prefs.canvasArtboard
+                ? { pad: prefs.canvasPadding, r: 255, g: 255, b: 255, a: 255 }
+                : undefined,
+            );
             setHasBeenModified(false);
             activeIdRef.current = entry.id;
             setActivePhotoId(entry.id);
@@ -577,7 +593,7 @@ export function AppShell() {
         }
       }
     },
-    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode],
+    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, prefs.canvasArtboard, prefs.canvasPadding],
   );
 
   // ── Select photo ───────────────────────────────────────────────────────────
