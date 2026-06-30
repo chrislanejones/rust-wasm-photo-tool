@@ -191,6 +191,23 @@ declare module "stamp_tool" {
      * 0 = nearest, 1 = bilinear, 2 = catmull-rom, 3 = lanczos3.
      */
     resize_with_filter(new_w: number, new_h: number, filter: number): void;
+    /**
+     * Photoshop-style **Canvas Size** — change the document to new_w × new_h
+     * WITHOUT resampling any layer (re-blits each layer's native pixels at the
+     * anchor; crops where smaller, transparent pad where larger). `anchor` is a
+     * 0..=8 nine-grid (4 = centre, the UI default). The bottom Background layer
+     * of a multi-layer doc is refilled with bg_* (bg_a = 0 ⇒ transparent ⇒
+     * checkerboard). Pushes one "Canvas Size" history step.
+     */
+    resize_canvas(
+      new_w: number,
+      new_h: number,
+      anchor: number,
+      bg_r: number,
+      bg_g: number,
+      bg_b: number,
+      bg_a: number,
+    ): void;
     /** History marker for a quality/format-only re-encode (pixels unchanged). */
     push_compress_marker(): void;
     adjust_brightness(delta: number): void;

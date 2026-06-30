@@ -38,7 +38,7 @@ import { CelebrationDialog } from "@/components/CelebrationDialog";
 import { ADMIN_EMAIL } from "@/lib/superuser";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
-import { usePreferences } from "@/lib/preferences";
+import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
 import { useTheme, useReduceMotion } from "@/lib/useTheme";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
@@ -85,6 +85,7 @@ import { getWorkingCopy, putWorkingCopy, clearWorkingCopyCache } from "@/lib/wor
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useGuidesStore } from "@/stores/useGuidesStore";
 import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
 import { logDiagnostic, installConsoleCapture } from "@/lib/diagnosticsLog";
 import {
@@ -347,6 +348,14 @@ export function AppShell() {
     stamp.setMaxHistory(prefs.maxHistory);
   }, [prefs.maxHistory, stamp.state.ready, activePhotoId, stamp.setMaxHistory]);
 
+  // Reset draggable image guides when the active photo changes. Guides are
+  // positioned in the current canvas's image space, so they don't carry over to
+  // a different photo. (v1 — per-photo guide persistence is a follow-up; see the
+  // TODO in stores/useGuidesStore.ts.)
+  useEffect(() => {
+    useGuidesStore.getState().clearGuides();
+  }, [activePhotoId]);
+
   // Idle screen — dims to "Continue with Image Horse" after the configured
   // timeout (0 = never) and lets the browser throttle the tab.
   const { idle, wake } = useIdleTimeout(prefs.idleTimeoutMin);
@@ -412,6 +421,7 @@ export function AppShell() {
    *  new working image, and mark the photo modified so it persists. */
   const handleAIResult = useCallback(
     (r: { pixels: Uint8ClampedArray; width: number; height: number }) => {
+      borderAppliedRef.current = null; // AI result replaces the doc — no artboard baseline
       loadImageFromPixels(r.pixels, r.width, r.height);
       setHasBeenModified(true);
     },
@@ -429,6 +439,12 @@ export function AppShell() {
   // repeated PgUp/PgDn advance correctly rather than recomputing "next" from a
   // stale id. Kept in sync at every place activePhotoId is set.
   const activeIdRef = useRef<string | null>(null);
+  // Last artboard border params actually baked into the CURRENT document, so the
+  // "Canvas border" / "Backing color" prefs can be re-applied live (delta from
+  // here) without re-importing. `null` ⇒ unknown baseline (e.g. a gallery-loaded
+  // or AI-result doc) → the live-border effect no-ops. Set on fresh artboard
+  // import; cleared on every other load path.
+  const borderAppliedRef = useRef<{ pad: number; bg: string } | null>(null);
 
   const loadPhotoFromEntry = useCallback(
     async (entry: PhotoEntry, isCurrent?: () => boolean) => {
@@ -446,6 +462,8 @@ export function AppShell() {
         putWorkingCopy(entry.originalKey, working);
       }
       if (isCurrent && !isCurrent()) return;
+      // Gallery-loaded docs aren't a fresh artboard — unknown border baseline.
+      borderAppliedRef.current = null;
       loadImageFromPixels(working.pixels, working.width, working.height);
     },
     [loadImageFromPixels],
@@ -567,7 +585,9 @@ export function AppShell() {
           if (!firstLoaded) {
             firstLoaded = true;
             // Fresh import only: honor the "Canvas on import" setting and land
-            // the photo on a two-layer padded artboard (white backing canvas).
+            // the photo on a two-layer padded artboard. The backing color comes
+            // from the "Backing canvas" pref (transparent ⇒ a:0 ⇒ checkerboard);
+            // the actual fill happens in Rust (`load_image_artboard`).
             // Photo-switch / restore / AI-result paths deliberately skip this so
             // an already-loaded photo isn't re-padded.
             loadImageFromPixels(
@@ -575,9 +595,15 @@ export function AppShell() {
               working.width,
               working.height,
               prefs.canvasArtboard
-                ? { pad: prefs.canvasPadding, r: 255, g: 255, b: 255, a: 255 }
+                ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
                 : undefined,
             );
+            // Record the border baked into this fresh doc so a later border-pref
+            // change re-applies non-destructively (delta from here). Artboard off
+            // ⇒ no backing canvas ⇒ no live border.
+            borderAppliedRef.current = prefs.canvasArtboard
+              ? { pad: prefs.canvasPadding, bg: prefs.canvasBgColor }
+              : null;
             setHasBeenModified(false);
             activeIdRef.current = entry.id;
             setActivePhotoId(entry.id);
@@ -593,7 +619,7 @@ export function AppShell() {
         }
       }
     },
-    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, prefs.canvasArtboard, prefs.canvasPadding],
+    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
   );
 
   // ── Select photo ───────────────────────────────────────────────────────────
@@ -1999,6 +2025,72 @@ export function AppShell() {
    * own. Text annotations stay live overlays (not flattened), like
    * Auto Compress.
    */
+  /**
+   * Re-encode the active photo's CURRENT canvas (composited pixels, live text
+   * left un-flattened) and store the new bytes + thumbnail + dims. Shared by
+   * Apply Compression/Resize and the Canvas-Size paths so a resized document is
+   * persisted exactly like a resample. No-op when there's no active photo/tool.
+   */
+  const persistActiveCanvas = useCallback(async () => {
+    const entry = photos.find((p) => p.id === activePhotoId);
+    const tool = stamp.toolRef.current;
+    if (!entry || !tool) return;
+    try {
+      const pixels = new Uint8Array(tool.get_image_data());
+      const tw = tool.width();
+      const th = tool.height();
+      const blob = await encodeRgba(pixels, tw, th, exportFormat, quality / 100);
+      // convertToBlob may fall back (e.g. AVIF → PNG on some browsers); trust
+      // the blob's actual MIME for the stored metadata.
+      const mime = blob.type || `image/${exportFormat}`;
+      const newFile = new File([blob], `${entry.name}${extFromMime(mime)}`, {
+        type: mime,
+      });
+
+      const mod = await import("stamp_tool");
+      await mod.default();
+      const oldKey = entry.originalKey;
+      const [newKey, newThumb] = await Promise.all([
+        putOriginal(newFile, tw, th),
+        makeThumbnailFromPixels(pixels, tw, th, mod.resize_pixels),
+      ]);
+      if (oldKey && oldKey !== newKey && oldKey !== entry.uploadKey) {
+        deleteOriginal(oldKey).catch(() => {});
+      }
+
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.id !== entry.id
+            ? p
+            : {
+                ...p,
+                originalKey: newKey,
+                byteSize: blob.size,
+                mimeType: mime,
+                origWidth: tw,
+                origHeight: th,
+                workingWidth: tw,
+                workingHeight: th,
+                thumbBlob: newThumb,
+              },
+        ),
+      );
+
+      // Real savings vs. the immutable upload-size baseline.
+      const realSavings =
+        entry.originalByteSize > 0
+          ? Math.max(0, Math.round((1 - blob.size / entry.originalByteSize) * 100))
+          : 0;
+      setImageSavings((prev) => ({
+        ...prev,
+        [entry.id]: { savingsPercent: realSavings },
+      }));
+    } catch (err) {
+      console.error("Persist canvas failed:", err);
+      toast.error("Couldn't save canvas changes");
+    }
+  }, [photos, activePhotoId, stamp, exportFormat, quality]);
+
   const handleApplyCompression = useCallback(
     async (w: number, h: number, filter: number) => {
       const origW = stamp.state.width;
@@ -2035,71 +2127,71 @@ export function AppShell() {
       }
 
       // ── Re-encode + persist (Auto Compress pattern) ──────────────────────
-      const entry = photos.find((p) => p.id === activePhotoId);
-      const tool = stamp.toolRef.current;
-      if (!entry || !tool) return;
-      try {
-        // Fresh copy of the (possibly just-resized) canvas buffer — live text
-        // annotations are intentionally NOT flattened.
-        const pixels = new Uint8Array(tool.get_image_data());
-        const tw = tool.width();
-        const th = tool.height();
-        const blob = await encodeRgba(pixels, tw, th, exportFormat, quality / 100);
-        // convertToBlob may fall back (e.g. AVIF → PNG on some browsers);
-        // trust the blob's actual MIME for the stored metadata.
-        const mime = blob.type || `image/${exportFormat}`;
-        const newFile = new File([blob], `${entry.name}${extFromMime(mime)}`, {
-          type: mime,
-        });
-
-        const mod = await import("stamp_tool");
-        await mod.default();
-        const oldKey = entry.originalKey;
-        const [newKey, newThumb] = await Promise.all([
-          putOriginal(newFile, tw, th),
-          makeThumbnailFromPixels(pixels, tw, th, mod.resize_pixels),
-        ]);
-        if (oldKey && oldKey !== newKey && oldKey !== entry.uploadKey) {
-          deleteOriginal(oldKey).catch(() => {});
-        }
-
-        setPhotos((prev) =>
-          prev.map((p) =>
-            p.id !== entry.id
-              ? p
-              : {
-                  ...p,
-                  originalKey: newKey,
-                  byteSize: blob.size,
-                  mimeType: mime,
-                  origWidth: tw,
-                  origHeight: th,
-                  workingWidth: tw,
-                  workingHeight: th,
-                  thumbBlob: newThumb,
-                },
-          ),
-        );
-
-        // Real savings vs. the immutable upload-size baseline.
-        const realSavings =
-          entry.originalByteSize > 0
-            ? Math.max(
-                0,
-                Math.round((1 - blob.size / entry.originalByteSize) * 100),
-              )
-            : 0;
-        setImageSavings((prev) => ({
-          ...prev,
-          [entry.id]: { savingsPercent: realSavings },
-        }));
-      } catch (err) {
-        console.error("Apply Compression & Resize failed:", err);
-        toast.error("Couldn't apply compression");
-      }
+      await persistActiveCanvas();
     },
-    [stamp, activePhotoId, photos, quality, exportFormat],
+    [stamp, activePhotoId, quality, persistActiveCanvas],
   );
+
+  /**
+   * Photoshop-style **Canvas Size** apply (the "Resize canvas" control in Layer
+   * Settings). Resizes the backing document WITHOUT resampling the photo — the
+   * layer content keeps its native resolution, centred, the new area filled with
+   * the user's chosen backing color (transparent ⇒ checkerboard). Undoable
+   * (resize_canvas pushes history) and persisted like any other canvas edit.
+   */
+  const handleResizeCanvas = useCallback(
+    async (w: number, h: number) => {
+      if (w < 1 || h < 1) return;
+      const bg = canvasBgToRgba(prefs.canvasBgColor);
+      stamp.resizeCanvas(w, h, 4 /* centre */, bg.r, bg.g, bg.b, bg.a);
+      setHasBeenModified(true);
+      if (activePhotoId) {
+        setModifiedPhotos((prev) =>
+          prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
+        );
+      }
+      await persistActiveCanvas();
+    },
+    [stamp, prefs.canvasBgColor, activePhotoId, persistActiveCanvas],
+  );
+
+  // ── Live "Canvas border" / "Backing color" re-apply ────────────────────────
+  // Changing the border (canvasPadding) or backing color (canvasBgColor) in
+  // Settings → "Layers and Canvas" while an artboard photo is loaded re-applies
+  // it to the CURRENT document NON-destructively via resize_canvas — no resample,
+  // edits/history preserved. The new doc grows/shrinks by 2× the padding delta
+  // (photo stays centred); the freshly exposed area is filled with the backing
+  // color. `borderAppliedRef` is the last border baked in (set on fresh artboard
+  // import, cleared on other loads), so a fresh import doesn't double-apply and a
+  // gallery/AI-loaded doc (unknown baseline) no-ops. Photo-only docs (artboard
+  // off) have no backing canvas → no-op.
+  useEffect(() => {
+    if (!prefs.canvasArtboard || !hasImage) return;
+    const applied = borderAppliedRef.current;
+    if (!applied) return;
+    if (applied.pad === prefs.canvasPadding && applied.bg === prefs.canvasBgColor) {
+      return; // nothing changed since the last bake
+    }
+    const delta = prefs.canvasPadding - applied.pad;
+    const newW = stamp.state.width + 2 * delta;
+    const newH = stamp.state.height + 2 * delta;
+    if (newW < 1 || newH < 1) return;
+    const bg = canvasBgToRgba(prefs.canvasBgColor);
+    // Same-size (backing-color-only) calls still refill the backing layer.
+    stamp.resizeCanvas(newW, newH, 4 /* centre */, bg.r, bg.g, bg.b, bg.a);
+    borderAppliedRef.current = { pad: prefs.canvasPadding, bg: prefs.canvasBgColor };
+    setHasBeenModified(true);
+    if (activePhotoId) {
+      setModifiedPhotos((prev) =>
+        prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
+      );
+    }
+    void persistActiveCanvas();
+    // Keyed only on the border prefs: resize_canvas → syncState changes
+    // stamp.state, but re-running on that would loop. Reading the current size
+    // inside is intentional and correct (effect fires after the pref change).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefs.canvasPadding, prefs.canvasBgColor]);
 
   const handleAutoCompress = useCallback(
     async (scope: "selected" | "all" = "all") => {
@@ -2772,7 +2864,13 @@ export function AppShell() {
               onNew={() => setShowUpload(true)}
               newActive={showUpload}
               settingsSlot={
-                <SubscriptionButton general={general} superUser={superUser} />
+                <SubscriptionButton
+                  general={general}
+                  superUser={superUser}
+                  canvasWidth={stamp.state.width}
+                  canvasHeight={stamp.state.height}
+                  onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
+                />
               }
               userSlot={<UserMenu />}
             />
@@ -2803,6 +2901,9 @@ export function AppShell() {
             reduceMotion={prefs.reduceMotion}
             general={general}
             superUser={superUser}
+            canvasWidth={stamp.state.width}
+            canvasHeight={stamp.state.height}
+            onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
           />
         )}
       </AnimatePresence>
@@ -2864,7 +2965,6 @@ export function AppShell() {
             }}
             moveActive={moveActive}
             onToggleMove={handleToggleMove}
-            onResizeCanvas={(w, h) => void handleApplyCompression(w, h, 3)}
             eraser={{
               active: cropEraserActive,
               onToggle: () => setCropEraserActive((v) => !v),

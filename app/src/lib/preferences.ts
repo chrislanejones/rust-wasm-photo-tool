@@ -54,6 +54,10 @@ export interface Preferences {
   /** Border (in image px) added on every side when `canvasArtboard` is on, i.e.
    *  the document is `photo + 2 × canvasPadding`. */
   canvasPadding: number;
+  /** Backing-canvas fill color for the artboard's Background layer. The sentinel
+   *  "transparent" ⇒ a fully-transparent fill (the checkerboard shows through);
+   *  any #rrggbb hex ⇒ that opaque color. Only used when `canvasArtboard` is on. */
+  canvasBgColor: string;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -73,10 +77,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // Privacy-by-default: strip EXIF (GPS, capture time, lens, device serial) on
   // export unless the user explicitly opts in via Settings → Security.
   exifKeep: false,
-  // Opt-in: keep the classic single-layer full-bleed load by default; users who
-  // want the Photoshop-style canvas + photo split enable it in Settings.
-  canvasArtboard: false,
+  // Default to the Photoshop-style "Canvas + photo" two-layer load (Background +
+  // Photo); users who want the classic single full-bleed layer switch it off in
+  // Settings → Layers and Canvas.
+  canvasArtboard: true,
   canvasPadding: 10,
+  // Backing canvas defaults to transparent ⇒ the checkerboard shows through.
+  canvasBgColor: "transparent",
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];
@@ -142,6 +149,40 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
         ? p.canvasArtboard
         : DEFAULT_PREFERENCES.canvasArtboard,
     canvasPadding: clampInt(p?.canvasPadding, 0, 200, DEFAULT_PREFERENCES.canvasPadding),
+    canvasBgColor:
+      p?.canvasBgColor === "transparent"
+        ? "transparent"
+        : safeHex(p?.canvasBgColor, DEFAULT_PREFERENCES.canvasBgColor),
+  };
+}
+
+/** Map the backing-canvas color pref to the rgba the Rust artboard fill expects.
+ *  The sentinel "transparent" ⇒ a:0 (checkerboard shows through); a #rrggbb hex
+ *  ⇒ that opaque color. The actual fill happens in Rust (`load_image_artboard`);
+ *  this only maps the chosen swatch to rgba. */
+export function canvasBgToRgba(c: string): {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+} {
+  if (c === "transparent") return { r: 0, g: 0, b: 0, a: 0 };
+  const hex = c.replace(/^#/, "");
+  const full =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((ch) => ch + ch)
+          .join("")
+      : hex;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return {
+    r: Number.isFinite(r) ? r : 255,
+    g: Number.isFinite(g) ? g : 255,
+    b: Number.isFinite(b) ? b : 255,
+    a: 255,
   };
 }
 
@@ -164,6 +205,7 @@ export function serializePreferences(p: Preferences): string {
     exifKeep: p.exifKeep,
     canvasArtboard: p.canvasArtboard,
     canvasPadding: p.canvasPadding,
+    canvasBgColor: p.canvasBgColor,
   });
 }
 

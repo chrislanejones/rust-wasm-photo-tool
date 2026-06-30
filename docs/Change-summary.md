@@ -511,7 +511,6 @@ tests), `tsc --noEmit`, and `vite build` (all green).
 | 2   | **Logo/title hidden in blank mode** — `NewActions` gained an `onBlankModeChange` prop (fired from a `useEffect` on `blankMode`); `UploadDialog` drops its logo + "Image Horse" header while the Blank Canvas panel is open, restoring it on close/reopen. Sign-in + close (X/Escape) unaffected | Complete |
 | 3   | **Two-layer "artboard" on import** — new Rust `ImageHorseTool::load_image_artboard(pixels, img_w, img_h, pad, bg_rgba)`: grows the document to `photo + 2·pad`, builds a solid **Background** layer + a transparent **Photo** layer with the image pasted centred at `(pad, pad)`, photo layer active. Mirrors `load_image` otherwise (clears history/overlays). Two unit tests (opaque + transparent canvas) | Complete |
 | 4   | **Canvas-on-import preference** — `canvasArtboard` (bool) + `canvasPadding` (px, 0–200, default 10) added to `Preferences` (interface, defaults, `normalize`, `serialize`). Settings → General → *Canvas on import* toggle (Canvas+photo / Photo-only) + a conditional border slider. Default **off** = classic single full-bleed `load_image`. Wired through `useCloneStamp.loadImageFromPixels`'s new optional `artboard` arg; AppShell passes it **only** on fresh import (`handleAddPhotos`), not on photo-switch / restore / AI-result, so an already-loaded photo isn't re-padded | Complete |
-| 5   | **Lacey QC subagent** — `.claude/agents/lacey.md` (`lacey`): a QC & approval gate that verifies OK/Apply/Create/Save buttons are wired to real handlers, enabled/disabled correctly, and commit/close as expected; gives a pass/fail verdict and may apply small wiring fixes. Added to the agents roster | Complete |
 
 > **Known follow-ups (artboard).** The two-layer artboard applies on **fresh import
 > only** ("at least initially"): switching away and back reloads the cached working
@@ -519,3 +518,25 @@ tests), `tsc --noEmit`, and `vite build` (all green).
 > split isn't yet persisted. The backing canvas is opaque white; export includes the
 > border. These are acceptable for the opt-in v1 and tracked for a follow-up alongside
 > multi-layer persistence.
+
+## v6.0 Change Summary — 2026-06-30
+
+Image guides, a real canvas-size operation, and a UI-polish pass (skeletons + spinner).
+Verified by `cargo test` (30 lib tests incl. two new `resize_canvas` tests), `tsc --noEmit`,
+and `vite build` (all green). Pixel work stays in Rust (`resize_canvas`); guides are a
+non-destructive client-side overlay.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Image guides** — new `useGuidesStore` (Zustand) + `ImageGuidesOverlay`: draggable horizontal/vertical guide lines projected image→screen the same way the grid/ruler overlay is, so they track zoom + pan. Layer Settings gained an "Guides" section — **Add horizontal / Add vertical / Remove lines / Lock** + a selectable list with per-row delete and a panel-scoped Delete/Backspace shortcut (ignored while typing). Guides render with or without rulers. Locked guides select but don't drag | Complete |
+| 2   | **Even guide distribution** — `addGuide` appends one guide then redistributes all same-axis guides to equal gaps (`k/(n+1)·size`, k=1..n; size = imgH for horizontal, imgW for vertical) — a CSS-`space-between` feel. Redistributes only on add; removes/drags leave the rest in place | Complete |
+| 3   | **Canvas-size resizer fixed + relocated** — new Rust `ImageHorseTool::resize_canvas(new_w, new_h, anchor, bg_rgba)` changes the document **without resampling** (re-blits each layer at a nine-grid anchor, rebuilds the Background fill, crops/pads, shifts masks + annotations; pushes one "Canvas Size" history entry). Two unit tests prove a stamped pixel survives a grow exactly + the shrink/crop case. `onResizeCanvas` was rewired off the resampler (`handleApplyCompression`) onto this. The Canvas Size control **moved from Layer Settings into Settings → Layers and Canvas** | Complete |
+| 4   | **Live Canvas border / backing color** — Settings → Layers and Canvas: **Canvas + photo** is now the import default (10px border); a **backing-canvas color palette** (`canvasBgColor`, default `"transparent"` ⇒ checkerboard via `bg_a=0`) drives the Rust Background fill. Changing the border or backing color re-applies live to a freshly-imported artboard doc via `resize_canvas` (non-destructive). Gallery/AI-reloaded docs no-op (baseline unknown) — a tracked follow-up | Complete |
+| 5   | **Skeleton loading SSOT** — new `Skeleton` / `SkeletonText` / `SkeletonCircle` primitive (token-driven shimmer, `prefers-reduced-motion` fallback, `SKELETON_BASE` in `lib/styles.ts`, `.skeleton` machinery in `styles.css`); migrated gallery thumbnails, share viewer, and Plan & Billing off ad-hoc loaders. Documented as Refactor-Playbook §5a | Complete |
+| 6   | **Spinner refresh** — single `Spinner` primitive (Lucide `Loader` + `.spinner-comet` conic-mask leading edge, reduced-motion aware, standardized spinner↔label gap) replacing 8 scattered `Loader2` sites. The transparent backing-palette swatch now renders the real `.checkerboard-canvas` pattern | Complete |
+
+> **Known follow-ups.** Guides are session-only (reset on photo switch — per-document
+> persistence is a follow-up). The live canvas-border re-apply is limited to freshly
+> imported artboard docs; on gallery/AI-reloaded docs the border slider no-ops rather
+> than risk a stale-delta resize. An artboard-on but single-layer doc has no solid
+> backing layer to repaint on a backing-color change.

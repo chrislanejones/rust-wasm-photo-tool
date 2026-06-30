@@ -1252,6 +1252,150 @@ impl ImageHorseTool {
         self.stamp.source_y = None;
     }
 
+    /// Photoshop-style **Canvas Size**: change the document to `new_w × new_h`
+    /// WITHOUT resampling any layer's pixels. Each layer's existing buffer is
+    /// re-blitted onto a fresh `new_w × new_h` buffer at the anchor offset, so
+    /// content keeps its native resolution — it is cropped where the new canvas
+    /// is smaller and surrounded by empty (transparent) space where it is
+    /// larger. This is the backing-canvas resize the "Canvas Size" control
+    /// wants, as opposed to `resize_with_filter` which resamples every layer.
+    ///
+    /// `anchor` is a 0..=8 Photoshop nine-grid position
+    /// (`0` TL, `1` TC, `2` TR, `3` ML, `4` MC, `5` MR, `6` BL, `7` BC, `8` BR);
+    /// `4` (centre) is the default the UI uses. The offset is the position of
+    /// the old top-left within the new canvas: each axis is flush at the start
+    /// (`col/row 0`), centred (`1`), or flush at the end (`2`).
+    ///
+    /// The bottom **Background** layer of a multi-layer document (the solid
+    /// backing canvas built by `load_image_artboard`) is rebuilt to the full
+    /// new size filled with `bg_*` (`bg_a = 0` ⇒ transparent ⇒ checkerboard,
+    /// matching that function's convention). A single-layer photo-only document
+    /// keeps its one layer anchored on a transparent canvas — its pixels are
+    /// preserved byte-for-byte, never resampled. Per-layer masks and live
+    /// text/shape annotations travel with their layer by the same anchor
+    /// offset. Pushes one undoable "Canvas Size" snapshot.
+    pub fn resize_canvas(
+        &mut self,
+        new_w: u32,
+        new_h: u32,
+        anchor: u8,
+        bg_r: u8,
+        bg_g: u8,
+        bg_b: u8,
+        bg_a: u8,
+    ) {
+        // Zero dimensions are invalid. A same-size call is intentionally NOT
+        // short-circuited: it re-fills the backing layer (so a backing-colour
+        // change with an unchanged border still repaints) while preserving the
+        // content layers byte-for-byte at offset 0.
+        if new_w == 0 || new_h == 0 {
+            return;
+        }
+        self.snap("Canvas Size");
+        let (ow, oh) = (self.width as i32, self.height as i32);
+        let (nw, nh) = (new_w as i32, new_h as i32);
+
+        // Anchor → where the old top-left lands in the new canvas. `col`/`row`
+        // pick 0 = flush start, 1 = centred, 2 = flush end on each axis.
+        let col = (anchor % 3) as i32;
+        let row = (anchor / 3) as i32;
+        let off_x = match col {
+            0 => 0,
+            1 => (nw - ow) / 2,
+            _ => nw - ow,
+        };
+        let off_y = match row {
+            0 => 0,
+            1 => (nh - oh) / 2,
+            _ => nh - oh,
+        };
+
+        // Only treat the bottom layer as a solid backing canvas to refill when
+        // there's a distinct layer above it (the artboard case). A single-layer
+        // photo-only doc — even though its layer is also named "Background" —
+        // holds real content and must be anchored, not overwritten.
+        let multi = self.layers.len() > 1;
+        for (idx, layer) in self.layers.iter_mut().enumerate() {
+            let is_backing = multi && idx == 0 && layer.name == "Background";
+            let mut nbuf = vec![0u8; (new_w as usize) * (new_h as usize) * 4];
+            if is_backing {
+                // Solid backing canvas: refill the whole new document (skip the
+                // write when transparent — the buffer is already zero-filled).
+                if bg_a != 0 {
+                    for px in nbuf.chunks_exact_mut(4) {
+                        px[0] = bg_r;
+                        px[1] = bg_g;
+                        px[2] = bg_b;
+                        px[3] = bg_a;
+                    }
+                }
+            } else {
+                // Re-blit native pixels at the anchor (cropped where smaller,
+                // transparent padding where larger). Pasting onto a zeroed
+                // buffer preserves every source pixel exactly — no resample.
+                transform::paste_region(
+                    &mut nbuf,
+                    nw,
+                    nh,
+                    &layer.buf.data,
+                    layer.buf.width,
+                    layer.buf.height,
+                    off_x,
+                    off_y,
+                );
+                // Live overlays travel with the layer content.
+                for a in &mut layer.text_annotations {
+                    a.x += off_x;
+                    a.y += off_y;
+                }
+                for s in &mut layer.shape_annotations {
+                    s.x0 += off_x as f64;
+                    s.y0 += off_y as f64;
+                    s.x1 += off_x as f64;
+                    s.y1 += off_y as f64;
+                    for p in &mut s.points {
+                        p.0 += off_x as f64;
+                        p.1 += off_y as f64;
+                    }
+                }
+            }
+            layer.buf.data = nbuf;
+            layer.buf.width = new_w;
+            layer.buf.height = new_h;
+
+            // A mask is one grayscale byte per pixel sized to the canvas; re-blit
+            // it at the same anchor (revealed in any freshly exposed area) so it
+            // stays aligned with the layer it scales.
+            if let Some(old_mask) = layer.mask.take() {
+                if old_mask.len() == (ow as usize) * (oh as usize) {
+                    let mut nmask = vec![255u8; (new_w as usize) * (new_h as usize)];
+                    for sy in 0..oh {
+                        let ty = sy + off_y;
+                        if ty < 0 || ty >= nh {
+                            continue;
+                        }
+                        for sx in 0..ow {
+                            let tx = sx + off_x;
+                            if tx < 0 || tx >= nw {
+                                continue;
+                            }
+                            nmask[(ty * nw + tx) as usize] = old_mask[(sy * ow + sx) as usize];
+                        }
+                    }
+                    layer.mask = Some(nmask);
+                }
+            }
+        }
+
+        self.width = new_w;
+        self.height = new_h;
+        self.stamp.source_x = None;
+        self.stamp.source_y = None;
+        self.editing_shape_id = None;
+        self.editing_text_id = None;
+        self.recomposite();
+    }
+
     /// Record a "Compress" entry in the history without changing pixels.
     /// Used when Apply Compression & Resize re-encodes at a new quality or
     /// format but the dimensions are unchanged — the stored file changed, so
@@ -1855,6 +1999,46 @@ mod layer_tests {
         assert_eq!(t.active, 1, "photo layer is active");
         assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "corner = canvas");
         assert_eq!(px(&t, 4, 4), [255, 0, 0, 255], "centre = photo");
+    }
+
+    #[test]
+    fn resize_canvas_grows_without_resampling() {
+        // 4×4 red photo on a 2px white artboard → 8×8 doc, two layers. Mark a
+        // single distinctive pixel on the Photo layer, then grow the canvas to
+        // 16×16 centred (no resample). The doc grows, the marked pixel survives
+        // byte-for-byte at its shifted location (a resample would blend it with
+        // its red neighbours), and the freshly exposed border is the bg fill.
+        let mut t = ImageHorseTool::new(8, 8);
+        t.load_image_artboard(&solid(4, 4, [255, 0, 0, 255]), 4, 4, 2, 255, 255, 255, 255);
+        // Photo layer (index 1) doc-coord (2,2) = photo top-left → unique colour.
+        let i = ((2 * 8 + 2) * 4) as usize;
+        t.layers[1].buf.data[i..i + 4].copy_from_slice(&[1, 2, 3, 255]);
+
+        t.resize_canvas(16, 16, 4, 255, 255, 255, 255);
+
+        assert_eq!((t.width, t.height), (16, 16), "doc grew");
+        assert_eq!(t.layer_count(), 2, "layer count unchanged");
+        // Centre offset = (16-8)/2 = 4, so doc(2,2) → doc(6,6).
+        assert_eq!(
+            px(&t, 6, 6),
+            [1, 2, 3, 255],
+            "photo pixel preserved exactly (not resampled)"
+        );
+        // Photo centre red(4,4) → doc(8,8) still pure red.
+        assert_eq!(px(&t, 8, 8), [255, 0, 0, 255], "photo centre preserved");
+        // Freshly exposed corner is the white backing fill.
+        assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "new border = bg fill");
+    }
+
+    #[test]
+    fn resize_canvas_shrinks_and_crops() {
+        // Shrink an 8×8 artboard to 4×4 centred: offset = (4-8)/2 = -2, so the
+        // photo region (2..6) lands at (0..4) and fills the whole smaller doc.
+        let mut t = ImageHorseTool::new(8, 8);
+        t.load_image_artboard(&solid(4, 4, [0, 128, 0, 255]), 4, 4, 2, 0, 0, 0, 0);
+        t.resize_canvas(4, 4, 4, 0, 0, 0, 0);
+        assert_eq!((t.width, t.height), (4, 4), "doc shrank");
+        assert_eq!(px(&t, 0, 0), [0, 128, 0, 255], "photo cropped to fill doc");
     }
 
     #[test]

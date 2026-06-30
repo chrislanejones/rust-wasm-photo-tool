@@ -8,15 +8,19 @@ interface Props {
   width: number;
   height: number;
   disabled?: boolean;
-  /** Apply the resize — the actual resample runs in Rust (resize_with_filter). */
+  /** Apply the canvas-size change — runs in Rust (`resize_canvas`), which
+   *  re-lays the photo at its native resolution (NO resample). */
   onApply: (w: number, h: number) => void;
 }
 
 /**
- * Canvas resizer for Layer Settings — reuses the Resize tool's shared
+ * Canvas-size control for Layer Settings — reuses the Resize tool's shared
  * {@link DimensionFields} (Scale %, W×H, aspect lock) so it matches that panel
- * exactly, plus an Apply button. The resample itself runs in Rust
- * (`resizeWithFilter`); this only collects the target dimensions.
+ * exactly, plus an Apply button. This is a Photoshop-style **Canvas Size**
+ * change (the backing document grows/shrinks, the photo stays at its native
+ * resolution, centred, and the new area fills with the backing color) — it does
+ * NOT resample the image. The work runs in Rust (`resize_canvas`); this only
+ * collects the target dimensions.
  */
 export function CanvasResize({ width, height, disabled, onApply }: Props) {
   const [w, setW] = useState(String(width));
@@ -74,6 +78,10 @@ export function CanvasResize({ width, height, disabled, onApply }: Props) {
       <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
         Canvas Size
       </span>
+      <p className="text-[11px] leading-snug text-theme-muted-foreground">
+        Resizes the backing canvas, not the photo — content keeps its native
+        resolution, centred; new area uses the backing color.
+      </p>
 
       <DimensionFields
         width={w}

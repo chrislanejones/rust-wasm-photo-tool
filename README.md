@@ -50,15 +50,17 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v5.9 — 2026-06-29
+### v6.0 — 2026-06-30
 
 | # | Change | Status |
 | --- | --- | --- |
-| 1 | **New-Document presets by use-case** — the Blank Canvas panel now has **Social / Web / Video / Paper** tabs, each offering ready sizes (Instagram, LinkedIn, Facebook, YouTube thumbnail/banner, FHD/4K, A4/Letter, 4×6…). Pick a tab, pick a size, create. The logo/title is hidden while the panel is open for an uncluttered "New Document" view | Complete |
-| 2 | **Canvas-on-import setting** — Settings → General → *Canvas on import* lets a freshly-opened photo land Photoshop-style on a slightly larger backing canvas as **two layers** (a Background canvas + the Photo on top), with a configurable border. Defaults to the classic single full-bleed layer (off). Backed by a new Rust `load_image_artboard` | Complete |
-| 3 | **Lacey QC agent** — a committed `lacey` subagent that gates UI work by verifying every OK / Apply / Create / Save button is wired to a real handler and commits/closes as expected | Complete |
+| 1 | **Image guides** — Photoshop-style draggable guide lines (with or without rulers). In Layer Settings: add horizontal / vertical guides, lock to prevent moving, and a list to select + delete individual guides. New guides auto-distribute to even spacing across the canvas | Complete |
+| 2 | **Layers and Canvas settings** — a new Settings section; **Canvas + photo** is now the default import (10px border), with a **backing-canvas color palette** (transparent → checkerboard by default). The Canvas Size resizer moved here from Layer Settings | Complete |
+| 3 | **Canvas resize fixed** — "Resize canvas" now resizes the backing canvas without resampling the photo (new Rust `resize_canvas`); changing the canvas border re-applies live to a loaded photo | Complete |
+| 4 | **Skeleton loading states** — a shared `Skeleton` primitive replaces ad-hoc spinners for content placeholders (gallery, share view, billing) | Complete |
+| 5 | **Refreshed spinner** — a single `Spinner` primitive (tinted comet leading edge, consistent label spacing, reduced-motion aware) replaces the scattered loaders | Complete |
 
-> **About this release — starting a canvas.** Two improvements to how an image session begins. The **Blank Canvas** panel is now organized by what you're making: a **Social / Web / Video / Paper** toggle swaps the offered sizes so a LinkedIn post, a YouTube thumbnail, or an A4 page is one click away — and the dialog drops its logo/title in that mode to give the setup the full panel. Separately, an opt-in **Canvas on import** preference loads a new photo onto a slightly larger backing canvas split into a *Background* and a *Photo* layer (Photoshop-style), so there's room to work around the image from the start; it's off by default, keeping the classic exact-size single-layer load. The two-layer artboard is rendered entirely in Rust (`load_image_artboard`) — the photo is pasted onto a transparent full-document layer over a solid canvas layer, with the photo layer active so the first edit targets the image.
+> **About this release — guides, and a proper canvas.** This release makes the canvas behave the way you'd expect from a desktop editor. **Image guides** are now draggable cyan lines you place from Layer Settings — add horizontal or vertical guides, lock them so they don't move, select and delete them individually, and let new ones snap to even spacing automatically; they work whether or not the rulers are showing. **Canvas Size** moved into a dedicated **Layers and Canvas** settings section and now actually resizes the backing canvas *behind* the photo (in Rust, without resampling the image), and the canvas border re-applies live. Canvas + photo is the default way photos open now, with a backing-color palette that defaults to the familiar transparent checkerboard. Under the hood, loading states are cleaner — a shared **Skeleton** for content placeholders and a refreshed **Spinner** with a tinted leading edge.
 
 ## License
 

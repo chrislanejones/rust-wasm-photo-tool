@@ -27,6 +27,17 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.42",
+    date: "2026-06-30",
+    headline: "Guides, and a canvas that resizes",
+    entries: [
+      { tag: "feature", text: "Image guides, like a desktop editor. From Layer Settings you can drop horizontal and vertical guide lines onto the canvas, drag them anywhere, lock them so they don't move, and select or delete them from a list. Add a few and they space themselves out evenly. They show whether or not the rulers are on." },
+      { tag: "fix", text: "“Resize canvas” now actually resizes the canvas behind your photo instead of scaling the whole image — your photo keeps its native size and the backing canvas grows or crops around it. Changing the canvas border updates a loaded photo live." },
+      { tag: "feature", text: "A new “Layers and Canvas” settings section. Photos now open on a canvas + photo by default with a 10px border, and you can pick the backing color from a palette — defaulting to the familiar transparent checkerboard. Canvas Size lives here now." },
+      { tag: "ui", text: "Cleaner loading states throughout — placeholder “skeletons” while content loads, and a refreshed spinner with a bright leading edge that respects reduced-motion settings." },
+    ],
+  },
+  {
     version: "v0.9.41",
     date: "2026-06-29",
     headline: "Start a canvas your way",

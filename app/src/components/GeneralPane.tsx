@@ -1,4 +1,4 @@
-import { Clock, History, Frame, Image as ImageIcon } from "lucide-react";
+import { Clock, History } from "lucide-react";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import {
@@ -136,51 +136,6 @@ export function GeneralPane({ value, onChange }: GeneralPaneProps) {
             },
           ]}
         />
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">
-            Canvas on import
-          </h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            How a freshly-opened photo lands. “Canvas + photo” places the image
-            on a slightly larger backing canvas as two layers (a Background and
-            the Photo on top), Photoshop-style. “Photo only” keeps the classic
-            single full-bleed layer at the exact photo size. Applies to new
-            imports.
-          </p>
-        </div>
-        <ToggleButtonGroup
-          fill
-          items={[
-            {
-              key: "artboard",
-              icon: Frame,
-              label: "Canvas + photo",
-              active: value.canvasArtboard,
-              onToggle: () => onChange({ canvasArtboard: true }),
-            },
-            {
-              key: "photo",
-              icon: ImageIcon,
-              label: "Photo only",
-              active: !value.canvasArtboard,
-              onToggle: () => onChange({ canvasArtboard: false }),
-            },
-          ]}
-        />
-        {value.canvasArtboard && (
-          <SizeSlider
-            label="Canvas border"
-            value={value.canvasPadding}
-            onChange={(n) => onChange({ canvasPadding: n })}
-            min={0}
-            max={200}
-            step={5}
-            unit=" px"
-          />
-        )}
       </section>
     </div>
   );

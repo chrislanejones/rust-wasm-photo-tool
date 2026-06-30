@@ -7,7 +7,9 @@ import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTool
 import { CompareSlider } from "./CompareSlider";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
+import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
+import { useGuidesStore } from "@/stores/useGuidesStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
 
@@ -661,6 +663,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
     const { width: imgW, height: imgH } = hookResult.state;
 
+    // Draggable image guides (read the store directly — non-destructive overlay,
+    // independent of the rulers/grid pref).
+    const imageGuides = useGuidesStore((s) => s.guides);
+    const guidesLocked = useGuidesStore((s) => s.guidesLocked);
+    const selectedGuideId = useGuidesStore((s) => s.selectedGuideId);
+    const selectGuide = useGuidesStore((s) => s.selectGuide);
+    const moveGuide = useGuidesStore((s) => s.moveGuide);
+
     return (
       <div
         className="canvas-wrapper"
@@ -750,6 +760,30 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   gridOpacity: guides.gridOpacity,
                 }}
                 gridSegments={guides.grid ? gridSegments : EMPTY_SEGMENTS}
+              />
+            );
+          })()}
+
+        {/* ── Draggable image guides overlay (independent of the rulers pref) ── */}
+        {imageGuides.length > 0 &&
+          canvasRef.current &&
+          imgW > 0 &&
+          imgH > 0 &&
+          (() => {
+            const canvas = canvasRef.current!;
+            const r = canvas.getBoundingClientRect();
+            return (
+              <ImageGuidesOverlay
+                rect={r}
+                sx={r.width / canvas.width}
+                sy={r.height / canvas.height}
+                imgW={imgW}
+                imgH={imgH}
+                guides={imageGuides}
+                locked={guidesLocked}
+                selectedId={selectedGuideId}
+                onSelect={selectGuide}
+                onMove={moveGuide}
               />
             );
           })()}

@@ -2,7 +2,8 @@
 // wired to the Replicate + Convex pipeline (useAIJob). Upscale is still a
 // Coming Soon placeholder until the same plumbing is cloned for it.
 import { useState } from "react";
-import { Type, Scissors, Sparkles, Eraser, Lock, Loader2, Copy } from "lucide-react";
+import { Type, Scissors, Sparkles, Eraser, Lock, Copy } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import { useAIJob, type AIResultPixels } from "@/hooks/useAIJob";
@@ -112,7 +113,7 @@ export function AISettings({
           className="mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy && lastType === "rembg" && (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner size={14} />
           )}
           {lastType === "rembg" && phase === "uploading"
             ? "Uploading..."
@@ -147,7 +148,7 @@ export function AISettings({
           className="mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy && lastType === "ocr" && (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner size={14} />
           )}
           {lastType === "ocr" && phase === "uploading"
             ? "Uploading..."
@@ -203,7 +204,7 @@ export function AISettings({
           className="mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy && lastType === "inpaint" && (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner size={14} />
           )}
           {lastType === "inpaint" && phase === "uploading"
             ? "Uploading..."

@@ -382,6 +382,94 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKELETON LOADING (single source of truth — components/ui/skeleton.tsx)
+
+   The `.skeleton` class supplies only the shimmer machinery (a clipped sweep
+   via ::after); the base surface colour comes from the `bg-muted` token in
+   SKELETON_BASE (lib/styles.ts) so it re-themes with the palette. Under
+   reduced-motion the sweep is removed and the placeholder degrades to a static
+   muted block (Refactor-Playbook §3).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 1.6s var(--ease-standard) infinite;
+}
+
+/* Dark surfaces need a softer highlight so the sweep doesn't blow out. */
+.dark .skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 100%
+  );
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Reduced-motion: drop the sweep entirely — the static muted block remains.
+   Covers both the OS media query and the in-app `.reduce-motion` toggle. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    display: none;
+  }
+}
+html.reduce-motion .skeleton::after {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPINNER (single source of truth — components/ui/spinner.tsx)
+
+   The Lucide `Loader` icon, tinted with the accent token, gets a "comet"
+   lead-blade: a conic-gradient `mask-image` fades the ring from a bright
+   leading spoke to a transparent tail, so the spin reads clearly instead of
+   looking flat. Reuses the `spin` keyframes above. Under reduced motion the
+   spin AND the mask are dropped, leaving a static, full-strength icon
+   (Refactor-Playbook §3) — covers both the OS media query and the in-app
+   `.reduce-motion` toggle.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.spinner-comet {
+  animation: spin 0.7s linear infinite;
+  -webkit-mask-image: conic-gradient(from 0deg, transparent, #000);
+  mask-image: conic-gradient(from 0deg, transparent, #000);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner-comet {
+    animation: none;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+html.reduce-motion .spinner-comet {
+  animation: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
 /* Brush cursor */
 .brush-cursor {
   position: fixed;

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { Download, Link2, Pencil, Loader2 } from "lucide-react";
+import { Download, Link2, Pencil } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { api } from "../../../convex/_generated/api";
 import { LargeButton } from "@/components/ui/large-button";
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Toaster, toast } from "@/components/ui/sonner";
 
 const horseLogo = "/Image-Horse-Logo.svg";
@@ -42,9 +44,9 @@ export function ShareViewer({ token }: { token: string }) {
 
       <main className="flex w-full max-w-3xl flex-1 flex-col items-center px-4 pb-10">
         {share === undefined && (
-          <div className="flex flex-1 items-center gap-2 text-text-muted">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading shared image…
+          <div className="flex w-full flex-col items-center gap-4" aria-label="Loading shared image">
+            <Skeleton className="h-[60vh] w-full rounded-xl" />
+            <SkeletonText aria-hidden="true" noOfLines={1} className="max-w-[16rem] items-center" lineClassName="h-3" />
           </div>
         )}
 
@@ -136,7 +138,7 @@ function ShareReady({ share, editorUrl }: { share: ShareData; editorUrl: string 
       <div className="flex w-full max-w-md flex-wrap gap-2">
         <LargeButton className="flex-1" onClick={handleDownload} disabled={downloading}>
           {downloading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner size={16} />
           ) : (
             <Download className="h-4 w-4" />
           )}

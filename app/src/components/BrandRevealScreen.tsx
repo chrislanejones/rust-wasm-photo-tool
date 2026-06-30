@@ -7,7 +7,7 @@
 // Covers everything at z-idle.
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 const horseLogo = "/Image-Horse-Logo.svg";
 
@@ -82,10 +82,11 @@ export function BrandRevealScreen({
                   transition={{ duration: reduceMotion ? 0 : 0.15 }}
                   className="mt-6 flex flex-col items-center gap-3"
                 >
-                  <Loader2
-                    className={`h-6 w-6 text-[var(--accent)] ${reduceMotion ? "" : "animate-spin"}`}
-                    aria-hidden="true"
-                  />
+                  {/* `.spinner-comet` already drops its spin + mask under the
+                      in-app `.reduce-motion` class (set from this same
+                      `reduceMotion` pref) and OS reduced-motion, so the static
+                      fallback is preserved without a prop. */}
+                  <Spinner size={24} />
                   <p className="text-xs text-text-muted" aria-hidden="true">
                     Loading your workspace…
                   </p>

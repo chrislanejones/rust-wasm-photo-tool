@@ -54,6 +54,11 @@ interface TopBarProps {
   general: GeneralControls;
   /** Admin-only: adds the Super User tab to the Settings modal. */
   superUser?: SuperUserControls | null;
+  /** Current canvas dimensions + apply — feed the Settings → Layers and Canvas
+   *  "Canvas size" control (relocated out of Layer Settings). */
+  canvasWidth?: number;
+  canvasHeight?: number;
+  onResizeCanvas?: (w: number, h: number) => void;
 }
 
 export function TopBar({
@@ -77,6 +82,9 @@ export function TopBar({
   reduceMotion,
   general,
   superUser,
+  canvasWidth,
+  canvasHeight,
+  onResizeCanvas,
 }: TopBarProps) {
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
@@ -232,7 +240,13 @@ export function TopBar({
 
             {/* Right cluster: Clerk user menu, anchored right */}
             <div className="flex items-center justify-end gap-1 min-w-0">
-              <SubscriptionButton general={general} superUser={superUser} />
+              <SubscriptionButton
+                general={general}
+                superUser={superUser}
+                canvasWidth={canvasWidth}
+                canvasHeight={canvasHeight}
+                onResizeCanvas={onResizeCanvas}
+              />
               <UserMenu />
             </div>
           </div>

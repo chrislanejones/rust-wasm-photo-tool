@@ -55,8 +55,6 @@ interface ToolsSidebarProps {
   /** Move-layer toggle — Layer Settings tool. */
   moveActive?: boolean;
   onToggleMove?: () => void;
-  /** Canvas resizer (Layer Settings) — applies a Rust resize to W×H. */
-  onResizeCanvas?: (w: number, h: number) => void;
   /** Embedded mode: render the inner content as a plain flex column (no fixed
    *  positioning / panel chrome / slide animation) so it can fill the compact
    *  master bar's content area instead of floating as its own panel. */
@@ -150,7 +148,6 @@ export function ToolsSidebar({
   eraser,
   moveActive,
   onToggleMove,
-  onResizeCanvas,
   embedded = false,
   onExport,
   canExport,
@@ -321,9 +318,8 @@ export function ToolsSidebar({
             moveActive={moveActive ?? false}
             onToggleMove={onToggleMove ?? (() => {})}
             selection={selection}
-            canvasWidth={imageWidth}
-            canvasHeight={imageHeight}
-            onResizeCanvas={onResizeCanvas ?? (() => {})}
+            imgW={imageWidth}
+            imgH={imageHeight}
           />
         )}
 

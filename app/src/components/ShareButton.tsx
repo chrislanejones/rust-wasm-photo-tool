@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Share2, Loader2 } from "lucide-react";
+import { Share2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { ToolButton } from "@/components/ui/tool-button";
 import { toast } from "@/components/ui/sonner";
 import { useShare } from "@/hooks/useShare";
@@ -74,7 +75,7 @@ export function ShareButton({
       disabled={disabled || busy}
       title={canShare ? "Create a public share link" : "Sign in to share"}
     >
-      {busy ? <Loader2 className="animate-spin" /> : <Share2 />}
+      {busy ? <Spinner size={24} /> : <Share2 />}
       <span>{busy ? "Creating…" : "Share link"}</span>
     </ToolButton>
   );

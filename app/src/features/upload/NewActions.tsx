@@ -11,12 +11,12 @@ import {
   FolderOpen,
   Clipboard,
   Images,
-  Loader2,
   SquarePen,
   ChevronLeft,
   Link,
   Github,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { panelSwap } from "@/lib/animations";
 import { LargeButton } from "@/components/ui/large-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
@@ -445,7 +445,7 @@ export function NewActions({
                     className="w-full"
                   >
                     {loadingTest ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Spinner size={16} />
                     ) : (
                       <Images className="h-4 w-4" />
                     )}

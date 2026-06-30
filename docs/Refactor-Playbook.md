@@ -22,6 +22,7 @@ Don't `git push`/merge without asking.
 3. [Layout tokens — z / shadow / radius / motion / heights](#3-layout-tokens--z-index--shadow--radius--motion--heights)
 4. [Typography (+ reusable playbook)](#4-typography)
 5. [React health](#5-react-health)
+   - 5a. [Skeleton / loading-state SSOT](#5a-skeleton--loading-state-ssot-ih)
 6. [Rust / WASM health](#6-rust--wasm-health)
 7. [Responsive snapped side panels](#7-responsive-snapped-side-panels)
 8. [Accessibility](#8-accessibility)
@@ -526,6 +527,94 @@ rg -n 'createObjectURL' app/src -g '*.tsx' -g '*.ts'     # each needs a paired r
 size=$(du -b www-dist/assets/index-*.js 2>/dev/null | sort -rn | head -1 | cut -f1)
 [ "${size:-0}" -gt 2500000 ] && echo "main chunk > 2.5 MB ($size bytes)"
 ```
+
+---
+
+---
+
+# 5a. Skeleton / loading-state SSOT [IH]
+
+Same idea as color/type: **one source of truth for "this content isn't ready yet" UI**, modelled on
+[Chakra UI's Skeleton](https://chakra-ui.com/docs/components/skeleton). No more scattered bespoke
+`Loading…` text nodes, ad-hoc `animate-pulse` placeholder blocks, or the `.canvas-spinner` doing
+double duty as a content placeholder.
+
+**Three coordinated definition sites:**
+
+| Concern                          | Single source                                                          |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| Component primitive + public API | `app/src/components/ui/skeleton.tsx`                                    |
+| Shared base class constant       | `app/src/lib/styles.ts` — `SKELETON_BASE = "skeleton block bg-muted"`  |
+| Shimmer machinery + a11y/motion  | `app/src/styles.css` — `.skeleton` + `@keyframes skeleton-shimmer`     |
+
+`SKELETON_BASE` mirrors the existing `HOVER_RING` SSOT convention in `lib/styles.ts`: the base surface
+colour is the **`bg-muted` semantic token** (§2 — no raw colours), so the placeholder re-themes with
+the palette. The `.skeleton` class layers a clipped shimmer sweep (`::after`) on top and degrades to a
+static muted block under `prefers-reduced-motion` / `html.reduce-motion` (§3). The component is an
+`aria-busy` live region announcing "Loading" to screen readers (§8).
+
+> **Rule:** no raw loading-placeholder UI in app chrome — use `<Skeleton>` / `<SkeletonText>` /
+> `<SkeletonCircle>`. Sizing is className-driven (`h-*` / `w-*` / `size-*`); `variant` only picks the
+> shape. Flip skeleton ⇄ real content from one boolean with `loading={false}` (renders `children`).
+
+## Public API (terse)
+
+- **`<Skeleton>`** — `loading?: boolean` (default `true`; `loading={false}` renders `children`),
+  `variant?: "rectangle" | "circle" | "text"` (default `rectangle`), + all `div` attrs. Renders
+  `role="status" aria-busy aria-live="polite"` with an sr-only "Loading…".
+- **`<SkeletonText>`** — `noOfLines?: number` (alias `lines?`, default `3`; final line shortened to
+  `w-3/5` when multi-line), `loading?`, `lineClassName?`. Same live-region semantics; the inner bars
+  are `aria-hidden`.
+- **`<SkeletonCircle>`** — `size?: number | string` (px number or any CSS length; falls back to
+  className sizing), `loading?`. A `variant="circle"` `Skeleton` with `aspect-square`.
+
+## Raw → primitive mapping
+
+| Raw placeholder pattern                                  | Primitive                                  |
+| ------------------------------------------------------- | ------------------------------------------ |
+| bespoke `>Loading…<` text node (content not ready)      | `<Skeleton>` / `<SkeletonText>`            |
+| `animate-pulse` placeholder block / bar                 | `<Skeleton>` (sized via className)         |
+| multi-line text placeholder                             | `<SkeletonText noOfLines={n}>`             |
+| circular avatar / round-thumbnail placeholder           | `<SkeletonCircle size={n}>`                |
+| `.canvas-spinner` used as a **content** placeholder     | `<Skeleton>` reserving the layout footprint |
+
+## DO NOT convert (the one intentional exception)
+
+- **In-button progress spinners** — `Loader2 animate-spin` inside a button/action ("Saving…",
+  "Removing…", "Uploading…"). These signal **action progress**, not a content placeholder, and must
+  stay. Skeletons reserve layout for content that is about to arrive; spinners report that an
+  in-flight operation is running. Different jobs — don't merge them.
+- The `.canvas-spinner` keyframe itself stays for genuine in-canvas progress; only its use as a
+  layout-reservation placeholder migrates to `<Skeleton>`.
+
+## Outstanding
+
+**Migrated (the representative slice):**
+
+- `features/gallery/GalleryBar.tsx` — thumbnail loading.
+- `components/ShareViewer.tsx` — shared-image loading.
+- `components/SubscriptionButton.tsx` — Plan & Billing loading.
+
+**Follow-up (still raw placeholder / spinner-as-placeholder — migrate, then drop from the guardrail
+exclude per §13 ratchet):** `UploadDialog.tsx`, `NewActions.tsx`, `FirstRunScreen.tsx`,
+`features/canvas/CanvasArea.tsx` (`.canvas-spinner`), `AISettings.tsx`, `ObjectRemovalModal.tsx`,
+`BatchSettings.tsx`, `ShareButton.tsx`, `ImageMetaPanel.tsx`, `BrandRevealScreen.tsx`, `AppShell.tsx`.
+
+## Guardrail — ad-hoc loading placeholders in app chrome
+
+```bash
+# Flags bespoke "Loading…" text nodes and animate-pulse placeholders that should
+# be <Skeleton>. Excludes the skeleton primitive itself and its sr-only label;
+# strips in-button progress spinners (Loader2 / animate-spin) — action progress
+# is NOT a content placeholder (see DO NOT, above).
+rg -n '>\s*Loading[.…]|\banimate-pulse\b' app/src -g '*.tsx' \
+  -g '!**/ui/skeleton.tsx' \
+  | rg -v 'Loader2|animate-spin|sr-only|allow: raw-loading' \
+  | (grep . && echo 'Use <Skeleton>/<SkeletonText>/<SkeletonCircle> for content placeholders' || echo 'clean')
+```
+
+(Marketing site `/marketing` is out of scope. Mark deliberate exceptions inline with
+`{/* allow: raw-loading (reason) */}` per §13.)
 
 ---
 

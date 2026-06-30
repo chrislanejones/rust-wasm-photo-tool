@@ -174,19 +174,28 @@ interface SwatchProps {
 }
 
 function Swatch({ color, active, onClick, onRemove }: SwatchProps) {
+  // The "transparent" entry is the transparent backing canvas: render the same
+  // transparency checkerboard the canvas itself shows (`.checkerboard-canvas`,
+  // styles.css — also used by CanvasArea) instead of a flat panel-coloured
+  // square, so the swatch reads as "no fill / checkerboard". Solid colours keep
+  // their flat fill.
+  const isTransparent = color === "transparent";
   return (
     <span className="relative inline-flex group">
       <button
         type="button"
         onClick={onClick}
         className={[
-          "w-7 h-7 rounded-full border-2 border-transparent transition-all",
+          "w-7 h-7 rounded-full border-2 border-transparent transition-all overflow-hidden",
+          isTransparent && "checkerboard-canvas",
           active
             ? "scale-110 ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
             : "hover:scale-105",
-        ].join(" ")}
-        style={{ backgroundColor: color }}
-        aria-label={`Color ${color}`}
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        style={isTransparent ? undefined : { backgroundColor: color }}
+        aria-label={isTransparent ? "Transparent (checkerboard)" : `Color ${color}`}
       />
       {onRemove && (
         <button

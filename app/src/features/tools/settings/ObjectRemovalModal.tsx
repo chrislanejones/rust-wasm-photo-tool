@@ -5,7 +5,8 @@
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { X, Eraser, Loader2, Undo2 } from "lucide-react";
+import { X, Eraser, Undo2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { fadeIn, quickSpring } from "@/lib/animations";
 
 interface Props {
@@ -237,7 +238,7 @@ export function ObjectRemovalModal({
                 disabled={!hasMask || busy}
                 className="flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {busy && <Spinner size={14} />}
                 {busy ? "Removing..." : "Remove Object"}
               </button>
             </div>

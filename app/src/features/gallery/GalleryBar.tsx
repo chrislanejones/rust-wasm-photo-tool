@@ -5,6 +5,7 @@ import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LargeButton } from "@/components/ui/large-button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes } from "@/lib/format";
 import { TIERS } from "@/lib/tiers";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
@@ -146,9 +147,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       />
 
       {loading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-bg-elevated rounded-lg">
-          <div className="canvas-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
-        </div>
+        <Skeleton className="absolute inset-0 z-10 rounded-lg" aria-label={`Loading ${entry.name}`} />
       )}
 
       <AnimatePresence>

@@ -947,6 +947,32 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [flushToCanvas, syncState],
   );
 
+  /**
+   * Photoshop-style **Canvas Size**: resize the document WITHOUT resampling any
+   * layer. Re-blits each layer's native pixels at the anchor (4 = centre) and
+   * refills the backing layer with the given color (a = 0 ⇒ transparent ⇒
+   * checkerboard). Undoable; mirrors `resize`/`resizeWithFilter` bookkeeping.
+   */
+  const resizeCanvas = useCallback(
+    (
+      newW: number,
+      newH: number,
+      anchor: number,
+      r: number,
+      g: number,
+      b: number,
+      a: number,
+    ) => {
+      const t = toolRef.current;
+      if (!t || newW < 1 || newH < 1) return;
+      t.resize_canvas(newW, newH, anchor, r, g, b, a);
+      sourcePosRef.current = null;
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
   // ── NEW: Pixel adjustments ────────────────────────────────────────────────
   /**
    * Adjusts brightness by `delta` (−1.0 to +1.0).
@@ -1202,6 +1228,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     crop,
     resize,
     resizeWithFilter,
+    resizeCanvas,
     adjustBrightness,
     adjustContrast,
     applyGlobalBlur,

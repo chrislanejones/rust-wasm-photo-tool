@@ -18,14 +18,15 @@ import {
   Shield,
   ShieldCheck,
   FlaskConical,
+  Layers,
   Check,
-  Loader2,
   ExternalLink,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Modal } from "@/components/ui/Modal";
 import { SuperUserPane, type SuperUserControls } from "@/components/SuperUserPane";
 import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
+import { LayersCanvasPane } from "@/components/LayersCanvasPane";
 import { AppearancePane } from "@/components/AppearancePane";
 import { SecurityPane } from "@/components/SecurityPane";
 import { RulersGridsPane } from "@/components/RulersGridsPane";
@@ -35,6 +36,8 @@ import { AIUsagePane } from "@/components/AIUsagePane";
 import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
 import { LargeButton } from "@/components/ui/large-button";
+import { SkeletonText } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import {
   DEFAULT_PREFERENCES,
   serializePreferences,
@@ -51,6 +54,7 @@ const PRO_FEATURES = [
 
 type SettingsTab =
   | "general"
+  | "canvas"
   | "appearance"
   | "security"
   | "rulers"
@@ -81,6 +85,14 @@ function describeChanges(prev: Preferences, next: Preferences): string[] {
     out.push(`Grid layout → ${next.gridKind}`);
   if (prev.reduceMotion !== next.reduceMotion)
     out.push(`Motion → ${next.reduceMotion ? "Reduced" : "Full"}`);
+  if (prev.canvasArtboard !== next.canvasArtboard)
+    out.push(`Canvas on import → ${next.canvasArtboard ? "Canvas + photo" : "Photo only"}`);
+  if (prev.canvasPadding !== next.canvasPadding)
+    out.push(`Canvas border → ${next.canvasPadding} px`);
+  if (prev.canvasBgColor !== next.canvasBgColor)
+    out.push(
+      `Backing canvas → ${next.canvasBgColor === "transparent" ? "Transparent" : next.canvasBgColor}`,
+    );
   return out;
 }
 
@@ -90,9 +102,21 @@ interface Props {
   /** When set (admin only), adds a gated "Super User" tab with the tier
    *  override. Omit / null for everyone else. */
   superUser?: SuperUserControls | null;
+  /** Current canvas (image) dimensions — feed the Layers and Canvas pane's
+   *  W×H Canvas Size control. */
+  canvasWidth?: number;
+  canvasHeight?: number;
+  /** Photoshop-style Canvas Size apply (Rust `resize_canvas`, non-resampling). */
+  onResizeCanvas?: (w: number, h: number) => void;
 }
 
-export function SubscriptionButton({ general, superUser }: Props) {
+export function SubscriptionButton({
+  general,
+  superUser,
+  canvasWidth,
+  canvasHeight,
+  onResizeCanvas,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<SettingsTab>("general");
 
@@ -107,6 +131,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
 
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] = [
     { id: "general", label: "General", icon: SlidersHorizontal },
+    { id: "canvas", label: "Layers and Canvas", icon: Layers },
     { id: "appearance", label: "Appearance", icon: Palette },
     { id: "security", label: "Security", icon: Shield },
     { id: "rulers", label: "Rulers & Grids", icon: Ruler },
@@ -219,6 +244,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
             {/* Clerk user button / sign-in — same component as the top bar. */}
             <UserMenu />
             {(tab === "general" ||
+              tab === "canvas" ||
               tab === "appearance" ||
               tab === "security" ||
               tab === "rulers" ||
@@ -278,6 +304,14 @@ export function SubscriptionButton({ general, superUser }: Props) {
                 value={draft}
                 onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
               />
+            ) : tab === "canvas" ? (
+              <LayersCanvasPane
+                value={draft}
+                onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+                canvasWidth={canvasWidth}
+                canvasHeight={canvasHeight}
+                onResizeCanvas={onResizeCanvas}
+              />
             ) : tab === "appearance" ? (
               <AppearancePane
                 value={draft.theme}
@@ -313,7 +347,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
                   Plan &amp; Billing
                 </h3>
                 {me === undefined ? (
-                  <p className="text-xs text-zinc-400">Loading…</p>
+                  <SkeletonText noOfLines={3} className="max-w-sm" />
                 ) : me === null ? (
                   <p className="text-xs text-zinc-400">
                     Sign in to view and manage your plan.
@@ -357,7 +391,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
                           className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-zinc-800 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-700 disabled:opacity-40"
                         >
                           {busy === "portal" ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <Spinner size={14} />
                           ) : (
                             <ExternalLink className="h-3.5 w-3.5" />
                           )}
@@ -371,7 +405,7 @@ export function SubscriptionButton({ general, superUser }: Props) {
                           className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-500 disabled:opacity-40"
                         >
                           {busy === "checkout" && (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <Spinner size={14} />
                           )}
                           Upgrade to Pro
                         </button>
