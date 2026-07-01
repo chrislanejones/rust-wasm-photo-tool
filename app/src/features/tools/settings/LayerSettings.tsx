@@ -8,10 +8,11 @@ import {
   Minus,
   Lock,
   LockOpen,
-  X,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
+import { ReselectBar } from "@/components/ui/reselect-bar";
 import { SizeSlider } from "@/components/SizeSlider";
+import { CanvasResize } from "@/components/CanvasResize";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 
 /** Controls for the Selection Marker (magic-wand) — lives in Layer Settings. */
@@ -38,6 +39,11 @@ interface LayerSettingsProps {
   /** Live canvas (image) dimensions — used to evenly distribute new guides. */
   imgW: number;
   imgH: number;
+  /** Canvas (image) dimensions + W×H resize apply — the backdrop is the canvas,
+   *  so its one-off Canvas Size resizer lives here. */
+  canvasWidth: number;
+  canvasHeight: number;
+  onResizeCanvas: (w: number, h: number) => void;
 }
 
 /**
@@ -55,6 +61,9 @@ export function LayerSettings({
   selection,
   imgW,
   imgH,
+  canvasWidth,
+  canvasHeight,
+  onResizeCanvas,
 }: LayerSettingsProps) {
   // Guide state lives in the dedicated Zustand slice (shared with the canvas
   // overlay), so we read it directly rather than prop-drilling.
@@ -165,7 +174,7 @@ export function LayerSettings({
         <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
           Guides
         </span>
-        <div className="grid grid-cols-4 gap-2 [grid-auto-rows:1fr]">
+        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
           <ToolButton
             disabled={disabled}
             onClick={() => addGuide("h", imgW, imgH)}
@@ -199,43 +208,17 @@ export function LayerSettings({
 
         {guides.length > 0 && (
           <div className="max-h-40 overflow-y-auto space-y-1">
-            {guides.map((g) => {
-              const isSelected = g.id === selectedGuideId;
-              return (
-                <div
-                  key={g.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => selectGuide(g.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      selectGuide(g.id);
-                    }
-                  }}
-                  className={`flex items-center justify-between rounded px-2 py-1 cursor-pointer font-mono text-2xs ${
-                    isSelected
-                      ? "bg-theme-muted text-text-primary ring-1 ring-theme-ring"
-                      : "text-theme-muted-foreground hover:bg-theme-muted"
-                  }`}
-                >
-                  <span>
-                    {g.axis === "h" ? "H" : "V"} · {Math.round(g.pos)}px
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeGuide(g.id);
-                    }}
-                    title="Delete guide"
-                    className="ml-2 rounded p-0.5 text-theme-muted-foreground hover:text-text-primary hover:bg-theme-muted"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              );
-            })}
+            {guides.map((g) => (
+              <ReselectBar
+                key={g.id}
+                label={`${g.axis === "h" ? "H" : "V"} · ${Math.round(g.pos)}px`}
+                selected={g.id === selectedGuideId}
+                onSelect={() => selectGuide(g.id)}
+                onDelete={() => removeGuide(g.id)}
+                title="Reselect guide"
+                deleteLabel="Delete guide"
+              />
+            ))}
           </div>
         )}
 
@@ -244,6 +227,16 @@ export function LayerSettings({
           canvas to reposition. Lock prevents moving; Delete/Backspace removes the
           selected guide.
         </p>
+      </div>
+
+      {/* ── Canvas size (the checkerboard backdrop is the canvas) ─────────── */}
+      <div className="pt-3 border-t border-theme-sidebar-border">
+        <CanvasResize
+          width={canvasWidth}
+          height={canvasHeight}
+          disabled={disabled}
+          onApply={onResizeCanvas}
+        />
       </div>
     </div>
   );

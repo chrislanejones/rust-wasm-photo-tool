@@ -265,26 +265,32 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       if (!canvas) return;
       const src = new Uint8Array(pixels.buffer as ArrayBuffer);
       if (artboard) {
-        // Two-layer artboard (Background canvas + Photo): the document is
-        // photo + 2×pad. A pad of 0 still yields the two-layer structure (same
-        // doc size), matching the "Canvas + photo" intent. Size the tool at the
-        // document dimensions; the flush effect blits the composite.
-        const docW = width + artboard.pad * 2;
-        const docH = height + artboard.pad * 2;
-        const tool = new Tool(docW, docH);
-        tool.load_image_artboard(
-          src,
-          width,
-          height,
+        // Two-layer artboard (Background canvas + Photo). Load the photo native,
+        // then border it with the IDEMPOTENT, ABSOLUTE `set_artboard_border`:
+        // the doc becomes exactly photo + 2×pad (a pad of 0 still yields the
+        // two-layer structure). Routing every artboard load through the same
+        // Rust method as the live border keeps the result uniform on every load
+        // path (fresh import, gallery switch, AI result). The flush blits the
+        // composite; the canvas is sized from the tool's resulting dimensions.
+        const tool = new Tool(width, height);
+        tool.load_image(src);
+        tool.set_artboard_border(
           artboard.pad,
           artboard.r,
           artboard.g,
           artboard.b,
           artboard.a,
         );
+        // The border is part of OPENING the photo, not a user edit. Clear the
+        // "Canvas Border" snapshot it pushed so a freshly-loaded artboard doc
+        // has undoCount 0 (clean baseline) — exactly like the non-artboard
+        // branch (load_image clears history). Otherwise every loaded photo
+        // reads as modified, lighting the gallery "edited" dot and dotting
+        // each photo you switch past.
+        tool.clear_history();
         toolRef.current = tool;
-        canvas.width = docW;
-        canvas.height = docH;
+        canvas.width = tool.width();
+        canvas.height = tool.height();
         // No raw putImageData here (the composite differs from the photo
         // pixels), so paint the layer composite straight away.
         flushToCanvas();
@@ -973,6 +979,26 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [flushToCanvas, syncState],
   );
 
+  /**
+   * Normalize the CURRENT document to an artboard: the photo at native size,
+   * centred, with a `pad`-px border filled with (r,g,b,a) (a = 0 ⇒ transparent
+   * ⇒ checkerboard). ABSOLUTE + IDEMPOTENT — the doc becomes exactly
+   * photo + 2×pad no matter its current size, so it both shrinks a "jumbo"
+   * canvas back to size and re-applies cleanly without accumulating. Backs the
+   * live "Canvas border" / "Backing color" re-apply.
+   */
+  const setArtboardBorder = useCallback(
+    (pad: number, r: number, g: number, b: number, a: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      t.set_artboard_border(pad, r, g, b, a);
+      sourcePosRef.current = null;
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
   // ── NEW: Pixel adjustments ────────────────────────────────────────────────
   /**
    * Adjusts brightness by `delta` (−1.0 to +1.0).
@@ -1229,6 +1255,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     resize,
     resizeWithFilter,
     resizeCanvas,
+    setArtboardBorder,
     adjustBrightness,
     adjustContrast,
     applyGlobalBlur,

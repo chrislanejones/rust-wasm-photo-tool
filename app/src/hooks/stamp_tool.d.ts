@@ -208,6 +208,22 @@ declare module "stamp_tool" {
       bg_b: number,
       bg_a: number,
     ): void;
+    /**
+     * Normalize the doc to an artboard: photo at native size, centred, with a
+     * uniform `pad`-px border filled with bg_* (bg_a = 0 ⇒ transparent ⇒
+     * checkerboard). ABSOLUTE and IDEMPOTENT — always yields exactly
+     * photoW + 2*pad × photoH + 2*pad regardless of the current size, so a
+     * "jumbo" doc snaps back to photo + border and repeated calls don't
+     * accumulate. Grows a Background layer if the doc has none (artboard-on
+     * always ends as Background + Photo). Pushes one "Canvas Border" step.
+     */
+    set_artboard_border(
+      pad: number,
+      bg_r: number,
+      bg_g: number,
+      bg_b: number,
+      bg_a: number,
+    ): void;
     /** History marker for a quality/format-only re-encode (pixels unchanged). */
     push_compress_marker(): void;
     adjust_brightness(delta: number): void;

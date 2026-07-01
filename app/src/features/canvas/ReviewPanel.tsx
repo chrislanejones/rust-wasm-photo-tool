@@ -23,6 +23,7 @@ import { HistogramView } from "./HistogramView";
 import { slideFromRight } from "@/lib/animations";
 import { TinyButton } from "@/components/ui/tiny-button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
+import { ReselectBar } from "@/components/ui/reselect-bar";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { TIERS } from "@/lib/tiers";
 import type { UserMode } from "@/components/StatusBar";
@@ -310,47 +311,25 @@ export function ReviewPanel({
                 </TinyButton>
               </div>
             </div>
-            <ul className="history-list reselect-list">
+            <div className="history-list reselect-list">
               {objects.length === 0 && (
-                <li className="history-empty">
+                <div className="history-empty">
                   <span className="large-badge">
                     Add text or a shape to reselect it
                   </span>
-                </li>
+                </div>
               )}
               {objects.map((o) => (
-                <li
+                <ReselectBar
                   key={o.key}
-                  className="large-badge-item type-redo"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onSelectObject(o)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelectObject(o);
-                    } else if (e.key === "Delete" || e.key === "Backspace") {
-                      e.preventDefault();
-                      onDeleteObject(o);
-                    }
-                  }}
+                  label={o.label}
+                  onSelect={() => onSelectObject(o)}
+                  onDelete={() => onDeleteObject(o)}
                   title={`Reselect ${o.label}`}
-                >
-                  <span className="history-dot" />
-                  <span className="large-badge">{o.label}</span>
-                  <button
-                    className="history-delete"
-                    title={`Delete ${o.label}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteObject(o);
-                    }}
-                  >
-                    <DeleteGlyph />
-                  </button>
-                </li>
+                  deleteLabel={`Delete ${o.label}`}
+                />
               ))}
-            </ul>
+            </div>
           </section>
         )}
 

@@ -453,8 +453,17 @@ html.reduce-motion .skeleton::after {
 
 .spinner-comet {
   animation: spin 0.7s linear infinite;
-  -webkit-mask-image: conic-gradient(from 0deg, transparent, #000);
-  mask-image: conic-gradient(from 0deg, transparent, #000);
+  /* Comet lead-blade: the tail fades but keeps a ~22% opacity FLOOR (not fully
+     transparent) and reaches full strength by ~70°, so the leading edge stays
+     crisp and the faint spokes never wash out to invisible — important on a
+     LIGHT panel where the warm `--primary` accent has less headroom. The
+     accent token (`text-theme-primary`) supplies the colour in both themes. */
+  -webkit-mask-image: conic-gradient(
+    from 0deg,
+    rgba(0, 0, 0, 0.22),
+    #000 70%
+  );
+  mask-image: conic-gradient(from 0deg, rgba(0, 0, 0, 0.22), #000 70%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -933,6 +942,29 @@ textarea:focus-visible {
 
 .large-badge-item.type-redo:hover {
   opacity: 0.7;
+}
+
+/* Persistent selection (e.g. the active guide) — full strength, accent ring. */
+.large-badge-item.is-selected,
+.large-badge-item.type-redo.is-selected {
+  opacity: 1;
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+}
+
+.large-badge-item.is-selected .history-dot {
+  background: var(--accent);
+  opacity: 1;
+}
+
+/* The ✕ stays visible while selected so the active row is always deletable. */
+.large-badge-item.is-selected .history-delete {
+  opacity: 1;
+}
+
+.large-badge-item.is-disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .large-badge {

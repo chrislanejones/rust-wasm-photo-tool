@@ -36,7 +36,6 @@ import { AIUsagePane } from "@/components/AIUsagePane";
 import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
 import { LargeButton } from "@/components/ui/large-button";
-import { SkeletonText } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DEFAULT_PREFERENCES,
@@ -102,20 +101,11 @@ interface Props {
   /** When set (admin only), adds a gated "Super User" tab with the tier
    *  override. Omit / null for everyone else. */
   superUser?: SuperUserControls | null;
-  /** Current canvas (image) dimensions — feed the Layers and Canvas pane's
-   *  W×H Canvas Size control. */
-  canvasWidth?: number;
-  canvasHeight?: number;
-  /** Photoshop-style Canvas Size apply (Rust `resize_canvas`, non-resampling). */
-  onResizeCanvas?: (w: number, h: number) => void;
 }
 
 export function SubscriptionButton({
   general,
   superUser,
-  canvasWidth,
-  canvasHeight,
-  onResizeCanvas,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<SettingsTab>("general");
@@ -131,8 +121,8 @@ export function SubscriptionButton({
 
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] = [
     { id: "general", label: "General", icon: SlidersHorizontal },
-    { id: "canvas", label: "Layers and Canvas", icon: Layers },
     { id: "appearance", label: "Appearance", icon: Palette },
+    { id: "canvas", label: "Layers and Canvas", icon: Layers },
     { id: "security", label: "Security", icon: Shield },
     { id: "rulers", label: "Rulers & Grids", icon: Ruler },
     { id: "export", label: "Import / Export", icon: Package },
@@ -308,9 +298,6 @@ export function SubscriptionButton({
               <LayersCanvasPane
                 value={draft}
                 onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
-                canvasWidth={canvasWidth}
-                canvasHeight={canvasHeight}
-                onResizeCanvas={onResizeCanvas}
               />
             ) : tab === "appearance" ? (
               <AppearancePane
@@ -347,7 +334,12 @@ export function SubscriptionButton({
                   Plan &amp; Billing
                 </h3>
                 {me === undefined ? (
-                  <SkeletonText noOfLines={3} className="max-w-sm" />
+                  /* Plan & Billing is still loading — one larger spinner,
+                     centered above the panel body (replaces the small inline
+                     skeleton). */
+                  <div className="flex justify-center pt-1 pb-6">
+                    <Spinner className="size-8" aria-label="Loading your plan" />
+                  </div>
                 ) : me === null ? (
                   <p className="text-xs text-zinc-400">
                     Sign in to view and manage your plan.

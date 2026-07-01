@@ -75,6 +75,8 @@ interface ToolsSidebarProps {
   imageReady: boolean;
   /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
   onResize: (newW: number, newH: number, filter: number) => void;
+  /** Photoshop-style Canvas Size resize (no resample) — Layer Settings tool. */
+  onResizeCanvas: (w: number, h: number) => void;
   imageWidth: number;
   imageHeight: number;
   currentByteSize: number;
@@ -161,6 +163,7 @@ export function ToolsSidebar({
   onContrast,
   imageReady,
   onResize,
+  onResizeCanvas,
   imageWidth,
   imageHeight,
   currentByteSize,
@@ -320,6 +323,9 @@ export function ToolsSidebar({
             selection={selection}
             imgW={imageWidth}
             imgH={imageHeight}
+            canvasWidth={imageWidth}
+            canvasHeight={imageHeight}
+            onResizeCanvas={onResizeCanvas}
           />
         )}
 

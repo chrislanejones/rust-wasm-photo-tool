@@ -540,3 +540,21 @@ non-destructive client-side overlay.
 > imported artboard docs; on gallery/AI-reloaded docs the border slider no-ops rather
 > than risk a stale-delta resize. An artboard-on but single-layer doc has no solid
 > backing layer to repaint on a backing-color change.
+
+## v6.1 Change Summary — 2026-06-30
+
+A polish release fixing the **import-canvas "jumbo" bug** from v6.0, plus spinner and
+reselect-list cleanups. Verified by `cargo test` (32 lib tests incl. two new
+`set_artboard_border` tests), `cargo build --lib`, and `tsc --noEmit` (all green).
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Canvas-jumbo fix — absolute, idempotent border** — new Rust `ImageHorseTool::set_artboard_border(pad, bg_rgba)` replaces the old delta-based border that could accumulate into a giant ("jumbo") canvas. It finds the photo's tight non-transparent bounding box, rebuilds the document to **exactly** `photoW + 2·pad × photoH + 2·pad` (re-blitting pixels at the border offset, **no resample**), refills the Background layer solid, grows a Background for single-layer docs, and carries per-layer masks + text/shape annotations along by the same offset. Pushes one "Canvas Border" history entry. Two new unit tests prove "a 44×44 jumbo snaps back to 24×24" and full idempotency (re-apply = no-op) | Complete |
+| 2   | **Live border wired off the delta path** — `useCloneStamp` exposes `setArtboardBorder`; AppShell's live-border effect and all three load paths (fresh / gallery / AI) now call the idempotent absolute border instead of the old `borderAppliedRef` delta (fully removed — `tsc` confirms no dangling refs). The hand-synced ambient `app/src/hooks/stamp_tool.d.ts` shadow matches the new wasm-bindgen export | Complete |
+| 3   | **Spinner honors size class + sits above Settings panel** — `Spinner` now detects a Tailwind sizing utility (`size-*`/`w-*`/`h-*`) via `hasSizeClass` and drops the inline `width/height` px fallback so `className="size-8"` actually wins (32px); the Lucide `Loader` fills the box. The Settings plan-loading spinner renders centered **above** the panel body. The `.spinner-comet` conic mask gained a ~22%-opacity floor reaching full by 70° so the tail stays visible on the light panel | Complete |
+| 4   | **Reusable `ReselectBar` component** — extracted the clickable reselect row (label + hover-revealed ✕, `role="button"` with Enter/Space → select, Delete/Backspace → delete, ✕ stops propagation) into one SSOT component reused by the ReviewPanel reselect list; supporting `.is-selected` / `.is-disabled` styles added to `styles.css` | Complete |
+| 5   | **Dead-prop cleanup** — with Canvas Size living in Layer Settings, the unused `canvasWidth` / `canvasHeight` / `onResizeCanvas` props were removed from `SubscriptionButton`, `TopBar`, and `LayersCanvasPane` and threaded through `ToolsSidebar` (`tsc` clean, no orphaned references) | Complete |
+
+> **Known follow-ups.** `load_image_artboard` remains in Rust/`pkg` but is no longer
+> called from the app (the artboard load now goes `load_image` + `set_artboard_border`) —
+> a harmless dead Rust path, prunable later.

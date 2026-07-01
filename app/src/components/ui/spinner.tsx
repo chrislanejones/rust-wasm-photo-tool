@@ -28,11 +28,19 @@ import { cn } from "@/lib/utils";
  * "Loading") is announced via an `sr-only` span.
  */
 export interface SpinnerProps extends HTMLAttributes<HTMLSpanElement> {
-  /** Icon edge length in px. Default 16. */
+  /** Icon edge length in px. Default 16. Ignored when `className` sets a size
+   *  utility (`size-*` / `w-*` / `h-*`) — e.g. `className="size-8"` → 32px. */
   size?: number;
   /** Optional text rendered to the right of the spinner (single `gap-2`). */
   label?: ReactNode;
 }
+
+/** Does the className carry a Tailwind sizing utility (`size-`/`w-`/`h-`)? If
+ *  so we let the class drive the box and drop the inline `size` px fallback,
+ *  so `className="size-8"` actually wins (inline style would otherwise beat the
+ *  class). */
+const hasSizeClass = (className?: string) =>
+  className != null && /(?:^|\s)(?:size|w|h)-/.test(className);
 
 export const Spinner = forwardRef<HTMLSpanElement, SpinnerProps>(
   (
@@ -48,22 +56,26 @@ export const Spinner = forwardRef<HTMLSpanElement, SpinnerProps>(
   ) => {
     const text = label ?? children;
     const hasText = text != null && text !== false;
+    const sized = hasSizeClass(className);
     return (
       <span
         ref={ref}
         role="status"
-        className={cn(
-          "inline-flex items-center gap-2 text-theme-primary",
-          className,
-        )}
+        className="inline-flex items-center gap-2 text-theme-primary"
         {...props}
       >
-        <Loader
-          className="spinner-comet shrink-0"
-          width={size}
-          height={size}
-          aria-hidden="true"
-        />
+        {/* Icon box: its size comes from the `className` sizing utility if one
+            was passed, else from the `size` px fallback. The Lucide `Loader`
+            fills the box (`w-full h-full`) so both paths scale it. */}
+        <span
+          className={cn(
+            "inline-flex shrink-0 [&>svg]:block [&>svg]:w-full [&>svg]:h-full",
+            className,
+          )}
+          style={sized ? undefined : { width: size, height: size }}
+        >
+          <Loader className="spinner-comet" aria-hidden="true" />
+        </span>
         {hasText ? (
           <span>{text}</span>
         ) : (

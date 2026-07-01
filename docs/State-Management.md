@@ -2,7 +2,7 @@
 
 > Part of the [Image Horse](../README.md) docs. See also: [IndexedDB Investigation](IndexedDB-Investigation.md) · [File Map](File-Map.md) · [Architecture](Architecture.md).
 >
-> **Status:** stores live under `app/src/stores/` on the `zustand-build` branch. AppShell is being migrated off local `useState` onto these stores, store-by-store, typecheck-gated.
+> **Status:** stores live under `app/src/stores/`; the `zustand-build` branch merged to `master` in v5.8 (9e614fc). AppShell's `useState`s that map to the three stores below have been fully swapped for selector bindings — verified 2026-06-30 via grep (all §2 "Replaces" entries are bound in `AppShell.tsx`; zero duplicate local `useState`s remain for them). What's still open is hook extraction and `useAnnotationStore` — see §8.
 
 ---
 
@@ -161,6 +161,8 @@ If a persisted store ever needs to persist a frequently-changing field, split th
 - [x] `useUIStore` / `useToolStore` / `useGalleryStore` + `_shared.ts` created, types mined from the real AppShell.
 - [x] `@stores` path alias (`tsconfig.json` + `vite.config.ts`).
 - [x] IndexedDB persist adapter (`storage/idbStorage.ts`) + `useUIStore` persisted.
-- [ ] AppShell wiring (useState → selector swap), store-by-store.
-- [ ] Hook extraction per the `/zustand` blueprint.
-- [ ] `useAnnotationStore` (with the tool-hook extraction).
+- [x] AppShell wiring (useState → selector swap), store-by-store — confirmed complete 2026-06-30: every `useState` named in the §2 "Replaces" column is now a `useUIStore`/`useToolStore`/`useGalleryStore` selector pair in `AppShell.tsx` (79 store-hook call sites). The 17 `useState`s still in `AppShell.tsx` are all out of this migration's scope: `booting`/`firstRun` (intentionally local, §2) plus lifecycle/one-off state the §2 table never claimed for a store (`originalUrl`, `compareActive`, `hasBeenModified`, `isImageLoading`, `loadProgress`, `isPanning`, `userMode`, `authResolved`, `devTierOverride`, `exportFormat`, `quality`, `selectedObject`, `isDraggingImage`, `importImage`). None of these are migration debt.
+- [ ] Hook extraction per the `/zustand` blueprint — still open. `app/src/hooks/usePaintTool.ts`, `useTextTool.ts`, and `useDrawingTools.ts` exist but predate the store work (present since the original tool commits, e.g. `ba06728`/`10fc3f3`/`f3a2b8b`) and don't import any store — they are not the extracted hooks the blueprint describes, just same-domain hooks that happen to share a name. `useImageActions`, `usePhotoLoader`, `useUploadHandler`, and `useEffectiveTool` from the `/zustand` sketches don't exist in `app/src` at all yet.
+- [ ] `useAnnotationStore` (with the tool-hook extraction) — still open, still deferred as designed: `app/src/stores/useAnnotationStore.ts` does not exist; annotation state still lives inside the tool hooks above, per §2's "Deferred" note.
+
+**What's genuinely left:** the store layer and AppShell wiring are done; the remaining work is the hook-extraction pass (turning `usePaintTool`/`useTextTool`/`useDrawingTools` into store-reading hooks and adding the still-missing `useImageActions`/`usePhotoLoader`/`useUploadHandler`/`useEffectiveTool`), with `useAnnotationStore` following once that lands.

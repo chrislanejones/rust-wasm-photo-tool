@@ -158,7 +158,7 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
 
 /** Map the backing-canvas color pref to the rgba the Rust artboard fill expects.
  *  The sentinel "transparent" ⇒ a:0 (checkerboard shows through); a #rrggbb hex
- *  ⇒ that opaque color. The actual fill happens in Rust (`load_image_artboard`);
+ *  ⇒ that opaque color. The actual fill happens in Rust (`set_artboard_border`);
  *  this only maps the chosen swatch to rgba. */
 export function canvasBgToRgba(c: string): {
   r: number;

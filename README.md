@@ -50,17 +50,15 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v6.0 — 2026-06-30
+### v6.1 — 2026-06-30
 
 | # | Change | Status |
 | --- | --- | --- |
-| 1 | **Image guides** — Photoshop-style draggable guide lines (with or without rulers). In Layer Settings: add horizontal / vertical guides, lock to prevent moving, and a list to select + delete individual guides. New guides auto-distribute to even spacing across the canvas | Complete |
-| 2 | **Layers and Canvas settings** — a new Settings section; **Canvas + photo** is now the default import (10px border), with a **backing-canvas color palette** (transparent → checkerboard by default). The Canvas Size resizer moved here from Layer Settings | Complete |
-| 3 | **Canvas resize fixed** — "Resize canvas" now resizes the backing canvas without resampling the photo (new Rust `resize_canvas`); changing the canvas border re-applies live to a loaded photo | Complete |
-| 4 | **Skeleton loading states** — a shared `Skeleton` primitive replaces ad-hoc spinners for content placeholders (gallery, share view, billing) | Complete |
-| 5 | **Refreshed spinner** — a single `Spinner` primitive (tinted comet leading edge, consistent label spacing, reduced-motion aware) replaces the scattered loaders | Complete |
+| 1 | **Canvas-jumbo fix** — importing a photo no longer balloons into a giant ("jumbo") canvas. The canvas border is now an absolute, idempotent Rust operation (`set_artboard_border`): the document always rebuilds to exactly photo size + border, so it can't accumulate, and the live border re-applies correctly on every load path (fresh, gallery, AI) without resampling the photo | Complete |
+| 2 | **Spinner fixes** — the shared `Spinner` now honors a Tailwind size class (`size-8` → 32px), the Settings loading spinner sits centered above the panel, and the comet tail keeps a faint opacity floor so it stays visible on the light panel | Complete |
+| 3 | **Reusable ReselectBar** — the clickable "reselect" row (label + hover-revealed ✕ delete, full keyboard support) is now one shared `ReselectBar` component, used across the reselect lists | Complete |
 
-> **About this release — guides, and a proper canvas.** This release makes the canvas behave the way you'd expect from a desktop editor. **Image guides** are now draggable cyan lines you place from Layer Settings — add horizontal or vertical guides, lock them so they don't move, select and delete them individually, and let new ones snap to even spacing automatically; they work whether or not the rulers are showing. **Canvas Size** moved into a dedicated **Layers and Canvas** settings section and now actually resizes the backing canvas *behind* the photo (in Rust, without resampling the image), and the canvas border re-applies live. Canvas + photo is the default way photos open now, with a backing-color palette that defaults to the familiar transparent checkerboard. Under the hood, loading states are cleaner — a shared **Skeleton** for content placeholders and a refreshed **Spinner** with a tinted leading edge.
+> **About this release — a proper canvas size.** A polish release that fixes the import-canvas bug from v6.0: photos no longer open onto a runaway "jumbo" canvas. The canvas border is now an **absolute, idempotent** operation in Rust — the document always rebuilds to exactly the photo size plus your border, so repeated changes never accumulate and a too-big canvas snaps straight back. The live border now re-applies cleanly across every way a photo can load. Alongside that: the shared **Spinner** respects an explicit size, the Settings spinner sits above the panel, and the reselect rows are unified into one reusable component.
 
 ## License
 

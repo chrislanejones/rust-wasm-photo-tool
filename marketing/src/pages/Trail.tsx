@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.43",
+    date: "2026-06-30",
+    headline: "A canvas that stays the right size",
+    entries: [
+      { tag: "fix", text: "Fixed a bug where opening a photo could blow the canvas up to a giant size. The canvas border is now exact and repeatable — your document is always the photo plus the border you chose, it never balloons, and a too-big canvas snaps right back. The live border updates cleanly no matter how a photo was opened." },
+      { tag: "ui", text: "Spinner polish — loading spinners now scale to the size we ask for, the Settings spinner sits neatly above the panel, and the spinning comet keeps a faint trail so it stays visible on the light theme." },
+    ],
+  },
+  {
     version: "v0.9.42",
     date: "2026-06-30",
     headline: "Guides, and a canvas that resizes",

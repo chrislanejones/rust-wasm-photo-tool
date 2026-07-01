@@ -421,11 +421,19 @@ export function AppShell() {
    *  new working image, and mark the photo modified so it persists. */
   const handleAIResult = useCallback(
     (r: { pixels: Uint8ClampedArray; width: number; height: number }) => {
-      borderAppliedRef.current = null; // AI result replaces the doc — no artboard baseline
-      loadImageFromPixels(r.pixels, r.width, r.height);
+      // AI result replaces the doc — re-normalize to the artboard (border +
+      // backing) when "Canvas on import" is on, exactly like every other load.
+      loadImageFromPixels(
+        r.pixels,
+        r.width,
+        r.height,
+        prefs.canvasArtboard
+          ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
+          : undefined,
+      );
       setHasBeenModified(true);
     },
-    [loadImageFromPixels],
+    [loadImageFromPixels, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
   );
 
   /** Load a photo entry from IndexedDB → downscale → hand to the tool. */
@@ -439,12 +447,6 @@ export function AppShell() {
   // repeated PgUp/PgDn advance correctly rather than recomputing "next" from a
   // stale id. Kept in sync at every place activePhotoId is set.
   const activeIdRef = useRef<string | null>(null);
-  // Last artboard border params actually baked into the CURRENT document, so the
-  // "Canvas border" / "Backing color" prefs can be re-applied live (delta from
-  // here) without re-importing. `null` ⇒ unknown baseline (e.g. a gallery-loaded
-  // or AI-result doc) → the live-border effect no-ops. Set on fresh artboard
-  // import; cleared on every other load path.
-  const borderAppliedRef = useRef<{ pad: number; bg: string } | null>(null);
 
   const loadPhotoFromEntry = useCallback(
     async (entry: PhotoEntry, isCurrent?: () => boolean) => {
@@ -462,11 +464,19 @@ export function AppShell() {
         putWorkingCopy(entry.originalKey, working);
       }
       if (isCurrent && !isCurrent()) return;
-      // Gallery-loaded docs aren't a fresh artboard — unknown border baseline.
-      borderAppliedRef.current = null;
-      loadImageFromPixels(working.pixels, working.width, working.height);
+      // Every load is normalized: when "Canvas on import" is on, a gallery
+      // switch lands the photo on the same padded artboard as a fresh import
+      // (border + backing), not just at native size.
+      loadImageFromPixels(
+        working.pixels,
+        working.width,
+        working.height,
+        prefs.canvasArtboard
+          ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
+          : undefined,
+      );
     },
-    [loadImageFromPixels],
+    [loadImageFromPixels, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
   );
 
   useEffect(() => {
@@ -584,12 +594,12 @@ export function AppShell() {
 
           if (!firstLoaded) {
             firstLoaded = true;
-            // Fresh import only: honor the "Canvas on import" setting and land
-            // the photo on a two-layer padded artboard. The backing color comes
-            // from the "Backing canvas" pref (transparent ⇒ a:0 ⇒ checkerboard);
-            // the actual fill happens in Rust (`load_image_artboard`).
-            // Photo-switch / restore / AI-result paths deliberately skip this so
-            // an already-loaded photo isn't re-padded.
+            // Honor the "Canvas on import" setting and land the photo on a
+            // two-layer padded artboard. The backing color comes from the
+            // "Backing canvas" pref (transparent ⇒ a:0 ⇒ checkerboard); the
+            // border is applied in Rust by the idempotent `set_artboard_border`.
+            // Gallery-switch / AI-result paths run the SAME normalization, so
+            // every load with artboard on ends up at photo + 2×pad.
             loadImageFromPixels(
               working.pixels,
               working.width,
@@ -598,12 +608,6 @@ export function AppShell() {
                 ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
                 : undefined,
             );
-            // Record the border baked into this fresh doc so a later border-pref
-            // change re-applies non-destructively (delta from here). Artboard off
-            // ⇒ no backing canvas ⇒ no live border.
-            borderAppliedRef.current = prefs.canvasArtboard
-              ? { pad: prefs.canvasPadding, bg: prefs.canvasBgColor }
-              : null;
             setHasBeenModified(false);
             activeIdRef.current = entry.id;
             setActivePhotoId(entry.id);
@@ -2156,30 +2160,25 @@ export function AppShell() {
   );
 
   // ── Live "Canvas border" / "Backing color" re-apply ────────────────────────
-  // Changing the border (canvasPadding) or backing color (canvasBgColor) in
-  // Settings → "Layers and Canvas" while an artboard photo is loaded re-applies
-  // it to the CURRENT document NON-destructively via resize_canvas — no resample,
-  // edits/history preserved. The new doc grows/shrinks by 2× the padding delta
-  // (photo stays centred); the freshly exposed area is filled with the backing
-  // color. `borderAppliedRef` is the last border baked in (set on fresh artboard
-  // import, cleared on other loads), so a fresh import doesn't double-apply and a
-  // gallery/AI-loaded doc (unknown baseline) no-ops. Photo-only docs (artboard
-  // off) have no backing canvas → no-op.
+  // Changing the border (canvasPadding) or backing color (canvasBgColor), or
+  // toggling "Canvas on import" (canvasArtboard) on, while a photo is loaded
+  // re-normalizes the CURRENT document to the artboard via the IDEMPOTENT,
+  // ABSOLUTE Rust `set_artboard_border`: the doc becomes exactly photo + 2×pad,
+  // photo centred, backing refilled — regardless of the doc's current size. This
+  // is what kills the "jumbo" canvas: hitting 10px always yields a 10px border
+  // (never a delta), and it applies to EVERY loaded doc (fresh, gallery, AI),
+  // not just a fresh artboard import.
+  //
+  // Keyed only on the prefs (not hasImage / stamp.state): the initial load
+  // applies the border through `loadImageFromPixels`, so this effect handles
+  // only subsequent pref changes — it never fires on a load and so can't loop
+  // (set_artboard_border changes stamp.state, not the prefs it depends on).
+  // Border prefs commit on the Settings "Apply" (draft model), so persisting
+  // per change doesn't thrash IndexedDB.
   useEffect(() => {
     if (!prefs.canvasArtboard || !hasImage) return;
-    const applied = borderAppliedRef.current;
-    if (!applied) return;
-    if (applied.pad === prefs.canvasPadding && applied.bg === prefs.canvasBgColor) {
-      return; // nothing changed since the last bake
-    }
-    const delta = prefs.canvasPadding - applied.pad;
-    const newW = stamp.state.width + 2 * delta;
-    const newH = stamp.state.height + 2 * delta;
-    if (newW < 1 || newH < 1) return;
     const bg = canvasBgToRgba(prefs.canvasBgColor);
-    // Same-size (backing-color-only) calls still refill the backing layer.
-    stamp.resizeCanvas(newW, newH, 4 /* centre */, bg.r, bg.g, bg.b, bg.a);
-    borderAppliedRef.current = { pad: prefs.canvasPadding, bg: prefs.canvasBgColor };
+    stamp.setArtboardBorder(prefs.canvasPadding, bg.r, bg.g, bg.b, bg.a);
     setHasBeenModified(true);
     if (activePhotoId) {
       setModifiedPhotos((prev) =>
@@ -2187,11 +2186,8 @@ export function AppShell() {
       );
     }
     void persistActiveCanvas();
-    // Keyed only on the border prefs: resize_canvas → syncState changes
-    // stamp.state, but re-running on that would loop. Reading the current size
-    // inside is intentional and correct (effect fires after the pref change).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefs.canvasPadding, prefs.canvasBgColor]);
+  }, [prefs.canvasPadding, prefs.canvasBgColor, prefs.canvasArtboard]);
 
   const handleAutoCompress = useCallback(
     async (scope: "selected" | "all" = "all") => {
@@ -2867,9 +2863,6 @@ export function AppShell() {
                 <SubscriptionButton
                   general={general}
                   superUser={superUser}
-                  canvasWidth={stamp.state.width}
-                  canvasHeight={stamp.state.height}
-                  onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
                 />
               }
               userSlot={<UserMenu />}
@@ -2901,9 +2894,6 @@ export function AppShell() {
             reduceMotion={prefs.reduceMotion}
             general={general}
             superUser={superUser}
-            canvasWidth={stamp.state.width}
-            canvasHeight={stamp.state.height}
-            onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
           />
         )}
       </AnimatePresence>
@@ -2931,6 +2921,7 @@ export function AppShell() {
             onGlobalBlur={stamp.applyGlobalBlur}
             imageReady={hasImage}
             onResize={handleApplyCompression}
+            onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
             imageWidth={stamp.state.width}
             imageHeight={stamp.state.height}
             currentByteSize={activeEntry?.byteSize ?? 0}

@@ -1396,6 +1396,169 @@ impl ImageHorseTool {
         self.recomposite();
     }
 
+    /// Normalize the current document to an **artboard**: the photo content at
+    /// its native size, centred, with a uniform `pad`-px border filled with
+    /// `bg_*` (`bg_a = 0` ⇒ transparent ⇒ checkerboard). This is the IDEMPOTENT,
+    /// ABSOLUTE counterpart to the old delta-based live border — calling it with
+    /// the same `pad` always yields exactly
+    /// `photoW + 2*pad × photoH + 2*pad`, regardless of the current canvas size.
+    /// A "jumbo" document therefore snaps straight back to photo + border, and
+    /// repeated calls never accumulate (idempotent).
+    ///
+    /// The PHOTO content is the tight non-transparent bounding box of the photo
+    /// layer (the layer named "Photo"; or — for a single-layer photo-only doc —
+    /// the sole layer). The document is rebuilt to that box plus `2*pad` on every
+    /// side WITHOUT resampling (the photo's pixels are re-blitted at the border
+    /// offset), the bottom **Background** layer is refilled solid to the full new
+    /// size, and the photo is placed at `(pad, pad)`. A document that has no
+    /// solid Background yet grows one (so artboard-on always ends up as a
+    /// Background + Photo pair). Per-layer masks and live text/shape annotations
+    /// travel with their layer by the same offset. Pushes one undoable
+    /// "Canvas Border" snapshot; recomposites.
+    pub fn set_artboard_border(&mut self, pad: u32, bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8) {
+        let ow = self.width;
+        let oh = self.height;
+        if ow == 0 || oh == 0 || self.layers.is_empty() {
+            return;
+        }
+
+        // Identify the photo layer (content) and whether a solid backing canvas
+        // already sits at the bottom of the stack. `load_image_artboard` names
+        // the photo "Photo" and the backing "Background"; a single-layer
+        // `load_image` doc has just one "Background" layer that holds the photo.
+        let backing_present = self.layers.len() > 1 && self.layers[0].name == "Background";
+        let photo_idx = if backing_present {
+            self.layers
+                .iter()
+                .position(|l| l.name == "Photo")
+                .unwrap_or(self.layers.len() - 1)
+        } else {
+            0
+        };
+
+        // Tight non-transparent bounding box of the photo layer = its native
+        // size and position within the current document.
+        let (bx, by, pw, ph) = {
+            let data = &self.layers[photo_idx].buf.data;
+            let (mut minx, mut miny, mut maxx, mut maxy) = (u32::MAX, u32::MAX, 0u32, 0u32);
+            let mut found = false;
+            for y in 0..oh {
+                let row = (y * ow) as usize * 4;
+                for x in 0..ow {
+                    if data[row + x as usize * 4 + 3] != 0 {
+                        found = true;
+                        minx = minx.min(x);
+                        miny = miny.min(y);
+                        maxx = maxx.max(x);
+                        maxy = maxy.max(y);
+                    }
+                }
+            }
+            if found {
+                (minx, miny, maxx - minx + 1, maxy - miny + 1)
+            } else {
+                // Fully transparent photo layer — fall back to the whole canvas.
+                (0, 0, ow, oh)
+            }
+        };
+
+        let new_w = pw + 2 * pad;
+        let new_h = ph + 2 * pad;
+        // Offset that lands the photo's top-left at (pad, pad) in the new doc.
+        let off_x = pad as i32 - bx as i32;
+        let off_y = pad as i32 - by as i32;
+
+        self.snap("Canvas Border");
+
+        // Ensure a solid Background exists at the bottom. A backing-less doc
+        // (fresh single-layer photo) grows one; the former content is renamed
+        // "Photo" so later calls find it by name.
+        if !backing_present {
+            let id = self.next_layer_id;
+            self.next_layer_id = self.next_layer_id.wrapping_add(1).max(1);
+            self.layers
+                .insert(0, Layer::new(id, "Background".to_string(), ow, oh));
+            self.active += 1; // every existing layer shifted up one slot
+            if let Some(content) = self.layers.get_mut(1) {
+                content.name = "Photo".to_string();
+            }
+        }
+
+        // Reframe every layer into the new document. Layer 0 is now always the
+        // solid backing (refilled, never resampled); every other layer's pixels,
+        // overlays and mask travel by the border offset (no resample).
+        for (idx, layer) in self.layers.iter_mut().enumerate() {
+            let mut nbuf = vec![0u8; (new_w as usize) * (new_h as usize) * 4];
+            if idx == 0 {
+                if bg_a != 0 {
+                    for px in nbuf.chunks_exact_mut(4) {
+                        px[0] = bg_r;
+                        px[1] = bg_g;
+                        px[2] = bg_b;
+                        px[3] = bg_a;
+                    }
+                }
+            } else {
+                transform::paste_region(
+                    &mut nbuf,
+                    new_w as i32,
+                    new_h as i32,
+                    &layer.buf.data,
+                    layer.buf.width,
+                    layer.buf.height,
+                    off_x,
+                    off_y,
+                );
+                for a in &mut layer.text_annotations {
+                    a.x += off_x;
+                    a.y += off_y;
+                }
+                for s in &mut layer.shape_annotations {
+                    s.x0 += off_x as f64;
+                    s.y0 += off_y as f64;
+                    s.x1 += off_x as f64;
+                    s.y1 += off_y as f64;
+                    for p in &mut s.points {
+                        p.0 += off_x as f64;
+                        p.1 += off_y as f64;
+                    }
+                }
+            }
+            layer.buf.data = nbuf;
+            layer.buf.width = new_w;
+            layer.buf.height = new_h;
+
+            if let Some(old_mask) = layer.mask.take() {
+                if old_mask.len() == (ow as usize) * (oh as usize) {
+                    let mut nmask = vec![255u8; (new_w as usize) * (new_h as usize)];
+                    for sy in 0..oh as i32 {
+                        let ty = sy + off_y;
+                        if ty < 0 || ty >= new_h as i32 {
+                            continue;
+                        }
+                        for sx in 0..ow as i32 {
+                            let tx = sx + off_x;
+                            if tx < 0 || tx >= new_w as i32 {
+                                continue;
+                            }
+                            nmask[(ty * new_w as i32 + tx) as usize] =
+                                old_mask[(sy * ow as i32 + sx) as usize];
+                        }
+                    }
+                    layer.mask = Some(nmask);
+                }
+            }
+        }
+
+        self.width = new_w;
+        self.height = new_h;
+        self.stamp.source_x = None;
+        self.stamp.source_y = None;
+        self.editing_shape_id = None;
+        self.editing_text_id = None;
+        self.recomposite();
+    }
+
     /// Record a "Compress" entry in the history without changing pixels.
     /// Used when Apply Compression & Resize re-encodes at a new quality or
     /// format but the dimensions are unchanged — the stored file changed, so
@@ -2048,6 +2211,59 @@ mod layer_tests {
         t.load_image_artboard(&solid(4, 4, [0, 128, 0, 255]), 4, 4, 2, 0, 0, 0, 0);
         assert_eq!(px(&t, 0, 0)[3], 0, "border transparent");
         assert_eq!(px(&t, 4, 4), [0, 128, 0, 255], "photo opaque");
+    }
+
+    #[test]
+    fn set_artboard_border_is_absolute_and_idempotent() {
+        // Simulate a "jumbo" doc: a 4×4 red photo on a 20px artboard → 44×44.
+        let mut t = ImageHorseTool::new(44, 44);
+        t.load_image_artboard(&solid(4, 4, [255, 0, 0, 255]), 4, 4, 20, 200, 200, 200, 255);
+        assert_eq!((t.width, t.height), (44, 44), "jumbo doc");
+        // Mark the photo top-left (doc 20,20) with a unique colour so we can
+        // prove the photo is re-blitted, not resampled.
+        let i = ((20 * 44 + 20) * 4) as usize;
+        t.layers[1].buf.data[i..i + 4].copy_from_slice(&[1, 2, 3, 255]);
+
+        // Absolute apply: 10px border → the doc snaps to photo(4×4) + 2*10 = 24.
+        t.set_artboard_border(10, 255, 255, 255, 255);
+        assert_eq!((t.width, t.height), (24, 24), "snaps to photo + 2*pad");
+        assert_eq!(t.layer_count(), 2, "still Background + Photo");
+        // The marked photo pixel survives byte-for-byte at (10,10) (a resample
+        // would have blended it with its red neighbours).
+        assert_eq!(px(&t, 10, 10), [1, 2, 3, 255], "photo pixel preserved");
+        assert_eq!(px(&t, 13, 13), [255, 0, 0, 255], "photo body preserved");
+        assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "border = white backing");
+
+        // IDEMPOTENT: calling again with the same pad changes nothing.
+        t.set_artboard_border(10, 255, 255, 255, 255);
+        assert_eq!((t.width, t.height), (24, 24), "size unchanged on re-apply");
+        assert_eq!(t.layer_count(), 2, "layer count unchanged on re-apply");
+        assert_eq!(
+            px(&t, 10, 10),
+            [1, 2, 3, 255],
+            "photo pixel still preserved"
+        );
+        assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "border still white");
+    }
+
+    #[test]
+    fn set_artboard_border_grows_backing_for_single_layer_doc() {
+        // A plain single-layer photo (load_image) gains a Background + Photo
+        // pair when bordered, with the photo centred inside the pad.
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [0, 0, 255, 255]));
+        assert_eq!(t.layer_count(), 1, "starts single-layer");
+
+        t.set_artboard_border(10, 255, 255, 255, 255);
+        assert_eq!((t.width, t.height), (24, 24), "photo + 2*pad");
+        assert_eq!(t.layer_count(), 2, "grew a Background layer");
+        assert_eq!(px(&t, 0, 0), [255, 255, 255, 255], "corner = backing");
+        assert_eq!(px(&t, 11, 11), [0, 0, 255, 255], "photo centred at (10,10)");
+
+        // Idempotent on the now-two-layer doc too.
+        t.set_artboard_border(10, 255, 255, 255, 255);
+        assert_eq!((t.width, t.height), (24, 24), "size stable");
+        assert_eq!(t.layer_count(), 2, "no extra Background layers accrue");
     }
 
     #[test]
