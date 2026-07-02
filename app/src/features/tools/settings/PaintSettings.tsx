@@ -8,7 +8,7 @@ import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { ToolButtonOption } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
-import { quickSpring } from "@/lib/animations";
+import { settingsPanelMotion } from "@/lib/animations";
 
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
 const OPACITY_PRESETS = [25, 50, 75, 100] as const;
@@ -73,9 +73,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
         {mode === "paint" && (
           <motion.div
             key="paint"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, transition: quickSpring }}
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+            {...settingsPanelMotion}
             className="space-y-4"
           >
             <SectionHeader
@@ -151,9 +149,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
         {mode === "blur" && (
           <motion.div
             key="blur"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, transition: quickSpring }}
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+            {...settingsPanelMotion}
             className="space-y-4"
           >
             <SectionHeader
@@ -224,9 +220,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
         {mode === "pen" && (
           <motion.div
             key="pen"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, transition: quickSpring }}
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+            {...settingsPanelMotion}
             className="space-y-4"
           >
             <SectionHeader
@@ -284,9 +278,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
         {mode === "erase" && (
           <motion.div
             key="erase"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, transition: quickSpring }}
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+            {...settingsPanelMotion}
             className="space-y-4"
           >
             <SectionHeader

@@ -632,3 +632,15 @@ image load, text commit + undo, brightness/blur filters). Landed from the
 | 2   | **Orphan state → Zustand (Stage 1)** — component-local `useState` that belonged in shared stores (loading + progress flags, original URL, compare/modified state) evicted into `useUIStore` / `useGalleryStore` / `useAnnotationStore` | Complete |
 | 3   | **Window CustomEvents → store (Stage 4)** — the last two `window` events, `text-committed` and `text-annotations-changed`, replaced with store actions; `useTextTool` / `useDrawingTools` / `useCloneStamp` drive annotation sync through the store now. New `CustomEvent`s stay forbidden | Complete |
 | 4   | **Docs + housekeeping** — added `docs/LANGUAGE-TIER-ROADMAP.md` (advisory: which TS↔Rust tier moves are worth doing, and why); removed the standalone `bench.html` SIMD micro-bench (unused by the build; recoverable from git history) | Complete |
+
+## v7.4 Change Summary — 2026-07-02
+
+The loading spinner no longer freezes under Reduced Motion, plus an animation
+SSOT tidy-up. Verified by `tsc --noEmit`, `vite build`, and an in-browser check —
+the boot spinner's computed animation is `spin` / `running` even with the OS
+`prefers-reduced-motion` active.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Spinner never freezes** — `components/ui/spinner.tsx` and the boot/canvas spinner now use a dedicated `.spinner-icon` class that keeps spinning under both OS `prefers-reduced-motion: reduce` and the in-app `.reduce-motion` toggle. Essential loading indicators are exempt from motion-reduction (WCAG 2.3.3) — a frozen spinner reads as a hung app. `ImageMetaPanel`'s pending icon moved onto the same class. *Decorative* `.animate-spin` still respects Reduced Motion | Complete |
+| 2   | **Animation SSOT — `settingsPanelMotion`** — the settings sub-panel enter/exit triple (`initial`/`animate`/`exit` with `quickSpring` + a 120 ms fade-up) had drifted into ~9 hand-copied inline copies (Paint ×4, Text ×2, Resize ×2, ImageMetaPanel). Now one `settingsPanelMotion` export in `lib/animations.ts`, spread at each site. Exact same values — no visual change | Complete |

@@ -12,7 +12,7 @@ import {
   MapPin,
   CalendarClock,
 } from "lucide-react";
-import { quickSpring } from "@/lib/animations";
+import { settingsPanelMotion } from "@/lib/animations";
 import { formatBytes } from "@/lib/format";
 import { sha256Hex, getOriginal } from "@/lib/originalsStore";
 import { parseExifFromImage, type ExifSummary } from "@/lib/exif";
@@ -121,7 +121,7 @@ function HashBox({
               title="Recompute"
             >
               <RefreshCw
-                className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`}
+                className={`h-3.5 w-3.5 ${pending ? "spinner-icon" : ""}`}
               />
             </button>
           )}
@@ -246,9 +246,7 @@ export function ImageMetaPanel({
   return (
     <motion.div
       key="imagemeta"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0, transition: quickSpring }}
-      exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+      {...settingsPanelMotion}
       className="space-y-4 p-4 font-mono text-xs"
     >
       {!meta.photoId ? (

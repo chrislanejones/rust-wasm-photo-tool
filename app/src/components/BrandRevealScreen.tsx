@@ -82,10 +82,9 @@ export function BrandRevealScreen({
                   transition={{ duration: reduceMotion ? 0 : 0.15 }}
                   className="mt-6 flex flex-col items-center gap-3"
                 >
-                  {/* `Spinner`'s `animate-spin` already drops under the in-app
-                      `.reduce-motion` class (set from this same `reduceMotion`
-                      pref) and OS reduced-motion, so the static fallback is
-                      preserved without a prop. */}
+                  {/* `Spinner` uses `.spinner-icon` — an essential loading
+                      indicator, so it keeps spinning even under reduced motion
+                      (a frozen boot spinner reads as a hung app). */}
                   <Spinner size={24} />
                   <p className="text-xs text-text-muted" aria-hidden="true">
                     Loading your workspace…

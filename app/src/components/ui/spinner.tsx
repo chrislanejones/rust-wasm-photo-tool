@@ -12,9 +12,11 @@ import { cn } from "@/lib/utils";
  * both sizing and the spinner↔label gap).
  *
  * Visual: the Lucide `LoaderIcon`, tinted with the accent token
- * (`text-theme-primary`), spun via plain Tailwind `animate-spin`. Under
- * `prefers-reduced-motion` / the in-app `.reduce-motion` toggle the spin is
- * dropped (Refactor-Playbook §3), leaving a static icon.
+ * (`text-theme-primary`), spun via the dedicated `.spinner-icon` class. As an
+ * ESSENTIAL loading indicator it keeps spinning even under reduced motion — a
+ * frozen spinner reads as a hung app, and WCAG 2.3.3 exempts essential loaders
+ * from the motion-reduction requirement (which targets decorative / large-scale
+ * motion). Decorative `.animate-spin` elsewhere still respects the setting.
  *
  * Spacing: pass `label` (or children) and the spinner + text render as one
  * inline-flex unit with a single standard `gap-2`, so every call site lands the
@@ -71,7 +73,7 @@ export const Spinner = forwardRef<HTMLSpanElement, SpinnerProps>(
           )}
           style={sized ? undefined : { width: size, height: size }}
         >
-          <LoaderIcon className="animate-spin" aria-hidden="true" />
+          <LoaderIcon className="spinner-icon" aria-hidden="true" />
         </span>
         {hasText ? (
           <span>{text}</span>

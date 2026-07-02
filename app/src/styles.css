@@ -442,14 +442,30 @@ html.reduce-motion .skeleton::after {
 /* ═══════════════════════════════════════════════════════════════════════════
    SPINNER (single source of truth — components/ui/spinner.tsx)
 
-   Plain Tailwind `animate-spin` on the Lucide `LoaderIcon`. Under reduced
-   motion the spin is dropped, leaving a static icon (Refactor-Playbook §3) —
-   covers both the OS media query and the in-app `.reduce-motion` toggle. The
-   in-app toggle is already covered by the global `html.reduce-motion *` rule
-   below; the OS media query needs its own rule since `animate-spin` is a
-   plain Tailwind utility, not scoped to the in-app toggle.
+   The essential loading spinner uses its OWN `.spinner-icon` class (not the
+   generic Tailwind `.animate-spin` utility) and spins for EVERYONE — including
+   under reduced motion. A frozen loading spinner reads as a hung app; WCAG
+   2.3.3 exempts essential loading indicators (the requirement targets
+   decorative / large-scale motion, not a small "working…" spin). The
+   `!important` beats the global `html.reduce-motion *` animation kill; the
+   OS-media rule that freezes the decorative `.animate-spin` never matches
+   `.spinner-icon`.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+.spinner-icon {
+  animation: spin 1s linear infinite;
+}
+html.reduce-motion .spinner-icon {
+  animation-duration: 1s !important;
+}
+
+/* The boot/canvas ring spinner is also essential loading feedback — keep it
+   spinning under the in-app reduce-motion toggle. */
+html.reduce-motion .canvas-spinner {
+  animation-duration: 0.7s !important;
+}
+
+/* Decorative `.animate-spin` (non-loading uses) still respects reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   .animate-spin {
     animation: none;

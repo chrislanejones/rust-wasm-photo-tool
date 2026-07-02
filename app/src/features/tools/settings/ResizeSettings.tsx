@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getWebPerfMetrics } from "@/lib/webPerf";
-import { quickSpring } from "@/lib/animations";
+import { settingsPanelMotion } from "@/lib/animations";
 import type { ExportFormat } from "@/lib/exportImage";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -257,9 +257,7 @@ export function ResizeSettings({
           {tab === "resize" && (
             <motion.div
               key="resize"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0, transition: quickSpring }}
-              exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+              {...settingsPanelMotion}
               className="space-y-3"
             >
               <DimensionFields
@@ -279,9 +277,7 @@ export function ResizeSettings({
           {tab === "compress" && (
             <motion.div
               key="compress"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0, transition: quickSpring }}
-              exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+              {...settingsPanelMotion}
               className="space-y-4"
             >
               {/* ── Method / Format side by side to save vertical space ── */}

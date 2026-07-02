@@ -80,6 +80,17 @@ export const panelSwap: Variants = {
   exit: { opacity: 0, x: -12, transition: { duration: 0.12 } },
 };
 
+// Settings sub-feature panel enter/exit (Paint / Text / Resize sub-panels and
+// ImageMetaPanel). Spread onto the `motion.div` — `{...settingsPanelMotion}` —
+// instead of hand-copying the same initial/animate/exit triple (it had drifted
+// into ~9 inline copies). Enter is the shared `quickSpring`; exit is a quick
+// 120ms fade-up.
+export const settingsPanelMotion = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0, transition: quickSpring },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.12 } },
+} as const;
+
 // Staggered thumbnail pop-in for gallery strip
 export const thumbEnter = (i: number) => ({
   initial: { opacity: 0, scale: 0.85 },

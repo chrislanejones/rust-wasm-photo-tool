@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.48",
+    date: "2026-07-02",
+    headline: "The loading spinner spins again",
+    entries: [
+      { tag: "fix", text: "The loading spinner no longer sits frozen when you have Reduced Motion turned on (in your OS or in the app). A spinner that doesn't spin looks like the app is stuck, so it keeps turning now — it's essential feedback, not decoration. Other, decorative animations still respect your Reduced Motion setting." },
+      { tag: "infra", text: "Tidied up a panel animation that had been copy-pasted into nine places down to one shared definition. No visible change." },
+    ],
+  },
+  {
     version: "v0.9.47",
     date: "2026-07-02",
     headline: "Housekeeping under the hood",

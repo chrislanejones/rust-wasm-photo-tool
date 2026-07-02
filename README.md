@@ -50,20 +50,17 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.4 — 2026-07-02
+
+The loading spinner never freezes now. It used to sit still under Reduced Motion — the OS setting or the in-app toggle — which reads as a hung app, because it rode the generic reduced-motion kill. Loading spinners are essential feedback (WCAG 2.3.3 exempts them), so the `Spinner` and the boot spinner keep turning for everyone; only *decorative* motion still stops. Under the hood, the settings-panel enter/exit animation that had been hand-copied into ~9 places is now one `settingsPanelMotion` export in the animation source of truth.
+
+> **About this release.** If your spinner looked frozen, this is why — it was respecting Reduced Motion a little too literally. A stuck spinner tells you nothing, so it spins regardless now, while the app still drops the decorative motion. Plus a tidy-up: nine copy-pasted panel animations became one.
+
 ### v7.3 — 2026-07-02
 
 Internal refactor — no behavior change. The `AppShell` composition root shed ~600 lines: image loading, canvas actions, selection, and mask handling moved into four focused session hooks (`useImageSession`, `useCanvasActions`, `useSelectionActions`, `useMaskActions`), stray component state moved into the Zustand stores, and the last two `window` `CustomEvent`s (text commit + annotation sync) became plain store updates. Same app, smaller AppShell.
 
 > **About this release.** Housekeeping. Nothing changes for anyone using the app — this splits the biggest file into pieces you can actually hold in your head, and closes out the last of the global window events. Also added a [Language-Tier Roadmap](docs/LANGUAGE-TIER-ROADMAP.md) to docs: which bits of TypeScript and Rust are in the right language, and which should trade places.
-
-### v7.2 — 2026-07-02
-
-| # | Change | Status |
-| --- | --- | --- |
-| 1 | **Layers are free (no login)** — layers are a fundamental, purely client-side editing tool (the Rust layer stack lives entirely in memory / IndexedDB), so they're no longer paywalled: the no-login Demo tier now gets 3 layers per image, same as Logged In. Login/paid differentiate on **cloud** features (storage, gallery cap, sharing, AI), not on local editing. "Unlimited layers" stays the paid perk. The other fundamental tools (Crop, Blur, Resize, Paint, Histogram) already ran in Demo | Complete |
-| 2 | **Pen: fill a path you already drew** — the Bézier pen's Background fill only applied if set *before* drawing; reselecting a committed path and changing the Background did nothing. `update_bezier_annotation` now carries stroke + fill, so reselecting a pen path and adjusting the Paint→Pen panel restyles it — including filling one drawn with Background: None | Complete |
-
-> **About this release — pricing philosophy + a pen fix.** Fundamental editing is local and costs us nothing to run, so it shouldn't sit behind a login: layers now work in the no-login tier (login/pay gate the cloud, not the canvas). And the pen tool's Background fill can finally be applied to a path you've already drawn, not just set up front.
 
 ## License
 

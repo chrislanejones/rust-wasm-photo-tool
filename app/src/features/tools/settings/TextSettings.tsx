@@ -8,7 +8,7 @@ import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
-import { quickSpring } from "@/lib/animations";
+import { settingsPanelMotion } from "@/lib/animations";
 
 const FONT_FAMILIES = [
   { label: "Sans Serif", value: "sans-serif" },
@@ -101,9 +101,7 @@ export function TextSettings({
         {mode === "text" && (
           <motion.div
             key="text"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, transition: quickSpring }}
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+            {...settingsPanelMotion}
             className="space-y-5"
           >
             {/* Font Size */}
@@ -168,9 +166,7 @@ export function TextSettings({
         {mode === "background" && (
           <motion.div
             key="background"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, transition: quickSpring }}
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+            {...settingsPanelMotion}
             className="space-y-5"
           >
             {/* Style toggle */}
