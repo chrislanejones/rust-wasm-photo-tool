@@ -66,6 +66,10 @@ import {
 import { getPhotoLimit } from "@/lib/photoLimits";
 import { hasReplicateAI, TIERS } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
+import { useMaskActions } from "./session/useMaskActions";
+import { useSelectionActions } from "./session/useSelectionActions";
+import { useCanvasActions } from "./session/useCanvasActions";
+import { useImageSession } from "./session/useImageSession";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
@@ -82,15 +86,15 @@ import {
 } from "@/lib/exif";
 import { pinLabelText } from "@/lib/pinLabel";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
-import { makeWorkingCopy, makeThumbnail, makeThumbnailFromPixels, ImageTooLargeError } from "@/lib/workingCopy";
-import { getWorkingCopy, putWorkingCopy, clearWorkingCopyCache } from "@/lib/workingCopyCache";
+import { makeThumbnail, makeThumbnailFromPixels } from "@/lib/workingCopy";
+import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
-import { logDiagnostic, installConsoleCapture } from "@/lib/diagnosticsLog";
+import { installConsoleCapture } from "@/lib/diagnosticsLog";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -242,11 +246,13 @@ export function AppShell() {
   // Cold-start boot splash (logo + spinner). True until WASM is up and the
   // IndexedDB session check has resolved, so we route to New vs Resume without a
   // flash.
-  const [booting, setBooting] = useState(true);
+  const booting = useUIStore((s) => s.booting);
+  const setBooting = useUIStore((s) => s.setBooting);
   // True until the user first enters the editor (a photo becomes active). While
   // true, the "New" surface is the full-page FirstRunScreen; once you've been in
   // the app, every later empty/New state uses the compact UploadDialog instead.
-  const [firstRun, setFirstRun] = useState(true);
+  const firstRun = useUIStore((s) => s.firstRun);
+  const setFirstRun = useUIStore((s) => s.setFirstRun);
   useEffect(() => {
     if (photos.length > 0) setFirstRun(false); // latches false for the session
   }, [photos.length]);
@@ -255,15 +261,22 @@ export function AppShell() {
   const modifiedPhotos = useGalleryStore((s) => s.modifiedPhotos);
   const setModifiedPhotos = useGalleryStore((s) => s.setModifiedPhotos);
   // originalUrl is populated by the compare effect; not set on photo select
-  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
-  const [compareActive, setCompareActive] = useState(false);
-  const [hasBeenModified, setHasBeenModified] = useState(false);
-  const [isImageLoading, setIsImageLoading] = useState(false);
-  const [loadProgress, setLoadProgress] = useState(0);
-  const loadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const originalUrl = useUIStore((s) => s.originalUrl);
+  const setOriginalUrl = useUIStore((s) => s.setOriginalUrl);
+  const compareActive = useUIStore((s) => s.compareActive);
+  const setCompareActive = useUIStore((s) => s.setCompareActive);
+  const hasBeenModified = useGalleryStore((s) => s.hasBeenModified);
+  const setHasBeenModified = useGalleryStore((s) => s.setHasBeenModified);
+  const isImageLoading = useUIStore((s) => s.isImageLoading);
+  const loadProgress = useUIStore((s) => s.loadProgress);
+  // finishImageLoad ends the fake-progress interval + hide-timer (both live in
+  // the UI store). startImageLoad + the raw progress setters moved into
+  // useImageSession along with the load callbacks that used them.
+  const finishImageLoad = useUIStore((s) => s.finishImageLoad);
 
   // Item 2: Pan mode state
-  const [isPanning, setIsPanning] = useState(false);
+  const isPanning = useUIStore((s) => s.isPanning);
+  const setIsPanning = useUIStore((s) => s.setIsPanning);
 
   const brushMode = useToolStore((s) => s.brushMode);
   const setBrushMode = useToolStore((s) => s.setBrushMode);
@@ -286,17 +299,20 @@ export function AppShell() {
    *  Drags in useDrawingTools snap to this ratio via Rust when set. */
   const cropRatio = useToolStore((s) => s.cropRatio);
   const setCropRatio = useToolStore((s) => s.setCropRatio);
-  const [userMode, setUserMode] = useState<UserMode>("demo");
-  const [authResolved, setAuthResolved] = useState(false);
+  const userMode = useUIStore((s) => s.userMode);
+  const setUserMode = useUIStore((s) => s.setUserMode);
+  const authResolved = useUIStore((s) => s.authResolved);
+  const setAuthResolved = useUIStore((s) => s.setAuthResolved);
   const handleAuthMode = useCallback((m: UserMode) => {
     setUserMode(m);
     setAuthResolved(true);
-  }, []);
+  }, [setUserMode, setAuthResolved]);
 
   // Tier override (set from the Super User settings tab). When set, it wins over
   // the Clerk-derived mode so the No Login / Logged In / Paid versions can be
   // tested without real auth. Only the admin can reach the tab that sets it.
-  const [devTierOverride, setDevTierOverride] = useState<UserMode | null>(null);
+  const devTierOverride = useUIStore((s) => s.devTierOverride);
+  const setDevTierOverride = useUIStore((s) => s.setDevTierOverride);
   const effectiveUserMode = devTierOverride ?? userMode;
 
   // Super User settings tab — only the admin account sees it. The tier override
@@ -398,109 +414,49 @@ export function AppShell() {
     [addRecentText, toolSettings.fontSize, toolSettings.fontFamily, toolSettings.fontWeight, toolSettings.textColor],
   );
 
+  // Was a `text-committed` window CustomEvent before stage 4; now driven by the
+  // store. prevRef skips the mount run so a commit is recorded exactly once, on
+  // change (matching the old event-only semantics).
+  const lastCommittedText = useAnnotationStore((s) => s.lastCommittedText);
+  const prevCommittedText = useRef(lastCommittedText);
   useEffect(() => {
-    const handler = (e: CustomEvent<{ text: string }>) =>
-      handleTextCommit(e.detail.text);
-    window.addEventListener("text-committed", handler as EventListener);
-    return () =>
-      window.removeEventListener("text-committed", handler as EventListener);
-  }, [handleTextCommit]);
+    if (prevCommittedText.current === lastCommittedText) return;
+    prevCommittedText.current = lastCommittedText;
+    if (lastCommittedText !== null) handleTextCommit(lastCommittedText);
+  }, [lastCommittedText, handleTextCommit]);
 
-  // ── Pixel-based loading (downscaled working copy) ──────────────────────────
-  const loadImageFromPixels = useCallback(
-    (
-      pixels: Uint8ClampedArray,
-      width: number,
-      height: number,
-      artboard?: { pad: number; r: number; g: number; b: number; a: number },
-    ) => {
-      setIsImageLoading(true);
-      setLoadProgress(0);
-      if (loadIntervalRef.current) clearInterval(loadIntervalRef.current);
-      loadIntervalRef.current = setInterval(() => {
-        setLoadProgress((prev) => (prev >= 90 ? 90 : prev + Math.random() * 15));
-      }, 100);
-      void stamp.loadImageFromPixels(pixels, width, height, artboard);
-    },
-    [stamp],
-  );
-
-  /** Apply a finished AI image result (decoded RGBA) back to the canvas as the
-   *  new working image, and mark the photo modified so it persists. */
-  const handleAIResult = useCallback(
-    (r: { pixels: Uint8ClampedArray; width: number; height: number }) => {
-      // AI result replaces the doc — re-normalize to the artboard (border +
-      // backing) when "Canvas on import" is on, exactly like every other load.
-      loadImageFromPixels(
-        r.pixels,
-        r.width,
-        r.height,
-        prefs.canvasArtboard
-          ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
-          : undefined,
-      );
-      setHasBeenModified(true);
-    },
-    [loadImageFromPixels, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
-  );
-
-  /** Load a photo entry from IndexedDB → downscale → hand to the tool. */
-  // Monotonic token for photo selection. Each handleSelectPhoto call claims the
-  // next value; any async load whose token is no longer current aborts before
-  // blitting, so rapid gallery clicks / PgUp-PgDn can't leave the canvas showing
-  // one photo while the gallery highlights another (latest selection wins).
-  const selectSeqRef = useRef(0);
-  // The current photo id tracked synchronously — React state `activePhotoId`
-  // lags behind the async image load, so gallery cycling reads this instead and
-  // repeated PgUp/PgDn advance correctly rather than recomputing "next" from a
-  // stale id. Kept in sync at every place activePhotoId is set.
-  const activeIdRef = useRef<string | null>(null);
-
-  const loadPhotoFromEntry = useCallback(
-    async (entry: PhotoEntry, isCurrent?: () => boolean) => {
-      // Fast path: a previously-decoded working copy. Keyed by the original's
-      // content hash (immutable → always valid), so revisiting a photo skips the
-      // IndexedDB read AND both createImageBitmap decodes — the slow part of a
-      // photo switch. See lib/workingCopyCache.ts.
-      let working = getWorkingCopy(entry.originalKey);
-      if (!working) {
-        const original = await getOriginal(entry.originalKey);
-        if (!original) return;
-        if (isCurrent && !isCurrent()) return;
-        const file = new File([original.bytes], original.name, { type: original.mimeType });
-        working = await makeWorkingCopy(file);
-        putWorkingCopy(entry.originalKey, working);
-      }
-      if (isCurrent && !isCurrent()) return;
-      // Every load is normalized: when "Canvas on import" is on, a gallery
-      // switch lands the photo on the same padded artboard as a fresh import
-      // (border + backing), not just at native size.
-      loadImageFromPixels(
-        working.pixels,
-        working.width,
-        working.height,
-        prefs.canvasArtboard
-          ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
-          : undefined,
-      );
-    },
-    [loadImageFromPixels, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
-  );
+  // ── Per-photo image session ────────────────────────────────────────────────
+  // Extracted verbatim to app/src/app/session/useImageSession.ts: pixel loads,
+  // AI-result apply, gallery add/select/cycle/remove, and Resume / Start-fresh.
+  // Reads gallery/UI stores directly; the lifecycle EFFECTS (boot, manifest,
+  // auto-select, finish-load) and the gallery multi-select cluster stay below in
+  // AppShell (see PARKING_LOT.md). loadPhotoFromEntry + activeIdRef are returned
+  // because the AppShell-resident handleDeleteSelected still uses them.
+  const {
+    loadPhotoFromEntry,
+    handleAIResult,
+    handleAddPhotos,
+    handleSelectPhoto,
+    handleNextPhoto,
+    handlePrevPhoto,
+    handleRemovePhoto,
+    handleResumeSession,
+    handleStartFresh,
+    activeIdRef,
+  } = useImageSession({
+    stamp,
+    prefs,
+    effectiveUserMode,
+    savePhotoEdit,
+    loadPhotoEdit,
+    deletePhotoEdit,
+  });
 
   useEffect(() => {
     if (stamp.state.ready && isImageLoading) {
-      if (loadIntervalRef.current) {
-        clearInterval(loadIntervalRef.current);
-        loadIntervalRef.current = null;
-      }
-      setLoadProgress(100);
-      const t = setTimeout(() => {
-        setIsImageLoading(false);
-        setLoadProgress(0);
-      }, 500);
-      return () => clearTimeout(t);
+      finishImageLoad();
     }
-  }, [stamp.state.ready, isImageLoading]);
+  }, [stamp.state.ready, isImageLoading, finishImageLoad]);
 
   // ── Compare: fetch original from IndexedDB when slider activates ───────────
   const activeEntry = photos.find((p) => p.id === activePhotoId) ?? null;
@@ -528,169 +484,6 @@ export function AppShell() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compareActive, activeOriginalKey]);
 
-  // ── Add photos ─────────────────────────────────────────────────────────────
-  const handleAddPhotos = useCallback(
-    async (files: File[]) => {
-      // ── Tier cap ─────────────────────────────────────────────────────────
-      // Enforce the per-tier gallery limit (from Rust `photo_limit`). Accept
-      // as many as fit, then notify if the batch was trimmed or already full.
-      const remaining = Math.max(0, maxPhotos - photos.length);
-      if (remaining <= 0) {
-        toast.error(capMessage(effectiveUserMode, maxPhotos));
-        return;
-      }
-      const accepted = files.length > remaining ? files.slice(0, remaining) : files;
-      if (files.length > remaining) {
-        toast.error(capMessage(effectiveUserMode, maxPhotos));
-      }
-
-      if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
-        setModifiedPhotos((prev) => {
-          if (prev.has(activePhotoId)) return prev;
-          const next = new Set(prev);
-          next.add(activePhotoId);
-          return next;
-        });
-      }
-      if (activePhotoId && stamp.toolRef.current) {
-        await savePhotoEdit(activePhotoId, stamp.toolRef);
-      }
-
-      let firstLoaded = false;
-      for (const f of accepted) {
-        try {
-          const t0 = performance.now();
-          const working = await makeWorkingCopy(f);
-          logDiagnostic(
-            "UI_THREAD",
-            `decode ${f.name} → ${working.width}×${working.height}`,
-            performance.now() - t0,
-          );
-          // Build the gallery thumbnail from the already-decoded working pixels
-          // (downscaled in Rust via resize_pixels) instead of decoding the
-          // source file a second time.
-          const mod = await import("stamp_tool");
-          await mod.default();
-          const [originalKey, thumbBlob] = await Promise.all([
-            putOriginal(f, working.origWidth, working.origHeight),
-            makeThumbnailFromPixels(
-              working.pixels,
-              working.width,
-              working.height,
-              mod.resize_pixels,
-            ),
-          ]);
-          // Seed the decode cache so re-selecting this photo later is instant
-          // (no IndexedDB read + re-decode). Keyed by content hash.
-          putWorkingCopy(originalKey, working);
-          const entry: PhotoEntry = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            name: f.name.replace(/\.[^.]+$/, ""),
-            mimeType: f.type || "application/octet-stream",
-            byteSize: f.size,
-            originalByteSize: f.size,
-            origWidth: working.origWidth,
-            origHeight: working.origHeight,
-            workingWidth: working.width,
-            workingHeight: working.height,
-            thumbBlob,
-            originalKey,
-            uploadKey: originalKey,
-          };
-
-          setPhotos((prev) => [...prev, entry]);
-
-          if (!firstLoaded) {
-            firstLoaded = true;
-            // Honor the "Canvas on import" setting and land the photo on a
-            // two-layer padded artboard. The backing color comes from the
-            // "Backing canvas" pref (transparent ⇒ a:0 ⇒ checkerboard); the
-            // border is applied in Rust by the idempotent `set_artboard_border`.
-            // Gallery-switch / AI-result paths run the SAME normalization, so
-            // every load with artboard on ends up at photo + 2×pad.
-            loadImageFromPixels(
-              working.pixels,
-              working.width,
-              working.height,
-              prefs.canvasArtboard
-                ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
-                : undefined,
-            );
-            setHasBeenModified(false);
-            activeIdRef.current = entry.id;
-            setActivePhotoId(entry.id);
-            setCompareActive(false);
-          }
-        } catch (err) {
-          console.error("Failed to add photo:", f.name, err);
-          toast.error(
-            err instanceof ImageTooLargeError
-              ? `${f.name}: ${err.message}`
-              : `Couldn't open ${f.name}.`,
-          );
-        }
-      }
-    },
-    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
-  );
-
-  // ── Select photo ───────────────────────────────────────────────────────────
-  const handleSelectPhoto = useCallback(
-    async (entry: PhotoEntry) => {
-      if (entry.id === activePhotoId) return;
-
-      // Claim the latest selection. Any await below that resolves after a newer
-      // click bails before touching the canvas, so highlight and pixels stay in sync.
-      const seq = ++selectSeqRef.current;
-      const isCurrent = () => seq === selectSeqRef.current;
-      activeIdRef.current = entry.id; // advance synchronously so cycling sees it
-
-      // Persist the OUTGOING photo only if it was actually modified. This used
-      // to save on EVERY switch — and when signed in, savePhotoEdit uploads the
-      // full edit archive to Convex, so just browsing the gallery re-uploaded
-      // each photo and made switching slow ("only when logged in").
-      if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
-        const outgoing = activePhotoId;
-        setModifiedPhotos((prev) => {
-          if (prev.has(outgoing)) return prev;
-          const next = new Set(prev);
-          next.add(outgoing);
-          return next;
-        });
-        if (stamp.toolRef.current) {
-          await savePhotoEdit(outgoing, stamp.toolRef);
-        }
-      }
-      if (!isCurrent()) return; // a newer selection superseded this one
-
-      setHasBeenModified(false);
-      setActivePhotoId(entry.id);
-      setCompareActive(false);
-      // Flag loading synchronously, before any await: switching photos briefly
-      // leaves the *outgoing* photo's undo count > 0 while activePhotoId already
-      // points at the incoming one. The modified-dot effect gates on this so it
-      // doesn't falsely dot the newly-selected photo during the transition.
-      setIsImageLoading(true);
-
-      const saved = await loadPhotoEdit(entry.id);
-      if (!isCurrent()) return;
-      if (saved) {
-        setLoadProgress(20);
-        await stamp.loadFromSaved(saved);
-        if (!isCurrent()) return;
-        setLoadProgress(100);
-        setTimeout(() => {
-          if (!isCurrent()) return;
-          setIsImageLoading(false);
-          setLoadProgress(0);
-        }, 400);
-      } else {
-        void loadPhotoFromEntry(entry, isCurrent);
-      }
-    },
-    [activePhotoId, hasBeenModified, stamp, loadPhotoFromEntry, savePhotoEdit, loadPhotoEdit],
-  );
-
   // Auto-select the first photo when none is active but photos exist. Keeps
   // the grid hero (and normal canvas) populated after session restore or after
   // the user deletes the previously active photo.
@@ -699,58 +492,6 @@ export function AppShell() {
       void handleSelectPhoto(photos[0]);
     }
   }, [activePhotoId, photos, handleSelectPhoto]);
-
-  // Item 4: PgUp/PgDn gallery cycling
-  const handleNextPhoto = useCallback(() => {
-    if (photos.length === 0) return;
-    const curId = activeIdRef.current ?? activePhotoId;
-    const idx = photos.findIndex((p) => p.id === curId);
-    const next = photos[(idx + 1) % photos.length];
-    if (next) void handleSelectPhoto(next);
-  }, [photos, activePhotoId, handleSelectPhoto]);
-
-  const handlePrevPhoto = useCallback(() => {
-    if (photos.length === 0) return;
-    const curId = activeIdRef.current ?? activePhotoId;
-    const idx = photos.findIndex((p) => p.id === curId);
-    const prev = photos[(idx - 1 + photos.length) % photos.length];
-    if (prev) void handleSelectPhoto(prev);
-  }, [photos, activePhotoId, handleSelectPhoto]);
-
-  const handleRemovePhoto = useCallback(
-    (id: string) => {
-      deletePhotoEdit(id).catch(() => {});
-      setImageSavings((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      setModifiedPhotos((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      setPhotos((prev) => {
-        const idx = prev.findIndex((p) => p.id === id);
-        const next = prev.filter((p) => p.id !== id);
-        if (id === activePhotoId && next.length > 0) {
-          const na = next[Math.min(idx, next.length - 1)]!;
-          void loadPhotoFromEntry(na);
-          activeIdRef.current = na.id;
-          setActivePhotoId(na.id);
-          setHasBeenModified(false);
-          setCompareActive(false);
-        } else if (next.length === 0) {
-          activeIdRef.current = null;
-          setActivePhotoId(null);
-          setHasBeenModified(false);
-          setCompareActive(false);
-        }
-        return next;
-      });
-    },
-    [activePhotoId, loadPhotoFromEntry, deletePhotoEdit],
-  );
 
   // Bulk delete from the gallery multi-select.
   // ── Gallery multi-select (lifted here so Compress/Export can use it) ────────
@@ -1189,49 +930,15 @@ export function AppShell() {
     }
   }, [photos, activePhotoId]);
 
-  const handleResumeSession = useCallback(() => {
-    const m = resumeManifest;
-    setResumeManifest(null);
-    if (m) setPhotos(m.photos); // 0 → N reveals the chrome + auto-selects photo 0
-  }, [resumeManifest]);
-
-  const handleStartFresh = useCallback(() => {
-    setResumeManifest(null);
-    void clearGalleryManifest();
-    setShowUpload(true);
-  }, []);
-
-  const handleExport = useCallback(async () => {
-    const entry = photos.find((p) => p.id === activePhotoId) ?? null;
-    const activeName = entry?.name ?? "image";
-    const blob = await stamp.exportBlob(exportFormat, quality / 100);
-    if (!blob) return;
-
-    let bytes = new Uint8Array(await blob.arrayBuffer());
-    // The canvas export is always freshly re-encoded, so it carries no EXIF.
-    // Keep → transplant the true original's EXIF (JPEG/WebP); strip → leave clean.
-    let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
-    if (exifKeep && entry && (exportFormat === "jpeg" || exportFormat === "webp")) {
-      const orig = await getOriginal(entry.uploadKey ?? entry.originalKey);
-      if (orig) sourceTiff = readExifTiff(new Uint8Array(orig.bytes), orig.mimeType);
-    }
-    bytes = applyExifToReencoded(
-      bytes,
-      exportFormat,
-      exifKeep ? "keep" : "strip",
-      sourceTiff,
-      stamp.state.width,
-      stamp.state.height,
-    );
-
-    const stem = activeName.replace(/\.[^.]+$/, "");
-    const url = URL.createObjectURL(new Blob([bytes], { type: blob.type }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${stem}-revised${EXT[exportFormat]}`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep]);
+  // Canvas viewport + single-image export/clipboard/histogram actions.
+  const {
+    getHistogram,
+    handleZoomIn,
+    handleZoomOut,
+    handleZoomReset,
+    handleCopyToClipboard,
+    handleExport,
+  } = useCanvasActions({ stamp, exportFormat, quality, exifKeep });
 
   const handleDeleteAll = useCallback(() => {
     setDeleteAllOpen(true);
@@ -1281,65 +988,25 @@ export function AppShell() {
 
   const isBlurringRef = useRef(false);
 
-  const getCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const c = canvasRef.current;
-    if (!c) return { x: 0, y: 0 };
-    const r = c.getBoundingClientRect();
-    return {
-      x: ((e.clientX - r.left) * c.width) / r.width,
-      y: ((e.clientY - r.top) * c.height) / r.height,
-    };
-  }, []);
+  const {
+    getCoords,
+    handleSelectionClick,
+    handleSelectAll,
+    handleDeselect,
+    handleDeleteSelection,
+    handleToggleMove,
+    handleToggleSelectionMode,
+  } = useSelectionActions(stamp, canvasRef);
 
   // ── Selection Marker (magic-wand) — Edit & Move → Selection (above Align) ──
   // All masking math is Rust; JS just stores the returned overlay + routes ops.
+  // (The click/toggle handlers now live in useSelectionActions; these selectors
+  // remain because the panel + canvas JSX and the leave-tool effect read them.)
   const selectionTolerance = useToolStore((s) => s.selectionTolerance);
   const setSelectionTolerance = useToolStore((s) => s.setSelectionTolerance);
   const selectionMode = useToolStore((s) => s.selectionMode);
   const setSelectionMode = useToolStore((s) => s.setSelectionMode);
   const selectionMask = useToolStore((s) => s.selectionMask);
-  const setSelectionMask = useToolStore((s) => s.setSelectionMask);
-
-  const handleSelectionClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const tool = stamp.toolRef.current;
-      if (!tool) return;
-      const { x, y } = getCoords(e);
-      const mask = tool.magic_wand_select(x, y, selectionTolerance);
-      setSelectionMask(mask.length ? mask : null);
-    },
-    [stamp, getCoords, selectionTolerance],
-  );
-  const handleSelectAll = useCallback(() => {
-    const tool = stamp.toolRef.current;
-    if (!tool) return;
-    const mask = tool.select_all();
-    setSelectionMask(mask.length ? mask : null);
-  }, [stamp]);
-  const handleDeselect = useCallback(() => {
-    stamp.toolRef.current?.clear_selection();
-    setSelectionMask(null);
-  }, [stamp]);
-  const handleDeleteSelection = useCallback(() => {
-    const tool = stamp.toolRef.current;
-    if (tool?.delete_selection()) {
-      stamp.flushToCanvas();
-      stamp.syncState();
-    }
-    setSelectionMask(null);
-  }, [stamp]);
-  // Move-layer toggle (Layer Settings + Ctrl+M). Switches to the Layer Settings
-  // tool and is mutually exclusive with the Selection marker.
-  const handleToggleMove = useCallback(() => {
-    setActiveTool("arrow");
-    setSelectionMode(false);
-    setMoveActive((m) => !m);
-  }, []);
-  // Selection toggle — mutually exclusive with Move.
-  const handleToggleSelectionMode = useCallback(() => {
-    setMoveActive(false);
-    setSelectionMode((m) => !m);
-  }, []);
 
   // Selection + Move now live on the Layer Settings ("arrow") tool; leaving it
   // clears both toggles.
@@ -1459,30 +1126,7 @@ export function AppShell() {
 
   // Mask edit-mode handlers (wired into the Layers panel). Entering mask edit
   // selects the layer + switches to the Paint brush so strokes hit the mask.
-  const handleAddMask = useCallback(
-    (id: number) => {
-      stamp.setActiveLayer(id);
-      stamp.addLayerMask(id);
-      setActiveTool("brush");
-      setBrushMode("paint");
-      setMaskEditing(true);
-    },
-    [stamp],
-  );
-  const handleToggleMaskEdit = useCallback(
-    (id: number) => {
-      const activeId = stamp.toolRef.current?.active_layer_id();
-      if (maskEditing && activeId === id) {
-        setMaskEditing(false);
-        return;
-      }
-      stamp.setActiveLayer(id);
-      setActiveTool("brush");
-      setBrushMode("paint");
-      setMaskEditing(true);
-    },
-    [stamp, maskEditing],
-  );
+  const { handleAddMask, handleToggleMaskEdit } = useMaskActions(stamp);
 
   // Mask editing is a brush activity — drop it when leaving the Paint tool so
   // the panel highlight and canvas routing don't get stuck on.
@@ -1611,6 +1255,7 @@ export function AppShell() {
   // The object the Align row acts on (set by reselect / "Select bounding box").
   const selectedObject = useAnnotationStore((s) => s.selectedObject);
   const setSelectedObject = useAnnotationStore((s) => s.setSelectedObject);
+  const bumpAnnotations = useAnnotationStore((s) => s.bumpAnnotations);
 
   const handleSelectObject = useCallback(
     (o: ReselectObject) => {
@@ -1649,13 +1294,6 @@ export function AppShell() {
     [stamp, selectedObject, drawingTools, textTool],
   );
 
-  // Histogram bins straight from Rust (`calculate_histogram` over the composite
-  // buffer) — replaces HistogramView's old per-resample canvas sampling loop.
-  const getHistogram = useCallback((): Uint32Array | null => {
-    const tool = stamp.toolRef.current;
-    return tool ? tool.calculate_histogram() : null;
-  }, [stamp]);
-
   // Drop the Align selection when switching photos (annotation ids are per-photo).
   useEffect(() => {
     setSelectedObject(null);
@@ -1668,12 +1306,12 @@ export function AppShell() {
         stamp.flushToCanvas();
         stamp.syncState();
         textTool.refreshAnnotations();
-        window.dispatchEvent(new Event("text-annotations-changed"));
+        bumpAnnotations(); // was a `text-annotations-changed` window event
       } else {
         drawingTools.removeShape(o.id);
       }
     },
-    [stamp, textTool, drawingTools],
+    [stamp, textTool, drawingTools, bumpAnnotations],
   );
 
   const redStampTool = useRedStampTool({
@@ -1705,55 +1343,6 @@ export function AppShell() {
     emojiTool,
     redStampTool,
   });
-
-  const handleZoomIn = useCallback(() => {
-    stamp.toolRef.current?.adjust_zoom(1);
-    stamp.syncState();
-  }, [stamp]);
-
-  const handleZoomOut = useCallback(() => {
-    stamp.toolRef.current?.adjust_zoom(-1);
-    stamp.syncState();
-  }, [stamp]);
-
-  const handleZoomReset = useCallback(() => {
-    stamp.toolRef.current?.set_zoom(1.0);
-    stamp.syncState();
-  }, [stamp]);
-
-  const handleCopyToClipboard = useCallback(async () => {
-    const tool = stamp.toolRef.current;
-    if (!tool) {
-      toast.error("No image to copy");
-      return;
-    }
-    try {
-      // Match the export-path semantics: bake any live text overlays into
-      // pixels first so the clipboard image reflects what's on screen.
-      if (tool.text_annotation_count() > 0) {
-        tool.flatten_text_annotations();
-        stamp.flushToCanvas();
-        stamp.syncState();
-      }
-      // Important: `tool.export_png()` returns a Uint8Array view into wasm
-      // memory. Passing `.buffer` to Blob() would include the entire wasm
-      // heap, not just the PNG slice — the resulting blob is huge and the
-      // clipboard write fails. Copy the slice into a fresh ArrayBuffer
-      // (detached from wasm memory) before handing it to Blob.
-      const pngView = tool.export_png();
-      const pngBytes = new Uint8Array(pngView.length);
-      pngBytes.set(pngView);
-      const blob = new Blob([pngBytes], { type: "image/png" });
-      await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blob }),
-      ]);
-      toast.success("Copied to clipboard");
-    } catch (err) {
-      console.error("Copy to clipboard failed:", err);
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      toast.error(`Couldn't copy to clipboard: ${msg}`);
-    }
-  }, [stamp]);
 
   /**
    * Paste a bitmap from the clipboard into the **active layer**, centred on the
@@ -2541,11 +2130,7 @@ export function AppShell() {
           />
         ) : (
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-bg-secondary shadow-2xl">
-            <NewActions
-              onFiles={handleAddPhotos}
-              isLoading={isImageLoading}
-              loadProgress={loadProgress}
-            />
+            <NewActions onFiles={handleAddPhotos} />
           </div>
         )}
       </FirstRunScreen>
@@ -2554,8 +2139,6 @@ export function AppShell() {
         open={showUpload && !resumeManifest && !booting && !firstRun}
         onClose={() => setShowUpload(false)}
         onFiles={handleAddPhotos}
-        isLoading={isImageLoading}
-        loadProgress={loadProgress}
         canClose={photos.length > 0}
       />
 
@@ -2877,8 +2460,6 @@ export function AppShell() {
             undoCount={stamp.state.undoCount}
             quality={quality}
             onQualityChange={handleQualityChange}
-            hasBeenModified={hasBeenModified}
-            compareActive={compareActive}
             onToggleCompare={handleToggleCompare}
             onAutoCompress={handleAutoCompress}
             isCompressing={compressProgress.running}
@@ -3008,8 +2589,6 @@ export function AppShell() {
                           cursorVisible={visible}
                           onCanvasEnter={onCanvasEnter}
                           onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
-                          beforeUrl={originalUrl}
-                          compareActive={compareActive}
                           activeTool={activeTool}
                           textInput={textTool.textInput}
                           textareaRef={textTool.textareaRef}
@@ -3036,7 +2615,6 @@ export function AppShell() {
                           annotations={annotationBoxes}
                           hoveredAnnotationId={textTool.hoveredAnnotationId}
                           onCanvasHover={textTool.onCanvasHover}
-                          isPanning={isPanning}
                           cropSelection={drawingTools.cropSelection}
                           onCropChange={(sel) => drawingTools.setCropSelection(sel)}
                           pastePlacementRect={pastePlacement.rect}
@@ -3097,8 +2675,6 @@ export function AppShell() {
                       cursorVisible={visible}
                       onCanvasEnter={onCanvasEnter}
                       onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
-                      beforeUrl={originalUrl}
-                      compareActive={compareActive}
                       activeTool={activeTool}
                       textInput={textTool.textInput}
                       textareaRef={textTool.textareaRef}
@@ -3132,7 +2708,6 @@ export function AppShell() {
                       annotations={annotationBoxes}
                       hoveredAnnotationId={textTool.hoveredAnnotationId}
                       onCanvasHover={textTool.onCanvasHover}
-                      isPanning={isPanning}
                       cropSelection={drawingTools.cropSelection}
                       onCropChange={(sel) => drawingTools.setCropSelection(sel)}
                       pastePlacementRect={pastePlacement.rect}

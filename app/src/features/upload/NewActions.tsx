@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { panelSwap } from "@/lib/animations";
+import { useUIStore } from "@/stores/useUIStore";
 import { Button } from "@/components/ui/button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
@@ -122,8 +123,6 @@ interface Props {
   onFilesAdded?: () => void;
   /** A drop/fetch produced no usable images (the modal shakes). */
   onInvalidFiles?: () => void;
-  isLoading?: boolean;
-  loadProgress?: number;
   /** Focus the first action on mount (modal yes; page no, to avoid a scroll jump). */
   autoFocusFirst?: boolean;
   /** Hide the website/GitHub/Codeberg row. */
@@ -137,12 +136,13 @@ export function NewActions({
   onFiles,
   onFilesAdded,
   onInvalidFiles,
-  isLoading = false,
-  loadProgress = 0,
   autoFocusFirst = false,
   showLinks = true,
   onBlankModeChange,
 }: Props) {
+  // Image-load indicator now lives in the UI store (was prop-drilled).
+  const isLoading = useUIStore((s) => s.isImageLoading);
+  const loadProgress = useUIStore((s) => s.loadProgress);
   const inputRef = useRef<HTMLInputElement>(null);
   const firstButtonRef = useRef<HTMLButtonElement>(null);
   const [dragging, setDragging] = useState(false);

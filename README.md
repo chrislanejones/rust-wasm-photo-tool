@@ -50,6 +50,12 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.3 — 2026-07-02
+
+Internal refactor — no behavior change. The `AppShell` composition root shed ~600 lines: image loading, canvas actions, selection, and mask handling moved into four focused session hooks (`useImageSession`, `useCanvasActions`, `useSelectionActions`, `useMaskActions`), stray component state moved into the Zustand stores, and the last two `window` `CustomEvent`s (text commit + annotation sync) became plain store updates. Same app, smaller AppShell.
+
+> **About this release.** Housekeeping. Nothing changes for anyone using the app — this splits the biggest file into pieces you can actually hold in your head, and closes out the last of the global window events. Also added a [Language-Tier Roadmap](docs/LANGUAGE-TIER-ROADMAP.md) to docs: which bits of TypeScript and Rust are in the right language, and which should trade places.
+
 ### v7.2 — 2026-07-02
 
 | # | Change | Status |
@@ -58,16 +64,6 @@ Latest release below. Full dated history → **[docs/Change-summary.md](docs/Cha
 | 2 | **Pen: fill a path you already drew** — the Bézier pen's Background fill only applied if set *before* drawing; reselecting a committed path and changing the Background did nothing. `update_bezier_annotation` now carries stroke + fill, so reselecting a pen path and adjusting the Paint→Pen panel restyles it — including filling one drawn with Background: None | Complete |
 
 > **About this release — pricing philosophy + a pen fix.** Fundamental editing is local and costs us nothing to run, so it shouldn't sit behind a login: layers now work in the no-login tier (login/pay gate the cloud, not the canvas). And the pen tool's Background fill can finally be applied to a path you've already drawn, not just set up front.
-
-### v7.1 — 2026-07-02
-
-| # | Change | Status |
-| --- | --- | --- |
-| 1 | **Crop no longer slides annotations** — `ImageHorseTool::crop` cropped the pixels but never offset text/shape annotations by the crop origin, so any crop not starting at the top-left corner left text and shapes visually drifting off the photo. They now shift with the pixels (same offset pattern as Move and Canvas Size), with a regression test | Complete |
-| 2 | **One dialog system** — `ui/Modal` and `SmallDialog` deleted; every dialog (Settings, Diagnostics, idle screen, small-window notice) now composes the shadcn `ui/dialog` primitives, which gained `size="sm" \| "default" \| "xl"` presets and an `overlayClassName` escape hatch. One focus trap, one animation, one API | Complete |
-| 3 | **One button primitive** — the unused stock-shadcn `ui/button` was rewritten as the app's real Button with cva sizes (`xs` / `tiny` / `default` / `large`), absorbing `LargeButton` and `TinyButton` (both deleted; 17 consumer files migrated). Also fixes the Apply Crop vs Activate Eyedropper font-size mismatch | Complete |
-
-> **About this release — a bug fix and two consolidations.** Cropping with any offset used to leave text and shape annotations behind while the pixels moved — they now travel together, verified down to the pixel. Under the hood, three modal systems became one and seven button-ish primitives became fewer: the shadcn dialog and a single cva-variant Button are now the only game in town, deleting four files and a matching set of visual inconsistencies.
 
 ## License
 

@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useUIStore } from "@/stores/useUIStore";
 
 interface CompareSliderProps {
-  /** Object URL or blob URL of the unedited original. */
-  beforeUrl: string | null;
   /** The canvas element rendering the current edited image — we mirror its bounding box. */
   canvasEl: HTMLCanvasElement | null;
-  active: boolean;
 }
 
 /**
@@ -13,7 +11,11 @@ interface CompareSliderProps {
  * canvas. The "before" layer fills that same box via background-size 100% 100%,
  * so both layers share one coordinate space regardless of zoom/pan.
  */
-export function CompareSlider({ beforeUrl, canvasEl, active }: CompareSliderProps) {
+export function CompareSlider({ canvasEl }: CompareSliderProps) {
+  // The "before" original URL + whether compare is on now come from the UI store
+  // (were prop-drilled AppShell → CanvasArea → here before stage 1).
+  const beforeUrl = useUIStore((s) => s.originalUrl);
+  const active = useUIStore((s) => s.compareActive);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState(0.5);
   const [dragging, setDragging] = useState(false);

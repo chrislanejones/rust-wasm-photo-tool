@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
 export interface Point {
   x: number;
@@ -460,28 +461,31 @@ export function useDrawingTools({
   // restore a different shape overlay). Same event the text tool listens to.
   // If the shape currently being edited vanished (undone away), drop the
   // overlay so we don't leave a hidden shape with no preview.
+  // Was a `text-annotations-changed` window event before stage 4; now driven by
+  // the annotation-revision counter in the store. prevRev skips the mount run so
+  // this fires only on an actual bump (matching the old event-only semantics).
+  const annotationsRevision = useAnnotationStore((s) => s.annotationsRevision);
+  const prevAnnotationsRev = useRef(annotationsRevision);
   useEffect(() => {
-    const handler = () => {
-      refreshShapes();
-      const editId = editStateRef.current?.editId;
-      if (editId == null) return;
-      const tool = toolRef.current;
-      let stillThere = false;
-      try {
-        stillThere = (JSON.parse(tool?.get_shape_annotations() ?? "[]") as ShapeMeta[])
-          .some((s) => s.id === editId);
-      } catch {
-        stillThere = false;
-      }
-      if (!stillThere) {
-        editStateRef.current = null;
-        setEditState(null);
-        tool?.set_editing_shape(-1);
-      }
-    };
-    window.addEventListener("text-annotations-changed", handler);
-    return () => window.removeEventListener("text-annotations-changed", handler);
-  }, [refreshShapes, toolRef]);
+    if (prevAnnotationsRev.current === annotationsRevision) return;
+    prevAnnotationsRev.current = annotationsRevision;
+    refreshShapes();
+    const editId = editStateRef.current?.editId;
+    if (editId == null) return;
+    const tool = toolRef.current;
+    let stillThere = false;
+    try {
+      stillThere = (JSON.parse(tool?.get_shape_annotations() ?? "[]") as ShapeMeta[])
+        .some((s) => s.id === editId);
+    } catch {
+      stillThere = false;
+    }
+    if (!stillThere) {
+      editStateRef.current = null;
+      setEditState(null);
+      tool?.set_editing_shape(-1);
+    }
+  }, [annotationsRevision, refreshShapes, toolRef]);
 
   /** Overlay handle drags push new geometry here (canvas coords). */
   const updateEditGeometry = useCallback((start: Point, end: Point) => {

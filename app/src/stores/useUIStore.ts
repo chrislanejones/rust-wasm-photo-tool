@@ -5,12 +5,23 @@
 // them here lets any component subscribe directly (see Grok's blueprint in
 // /zustand) and is the first slice of slimming the 3k-line AppShell down.
 //
-// Lifecycle flags (booting, firstRun) intentionally stay local in AppShell —
-// they're wired to boot effects, not UI chrome.
+// Boot/lifecycle flags (booting, firstRun), the image-load indicator
+// (isImageLoading/loadProgress + the fake-progress interval, encapsulated in the
+// startImageLoad/finishImageLoad action pair), the A/B compare view state
+// (compareActive/originalUrl), the spacebar pan flag (isPanning), and the
+// resolved auth tier (userMode/authResolved/devTierOverride) also live here now —
+// evicted from AppShell's local useState in the stage-1 dismantle.
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { resolveSet, type SetArg } from "./_shared";
 import { idbStorage } from "./storage/idbStorage";
+import type { UserMode } from "@/components/StatusBar";
+
+// Module-scoped handles for the fake image-load progress interval and the
+// hide-after-finish timer. Kept out of store state (they're imperative timer
+// ids, not render inputs) — mirrors the loadIntervalRef AppShell used to hold.
+let loadInterval: ReturnType<typeof setInterval> | null = null;
+let finishTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Compact master-bar active tab (≤1000px). */
 export type MasterTab = "tools" | "gallery" | "review";
@@ -33,6 +44,23 @@ interface UIState {
   deleteSelectedOpen: boolean;
   exportDialogOpen: boolean;
 
+  // Cold-start boot splash: true until WASM is up + the session check resolves.
+  booting: boolean;
+  // True until the user first enters the editor (a photo becomes active).
+  firstRun: boolean;
+  // Image-load indicator (top progress bar + New/Upload spinners).
+  isImageLoading: boolean;
+  loadProgress: number;
+  // A/B compare: the "before" original blob URL + whether the slider is on.
+  originalUrl: string | null;
+  compareActive: boolean;
+  // Spacebar-held pan mode.
+  isPanning: boolean;
+  // Resolved auth tier + the Super-User client-side override.
+  userMode: UserMode;
+  authResolved: boolean;
+  devTierOverride: UserMode | null;
+
   setShowUpload: (v: SetArg<boolean>) => void;
   setShowTopBar: (v: SetArg<boolean>) => void;
   setMasterTab: (v: SetArg<MasterTab>) => void;
@@ -48,6 +76,21 @@ interface UIState {
   setDeletePhotoId: (v: SetArg<string | null>) => void;
   setDeleteSelectedOpen: (v: SetArg<boolean>) => void;
   setExportDialogOpen: (v: SetArg<boolean>) => void;
+
+  setBooting: (v: SetArg<boolean>) => void;
+  setFirstRun: (v: SetArg<boolean>) => void;
+  setIsImageLoading: (v: SetArg<boolean>) => void;
+  setLoadProgress: (v: SetArg<number>) => void;
+  /** Begin the fake-progress indicator: reset to 0, tick up toward 90%. */
+  startImageLoad: () => void;
+  /** Finish it: snap to 100%, then hide + reset after a short beat. */
+  finishImageLoad: () => void;
+  setOriginalUrl: (v: SetArg<string | null>) => void;
+  setCompareActive: (v: SetArg<boolean>) => void;
+  setIsPanning: (v: SetArg<boolean>) => void;
+  setUserMode: (v: SetArg<UserMode>) => void;
+  setAuthResolved: (v: SetArg<boolean>) => void;
+  setDevTierOverride: (v: SetArg<UserMode | null>) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -68,6 +111,17 @@ export const useUIStore = create<UIState>()(
       deletePhotoId: null,
       deleteSelectedOpen: false,
       exportDialogOpen: false,
+
+      booting: true,
+      firstRun: true,
+      isImageLoading: false,
+      loadProgress: 0,
+      originalUrl: null,
+      compareActive: false,
+      isPanning: false,
+      userMode: "demo",
+      authResolved: false,
+      devTierOverride: null,
 
       setShowUpload: (v) => set((s) => ({ showUpload: resolveSet(v, s.showUpload) })),
       setShowTopBar: (v) => set((s) => ({ showTopBar: resolveSet(v, s.showTopBar) })),
@@ -93,6 +147,47 @@ export const useUIStore = create<UIState>()(
         set((s) => ({ deleteSelectedOpen: resolveSet(v, s.deleteSelectedOpen) })),
       setExportDialogOpen: (v) =>
         set((s) => ({ exportDialogOpen: resolveSet(v, s.exportDialogOpen) })),
+
+      setBooting: (v) => set((s) => ({ booting: resolveSet(v, s.booting) })),
+      setFirstRun: (v) => set((s) => ({ firstRun: resolveSet(v, s.firstRun) })),
+      setIsImageLoading: (v) =>
+        set((s) => ({ isImageLoading: resolveSet(v, s.isImageLoading) })),
+      setLoadProgress: (v) =>
+        set((s) => ({ loadProgress: resolveSet(v, s.loadProgress) })),
+      startImageLoad: () => {
+        if (loadInterval) clearInterval(loadInterval);
+        if (finishTimer) {
+          clearTimeout(finishTimer);
+          finishTimer = null;
+        }
+        set({ isImageLoading: true, loadProgress: 0 });
+        loadInterval = setInterval(() => {
+          set((s) => ({
+            loadProgress: s.loadProgress >= 90 ? 90 : s.loadProgress + Math.random() * 15,
+          }));
+        }, 100);
+      },
+      finishImageLoad: () => {
+        if (loadInterval) {
+          clearInterval(loadInterval);
+          loadInterval = null;
+        }
+        set({ loadProgress: 100 });
+        if (finishTimer) clearTimeout(finishTimer);
+        finishTimer = setTimeout(() => {
+          set({ isImageLoading: false, loadProgress: 0 });
+          finishTimer = null;
+        }, 500);
+      },
+      setOriginalUrl: (v) => set((s) => ({ originalUrl: resolveSet(v, s.originalUrl) })),
+      setCompareActive: (v) =>
+        set((s) => ({ compareActive: resolveSet(v, s.compareActive) })),
+      setIsPanning: (v) => set((s) => ({ isPanning: resolveSet(v, s.isPanning) })),
+      setUserMode: (v) => set((s) => ({ userMode: resolveSet(v, s.userMode) })),
+      setAuthResolved: (v) =>
+        set((s) => ({ authResolved: resolveSet(v, s.authResolved) })),
+      setDevTierOverride: (v) =>
+        set((s) => ({ devTierOverride: resolveSet(v, s.devTierOverride) })),
     }),
     {
       name: "image-horse-ui-v1",

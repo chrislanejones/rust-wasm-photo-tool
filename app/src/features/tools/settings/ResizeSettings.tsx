@@ -14,6 +14,8 @@ import {
 import { getWebPerfMetrics } from "@/lib/webPerf";
 import { quickSpring } from "@/lib/animations";
 import type { ExportFormat } from "@/lib/exportImage";
+import { useUIStore } from "@/stores/useUIStore";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 
 type ResizeTab = "resize" | "compress";
 
@@ -57,9 +59,7 @@ interface ResizeSettingsProps {
   onResize: (w: number, h: number, filter: number) => void;
   exportFormat: ExportFormat;
   onExportFormatChange: (f: ExportFormat) => void;
-  compareActive: boolean;
   onToggleCompare: () => void;
-  hasBeenModified: boolean;
   /** Run Auto Compress over the current selection, or over the whole gallery. */
   onAutoCompress: (scope: "selected" | "all") => void;
   isCompressing: boolean;
@@ -89,14 +89,16 @@ export function ResizeSettings({
   onResize,
   exportFormat,
   onExportFormatChange,
-  compareActive,
   onToggleCompare,
-  hasBeenModified,
   onAutoCompress,
   isCompressing,
   selectedCount,
   totalCount,
 }: ResizeSettingsProps) {
+  // A/B compare view lives in the UI store; the active-image dirty flag in the
+  // gallery store — both were prop-drilled from AppShell before stage 1.
+  const compareActive = useUIStore((s) => s.compareActive);
+  const hasBeenModified = useGalleryStore((s) => s.hasBeenModified);
   const [width, setWidth] = useState(String(imageWidth));
   const [height, setHeight] = useState(String(imageHeight));
   const [lockAspect, setLockAspect] = useState(true);

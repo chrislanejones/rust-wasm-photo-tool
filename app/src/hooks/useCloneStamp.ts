@@ -3,6 +3,7 @@ import type { RefObject, MouseEvent } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
 import { registerWasmMemory } from "@/lib/resourceMonitor";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
 /** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
 async function decodePngToRgba(
@@ -584,11 +585,12 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   }, []);
 
   // ── History ───────────────────────────────────────────────────────────────
-  /** Fire a window event so consumers (e.g. the text tool) can re-sync any
-   *  derived state (the live annotation list, hover/edit selection, etc.)
-   *  after an undo/redo/jump that may have restored a different overlay. */
+  /** Bump the annotation revision so consumers (e.g. the text tool) can re-sync
+   *  any derived state (the live annotation list, hover/edit selection, etc.)
+   *  after an undo/redo/jump that may have restored a different overlay.
+   *  (Was a `text-annotations-changed` window event before stage 4.) */
   const broadcastAnnotationsChanged = useCallback(() => {
-    window.dispatchEvent(new Event("text-annotations-changed"));
+    useAnnotationStore.getState().bumpAnnotations();
   }, []);
 
   const undo = useCallback(() => {

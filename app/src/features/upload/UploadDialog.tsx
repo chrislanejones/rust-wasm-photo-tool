@@ -16,8 +16,6 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onFiles: (files: File[]) => void;
-  isLoading?: boolean;
-  loadProgress?: number;
   canClose?: boolean;
 }
 
@@ -25,8 +23,6 @@ export function UploadDialog({
   open,
   onClose,
   onFiles,
-  isLoading = false,
-  loadProgress = 0,
   canClose = true,
 }: Props) {
   const controls = useAnimation();
@@ -112,8 +108,6 @@ export function UploadDialog({
                 onFiles={onFiles}
                 onFilesAdded={onClose}
                 onInvalidFiles={triggerShake}
-                isLoading={isLoading}
-                loadProgress={loadProgress}
                 autoFocusFirst
                 onBlankModeChange={setBlankMode}
               />

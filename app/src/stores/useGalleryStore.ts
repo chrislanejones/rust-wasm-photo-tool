@@ -19,6 +19,9 @@ interface GalleryState {
   imageSavings: Record<string, { savingsPercent: number }>;
   /** Ids of photos edited this session (drives the "modified" dot). */
   modifiedPhotos: Set<string>;
+  /** Whether the ACTIVE image has unsaved edits this session (drives the compare
+   *  gate + save-on-switch). Sits next to modifiedPhotos as edit bookkeeping. */
+  hasBeenModified: boolean;
   /** Gallery cap for the current tier. */
   maxPhotos: number;
   /** Prior-session manifest offered on the Resume screen (null = none). */
@@ -31,6 +34,7 @@ interface GalleryState {
     v: SetArg<Record<string, { savingsPercent: number }>>,
   ) => void;
   setModifiedPhotos: (v: SetArg<Set<string>>) => void;
+  setHasBeenModified: (v: SetArg<boolean>) => void;
   setMaxPhotos: (v: SetArg<number>) => void;
   setResumeManifest: (v: SetArg<GalleryManifest | null>) => void;
 }
@@ -41,6 +45,7 @@ export const useGalleryStore = create<GalleryState>((set) => ({
   selectedIds: new Set(),
   imageSavings: {},
   modifiedPhotos: new Set(),
+  hasBeenModified: false,
   maxPhotos: DEFAULT_PHOTO_LIMIT,
   resumeManifest: null,
 
@@ -52,6 +57,8 @@ export const useGalleryStore = create<GalleryState>((set) => ({
     set((s) => ({ imageSavings: resolveSet(v, s.imageSavings) })),
   setModifiedPhotos: (v) =>
     set((s) => ({ modifiedPhotos: resolveSet(v, s.modifiedPhotos) })),
+  setHasBeenModified: (v) =>
+    set((s) => ({ hasBeenModified: resolveSet(v, s.hasBeenModified) })),
   setMaxPhotos: (v) => set((s) => ({ maxPhotos: resolveSet(v, s.maxPhotos) })),
   setResumeManifest: (v) =>
     set((s) => ({ resumeManifest: resolveSet(v, s.resumeManifest) })),

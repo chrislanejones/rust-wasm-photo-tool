@@ -85,8 +85,6 @@ interface ToolsSidebarProps {
   undoCount: number;
   quality: number;
   onQualityChange: (q: number) => void;
-  hasBeenModified: boolean;
-  compareActive: boolean;
   onToggleCompare: () => void;
   onAutoCompress: (scope: "selected" | "all") => void;
   isCompressing: boolean;
@@ -169,8 +167,6 @@ export function ToolsSidebar({
   undoCount,
   quality,
   onQualityChange,
-  hasBeenModified,
-  compareActive,
   onToggleCompare,
   onAutoCompress,
   isCompressing,
@@ -250,9 +246,7 @@ export function ToolsSidebar({
             onResize={onResize}
             exportFormat={exportFormat}
             onExportFormatChange={onExportFormatChange ?? (() => {})}
-            compareActive={compareActive}
             onToggleCompare={onToggleCompare}
-            hasBeenModified={hasBeenModified}
             onAutoCompress={onAutoCompress}
             isCompressing={isCompressing}
             compressProgress={compressProgress}

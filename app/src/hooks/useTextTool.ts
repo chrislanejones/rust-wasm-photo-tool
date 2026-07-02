@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { parseColorSync, warmColorParser } from "@/lib/colorParser";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
 export interface TextInput {
   screenX: number;
@@ -140,35 +141,38 @@ export function useTextTool({
   // may have changed even though no JS-side text op fired. Refresh and drop
   // any stale edit/hover state pointing at an annotation that no longer
   // exists at this history step.
+  // Was a `text-annotations-changed` window event before stage 4; now driven by
+  // the annotation-revision counter in the store. prevRev skips the mount run so
+  // this fires only on an actual bump (matching the old event-only semantics).
+  const annotationsRevision = useAnnotationStore((s) => s.annotationsRevision);
+  const prevAnnotationsRev = useRef(annotationsRevision);
   useEffect(() => {
-    const handler = () => {
-      const tool = toolRef.current;
-      if (!tool) return;
-      let list: AnnotationMeta[] = [];
-      try {
-        list = JSON.parse(tool.get_text_annotations());
-      } catch {
-        list = [];
+    if (prevAnnotationsRev.current === annotationsRevision) return;
+    prevAnnotationsRev.current = annotationsRevision;
+    const tool = toolRef.current;
+    if (!tool) return;
+    let list: AnnotationMeta[] = [];
+    try {
+      list = JSON.parse(tool.get_text_annotations());
+    } catch {
+      list = [];
+    }
+    setAnnotations(list);
+    // Drop the editing input if it points at a vanished annotation.
+    if (editingAnnotationId.current !== null) {
+      const stillThere = list.some((a) => a.id === editingAnnotationId.current);
+      if (!stillThere) {
+        editingAnnotationId.current = null;
+        textInputRef.current = null;
+        setTextInput(null);
+        tool.set_editing_text(-1);
       }
-      setAnnotations(list);
-      // Drop the editing input if it points at a vanished annotation.
-      if (editingAnnotationId.current !== null) {
-        const stillThere = list.some((a) => a.id === editingAnnotationId.current);
-        if (!stillThere) {
-          editingAnnotationId.current = null;
-          textInputRef.current = null;
-          setTextInput(null);
-          tool.set_editing_text(-1);
-        }
-      }
-      // Drop stale hover.
-      setHoveredAnnotationId((prev) =>
-        prev === null || list.some((a) => a.id === prev) ? prev : null,
-      );
-    };
-    window.addEventListener("text-annotations-changed", handler);
-    return () => window.removeEventListener("text-annotations-changed", handler);
-  }, [toolRef]);
+    }
+    // Drop stale hover.
+    setHoveredAnnotationId((prev) =>
+      prev === null || list.some((a) => a.id === prev) ? prev : null,
+    );
+  }, [annotationsRevision, toolRef]);
 
   const commitText = useCallback(() => {
     const ti = textInputRef.current;
@@ -278,9 +282,8 @@ export function useTextTool({
     refreshAnnotations();
     flushToCanvas();
     syncState();
-    window.dispatchEvent(
-      new CustomEvent("text-committed", { detail: { text: ti.text } }),
-    );
+    // Was a `text-committed` window CustomEvent before stage 4.
+    useAnnotationStore.getState().commitText(ti.text);
   }, [toolRef, flushToCanvas, syncState, refreshAnnotations]);
 
   /** Open the textarea on top of an existing annotation for re-editing. */

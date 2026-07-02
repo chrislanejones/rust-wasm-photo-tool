@@ -27,6 +27,14 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.47",
+    date: "2026-07-02",
+    headline: "Housekeeping under the hood",
+    entries: [
+      { tag: "infra", text: "Internal cleanup with no change to how the app works. The big central component that wires the editor together was split into smaller, focused pieces, and the last of the app's global browser events moved into its shared state stores. Nothing looks or behaves differently — it just makes the code easier to work on." },
+    ],
+  },
+  {
     version: "v0.9.46",
     date: "2026-07-02",
     headline: "Layers are free, and the pen fills what you drew",

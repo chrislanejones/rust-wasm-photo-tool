@@ -17,6 +17,7 @@ import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { useGuidesStore } from "@/stores/useGuidesStore";
+import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
 
@@ -65,8 +66,6 @@ interface Props {
   cursorVisible: boolean;
   onCanvasEnter: (rect: DOMRect) => void;
   onCanvasLeave: () => void;
-  beforeUrl: string | null;
-  compareActive: boolean;
   activeTool?: string;
   textInput?: TextInputState | null;
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
@@ -111,8 +110,6 @@ interface Props {
   /** Mousemove handler used to drive the hover highlight while the text
    *  tool is active. */
   onCanvasHover?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  // Item 2: Pan mode
-  isPanning?: boolean;
   cropSelection?: CropSelection | null;
   onCropChange?: (sel: CropSelection) => void;
   /** Pending paste-onto-layer placement (movable/resizable bounding box).
@@ -299,8 +296,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       cursorVisible,
       onCanvasEnter,
       onCanvasLeave,
-      beforeUrl,
-      compareActive,
       activeTool,
       textInput,
       textareaRef,
@@ -316,7 +311,6 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       annotations,
       hoveredAnnotationId,
       onCanvasHover,
-      isPanning = false,
       cropSelection,
       onCropChange,
       pastePlacementRect,
@@ -349,6 +343,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
     const internalContainerRef = useRef<HTMLDivElement>(null);
     const containerRef = externalContainerRef ?? internalContainerRef;
+
+    // Spacebar-pan now comes straight from the UI store — it was prop-drilled
+    // from AppShell before stage 1. (Compare state is read inside CompareSlider.)
+    const isPanning = useUIStore((s) => s.isPanning);
 
     // ── Rulers & Grids: grid geometry comes from Rust (gridLinesSync). Warm the
     // WASM fn once the grid is enabled, then recompute segments when the image
@@ -862,7 +860,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           }
           onMouseOut={onCanvasLeave}
         />
-        <CompareSlider beforeUrl={beforeUrl} canvasEl={canvasRef.current} active={compareActive} />
+        <CompareSlider canvasEl={canvasRef.current} />
 
         {/* ── Selection Marker overlay (marching-ants marker, computed in Rust) ── */}
         {selectionMask &&
