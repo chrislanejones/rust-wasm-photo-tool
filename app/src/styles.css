@@ -442,41 +442,18 @@ html.reduce-motion .skeleton::after {
 /* ═══════════════════════════════════════════════════════════════════════════
    SPINNER (single source of truth — components/ui/spinner.tsx)
 
-   The Lucide `Loader` icon, tinted with the accent token, gets a "comet"
-   lead-blade: a conic-gradient `mask-image` fades the ring from a bright
-   leading spoke to a transparent tail, so the spin reads clearly instead of
-   looking flat. Reuses the `spin` keyframes above. Under reduced motion the
-   spin AND the mask are dropped, leaving a static, full-strength icon
-   (Refactor-Playbook §3) — covers both the OS media query and the in-app
-   `.reduce-motion` toggle.
+   Plain Tailwind `animate-spin` on the Lucide `LoaderIcon`. Under reduced
+   motion the spin is dropped, leaving a static icon (Refactor-Playbook §3) —
+   covers both the OS media query and the in-app `.reduce-motion` toggle. The
+   in-app toggle is already covered by the global `html.reduce-motion *` rule
+   below; the OS media query needs its own rule since `animate-spin` is a
+   plain Tailwind utility, not scoped to the in-app toggle.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.spinner-comet {
-  animation: spin 0.7s linear infinite;
-  /* Comet lead-blade: the tail fades but keeps a ~22% opacity FLOOR (not fully
-     transparent) and reaches full strength by ~70°, so the leading edge stays
-     crisp and the faint spokes never wash out to invisible — important on a
-     LIGHT panel where the warm `--primary` accent has less headroom. The
-     accent token (`text-theme-primary`) supplies the colour in both themes. */
-  -webkit-mask-image: conic-gradient(
-    from 0deg,
-    rgba(0, 0, 0, 0.22),
-    #000 70%
-  );
-  mask-image: conic-gradient(from 0deg, rgba(0, 0, 0, 0.22), #000 70%);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .spinner-comet {
+  .animate-spin {
     animation: none;
-    -webkit-mask-image: none;
-    mask-image: none;
   }
-}
-html.reduce-motion .spinner-comet {
-  animation: none;
-  -webkit-mask-image: none;
-  mask-image: none;
 }
 
 /* Brush cursor */
@@ -874,7 +851,7 @@ textarea:focus-visible {
   border-radius: 2px;
 }
 
-.large-badge-item {
+.full-width-badge {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -887,11 +864,11 @@ textarea:focus-visible {
   border: 1px solid transparent;
 }
 
-.large-badge-item:hover {
+.full-width-badge:hover {
   background: var(--bg-elevated);
 }
 
-.large-badge-item:hover .history-delete {
+.full-width-badge:hover .history-delete {
   opacity: 1;
 }
 
@@ -902,67 +879,67 @@ textarea:focus-visible {
   flex-shrink: 0;
 }
 
-.large-badge-item.type-undo .history-dot {
+.full-width-badge.type-undo .history-dot {
   background: var(--undo-color);
 }
 
-.large-badge-item.type-current .history-dot {
+.full-width-badge.type-current .history-dot {
   background: var(--current-color);
   box-shadow: 0 0 8px var(--accent-dim);
 }
 
-.large-badge-item.type-redo .history-dot {
+.full-width-badge.type-redo .history-dot {
   background: var(--redo-color);
   opacity: 0.5;
 }
 
-.large-badge-item.type-current {
+.full-width-badge.type-current {
   background: var(--bg-tertiary);
   border-color: var(--border);
   justify-content: center;
 }
 
-.large-badge-item.type-current .history-dot {
+.full-width-badge.type-current .history-dot {
   background: var(--text-muted);
 }
 
-.large-badge-item.type-current .history-index {
+.full-width-badge.type-current .history-index {
   color: var(--text-muted);
 }
 
-.large-badge-item.type-current .large-badge {
+.full-width-badge.type-current .large-badge {
   color: var(--accent);
   font-weight: 600;
   text-align: center;
 }
 
-.large-badge-item.type-redo {
+.full-width-badge.type-redo {
   opacity: 0.45;
 }
 
-.large-badge-item.type-redo:hover {
+.full-width-badge.type-redo:hover {
   opacity: 0.7;
 }
 
 /* Persistent selection (e.g. the active guide) — full strength, accent ring. */
-.large-badge-item.is-selected,
-.large-badge-item.type-redo.is-selected {
+.full-width-badge.is-selected,
+.full-width-badge.type-redo.is-selected {
   opacity: 1;
   background: var(--bg-elevated);
   border-color: var(--accent);
 }
 
-.large-badge-item.is-selected .history-dot {
+.full-width-badge.is-selected .history-dot {
   background: var(--accent);
   opacity: 1;
 }
 
 /* The ✕ stays visible while selected so the active row is always deletable. */
-.large-badge-item.is-selected .history-delete {
+.full-width-badge.is-selected .history-delete {
   opacity: 1;
 }
 
-.large-badge-item.is-disabled {
+.full-width-badge.is-disabled {
   opacity: 0.4;
   pointer-events: none;
 }
@@ -977,16 +954,16 @@ textarea:focus-visible {
   text-overflow: ellipsis;
 }
 
-.large-badge-item.type-current .large-badge {
+.full-width-badge.type-current .large-badge {
   color: var(--accent);
   font-weight: 600;
 }
 
-.large-badge-item.type-current .history-dot {
+.full-width-badge.type-current .history-dot {
   background: var(--text-muted);
 }
 
-.large-badge-item.type-current .history-index {
+.full-width-badge.type-current .history-index {
   color: var(--text-muted);
 }
 
@@ -1448,46 +1425,43 @@ input[type="range"].slider-overlay::-moz-range-thumb {
   z-index: 1;
 }
 
+/* All three checkerboards below (viewport `.canvas-wrapper`, per-image
+   `.checkerboard-canvas`, and this one for thumbnails/swatches) share the
+   same `--bg-primary`/`--bg-tertiary` theme tokens now, differing only in
+   tile scale — so they read as one continuous surface instead of separately
+   hand-tuned patterns that drift apart under theme changes. */
 .checkerboard {
   background-image:
-    linear-gradient(45deg, #999 25%, transparent 25%),
-    linear-gradient(-45deg, #999 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #999 75%),
-    linear-gradient(-45deg, transparent 75%, #999 75%);
+    linear-gradient(45deg, var(--bg-tertiary) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--bg-tertiary) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--bg-tertiary) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--bg-tertiary) 75%);
   background-size: 12px 12px;
   background-position:
     0 0,
     0 6px,
     6px -6px,
     -6px 0px;
-  background-color: #d0d0d0;
+  background-color: var(--bg-primary);
 }
 
-/* Main canvas transparency grid. Theme-driven: warm light squares on light,
-   the original near-black grid on dark (see `.dark` override below). Applied
-   via the `checkerboard-canvas` class in AppShell. */
+/* Main canvas transparency grid — same tokens as `.canvas-wrapper`, just a
+   finer tile, so the per-image checker and the viewport backdrop it sits on
+   no longer look like two competing patterns. Applied via the
+   `checkerboard-canvas` class in CanvasArea. */
 .checkerboard-canvas {
   background-image:
-    linear-gradient(45deg, #d4cdbf 25%, transparent 25%),
-    linear-gradient(-45deg, #d4cdbf 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #d4cdbf 75%),
-    linear-gradient(-45deg, transparent 75%, #d4cdbf 75%);
+    linear-gradient(45deg, var(--bg-tertiary) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--bg-tertiary) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--bg-tertiary) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--bg-tertiary) 75%);
   background-size: 14px 14px;
   background-position:
     0 0,
     0 7px,
     7px -7px,
     -7px 0;
-  background-color: #e9e3d8;
-}
-
-.dark .checkerboard-canvas {
-  background-image:
-    linear-gradient(45deg, #2a2a2a 25%, transparent 25%),
-    linear-gradient(-45deg, #2a2a2a 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #2a2a2a 75%),
-    linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
-  background-color: #1a1a1a;
+  background-color: var(--bg-primary);
 }
 
 .photo-thumb-label {

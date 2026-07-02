@@ -287,6 +287,30 @@ fn erf(x: f64) -> f64 {
     sign * y
 }
 
+/// Live, non-destructive "placing" preview for a pasted image: holds the
+/// ORIGINAL decoded source pixels (never cumulatively re-resampled) plus the
+/// user's current placement rect. `recomposite()` scales+composites this onto
+/// the render-only cache every frame; the active layer's stored buffer is
+/// untouched until `commit_paste_preview`. Never part of a history `Snapshot`
+/// (mirrors `move_preview`).
+///
+/// Also doubles as the "Resize Layer" preview (`begin_layer_resize_preview`):
+/// same drag/commit/cancel flow, except the source pixels are the active
+/// layer's OWN current content rather than externally pasted bytes. That case
+/// is flagged by `is_layer_source` so `recomposite` can hide the (otherwise
+/// untouched, would-double-up) active layer, and `commit_paste_preview` can
+/// replace its buffer outright instead of blending onto it.
+struct PastePreview {
+    pixels: Vec<u8>, // src_w × src_h RGBA, at native/original resolution
+    src_w: u32,
+    src_h: u32,
+    dest_x: i32,
+    dest_y: i32,
+    dest_w: u32,
+    dest_h: u32,
+    is_layer_source: bool,
+}
+
 #[wasm_bindgen]
 pub struct ImageHorseTool {
     /// Layer stack, bottom (index 0) → top (last). Always non-empty.
@@ -329,6 +353,10 @@ pub struct ImageHorseTool {
     /// stored pixels. `None` when no move is in progress. Committed by
     /// `translate_active_layer`; transient (never part of a history snapshot).
     move_preview: Option<(i32, i32)>,
+    /// Live, non-destructive placement preview for a pasted image (see
+    /// `PastePreview`). `None` when no placement is in progress. Committed by
+    /// `commit_paste_preview`; transient (never part of a history snapshot).
+    paste_preview: Option<PastePreview>,
     /// Paint stroke-stabilizer trailing tip ("lazy mouse"). Set on stroke start;
     /// advances toward the cursor only when it pulls past the leash. `None` when
     /// no stabilized stroke is active.
@@ -434,6 +462,7 @@ impl ImageHorseTool {
             editing_text_id: None,
             selection: None,
             move_preview: None,
+            paste_preview: None,
             paint_stab_tip: None,
             paint_cov: Vec::new(),
             paint_base: Vec::new(),
@@ -580,6 +609,15 @@ impl ImageHorseTool {
         // it as `&mut` alongside the immutable layer borrow.
         let mut cache = std::mem::take(&mut self.composite_cache);
         let move_preview = self.move_preview.map(|(dx, dy)| (self.active, dx, dy));
+        // A layer-resize preview's source IS the active layer's own pixels, so
+        // that layer must be hidden from the base composite below — otherwise
+        // its untouched original would show through underneath the scaled
+        // copy the overlay pass draws on top of it.
+        let hide_layer = self
+            .paste_preview
+            .as_ref()
+            .filter(|p| p.is_layer_source)
+            .map(|_| self.active);
         composite_layers_into(
             &mut cache,
             &self.layers,
@@ -588,7 +626,28 @@ impl ImageHorseTool {
             self.editing_shape_id,
             self.editing_text_id,
             move_preview,
+            hide_layer,
         );
+        // Overlay the in-progress paste placement (if any) on top of the
+        // flattened composite — render-only, never touches a layer's stored
+        // buffer, so it stays out of undo history until `commit_paste_preview`.
+        if let Some(p) = &self.paste_preview {
+            let scaled = if p.dest_w == p.src_w && p.dest_h == p.src_h {
+                p.pixels.clone()
+            } else {
+                transform::resize_nearest(&p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h)
+            };
+            transform::paste_region(
+                &mut cache,
+                self.width as i32,
+                self.height as i32,
+                &scaled,
+                p.dest_w,
+                p.dest_h,
+                p.dest_x,
+                p.dest_y,
+            );
+        }
         self.composite_cache = cache;
     }
 
@@ -2587,6 +2646,155 @@ mod layer_persistence_tests {
         t.translate_active_layer(0, 0); // clears preview, records nothing
         assert_eq!(t.undo_count(), undo_before, "zero move adds no history");
         assert!(t.move_preview.is_none(), "preview cleared");
+    }
+
+    #[test]
+    fn paste_preview_renders_live_without_touching_the_layer_buffer() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [0, 0, 0, 255]));
+        t.begin_paste_preview(&solid(2, 2, [255, 255, 255, 255]), 2, 2, 0, 0, 2, 2);
+        // The stored layer buffer is untouched — get_image_data() recomposites
+        // straight from `layers`, bypassing the preview entirely.
+        assert_eq!(px(&t, 0, 0), [0, 0, 0, 255], "layer buffer not baked yet");
+        // recomposite() is what JS calls before each blit — it overlays the
+        // live preview onto composite_cache without touching `layers`.
+        t.recomposite();
+        let i = 0usize; // (0,0) in the flattened composite
+        assert_eq!(
+            &t.composite_cache[i..i + 4],
+            &[255u8, 255, 255, 255][..],
+            "recomposite() renders the pending placement"
+        );
+        assert_eq!(
+            t.layers[t.active].buf.data[0..4],
+            [0, 0, 0, 255],
+            "layer buffer still untouched after recomposite"
+        );
+    }
+
+    #[test]
+    fn commit_paste_preview_bakes_active_layer_and_records_one_step() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [0, 0, 0, 255]));
+        // Placement preview doesn't touch the layer buffer yet.
+        t.begin_paste_preview(&solid(2, 2, [255, 255, 255, 255]), 2, 2, 0, 0, 2, 2);
+        assert_eq!(
+            px(&t, 0, 0),
+            [0, 0, 0, 255],
+            "preview is render-only, not baked"
+        );
+        let undo_before = t.undo_count();
+        // Resize the placement to 4x4 (upscaling the 2x2 source) before commit.
+        t.set_paste_preview_rect(0, 0, 4, 4);
+        t.commit_paste_preview(0); // nearest, so the corners stay pure white
+        assert_eq!(
+            px(&t, 0, 0),
+            [255, 255, 255, 255],
+            "baked at the resized rect"
+        );
+        assert_eq!(px(&t, 3, 3), [255, 255, 255, 255]);
+        assert_eq!(t.undo_count(), undo_before + 1, "one Paste history step");
+        assert!(t.paste_preview.is_none(), "preview cleared after commit");
+    }
+
+    #[test]
+    fn cancel_paste_preview_discards_without_history() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [0, 0, 0, 255]));
+        t.begin_paste_preview(&solid(2, 2, [255, 255, 255, 255]), 2, 2, 0, 0, 2, 2);
+        let undo_before = t.undo_count();
+        t.cancel_paste_preview();
+        assert!(t.paste_preview.is_none());
+        assert_eq!(t.undo_count(), undo_before, "cancel adds no history");
+        assert_eq!(px(&t, 0, 0), [0, 0, 0, 255], "layer buffer untouched");
+    }
+
+    // 20x20 so a shrunk dest rect (10x10) stays above `PASTE_MIN_SIZE` (10)
+    // while still leaving pixels outside it to prove the original isn't
+    // doubled/left stale there.
+    #[test]
+    fn layer_resize_preview_hides_original_without_touching_the_buffer() {
+        let mut t = ImageHorseTool::new(20, 20);
+        t.load_image(&solid(20, 20, [10, 20, 30, 255]));
+        t.begin_layer_resize_preview();
+        assert_eq!(
+            px(&t, 0, 0),
+            [10, 20, 30, 255],
+            "layer buffer untouched before recomposite"
+        );
+        t.set_paste_preview_rect(0, 0, 10, 10);
+        t.recomposite();
+        // Check `composite_cache` directly (what `recomposite` actually
+        // renders) — `get_image_data()`/`px()` recomposite straight from
+        // `layers`, bypassing `paste_preview` entirely, so they'd show the
+        // stored (untouched) buffer either way and couldn't catch a doubling
+        // bug here.
+        assert_eq!(
+            &t.composite_cache[0..4],
+            &[10u8, 20, 30, 255][..],
+            "preview itself renders inside the shrunk rect"
+        );
+        let corner = ((19 * 20 + 19) * 4) as usize;
+        assert_eq!(
+            &t.composite_cache[corner..corner + 4],
+            &[0u8, 0, 0, 0][..],
+            "original hidden (not doubled) outside the shrunk preview rect"
+        );
+        assert_eq!(
+            t.layers[t.active].buf.data[0..4],
+            [10, 20, 30, 255],
+            "layer buffer still untouched after recomposite"
+        );
+    }
+
+    #[test]
+    fn commit_layer_resize_preview_replaces_buffer_and_records_one_step() {
+        let mut t = ImageHorseTool::new(20, 20);
+        t.load_image(&solid(20, 20, [10, 20, 30, 255]));
+        t.begin_layer_resize_preview();
+        let undo_before = t.undo_count();
+        // Shrink the layer's own content down to the top-left 10x10 quadrant.
+        t.set_paste_preview_rect(0, 0, 10, 10);
+        t.commit_paste_preview(0); // nearest
+        assert_eq!(
+            px(&t, 0, 0),
+            [10, 20, 30, 255],
+            "content kept in the shrunk rect"
+        );
+        assert_eq!(
+            px(&t, 19, 19),
+            [0, 0, 0, 0],
+            "rest of the layer is now transparent, not the stale original"
+        );
+        assert_eq!(
+            t.undo_count(),
+            undo_before + 1,
+            "one Resize Layer history step"
+        );
+        assert!(t.paste_preview.is_none(), "preview cleared after commit");
+    }
+
+    #[test]
+    fn cancel_layer_resize_preview_leaves_original_content_intact() {
+        let mut t = ImageHorseTool::new(20, 20);
+        t.load_image(&solid(20, 20, [10, 20, 30, 255]));
+        t.begin_layer_resize_preview();
+        t.set_paste_preview_rect(0, 0, 10, 10);
+        t.cancel_paste_preview();
+        assert!(t.paste_preview.is_none());
+        assert_eq!(
+            px(&t, 19, 19),
+            [10, 20, 30, 255],
+            "cancel restores the original full-size content (buffer was never touched)"
+        );
+    }
+
+    #[test]
+    fn set_paste_preview_rect_is_noop_without_begin() {
+        let mut t = ImageHorseTool::new(4, 4);
+        assert!(!t.has_paste_preview());
+        t.set_paste_preview_rect(1, 1, 3, 3); // no preview to update — safe no-op
+        assert!(!t.has_paste_preview());
     }
 
     #[test]

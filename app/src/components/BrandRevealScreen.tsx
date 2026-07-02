@@ -82,10 +82,10 @@ export function BrandRevealScreen({
                   transition={{ duration: reduceMotion ? 0 : 0.15 }}
                   className="mt-6 flex flex-col items-center gap-3"
                 >
-                  {/* `.spinner-comet` already drops its spin + mask under the
-                      in-app `.reduce-motion` class (set from this same
-                      `reduceMotion` pref) and OS reduced-motion, so the static
-                      fallback is preserved without a prop. */}
+                  {/* `Spinner`'s `animate-spin` already drops under the in-app
+                      `.reduce-motion` class (set from this same `reduceMotion`
+                      pref) and OS reduced-motion, so the static fallback is
+                      preserved without a prop. */}
                   <Spinner size={24} />
                   <p className="text-xs text-text-muted" aria-hidden="true">
                     Loading your workspace…

@@ -10,6 +10,7 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { SectionHeader } from "@/components/ui/section-header";
 import { TabGroup } from "@/components/TabGroup";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SizeSlider } from "@/components/SizeSlider";
@@ -91,7 +92,12 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
 
       {/* ── Shapes tab ── */}
       {mode === "shapes" && (
-        <div className="space-y-6">
+        <div className="space-y-3">
+          <SectionHeader
+            title="Shapes"
+            info="Pick a shape, style it below, then click-drag on the canvas to draw it — it stays live-editable (drag handles, re-angle) until you commit it."
+          />
+
           {/* Shape selector — stacked tiles (icon on top, label below). */}
           <ToolButtonGroup
             stacked
@@ -126,7 +132,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
           {/* Fill — rectangle + circle only (line/hand-drawn have no area) */}
           {(currentShape === "rect" || currentShape === "circle") && (
             <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-theme-muted-foreground">
+              <label className="text-2xs font-bold text-theme-muted-foreground">
                 Fill
               </label>
               <ToolButtonGroup
@@ -202,7 +208,12 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
           A static body (no mode toggle / panel swap): Stroke Width → pin
           label style → colour. */}
       {mode === "pens" && (
-        <div className="space-y-6">
+        <div className="space-y-3">
+          <SectionHeader
+            title="Pins"
+            info="Click the canvas to drop an auto-sequenced callout pin — Numbers or Letters, in the order you place them."
+          />
+
           {/* Pin label style: Numbers / Letters — first, above the size. */}
           <ToolButtonGroup
             stacked
@@ -241,7 +252,12 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
       {/* ── Arrows tab ── mirrors the Pins tab: Stroke Width (dots variant) →
           style toggle → colour, same spacing + same components. */}
       {mode === "arrows" && (
-        <div className="space-y-6">
+        <div className="space-y-3">
+          <SectionHeader
+            title="Arrow"
+            info="Single or double-headed. Drag on the canvas to draw it, then hold Shift while dragging an endpoint to snap the angle to 0/90/180/270°."
+          />
+
           {/* Arrow style: Single / Double — first, above the size. */}
           <ToolButtonGroup
             stacked
@@ -281,15 +297,15 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
         <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
           <PlacementGrid
             label="Placement"
+            info={
+              canPlace
+                ? "Numpad 1-9 also work, spatially matched to the grid."
+                : "Select a shape to place it on the canvas."
+            }
             disabled={!canPlace}
             numpadKeys={canPlace}
             onChange={onPlace}
           />
-          {!canPlace && (
-            <p className="text-2xs text-theme-muted-foreground">
-              Select a shape to place it on the canvas.
-            </p>
-          )}
         </div>
       )}
     </div>

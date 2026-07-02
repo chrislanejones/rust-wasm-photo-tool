@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { LargeButton } from "@/components/ui/large-button";
 import { ToolButton } from "@/components/ui/tool-button";
+import { SectionHeader } from "@/components/ui/section-header";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
@@ -544,9 +545,11 @@ export function BatchSettings({
       ) : (
       <>
       <div>
-        <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
-          Logo
-        </p>
+        <SectionHeader
+          title="Logo"
+          info="Pick a logo image, choose its placement and size, then apply it to every loaded photo at once."
+          className="mb-2"
+        />
         {!logo ? (
           <div
             role="button"
@@ -611,12 +614,12 @@ export function BatchSettings({
         />
       </div>
 
-      <div>
-        <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
-          Position
-        </p>
-        <PlacementGrid value={position} onChange={setPosition} />
-      </div>
+      <PlacementGrid
+        label="Placement"
+        info="Which corner (or center) of each photo the logo gets stamped onto."
+        value={position}
+        onChange={setPosition}
+      />
 
       <SizeSlider
         variant="dots"
@@ -732,6 +735,17 @@ function RenameBatchPanel({
 
   return (
     <div className="space-y-3 pt-1">
+      <SectionHeader
+        title="Rename"
+        info={
+          <>
+            <span className="font-mono">{"{name}"}</span> = original ·{" "}
+            <span className="font-mono">{"{n}"}</span> = number · the
+            extension is kept.
+          </>
+        }
+      />
+
       <div className="space-y-1">
         <span className="text-2xs text-theme-muted-foreground">Name pattern</span>
         <input
@@ -740,11 +754,6 @@ function RenameBatchPanel({
           placeholder="{name}"
           className={`${inputCls} font-mono`}
         />
-        <p className="text-2xs text-theme-muted-foreground">
-          <span className="font-mono">{"{name}"}</span> = original ·{" "}
-          <span className="font-mono">{"{n}"}</span> = number · the extension is
-          kept
-        </p>
       </div>
 
       <div className="space-y-1">
@@ -810,23 +819,21 @@ function RenameBatchPanel({
 
       <div className="space-y-1">
         <span className="text-2xs text-theme-muted-foreground">Preview</span>
-        <div className="divide-y divide-border rounded-md border border-border bg-bg-elevated/40 text-2xs">
-          {preview.length === 0 ? (
-            <p className="px-2.5 py-2 text-theme-muted-foreground">No images.</p>
-          ) : (
-            preview.map((row, i) => (
-              <div key={i} className="flex items-center gap-2 px-2.5 py-1.5">
-                <span className="flex-1 truncate text-theme-muted-foreground line-through">
-                  {row.from}
-                </span>
-                <span className="shrink-0 text-theme-muted-foreground">→</span>
-                <span className="flex-1 truncate font-mono text-text-primary">
-                  {row.to}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
+        {preview.length === 0 ? (
+          <p className="text-2xs text-theme-muted-foreground">No images.</p>
+        ) : (
+          preview.map((row, i) => (
+            <div key={i} className="full-width-badge" title={`${row.from} → ${row.to}`}>
+              <span className="large-badge text-theme-muted-foreground line-through">
+                {row.from}
+              </span>
+              <span className="history-index">→</span>
+              <span className="large-badge font-mono text-text-primary">
+                {row.to}
+              </span>
+            </div>
+          ))
+        )}
         {photos.length > preview.length && (
           <p className="text-2xs text-theme-muted-foreground">
             +{photos.length - preview.length} more
@@ -1095,9 +1102,11 @@ function TextBatchPanel({
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
-          Text
-        </p>
+        <SectionHeader
+          title="Text"
+          info="Rendered in Rust (Liberation Sans). Bold applies to the output; the font family below is a preview only — the baked text stays Liberation Sans."
+          className="mb-2"
+        />
         <textarea
           rows={2}
           value={text}
@@ -1106,10 +1115,6 @@ function TextBatchPanel({
           style={{ fontFamily, fontWeight: bold ? "bold" : "normal" }}
           className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-2xs text-theme-foreground placeholder:text-theme-muted-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
         />
-        <p className="mt-1 text-2xs text-theme-muted-foreground">
-          Rendered in Rust (Liberation Sans). Bold applies to the output; the font
-          family is a preview only — the baked text stays Liberation Sans.
-        </p>
       </div>
 
       <SizeSlider
@@ -1154,12 +1159,12 @@ function TextBatchPanel({
         onChange={setTextColor}
       />
 
-      <div>
-        <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
-          Position
-        </p>
-        <PlacementGrid value={position} onChange={setPosition} />
-      </div>
+      <PlacementGrid
+        label="Placement"
+        info="Which corner (or center) of each photo the text gets stamped onto."
+        value={position}
+        onChange={setPosition}
+      />
 
       <SizeSlider
         label="Margin"

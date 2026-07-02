@@ -558,3 +558,32 @@ reselect-list cleanups. Verified by `cargo test` (32 lib tests incl. two new
 > **Known follow-ups.** `load_image_artboard` remains in Rust/`pkg` but is no longer
 > called from the app (the artboard load now goes `load_image` + `set_artboard_border`) —
 > a harmless dead Rust path, prunable later.
+
+## v7.0 Change Summary — 2026-07-02
+
+The biggest UI pass to date: every tool's settings panel was rebuilt around a shared
+`SectionHeader` (title + lightbulb tooltip) pattern, two tools swapped sub-features
+(Paint ↔ Eraser, Effects ↔ Color Picker), and a new **Resize Layer** tool reuses the
+paste-placement machinery for non-destructive per-layer scale/reposition. Verified by
+`cargo test` (39 lib tests incl. 3 new layer-resize tests), `cargo clippy`/`cargo fmt`,
+`tsc --noEmit`, and `vite build` (all green) throughout.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **"Resize Layer"** — new Rust `ImageHorseTool::begin_layer_resize_preview()` seeds the existing `PastePreview` machinery from the active layer's own pixels (tagged `is_layer_source`); `recomposite()` hides that layer while the preview is live (no ghosting/doubling) and `commit_paste_preview` replaces the buffer outright instead of blending. Exposed via `usePastePlacementTool.beginLayerResize()` (zero pixel marshalling — pure Rust snapshot) and a "Resize Layer" tile in the Layers tab next to Move, reusing the identical drag-handle/commit/cancel overlay built for paste placement | Complete |
+| 2   | **Settings-panel redesign** — new `SectionHeader` (title + lightbulb `InfoTooltip`) and `FieldLabel` (compact field-level variant) primitives replace inline paragraphs across every tool panel: Layers (Move/Resize, Selection Marker, Guides, Canvas Size), Paint (Paint/Blur/Pen/Eraser), Edit & Transform (Crop, Transform, Color Picker), Shapes (Shapes/Pins/Arrow), Stamp (Clone/Stamps/Emojis), Effects (Levels/Quick Adjust), and Batch (Logo/Text/Rename) | Complete |
+| 3   | **Paint ↔ Eraser swap** — the Eraser (scrub the active layer to transparent) moved from Edit & Transform into Paint as a 4th mode alongside a new 2×2 icon grid (`Brush`/`Droplets`/`PenTool`/`Eraser` from `lucide-react`, via `ToolButtonGroup stacked columns={2}`). Full behavioral rewire, not just UI: canvas drag routing (`useEffectiveTool.ts`), the `Ctrl+]`/`Ctrl+[` brush-size shortcut, and the cursor-preview diameter all moved from `activeTool === "crop" && cropEraserActive` to `activeTool === "brush" && brushMode === "erase"`; `cropEraserActive` deleted from the Zustand store entirely (`BrushMode` gained `"erase"` instead) | Complete |
+| 4   | **Effects ↔ Color Picker swap** — Effects lost its Levels/Color-Picker `TabGroup` (now single-mode, just Levels); the Color Picker moved to the bottom of Edit & Transform. Same full-rewire treatment: `useEffectiveTool.ts`'s color-picker branch, the canvas cursor logic, the eyedropper context-menu shortcut, and the tool-switch reset effect all moved from `activeTool === "effects"` to `activeTool === "crop"`; `effectsMode`/`EffectsMode`/`setEffectsMode` deleted entirely from the store, AppShell, and ToolsSidebar | Complete |
+| 5   | **Status bar hints redesign** — now cycles 4 slots (`StatusBar.tsx`): two tool-related (`TOOL_SHORTCUT` digit-key + new `TOOL_ACTION_SHORTCUT` per-tool action, e.g. `Ctrl+M` for Layer Settings), one generic interface hint cycling from a trimmed `BASE_HINTS` pool, and `Alt+/` always pinned last. Cycle interval changed 5min → 3min. Top tool-grid tooltips (`ToolGrid.tsx`) now show each tool's digit-key shortcut (`toolConfig.ts` gained `shortcutKey`) | Complete |
+| 6   | **Checkerboard unification** — `.canvas-wrapper` (viewport backdrop), `.checkerboard-canvas` (per-image transparency grid), and `.checkerboard` (thumbnails/swatches) now all reference the same `--bg-primary`/`--bg-tertiary` theme tokens, differing only in tile size; the redundant hardcoded `.dark .checkerboard-canvas` override was removed (the shared vars already theme-switch) | Complete |
+| 7   | **Shift = 90° angle lock** — new `lockAxisDelta`/`lockPointToAxis` helpers (`app/src/lib/aspectLock.ts`) applied to the shape/arrow edit-overlay and paste-placement drag handlers in `CanvasArea.tsx`: Shift+drag on a bounding-box body snaps to the dominant axis; Shift+drag on a line/arrow endpoint snaps the angle (relative to the fixed endpoint) to the nearest 90° | Complete |
+| 8   | **Componentized list rows** — `.large-badge-item` CSS class renamed to `.full-width-badge` everywhere; `ReselectBar` gained optional `type`/`index`/`onDelete` (omit `onDelete` for a no-✕ variant) so History (delete only on undo-type entries, matching prior behavior), Reselect, Guides, and Batch Rename's Preview rows (from→to, non-interactive) all render through the one component | Complete |
+| 9   | **`PlacementGrid` self-contained** — extended with its own `label`/`info` (via new `FieldLabel` primitive) instead of callers hand-rolling a separate label `<p>`; every usage (Batch Logo, Batch Text, Shapes/Pins/Arrows, Text tool) standardized to the label "Placement" with a contextual tooltip, trailing paragraphs folded in | Complete |
+| 10  | **"Add this image" dialog reworded** — the three-tile choice (previously "New layer" / "Onto image" / "To gallery") renamed to **Stack as layer** / **Merge into layer** / **New gallery image**, each tile and the body copy now spelling out destructive vs. non-destructive vs. separate-photo | Complete |
+
+> **Known follow-ups.** The "Resize Layer" preview always opens at full canvas size
+> (no alpha-based content-bounding-box helper exists yet, so it isn't auto-fitted to
+> just the layer's visible pixels — the user drags it down manually). A pre-existing,
+> unrelated bug was surfaced during verification: creating a "Blank Canvas" with
+> "Transparent background" produces an actually-opaque white layer despite the
+> gallery thumbnail rendering it as transparent — not touched by this release.

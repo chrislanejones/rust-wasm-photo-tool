@@ -13,9 +13,11 @@ import { useBrushPreview } from "@/hooks/useBrushPreview";
 import { useDrawingTools } from "@/hooks/useDrawingTools";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
 import { useMoveLayerTool } from "@/hooks/useMoveLayerTool";
+import { usePastePlacementTool } from "@/hooks/usePastePlacementTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
 import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
+import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { panelSpacingTransition, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
@@ -85,6 +87,7 @@ import { getWorkingCopy, putWorkingCopy, clearWorkingCopyCache } from "@/lib/wor
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { DiagnosticLogOverlay } from "@/components/DiagnosticLogOverlay";
 import { logDiagnostic, installConsoleCapture } from "@/lib/diagnosticsLog";
@@ -137,6 +140,16 @@ const TOOL_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {
   effects: { keys: "8", label: "effects" },
   stamp: { keys: "9", label: "stamp" },
   emoji: { keys: "0", label: "batch" },
+};
+
+/** The current tool's own distinctive action shortcut (not every tool has
+ *  one) — mirrors the actual bindings in useKeyboardShortcuts.ts. Tools
+ *  without an entry just leave that status-bar slot to the cycling pool. */
+const TOOL_ACTION_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {
+  crop: { keys: "Alt+F", label: "flip" },
+  brush: { keys: "Ctrl+]/[", label: "brush size" },
+  arrow: { keys: "Ctrl+M", label: "move" },
+  stamp: { keys: "Ctrl+]/[", label: "brush size" },
 };
 
 const AUTH_ENABLED = !!(
@@ -254,9 +267,6 @@ export function AppShell() {
 
   const brushMode = useToolStore((s) => s.brushMode);
   const setBrushMode = useToolStore((s) => s.setBrushMode);
-  // Edit & Transform → Eraser toggle (canvas strokes erase while on).
-  const cropEraserActive = useToolStore((s) => s.cropEraserActive);
-  const setCropEraserActive = useToolStore((s) => s.setCropEraserActive);
   // Layer Settings → Move-layer toggle (canvas drags reposition the layer).
   const moveActive = useToolStore((s) => s.moveActive);
   const setMoveActive = useToolStore((s) => s.setMoveActive);
@@ -266,8 +276,6 @@ export function AppShell() {
   const setMaskEditing = useToolStore((s) => s.setMaskEditing);
   const maskPaintValue = useToolStore((s) => s.maskPaintValue);
   const setMaskPaintValue = useToolStore((s) => s.setMaskPaintValue);
-  const effectsMode = useToolStore((s) => s.effectsMode);
-  const setEffectsMode = useToolStore((s) => s.setEffectsMode);
   const colorPickerActive = useToolStore((s) => s.colorPickerActive);
   const setColorPickerActive = useToolStore((s) => s.setColorPickerActive);
   const stampSubMode = useToolStore((s) => s.stampSubMode);
@@ -1020,7 +1028,7 @@ export function AppShell() {
   }, [stamp]);
 
   useEffect(() => {
-    if (activeTool !== "effects") setColorPickerActive(false);
+    if (activeTool !== "crop") setColorPickerActive(false);
   }, [activeTool]);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("jpeg");
   const [quality, setQuality] = useState(75);
@@ -1030,10 +1038,10 @@ export function AppShell() {
       case "brush":
         if (maskEditing) return toolSettings.brushSize / 2;
         if (brushMode === "blur") return toolSettings.blurSize / 2;
+        if (brushMode === "erase") return toolSettings.eraserSize / 2;
         return toolSettings.brushSize / 2;
       case "crop":
-        // Eraser now lives in Edit & Transform — show its ring while active.
-        return cropEraserActive ? toolSettings.eraserSize / 2 : 0;
+        return 0;
       case "stamp":
         if (stampSubMode === "emojis") return (toolSettings.emojiSize * 1.2) / 2;
         return stampSettings.brushSize;
@@ -1233,12 +1241,11 @@ export function AppShell() {
     setColorPickerActive(false);
   }, []);
 
-  /** Context-menu shortcut: open the Effects panel on its Color Picker tab
-   *  with the eyedropper already armed. */
+  /** Context-menu shortcut: open the Edit & Transform panel with the
+   *  eyedropper already armed. */
   const handleActivateEyedropper = useCallback(() => {
     setShowTools(true);
-    setActiveTool("effects");
-    setEffectsMode("picker");
+    setActiveTool("crop");
     setColorPickerActive(true);
   }, []);
 
@@ -1246,7 +1253,7 @@ export function AppShell() {
     toolRef: stamp.toolRef,
     canvasRef,
     containerRef,
-    active: colorPickerActive && activeTool === "effects",
+    active: colorPickerActive && activeTool === "crop",
     onPickColor: handlePickColor,
   });
 
@@ -1318,13 +1325,12 @@ export function AppShell() {
   }, []);
 
   // Selection + Move now live on the Layer Settings ("arrow") tool; leaving it
-  // clears both toggles. Leaving Edit & Transform ("crop") clears the eraser.
+  // clears both toggles.
   useEffect(() => {
     if (activeTool !== "arrow") {
       setSelectionMode(false);
       setMoveActive(false);
     }
-    if (activeTool !== "crop") setCropEraserActive(false);
   }, [activeTool]);
 
   const blurDown = useCallback(
@@ -1475,6 +1481,16 @@ export function AppShell() {
     syncState: stamp.syncState,
   });
 
+  // Paste-onto-layer placement: gives a pasted image a movable/resizable
+  // bounding box instead of baking it straight into the active layer.
+  const pastePlacement = usePastePlacementTool({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    flushToCanvas: stamp.flushToCanvas,
+    syncState: stamp.syncState,
+    activeTool,
+  });
+
   const textTool = useTextTool({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -1576,9 +1592,8 @@ export function AppShell() {
   }, [stamp.state.history, activePhotoId]);
 
   // The object the Align row acts on (set by reselect / "Select bounding box").
-  const [selectedObject, setSelectedObject] = useState<ReselectObject | null>(
-    null,
-  );
+  const selectedObject = useAnnotationStore((s) => s.selectedObject);
+  const setSelectedObject = useAnnotationStore((s) => s.setSelectedObject);
 
   const handleSelectObject = useCallback(
     (o: ReselectObject) => {
@@ -1653,114 +1668,26 @@ export function AppShell() {
     brushSize: stampSettings.brushSize,
   });
 
-  const effectiveStamp = (() => {
-    // Idle handlers for tools that don't paint on the canvas. The clone stamp's
-    // own onMouseDown/Move/Up ride along on `...stamp`; without overriding them
-    // they "leak" — e.g. on the Effects tool the clone stamp would keep drawing.
-    const idle = {
-      ...stamp,
-      onMouseDown: (() => {}) as typeof stamp.onMouseDown,
-      onMouseMove: (() => {}) as typeof stamp.onMouseMove,
-      onMouseUp: (() => {}) as typeof stamp.onMouseUp,
-    };
-    if (activeTool === "effects") {
-      if (colorPickerActive) {
-        return {
-          ...stamp,
-          onMouseDown: colorPicker.onMouseDown as typeof stamp.onMouseDown,
-          onMouseMove: colorPicker.onMouseMove as typeof stamp.onMouseMove,
-          onMouseUp: stamp.onMouseUp,
-        };
-      }
-      return idle;
-    }
-    // Layer Settings tool: Move drags the layer (when its toggle is on);
-    // otherwise idle so canvas clicks fall through to the Selection marker.
-    if (activeTool === "arrow") {
-      if (moveActive)
-        return {
-          ...stamp,
-          onMouseDown: moveLayerTool.onMouseDown as typeof stamp.onMouseDown,
-          onMouseMove: moveLayerTool.onMouseMove as typeof stamp.onMouseMove,
-          onMouseUp: moveLayerTool.onMouseUp as typeof stamp.onMouseUp,
-        };
-      return idle;
-    }
-    // Edit & Transform: the Eraser toggle takes over the canvas while on;
-    // otherwise the crop-rectangle drag (drawingTools).
-    if (activeTool === "crop") {
-      if (cropEraserActive)
-        return {
-          ...stamp,
-          onMouseDown: eraserTool.onMouseDown as typeof stamp.onMouseDown,
-          onMouseMove: eraserTool.onMouseMove as typeof stamp.onMouseMove,
-          onMouseUp: eraserTool.onMouseUp as typeof stamp.onMouseUp,
-        };
-      return {
-        ...stamp,
-        onMouseDown: drawingTools.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: drawingTools.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
-      };
-    }
-    if (activeTool === "shapes")
-      return {
-        ...stamp,
-        onMouseDown: drawingTools.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: drawingTools.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
-      };
-    if (activeTool === "brush") {
-      if (maskEditing) {
-        return {
-          ...stamp,
-          onMouseDown: maskTool.onMouseDown as typeof stamp.onMouseDown,
-          onMouseMove: maskTool.onMouseMove as typeof stamp.onMouseMove,
-          onMouseUp: maskTool.onMouseUp as typeof stamp.onMouseUp,
-        };
-      }
-      if (brushMode === "blur") {
-        return {
-          ...stamp,
-          onMouseDown: blurDown,
-          onMouseMove: blurMove,
-          onMouseUp: blurUp,
-        };
-      }
-      // "pen" mode draws via the PenOverlay; the canvas itself uses the paint
-      // handlers (harmless when the overlay is capturing).
-      return {
-        ...stamp,
-        onMouseDown: paintTool.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: paintTool.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: paintTool.onMouseUp as typeof stamp.onMouseUp,
-      };
-    }
-    if (activeTool === "stamp") {
-      if (stampSubMode === "emojis") {
-        return {
-          ...stamp,
-          onMouseDown: emojiTool.onMouseDown as typeof stamp.onMouseDown,
-          onMouseMove: emojiTool.onMouseMove as typeof stamp.onMouseMove,
-          onMouseUp: emojiTool.onMouseUp as typeof stamp.onMouseUp,
-        };
-      }
-      const combinedDown: typeof stamp.onMouseDown = (e) => {
-        if (redStampTool.hasPendingStamp()) {
-          redStampTool.onMouseDown(e as React.MouseEvent<HTMLCanvasElement>);
-        } else {
-          stamp.onMouseDown(e);
-        }
-      };
-      return {
-        ...stamp,
-        onMouseDown: combinedDown,
-      };
-    }
-    // No painting tool selected → idle handlers, so the clone stamp only acts
-    // when the Stamp tool itself is active (it used to leak onto other tools).
-    return idle;
-  })();
+  const effectiveStamp = useEffectiveTool({
+    stamp,
+    activeTool,
+    colorPickerActive,
+    colorPicker,
+    moveActive,
+    moveLayerTool,
+    eraserTool,
+    drawingTools,
+    maskEditing,
+    maskTool,
+    brushMode,
+    blurDown,
+    blurMove,
+    blurUp,
+    paintTool,
+    stampSubMode,
+    emojiTool,
+    redStampTool,
+  });
 
   const handleZoomIn = useCallback(() => {
     stamp.toolRef.current?.adjust_zoom(1);
@@ -2004,10 +1931,12 @@ export function AppShell() {
     const img = importImage;
     if (!img) return;
     const { x, y } = importDest(img.w, img.h);
-    stamp.pasteRegion(img.pixels, img.w, img.h, x, y);
-    toast.success("Added onto the image");
+    // Seed a movable/resizable placement instead of baking the pixels in
+    // immediately — the bounding-box overlay takes over the canvas; Enter,
+    // clicking away, or switching tools commits it (Escape cancels).
+    pastePlacement.begin(img.pixels, img.w, img.h, x, y);
     closeImportDialog();
-  }, [importImage, importDest, stamp, closeImportDialog]);
+  }, [importImage, importDest, pastePlacement, closeImportDialog]);
   const importToGallery = useCallback(() => {
     const img = importImage;
     if (!img) return;
@@ -2449,11 +2378,10 @@ export function AppShell() {
           setToolSettings((p) => ({ ...p, brushSize: clamp(p.brushSize + step, 1, 50) }));
         } else if (brushMode === "blur") {
           setToolSettings((p) => ({ ...p, blurSize: clamp(p.blurSize + step, 4, 128) }));
+        } else if (brushMode === "erase") {
+          setToolSettings((p) => ({ ...p, eraserSize: clamp(p.eraserSize + step, 1, 100) }));
         }
         // pen mode draws vector paths — no brush size
-      } else if (activeTool === "crop" && cropEraserActive) {
-        // Eraser now lives in Edit & Transform.
-        setToolSettings((p) => ({ ...p, eraserSize: clamp(p.eraserSize + step, 1, 100) }));
       } else if (activeTool === "stamp") {
         if (stampSubMode === "emojis") {
           setToolSettings((p) => ({ ...p, emojiSize: clamp(p.emojiSize + step, 16, 128) }));
@@ -2467,7 +2395,7 @@ export function AppShell() {
         }
       }
     },
-    [activeTool, brushMode, cropEraserActive, stampSubMode, setToolSettings, setStampSettings, stamp],
+    [activeTool, brushMode, stampSubMode, setToolSettings, setStampSettings, stamp],
   );
 
   useKeyboardShortcuts({
@@ -2916,6 +2844,7 @@ export function AppShell() {
             onFlipH={stamp.flipHorizontal}
             onFlipV={stamp.flipVertical}
             onRotate90Cw={stamp.rotate90Cw}
+            onResizeLayer={pastePlacement.beginLayerResize}
             onBrightness={stamp.adjustBrightness}
             onContrast={stamp.adjustContrast}
             onGlobalBlur={stamp.applyGlobalBlur}
@@ -2956,27 +2885,12 @@ export function AppShell() {
             }}
             moveActive={moveActive}
             onToggleMove={handleToggleMove}
-            eraser={{
-              active: cropEraserActive,
-              onToggle: () => setCropEraserActive((v) => !v),
-              size: toolSettings.eraserSize,
-              onSizeChange: (v) =>
-                setToolSettings((p) => ({ ...p, eraserSize: v })),
-              opacity: toolSettings.eraserOpacity,
-              onOpacityChange: (v) =>
-                setToolSettings((p) => ({ ...p, eraserOpacity: v })),
-              hardness: toolSettings.eraserHardness,
-              onHardnessChange: (v) =>
-                setToolSettings((p) => ({ ...p, eraserHardness: v })),
-            }}
             toolSettings={toolSettings}
             onToolSettingsChange={handleToolSettingsChange}
             shapesMode={shapesMode}
             onShapesModeChange={setShapesMode}
             brushMode={brushMode}
             onBrushModeChange={setBrushMode}
-            effectsMode={effectsMode}
-            onEffectsModeChange={setEffectsMode}
             colorPickerActive={colorPickerActive}
             onSetColorPickerActive={setColorPickerActive}
             pickedColor={toolSettings.brushColor}
@@ -3108,6 +3022,8 @@ export function AppShell() {
                           isPanning={isPanning}
                           cropSelection={drawingTools.cropSelection}
                           onCropChange={(sel) => drawingTools.setCropSelection(sel)}
+                          pastePlacementRect={pastePlacement.rect}
+                          onPastePlacementChange={pastePlacement.update}
                           colorPickerActive={colorPickerActive}
                           drawEditState={drawingTools.editState}
                           onDrawEditChange={drawingTools.updateEditGeometry}
@@ -3202,6 +3118,8 @@ export function AppShell() {
                       isPanning={isPanning}
                       cropSelection={drawingTools.cropSelection}
                       onCropChange={(sel) => drawingTools.setCropSelection(sel)}
+                      pastePlacementRect={pastePlacement.rect}
+                      onPastePlacementChange={pastePlacement.update}
                       colorPickerActive={colorPickerActive}
                       drawEditState={drawingTools.editState}
                       onDrawEditChange={drawingTools.updateEditGeometry}
@@ -3373,6 +3291,9 @@ export function AppShell() {
               ? { keys: "Enter/Esc", label: "place / cancel" }
               : TOOL_SHORTCUT[activeTool]
           }
+          activeToolHint2={
+            drawingTools.editState ? undefined : TOOL_ACTION_SHORTCUT[activeTool]
+          }
         />
       )}
 
@@ -3382,8 +3303,7 @@ export function AppShell() {
         !colorPickerActive &&
         (activeTool === "stamp" ||
           activeTool === "brush" ||
-          activeTool === "emoji" ||
-          (activeTool === "crop" && cropEraserActive)) && (
+          activeTool === "emoji") && (
           <div
             className="brush-cursor"
             style={{

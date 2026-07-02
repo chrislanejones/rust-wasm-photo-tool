@@ -242,54 +242,35 @@ export function ReviewPanel({
                 <TinyNumberBox>{history.length}</TinyNumberBox>
               </div>
             </div>
-            <ul className="history-list">
+            <div className="history-list">
               {history.length === 0 && (
-                <li className="history-empty">
+                <div className="history-empty">
                   <span className="large-badge">No history yet</span>
-                </li>
+                </div>
               )}
               {history.map((entry, listIdx) => (
                 // FIX: compound key so identical entry.index values across
                 // re-renders never collide (seen when redo stack rebuilds).
-                <li
+                <ReselectBar
                   key={`${entry.type}-${entry.index}-${listIdx}`}
-                  className={`large-badge-item type-${entry.type}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onJump(entry.index)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onJump(entry.index);
-                    } else if (e.key === "Delete" && entry.type === "undo") {
-                      e.preventDefault();
-                      onDelete(entry.index);
-                    }
-                  }}
+                  type={entry.type}
+                  index={entry.index}
+                  label={entry.label}
+                  onSelect={() => onJump(entry.index)}
+                  onDelete={
+                    entry.type === "undo"
+                      ? () => onDelete(entry.index)
+                      : undefined
+                  }
+                  deleteLabel="Delete entry"
                   title={
                     entry.type === "current"
                       ? "Current state"
                       : `Jump to: ${entry.label}`
                   }
-                >
-                  <span className="history-dot" />
-                  <span className="history-index">{entry.index}</span>
-                  <span className="large-badge">{entry.label}</span>
-                  {entry.type === "undo" && (
-                    <button
-                      className="history-delete"
-                      title="Delete entry"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(entry.index);
-                      }}
-                    >
-                      <DeleteGlyph />
-                    </button>
-                  )}
-                </li>
+                />
               ))}
-            </ul>
+            </div>
           </section>
         )}
 
@@ -392,7 +373,7 @@ export function ReviewPanel({
                   return (
                     <li
                       key={layer.id}
-                      className={`large-badge-item layer-row ${
+                      className={`full-width-badge layer-row ${
                         layer.active ? "layer-active" : ""
                       }`}
                       role="button"

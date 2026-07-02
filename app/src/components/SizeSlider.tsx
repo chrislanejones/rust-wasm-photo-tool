@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 // Presets divide the slider into equal segments so the thumb lines up under each dot.
 // e.g. 4 presets → segments at 0%, 33%, 67%, 100%.
@@ -29,6 +30,12 @@ function posToValue(pos: number, presets: readonly number[]): number {
 
 interface CommonProps {
   label: string;
+  /** Override the label's default `text-2xs text-theme-muted-foreground` —
+   *  e.g. to match a section-header title style (Brightness/Contrast/Blur). */
+  labelClassName?: string;
+  /** Renders a lightbulb info tooltip immediately after the label text (not
+   *  pushed to the far right, since that side already shows the live value). */
+  labelInfo?: ReactNode;
   value: number;
   onChange: (v: number) => void;
   unit?: string;
@@ -57,12 +64,15 @@ interface DotsSliderProps extends CommonProps {
 type SizeSliderProps = PlainSliderProps | DotsSliderProps;
 
 export function SizeSlider(props: SizeSliderProps) {
-  const { label, value, onChange, unit = "", valueDisplay, disabled, onCommit } = props;
+  const { label, labelClassName, labelInfo, value, onChange, unit = "", valueDisplay, disabled, onCommit } = props;
   const display = valueDisplay ?? `${value}${unit}`;
 
   const labelRow = (
     <div className="flex items-center justify-between text-2xs">
-      <span className="text-theme-muted-foreground">{label}</span>
+      <span className={`flex items-center gap-1 ${labelClassName ?? "text-theme-muted-foreground"}`}>
+        {label}
+        {labelInfo && <InfoTooltip info={labelInfo} label={label} />}
+      </span>
       <span className="text-theme-foreground tabular-nums">{display}</span>
     </div>
   );

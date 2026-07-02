@@ -314,15 +314,15 @@ export function TextSettings({
         <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
           <PlacementGrid
             label="Placement"
+            info={
+              canPlace
+                ? "Numpad 1-9 also work, spatially matched to the grid."
+                : "Select a text to place it on the canvas."
+            }
             disabled={!canPlace}
             numpadKeys={canPlace}
             onChange={onPlace}
           />
-          {!canPlace && (
-            <p className="text-2xs text-theme-muted-foreground">
-              Select a text to place it on the canvas.
-            </p>
-          )}
         </div>
       )}
     </div>

@@ -4,31 +4,18 @@ import {
   FlipHorizontal,
   FlipVertical,
   Crop,
-  Eraser,
   Maximize,
+  Pipette,
   Square,
   RectangleHorizontal,
   RectangleVertical,
 } from "lucide-react";
 import { LargeButton } from "@/components/ui/large-button";
-import { ToolButton } from "@/components/ui/tool-button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
-import { SizeSlider } from "@/components/SizeSlider";
+import { SectionHeader } from "@/components/ui/section-header";
+import { cn } from "@/lib/utils";
 import type { CropSelection } from "@/hooks/useDrawingTools";
-
-/** Eraser controls — the Eraser lives at the bottom of Edit & Transform. While
- *  `active`, canvas strokes erase the active layer to transparent. */
-export interface EraserControls {
-  active: boolean;
-  onToggle: () => void;
-  size: number;
-  onSizeChange: (v: number) => void;
-  opacity: number;
-  onOpacityChange: (v: number) => void;
-  hardness: number;
-  onHardnessChange: (v: number) => void;
-}
 
 /* ── Aspect-ratio presets ─────────────────────────────────────────────
  * "free" leaves the user dragging without constraint; everything else
@@ -86,8 +73,13 @@ interface TransformCropSettingsProps {
   /** Currently-locked aspect ratio as `[w, h]`. `null` = Free. */
   cropRatio: [number, number] | null;
   onCropRatioChange: (lock: [number, number] | null) => void;
-  /** Eraser controls (bottom of the panel). */
-  eraser?: EraserControls;
+  /** Color Picker (bottom of the panel) — Alt+Click-style eyedropper that
+   *  magnifies + samples a canvas pixel into the brush/text color. */
+  colorPickerActive?: boolean;
+  onSetColorPickerActive?: (active: boolean) => void;
+  /** Currently-selected color to preview in the swatch (falls back to a
+   *  neutral color if the caller hasn't picked one yet). */
+  pickedColor?: string;
 }
 
 export function TransformCropSettings({
@@ -101,9 +93,12 @@ export function TransformCropSettings({
   onSetCropSelection,
   cropRatio,
   onCropRatioChange,
-  eraser,
+  colorPickerActive = false,
+  onSetColorPickerActive,
+  pickedColor,
 }: TransformCropSettingsProps) {
   const ratio = ratioIdFromLock(cropRatio);
+  const displayColor = pickedColor ?? "#000000";
 
   const handleRatioChange = async (id: RatioId) => {
     if (id === "free") {
@@ -129,9 +124,16 @@ export function TransformCropSettings({
       {/* ── Crop (first; no verbiage — just the ratio + apply) ───────────── */}
       {onApplyCrop && (
         <div className="space-y-3 -mt-2">
-          <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-            Crop
-          </span>
+          <SectionHeader
+            title="Crop"
+            info={
+              <>
+                Pick a ratio (or Free), drag the crop box on the canvas, then
+                Apply Crop to bake it in. Drags snap to the locked ratio when
+                one is set.
+              </>
+            }
+          />
 
           <ToolButtonGroup
             stacked
@@ -143,7 +145,7 @@ export function TransformCropSettings({
           />
 
           {ratio !== "free" && (
-            <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs large-badge-item type-current">
+            <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs full-width-badge type-current">
               <span className="large-badge">
                 Locked to {ratio} — drags snap to this ratio
               </span>
@@ -162,9 +164,15 @@ export function TransformCropSettings({
 
       {/* ── Transform ───────────────────────────────────────────────────── */}
       <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
-        <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-          Transform
-        </span>
+        <SectionHeader
+          title="Transform"
+          info={
+            <>
+              Flip or rotate the active layer in place. Rotate −90° is three
+              90° turns, so undo steps back one quarter-turn at a time.
+            </>
+          }
+        />
         <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
           <ActionTile
             icon={FlipHorizontal}
@@ -197,56 +205,48 @@ export function TransformCropSettings({
         </div>
       </div>
 
-      {/* ── Eraser — scrubs the active layer to transparent ─────────────── */}
-      {eraser && (
-        <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
-          <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-            Eraser
-          </span>
-          <ToolButton
-            active={eraser.active}
+      {/* ── Color Picker ────────────────────────────────────────────────── */}
+      {onSetColorPickerActive && (
+        <div className="space-y-3 pt-3 border-t border-theme-sidebar-border">
+          <SectionHeader
+            title="Color Picker"
+            info="Click the eyedropper to activate, then hover over the image to magnify pixels. Click to pick a color — it will be set as your brush and text color."
+          />
+
+          <LargeButton
+            className={cn(
+              "w-full",
+              colorPickerActive &&
+                "bg-theme-primary text-theme-primary-foreground border-theme-primary ring-2 ring-theme-primary/40 hover:brightness-100",
+            )}
             disabled={disabled}
-            onClick={eraser.onToggle}
-            className="w-full"
+            onClick={() => onSetColorPickerActive(!colorPickerActive)}
           >
-            <Eraser /> {eraser.active ? "Erasing: on" : "Eraser"}
-          </ToolButton>
-          {eraser.active && (
-            <>
-              <SizeSlider
-                label="Size"
-                value={eraser.size}
-                min={1}
-                max={100}
-                onChange={eraser.onSizeChange}
-              />
-              <SizeSlider
-                label="Opacity"
-                value={eraser.opacity}
-                min={0}
-                max={100}
-                variant="numbers"
-                unit="%"
-                presets={[25, 50, 75, 100]}
-                onChange={eraser.onOpacityChange}
-              />
-              <SizeSlider
-                label="Hardness"
-                value={eraser.hardness}
-                min={0}
-                max={100}
-                variant="numbers"
-                unit="%"
-                presets={[25, 50, 75, 100]}
-                onChange={eraser.onHardnessChange}
-              />
-            </>
+            <Pipette className="h-4 w-4" />
+            {colorPickerActive ? "Click image to pick" : "Activate Eyedropper"}
+          </LargeButton>
+
+          <div className="flex items-center gap-3">
+            <div
+              className="h-10 w-10 rounded-lg border-2 border-theme-muted shrink-0"
+              style={{ backgroundColor: displayColor }}
+            />
+            <div className="space-y-0.5">
+              <span className="block text-sm font-mono text-theme-foreground uppercase">
+                {displayColor}
+              </span>
+              <span className="block text-2xs text-theme-muted-foreground">
+                brush &amp; text color
+              </span>
+            </div>
+          </div>
+
+          {colorPickerActive && (
+            <div className="rounded-lg bg-theme-muted/50 px-3 py-2 text-2xs text-theme-muted-foreground leading-relaxed">
+              A pixel magnifier follows your cursor over the canvas. Hover to
+              preview, click to pick.
+            </div>
           )}
-          <p className="text-2xs text-theme-muted-foreground leading-relaxed">
-            Turn on the eraser, then drag on the canvas to scrub the active layer
-            to transparent — revealing whatever&rsquo;s beneath it. Lower opacity
-            erases gradually.
-          </p>
         </div>
       )}
     </div>

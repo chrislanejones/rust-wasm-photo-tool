@@ -9,12 +9,12 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
-import type { EffectsMode } from "@/features/tools/settings/EffectsSettings";
 import { resolveSet, type SetArg } from "./_shared";
 import { idbStorage } from "./storage/idbStorage";
 
-/** Paint sub-modes (Paint tool): freehand paint, blur brush, or Bézier pen. */
-export type BrushMode = "paint" | "blur" | "pen";
+/** Paint sub-modes (Paint tool): freehand paint, blur brush, Bézier pen, or
+ *  the eraser (scrubs the active layer's alpha). */
+export type BrushMode = "paint" | "blur" | "pen" | "erase";
 /** Stamp tool sub-modes. */
 export type StampSubMode = "clone" | "red" | "emojis";
 /** Shapes tool sub-modes. */
@@ -23,15 +23,12 @@ export type ShapesMode = "shapes" | "pens" | "arrows";
 interface ToolState {
   activeTool: ToolType;
   brushMode: BrushMode;
-  /** Edit & Transform → Eraser toggle (canvas strokes erase while on). */
-  cropEraserActive: boolean;
   /** Layer Settings → Move-layer toggle (drags reposition the layer). */
   moveActive: boolean;
   /** Layer-mask editing: Paint brush paints the active layer's mask. */
   maskEditing: boolean;
   /** Mask paint value (0 = hide/black, 255 = reveal/white). */
   maskPaintValue: number;
-  effectsMode: EffectsMode;
   colorPickerActive: boolean;
   stampSubMode: StampSubMode;
   shapesMode: ShapesMode;
@@ -45,11 +42,9 @@ interface ToolState {
 
   setActiveTool: (v: SetArg<ToolType>) => void;
   setBrushMode: (v: SetArg<BrushMode>) => void;
-  setCropEraserActive: (v: SetArg<boolean>) => void;
   setMoveActive: (v: SetArg<boolean>) => void;
   setMaskEditing: (v: SetArg<boolean>) => void;
   setMaskPaintValue: (v: SetArg<number>) => void;
-  setEffectsMode: (v: SetArg<EffectsMode>) => void;
   setColorPickerActive: (v: SetArg<boolean>) => void;
   setStampSubMode: (v: SetArg<StampSubMode>) => void;
   setShapesMode: (v: SetArg<ShapesMode>) => void;
@@ -66,11 +61,9 @@ export const useToolStore = create<ToolState>()(
     (set) => ({
       activeTool: "compress",
       brushMode: "paint",
-      cropEraserActive: false,
       moveActive: false,
       maskEditing: false,
       maskPaintValue: 0,
-      effectsMode: "levels",
       colorPickerActive: false,
       stampSubMode: "clone",
       shapesMode: "shapes",
@@ -83,13 +76,10 @@ export const useToolStore = create<ToolState>()(
 
       setActiveTool: (v) => set((s) => ({ activeTool: resolveSet(v, s.activeTool) })),
       setBrushMode: (v) => set((s) => ({ brushMode: resolveSet(v, s.brushMode) })),
-      setCropEraserActive: (v) =>
-        set((s) => ({ cropEraserActive: resolveSet(v, s.cropEraserActive) })),
       setMoveActive: (v) => set((s) => ({ moveActive: resolveSet(v, s.moveActive) })),
       setMaskEditing: (v) => set((s) => ({ maskEditing: resolveSet(v, s.maskEditing) })),
       setMaskPaintValue: (v) =>
         set((s) => ({ maskPaintValue: resolveSet(v, s.maskPaintValue) })),
-      setEffectsMode: (v) => set((s) => ({ effectsMode: resolveSet(v, s.effectsMode) })),
       setColorPickerActive: (v) =>
         set((s) => ({ colorPickerActive: resolveSet(v, s.colorPickerActive) })),
       setStampSubMode: (v) =>
@@ -121,7 +111,6 @@ export const useToolStore = create<ToolState>()(
       // docs/State-Management.md §6).
       partialize: (s): Partial<ToolState> => ({
         brushMode: s.brushMode,
-        effectsMode: s.effectsMode,
         stampSubMode: s.stampSubMode,
         shapesMode: s.shapesMode,
       }),

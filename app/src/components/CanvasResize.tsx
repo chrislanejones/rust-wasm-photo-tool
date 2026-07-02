@@ -74,15 +74,7 @@ export function CanvasResize({ width, height, disabled, onApply }: Props) {
     (targetW !== width || targetH !== height);
 
   return (
-    <div className="space-y-3 pt-3 border-t border-theme-sidebar-border">
-      <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-        Canvas Size
-      </span>
-      <p className="text-[11px] leading-snug text-theme-muted-foreground">
-        Resizes the backing canvas, not the photo — content keeps its native
-        resolution, centred; new area uses the backing color.
-      </p>
-
+    <div className="space-y-3">
       <DimensionFields
         width={w}
         height={h}

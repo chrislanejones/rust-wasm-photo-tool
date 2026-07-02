@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Brush, Droplets, PenTool, Eraser } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
-import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import type { ToolButtonOption } from "@/components/ui/tool-button-group";
+import { SectionHeader } from "@/components/ui/section-header";
 import { quickSpring } from "@/lib/animations";
 
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
@@ -13,6 +15,7 @@ const OPACITY_PRESETS = [25, 50, 75, 100] as const;
 const HARDNESS_PRESETS = [25, 50, 75, 100] as const;
 const BLUR_SIZE_PRESETS = [8, 16, 32, 64] as const;
 const PIXEL_SIZE_PRESETS = [8, 16, 32, 48] as const;
+const ERASER_SIZE_PRESETS = [8, 16, 32, 64] as const;
 
 // Blur-brush modes — gaussian (soften), pixelate (mosaic), solid (redact).
 const BLUR_MODES = [
@@ -31,7 +34,14 @@ const STABILIZER_LEVELS = [
 
 const PEN_WIDTH_PRESETS = [2, 4, 8, 16] as const;
 
-type PaintMode = "paint" | "blur" | "pen";
+type PaintMode = "paint" | "blur" | "pen" | "erase";
+
+const MODE_OPTIONS: readonly ToolButtonOption<PaintMode>[] = [
+  { id: "paint", label: "Paint", icon: Brush },
+  { id: "blur", label: "Blur", icon: Droplets },
+  { id: "pen", label: "Pen", icon: PenTool },
+  { id: "erase", label: "Eraser", icon: Eraser },
+];
 
 interface PaintSettingsProps {
   settings: ToolSettings;
@@ -44,21 +54,18 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
   const [internalMode, setInternalMode] = useState<PaintMode>("paint");
   const mode = activeMode ?? internalMode;
 
-  const handleModeChange = (id: string) => {
-    const m = id as PaintMode;
+  const handleModeChange = (m: PaintMode) => {
     setInternalMode(m);
     onModeChange?.(m);
   };
 
   return (
     <div className="space-y-2.5 -mt-2">
-      <TabGroup
-        tabs={[
-          { id: "paint", label: "Paint" },
-          { id: "blur", label: "Blur" },
-          { id: "pen", label: "Pen" },
-        ]}
-        active={mode}
+      <ToolButtonGroup
+        stacked
+        columns={2}
+        options={MODE_OPTIONS}
+        value={mode}
         onChange={handleModeChange}
       />
 
@@ -71,6 +78,17 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
             className="space-y-4"
           >
+            <SectionHeader
+              title="Paint"
+              info={
+                <>
+                  Freehand-paints the active layer in the selected color.{" "}
+                  <kbd>Ctrl+]</kbd>/<kbd>Ctrl+[</kbd> grows/shrinks the brush.
+                  Stroke Stabilizer smooths shaky drags.
+                </>
+              }
+            />
+
             {/* Brush Size */}
             <SizeSlider
               label="Brush Size"
@@ -138,6 +156,17 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
             className="space-y-4"
           >
+            <SectionHeader
+              title="Blur"
+              info={
+                <>
+                  Softens (Blur), mosaics (Pixelate), or fully redacts
+                  (Solid) whatever you drag over on the active layer.{" "}
+                  <kbd>Ctrl+]</kbd>/<kbd>Ctrl+[</kbd> grows/shrinks the brush.
+                </>
+              }
+            />
+
             {/* Mode: Gaussian blur / Pixelate / Solid redaction */}
             <ToolButtonGroup
               columns={3}
@@ -200,10 +229,16 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
             exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
             className="space-y-4"
           >
-            <p className="text-2xs leading-relaxed text-theme-muted-foreground">
-              Click to drop points, drag to pull Bézier handles. Enter closes the
-              path, Esc finishes it open, Backspace undoes a point.
-            </p>
+            <SectionHeader
+              title="Pen"
+              info={
+                <>
+                  Click to drop points, drag to pull Bézier handles.{" "}
+                  <kbd>Enter</kbd> closes the path, <kbd>Esc</kbd> finishes it
+                  open, <kbd>Backspace</kbd> undoes a point.
+                </>
+              }
+            />
 
             <SizeSlider
               label="Stroke Width"
@@ -243,6 +278,55 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                 />
               )}
             </div>
+          </motion.div>
+        )}
+
+        {mode === "erase" && (
+          <motion.div
+            key="erase"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0, transition: quickSpring }}
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+            className="space-y-4"
+          >
+            <SectionHeader
+              title="Eraser"
+              info={
+                <>
+                  Drag on the canvas to scrub the active layer to
+                  transparent — revealing whatever&rsquo;s beneath it. Lower
+                  opacity erases gradually. <kbd>Ctrl+]</kbd>/<kbd>Ctrl+[</kbd>{" "}
+                  grows/shrinks the brush.
+                </>
+              }
+            />
+
+            <SizeSlider
+              label="Brush Size"
+              value={settings.eraserSize}
+              min={1}
+              max={100}
+              onChange={(v) => onChange({ ...settings, eraserSize: v })}
+              presets={ERASER_SIZE_PRESETS}
+            />
+
+            <SizeSlider
+              label="Opacity"
+              value={settings.eraserOpacity}
+              onChange={(v) => onChange({ ...settings, eraserOpacity: v })}
+              presets={OPACITY_PRESETS}
+              variant="numbers"
+              unit="%"
+            />
+
+            <SizeSlider
+              label="Hardness"
+              value={settings.eraserHardness}
+              onChange={(v) => onChange({ ...settings, eraserHardness: v })}
+              presets={HARDNESS_PRESETS}
+              variant="numbers"
+              unit="%"
+            />
           </motion.div>
         )}
       </AnimatePresence>

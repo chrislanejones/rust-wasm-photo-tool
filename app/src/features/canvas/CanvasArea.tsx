@@ -4,6 +4,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTools";
+import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
+import {
+  lockAxisDelta,
+  lockCornerDelta,
+  lockPointToAxis,
+  lockScaleFactors,
+} from "@/lib/aspectLock";
 import { CompareSlider } from "./CompareSlider";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
@@ -108,6 +115,10 @@ interface Props {
   isPanning?: boolean;
   cropSelection?: CropSelection | null;
   onCropChange?: (sel: CropSelection) => void;
+  /** Pending paste-onto-layer placement (movable/resizable bounding box).
+   *  Floats independent of `activeTool` — same pattern as `drawEditState`. */
+  pastePlacementRect?: PastePlacementRect | null;
+  onPastePlacementChange?: (rect: PastePlacementRect) => void;
   /** Pending shape/arrow being edited via the Figma-style overlay. */
   drawEditState?: DrawEditState | null;
   /** Overlay handle drags push new geometry (canvas coords) up through this. */
@@ -261,7 +272,7 @@ function getCursorForTool(
   moveActive?: boolean,
 ): string | undefined {
   if (isPanning) return "grab";
-  if (colorPickerActive && tool === "effects") return "crosshair";
+  if (colorPickerActive && tool === "crop") return "crosshair";
   switch (tool) {
     case "text":
       return "text";
@@ -308,6 +319,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       isPanning = false,
       cropSelection,
       onCropChange,
+      pastePlacementRect,
+      onPastePlacementChange,
       colorPickerActive,
       selectionActive,
       layerMoveActive,
@@ -463,8 +476,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         if (!drag || !onCropChangeRef.current || !canvasRef.current) return;
         const canvas = canvasRef.current;
         const { handle, startX, startY, startSel, scaleX, scaleY } = drag;
-        const dx = (e.clientX - startX) / scaleX;
-        const dy = (e.clientY - startY) / scaleY;
+        let dx = (e.clientX - startX) / scaleX;
+        let dy = (e.clientY - startY) / scaleY;
+        if (e.shiftKey) {
+          ({ dx, dy } = lockCornerDelta(handle, dx, dy, startSel.width, startSel.height));
+        }
         let { x, y, width: w, height: h } = startSel;
         switch (handle) {
           case "nw": x += dx; y += dy; w -= dx; h -= dy; break;
@@ -517,6 +533,107 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       [cropSelection, canvasRef],
     );
 
+    // ── Paste-placement drag (move body + resize handles) ──────────────
+    // Same window-listener pattern as the crop handles, extended with a
+    // "move" mode since — unlike crop, where the selection rect overlays the
+    // photo itself — a placed paste needs to be draggable by its body too.
+    const pasteDragRef = useRef<{
+      mode: "move" | "resize";
+      handle: string; // resize: nw|n|ne|e|se|s|sw|w · move: "body"
+      startX: number;
+      startY: number;
+      startRect: PastePlacementRect;
+      scaleX: number;
+      scaleY: number;
+    } | null>(null);
+
+    const onPastePlacementChangeRef = useRef(onPastePlacementChange);
+    useEffect(() => {
+      onPastePlacementChangeRef.current = onPastePlacementChange;
+    });
+
+    useEffect(() => {
+      const onMove = (e: PointerEvent) => {
+        const drag = pasteDragRef.current;
+        if (!drag || !onPastePlacementChangeRef.current) return;
+        const { mode, handle, startX, startY, startRect, scaleX, scaleY } = drag;
+        const dx = (e.clientX - startX) / scaleX;
+        const dy = (e.clientY - startY) / scaleY;
+        if (mode === "move") {
+          const { dx: mdx, dy: mdy } = e.shiftKey
+            ? lockAxisDelta(dx, dy)
+            : { dx, dy };
+          onPastePlacementChangeRef.current({
+            ...startRect,
+            x: Math.round(startRect.x + mdx),
+            y: Math.round(startRect.y + mdy),
+          });
+          return;
+        }
+        let { x, y, width: w, height: h } = startRect;
+        let cdx = dx;
+        let cdy = dy;
+        if (e.shiftKey) {
+          ({ dx: cdx, dy: cdy } = lockCornerDelta(
+            handle,
+            dx,
+            dy,
+            startRect.width,
+            startRect.height,
+          ));
+        }
+        switch (handle) {
+          case "nw": x += cdx; y += cdy; w -= cdx; h -= cdy; break;
+          case "n":  y += cdy; h -= cdy; break;
+          case "ne": y += cdy; w += cdx; h -= cdy; break;
+          case "e":  w += cdx; break;
+          case "se": w += cdx; h += cdy; break;
+          case "s":  h += cdy; break;
+          case "sw": x += cdx; w -= cdx; h += cdy; break;
+          case "w":  x += cdx; w -= cdx; break;
+        }
+        const min = 10;
+        w = Math.max(min, w);
+        h = Math.max(min, h);
+        onPastePlacementChangeRef.current({
+          x: Math.round(x), y: Math.round(y),
+          width: Math.round(w), height: Math.round(h),
+        });
+      };
+      const onUp = () => { pasteDragRef.current = null; };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      return () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+    }, []);
+
+    const handlePastePointerDown = useCallback(
+      (
+        e: React.PointerEvent<SVGElement>,
+        mode: "move" | "resize",
+        handle: string,
+      ) => {
+        if (!pastePlacementRect || !canvasRef.current) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        pasteDragRef.current = {
+          mode,
+          handle,
+          startX: e.clientX,
+          startY: e.clientY,
+          startRect: { ...pastePlacementRect },
+          scaleX: rect.width / canvas.width,
+          scaleY: rect.height / canvas.height,
+        };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      },
+      [pastePlacementRect, canvasRef],
+    );
+
     // ── Shape/arrow edit-overlay drag ──────────────────────────────────
     // Same window-listener pattern as the crop handles. Geometry math is
     // plain JS (trivial); Rust does all pixel rendering at commit.
@@ -543,16 +660,30 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         const dy = (e.clientY - drag.startY) / drag.scaleY;
         const g = drag.startGeom;
         if (drag.mode === "move") {
-          // Translate the whole geometry.
-          cb({ x: g.sx + dx, y: g.sy + dy }, { x: g.ex + dx, y: g.ey + dy });
+          // Translate the whole geometry. Shift constrains the drag to
+          // whichever axis (horizontal/vertical) is moving more.
+          const { dx: mdx, dy: mdy } = e.shiftKey
+            ? lockAxisDelta(dx, dy)
+            : { dx, dy };
+          cb({ x: g.sx + mdx, y: g.sy + mdy }, { x: g.ex + mdx, y: g.ey + mdy });
           return;
         }
         if (drag.mode === "endpoint") {
-          // Re-angle a line/arrow by dragging one endpoint freely.
+          // Re-angle a line/arrow by dragging one endpoint freely. Shift
+          // snaps the resulting angle (relative to the fixed endpoint) to
+          // the nearest 90° — lets an arrow go cleanly left/right/up/down.
           if (drag.handle === "start") {
-            cb({ x: g.sx + dx, y: g.sy + dy }, { x: g.ex, y: g.ey });
+            const free = { x: g.sx + dx, y: g.sy + dy };
+            const p = e.shiftKey
+              ? lockPointToAxis(g.ex, g.ey, free.x, free.y)
+              : free;
+            cb(p, { x: g.ex, y: g.ey });
           } else {
-            cb({ x: g.sx, y: g.sy }, { x: g.ex + dx, y: g.ey + dy });
+            const free = { x: g.ex + dx, y: g.ey + dy };
+            const p = e.shiftKey
+              ? lockPointToAxis(g.sx, g.sy, free.x, free.y)
+              : free;
+            cb({ x: g.sx, y: g.sy }, p);
           }
           return;
         }
@@ -583,6 +714,12 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         } else if (h.includes("s")) {
           ay = y0;
           if (y1 - y0 > 0.5) ky = Math.max(MIN, y1 + dy - y0) / (y1 - y0);
+        }
+        // Shift-lock only makes sense on corner handles — edge handles leave
+        // one of kx/ky at exactly 1 by construction above, and forcing it
+        // toward the other would pull a single-axis drag off its own axis.
+        if (e.shiftKey && h.length === 2) {
+          ({ kx, ky } = lockScaleFactors(kx, ky));
         }
         cb(
           { x: ax + (g.sx - ax) * kx, y: ay + (g.sy - ay) * ky },
@@ -676,19 +813,23 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         className="canvas-wrapper"
         ref={containerRef as React.RefObject<HTMLDivElement>}
       >
-        {/* Transparency checkerboard — the image's "canvas" backdrop. Sized 10px
-            larger than the image on every side (a tidy mat, not the whole desk)
-            and centered behind it; theme-aware (light grid in light mode, dark in
-            dark mode via `.checkerboard-canvas`). Always rendered (an opaque image
-            covers all but the 10px frame) so transparent pixels — PNG alpha, a
-            deleted selection, an eraser stroke — read as "empty" instead of black. */}
+        {/* Transparency checkerboard — the image's "canvas" backdrop, sized flush
+            (1:1) with the canvas and centered behind it; theme-aware (light grid
+            in light mode, dark in dark mode via `.checkerboard-canvas`). `imgW`/
+            `imgH` is the full document size (photo + any artboard border, which
+            Rust already bakes into the canvas bitmap via `set_artboard_border`),
+            so this div must match it exactly — any offset renders as a second,
+            visibly mismatched rectangle behind the canvas. Always rendered so
+            transparent pixels — PNG alpha, a deleted selection, an eraser stroke,
+            or a "transparent" artboard backing color — read as "empty" instead
+            of black. */}
         {imgW > 0 && imgH > 0 && (
           <div
             className="checkerboard-canvas"
             style={{
               position: "absolute",
-              width: imgW + 10,
-              height: imgH + 10,
+              width: imgW,
+              height: imgH,
               borderRadius: 2,
               transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
               transformOrigin: "center center",
@@ -868,6 +1009,80 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   rx={1}
                   style={{ cursor: h.cursor, pointerEvents: "all" }}
                   onPointerDown={(e) => handleCropPointerDown(e, h.id)}
+                />
+              ))}
+            </svg>
+          );
+        })()}
+
+        {/* ── Paste-placement overlay: movable/resizable bounding box ──────
+            Floats independent of `activeTool` (same pattern as the shape/arrow
+            edit overlay below) — a pasted image can be adjusted no matter what
+            tool is selected. No dimming mask: the pasted content itself is the
+            visible thing, nothing needs to be dimmed around it. */}
+        {pastePlacementRect && canvasRef.current && (() => {
+          const canvas = canvasRef.current!;
+          const r = canvas.getBoundingClientRect();
+          const sx = r.width / canvas.width;
+          const sy = r.height / canvas.height;
+          const { x, y, width: pw, height: ph } = pastePlacementRect;
+          const vx = r.left + x * sx;
+          const vy = r.top + y * sy;
+          const vw = pw * sx;
+          const vh = ph * sy;
+          const HS = 9; // handle size in screen px
+
+          const handles = [
+            { id: "nw", hx: vx,        hy: vy,       cursor: "nw-resize" },
+            { id: "n",  hx: vx+vw/2,   hy: vy,       cursor: "n-resize"  },
+            { id: "ne", hx: vx+vw,     hy: vy,       cursor: "ne-resize" },
+            { id: "e",  hx: vx+vw,     hy: vy+vh/2,  cursor: "e-resize"  },
+            { id: "se", hx: vx+vw,     hy: vy+vh,    cursor: "se-resize" },
+            { id: "s",  hx: vx+vw/2,   hy: vy+vh,    cursor: "s-resize"  },
+            { id: "sw", hx: vx,        hy: vy+vh,    cursor: "sw-resize" },
+            { id: "w",  hx: vx,        hy: vy+vh/2,  cursor: "w-resize"  },
+          ];
+
+          return (
+            <svg
+              data-paste-overlay="true"
+              style={{
+                position: "fixed",
+                inset: 0,
+                width: "100vw",
+                height: "100vh",
+                pointerEvents: "none",
+                // Was 40 (--z-panel), tied with the Gallery filmstrip — DOM
+                // order let the filmstrip win the tie and swallow pointerdowns
+                // on handles near the bottom edge, which the "click outside
+                // commits" listener then read as a commit. 45 (--z-cursor,
+                // "above canvas chrome") matches the shape/arrow overlay below.
+                zIndex: 45,
+                overflow: "hidden",
+              }}
+            >
+              {/* Draggable body (move) — under the handles in z-order. */}
+              <rect
+                x={vx} y={vy} width={vw} height={vh}
+                fill="transparent"
+                stroke="white"
+                strokeWidth={1.5}
+                style={{ cursor: "move", pointerEvents: "all" }}
+                onPointerDown={(e) => handlePastePointerDown(e, "move", "body")}
+              />
+
+              {/* Resize handles */}
+              {handles.map(h => (
+                <rect
+                  key={h.id}
+                  x={h.hx - HS/2} y={h.hy - HS/2}
+                  width={HS} height={HS}
+                  fill="white"
+                  stroke="rgba(0,0,0,0.35)"
+                  strokeWidth={1}
+                  rx={1}
+                  style={{ cursor: h.cursor, pointerEvents: "all" }}
+                  onPointerDown={(e) => handlePastePointerDown(e, "resize", h.id)}
                 />
               ))}
             </svg>

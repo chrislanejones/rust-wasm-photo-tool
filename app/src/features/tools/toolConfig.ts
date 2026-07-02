@@ -22,6 +22,9 @@ export interface ToolDefinition {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   gradient: string;
+  /** Digit-key shortcut that switches to this tool (mirrors TOOL_BY_DIGIT in
+   *  useKeyboardShortcuts.ts — keys 1-9, then 0 for the 10th tool). */
+  shortcutKey: string;
 }
 
 export const TOOLS: ToolDefinition[] = [
@@ -32,6 +35,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "Compress & resize images",
     icon: Shrink,
     gradient: "from-orange-500 to-red-500",
+    shortcutKey: "1",
   },
   {
     id: "crop",
@@ -39,6 +43,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "Crop, transform & erase",
     icon: SquareMousePointer,
     gradient: "from-cyan-500 to-blue-500",
+    shortcutKey: "2",
   },
   {
     id: "brush",
@@ -46,6 +51,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "Paint, blur, pen & erase",
     icon: Paintbrush,
     gradient: "from-blue-500 to-indigo-500",
+    shortcutKey: "3",
   },
   {
     id: "text",
@@ -53,6 +59,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "Text & speech bubbles",
     icon: Type,
     gradient: "from-amber-400 to-orange-500",
+    shortcutKey: "4",
   },
   {
     // NB: the `arrow` id is legacy — this slot is now the Layer Settings tool:
@@ -64,6 +71,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "Move the active layer & select regions",
     icon: Layers,
     gradient: "from-emerald-500 to-teal-500",
+    shortcutKey: "5",
   },
   {
     id: "ai",
@@ -71,6 +79,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "AI-powered tools (coming soon)",
     icon: Brain,
     gradient: "from-violet-500 to-purple-600",
+    shortcutKey: "6",
   },
   {
     id: "shapes",
@@ -78,6 +87,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "Shapes & arrows",
     icon: Shapes,
     gradient: "from-pink-500 to-rose-500",
+    shortcutKey: "7",
   },
   {
     id: "effects",
@@ -85,6 +95,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "Levels & color picker",
     icon: Sparkles,
     gradient: "from-indigo-400 to-violet-600",
+    shortcutKey: "8",
   },
   {
     id: "stamp",
@@ -92,6 +103,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "Clone stamp, red stamps & emojis",
     icon: Stamp,
     gradient: "from-rose-500 to-red-600",
+    shortcutKey: "9",
   },
   {
     id: "emoji",
@@ -99,5 +111,6 @@ export const TOOLS: ToolDefinition[] = [
     description: "Apply logo or text to all loaded images at once",
     icon: Images,
     gradient: "from-yellow-400 to-orange-400",
+    shortcutKey: "0",
   },
 ];

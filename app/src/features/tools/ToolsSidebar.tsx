@@ -15,13 +15,11 @@ import type {
   ToolSettings,
 } from "@/lib/types";
 import type { ExportFormat } from "@/lib/exportImage";
-import type { EffectsMode } from "./settings/EffectsSettings";
 import type { StampMode } from "./settings/StampSettings";
 import type { ShapesMode } from "./settings/ShapeSettings";
 import { ToolGrid } from "./ToolGrid";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
-import type { EraserControls } from "./settings/TransformCropSettings";
 import { LayerSettings } from "./settings/LayerSettings";
 import type { SelectionControls } from "./settings/LayerSettings";
 import type { PlacementCell } from "@/components/PlacementGrid";
@@ -50,8 +48,6 @@ interface ToolsSidebarProps {
   selectedKind?: "text" | "shape" | null;
   /** Selection Marker (magic-wand) controls — Layer Settings tool. */
   selection?: SelectionControls;
-  /** Eraser controls — Edit & Transform tool (bottom of the panel). */
-  eraser?: EraserControls;
   /** Move-layer toggle — Layer Settings tool. */
   moveActive?: boolean;
   onToggleMove?: () => void;
@@ -70,6 +66,8 @@ interface ToolsSidebarProps {
   onFlipH: () => void;
   onFlipV: () => void;
   onRotate90Cw: () => void;
+  /** "Resize Layer" — see `TransformCropSettingsProps.onResizeLayer`. */
+  onResizeLayer?: () => void;
   onBrightness: (delta: number) => void;
   onContrast: (factor: number) => void;
   imageReady: boolean;
@@ -106,12 +104,10 @@ interface ToolsSidebarProps {
   onCropRatioChange?: (lock: [number, number] | null) => void;
   toolSettings: ToolSettings;
   onToolSettingsChange: (s: ToolSettings) => void;
-  // Paint sub-mode (paint / blur / pen)
-  brushMode?: "paint" | "blur" | "pen";
-  onBrushModeChange?: (mode: "paint" | "blur" | "pen") => void;
-  // Effects sub-mode + color picker
-  effectsMode?: EffectsMode;
-  onEffectsModeChange?: (mode: EffectsMode) => void;
+  // Paint sub-mode (paint / blur / pen / erase)
+  brushMode?: "paint" | "blur" | "pen" | "erase";
+  onBrushModeChange?: (mode: "paint" | "blur" | "pen" | "erase") => void;
+  // Color Picker — Edit & Transform tool (bottom of the panel).
   colorPickerActive?: boolean;
   onSetColorPickerActive?: (active: boolean) => void;
   pickedColor?: string;
@@ -147,7 +143,6 @@ export function ToolsSidebar({
   onPlace,
   selectedKind,
   selection,
-  eraser,
   moveActive,
   onToggleMove,
   embedded = false,
@@ -159,6 +154,7 @@ export function ToolsSidebar({
   onFlipH,
   onFlipV,
   onRotate90Cw,
+  onResizeLayer,
   onBrightness,
   onContrast,
   imageReady,
@@ -188,8 +184,6 @@ export function ToolsSidebar({
   onToolSettingsChange,
   brushMode,
   onBrushModeChange,
-  effectsMode,
-  onEffectsModeChange,
   colorPickerActive,
   onSetColorPickerActive,
   pickedColor,
@@ -279,7 +273,9 @@ export function ToolsSidebar({
             onSetCropSelection={onSetCropSelection}
             cropRatio={cropRatio ?? null}
             onCropRatioChange={onCropRatioChange ?? (() => {})}
-            eraser={eraser}
+            colorPickerActive={colorPickerActive}
+            onSetColorPickerActive={onSetColorPickerActive}
+            pickedColor={pickedColor}
           />
         )}
 
@@ -305,11 +301,6 @@ export function ToolsSidebar({
             onContrast={onContrast}
             onGlobalBlur={onGlobalBlur}
             imageReady={imageReady}
-            colorPickerActive={colorPickerActive}
-            onSetColorPickerActive={onSetColorPickerActive}
-            pickedColor={pickedColor}
-            activeMode={effectsMode}
-            onModeChange={onEffectsModeChange}
             undoCount={undoCount}
             activePhotoId={activePhotoId}
           />
@@ -320,6 +311,7 @@ export function ToolsSidebar({
             disabled={!imageReady}
             moveActive={moveActive ?? false}
             onToggleMove={onToggleMove ?? (() => {})}
+            onResizeLayer={onResizeLayer}
             selection={selection}
             imgW={imageWidth}
             imgH={imageHeight}

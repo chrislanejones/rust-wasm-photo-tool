@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import {
   Move,
+  Scaling,
   MousePointerClick,
   BoxSelect,
   SquareDashed,
@@ -10,7 +11,9 @@ import {
   LockOpen,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
+import { ActionTile } from "@/components/ui/action-tile";
 import { ReselectBar } from "@/components/ui/reselect-bar";
+import { SectionHeader } from "@/components/ui/section-header";
 import { SizeSlider } from "@/components/SizeSlider";
 import { CanvasResize } from "@/components/CanvasResize";
 import { useGuidesStore } from "@/stores/useGuidesStore";
@@ -34,6 +37,10 @@ interface LayerSettingsProps {
   /** Move-layer toggle — while on, canvas drags reposition the active layer. */
   moveActive: boolean;
   onToggleMove: () => void;
+  /** "Resize Layer" — opens a movable/resizable bounding box (same overlay as
+   *  paste placement) around the active layer's own content; drag the handles
+   *  then Enter/click-away to bake the scale, Escape to cancel. */
+  onResizeLayer?: () => void;
   /** Selection Marker controls. */
   selection: SelectionControls;
   /** Live canvas (image) dimensions — used to evenly distribute new guides. */
@@ -58,6 +65,7 @@ export function LayerSettings({
   disabled,
   moveActive,
   onToggleMove,
+  onResizeLayer,
   selection,
   imgW,
   imgH,
@@ -100,30 +108,55 @@ export function LayerSettings({
 
   return (
     <div className="space-y-6 -mt-2">
-      {/* ── Move the active layer ──────────────────────────────────────── */}
+      {/* ── Move or Resize the active layer ──────────────────────────────── */}
       <div className="space-y-2">
-        <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-          Move Layer
-        </span>
-        <ToolButton
-          active={moveActive}
-          disabled={disabled}
-          onClick={onToggleMove}
-          className="w-full"
-        >
-          <Move /> {moveActive ? "Move: on" : "Move (Ctrl+M)"}
-        </ToolButton>
-        <p className="text-2xs text-theme-muted-foreground leading-relaxed">
-          Turn on Move, then drag on the canvas to reposition the active layer
-          (non-destructive). Ctrl+M toggles it.
-        </p>
+        <SectionHeader
+          title="Move or Resize Layer"
+          info={
+            <>
+              <strong className="font-semibold text-theme-foreground">
+                Move
+              </strong>{" "}
+              drags the active layer&rsquo;s content on the canvas.{" "}
+              <strong className="font-semibold text-theme-foreground">
+                Resize
+              </strong>{" "}
+              opens a draggable bounding box to scale/reposition it, then
+              Enter or click away to bake it in (Escape cancels). Both are
+              non-destructive until committed. <kbd>Ctrl+M</kbd> toggles Move.
+            </>
+          }
+        />
+        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
+          <ToolButton
+            stacked
+            active={moveActive}
+            disabled={disabled}
+            onClick={onToggleMove}
+          >
+            <Move /> <span>{moveActive ? "Move: on" : "Move"}</span>
+          </ToolButton>
+          <ActionTile
+            icon={Scaling}
+            label="Resize"
+            disabled={disabled || !onResizeLayer}
+            onClick={onResizeLayer}
+          />
+        </div>
       </div>
 
       {/* ── Selection Marker (magic-wand) — Rust flood-fill ─────────────── */}
       <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
-        <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-          Selection Marker
-        </span>
+        <SectionHeader
+          title="Selection Marker"
+          info={
+            <>
+              Turn on click-to-select, then click a region to flood-select
+              similar colors. <kbd>Alt+A</kbd> selects all,{" "}
+              <kbd>Alt+D</kbd> deselects.
+            </>
+          }
+        />
         <ToolButton
           active={selection.mode}
           disabled={disabled}
@@ -163,17 +196,21 @@ export function LayerSettings({
             <Trash2 /> Delete
           </ToolButton>
         </div>
-        <p className="text-2xs text-theme-muted-foreground leading-relaxed">
-          Turn on click-to-select, then click a region to flood-select similar
-          colors. Alt+A selects all, Alt+D deselects.
-        </p>
       </div>
 
       {/* ── Guides (non-destructive draggable overlay lines) ─────────────── */}
       <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
-        <span className="text-xs font-semibold font-mono text-theme-muted-foreground">
-          Guides
-        </span>
+        <SectionHeader
+          title="Horizontal and Vertical Guides"
+          info={
+            <>
+              Add evenly-spaced horizontal/vertical guides, then drag them on
+              the canvas to reposition. Lock prevents moving;{" "}
+              <kbd>Delete</kbd>/<kbd>Backspace</kbd> removes the selected
+              guide.
+            </>
+          }
+        />
         <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
           <ToolButton
             disabled={disabled}
@@ -221,16 +258,14 @@ export function LayerSettings({
             ))}
           </div>
         )}
-
-        <p className="text-2xs text-theme-muted-foreground leading-relaxed">
-          Add evenly-spaced horizontal/vertical guides, then drag them on the
-          canvas to reposition. Lock prevents moving; Delete/Backspace removes the
-          selected guide.
-        </p>
       </div>
 
       {/* ── Canvas size (the checkerboard backdrop is the canvas) ─────────── */}
-      <div className="pt-3 border-t border-theme-sidebar-border">
+      <div className="space-y-3 pt-3 border-t border-theme-sidebar-border">
+        <SectionHeader
+          title="Background Canvas Size"
+          info="Resizes the backing canvas, not the photo — content keeps its native resolution, centred; new area uses the backing color."
+        />
         <CanvasResize
           width={canvasWidth}
           height={canvasHeight}

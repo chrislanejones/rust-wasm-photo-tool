@@ -597,6 +597,43 @@ declare module "stamp_tool" {
      *  Pushes one "Move Layer" snapshot; a zero delta is a no-op. */
     translate_active_layer(dx: number, dy: number): void;
 
+    // ── Paste placement (movable/resizable bounding-box preview) ──
+    /** Begin a placement preview for `pixels` (src_w × src_h RGBA), shown at
+     *  (dest_x, dest_y, dest_w, dest_h). Transient — not part of undo history
+     *  until `commit_paste_preview`. Replaces any prior preview. */
+    begin_paste_preview(
+      pixels: Uint8Array,
+      src_w: number,
+      src_h: number,
+      dest_x: number,
+      dest_y: number,
+      dest_w: number,
+      dest_h: number,
+    ): void;
+    /** Update the live placement rect (called every move/resize drag frame). */
+    set_paste_preview_rect(
+      dest_x: number,
+      dest_y: number,
+      dest_w: number,
+      dest_h: number,
+    ): void;
+    /** Discard the in-progress preview without committing (Escape). No history. */
+    cancel_paste_preview(): void;
+    /** True while a placement preview is active. */
+    has_paste_preview(): boolean;
+    /** Bake the preview into the active layer at its current placement, resampled
+     *  with `filter` (0=nearest, 1=bilinear, 2=catmull-rom, 3=lanczos3 — same
+     *  convention as `resize_with_filter`). Pushes one "Paste" (or "Resize Layer",
+     *  for a `begin_layer_resize_preview` preview) snapshot. */
+    commit_paste_preview(filter: number): void;
+    /** "Resize Layer" — begin a placement preview seeded from the ACTIVE layer's
+     *  own current pixels (full canvas size initially) instead of externally
+     *  pasted bytes. Reuses the exact same set_paste_preview_rect/
+     *  cancel_paste_preview/commit_paste_preview flow as paste placement; while
+     *  live, the active layer is hidden from the composite (its own content is
+     *  the drag preview) so nothing doubles up. No-op if there's no active layer. */
+    begin_layer_resize_preview(): void;
+
     // ── Layer persistence (serialize / restore) ──
     /** PNG of one layer's raw pixels (no compositing, no overlays). */
     get_layer_png(index: number): Uint8Array;

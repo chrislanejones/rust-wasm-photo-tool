@@ -27,6 +27,19 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.44",
+    date: "2026-07-02",
+    headline: "Resize a layer in place, and a cleaner, friendlier settings panel",
+    entries: [
+      { tag: "feature", text: "New “Resize Layer” tool — drag a bounding box around any layer's content (a pasted photo, a sticker, a speech bubble) to scale and reposition it in place, non-destructively, before committing. Lives in the Layers tab next to Move." },
+      { tag: "ui", text: "Every tool's settings panel got a pass: section titles now sit next to a small lightbulb you can hover for an explanation and any keyboard shortcuts, instead of paragraphs of instructions taking up space. The Paint tool is now a 2×2 icon grid — Paint, Blur, Pen, and Eraser (moved here from Edit & Transform, where the Color Picker now lives instead)." },
+      { tag: "ui", text: "The status bar now cycles through more useful shortcut hints — two tied to whatever tool you're using, one general tip, and Alt+/ (open the full shortcut list) always pinned last." },
+      { tag: "fix", text: "Fixed a visual bug where the app's background checkerboard and the photo's own transparency checkerboard were two subtly different patterns fighting each other — they're unified now, along with the thumbnail checkerboards." },
+      { tag: "ui", text: "Holding Shift while dragging an arrow, shape, or pasted image now locks the angle or direction to a clean 90° — handy for perfectly straight connector arrows." },
+      { tag: "ui", text: "Renamed the confusing three-button “Add this image” dialog to Stack as layer / Merge into layer / New gallery image, each with a plain-language explanation of what it does." },
+    ],
+  },
+  {
     version: "v0.9.43",
     date: "2026-06-30",
     headline: "A canvas that stays the right size",

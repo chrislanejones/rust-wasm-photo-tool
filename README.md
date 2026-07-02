@@ -50,15 +50,18 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v6.1 — 2026-06-30
+### v7.0 — 2026-07-02
 
 | # | Change | Status |
 | --- | --- | --- |
-| 1 | **Canvas-jumbo fix** — importing a photo no longer balloons into a giant ("jumbo") canvas. The canvas border is now an absolute, idempotent Rust operation (`set_artboard_border`): the document always rebuilds to exactly photo size + border, so it can't accumulate, and the live border re-applies correctly on every load path (fresh, gallery, AI) without resampling the photo | Complete |
-| 2 | **Spinner fixes** — the shared `Spinner` now honors a Tailwind size class (`size-8` → 32px), the Settings loading spinner sits centered above the panel, and the comet tail keeps a faint opacity floor so it stays visible on the light panel | Complete |
-| 3 | **Reusable ReselectBar** — the clickable "reselect" row (label + hover-revealed ✕ delete, full keyboard support) is now one shared `ReselectBar` component, used across the reselect lists | Complete |
+| 1 | **"Resize Layer"** — new Rust `begin_layer_resize_preview` reuses the paste-placement preview machinery to give any layer's content a movable/resizable bounding box (non-destructive, one-step commit/cancel); lives in the Layers tab next to Move | Complete |
+| 2 | **Settings-panel redesign** — every tool panel now uses a shared `SectionHeader` (title + lightbulb info tooltip) instead of inline paragraphs; Paint became a 2×2 icon grid (Paint / Blur / Pen / Eraser); Eraser moved here from Edit & Transform, and the Color Picker moved the other way (Edit & Transform now hosts it, Effects lost its Levels/Color-Picker toggle) | Complete |
+| 3 | **Status bar hints** — now cycles 4 slots (two tool-related, one general, Alt+/ always pinned last) every 3 minutes; top tool icons show their digit-key shortcut in their tooltip | Complete |
+| 4 | **Checkerboard unification** — the app-chrome, per-image, and thumbnail transparency checkerboards now share one set of theme tokens instead of three independently hand-tuned patterns | Complete |
+| 5 | **Shift = 90° angle lock** — holding Shift while dragging an arrow/shape endpoint or moving any bounding box (paste, resize) now snaps to 0/90/180/270° | Complete |
+| 6 | **Componentized list rows** — `ReselectBar` gained optional index/type/delete so History, Reselect, Guides, and Batch Rename's Preview rows all render as one shared `full-width-badge`; `PlacementGrid` now owns its own label + tooltip, standardized to "Placement" everywhere it appears | Complete |
 
-> **About this release — a proper canvas size.** A polish release that fixes the import-canvas bug from v6.0: photos no longer open onto a runaway "jumbo" canvas. The canvas border is now an **absolute, idempotent** operation in Rust — the document always rebuilds to exactly the photo size plus your border, so repeated changes never accumulate and a too-big canvas snaps straight back. The live border now re-applies cleanly across every way a photo can load. Alongside that: the shared **Spinner** respects an explicit size, the Settings spinner sits above the panel, and the reselect rows are unified into one reusable component.
+> **About this release — a settings-panel overhaul, plus a new layer tool.** The biggest UI pass yet: every tool's settings panel was rebuilt around a consistent title-plus-lightbulb pattern, trading paragraphs of instructions for on-demand tooltips. Paint gained a proper 2×2 mode grid and inherited the Eraser from Edit & Transform, which in turn picked up the Color Picker from Effects. The new **Resize Layer** tool reuses the paste-placement machinery to let you scale/reposition any layer's content in place. Smaller fixes: a unified checkerboard pattern, Shift-to-90° angle snapping, and a handful of list components (history, reselect, guides, batch preview) consolidated onto one shared row style.
 
 ## License
 

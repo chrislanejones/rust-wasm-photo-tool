@@ -101,7 +101,7 @@ export function AISettings({
         <div className="flex items-start gap-3">
           <Scissors className="h-5 w-5 shrink-0 text-text-primary/80" />
           <div className="flex-1 min-w-0">
-            <span className="text-xs font-semibold text-text-primary">
+            <span className="text-xs font-semibold font-mono text-text-muted">
               Background Removal
             </span>
           </div>
@@ -136,7 +136,7 @@ export function AISettings({
         <div className="flex items-start gap-3">
           <Type className="h-5 w-5 shrink-0 text-text-primary/80" />
           <div className="flex-1 min-w-0">
-            <span className="text-xs font-semibold text-text-primary">
+            <span className="text-xs font-semibold font-mono text-text-muted">
               Text Extract (OCR)
             </span>
           </div>
@@ -192,7 +192,7 @@ export function AISettings({
         <div className="flex items-start gap-3">
           <Eraser className="h-5 w-5 shrink-0 text-text-primary/80" />
           <div className="flex-1 min-w-0">
-            <span className="text-xs font-semibold text-text-primary">
+            <span className="text-xs font-semibold font-mono text-text-muted">
               Object Removal
             </span>
           </div>
@@ -231,7 +231,7 @@ export function AISettings({
           <Icon className="h-5 w-5 shrink-0 text-text-primary/80" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-text-primary">
+              <span className="text-xs font-semibold font-mono text-text-muted">
                 {title}
               </span>
               <span className="rounded-full bg-theme-muted/40 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-theme-foreground/70">

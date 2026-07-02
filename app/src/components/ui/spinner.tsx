@@ -3,7 +3,7 @@ import {
   type HTMLAttributes,
   type ReactNode,
 } from "react";
-import { Loader } from "lucide-react";
+import { LoaderIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,13 +11,10 @@ import { cn } from "@/lib/utils";
  * replaces the repo's scattered `Loader2` + `animate-spin` (which drifted on
  * both sizing and the spinner↔label gap).
  *
- * Visual: the Lucide 12-spoke `Loader` icon tinted with the accent token
- * (`text-theme-primary`) and given a "comet" lead-blade via a conic-gradient
- * mask (the `.spinner-comet` class in styles.css) — the leading spoke is
- * brightest and the tail fades, so the rotation reads clearly instead of
- * looking like a flat ring. Under `prefers-reduced-motion` / the in-app
- * `.reduce-motion` toggle both the spin and the mask are dropped
- * (Refactor-Playbook §3), leaving a static, full-strength icon.
+ * Visual: the Lucide `LoaderIcon`, tinted with the accent token
+ * (`text-theme-primary`), spun via plain Tailwind `animate-spin`. Under
+ * `prefers-reduced-motion` / the in-app `.reduce-motion` toggle the spin is
+ * dropped (Refactor-Playbook §3), leaving a static icon.
  *
  * Spacing: pass `label` (or children) and the spinner + text render as one
  * inline-flex unit with a single standard `gap-2`, so every call site lands the
@@ -74,7 +71,7 @@ export const Spinner = forwardRef<HTMLSpanElement, SpinnerProps>(
           )}
           style={sized ? undefined : { width: size, height: size }}
         >
-          <Loader className="spinner-comet" aria-hidden="true" />
+          <LoaderIcon className="animate-spin" aria-hidden="true" />
         </span>
         {hasText ? (
           <span>{text}</span>

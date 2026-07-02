@@ -9,12 +9,14 @@
 //
 // Numpad maps spatially: 7/8/9 = top row, 4/5/6 = middle, 1/2/3 = bottom.
 import { useEffect } from "react";
+import type { ReactNode } from "react";
 import {
   AlignVerticalJustifyStart,
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
+import { FieldLabel } from "@/components/ui/field-label";
 
 export type PlacementCell =
   | "top-left"
@@ -58,12 +60,15 @@ export function PlacementGrid({
   onChange,
   disabled = false,
   label,
+  /** Lightbulb-tooltip content shown next to `label`. Omit for a plain label. */
+  info,
   numpadKeys = false,
 }: {
   value?: PlacementCell | null;
   onChange: (cell: PlacementCell) => void;
   disabled?: boolean;
   label?: string;
+  info?: ReactNode;
   numpadKeys?: boolean;
 }) {
   useEffect(() => {
@@ -87,9 +92,7 @@ export function PlacementGrid({
 
   return (
     <div className="space-y-2">
-      {label && (
-        <label className="text-2xs text-theme-muted-foreground">{label}</label>
-      )}
+      {label && <FieldLabel title={label} info={info} />}
       <div
         role="group"
         aria-label={label ?? "Placement"}

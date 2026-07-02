@@ -50,9 +50,9 @@ export function ImportImageDialog({
     ? "Open an image first"
     : !canUseLayers
       ? "Log in to use layers"
-      : "Drop it onto its own new layer (non-destructive)";
+      : "Stack it above the current layer as its own new layer — non-destructive, keeps both images separately editable";
   const ontoTitle = hasActivePhoto
-    ? "Composite it on top of the current layer's pixels"
+    ? "Merge it directly into the current layer's pixels — destructive, can't be un-stacked later"
     : "Open an image first";
 
   return (
@@ -66,12 +66,16 @@ export function ImportImageDialog({
           <DialogDescription>
             {hasActivePhoto ? (
               <>
-                Drop it onto its{" "}
+                Stack it as a{" "}
                 <strong className="font-semibold text-text-secondary">
-                  own new layer
-                </strong>
-                , stack it on top of the image you&rsquo;re editing, or add it to
-                your gallery as a separate image.
+                  new layer
+                </strong>{" "}
+                you can move and edit separately, permanently{" "}
+                <strong className="font-semibold text-text-secondary">
+                  merge
+                </strong>{" "}
+                it into the layer you&rsquo;re already editing, or keep it apart
+                as a new image in your gallery.
               </>
             ) : (
               <>
@@ -79,7 +83,8 @@ export function ImportImageDialog({
                 <strong className="font-semibold text-text-secondary">
                   gallery
                 </strong>{" "}
-                to start editing. (Open an image first to drop it onto a layer.)
+                to start editing. (Open an image first to stack or merge it onto
+                a layer.)
               </>
             )}
           </DialogDescription>
@@ -99,22 +104,22 @@ export function ImportImageDialog({
         <DialogFooter className="flex-row gap-2">
           <ActionTile
             icon={Layers}
-            label="New layer"
+            label="Stack as layer"
             disabled={!canUseLayers || !hasActivePhoto}
             title={newLayerTitle}
             onClick={onNewLayer}
           />
           <ActionTile
             icon={ImagePlus}
-            label="Onto image"
+            label="Merge into layer"
             disabled={!hasActivePhoto}
             title={ontoTitle}
             onClick={onOntoLayer}
           />
           <ActionTile
             icon={Images}
-            label="To gallery"
-            title="Add as a new, separate image in the gallery"
+            label="New gallery image"
+            title="Add as a new, separate image in the gallery — unrelated to the image you're editing"
             onClick={onAddToGallery}
           />
         </DialogFooter>

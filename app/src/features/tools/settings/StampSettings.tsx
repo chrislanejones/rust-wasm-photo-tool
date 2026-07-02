@@ -4,6 +4,7 @@ import data from "@emoji-mart/data";
 import type { StampSettings } from "@/lib/types";
 import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
+import { SectionHeader } from "@/components/ui/section-header";
 import { useResolvedTheme } from "@/lib/useTheme";
 
 const SIZE_PRESETS = [8, 16, 24, 32] as const;
@@ -80,8 +81,13 @@ export function StampSettingsPanel({
 
       {/* ── Clone Stamp panel ── */}
       {mode === "clone" && (
-        <div className="space-y-6">
-          <div className="mb-8 flex justify-center gap-2 px-3 py-4 rounded-lg text-xs large-badge-item type-current">
+        <div className="space-y-3">
+          <SectionHeader
+            title="Clone"
+            info="Alt+Click to set the clone source, then paint elsewhere on the canvas to stamp copies of it."
+          />
+
+          <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs full-width-badge type-current">
             <span className="large-badge">
               {hasSource
                 ? "Source set — click to paint"
@@ -133,7 +139,12 @@ export function StampSettingsPanel({
 
       {/* ── Red Stamps panel ── */}
       {mode === "red" && (
-        <div className="space-y-8">
+        <div className="space-y-3">
+          <SectionHeader
+            title="Stamps"
+            info="Select a stamp, then click on the image to place it. Full undo/redo via Rust."
+          />
+
           {/* Brush Size */}
           <SizeSlider
             label="Brush Size"
@@ -145,10 +156,6 @@ export function StampSettingsPanel({
           />
 
           <div className="space-y-4">
-            <p className="text-2xs text-text-muted/60 leading-relaxed">
-              Select a stamp, then click on the image to place it. Full
-              undo/redo via Rust.
-            </p>
             <div className="grid grid-cols-1 gap-2">
               {RED_STAMP_PRESETS.map((stamp) => {
                 const isSelected = selectedStampId === stamp.id;
@@ -202,7 +209,12 @@ export function StampSettingsPanel({
 
       {/* ── Emojis panel ── */}
       {mode === "emojis" && (
-        <div className="space-y-4">
+        <div className="space-y-3">
+          <SectionHeader
+            title="Emojis"
+            info="Pick an emoji, then click on the canvas to place it at the chosen size."
+          />
+
           <div className="emoji-picker-host">
             <Picker
               data={data}

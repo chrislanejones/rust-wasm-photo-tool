@@ -8,6 +8,7 @@ use crate::annotations::{
 use crate::core::ImageBuffer;
 use crate::utils::json_escape;
 use crate::ImageHorseTool;
+use crate::PastePreview;
 use crate::{codec, transform};
 use wasm_bindgen::prelude::*;
 
@@ -156,6 +157,11 @@ pub(crate) fn composite_layers_into(
     // rendered pixels are shifted by (dx, dy) before blending — non-destructive,
     // operating on the temporary render only.
     move_preview: Option<(usize, i32, i32)>,
+    // Layer-resize preview: the layer at this index is skipped entirely — its
+    // own (still-unmodified) pixels would otherwise double up with the scaled
+    // copy `recomposite` overlays on top via `paste_preview`. `None` outside a
+    // "Resize Layer" drag.
+    hide_layer: Option<usize>,
 ) {
     let n = (w as usize) * (h as usize) * 4;
     if out.len() != n {
@@ -166,8 +172,9 @@ pub(crate) fn composite_layers_into(
     // Fast path: exactly one visible, fully-opaque layer with no overlays →
     // copy its pixels straight in. Avoids the zero-fill + per-pixel blend that
     // would otherwise run on every paint/stamp dab. Skipped during a move
-    // preview so the shift actually applies.
-    if move_preview.is_none() {
+    // preview (so the shift actually applies) or a layer-resize preview (so
+    // the hidden layer doesn't show through).
+    if move_preview.is_none() && hide_layer.is_none() {
         let mut visible = layers.iter().filter(|l| l.visible);
         if let (Some(only), None) = (visible.next(), visible.next()) {
             // A masked layer isn't a straight copy — it must go through
@@ -185,7 +192,7 @@ pub(crate) fn composite_layers_into(
 
     out.iter_mut().for_each(|b| *b = 0);
     for (idx, layer) in layers.iter().enumerate() {
-        if !layer.visible {
+        if !layer.visible || hide_layer == Some(idx) {
             continue;
         }
         let mut rendered = render_layer(layer, w, h, editing_shape_id, editing_text_id);
@@ -215,6 +222,7 @@ pub(crate) fn composite_layers(
         h,
         editing_shape_id,
         editing_text_id,
+        None,
         None,
     );
     out
@@ -549,6 +557,11 @@ pub(crate) fn build_annotation_tile(
     let off_y = cy - rotated.height as i32 / 2;
     (rotated.pixels, rotated.width, rotated.height, off_x, off_y)
 }
+
+/// Minimum paste-placement size (px), matching the crop overlay's own floor —
+/// keeps a resize from collapsing the box to nothing.
+const PASTE_MIN_SIZE: u32 = 10;
+
 #[wasm_bindgen]
 impl ImageHorseTool {
     // ── Layers ───────────────────────────────────────────────────────────
@@ -739,6 +752,145 @@ impl ImageHorseTool {
                 p.1 += dy as f64;
             }
         }
+    }
+
+    // ── Paste placement (movable/resizable bounding-box preview) ──────────
+    // Same transient-preview split as the Move tool above: nothing here
+    // touches a layer's stored pixel buffer until `commit_paste_preview`, so
+    // the pasted image stays adjustable (not yet in undo history) until the
+    // user finalizes its placement.
+
+    /// Begin a placement preview for `pixels` (src_w × src_h RGBA), initially
+    /// shown at (dest_x, dest_y, dest_w, dest_h). Transient — not part of undo
+    /// history until `commit_paste_preview`. Replaces any prior preview.
+    pub fn begin_paste_preview(
+        &mut self,
+        pixels: &[u8],
+        src_w: u32,
+        src_h: u32,
+        dest_x: i32,
+        dest_y: i32,
+        dest_w: u32,
+        dest_h: u32,
+    ) {
+        if pixels.len() != (src_w * src_h * 4) as usize || src_w == 0 || src_h == 0 {
+            return;
+        }
+        self.paste_preview = Some(PastePreview {
+            pixels: pixels.to_vec(),
+            src_w,
+            src_h,
+            dest_x,
+            dest_y,
+            dest_w: dest_w.max(PASTE_MIN_SIZE),
+            dest_h: dest_h.max(PASTE_MIN_SIZE),
+            is_layer_source: false,
+        });
+    }
+
+    /// "Resize Layer" — begin a placement preview seeded from the ACTIVE
+    /// layer's own current pixels, initially shown at full canvas size.
+    /// Reuses the exact `set_paste_preview_rect`/`cancel_paste_preview`/
+    /// `commit_paste_preview` flow built for paste placement: drag the same
+    /// bounding-box handles to scale/move the layer's content, Escape cancels
+    /// with the layer untouched, committing resamples+replaces the layer's
+    /// buffer and pushes one history snapshot. No-op if there's no active
+    /// layer.
+    pub fn begin_layer_resize_preview(&mut self) {
+        if self.active >= self.layers.len() {
+            return;
+        }
+        let (w, h) = (self.width, self.height);
+        let pixels = self.layers[self.active].buf.data.clone();
+        self.paste_preview = Some(PastePreview {
+            pixels,
+            src_w: w,
+            src_h: h,
+            dest_x: 0,
+            dest_y: 0,
+            dest_w: w,
+            dest_h: h,
+            is_layer_source: true,
+        });
+    }
+
+    /// Update the live placement rect (called every move/resize drag frame).
+    /// No-op if there's no active preview (e.g. `begin_paste_preview` wasn't
+    /// called, or it already ended via commit/cancel).
+    pub fn set_paste_preview_rect(&mut self, dest_x: i32, dest_y: i32, dest_w: u32, dest_h: u32) {
+        if let Some(p) = &mut self.paste_preview {
+            p.dest_x = dest_x;
+            p.dest_y = dest_y;
+            p.dest_w = dest_w.max(PASTE_MIN_SIZE);
+            p.dest_h = dest_h.max(PASTE_MIN_SIZE);
+        }
+    }
+
+    /// Discard the in-progress preview without committing (Escape / cancel).
+    /// No history.
+    pub fn cancel_paste_preview(&mut self) {
+        self.paste_preview = None;
+    }
+
+    /// True while a placement preview is active — lets JS gate Enter/Escape/
+    /// click-away handlers without duplicating state on the JS side.
+    pub fn has_paste_preview(&self) -> bool {
+        self.paste_preview.is_some()
+    }
+
+    /// Bake the current preview into the ACTIVE layer's pixel buffer: resamples
+    /// the ORIGINAL source pixels to (dest_w, dest_h) with `filter` (same
+    /// 0=nearest/1=bilinear/2=catmull-rom/3=lanczos3 convention as
+    /// `resize_with_filter`), then alpha-composites at (dest_x, dest_y) — or,
+    /// for a "Resize Layer" preview (`is_layer_source`), REPLACES the buffer
+    /// outright, since the source there is that same layer's own pre-drag
+    /// content and blending onto it would double it up. Pushes ONE history
+    /// snapshot ("Paste" / "Resize Layer") and clears the preview. No-op if
+    /// there is no active preview.
+    pub fn commit_paste_preview(&mut self, filter: u8) {
+        let Some(p) = self.paste_preview.take() else {
+            return;
+        };
+        if self.active >= self.layers.len() {
+            return;
+        }
+        self.snap(if p.is_layer_source {
+            "Resize Layer"
+        } else {
+            "Paste"
+        });
+        let scaled = if p.dest_w == p.src_w && p.dest_h == p.src_h {
+            p.pixels
+        } else {
+            match filter {
+                0 => crate::transform::resize_nearest(
+                    &p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h,
+                ),
+                2 => crate::transform::resize_catmull_rom(
+                    &p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h,
+                ),
+                3 => crate::transform::resize_lanczos3(
+                    &p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h,
+                ),
+                _ => crate::transform::resize_bilinear(
+                    &p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h,
+                ),
+            }
+        };
+        let buf = &mut self.layers[self.active].buf.data;
+        if p.is_layer_source {
+            buf.iter_mut().for_each(|b| *b = 0);
+        }
+        crate::transform::paste_region(
+            buf,
+            self.width as i32,
+            self.height as i32,
+            &scaled,
+            p.dest_w,
+            p.dest_h,
+            p.dest_x,
+            p.dest_y,
+        );
     }
 
     /// Merge the layer with `id` down onto the layer directly below it (the
