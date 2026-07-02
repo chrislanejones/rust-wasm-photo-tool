@@ -50,18 +50,15 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.0 — 2026-07-02
+### v7.1 — 2026-07-02
 
 | # | Change | Status |
 | --- | --- | --- |
-| 1 | **"Resize Layer"** — new Rust `begin_layer_resize_preview` reuses the paste-placement preview machinery to give any layer's content a movable/resizable bounding box (non-destructive, one-step commit/cancel); lives in the Layers tab next to Move | Complete |
-| 2 | **Settings-panel redesign** — every tool panel now uses a shared `SectionHeader` (title + lightbulb info tooltip) instead of inline paragraphs; Paint became a 2×2 icon grid (Paint / Blur / Pen / Eraser); Eraser moved here from Edit & Transform, and the Color Picker moved the other way (Edit & Transform now hosts it, Effects lost its Levels/Color-Picker toggle) | Complete |
-| 3 | **Status bar hints** — now cycles 4 slots (two tool-related, one general, Alt+/ always pinned last) every 3 minutes; top tool icons show their digit-key shortcut in their tooltip | Complete |
-| 4 | **Checkerboard unification** — the app-chrome, per-image, and thumbnail transparency checkerboards now share one set of theme tokens instead of three independently hand-tuned patterns | Complete |
-| 5 | **Shift = 90° angle lock** — holding Shift while dragging an arrow/shape endpoint or moving any bounding box (paste, resize) now snaps to 0/90/180/270° | Complete |
-| 6 | **Componentized list rows** — `ReselectBar` gained optional index/type/delete so History, Reselect, Guides, and Batch Rename's Preview rows all render as one shared `full-width-badge`; `PlacementGrid` now owns its own label + tooltip, standardized to "Placement" everywhere it appears | Complete |
+| 1 | **Crop no longer slides annotations** — `ImageHorseTool::crop` cropped the pixels but never offset text/shape annotations by the crop origin, so any crop not starting at the top-left corner left text and shapes visually drifting off the photo. They now shift with the pixels (same offset pattern as Move and Canvas Size), with a regression test | Complete |
+| 2 | **One dialog system** — `ui/Modal` and `SmallDialog` deleted; every dialog (Settings, Diagnostics, idle screen, small-window notice) now composes the shadcn `ui/dialog` primitives, which gained `size="sm" \| "default" \| "xl"` presets and an `overlayClassName` escape hatch. One focus trap, one animation, one API | Complete |
+| 3 | **One button primitive** — the unused stock-shadcn `ui/button` was rewritten as the app's real Button with cva sizes (`xs` / `tiny` / `default` / `large`), absorbing `LargeButton` and `TinyButton` (both deleted; 17 consumer files migrated). Also fixes the Apply Crop vs Activate Eyedropper font-size mismatch | Complete |
 
-> **About this release — a settings-panel overhaul, plus a new layer tool.** The biggest UI pass yet: every tool's settings panel was rebuilt around a consistent title-plus-lightbulb pattern, trading paragraphs of instructions for on-demand tooltips. Paint gained a proper 2×2 mode grid and inherited the Eraser from Edit & Transform, which in turn picked up the Color Picker from Effects. The new **Resize Layer** tool reuses the paste-placement machinery to let you scale/reposition any layer's content in place. Smaller fixes: a unified checkerboard pattern, Shift-to-90° angle snapping, and a handful of list components (history, reselect, guides, batch preview) consolidated onto one shared row style.
+> **About this release — a bug fix and two consolidations.** Cropping with any offset used to leave text and shape annotations behind while the pixels moved — they now travel together, verified down to the pixel. Under the hood, three modal systems became one and seven button-ish primitives became fewer: the shadcn dialog and a single cva-variant Button are now the only game in town, deleting four files and a matching set of visual inconsistencies.
 
 ## License
 

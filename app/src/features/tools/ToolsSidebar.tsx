@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Download } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -378,7 +378,7 @@ export function ToolsSidebar({
         <Tooltip>
           <TooltipTrigger asChild>
             <div>
-              <LargeButton
+              <Button size="large"
                 onClick={onExport}
                 disabled={!canExport}
                 className="w-full"
@@ -386,7 +386,7 @@ export function ToolsSidebar({
                 <Download className="h-4 w-4" />
                 Download &amp; Share {exportFormat.toUpperCase()}
                 {photoCount > 1 ? "s" : ""}
-              </LargeButton>
+              </Button>
             </div>
           </TooltipTrigger>
           {!canExport && (

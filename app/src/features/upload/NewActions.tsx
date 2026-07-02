@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { panelSwap } from "@/lib/animations";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { TEXT_COLORS } from "@/lib/colors";
@@ -404,17 +404,17 @@ export function NewActions({
                 </button>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <LargeButton
+                  <Button size="large"
                     onClick={() => setBlankMode(false)}
                     className="w-full"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Back
-                  </LargeButton>
-                  <LargeButton onClick={createBlank} className="w-full">
+                  </Button>
+                  <Button size="large" onClick={createBlank} className="w-full">
                     <SquarePen className="h-4 w-4" />
                     Create Canvas
-                  </LargeButton>
+                  </Button>
                 </div>
               </motion.div>
             ) : (
@@ -427,19 +427,19 @@ export function NewActions({
                 className="flex flex-1 flex-col items-center gap-4"
               >
                 <div className="grid grid-cols-2 gap-3 w-full">
-                  <LargeButton
+                  <Button size="large"
                     ref={firstButtonRef}
                     onClick={() => inputRef.current?.click()}
                     className="w-full"
                   >
                     <FolderOpen className="h-4 w-4" />
                     Browse Files
-                  </LargeButton>
-                  <LargeButton onClick={handlePasteClick} className="w-full">
+                  </Button>
+                  <Button size="large" onClick={handlePasteClick} className="w-full">
                     <Clipboard className="h-4 w-4" />
                     Paste (Ctrl+V)
-                  </LargeButton>
-                  <LargeButton
+                  </Button>
+                  <Button size="large"
                     onClick={handleTestImages}
                     disabled={loadingTest}
                     className="w-full"
@@ -450,15 +450,15 @@ export function NewActions({
                       <Images className="h-4 w-4" />
                     )}
                     {loadingTest ? `Loading ${TEST_IMAGE_COUNT}…` : "Sample Images"}
-                  </LargeButton>
-                  <LargeButton
+                  </Button>
+                  <Button size="large"
                     onClick={() => setBlankMode(true)}
                     title="Start with a blank canvas"
                     className="w-full"
                   >
                     <SquarePen className="h-4 w-4" />
                     Blank Canvas
-                  </LargeButton>
+                  </Button>
                 </div>
 
                 {/* Dotted drop zone — highlights + nudges when an image is
@@ -505,7 +505,7 @@ export function NewActions({
           Canvas panel (keeps that panel uncluttered). */}
       {showLinks && !blankMode && (
         <div className="flex items-center gap-2 px-6 pb-4">
-          <LargeButton
+          <Button size="large"
             onClick={() =>
               window.open("https://image-horse.vercel.app/", "_blank", "noopener")
             }
@@ -513,8 +513,8 @@ export function NewActions({
           >
             <Link className="h-4 w-4" />
             Image Horse Website
-          </LargeButton>
-          <LargeButton
+          </Button>
+          <Button size="large"
             aria-label="View source on GitHub"
             title="GitHub"
             onClick={() =>
@@ -528,8 +528,8 @@ export function NewActions({
           >
             <Github />
             GitHub
-          </LargeButton>
-          <LargeButton
+          </Button>
+          <Button size="large"
             aria-label="View source on Codeberg"
             title="Codeberg"
             onClick={() =>
@@ -543,7 +543,7 @@ export function NewActions({
           >
             <CodebergIcon />
             Codeberg
-          </LargeButton>
+          </Button>
         </div>
       )}
     </>

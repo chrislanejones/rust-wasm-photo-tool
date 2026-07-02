@@ -23,7 +23,13 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
-import { Modal } from "@/components/ui/Modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { SuperUserPane, type SuperUserControls } from "@/components/SuperUserPane";
 import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
 import { LayersCanvasPane } from "@/components/LayersCanvasPane";
@@ -35,7 +41,7 @@ import { StoragePane } from "@/components/StoragePane";
 import { AIUsagePane } from "@/components/AIUsagePane";
 import { DevTestsPane } from "@/components/DevTestsPane";
 import { UserMenu } from "@/components/UserMenu";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DEFAULT_PREFERENCES,
@@ -223,51 +229,21 @@ export function SubscriptionButton({
         <Settings className="h-4 w-4" />
       </button>
 
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Settings"
-        icon={Settings}
-        fill
-        footer={
-          <div className="flex items-center justify-between gap-2">
-            {/* Clerk user button / sign-in — same component as the top bar. */}
-            <UserMenu />
-            {(tab === "general" ||
-              tab === "canvas" ||
-              tab === "appearance" ||
-              tab === "security" ||
-              tab === "rulers" ||
-              tab === "superuser") && (
-              <div className="flex items-center gap-2">
-                <LargeButton
-                  onClick={() => setRestoreConfirmOpen(true)}
-                  disabled={
-                    tab === "superuser" ? !superUser?.overridden : atDefaults
-                  }
-                >
-                  Restore Settings
-                </LargeButton>
-                {tab === "superuser" ? (
-                  <LargeButton onClick={handleApplyTier} disabled={granting}>
-                    {granting
-                      ? "Applying…"
-                      : `Apply ${superUser?.mode === "paid" ? "Paid" : "Free"}`}
-                  </LargeButton>
-                ) : (
-                  <LargeButton
-                    onClick={handleApplySettings}
-                    disabled={!settingsDirty}
-                  >
-                    Apply
-                  </LargeButton>
-                )}
-              </div>
-            )}
-          </div>
-        }
-      >
-        <div className="flex h-full">
+      <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
+        <DialogContent
+          size="xl"
+          aria-describedby={undefined}
+          className="z-[var(--z-modal)] flex h-[80vh] flex-col"
+          overlayClassName="z-[var(--z-modal)]"
+        >
+          <DialogHeader className="px-4 py-2.5">
+            <DialogTitle className="flex items-center gap-2 font-mono text-xs font-normal uppercase tracking-wider text-text-secondary">
+              <Settings className="h-4 w-4" />
+              Settings
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex min-h-0 flex-1">
           {/* GNOME-style category rail (left) */}
           <nav className="w-48 shrink-0 space-y-1 overflow-y-auto border-r border-border bg-bg-tertiary/30 p-2">
             {tabs.map(({ id, label, icon: Icon }) => (
@@ -418,7 +394,52 @@ export function SubscriptionButton({
             )}
           </div>
         </div>
-      </Modal>
+
+          <DialogFooter className="block border-t border-border px-4 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              {/* Clerk user button / sign-in — same component as the top bar. */}
+              <UserMenu />
+              {(tab === "general" ||
+                tab === "canvas" ||
+                tab === "appearance" ||
+                tab === "security" ||
+                tab === "rulers" ||
+                tab === "superuser") && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="large"
+                    onClick={() => setRestoreConfirmOpen(true)}
+                    disabled={
+                      tab === "superuser" ? !superUser?.overridden : atDefaults
+                    }
+                  >
+                    Restore Settings
+                  </Button>
+                  {tab === "superuser" ? (
+                    <Button
+                      size="large"
+                      onClick={handleApplyTier}
+                      disabled={granting}
+                    >
+                      {granting
+                        ? "Applying…"
+                        : `Apply ${superUser?.mode === "paid" ? "Paid" : "Free"}`}
+                    </Button>
+                  ) : (
+                    <Button
+                      size="large"
+                      onClick={handleApplySettings}
+                      disabled={!settingsDirty}
+                    >
+                      Apply
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Restore confirmation — portaled above the Settings modal (z-modal). */}
       {restoreConfirmOpen &&
@@ -441,15 +462,15 @@ export function SubscriptionButton({
                   : "This resets all your preferences to their defaults. Your images and edits aren't affected."}
               </p>
               <div className="mt-4 flex gap-2">
-                <LargeButton
+                <Button size="large"
                   className="flex-1"
                   onClick={() => setRestoreConfirmOpen(false)}
                 >
                   Cancel
-                </LargeButton>
-                <LargeButton className="flex-1" onClick={handleRestore}>
+                </Button>
+                <Button size="large" className="flex-1" onClick={handleRestore}>
                   Restore
-                </LargeButton>
+                </Button>
               </div>
             </div>
           </div>,

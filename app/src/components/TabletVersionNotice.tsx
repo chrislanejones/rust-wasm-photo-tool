@@ -8,7 +8,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   open: boolean;
@@ -40,9 +40,9 @@ export function TabletVersionNotice({ open, onOpenChange }: Props) {
           </DialogDescription>
         </DialogBody>
         <DialogFooter>
-          <LargeButton className="w-full" onClick={() => onOpenChange(false)}>
+          <Button size="large" className="w-full" onClick={() => onOpenChange(false)}>
             Continue anyway
-          </LargeButton>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SlidersHorizontal, Zap, Scaling, ChevronDown } from "lucide-react";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 import { DimensionFields } from "@/components/DimensionFields";
 import { SizeSlider } from "@/components/SizeSlider";
 import { TabGroup } from "@/components/TabGroup";
@@ -395,7 +395,7 @@ export function ResizeSettings({
             as a photo is active (disabled handles the empty-gallery case). The
             "All Images" button is hidden when the gallery holds a single image. */}
         <div className={totalCount > 1 ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
-          <LargeButton
+          <Button size="large"
             onClick={() => handleAutoCompress("selected")}
             disabled={disabled || isCompressing}
             className="w-full"
@@ -405,36 +405,36 @@ export function ResizeSettings({
               : selectedCount > 1
                 ? "Compress Images"
                 : "Compress Image"}
-          </LargeButton>
+          </Button>
           {totalCount > 1 && (
-            <LargeButton
+            <Button size="large"
               onClick={() => handleAutoCompress("all")}
               disabled={disabled || isCompressing}
               className="w-full"
             >
               {isCompressing ? "Compressing…" : "Compress All Images"}
-            </LargeButton>
+            </Button>
           )}
         </div>
 
         <hr className="border-theme-sidebar-border" />
 
-        <LargeButton
+        <Button size="large"
           onClick={handleApplyResize}
           disabled={disabled || !resizeChanged}
           className="w-full"
         >
           <Scaling className="h-4 w-4" />
           Apply Compression &amp; Resize
-        </LargeButton>
+        </Button>
 
-        {/* A/B Compare — same LargeButton, locked until an edit is applied via
+        {/* A/B Compare — same Button size="large", locked until an edit is applied via
             Apply Compression & Resize or Auto Compress. Shows the active ring
             when the compare overlay is on. */}
         <Tooltip>
           <TooltipTrigger asChild>
             <div>
-              <LargeButton
+              <Button size="large"
                 onClick={onToggleCompare}
                 disabled={compareDisabled}
                 aria-pressed={compareActive}
@@ -446,7 +446,7 @@ export function ResizeSettings({
               >
                 <SlidersHorizontal className="h-4 w-4" />
                 {compareActive ? "Hide A/B Compare" : "Show A/B Compare"}
-              </LargeButton>
+              </Button>
             </div>
           </TooltipTrigger>
           {compareDisabled && (

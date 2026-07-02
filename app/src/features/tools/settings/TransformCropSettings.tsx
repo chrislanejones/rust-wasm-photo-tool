@@ -10,7 +10,7 @@ import {
   RectangleHorizontal,
   RectangleVertical,
 } from "lucide-react";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -152,13 +152,13 @@ export function TransformCropSettings({
             </div>
           )}
 
-          <LargeButton
+          <Button size="large"
             className="w-full"
             disabled={disabled}
             onClick={onApplyCrop}
           >
             <Crop className="h-4 w-4" /> Apply Crop
-          </LargeButton>
+          </Button>
         </div>
       )}
 
@@ -213,7 +213,7 @@ export function TransformCropSettings({
             info="Click the eyedropper to activate, then hover over the image to magnify pixels. Click to pick a color — it will be set as your brush and text color."
           />
 
-          <LargeButton
+          <Button size="large"
             className={cn(
               "w-full",
               colorPickerActive &&
@@ -224,7 +224,7 @@ export function TransformCropSettings({
           >
             <Pipette className="h-4 w-4" />
             {colorPickerActive ? "Click image to pick" : "Activate Eyedropper"}
-          </LargeButton>
+          </Button>
 
           <div className="flex items-center gap-3">
             <div

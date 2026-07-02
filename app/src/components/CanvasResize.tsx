@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Scaling } from "lucide-react";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 import { DimensionFields } from "@/components/DimensionFields";
 
 interface Props {
@@ -87,14 +87,14 @@ export function CanvasResize({ width, height, disabled, onApply }: Props) {
         onToggleLock={() => setLockAspect((v) => !v)}
       />
 
-      <LargeButton
+      <Button size="large"
         className="w-full"
         disabled={disabled || !changed}
         onClick={() => onApply(targetW, targetH)}
       >
         <Scaling className="h-4 w-4" /> Resize canvas
         {changed ? ` → ${targetW}×${targetH}` : ""}
-      </LargeButton>
+      </Button>
     </div>
   );
 }

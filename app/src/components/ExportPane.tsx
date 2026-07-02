@@ -1,5 +1,5 @@
 import { Package, Upload } from "lucide-react";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 
 /**
  * Settings → Import / Export pane. Round-trips the full project (every layer +
@@ -20,10 +20,10 @@ export function ExportPane() {
             Coming soon.
           </p>
         </div>
-        <LargeButton disabled className="w-full">
+        <Button size="large" disabled className="w-full">
           <Upload />
           Import .ora
-        </LargeButton>
+        </Button>
       </div>
 
       {/* Export */}
@@ -36,10 +36,10 @@ export function ExportPane() {
             editors. Coming soon.
           </p>
         </div>
-        <LargeButton disabled className="w-full">
+        <Button size="large" disabled className="w-full">
           <Package />
           Export as .ora
-        </LargeButton>
+        </Button>
       </div>
     </div>
   );

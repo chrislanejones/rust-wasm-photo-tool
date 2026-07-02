@@ -1,14 +1,14 @@
 // Dialog-box variant of the idle "paused to save power" screen, used by the
 // Settings → Dev Tests preview. The real in-app idle screen is the full-screen
-// IdleScreen; this boxes the very same SmallDialog card so it can be previewed
-// inline. In `dismissible` mode the X / Esc / click-outside close it and it
-// stacks above the Settings modal; otherwise a close attempt shakes the box.
+// IdleScreen; this boxes the very same card (IdleScreenCard) so it can be
+// previewed inline. In `dismissible` mode the X / Esc / click-outside close it
+// and it stacks above the Settings modal; otherwise a close attempt shakes the
+// box.
 import { useCallback } from "react";
 import { motion, useAnimation } from "framer-motion";
-import { Hourglass } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { SmallDialog } from "@/components/SmallDialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { IdleScreenCard } from "@/components/IdleScreen";
 
 interface Props {
   open: boolean;
@@ -37,27 +37,17 @@ export function IdleScreenDialog({ open, onContinue, dismissible = false }: Prop
         else triggerShake();
       }}
     >
-      {/* Transparent, chrome-less content — the visible box is the SmallDialog
-          card, so no DialogHeader/DialogFooter (no header, no footer). */}
+      {/* Transparent, chrome-less content — the visible box is the card, so no
+          DialogHeader/DialogFooter (no header, no footer). The card supplies
+          the accessible DialogTitle. */}
       <DialogContent
-        aria-describedby={undefined}
         className={cn(
           "w-auto max-w-xs overflow-visible border-0 bg-transparent p-0 shadow-none",
           dismissible && "z-[var(--z-devpreview)]",
         )}
       >
-        {/* Radix needs an accessible title; the visible heading lives in the card. */}
-        <DialogTitle className="sr-only">Idle Screen</DialogTitle>
         <motion.div animate={controls}>
-          <SmallDialog
-            icon={Hourglass}
-            title="Paused to save power"
-            actionLabel="Continue with Image Horse"
-            onAction={onContinue}
-          >
-            Background activity is throttled after a while idle. Your edits are
-            safe.
-          </SmallDialog>
+          <IdleScreenCard onContinue={onContinue} />
         </motion.div>
       </DialogContent>
     </Dialog>

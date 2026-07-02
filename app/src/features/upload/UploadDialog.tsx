@@ -6,7 +6,7 @@ import { useEffect, useCallback, useState } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { X } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
-import { TinyButton } from "@/components/ui/tiny-button";
+import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/UserMenu";
 import { NewActions } from "@/features/upload/NewActions";
 
@@ -104,9 +104,9 @@ export function UploadDialog({
               </div>
 
               {/* Close */}
-              <TinyButton className="absolute top-4 right-4" onClick={handleTryClose}>
+              <Button size="tiny" className="absolute top-4 right-4" onClick={handleTryClose}>
                 <X className="h-4 w-4" />
-              </TinyButton>
+              </Button>
 
               <NewActions
                 onFiles={onFiles}

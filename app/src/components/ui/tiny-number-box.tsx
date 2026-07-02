@@ -2,7 +2,7 @@ import { forwardRef, type HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Small bordered box matching TinyButton / `.btn-icon` (elevated surface,
+ * Small bordered box matching Button size="tiny" / `.btn-icon` (elevated surface,
  * border, ~28px tall, rounded) that displays a number. Used for the history
  * count and the gallery header counts.
  */

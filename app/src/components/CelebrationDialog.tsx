@@ -20,7 +20,7 @@ import {
   DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 
 /** Live shipping stats (June 2026, through v0.9.31 · Jun 12–27). */
 const STATS = {
@@ -201,9 +201,9 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
         </DialogBody>
 
         <DialogFooter style={{ position: "relative", zIndex: 1 }}>
-          <LargeButton className="w-full" onClick={() => onOpenChange(false)}>
+          <Button size="large" className="w-full" onClick={() => onOpenChange(false)}>
             <PartyPopper className="h-4 w-4" /> Keep shipping
-          </LargeButton>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

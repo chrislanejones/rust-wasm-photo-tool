@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { Download, Link2, Pencil } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { api } from "../../../convex/_generated/api";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Toaster, toast } from "@/components/ui/sonner";
 
@@ -57,10 +57,10 @@ export function ShareViewer({ token }: { token: string }) {
               The share may have been revoked, or the link is incorrect.
             </p>
             <a href={editorUrl}>
-              <LargeButton>
+              <Button size="large">
                 <Pencil className="h-4 w-4" />
                 Open the editor
-              </LargeButton>
+              </Button>
             </a>
           </div>
         )}
@@ -136,23 +136,23 @@ function ShareReady({ share, editorUrl }: { share: ShareData; editorUrl: string 
       </div>
 
       <div className="flex w-full max-w-md flex-wrap gap-2">
-        <LargeButton className="flex-1" onClick={handleDownload} disabled={downloading}>
+        <Button size="large" className="flex-1" onClick={handleDownload} disabled={downloading}>
           {downloading ? (
             <Spinner size={16} />
           ) : (
             <Download className="h-4 w-4" />
           )}
           Download
-        </LargeButton>
-        <LargeButton className="flex-1" onClick={handleCopyLink}>
+        </Button>
+        <Button size="large" className="flex-1" onClick={handleCopyLink}>
           <Link2 className="h-4 w-4" />
           Copy link
-        </LargeButton>
+        </Button>
         <a href={editorUrl} className="flex-1">
-          <LargeButton className="w-full">
+          <Button size="large" className="w-full">
             <Pencil className="h-4 w-4" />
             Open the editor
-          </LargeButton>
+          </Button>
         </a>
       </div>
     </div>

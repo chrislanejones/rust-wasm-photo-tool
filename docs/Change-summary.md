@@ -587,3 +587,22 @@ paste-placement machinery for non-destructive per-layer scale/reposition. Verifi
 > unrelated bug was surfaced during verification: creating a "Blank Canvas" with
 > "Transparent background" produces an actually-opaque white layer despite the
 > gallery thumbnail rendering it as transparent — not touched by this release.
+
+## v7.1 Change Summary — 2026-07-02
+
+A crop bug fix plus the modal/button consolidation pass. Verified by `cargo test`
+(40 lib tests incl. the new crop regression test), `cargo clippy`/`cargo fmt`,
+`tsc --noEmit`, `vite build`, and in-browser checks of Settings, Diagnostics, the
+idle screens, and the migrated buttons (fresh load, zero console errors).
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Crop annotation-offset fix** — `ImageHorseTool::crop()` (src/lib.rs) cropped every layer's pixel buffer but never offset `text_annotations`/`shape_annotations` by the crop origin, so any crop not anchored at (0,0) left annotations at stale absolute coordinates ("the text slides over"). Now both annotation kinds (incl. shape `points`) shift by `(-x, -y)`, clamped exactly the way `transform::crop` clamps — the same pattern `translate_active_layer` and `resize_canvas` already used. New test `crop_offsets_text_and_shape_annotations`; verified in-browser (painted dot + text annotation stay glued through an off-origin crop; one-step undo restores) | Complete |
+| 2   | **Modal consolidation → `ui/dialog`** — `DialogContent` gained `size="sm"` (notice card: the old SmallDialog look), `"default"`, `"xl"` (the old 760px Modal width) plus `overlayClassName` for z-index/blur overrides. Converted: `SubscriptionButton` (Settings) + `DiagnosticLogOverlay` off `ui/Modal`; `IdleScreen`/`IdleScreenDialog`/`SmallWindowNotice` off `SmallDialog`, with the idle card shared as `IdleScreenCard` so the real idle screen and the Dev-Tests preview stay identical (shake-on-close preserved, idle stays non-dismissable at `--z-idle`). **Deleted:** `ui/Modal.tsx`, `SmallDialog.tsx` | Complete |
+| 3   | **Button consolidation → `ui/button` (cva)** — the previously-unused stock-shadcn `button.tsx` rewritten as the app's one Button: `size="xs" \| "tiny" \| "default" \| "large"` (xs/tiny = the 20/28px `.btn-icon` icon-button styles, large = the old LargeButton exactly). All 17 consumers migrated (13 LargeButton files, 4 TinyButton files incl. ReviewPanel's 12 `size="xs"` rows and dialog.tsx's own close X). **Deleted:** `large-button.tsx`, `tiny-button.tsx`. Stale comment/docs references redirected | Complete |
+
+> **Known follow-ups (PARKING_LOT.md).** `ShortcutModal.tsx` still hand-rolls an
+> inline framer modal (last non-ui/dialog modal); SubscriptionButton's
+> restore-confirm is a hand-rolled portal overlay; Resize Layer's preview opens
+> full-canvas (no content-bbox autofit yet); pre-existing: Blank Canvas
+> "Transparent background" produces an opaque white layer.

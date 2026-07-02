@@ -5,7 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { TinyButton } from "@/components/ui/tiny-button"
+import { Button } from "@/components/ui/button"
 
 const Dialog = DialogPrimitive.Root
 
@@ -28,12 +28,31 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+/** Width/style presets for `DialogContent`:
+ *  - `sm` — the compact notice card (icon/title/copy/one button; the old
+ *    SmallDialog look): narrow, extra-rounded, centered text, card surface.
+ *  - `default` — the standard editor dialog (max-w-lg).
+ *  - `xl` — the large editor sheet (Settings, Diagnostics; the old Modal
+ *    width): ≤760px wide, consumers add their own height/flex classes. */
+const dialogContentSizes = {
+  sm: "block max-w-xs rounded-2xl bg-card p-6 text-center shadow-panel",
+  default: "",
+  xl: "max-w-[760px]",
+} as const
+
+interface DialogContentProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  size?: keyof typeof dialogContentSizes
+  /** Extra classes for the backdrop (e.g. a z-index or blur override). */
+  overlayClassName?: string
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, overlayClassName, size = "default", children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay className={overlayClassName} />
     <DialogPrimitive.Content
       ref={ref}
       // Don't auto-focus (and ring) the first button when the dialog opens —
@@ -42,6 +61,7 @@ const DialogContent = React.forwardRef<
       onOpenAutoFocus={(e) => e.preventDefault()}
       className={cn(
         "fixed left-[50%] top-[50%] z-[var(--z-dialog)] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-0 overflow-hidden rounded-xl border border-border bg-bg-secondary p-0 text-text-primary shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+        dialogContentSizes[size],
         className
       )}
       {...props}
@@ -69,9 +89,9 @@ const DialogHeader = ({
   >
     <div className="flex min-w-0 flex-col gap-1 text-left">{children}</div>
     <DialogPrimitive.Close asChild>
-      <TinyButton className="shrink-0" aria-label="Close">
+      <Button size="tiny" className="shrink-0" aria-label="Close">
         <X className="h-4 w-4" />
-      </TinyButton>
+      </Button>
     </DialogPrimitive.Close>
   </div>
 )

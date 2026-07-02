@@ -1191,6 +1191,16 @@ impl ImageHorseTool {
         let (ow, oh) = (self.width, self.height);
         let mut nw = self.width;
         let mut nh = self.height;
+        // Mirror `transform::crop`'s own x/y clamping so the annotation offset
+        // matches the pixel crop exactly even when the requested rect
+        // overhangs the canvas.
+        let (dx, dy) = if ow == 0 || oh == 0 {
+            (0, 0)
+        } else {
+            let cx = x.min(ow - 1);
+            let cy = y.min(oh - 1);
+            (-(cx as i32), -(cy as i32))
+        };
         for layer in &mut self.layers {
             let (new_data, cw, ch) = transform::crop(&layer.buf.data, ow, oh, x, y, w, h);
             layer.buf.data = new_data;
@@ -1198,6 +1208,20 @@ impl ImageHorseTool {
             layer.buf.height = ch;
             nw = cw;
             nh = ch;
+            for a in &mut layer.text_annotations {
+                a.x += dx;
+                a.y += dy;
+            }
+            for s in &mut layer.shape_annotations {
+                s.x0 += dx as f64;
+                s.y0 += dy as f64;
+                s.x1 += dx as f64;
+                s.y1 += dy as f64;
+                for p in &mut s.points {
+                    p.0 += dx as f64;
+                    p.1 += dy as f64;
+                }
+            }
         }
         self.width = nw;
         self.height = nh;
@@ -2635,6 +2659,36 @@ mod layer_persistence_tests {
             t.undo_count(),
             undo_before + 1,
             "one Move Layer history step"
+        );
+    }
+
+    #[test]
+    fn crop_offsets_text_and_shape_annotations() {
+        let mut t = ImageHorseTool::new(20, 20);
+        t.load_image(&solid(20, 20, [10, 20, 30, 255]));
+        t.add_text_annotation(
+            "hi", 12.0, 255, 255, 255, false, 15, 12, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+        );
+        t.add_shape_annotation(
+            1, 5.0, 5.0, 8.0, 8.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        );
+        // Crop a 10x10 rect starting at (5,5) — annotations must shift by
+        // (-5,-5) to stay anchored to the same photo content, matching the
+        // Move tool / resize_canvas offset pattern.
+        t.crop(5, 5, 10, 10);
+        let layer = &t.layers[t.active];
+        assert_eq!(
+            layer.text_annotations[0].x, 10,
+            "text.x follows the crop origin"
+        );
+        assert_eq!(
+            layer.text_annotations[0].y, 7,
+            "text.y follows the crop origin"
+        );
+        let shape = &layer.shape_annotations[0];
+        assert_eq!(
+            (shape.x0, shape.y0, shape.x1, shape.y1),
+            (0.0, 0.0, 3.0, 3.0)
         );
     }
 

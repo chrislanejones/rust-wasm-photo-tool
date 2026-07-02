@@ -6,7 +6,7 @@ import {
   UserButton,
 } from "@clerk/clerk-react";
 import { User } from "lucide-react";
-import { TinyButton } from "@/components/ui/tiny-button";
+import { Button } from "@/components/ui/button";
 import { MediaTile } from "@/components/MediaTile";
 
 /** `large` → a welcome-back-sized avatar / sign-in tile (the small icon was hard
@@ -35,9 +35,9 @@ export function UserMenu({ large = false }: { large?: boolean }) {
               aria-label="Sign in"
             />
           ) : (
-            <TinyButton title="Sign in to save your work">
+            <Button size="tiny" title="Sign in to save your work">
               <User className="h-4 w-4" />
-            </TinyButton>
+            </Button>
           )}
         </SignInButton>
       </SignedOut>

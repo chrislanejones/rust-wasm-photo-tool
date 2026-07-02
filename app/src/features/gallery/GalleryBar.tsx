@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter } from "@/lib/animations";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes } from "@/lib/format";
@@ -448,54 +448,54 @@ export function GalleryBar({
               }
             >
               {selectionActive && onExportSelected && (
-                <LargeButton
+                <Button size="large"
                   onClick={onExportSelected}
                   title="Export selected images"
                   className="px-2.5 py-1.5 text-xs"
                 >
                   <Download className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Export Selected</span>
-                </LargeButton>
+                </Button>
               )}
               {selectionActive && onDuplicateSelected && (
-                <LargeButton
+                <Button size="large"
                   onClick={onDuplicateSelected}
                   title="Duplicate selected images"
                   className="px-2.5 py-1.5 text-xs"
                 >
                   <Copy className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Duplicate</span>
-                </LargeButton>
+                </Button>
               )}
               {selectionActive && onDeleteSelected && (
-                <LargeButton
+                <Button size="large"
                   onClick={onDeleteSelected}
                   title="Delete selected images"
                   className="px-2.5 py-1.5 text-xs"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Delete Selected</span>
-                </LargeButton>
+                </Button>
               )}
               {onDeleteAll && (
-                <LargeButton
+                <Button size="large"
                   onClick={onDeleteAll}
                   title="Delete all images"
                   className="px-2.5 py-1.5 text-xs"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Delete All</span>
-                </LargeButton>
+                </Button>
               )}
               {selectionActive && onClearSelection && (
-                <LargeButton
+                <Button size="large"
                   onClick={onClearSelection}
                   title="Clear selection"
                   className="px-2.5 py-1.5 text-xs"
                 >
                   <SquareX className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Unselect</span>
-                </LargeButton>
+                </Button>
               )}
             </div>
           </div>

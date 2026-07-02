@@ -41,3 +41,10 @@ docs/.hidden/
 
 # Scalar wasm build for the SIMD benchmark (rebuild on demand — see bench.html)
 pkg-scalar/
+
+# Overnight run docs
+RUN_SCHEDULE.md
+NIGHT*_PROMPT.md
+DAY*_PROMPT.md
+SESSION_LOG.md
+PARKING_LOT.md

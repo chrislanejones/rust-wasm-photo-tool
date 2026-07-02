@@ -105,7 +105,7 @@ VitePWA({
 The SW update flow matters more here than on a typical site because a stale WASM can corrupt an in-progress edit (§7).
 
 - Prefer **`registerType: "prompt"`** over `autoUpdate`. On a new SW, **notify** the user and let them reload, rather than silently `skipWaiting()` + `clientsClaim()` mid-session and swap the WASM out from under an active edit.
-- Reuse the existing **`SmallDialog`** notice pattern (used for idle / small-window / resume) for an "Update available — reload" prompt. Consistent UX, already built.
+- Reuse the existing **`DialogContent size="sm"`** notice-card pattern (ui/dialog; used for idle / small-window / resume) for an "Update available — reload" prompt. Consistent UX, already built.
 - Only `skipWaiting` on explicit user action (clicking "Reload to update"), so the swap happens at a safe moment.
 
 ---
@@ -124,7 +124,7 @@ The SW update flow matters more here than on a typical site because a stale WASM
 
 1. **Phase 0 (this note).** Decision recorded; no SW shipped.
 2. **Phase 1 — shell + WASM precache.** Add `vite-plugin-pwa` with `registerType: "prompt"`, precache the hashed shell + `.wasm`, `NetworkOnly` for Convex/Clerk/PostHog/Replicate. Verify offline boot + instant repeat load.
-3. **Phase 2 — update UX.** Wire the "update available" prompt into `SmallDialog`; `skipWaiting` only on user click.
+3. **Phase 2 — update UX.** Wire the "update available" prompt into the `ui/dialog` `size="sm"` notice card; `skipWaiting` only on user click.
 4. **Phase 3 — installable PWA.** Web manifest + icons; test install on desktop + mobile.
 5. **Future — threads.** If WASM threads are adopted, add COOP/COEP headers on both hosts and re-validate the SW's cross-origin behaviour (§5).
 

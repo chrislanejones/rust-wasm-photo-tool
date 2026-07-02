@@ -109,7 +109,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { LargeButton } from "@/components/ui/large-button";
+import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ShareButton } from "@/components/ShareButton";
 import {
@@ -2615,15 +2615,15 @@ export function AppShell() {
           </DialogBody>
           <DialogFooter>
             <DialogClose asChild>
-              <LargeButton className="flex-1">Cancel</LargeButton>
+              <Button size="large" className="flex-1">Cancel</Button>
             </DialogClose>
-            <LargeButton
+            <Button size="large"
               onClick={confirmDeleteAll}
               className="flex-1 border-destructive/40 bg-destructive/15 text-destructive hover:border-destructive hover:bg-destructive/25 hover:brightness-100"
             >
               <Trash2 className="h-4 w-4" />
               Delete all
-            </LargeButton>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2644,9 +2644,9 @@ export function AppShell() {
           </DialogBody>
           <DialogFooter>
             <DialogClose asChild>
-              <LargeButton className="flex-1">Cancel</LargeButton>
+              <Button size="large" className="flex-1">Cancel</Button>
             </DialogClose>
-            <LargeButton
+            <Button size="large"
               onClick={() => {
                 const id = deletePhotoId;
                 setDeletePhotoId(null);
@@ -2656,7 +2656,7 @@ export function AppShell() {
             >
               <Trash2 className="h-4 w-4" />
               Delete image
-            </LargeButton>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2676,9 +2676,9 @@ export function AppShell() {
           </DialogBody>
           <DialogFooter>
             <DialogClose asChild>
-              <LargeButton className="flex-1">Cancel</LargeButton>
+              <Button size="large" className="flex-1">Cancel</Button>
             </DialogClose>
-            <LargeButton
+            <Button size="large"
               onClick={() => {
                 setDeleteSelectedOpen(false);
                 handleDeleteSelected();
@@ -2687,7 +2687,7 @@ export function AppShell() {
             >
               <Trash2 className="h-4 w-4" />
               Delete selected
-            </LargeButton>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

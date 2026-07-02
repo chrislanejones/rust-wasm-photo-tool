@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { HistogramView } from "./HistogramView";
 import { slideFromRight } from "@/lib/animations";
-import { TinyButton } from "@/components/ui/tiny-button";
+import { Button } from "@/components/ui/button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
@@ -233,12 +233,12 @@ export function ReviewPanel({
               <History className="h-3.5 w-3.5" />
               <span className="review-section-name">History</span>
               <div className="ml-auto flex items-center gap-1.5">
-                <TinyButton onClick={onUndo} disabled={!canUndo} title="Undo">
+                <Button size="tiny" onClick={onUndo} disabled={!canUndo} title="Undo">
                   <Undo2 className="h-3.5 w-3.5" />
-                </TinyButton>
-                <TinyButton onClick={onRedo} disabled={!canRedo} title="Redo">
+                </Button>
+                <Button size="tiny" onClick={onRedo} disabled={!canRedo} title="Redo">
                   <Redo2 className="h-3.5 w-3.5" />
-                </TinyButton>
+                </Button>
                 <TinyNumberBox>{history.length}</TinyNumberBox>
               </div>
             </div>
@@ -284,12 +284,12 @@ export function ReviewPanel({
               <span className="review-section-name">Reselect</span>
               <div className="ml-auto flex items-center gap-1.5">
                 <TinyNumberBox>{objects.length}</TinyNumberBox>
-                <TinyButton
+                <Button size="tiny"
                   onClick={() => toggle("reselect")}
                   title="Close section"
                 >
                   <X className="h-4 w-4" />
-                </TinyButton>
+                </Button>
               </div>
             </div>
             <div className="history-list reselect-list">
@@ -328,7 +328,7 @@ export function ReviewPanel({
                 >
                   {layers.length}
                 </TinyNumberBox>
-                <TinyButton
+                <Button size="tiny"
                   onClick={onAddLayer}
                   disabled={!canAddLayer}
                   title={
@@ -340,20 +340,20 @@ export function ReviewPanel({
                   }
                 >
                   <Plus className="h-3.5 w-3.5" />
-                </TinyButton>
-                <TinyButton
+                </Button>
+                <Button size="tiny"
                   onClick={onFlattenAll}
                   disabled={!layersUnlocked || layers.length < 2}
                   title="Flatten all layers"
                 >
                   <Layers2 className="h-3.5 w-3.5" />
-                </TinyButton>
-                <TinyButton
+                </Button>
+                <Button size="tiny"
                   onClick={() => toggle("layers")}
                   title="Close section"
                 >
                   <X className="h-4 w-4" />
-                </TinyButton>
+                </Button>
               </div>
             </div>
 
@@ -387,7 +387,7 @@ export function ReviewPanel({
                       }}
                       title={`Select ${layer.name}`}
                     >
-                      <TinyButton
+                      <Button
                         size="xs"
                         title={layer.visible ? "Hide layer" : "Show layer"}
                         onClick={(e) => {
@@ -398,7 +398,7 @@ export function ReviewPanel({
                         {/* Icon swap stays here (out of the button component) so
                             it isn't baked in as a one-off variant. */}
                         {layer.visible ? <Eye /> : <EyeOff className="opacity-40" />}
-                      </TinyButton>
+                      </Button>
 
                       {renamingId === layer.id ? (
                         <input
@@ -429,7 +429,7 @@ export function ReviewPanel({
                       )}
 
                       <div className="layer-row-actions">
-                        <TinyButton
+                        <Button
                           size="xs"
                           title="Move up"
                           disabled={isTop}
@@ -439,8 +439,8 @@ export function ReviewPanel({
                           }}
                         >
                           <ChevronUp />
-                        </TinyButton>
-                        <TinyButton
+                        </Button>
+                        <Button
                           size="xs"
                           title="Move down"
                           disabled={isBottom}
@@ -450,8 +450,8 @@ export function ReviewPanel({
                           }}
                         >
                           <ChevronDown />
-                        </TinyButton>
-                        <TinyButton
+                        </Button>
+                        <Button
                           size="xs"
                           title="Merge down"
                           disabled={isBottom}
@@ -461,8 +461,8 @@ export function ReviewPanel({
                           }}
                         >
                           <Layers2 />
-                        </TinyButton>
-                        <TinyButton
+                        </Button>
+                        <Button
                           size="xs"
                           title={
                             layer.hasMask
@@ -485,8 +485,8 @@ export function ReviewPanel({
                           }}
                         >
                           <Aperture />
-                        </TinyButton>
-                        <TinyButton
+                        </Button>
+                        <Button
                           size="xs"
                           title="Duplicate layer"
                           onClick={(e) => {
@@ -495,8 +495,8 @@ export function ReviewPanel({
                           }}
                         >
                           <Copy />
-                        </TinyButton>
-                        <TinyButton
+                        </Button>
+                        <Button
                           size="xs"
                           title="Delete layer"
                           disabled={layers.length <= 1}
@@ -506,7 +506,7 @@ export function ReviewPanel({
                           }}
                         >
                           <DeleteGlyph />
-                        </TinyButton>
+                        </Button>
                       </div>
 
                       {/* Opacity slider for the active layer. */}
@@ -543,7 +543,7 @@ export function ReviewPanel({
                         >
                           {mask.editing && (
                             <>
-                              <TinyButton
+                              <Button
                                 size="xs"
                                 title="Brush hides (paint black)"
                                 className={
@@ -554,8 +554,8 @@ export function ReviewPanel({
                                 onClick={() => mask.onSetValue(0)}
                               >
                                 <EyeOff />
-                              </TinyButton>
-                              <TinyButton
+                              </Button>
+                              <Button
                                 size="xs"
                                 title="Brush reveals (paint white)"
                                 className={
@@ -566,30 +566,30 @@ export function ReviewPanel({
                                 onClick={() => mask.onSetValue(255)}
                               >
                                 <Eye />
-                              </TinyButton>
+                              </Button>
                             </>
                           )}
-                          <TinyButton
+                          <Button
                             size="xs"
                             title="Invert mask"
                             onClick={() => mask.onInvert(layer.id)}
                           >
                             <Contrast />
-                          </TinyButton>
-                          <TinyButton
+                          </Button>
+                          <Button
                             size="xs"
                             title="Apply mask (bake in, permanent)"
                             onClick={() => mask.onApply(layer.id)}
                           >
                             <Check />
-                          </TinyButton>
-                          <TinyButton
+                          </Button>
+                          <Button
                             size="xs"
                             title="Remove mask"
                             onClick={() => mask.onRemove(layer.id)}
                           >
                             <X />
-                          </TinyButton>
+                          </Button>
                         </div>
                       )}
                     </li>
@@ -609,12 +609,12 @@ export function ReviewPanel({
               <ChartArea className="h-3.5 w-3.5" />
               <span className="review-section-name">Histogram</span>
               <div className="ml-auto flex items-center gap-1.5">
-                <TinyButton
+                <Button size="tiny"
                   onClick={() => toggle("histogram")}
                   title="Close section"
                 >
                   <X className="h-4 w-4" />
-                </TinyButton>
+                </Button>
               </div>
             </div>
             <HistogramView

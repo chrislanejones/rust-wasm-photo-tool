@@ -31,7 +31,7 @@ import {
  *     - Confirm before "Delete All" (gate the existing Delete-All dialog).
  *     - Restore last session on launch (edits persist to `image-horse-edits`;
  *       today a reload drops logged-out users back to the upload screen).
- * • Data & privacy (bottom danger-zone, destructive `LargeButton`):
+ * • Data & privacy (bottom danger-zone, destructive `Button size="large"`):
  *     - Clear local data — wipe LS keys `image-horse-user-colors` /
  *       `-recent-texts` and IndexedDB `image-horse-originals` / `-edits`
  *       (`indexedDB.deleteDatabase`).
@@ -39,7 +39,7 @@ import {
  * Other tabs (not General): Super User ✓, Plan & Billing ✓; maybe a Shortcuts
  * tab later (mirror `ShortcutModal`). All client-side prefs — not a security
  * boundary. Keep the visual language consistent with `SuperUserPane` (section
- * heading + `space-y-4`, `ToggleButtonGroup` for choices, `LargeButton` actions).
+ * heading + `space-y-4`, `ToggleButtonGroup` for choices, `Button size="large"` actions).
  */
 /** AppShell → Settings modal contract: the live prefs + a commit callback. */
 export interface GeneralControls {

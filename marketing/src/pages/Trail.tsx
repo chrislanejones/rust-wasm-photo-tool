@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.45",
+    date: "2026-07-02",
+    headline: "Crop keeps your annotations put",
+    entries: [
+      { tag: "fix", text: "Fixed a bug where cropping a photo made text and shapes slide off their spots — the pixels moved but the annotations didn't. They now travel together, wherever you crop." },
+      { tag: "ui", text: "Under-the-hood consistency pass: every dialog in the app now shares one system (same focus handling, same animation), and the button zoo was consolidated into a single primitive — fixing a few font-size mismatches along the way." },
+    ],
+  },
+  {
     version: "v0.9.44",
     date: "2026-07-02",
     headline: "Resize a layer in place, and a cleaner, friendlier settings panel",
