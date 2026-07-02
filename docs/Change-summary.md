@@ -606,3 +606,15 @@ idle screens, and the migrated buttons (fresh load, zero console errors).
 > restore-confirm is a hand-rolled portal overlay; Resize Layer's preview opens
 > full-canvas (no content-bbox autofit yet); pre-existing: Blank Canvas
 > "Transparent background" produces an opaque white layer.
+
+## v7.2 Change Summary — 2026-07-02
+
+A pricing-philosophy change (fundamental editing is free) plus a pen-tool fix.
+Verified by `cargo test` (40 lib tests), `cargo clippy`/`cargo fmt`, `tsc --noEmit`,
+`vite build` (app + marketing). Pen fill mechanism confirmed in-browser earlier.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Layers un-paywalled (free / no-login)** — layers are a fundamental, purely client-side editing tool (the Rust `Vec<Layer>` stack + recomposite live entirely in memory / IndexedDB, tier-agnostic), so they're no longer gated behind login. `app/src/lib/tiers.ts` demo `layersPerImage: 0 → 3` (matching Logged In) — one value that flows through the existing `layersUnlocked = layerLimit > 0` checks in `ReviewPanel` (the "Log in to unlock layers" badge is now dead code) and `canUseLayers` in the import dialog, no component edits. Cloud layer *persistence* stays `isAuthenticated`-gated (the Convex archive is single-layer anyway), so in-memory layers work in Demo while cloud save stays login-only. Login/paid now differentiate on cloud features (storage, gallery cap, sharing, AI); "unlimited layers" remains the paid perk. The other listed fundamentals (Crop, Blur, Resize, Paint, Histogram) were already Demo-available (gated only by `imageReady`) | Complete |
+| 2   | **Pen Background fill applies to an already-drawn path** — the Bézier pen's Background fill was captured only at draw time (`add_bezier_annotation`), so reselecting a committed path and changing the Background did nothing (the fill mechanism itself works — verified: a fresh Solid path fills correctly). `update_bezier_annotation` (src/annotations.rs) extended from `(id, points)` to also take `(color_hex, stroke_width, fill_kind, fill_color_hex)` — mirroring `update_shape_annotation` — and `handlePenEditCommit` (AppShell) now passes the current Paint→Pen panel style on commit. So reselecting a pen path and adjusting the Background/stroke restyles it, including filling one drawn with Background: None. `stamp_tool.d.ts` shadow hand-synced; wasm rebuilt | Complete |
+| 3   | **Pricing sheets synced** — `marketing/src/sections/Pricing.tsx`: Demo plan card gains "3 layers / image"; the "Layers" row moved out of the "Projects & data (Convex)" category into "Editing tools (WASM — zero server cost)" as `demo=3 / free=3 / pro=unlimited` (client-side stack), reflecting that layers are free local editing, not a cloud feature | Complete |

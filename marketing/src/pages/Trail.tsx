@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.46",
+    date: "2026-07-02",
+    headline: "Layers are free, and the pen fills what you drew",
+    entries: [
+      { tag: "feature", text: "Layers no longer require an account. They run entirely on your device, so they shouldn't sit behind a login — the free no-login tier now gets 3 layers per image, same as a logged-in account. Signing in and going Pro is about the cloud stuff (saved projects, storage, sharing, AI), not the editing itself. Crop, blur, resize, paint, and the histogram were already free." },
+      { tag: "fix", text: "The pen tool's Background fill can now be applied to a path you already drew — reselect the path and change the Background and it fills, instead of only working if you set it before drawing." },
+    ],
+  },
+  {
     version: "v0.9.45",
     date: "2026-07-02",
     headline: "Crop keeps your annotations put",

@@ -48,3 +48,7 @@ NIGHT*_PROMPT.md
 DAY*_PROMPT.md
 SESSION_LOG.md
 PARKING_LOT.md
+
+# Overnight-run tooling (any *_PROMPT.md + the status dashboard)
+*_PROMPT.md
+runs-status.sh

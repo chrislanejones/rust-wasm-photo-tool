@@ -1012,12 +1012,29 @@ export function AppShell() {
     (id: number, flatPoints: number[]) => {
       const tool = stamp.toolRef.current;
       if (!tool) return;
-      tool.update_bezier_annotation(id, new Float64Array(flatPoints));
+      // Re-committing a reselected path adopts the current Paint→Pen panel
+      // style, so changing the Background (or stroke) restyles a path you
+      // already drew — including filling one committed with Background: None.
+      const fillKind = toolSettings.fillMode !== "none" ? 1 : 0;
+      tool.update_bezier_annotation(
+        id,
+        new Float64Array(flatPoints),
+        toolSettings.strokeColor,
+        toolSettings.strokeWidth,
+        fillKind,
+        toolSettings.fillColor,
+      );
       tool.set_editing_shape(-1);
       stamp.flushToCanvas();
       stamp.syncState();
     },
-    [stamp],
+    [
+      stamp,
+      toolSettings.strokeColor,
+      toolSettings.strokeWidth,
+      toolSettings.fillMode,
+      toolSettings.fillColor,
+    ],
   );
   const handlePenEditCancel = useCallback(() => {
     const tool = stamp.toolRef.current;

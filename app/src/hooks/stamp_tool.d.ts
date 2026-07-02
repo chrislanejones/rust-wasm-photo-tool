@@ -721,8 +721,17 @@ declare module "stamp_tool" {
     ): number;
     /** Replace just the control points of an annotation (no history) — live drag-edit. */
     set_annotation_points(id: number, points: Float64Array): void;
-    /** Commit a Bézier-path reshape: snapshot "Edit Pen Path" + replace its points. */
-    update_bezier_annotation(id: number, points: Float64Array): void;
+    /** Commit a Bézier-path reshape + restyle: snapshot "Edit Pen Path", replace
+     *  points, and apply stroke colour/width + solid Background fill (fill_kind
+     *  0 = none, 1 = solid fill_color_hex) so reselecting a path can fill it. */
+    update_bezier_annotation(
+      id: number,
+      points: Float64Array,
+      color_hex: string,
+      stroke_width: number,
+      fill_kind: number,
+      fill_color_hex: string,
+    ): void;
     /** Add a live shape/arrow. Pushes an "Add Shape"/"Add Arrow" history step. Returns the new id. */
     add_shape_annotation(
       kind: number,

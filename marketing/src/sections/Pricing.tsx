@@ -138,7 +138,7 @@ export default function Pricing() {
         <div className="grid md:grid-cols-3 gap-4 mb-8">
           <PlanCard
             tier="Demo" tag="anonymous" price="$0" sub="forever" color="zinc" cta="Try it now"
-            features={["All WASM tools", "12 image gallery", "Session-only", "No signup"]}
+            features={["All WASM tools", "3 layers / image", "12 image gallery", "Session-only", "No signup"]}
           />
           <PlanCard
             tier="Free" tag="logged in" price="$0" sub="per month" color="emerald" cta="Create account"
@@ -175,6 +175,7 @@ export default function Pricing() {
           <TierRow feature="Blur brush" demo="yes" free="yes" pro="yes" />
           <TierRow feature="Brightness / contrast" demo="yes" free="yes" pro="yes" />
           <TierRow feature="Crop / resize" demo="yes" free="yes" pro="yes" />
+          <TierRow feature="Layers" sub="client-side stack" demo="3 per image" free="3 per image" pro="unlimited" />
           <TierRow feature="Undo / redo (50 steps)" demo="yes" free="yes" pro="yes" />
           <TierRow feature="Export (PNG/JPEG/WebP/AVIF)" demo="yes" free="yes" pro="yes" />
 
@@ -189,7 +190,6 @@ export default function Pricing() {
           <TierRow feature="Projects" sub="organize into folders" demo="—" free="3 projects" pro="unlimited" />
           <TierRow feature="Persistent history" sub="edit history saved" demo="—" free="yes" pro="yes" />
           <TierRow feature="Annotations sync" sub="shapes recoverable" demo="—" free="yes" pro="yes" />
-          <TierRow feature="Layers" demo="—" free="3 per image" pro="unlimited" />
           <TierRow feature="Share links" sub="public project URLs" demo="—" free="1 active" pro="unlimited" />
 
           <TierCategory label="AI features (Replicate — costs us money)" />

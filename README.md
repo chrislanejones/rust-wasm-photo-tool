@@ -50,6 +50,15 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.2 — 2026-07-02
+
+| # | Change | Status |
+| --- | --- | --- |
+| 1 | **Layers are free (no login)** — layers are a fundamental, purely client-side editing tool (the Rust layer stack lives entirely in memory / IndexedDB), so they're no longer paywalled: the no-login Demo tier now gets 3 layers per image, same as Logged In. Login/paid differentiate on **cloud** features (storage, gallery cap, sharing, AI), not on local editing. "Unlimited layers" stays the paid perk. The other fundamental tools (Crop, Blur, Resize, Paint, Histogram) already ran in Demo | Complete |
+| 2 | **Pen: fill a path you already drew** — the Bézier pen's Background fill only applied if set *before* drawing; reselecting a committed path and changing the Background did nothing. `update_bezier_annotation` now carries stroke + fill, so reselecting a pen path and adjusting the Paint→Pen panel restyles it — including filling one drawn with Background: None | Complete |
+
+> **About this release — pricing philosophy + a pen fix.** Fundamental editing is local and costs us nothing to run, so it shouldn't sit behind a login: layers now work in the no-login tier (login/pay gate the cloud, not the canvas). And the pen tool's Background fill can finally be applied to a path you've already drawn, not just set up front.
+
 ### v7.1 — 2026-07-02
 
 | # | Change | Status |

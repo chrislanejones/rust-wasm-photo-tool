@@ -838,10 +838,25 @@ impl ImageHorseTool {
     /// Commit a reshape of an existing Bézier path: pushes one "Edit Pen Path"
     /// snapshot (so undo restores the prior shape), then replaces its control
     /// points. Style (colour / width / fill) is left untouched.
-    pub fn update_bezier_annotation(&mut self, id: u32, points: &[f64]) {
+    /// Update a Bézier pen path's geometry AND style (stroke colour/width +
+    /// solid Background fill), so reselecting a committed path and changing the
+    /// Paint→Pen panel re-styles it — including filling a path that was drawn
+    /// without a Background. `fill_kind`: 0 = no fill, 1 = solid `fill_color_hex`.
+    /// Mirrors `update_shape_annotation` for shapes. Pushes "Edit Pen Path".
+    pub fn update_bezier_annotation(
+        &mut self,
+        id: u32,
+        points: &[f64],
+        color_hex: &str,
+        stroke_width: f64,
+        fill_kind: u8,
+        fill_color_hex: &str,
+    ) {
         self.snap("Edit Pen Path");
         let pts = flat_to_points(points);
         let (x0, y0, x1, y1) = points_bbox(&pts);
+        let c = drawing::parse_hex_color(color_hex);
+        let fc = drawing::parse_hex_color(fill_color_hex);
         if let Some(s) = self.layers[self.active]
             .shape_annotations
             .iter_mut()
@@ -852,6 +867,15 @@ impl ImageHorseTool {
             s.y0 = y0;
             s.x1 = x1;
             s.y1 = y1;
+            s.r = c[0];
+            s.g = c[1];
+            s.b = c[2];
+            s.stroke_width = stroke_width;
+            s.fill_kind = fill_kind;
+            s.fill_r = fc[0];
+            s.fill_g = fc[1];
+            s.fill_b = fc[2];
+            s.fill_a = fc[3];
         }
     }
 

@@ -41,9 +41,15 @@ export const TIERS: Record<UserMode, TierConfig> = {
     galleryLimit: 12,
     storageQuotaBytes: null,
     storageLabel: "—",
-    layersPerImage: 0,
-    layersShort: "—",
-    layersLabel: "—",
+    // Layers are a fundamental, purely client-side editing tool (the Rust
+    // layer stack lives entirely in-memory / IndexedDB), so they are NOT
+    // paywalled — the no-login tier gets the same 3-per-image as Logged In.
+    // Login/paid differentiate on CLOUD features (storage, gallery cap,
+    // sharing, AI), not on local editing. "Unlimited layers" stays the paid
+    // perk.
+    layersPerImage: 3,
+    layersShort: "3",
+    layersLabel: "3 per image",
     replicateAI: false,
   },
   loggedIn: {
