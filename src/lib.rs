@@ -35,8 +35,10 @@ mod text;
 mod transform;
 mod utils;
 
-// Tile engine core. Feature-gated (`tiles`) and NOT part of the wasm build or
-// the wasm-bindgen surface — see src/tiles.rs.
+// Tile engine core + operation log. Feature-gated (`tiles`) and NOT part of the
+// wasm build or the wasm-bindgen surface — see src/tiles.rs / src/ops.rs.
+#[cfg(feature = "tiles")]
+pub mod ops;
 #[cfg(feature = "tiles")]
 pub mod tiles;
 

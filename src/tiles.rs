@@ -23,7 +23,9 @@ pub const TILE_BYTES: usize = (TILE_EDGE as usize) * (TILE_EDGE as usize) * 4;
 /// A single tile: an owned, heap-allocated RGBA block plus bookkeeping.
 ///
 /// The pixel block is boxed so that a `Tile` is cheap to move and a
-/// `TileBuffer` full of them does not blow the stack.
+/// `TileBuffer` full of them does not blow the stack. `Clone` is derived so
+/// the op-log can take cheap-to-reason-about keyframe snapshots.
+#[derive(Clone)]
 pub struct Tile {
     pixels: Box<[u8; TILE_BYTES]>,
     /// Set on every write; cleared by [`TileBuffer::clear_dirty`].
@@ -85,7 +87,7 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 /// `width`/`height` are the logical image dimensions. Tiles on the right/bottom
 /// edges may extend past those bounds; the out-of-bounds pixels are never read
 /// or written by the region/blit API and stay transparent.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TileBuffer {
     tiles: HashMap<(i32, i32), Tile>,
     width: u32,
@@ -218,6 +220,21 @@ impl TileBuffer {
             }
         }
         true
+    }
+
+    /// Visit every pixel of every materialised tile, replacing it with the
+    /// closure's return value. All visited tiles are marked dirty. Used by
+    /// pure per-pixel ops (e.g. Levels). Absent tiles stay absent — this does
+    /// not materialise transparent space.
+    pub fn map_pixels_mut<F: FnMut([u8; 4]) -> [u8; 4]>(&mut self, mut f: F) {
+        for t in self.tiles.values_mut() {
+            for px in t.pixels.chunks_exact_mut(4) {
+                let new = f([px[0], px[1], px[2], px[3]]);
+                px.copy_from_slice(&new);
+            }
+            t.dirty = true;
+            t.generation = t.generation.wrapping_add(1);
+        }
     }
 
     /// Iterator over the coordinates of currently-dirty tiles.
