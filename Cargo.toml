@@ -25,6 +25,14 @@ console_error_panic_hook = "0.1"
 serde = { version = "1", features = ["derive"], optional = true }
 postcard = { version = "1", features = ["alloc"], optional = true }
 
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false }
+
+[[bench]]
+name = "tiles"
+harness = false
+required-features = ["tiles"]
+
 # Release tuning for the WASM build. wasm-pack builds in release by default;
 # LTO + a single codegen unit let the optimizer inline across modules (pairs
 # with SIMD in .cargo/config.toml). Slower to compile, faster at runtime.
