@@ -35,6 +35,11 @@ mod text;
 mod transform;
 mod utils;
 
+// Tile engine core. Feature-gated (`tiles`) and NOT part of the wasm build or
+// the wasm-bindgen surface — see src/tiles.rs.
+#[cfg(feature = "tiles")]
+pub mod tiles;
+
 use crate::annotations::{annotations_to_json, build_text_annotation};
 use crate::core::ImageBuffer;
 use crate::history::{History, Snapshot};

@@ -6,6 +6,12 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# Tile engine core + operation log. OFF by default and NOT compiled into the
+# wasm build — the default build must stay byte-for-byte unchanged. Enabling it
+# pulls in serde + postcard purely for the op-log codec.
+tiles = ["dep:serde", "dep:postcard"]
+
 [dependencies]
 wasm-bindgen = "0.2.108"
 png = "0.17"
@@ -14,6 +20,10 @@ ab_glyph = "0.2"
 # the opaque "unreachable executed" RuntimeError. Installed once on module init
 # (see `start` in lib.rs).
 console_error_panic_hook = "0.1"
+
+# Op-log serialization — only compiled when the `tiles` feature is enabled.
+serde = { version = "1", features = ["derive"], optional = true }
+postcard = { version = "1", features = ["alloc"], optional = true }
 
 # Release tuning for the WASM build. wasm-pack builds in release by default;
 # LTO + a single codegen unit let the optimizer inline across modules (pairs
