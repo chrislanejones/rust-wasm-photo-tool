@@ -1578,7 +1578,10 @@ export function AppShell() {
       const pixels = new Uint8Array(tool.get_image_data());
       const tw = tool.width();
       const th = tool.height();
-      const blob = await encodeRgba(pixels, tw, th, exportFormat, quality / 100);
+      // encodeRgba and makeThumbnailFromPixels each hand their buffer to the
+      // codec worker, which transfers (detaches) it. Give encodeRgba its own
+      // copy so the original `pixels` survives for the thumbnail below.
+      const blob = await encodeRgba(pixels.slice(), tw, th, exportFormat, quality / 100);
       // convertToBlob may fall back (e.g. AVIF → PNG on some browsers); trust
       // the blob's actual MIME for the stored metadata.
       const mime = blob.type || `image/${exportFormat}`;

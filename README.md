@@ -50,17 +50,17 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.7 — 2026-07-02
+
+Image encoding and thumbnailing move off the main thread. Exporting a WebP/JPEG and generating gallery thumbnails now run in a Web Worker (`codec.worker.ts`, via Comlink), so the UI stays responsive during a big export or a multi-image import instead of janking — pixel buffers are transferred (not copied) into the worker. **PNG export stays on the Rust encoder;** this only moves the browser-native codecs (WebP/JPEG) and thumbnail resizing. It's an accelerator, not a replacement: if the worker can't start, every path falls back to the main thread (with a one-time console warning), so correctness never depends on the worker.
+
+> **About this release.** Big exports and dropping a pile of images no longer freeze the toolbar. The worker does the heavy encoding; if it ever can't, the app quietly does it the old way instead.
+
 ### v7.6 — 2026-07-02
 
 CI maintenance, no app changes. Bumped the GitHub Actions Node runtime from 22 to 24 (current LTS, the runner default), and gave the `cargo audit` job `checks: write` so `rustsec/audit-check` can post its results instead of failing with a permissions error. (The Node-20 deprecation warning in the logs is from `audit-check`'s own runtime, not our config — GitHub runs it on 24 regardless.)
 
 > **About this release.** Pipeline housekeeping. Nothing in the app.
-
-### v7.5 — 2026-07-02
-
-Storage plumbing, invisible to use. Original photo bytes now read and write through a Dexie adapter instead of the hand-rolled IndexedDB `originalsStore`, using **lazy read-through migration**: the first time you open a photo that still lives in the old store, its bytes are copied into Dexie and served from there after — no bulk boot-time migration, no stall. The old database is never written or deleted, so it stays a clean rollback, and a single `USE_DEXIE_ORIGINALS` flag reverts everything. Verified against a real 12-photo gallery: every photo loads, only the ones you open get copied, the old store stays byte-identical. See [ADR-001](docs/adr/001-originals-lazy-migration-to-dexie.md).
-
-> **About this release.** You won't notice anything — that's the point. First step of moving photo storage onto Dexie, done the careful way: existing photos keep working, migrate one at a time as you touch them, and the old copy stays put as a fallback until a future release retires it.
 
 ## License
 

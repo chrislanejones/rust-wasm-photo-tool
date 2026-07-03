@@ -188,8 +188,11 @@ export function useImageSession({
           await mod.default();
           const [originalKey, thumbBlob] = await Promise.all([
             putOriginal(f, working.origWidth, working.origHeight),
+            // Copy: the codec worker transfers (detaches) the buffer it's given,
+            // but `working.pixels` is cached below via putWorkingCopy and must
+            // stay intact.
             makeThumbnailFromPixels(
-              working.pixels,
+              working.pixels.slice(),
               working.width,
               working.height,
               mod.resize_pixels,

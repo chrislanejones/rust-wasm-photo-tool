@@ -1,5 +1,7 @@
 // Downscale uploads to a working resolution and produce a small gallery thumbnail.
 
+import { thumbnailViaWorker } from "@/lib/codecWorkerClient";
+
 const WORKING_MAX_EDGE = 2048;
 const THUMB_MAX_EDGE = 256;
 
@@ -143,6 +145,13 @@ export async function makeThumbnailFromPixels(
   ) => Uint8Array,
   maxEdge = THUMB_MAX_EDGE,
 ): Promise<Blob> {
+  // Off-thread path: the worker resizes (OffscreenCanvas) + encodes WebP.
+  // Returns null when the worker is unavailable → fall through to the Rust
+  // resize path below. NOTE: on success this DETACHES `pixels` (transferred);
+  // callers that reuse `pixels` after this call must pass a copy.
+  const viaWorker = await thumbnailViaWorker(pixels, width, height, maxEdge);
+  if (viaWorker) return viaWorker;
+
   const longEdge = Math.max(width, height);
   let tw = width;
   let th = height;

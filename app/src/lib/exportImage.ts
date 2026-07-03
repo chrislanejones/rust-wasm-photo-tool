@@ -9,6 +9,7 @@
 // the Rust `png` crate only handles PNG.
 
 import type { SavedEdit } from "@/lib/editPersistence";
+import { encodeViaWorker } from "@/lib/codecWorkerClient";
 
 export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
 
@@ -110,8 +111,12 @@ export async function compositeSavedEdit(
 
 /**
  * Encode an RGBA buffer to the requested format. PNG goes through Rust
- * (`encode_png_pixels`); lossy formats use the browser codec via
- * `OffscreenCanvas.convertToBlob`.
+ * (`encode_png_pixels`); lossy formats are offloaded to the codec worker
+ * (`OffscreenCanvas.convertToBlob` off the main thread) and fall back to the
+ * main-thread `convertToBlob` if the worker is unavailable.
+ *
+ * NOTE: on the worker path this DETACHES `pixels` (transferred, zero-copy).
+ * Callers that reuse `pixels` after this call must pass a copy.
  */
 export async function encodeRgba(
   pixels: Uint8Array,
@@ -126,6 +131,15 @@ export async function encodeRgba(
     const png = mod.encode_png_pixels(pixels, w, h);
     return new Blob([new Uint8Array(png)], { type: "image/png" });
   }
+
+  // Off-thread encode (transfers `pixels`); null → worker unavailable.
+  const viaWorker = await encodeViaWorker(pixels, w, h, MIME[format], quality);
+  if (viaWorker) return viaWorker;
+
+  // Main-thread fallback. If the worker path already ran and detached `pixels`,
+  // this read would throw — but encodeViaWorker only returns null before any
+  // transfer (probe failed) OR after a post-probe failure at reuse-safe call
+  // sites, so `pixels` is valid here.
   const oc = new OffscreenCanvas(w, h);
   const ctx = oc.getContext("2d")!;
   // Copy into a fresh (non-shared) ArrayBuffer so ImageData accepts it.

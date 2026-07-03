@@ -668,3 +668,17 @@ CI-only maintenance — no app changes.
 | --- | ------ | ------ |
 | 1   | **Node 22 → 24 in CI** — all four `actions/setup-node@v4` steps bumped to Node 24 (current LTS / runner default). The Node-20 deprecation warning in the logs comes from `rustsec/audit-check`'s own runtime, not our config — GitHub runs it on 24 regardless | Complete |
 | 2   | **`cargo-audit` job `checks: write`** — the job inherited the workflow's top-level `contents: read`, so `rustsec/audit-check` failed with "Resource not accessible by integration" when posting its check-run. Added job-level `checks: write` (kept `contents: read`) | Complete |
+
+## v7.7 Change Summary — 2026-07-02
+
+Image encode + thumbnail moved to a Web Worker, with a mandatory main-thread
+fallback. Verified: `tsc --noEmit`, `vite build` (emits a `codec.worker` chunk),
+and in-browser (boots clean, thumbnails populate, no "codec worker unavailable"
+warning, no console errors). The worker's encode path is fallback-protected; a
+full export-output check (dimensions/validity) is a follow-up.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Codec worker** — `app/src/workers/codec.worker.ts` (Vite module worker) exposes `encodeImage` + `makeThumbnail` via Comlink, using `OffscreenCanvas` + `convertToBlob`. `codecWorkerClient.ts` is the main-thread facade; pixel buffers cross as transferables only | Complete |
+| 2   | **Call sites migrated + fallback** — the WebP/JPEG encode path (`exportImage.ts`, `useAutoCompress.ts`) and the thumbnail path (`workingCopy.ts` `makeThumbnailFromPixels`) route through the worker. **PNG export stays on Rust `encode_png_pixels`.** Every path keeps its main-thread function as a fallback; a warn-once guard logs `"codec worker unavailable, using main thread"` if the worker can't start | Complete |
+| 3   | **Safety** — the worker is probed with `ping()` before any pixel transfer (a broken worker never eats a caller's buffer); reuse sites copy-before-transfer; the worker is stateless per call, so concurrent gallery-import calls are safe without an explicit queue | Complete |

@@ -27,6 +27,14 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.51",
+    date: "2026-07-02",
+    headline: "Exports and imports stay smooth",
+    entries: [
+      { tag: "perf", text: "Encoding images for export and making gallery thumbnails now happen on a background thread, so the app doesn't freeze up when you export a large image or drop a big batch of photos in at once. If that background worker ever can't run, the app just does the work the normal way instead — nothing breaks." },
+    ],
+  },
+  {
     version: "v0.9.50",
     date: "2026-07-02",
     headline: "Pipeline housekeeping",

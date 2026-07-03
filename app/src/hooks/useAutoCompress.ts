@@ -1,5 +1,6 @@
 // ===== FILE: app/src/hooks/useAutoCompress.ts =====
 import { useCallback, useRef, useState } from "react";
+import { encodeViaWorker } from "@/lib/codecWorkerClient";
 
 export interface CompressionProgress {
   /** Progress per photo ID: 0..100 for progress, -1 for error. Matches existing GalleryBar type. */
@@ -111,10 +112,13 @@ export function useAutoCompress() {
           items[photo.id] = 70;
           setProgress((prev) => ({ ...prev, items: { ...items } }));
 
-          const blob = await resized.convertToBlob({
-            type: format,
-            quality,
-          });
+          // Offload the (expensive) encode to the codec worker. It transfers
+          // the resized pixels; if the worker is unavailable, fall back to the
+          // main-thread convertToBlob on the same canvas (pixels untouched).
+          const resizedPixels = rctx.getImageData(0, 0, tw, th).data;
+          const blob =
+            (await encodeViaWorker(resizedPixels, tw, th, format, quality)) ??
+            (await resized.convertToBlob({ type: format, quality }));
 
           items[photo.id] = 90;
           setProgress((prev) => ({ ...prev, items: { ...items } }));
