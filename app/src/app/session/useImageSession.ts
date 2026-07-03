@@ -17,7 +17,7 @@ import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { toast } from "@/components/ui/sonner";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
-import { putOriginal, getOriginal } from "@/lib/originalsStore";
+import { putOriginal, getOriginal } from "@/lib/dexie/originalsAdapter";
 import { makeWorkingCopy, makeThumbnailFromPixels, ImageTooLargeError } from "@/lib/workingCopy";
 import { getWorkingCopy, putWorkingCopy } from "@/lib/workingCopyCache";
 import { logDiagnostic } from "@/lib/diagnosticsLog";

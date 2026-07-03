@@ -50,17 +50,17 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.5 — 2026-07-02
+
+Storage plumbing, invisible to use. Original photo bytes now read and write through a Dexie adapter instead of the hand-rolled IndexedDB `originalsStore`, using **lazy read-through migration**: the first time you open a photo that still lives in the old store, its bytes are copied into Dexie and served from there after — no bulk boot-time migration, no stall. The old database is never written or deleted, so it stays a clean rollback, and a single `USE_DEXIE_ORIGINALS` flag reverts everything. Verified against a real 12-photo gallery: every photo loads, only the ones you open get copied, the old store stays byte-identical. See [ADR-001](docs/adr/001-originals-lazy-migration-to-dexie.md).
+
+> **About this release.** You won't notice anything — that's the point. First step of moving photo storage onto Dexie, done the careful way: existing photos keep working, migrate one at a time as you touch them, and the old copy stays put as a fallback until a future release retires it.
+
 ### v7.4 — 2026-07-02
 
 The loading spinner never freezes now. It used to sit still under Reduced Motion — the OS setting or the in-app toggle — which reads as a hung app, because it rode the generic reduced-motion kill. Loading spinners are essential feedback (WCAG 2.3.3 exempts them), so the `Spinner` and the boot spinner keep turning for everyone; only *decorative* motion still stops. Under the hood, the settings-panel enter/exit animation that had been hand-copied into ~9 places is now one `settingsPanelMotion` export in the animation source of truth.
 
 > **About this release.** If your spinner looked frozen, this is why — it was respecting Reduced Motion a little too literally. A stuck spinner tells you nothing, so it spins regardless now, while the app still drops the decorative motion. Plus a tidy-up: nine copy-pasted panel animations became one.
-
-### v7.3 — 2026-07-02
-
-Internal refactor — no behavior change. The `AppShell` composition root shed ~600 lines: image loading, canvas actions, selection, and mask handling moved into four focused session hooks (`useImageSession`, `useCanvasActions`, `useSelectionActions`, `useMaskActions`), stray component state moved into the Zustand stores, and the last two `window` `CustomEvent`s (text commit + annotation sync) became plain store updates. Same app, smaller AppShell.
-
-> **About this release.** Housekeeping. Nothing changes for anyone using the app — this splits the biggest file into pieces you can actually hold in your head, and closes out the last of the global window events. Also added a [Language-Tier Roadmap](docs/LANGUAGE-TIER-ROADMAP.md) to docs: which bits of TypeScript and Rust are in the right language, and which should trade places.
 
 ## License
 

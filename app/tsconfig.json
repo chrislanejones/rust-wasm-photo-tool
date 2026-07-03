@@ -26,5 +26,7 @@
       "@app/*": ["./src/app/*.tsx"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "//exclude": "Vitest specs are typechecked + run by vitest (vitest.config.ts), not the app build's noEmit pass — keeps `tsc` green without the test-runner installed in every environment.",
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

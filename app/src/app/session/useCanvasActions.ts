@@ -6,7 +6,7 @@ import { useCallback } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { toast } from "@/components/ui/sonner";
-import { getOriginal } from "@/lib/originalsStore";
+import { getOriginal } from "@/lib/dexie/originalsAdapter";
 import { readExifTiff, applyExifToReencoded } from "@/lib/exif";
 import { EXT } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";

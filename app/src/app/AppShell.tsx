@@ -75,7 +75,7 @@ import { MagnifierOverlay } from "@/components/MagnifierOverlay";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
 import { useRecentTexts } from "@/hooks/useRecentTexts";
-import { putOriginal, getOriginal, getOriginalAsBlobUrl, deleteOriginal } from "@/lib/originalsStore";
+import { putOriginal, getOriginal, getOriginalAsBlobUrl, deleteOriginal } from "@/lib/dexie/originalsAdapter";
 import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 import { RadioCards } from "@/components/ui/radio-cards";

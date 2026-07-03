@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { settingsPanelMotion } from "@/lib/animations";
 import { formatBytes } from "@/lib/format";
-import { sha256Hex, getOriginal } from "@/lib/originalsStore";
+import { sha256Hex } from "@/lib/originalsStore";
+import { getOriginal } from "@/lib/dexie/originalsAdapter";
 import { parseExifFromImage, type ExifSummary } from "@/lib/exif";
 
 /** Everything the image-meta tab needs about the currently selected photo.

@@ -27,6 +27,14 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.49",
+    date: "2026-07-02",
+    headline: "Sturdier photo storage, invisibly",
+    entries: [
+      { tag: "infra", text: "Started moving where your original photos are stored onto a more robust database layer. It happens quietly as you open photos — nothing changes for you, and your existing photos keep working. The old storage stays untouched as a safety net, and the whole thing can be switched back with one flag if anything ever looks off." },
+    ],
+  },
+  {
     version: "v0.9.48",
     date: "2026-07-02",
     headline: "The loading spinner spins again",

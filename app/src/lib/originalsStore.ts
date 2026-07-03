@@ -99,3 +99,16 @@ export async function deleteOriginal(key: string): Promise<void> {
     req.onerror = () => reject(req.error);
   });
 }
+
+/** Read-only list of every stored content-address key. Added for the Dexie
+ *  read-through adapter's union listing — this only *reads* keys, it never
+ *  mutates the legacy store, so the legacy DB stays byte-identical. */
+export async function listOriginalKeys(): Promise<string[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).getAllKeys();
+    req.onsuccess = () => resolve((req.result as IDBValidKey[]).map(String));
+    req.onerror = () => reject(req.error);
+  });
+}

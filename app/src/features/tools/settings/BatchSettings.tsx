@@ -12,7 +12,7 @@ import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { TEXT_COLORS } from "@/lib/colors";
-import { getOriginal, putOriginal, deleteOriginal } from "@/lib/originalsStore";
+import { getOriginal, putOriginal, deleteOriginal } from "@/lib/dexie/originalsAdapter";
 import {
   makeWorkingCopy,
   makeThumbnail,

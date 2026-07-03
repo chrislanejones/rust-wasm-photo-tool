@@ -644,3 +644,18 @@ the boot spinner's computed animation is `spin` / `running` even with the OS
 | --- | ------ | ------ |
 | 1   | **Spinner never freezes** — `components/ui/spinner.tsx` and the boot/canvas spinner now use a dedicated `.spinner-icon` class that keeps spinning under both OS `prefers-reduced-motion: reduce` and the in-app `.reduce-motion` toggle. Essential loading indicators are exempt from motion-reduction (WCAG 2.3.3) — a frozen spinner reads as a hung app. `ImageMetaPanel`'s pending icon moved onto the same class. *Decorative* `.animate-spin` still respects Reduced Motion | Complete |
 | 2   | **Animation SSOT — `settingsPanelMotion`** — the settings sub-panel enter/exit triple (`initial`/`animate`/`exit` with `quickSpring` + a 120 ms fade-up) had drifted into ~9 hand-copied inline copies (Paint ×4, Text ×2, Resize ×2, ImageMetaPanel). Now one `settingsPanelMotion` export in `lib/animations.ts`, spread at each site. Exact same values — no visual change | Complete |
+
+## v7.5 Change Summary — 2026-07-02
+
+Originals storage cut over to a Dexie read-through adapter — invisible to users,
+reversible by design. Verified: `tsc --noEmit`, `vite build`, vitest (7/7 in the
+migration worktree), and an in-browser legacy round-trip against a real 12-photo
+gallery — all load via read-through, only opened photos copy into Dexie, the
+legacy DB stays byte-identical.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Originals → Dexie adapter, lazy read-through** — `app/src/lib/dexie/originalsAdapter.ts` presents the legacy `StoredOriginal` signature so the cut-over is a mechanical import swap. `getOriginal` reads Dexie-first, falls through to the legacy store on a miss, and copies the hit into Dexie (best-effort, idempotent). `putOriginal` → Dexie only; `deleteOriginal` → both stores; `listOriginals` → deduped union. No bulk backfill — read-through IS the backfill | Complete |
+| 2   | **Five call sites cut** — `useImageSession`, `useCanvasActions`, `AppShell`, `ImageMetaPanel`, `BatchSettings` go through the adapter now; `originalsStore` gains a read-only `listOriginalKeys()` (legacy DB stays byte-identical) | Complete |
+| 3   | **Kill switch + tests** — `USE_DEXIE_ORIGINALS` (`flags.ts`) reverts to legacy-only in one flag. vitest harness added (vitest + fake-indexeddb); 7 specs: copy-once, interrupt+retry, delete-both, union-dedupe, fresh-install, legacy-fixture round-trip, kill-switch routing. App `tsc` excludes specs (run via vitest) | Complete |
+| 4   | **ADR-001 (Draft)** — `docs/adr/001-originals-lazy-migration-to-dexie.md` with pre-mortem; legacy-DB deletion deferred to a separate future ADR ≥1 release out. `docs/adr/` + INDEX bootstrapped | Complete |
