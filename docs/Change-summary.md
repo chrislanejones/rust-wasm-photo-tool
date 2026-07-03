@@ -659,3 +659,12 @@ legacy DB stays byte-identical.
 | 2   | **Five call sites cut** — `useImageSession`, `useCanvasActions`, `AppShell`, `ImageMetaPanel`, `BatchSettings` go through the adapter now; `originalsStore` gains a read-only `listOriginalKeys()` (legacy DB stays byte-identical) | Complete |
 | 3   | **Kill switch + tests** — `USE_DEXIE_ORIGINALS` (`flags.ts`) reverts to legacy-only in one flag. vitest harness added (vitest + fake-indexeddb); 7 specs: copy-once, interrupt+retry, delete-both, union-dedupe, fresh-install, legacy-fixture round-trip, kill-switch routing. App `tsc` excludes specs (run via vitest) | Complete |
 | 4   | **ADR-001 (Draft)** — `docs/adr/001-originals-lazy-migration-to-dexie.md` with pre-mortem; legacy-DB deletion deferred to a separate future ADR ≥1 release out. `docs/adr/` + INDEX bootstrapped | Complete |
+
+## v7.6 Change Summary — 2026-07-02
+
+CI-only maintenance — no app changes.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Node 22 → 24 in CI** — all four `actions/setup-node@v4` steps bumped to Node 24 (current LTS / runner default). The Node-20 deprecation warning in the logs comes from `rustsec/audit-check`'s own runtime, not our config — GitHub runs it on 24 regardless | Complete |
+| 2   | **`cargo-audit` job `checks: write`** — the job inherited the workflow's top-level `contents: read`, so `rustsec/audit-check` failed with "Resource not accessible by integration" when posting its check-run. Added job-level `checks: write` (kept `contents: read`) | Complete |

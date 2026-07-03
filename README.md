@@ -50,17 +50,17 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.6 — 2026-07-02
+
+CI maintenance, no app changes. Bumped the GitHub Actions Node runtime from 22 to 24 (current LTS, the runner default), and gave the `cargo audit` job `checks: write` so `rustsec/audit-check` can post its results instead of failing with a permissions error. (The Node-20 deprecation warning in the logs is from `audit-check`'s own runtime, not our config — GitHub runs it on 24 regardless.)
+
+> **About this release.** Pipeline housekeeping. Nothing in the app.
+
 ### v7.5 — 2026-07-02
 
 Storage plumbing, invisible to use. Original photo bytes now read and write through a Dexie adapter instead of the hand-rolled IndexedDB `originalsStore`, using **lazy read-through migration**: the first time you open a photo that still lives in the old store, its bytes are copied into Dexie and served from there after — no bulk boot-time migration, no stall. The old database is never written or deleted, so it stays a clean rollback, and a single `USE_DEXIE_ORIGINALS` flag reverts everything. Verified against a real 12-photo gallery: every photo loads, only the ones you open get copied, the old store stays byte-identical. See [ADR-001](docs/adr/001-originals-lazy-migration-to-dexie.md).
 
 > **About this release.** You won't notice anything — that's the point. First step of moving photo storage onto Dexie, done the careful way: existing photos keep working, migrate one at a time as you touch them, and the old copy stays put as a fallback until a future release retires it.
-
-### v7.4 — 2026-07-02
-
-The loading spinner never freezes now. It used to sit still under Reduced Motion — the OS setting or the in-app toggle — which reads as a hung app, because it rode the generic reduced-motion kill. Loading spinners are essential feedback (WCAG 2.3.3 exempts them), so the `Spinner` and the boot spinner keep turning for everyone; only *decorative* motion still stops. Under the hood, the settings-panel enter/exit animation that had been hand-copied into ~9 places is now one `settingsPanelMotion` export in the animation source of truth.
-
-> **About this release.** If your spinner looked frozen, this is why — it was respecting Reduced Motion a little too literally. A stuck spinner tells you nothing, so it spins regardless now, while the app still drops the decorative motion. Plus a tidy-up: nine copy-pasted panel animations became one.
 
 ## License
 

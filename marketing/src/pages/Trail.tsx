@@ -27,6 +27,14 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.50",
+    date: "2026-07-02",
+    headline: "Pipeline housekeeping",
+    entries: [
+      { tag: "infra", text: "Maintenance on the build pipeline — updated the CI Node version and fixed a permissions hiccup in the Rust dependency audit. Nothing changes in the app." },
+    ],
+  },
+  {
     version: "v0.9.49",
     date: "2026-07-02",
     headline: "Sturdier photo storage, invisibly",

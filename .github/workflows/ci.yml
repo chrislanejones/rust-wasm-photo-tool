@@ -41,7 +41,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -65,7 +65,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       # marketing/vercel.json -> installCommand "pnpm install", buildCommand
@@ -85,7 +85,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # `convex codegen` runs Convex's OWN TypeScript check (correct runtime type
@@ -127,6 +127,9 @@ jobs:
   cargo-audit:
     name: cargo audit (Rust deps)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write # rustsec/audit-check posts its results as a check-run
     steps:
       - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v2
@@ -141,7 +144,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Non-blocking: transitive npm advisories are often unfixable noise for a
