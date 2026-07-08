@@ -308,6 +308,14 @@ struct PastePreview {
     dest_y: i32,
     dest_w: u32,
     dest_h: u32,
+    /// The rect the preview STARTED at (the centered fit box). Compared with
+    /// the final dest rect on commit: when they differ, the commit records the
+    /// user's move/resize as its own history step after "Paste", so the sizing
+    /// shows up in the History panel and undoes independently of the paste.
+    init_x: i32,
+    init_y: i32,
+    init_w: u32,
+    init_h: u32,
     is_layer_source: bool,
 }
 

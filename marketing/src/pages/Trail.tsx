@@ -27,6 +27,17 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.52",
+    date: "2026-07-08",
+    headline: "Pasting big images finally behaves — and SVGs just work",
+    entries: [
+      { tag: "feature", text: "Paste an image as a new layer and you now get a movable, resizable placement box — an image bigger than your canvas arrives scaled to fit instead of getting cropped with no way back. Press Enter to place it, or Esc to cancel — and cancelling cleans up the layer it would have landed on, too." },
+      { tag: "feature", text: "Resizing or moving a pasted image now shows up in History as its own step. Undo peels back just the resize first, then the paste — instead of nuking the whole thing in one go. The image is re-rendered from the original every time, so there's no quality loss from resizing twice." },
+      { tag: "feature", text: "You can drop, paste, or open SVG files now. They're converted to regular pixels the moment they come in — safely, so nothing inside the file can run — and from there they edit like any other image." },
+      { tag: "ui", text: "The Compress panel's buttons are regrouped: Apply Compression & Resize and A/B Compare sit together at the top, with the one-click Auto Compress actions below." },
+    ],
+  },
+  {
     version: "v0.9.51",
     date: "2026-07-02",
     headline: "Exports and imports stay smooth",

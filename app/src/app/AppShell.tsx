@@ -64,6 +64,7 @@ import {
   clearGalleryManifest,
 } from "@/lib/galleryManifest";
 import { getPhotoLimit } from "@/lib/photoLimits";
+import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { hasReplicateAI, TIERS } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
@@ -1374,6 +1375,12 @@ export function AppShell() {
 
   const openImportDialog = useCallback(async (source: Blob, file: File) => {
     try {
+      // SVGs are rasterized to PNG at the boundary (createImageBitmap can't
+      // decode them, and raw SVG never enters the pipeline — lib/rasterizeSvg).
+      if (isSvgFile(file)) {
+        file = await rasterizeSvgToPng(file);
+        source = file;
+      }
       const { pixels, w, h } = await decodeImageSource(source);
       const previewUrl = URL.createObjectURL(source);
       setImportImage((prev) => {
@@ -1492,8 +1499,9 @@ export function AppShell() {
       e.preventDefault(); // stop the browser from navigating to the image
       depth = 0;
       setIsDraggingImage(false);
-      const file = Array.from(e.dataTransfer?.files ?? []).find((f) =>
-        f.type.startsWith("image/"),
+      // isSvgFile catches .svg drops whose source hands over an empty mime.
+      const file = Array.from(e.dataTransfer?.files ?? []).find(
+        (f) => f.type.startsWith("image/") || isSvgFile(f),
       );
       if (!file) {
         toast.error("That doesn't look like an image");
@@ -1528,11 +1536,18 @@ export function AppShell() {
     const img = importImage;
     if (!img) return;
     const { x, y } = importDest(img.w, img.h);
-    stamp.addLayer("Pasted Image"); // creates + activates a fresh layer
-    stamp.pasteRegion(img.pixels, img.w, img.h, x, y);
-    toast.success("Added as a new layer");
+    const layerId = stamp.addLayer("Pasted Image"); // creates + activates a fresh layer
+    // Same movable/resizable placement as "Merge into layer" — `begin` scales
+    // the box down to fit when the image is bigger than the canvas, so an
+    // oversized paste stays fully visible and resizable instead of baking in
+    // at 1:1 and permanently clipping at the layer edges. Escape aborts the
+    // paste and removes the layer it would have landed on.
+    pastePlacement.begin(img.pixels, img.w, img.h, x, y, () =>
+      stamp.removeLayer(layerId),
+    );
+    toast.success("Pasted on a new layer — Enter places it, Esc cancels");
     closeImportDialog();
-  }, [importImage, importDest, stamp, closeImportDialog]);
+  }, [importImage, importDest, stamp, pastePlacement, closeImportDialog]);
   const importOntoLayer = useCallback(() => {
     const img = importImage;
     if (!img) return;

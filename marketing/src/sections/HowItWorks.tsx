@@ -20,7 +20,7 @@ export default function HowItWorks() {
           <Step
             n="01"
             title="Drop an image"
-            body="PNG, JPEG, WebP, AVIF. Up to your browser's memory limit. Nothing is sent anywhere — the WASM module loads on first interaction."
+            body="PNG, JPEG, WebP, AVIF — plus SVG, converted safely to pixels on import. Up to your browser's memory limit. Nothing is sent anywhere — the WASM module loads on first interaction."
           />
           <Step
             n="02"

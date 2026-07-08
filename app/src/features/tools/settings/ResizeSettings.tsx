@@ -383,40 +383,6 @@ export function ResizeSettings({
 
       {/* ── Bottom Buttons ── */}
       <div className="border-t border-theme-sidebar-border pt-4 mt-8 space-y-2">
-        {/* ── Auto Compress: labelled section with explicit scope buttons ── */}
-        <div className="flex items-center justify-center gap-1.5 text-xs font-semibold font-mono text-theme-muted-foreground">
-          <Zap className="h-3.5 w-3.5" />
-          Auto Compress
-        </div>
-        {/* Compression progress is surfaced via a sonner toast, not inline.
-            "Compress Image" compresses whatever is in the ring — enabled as long
-            as a photo is active (disabled handles the empty-gallery case). The
-            "All Images" button is hidden when the gallery holds a single image. */}
-        <div className={totalCount > 1 ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
-          <Button size="large"
-            onClick={() => handleAutoCompress("selected")}
-            disabled={disabled || isCompressing}
-            className="w-full"
-          >
-            {isCompressing
-              ? "Compressing…"
-              : selectedCount > 1
-                ? "Compress Images"
-                : "Compress Image"}
-          </Button>
-          {totalCount > 1 && (
-            <Button size="large"
-              onClick={() => handleAutoCompress("all")}
-              disabled={disabled || isCompressing}
-              className="w-full"
-            >
-              {isCompressing ? "Compressing…" : "Compress All Images"}
-            </Button>
-          )}
-        </div>
-
-        <hr className="border-theme-sidebar-border" />
-
         <Button size="large"
           onClick={handleApplyResize}
           disabled={disabled || !resizeChanged}
@@ -456,6 +422,40 @@ export function ResizeSettings({
             </TooltipContent>
           )}
         </Tooltip>
+
+        <hr className="border-theme-sidebar-border" />
+
+        {/* ── Auto Compress: labelled section with explicit scope buttons ── */}
+        <div className="flex items-center justify-center gap-1.5 text-xs font-semibold font-mono text-theme-muted-foreground">
+          <Zap className="h-3.5 w-3.5" />
+          Auto Compress
+        </div>
+        {/* Compression progress is surfaced via a sonner toast, not inline.
+            "Compress Image" compresses whatever is in the ring — enabled as long
+            as a photo is active (disabled handles the empty-gallery case). The
+            "All Images" button is hidden when the gallery holds a single image. */}
+        <div className={totalCount > 1 ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
+          <Button size="large"
+            onClick={() => handleAutoCompress("selected")}
+            disabled={disabled || isCompressing}
+            className="w-full"
+          >
+            {isCompressing
+              ? "Compressing…"
+              : selectedCount > 1
+                ? "Compress Images"
+                : "Compress Image"}
+          </Button>
+          {totalCount > 1 && (
+            <Button size="large"
+              onClick={() => handleAutoCompress("all")}
+              disabled={disabled || isCompressing}
+              className="w-full"
+            >
+              {isCompressing ? "Compressing…" : "Compress All Images"}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

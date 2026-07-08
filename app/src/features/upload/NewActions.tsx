@@ -25,6 +25,7 @@ import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { TEXT_COLORS } from "@/lib/colors";
 import { parseColor } from "@/lib/colorParser";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
+import { isSvgFile } from "@/lib/rasterizeSvg";
 
 interface SizePreset {
   id: string;
@@ -165,7 +166,11 @@ export function NewActions({
 
   const processFiles = useCallback(
     (files: File[]) => {
-      const images = files.filter((f) => f.type.startsWith("image/"));
+      // isSvgFile catches .svg files whose source hands over an empty mime;
+      // the session's handleAddPhotos rasterizes them to PNG at the boundary.
+      const images = files.filter(
+        (f) => f.type.startsWith("image/") || isSvgFile(f),
+      );
       if (images.length) {
         onFiles(images);
         onFilesAdded?.();
@@ -481,7 +486,7 @@ export function NewActions({
                     <Upload className="h-7 w-7 text-text-muted" />
                   </div>
                   <p className="text-xs text-text-secondary">
-                    Supports PNG, JPG, GIF, WebP, AVIF
+                    Supports PNG, JPG, GIF, WebP, AVIF, SVG
                   </p>
                 </div>
               </motion.div>
@@ -493,7 +498,7 @@ export function NewActions({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.svg"
         multiple
         className="hidden"
         onChange={(e) => {

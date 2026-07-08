@@ -50,17 +50,11 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.7 — 2026-07-02
+### v7.8 — 2026-07-08
 
-Image encoding and thumbnailing move off the main thread. Exporting a WebP/JPEG and generating gallery thumbnails now run in a Web Worker (`codec.worker.ts`, via Comlink), so the UI stays responsive during a big export or a multi-image import instead of janking — pixel buffers are transferred (not copied) into the worker. **PNG export stays on the Rust encoder;** this only moves the browser-native codecs (WebP/JPEG) and thumbnail resizing. It's an accelerator, not a replacement: if the worker can't start, every path falls back to the main thread (with a one-time console warning), so correctness never depends on the worker.
+Paste and import get properly sized. "Stack as layer" now opens the same movable/resizable placement box as "Merge into layer" — an image bigger than the canvas arrives scaled to fit instead of being baked in at 1:1 and clipped forever, and Escape aborts the paste *and* the layer it would have landed on. Placement adjustments are real history now: committing a moved/resized paste records "Paste" plus its own "Resize Layer"/"Move Layer" step (baked fresh from the original source both times, never a resample-of-a-resample), so undo peels back just the sizing. **SVG import works everywhere** (drop, paste, browse): SVGs are rasterized to PNG at the import boundary — scripts can't execute, and only pixels are ever stored (ADR-008). The Compress panel's bottom stack is reordered to Apply Compression & Resize → A/B Compare → Auto Compress, and `docs/adr/` gains seven decision records (002–007 backfilled drafts + 008).
 
-> **About this release.** Big exports and dropping a pile of images no longer freeze the toolbar. The worker does the heavy encoding; if it ever can't, the app quietly does it the old way instead.
-
-### v7.6 — 2026-07-02
-
-CI maintenance, no app changes. Bumped the GitHub Actions Node runtime from 22 to 24 (current LTS, the runner default), and gave the `cargo audit` job `checks: write` so `rustsec/audit-check` can post its results instead of failing with a permissions error. (The Node-20 deprecation warning in the logs is from `audit-check`'s own runtime, not our config — GitHub runs it on 24 regardless.)
-
-> **About this release.** Pipeline housekeeping. Nothing in the app.
+> **About this release.** Pasting a big image onto a layer finally behaves: you get a resize box, undo understands the resize, and Esc cleans up after itself. SVGs just work now — dropped in and converted to pixels safely. WASM binary: 552,114 → 553,019 bytes (+905 B, the two-step paste history commit).
 
 ## License
 

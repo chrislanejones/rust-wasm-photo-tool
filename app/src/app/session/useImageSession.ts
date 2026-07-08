@@ -22,6 +22,7 @@ import { makeWorkingCopy, makeThumbnailFromPixels, ImageTooLargeError } from "@/
 import { getWorkingCopy, putWorkingCopy } from "@/lib/workingCopyCache";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { clearGalleryManifest } from "@/lib/galleryManifest";
+import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 
 type Preferences = ReturnType<typeof usePreferences>[0];
 type EditPersistence = ReturnType<typeof useEditPersistence>;
@@ -172,8 +173,12 @@ export function useImageSession({
       }
 
       let firstLoaded = false;
-      for (const f of accepted) {
+      for (const raw of accepted) {
         try {
+          // SVGs never enter the pipeline as vectors — rasterize to a PNG File
+          // at the boundary (lib/rasterizeSvg), so the stored gallery original
+          // is pixels too. Everything below sees the PNG.
+          const f = isSvgFile(raw) ? await rasterizeSvgToPng(raw) : raw;
           const t0 = performance.now();
           const working = await makeWorkingCopy(f);
           logDiagnostic(
@@ -240,11 +245,11 @@ export function useImageSession({
             setCompareActive(false);
           }
         } catch (err) {
-          console.error("Failed to add photo:", f.name, err);
+          console.error("Failed to add photo:", raw.name, err);
           toast.error(
             err instanceof ImageTooLargeError
-              ? `${f.name}: ${err.message}`
-              : `Couldn't open ${f.name}.`,
+              ? `${raw.name}: ${err.message}`
+              : `Couldn't open ${raw.name}.`,
           );
         }
       }

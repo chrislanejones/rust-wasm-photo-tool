@@ -682,3 +682,20 @@ full export-output check (dimensions/validity) is a follow-up.
 | 1   | **Codec worker** — `app/src/workers/codec.worker.ts` (Vite module worker) exposes `encodeImage` + `makeThumbnail` via Comlink, using `OffscreenCanvas` + `convertToBlob`. `codecWorkerClient.ts` is the main-thread facade; pixel buffers cross as transferables only | Complete |
 | 2   | **Call sites migrated + fallback** — the WebP/JPEG encode path (`exportImage.ts`, `useAutoCompress.ts`) and the thumbnail path (`workingCopy.ts` `makeThumbnailFromPixels`) route through the worker. **PNG export stays on Rust `encode_png_pixels`.** Every path keeps its main-thread function as a fallback; a warn-once guard logs `"codec worker unavailable, using main thread"` if the worker can't start | Complete |
 | 3   | **Safety** — the worker is probed with `ping()` before any pixel transfer (a broken worker never eats a caller's buffer); reuse sites copy-before-transfer; the worker is stateless per call, so concurrent gallery-import calls are safe without an explicit queue | Complete |
+
+## v7.8 Change Summary — 2026-07-08
+
+Paste placement + history, SVG import, Compress panel reorder, ADR system.
+Verified: `cargo fmt/clippy/test` (40 passed), `tsc --noEmit`, `vite build`,
+and in-browser QC via Playwright against the production preview (placement
+box fit-scaling, shift+drag proportional resize, Enter/Escape/click-away
+commit paths, undo granularity, real 4200×2800 JPEG + real 959×593 SVG
+fixtures). WASM: 552,114 → 553,019 bytes (+905 B — two-step paste commit).
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Stack-as-layer paste → placement box** — `importToNewLayer` routes through `usePastePlacementTool` like "Merge into layer": oversized pastes arrive fit-scaled and resizable instead of baked at 1:1 and clipped at the layer edges. `begin()` gained an `onCancel` cleanup; Escape removes the pre-created "Pasted Image" layer via `removeLayer` | Complete |
+| 2   | **Paste sizing is real history** — `PastePreview` (Rust) remembers its initial fit rect; `commit_paste_preview` double-snaps when the box was adjusted: "Paste" (baked at the fit rect) then "Resize Layer"/"Move Layer" (final rect, re-baked from the ORIGINAL source — never resample-of-resample). Undo peels the sizing first, then the paste; the History panel shows both. Unadjusted pastes and the Resize Layer tool still single-snap | Complete |
+| 3   | **SVG import via rasterization** — new `app/src/lib/rasterizeSvg.ts`: SVGs convert to PNG at both import funnels (`openImportDialog`, `handleAddPhotos`) through an `<img>` element (scripts never execute); the SVG bytes are discarded and the stored gallery original is the PNG. Raster policy: intrinsic size clamped to a 1024–4096 long side, 2048 viewBox-aspect fallback. Root cause: Chrome `createImageBitmap()` can't decode SVG; the firewall's never-render-live-SVG stance holds. Drop/paste/browse filters + start-screen copy updated (`accept="image/*,.svg"`, "Supports … SVG") | Complete |
+| 4   | **Compress panel reorder** — bottom stack is now Apply Compression & Resize → Show A/B Compare → divider → Auto Compress (label + Compress Image / Compress All Images) | Complete |
+| 5   | **ADRs** — `docs/adr/` gains 002–007 (backfilled drafts imported from the adr-bundle, renumbered past the existing 001; INDEX carries a review note that 003/004/006 describe planned/unmerged architecture) and ADR-008 (SVG rasterize-at-import, with pre-mortem). INDEX.md updated | Complete |

@@ -784,6 +784,10 @@ impl ImageHorseTool {
             dest_y,
             dest_w: dest_w.max(PASTE_MIN_SIZE),
             dest_h: dest_h.max(PASTE_MIN_SIZE),
+            init_x: dest_x,
+            init_y: dest_y,
+            init_w: dest_w.max(PASTE_MIN_SIZE),
+            init_h: dest_h.max(PASTE_MIN_SIZE),
             is_layer_source: false,
         });
     }
@@ -810,6 +814,10 @@ impl ImageHorseTool {
             dest_y: 0,
             dest_w: w,
             dest_h: h,
+            init_x: 0,
+            init_y: 0,
+            init_w: w,
+            init_h: h,
             is_layer_source: true,
         });
     }
@@ -844,9 +852,15 @@ impl ImageHorseTool {
     /// `resize_with_filter`), then alpha-composites at (dest_x, dest_y) — or,
     /// for a "Resize Layer" preview (`is_layer_source`), REPLACES the buffer
     /// outright, since the source there is that same layer's own pre-drag
-    /// content and blending onto it would double it up. Pushes ONE history
-    /// snapshot ("Paste" / "Resize Layer") and clears the preview. No-op if
-    /// there is no active preview.
+    /// content and blending onto it would double it up. Clears the preview.
+    /// No-op if there is no active preview.
+    ///
+    /// History: a "Resize Layer" preview pushes ONE snapshot. A paste pushes
+    /// "Paste" — and, when the box was moved/resized away from its initial
+    /// fit rect, a SECOND "Resize Layer"/"Move Layer" snapshot, so the sizing
+    /// shows in the History panel and undoes independently of the paste
+    /// itself. Both bakes resample from the ORIGINAL source pixels (never a
+    /// resample of a resample).
     pub fn commit_paste_preview(&mut self, filter: u8) {
         let Some(p) = self.paste_preview.take() else {
             return;
@@ -854,35 +868,54 @@ impl ImageHorseTool {
         if self.active >= self.layers.len() {
             return;
         }
-        self.snap(if p.is_layer_source {
-            "Resize Layer"
-        } else {
-            "Paste"
-        });
-        let scaled = if p.dest_w == p.src_w && p.dest_h == p.src_h {
-            p.pixels
-        } else {
-            match filter {
-                0 => crate::transform::resize_nearest(
-                    &p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h,
-                ),
-                2 => crate::transform::resize_catmull_rom(
-                    &p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h,
-                ),
-                3 => crate::transform::resize_lanczos3(
-                    &p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h,
-                ),
-                _ => crate::transform::resize_bilinear(
-                    &p.pixels, p.src_w, p.src_h, p.dest_w, p.dest_h,
-                ),
-            }
-        };
-        let buf = &mut self.layers[self.active].buf.data;
+        let resized = p.dest_w != p.init_w || p.dest_h != p.init_h;
+        let moved = p.dest_x != p.init_x || p.dest_y != p.init_y;
+
         if p.is_layer_source {
+            self.snap("Resize Layer");
+            let scaled = Self::scale_paste_source(&p, p.dest_w, p.dest_h, filter);
+            let buf = &mut self.layers[self.active].buf.data;
             buf.iter_mut().for_each(|b| *b = 0);
+            crate::transform::paste_region(
+                buf,
+                self.width as i32,
+                self.height as i32,
+                &scaled,
+                p.dest_w,
+                p.dest_h,
+                p.dest_x,
+                p.dest_y,
+            );
+            return;
         }
+
+        self.snap("Paste");
+        if resized || moved {
+            // Intermediate bake at the initial fit rect, snapshotted, then
+            // wiped — leaves history reading "Paste" → "Resize/Move Layer"
+            // with the final bake done fresh over the pre-paste pixels.
+            let before = self.layers[self.active].buf.data.clone();
+            let init_scaled = Self::scale_paste_source(&p, p.init_w, p.init_h, filter);
+            crate::transform::paste_region(
+                &mut self.layers[self.active].buf.data,
+                self.width as i32,
+                self.height as i32,
+                &init_scaled,
+                p.init_w,
+                p.init_h,
+                p.init_x,
+                p.init_y,
+            );
+            self.snap(if resized {
+                "Resize Layer"
+            } else {
+                "Move Layer"
+            });
+            self.layers[self.active].buf.data = before;
+        }
+        let scaled = Self::scale_paste_source(&p, p.dest_w, p.dest_h, filter);
         crate::transform::paste_region(
-            buf,
+            &mut self.layers[self.active].buf.data,
             self.width as i32,
             self.height as i32,
             &scaled,
@@ -891,6 +924,21 @@ impl ImageHorseTool {
             p.dest_x,
             p.dest_y,
         );
+    }
+
+    /// Resample a preview's ORIGINAL source pixels to (w, h) with `filter`
+    /// (0=nearest/1=bilinear/2=catmull-rom/3=lanczos3). Identity dimensions
+    /// skip the resample.
+    fn scale_paste_source(p: &PastePreview, w: u32, h: u32, filter: u8) -> Vec<u8> {
+        if w == p.src_w && h == p.src_h {
+            return p.pixels.clone();
+        }
+        match filter {
+            0 => crate::transform::resize_nearest(&p.pixels, p.src_w, p.src_h, w, h),
+            2 => crate::transform::resize_catmull_rom(&p.pixels, p.src_w, p.src_h, w, h),
+            3 => crate::transform::resize_lanczos3(&p.pixels, p.src_w, p.src_h, w, h),
+            _ => crate::transform::resize_bilinear(&p.pixels, p.src_w, p.src_h, w, h),
+        }
     }
 
     /// Merge the layer with `id` down onto the layer directly below it (the

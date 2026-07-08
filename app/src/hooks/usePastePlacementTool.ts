@@ -41,6 +41,10 @@ export function usePastePlacementTool({
   activeTool,
 }: Opts) {
   const [rect, setRect] = useState<PastePlacementRect | null>(null);
+  // Cleanup for an aborted placement — "Stack as layer" pre-creates the
+  // destination layer, and Escape must remove it again, not leave an empty
+  // "Pasted Image" layer behind. Cleared on commit.
+  const onCancelRef = useRef<(() => void) | null>(null);
 
   const begin = useCallback(
     (
@@ -49,10 +53,12 @@ export function usePastePlacementTool({
       srcH: number,
       destX: number,
       destY: number,
+      onCancel?: () => void,
     ) => {
       const t = toolRef.current;
       const canvas = canvasRef.current;
       if (!t || !canvas) return;
+      onCancelRef.current = onCancel ?? null;
       // If the pasted image is larger than the canvas, scale the initial box
       // down to fit so the whole image is visible immediately rather than
       // silently clipping off-canvas.
@@ -111,6 +117,7 @@ export function usePastePlacementTool({
     const t = toolRef.current;
     const canvas = canvasRef.current;
     if (!t || !canvas) return;
+    onCancelRef.current = null; // layer-resize cancel leaves the layer as-is
     t.begin_layer_resize_preview();
     if (!t.has_paste_preview()) return; // no active layer — Rust no-op'd
     setRect({ x: 0, y: 0, width: canvas.width, height: canvas.height });
@@ -121,6 +128,7 @@ export function usePastePlacementTool({
     (filter = 1 /* bilinear, matches resize()'s own default */) => {
       const t = toolRef.current;
       if (!t || !t.has_paste_preview()) return;
+      onCancelRef.current = null;
       t.commit_paste_preview(filter);
       setRect(null);
       flushToCanvas();
@@ -135,6 +143,9 @@ export function usePastePlacementTool({
     t.cancel_paste_preview();
     setRect(null);
     flushToCanvas();
+    const cleanup = onCancelRef.current;
+    onCancelRef.current = null;
+    cleanup?.();
   }, [toolRef, flushToCanvas]);
 
   // Enter commits, Escape cancels — same shape as useDrawingTools' pending-edit
