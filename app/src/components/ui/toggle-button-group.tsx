@@ -53,6 +53,7 @@ export function ToggleButtonGroup({
           <button
             onClick={onToggle}
             title={tooltip ? undefined : label}
+            aria-label={tooltip?.label ?? label}
             className={cn(
               "flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold font-mono transition-all",
               fill && "flex-1",

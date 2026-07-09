@@ -25,6 +25,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { SubscriptionButton } from "@/components/SubscriptionButton";
 import type { SuperUserControls } from "@/components/SuperUserPane";
 import type { GeneralControls } from "@/components/GeneralPane";
+import type { OpenRasterControls } from "@/components/ExportPane";
 
 interface TopBarProps {
   zoom: number;
@@ -54,6 +55,8 @@ interface TopBarProps {
   general: GeneralControls;
   /** Admin-only: adds the Super User tab to the Settings modal. */
   superUser?: SuperUserControls | null;
+  /** Live-tool access for the Settings → Import / Export (.ora) tab. */
+  openRaster: OpenRasterControls;
 }
 
 export function TopBar({
@@ -77,6 +80,7 @@ export function TopBar({
   reduceMotion,
   general,
   superUser,
+  openRaster,
 }: TopBarProps) {
   // Collapse the top bar to icon-only buttons (and drop the zoom %) when space
   // is tight: always under BP_COMPACT, and under BP_TIGHT when both side panels
@@ -235,6 +239,7 @@ export function TopBar({
               <SubscriptionButton
                 general={general}
                 superUser={superUser}
+                openRaster={openRaster}
               />
               <UserMenu />
             </div>

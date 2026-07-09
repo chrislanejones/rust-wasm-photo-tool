@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.55",
+    date: "2026-07-09",
+    headline: "Save and open real projects — full layer stacks, no flattening",
+    entries: [
+      { tag: "feature", text: "You can now export your whole project — every layer — as an OpenRaster (.ora) file, the same format Krita and GIMP use. Open it back up here, or in one of those, and every layer comes back intact. Importing an .ora adds it as a new photo, so it never touches whatever you're already working on." },
+      { tag: "fix", text: "A few toolbar icons in the Review panel (History, Layers, Reselect, Histogram) had lost their hover tooltips somewhere along the way — you'd see a bare icon with no label. Fixed, and while I was in there, made sure those buttons work properly with a keyboard or screen reader too, not just a mouse." },
+    ],
+  },
+  {
     version: "v0.9.54",
     date: "2026-07-09",
     headline: "Four new editing tools, plus two real bugs fixed",

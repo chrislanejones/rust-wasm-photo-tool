@@ -108,11 +108,21 @@ const DeleteGlyph = () => (
   </svg>
 );
 
-const TOGGLES: { key: SectionKey; icon: typeof History; label: string }[] = [
-  { key: "history", icon: History, label: "History" },
-  { key: "layers", icon: Layers, label: "Layers" },
-  { key: "reselect", icon: MousePointerSquareDashed, label: "Reselect" },
-  { key: "histogram", icon: ChartArea, label: "Histogram" },
+const TOGGLES: {
+  key: SectionKey;
+  icon: typeof History;
+  label: string;
+  tooltip: { label: string };
+}[] = [
+  { key: "history", icon: History, label: "History", tooltip: { label: "History" } },
+  { key: "layers", icon: Layers, label: "Layers", tooltip: { label: "Layers" } },
+  {
+    key: "reselect",
+    icon: MousePointerSquareDashed,
+    label: "Reselect",
+    tooltip: { label: "Reselect" },
+  },
+  { key: "histogram", icon: ChartArea, label: "Histogram", tooltip: { label: "Histogram" } },
 ];
 
 export function ReviewPanel({
@@ -209,10 +219,11 @@ export function ReviewPanel({
         <ToggleButtonGroup
           fill
           compact
-          items={TOGGLES.map(({ key, icon, label }) => ({
+          items={TOGGLES.map(({ key, icon, label, tooltip }) => ({
             key,
             icon,
             label,
+            tooltip,
             active: open[key],
             onToggle: () => toggle(key),
           }))}

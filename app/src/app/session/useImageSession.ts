@@ -146,7 +146,7 @@ export function useImageSession({
 
   // ── Add photos ─────────────────────────────────────────────────────────────
   const handleAddPhotos = useCallback(
-    async (files: File[]) => {
+    async (files: File[], opts?: { skipArtboard?: boolean }) => {
       // ── Tier cap ─────────────────────────────────────────────────────────
       // Enforce the per-tier gallery limit (from Rust `photo_limit`). Accept
       // as many as fit, then notify if the batch was trimmed or already full.
@@ -235,7 +235,7 @@ export function useImageSession({
               working.pixels,
               working.width,
               working.height,
-              prefs.canvasArtboard
+              prefs.canvasArtboard && !opts?.skipArtboard
                 ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
                 : undefined,
             );

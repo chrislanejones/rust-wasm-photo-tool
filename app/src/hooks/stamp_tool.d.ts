@@ -75,6 +75,28 @@ declare module "stamp_tool" {
   ): Uint8Array;
 
   /**
+   * Return value of `decode_png_to_rgba`: decoded pixels + dimensions out of
+   * one wasm-bindgen call. Call `.free()` once you've read the fields you
+   * need — it holds a boxed allocation on the wasm heap.
+   */
+  export class DecodedPng {
+    private constructor();
+    free(): void;
+    width: number;
+    height: number;
+    rgba: Uint8Array;
+  }
+
+  /**
+   * Stateless: decode PNG bytes back into straight (non-premultiplied)
+   * RGBA8 pixels, normalizing any source color type (RGB, RGBA, indexed,
+   * grayscale…) to the same convention `encode_png_pixels`/`get_layer_png`
+   * write on the way out. The inverse of `encode_png_pixels`. Throws (a
+   * JS-catchable exception, not a WASM trap) on corrupt/non-PNG input.
+   */
+  export function decode_png_to_rgba(png: Uint8Array): DecodedPng;
+
+  /**
    * Parse a CSS-ish color string into RGBA bytes.
    * Accepts: #rgb, #rgba, #rrggbb, #rrggbbaa, rgb(...), rgba(...).
    * Returns a 4-byte Uint8Array [r, g, b, a] on success, or an empty

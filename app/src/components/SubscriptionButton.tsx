@@ -36,7 +36,7 @@ import { LayersCanvasPane } from "@/components/LayersCanvasPane";
 import { AppearancePane } from "@/components/AppearancePane";
 import { SecurityPane } from "@/components/SecurityPane";
 import { RulersGridsPane } from "@/components/RulersGridsPane";
-import { ExportPane } from "@/components/ExportPane";
+import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
 import { AIUsagePane } from "@/components/AIUsagePane";
 import { DevTestsPane } from "@/components/DevTestsPane";
@@ -107,11 +107,14 @@ interface Props {
   /** When set (admin only), adds a gated "Super User" tab with the tier
    *  override. Omit / null for everyone else. */
   superUser?: SuperUserControls | null;
+  /** Live-tool access for the Import / Export (.ora) tab. */
+  openRaster: OpenRasterControls;
 }
 
 export function SubscriptionButton({
   general,
   superUser,
+  openRaster,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<SettingsTab>("general");
@@ -295,7 +298,7 @@ export function SubscriptionButton({
                 onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
               />
             ) : tab === "export" ? (
-              <ExportPane />
+              <ExportPane {...openRaster} />
             ) : tab === "storage" ? (
               <StoragePane isPaid={isPaid} tier={tier} />
             ) : tab === "aiusage" ? (

@@ -1998,6 +1998,44 @@ pub fn encode_png_pixels(pixels: &[u8], width: u32, height: u32) -> Vec<u8> {
     codec::export_png(&tmp)
 }
 
+/// Return value of `decode_png_to_rgba`: decoded pixels + the dimensions the
+/// `png` crate reported for them, out of one wasm-bindgen call.
+///
+/// Not a JSON string (like `get_layers`) because the payload is binary, and
+/// not split into separate `_width`/`_height`/`_data` calls (like
+/// `thumbnail_width`/`_height`/`_data`) because that pattern only works when
+/// each piece is cheap/pure to recompute independently — here all three come
+/// out of one PNG decode, which is also the one place that can fail on bad
+/// input, so splitting it would mean parsing the header three times and
+/// smearing one `Result` across calls that don't each naturally return one.
+#[wasm_bindgen(getter_with_clone)]
+pub struct DecodedPng {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
+}
+
+/// Stateless: decode PNG bytes back into straight (non-premultiplied) RGBA8
+/// pixels, normalizing any source color type to the engine's own encode
+/// convention (see `codec::decode_png`) — the inverse of `encode_png_pixels`.
+///
+/// Used by OpenRaster import so encoding (`export_png`, Rust) and decoding a
+/// layer's PNG back to pixels go through the *same* codec instead of two
+/// different ones (Rust encode, browser `<canvas>` decode) round-tripping the
+/// same bytes — a real correctness risk if they ever disagree on alpha
+/// handling. Returns `Err` (a JS-catchable exception) rather than panicking
+/// on corrupt or non-PNG input, per this engine's no-panics-across-the-
+/// boundary rule.
+#[wasm_bindgen]
+pub fn decode_png_to_rgba(png: &[u8]) -> Result<DecodedPng, JsError> {
+    let (rgba, width, height) = codec::decode_png(png)?;
+    Ok(DecodedPng {
+        width,
+        height,
+        rgba,
+    })
+}
+
 /// Parse a CSS-ish color string into RGBA bytes. Accepts:
 ///   #rgb, #rgba, #rrggbb, #rrggbbaa
 ///   rgb(r, g, b)       — components 0–255 or 0–255 (no percentages)
