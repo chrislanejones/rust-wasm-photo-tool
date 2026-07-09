@@ -70,6 +70,10 @@ interface ToolsSidebarProps {
   onResizeLayer?: () => void;
   onBrightness: (delta: number) => void;
   onContrast: (factor: number) => void;
+  onSaturation?: (factor: number) => void;
+  onShadows?: (amount: number) => void;
+  onHighlights?: (amount: number) => void;
+  onSharpen?: (amount: number) => void;
   imageReady: boolean;
   /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
   onResize: (newW: number, newH: number, filter: number) => void;
@@ -155,6 +159,10 @@ export function ToolsSidebar({
   onResizeLayer,
   onBrightness,
   onContrast,
+  onSaturation,
+  onShadows,
+  onHighlights,
+  onSharpen,
   imageReady,
   onResize,
   onResizeCanvas,
@@ -294,6 +302,10 @@ export function ToolsSidebar({
             onBrightness={onBrightness}
             onContrast={onContrast}
             onGlobalBlur={onGlobalBlur}
+            onSaturation={onSaturation}
+            onShadows={onShadows}
+            onHighlights={onHighlights}
+            onSharpen={onSharpen}
             imageReady={imageReady}
             undoCount={undoCount}
             activePhotoId={activePhotoId}

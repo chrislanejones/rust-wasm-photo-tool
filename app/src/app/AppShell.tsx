@@ -2466,6 +2466,10 @@ export function AppShell() {
             onBrightness={stamp.adjustBrightness}
             onContrast={stamp.adjustContrast}
             onGlobalBlur={stamp.applyGlobalBlur}
+            onSaturation={stamp.adjustSaturation}
+            onShadows={stamp.adjustShadows}
+            onHighlights={stamp.adjustHighlights}
+            onSharpen={stamp.adjustSharpen}
             imageReady={hasImage}
             onResize={handleApplyCompression}
             onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}

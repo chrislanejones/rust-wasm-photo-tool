@@ -11,6 +11,10 @@ interface EffectsSettingsProps {
   onBrightness: (delta: number) => void;
   onContrast: (factor: number) => void;
   onGlobalBlur?: (intensity: number) => void;
+  onSaturation?: (factor: number) => void;
+  onShadows?: (amount: number) => void;
+  onHighlights?: (amount: number) => void;
+  onSharpen?: (amount: number) => void;
   imageReady: boolean;
   /** WASM undo count — changes (other than our own commits) re-sync the latches. */
   undoCount?: number;
@@ -31,6 +35,10 @@ export function EffectsSettings({
   onBrightness,
   onContrast,
   onGlobalBlur,
+  onSaturation,
+  onShadows,
+  onHighlights,
+  onSharpen,
   imageReady,
   undoCount,
   activePhotoId,
@@ -46,6 +54,21 @@ export function EffectsSettings({
 
   // Blur resets after each apply (applying more blur is additive anyway).
   const [blur, setBlur] = useState(0);
+
+  // Latching saturation: same latch-to-position principle as Contrast — a
+  // ratio relative to the last committed value, 100 = neutral.
+  const [saturation, setSaturation] = useState(100);
+  const [saturationCommitted, setSaturationCommitted] = useState(100);
+
+  // Shadows/Highlights are absolute, non-latching sliders like Blur: each
+  // release applies the raw slider value as a luminance-masked brightness
+  // delta, then resets to neutral (0) rather than staying at the dragged
+  // position — repeated drags are additive on the image, not on the slider.
+  const [shadows, setShadows] = useState(0);
+  const [highlights, setHighlights] = useState(0);
+
+  // Sharpen mirrors Blur's own UX exactly (0..100 range, resets after apply).
+  const [sharpen, setSharpen] = useState(0);
 
   // Set right before we apply our own brightness/contrast/blur so the history
   // effect below can tell our own commit apart from an external change.
@@ -66,6 +89,11 @@ export function EffectsSettings({
     setContrast(100);
     setContrastCommitted(100);
     setBlur(0);
+    setSaturation(100);
+    setSaturationCommitted(100);
+    setShadows(0);
+    setHighlights(0);
+    setSharpen(0);
   }, [undoCount, activePhotoId]);
 
   const commitBrightness = (v: number) => {
@@ -90,6 +118,40 @@ export function EffectsSettings({
       selfEditRef.current = true;
       onGlobalBlur(v / 100);
       setBlur(0);
+    }
+  };
+
+  const commitSaturation = (v: number) => {
+    if (v === saturationCommitted || !onSaturation) return;
+    const factor = v / saturationCommitted;
+    selfEditRef.current = true;
+    onSaturation(factor);
+    setSaturationCommitted(v);
+  };
+
+  const commitShadows = (v: number) => {
+    if (v !== 0 && onShadows) {
+      selfEditRef.current = true;
+      onShadows(v);
+      setShadows(0);
+    }
+  };
+
+  const commitHighlights = (v: number) => {
+    if (v !== 0 && onHighlights) {
+      selfEditRef.current = true;
+      onHighlights(v);
+      setHighlights(0);
+    }
+  };
+
+  const commitSharpen = (v: number) => {
+    if (v > 0 && onSharpen) {
+      selfEditRef.current = true;
+      // Map the 0..100 slider fraction onto a 0..2 unsharp-mask `amount`
+      // (default-strength sharpen sits around v≈50-75 → amount 1.0-1.5).
+      onSharpen((v / 100) * 2);
+      setSharpen(0);
     }
   };
 
@@ -142,6 +204,63 @@ export function EffectsSettings({
         />
       </div>
 
+      {/* Saturation */}
+      {onSaturation && (
+        <div className="space-y-3">
+          <SizeSlider
+            label="Saturation"
+            labelInfo="100 = neutral, 0 = grayscale. Slider latches — drag again to adjust further."
+            value={saturation}
+            onChange={setSaturation}
+            onCommit={commitSaturation}
+            min={0}
+            max={300}
+            disabled={!imageReady}
+            valueDisplay={
+              saturation > 100
+                ? `+${saturation - 100}`
+                : saturation < 100
+                  ? `${saturation - 100}`
+                  : "0"
+            }
+          />
+        </div>
+      )}
+
+      {/* Shadows */}
+      {onShadows && (
+        <div className="space-y-3">
+          <SizeSlider
+            label="Shadows"
+            labelInfo="Lifts dark tones. Drag & release — resets after apply. Undo-able."
+            value={shadows}
+            onChange={setShadows}
+            onCommit={commitShadows}
+            min={-100}
+            max={100}
+            disabled={!imageReady}
+            valueDisplay={shadows > 0 ? `+${shadows}` : String(shadows)}
+          />
+        </div>
+      )}
+
+      {/* Highlights */}
+      {onHighlights && (
+        <div className="space-y-3">
+          <SizeSlider
+            label="Highlights"
+            labelInfo="Recovers blown highlights. Drag & release — resets after apply. Undo-able."
+            value={highlights}
+            onChange={setHighlights}
+            onCommit={commitHighlights}
+            min={-100}
+            max={100}
+            disabled={!imageReady}
+            valueDisplay={highlights > 0 ? `+${highlights}` : String(highlights)}
+          />
+        </div>
+      )}
+
       {/* Global Blur */}
       {onGlobalBlur && (
         <div className="space-y-3">
@@ -151,6 +270,23 @@ export function EffectsSettings({
             value={blur}
             onChange={setBlur}
             onCommit={commitBlur}
+            min={0}
+            max={100}
+            unit="%"
+            disabled={!imageReady}
+          />
+        </div>
+      )}
+
+      {/* Sharpen */}
+      {onSharpen && (
+        <div className="space-y-3">
+          <SizeSlider
+            label="Sharpen"
+            labelInfo="Unsharp mask across the full image. Resets after apply."
+            value={sharpen}
+            onChange={setSharpen}
+            onCommit={commitSharpen}
             min={0}
             max={100}
             unit="%"

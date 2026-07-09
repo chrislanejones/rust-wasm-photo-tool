@@ -11,6 +11,47 @@ pub fn adjust_contrast(data: &mut [u8], factor: f64) {
     crate::simd::color::adjust_contrast(data, factor);
 }
 
+pub fn adjust_saturation(data: &mut [u8], factor: f64) {
+    crate::simd::color::adjust_saturation(data, factor);
+}
+
+pub fn adjust_shadows(data: &mut [u8], amount: f64) {
+    crate::simd::color::adjust_shadows(data, amount);
+}
+
+pub fn adjust_highlights(data: &mut [u8], amount: f64) {
+    crate::simd::color::adjust_highlights(data, amount);
+}
+
+/// Unsharp-mask sharpen over the WHOLE buffer (not a brush region): blur a
+/// copy with a small fixed-radius Gaussian (reusing the existing separable
+/// `simd::blur` passes — no second blur implementation), then combine
+/// `orig + amount * (orig - blurred)` per RGB channel (alpha untouched).
+/// `amount` 0 = identity; the caller clamps to a sane UI range.
+///
+/// One-shot (slider-commit) call, not a per-frame hot path: the two
+/// full-buffer scratch `Vec`s are unavoidable here (`blur_horizontal`/
+/// `blur_vertical` need input/output buffers distinct from `data`, same as
+/// `gaussian_blur_region`'s scratch buffers) but are allocated once per call,
+/// not per pixel.
+pub fn sharpen(data: &mut [u8], width: u32, height: u32, amount: f64) {
+    const RADIUS: u32 = 2;
+    let len = data.len();
+    if len == 0 {
+        return;
+    }
+    let kernel = build_gaussian_kernel(RADIUS);
+    let kr = RADIUS as i32;
+    let w = width as usize;
+    let h = height as usize;
+
+    let mut h_pass = vec![0u8; len];
+    let mut blurred = vec![0u8; len];
+    crate::simd::blur::blur_horizontal(data, &mut h_pass, w, h, kr, &kernel);
+    crate::simd::blur::blur_vertical(&h_pass, &mut blurred, w, h, kr, &kernel);
+    crate::simd::color::unsharp_combine(data, &blurred, amount);
+}
+
 /// Build a 1D Gaussian kernel of the given radius.
 /// Kernel size = 2*radius + 1.
 pub fn build_gaussian_kernel(radius: u32) -> Vec<f32> {
@@ -215,5 +256,45 @@ pub fn redact_region(
             let i = ((yy * w + xx) * 4) as usize;
             data[i..i + 4].copy_from_slice(&fill);
         }
+    }
+}
+
+#[cfg(test)]
+mod sharpen_tests {
+    use super::*;
+
+    fn solid(w: u32, h: u32, rgba: [u8; 4]) -> Vec<u8> {
+        let mut v = Vec::with_capacity((w * h * 4) as usize);
+        for _ in 0..(w * h) {
+            v.extend_from_slice(&rgba);
+        }
+        v
+    }
+
+    #[test]
+    fn sharpen_amount_zero_is_identity() {
+        let mut data = solid(4, 4, [10, 20, 30, 255]);
+        let before = data.clone();
+        sharpen(&mut data, 4, 4, 0.0);
+        assert_eq!(data, before);
+    }
+
+    #[test]
+    fn sharpen_flat_image_is_unchanged() {
+        // A uniform-colour image blurs to itself (every kernel tap samples the
+        // same value, edge-clamped or not), so `orig - blurred == 0`
+        // everywhere and the unsharp-mask combine is a no-op regardless of
+        // `amount`.
+        let mut data = solid(6, 6, [80, 120, 200, 255]);
+        let before = data.clone();
+        sharpen(&mut data, 6, 6, 1.5);
+        assert_eq!(data, before);
+    }
+
+    #[test]
+    fn sharpen_empty_buffer_does_not_panic() {
+        let mut data: Vec<u8> = Vec::new();
+        sharpen(&mut data, 0, 0, 1.0);
+        assert!(data.is_empty());
     }
 }

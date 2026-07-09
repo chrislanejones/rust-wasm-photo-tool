@@ -6,7 +6,7 @@
 //! - `history`   — Undo / redo snapshot system
 //! - `stamp`     — Clone stamp brush engine
 //! - `transform` — Flip, rotate, copy/paste regions
-//! - `filters`   — Brightness, contrast (future: blur, sharpen)
+//! - `filters`   — Brightness, contrast, saturation, shadows, highlights, blur, sharpen
 //! - `codec`     — PNG encoding, thumbnail generation
 //!
 //! The JS side imports `ImageHorseTool` — the API surface is unchanged.
@@ -1676,6 +1676,40 @@ impl ImageHorseTool {
     pub fn adjust_contrast(&mut self, factor: f64) {
         self.snap("Contrast");
         filters::adjust_contrast(&mut self.layers[self.active].buf.data, factor);
+    }
+
+    /// Saturation: 0 = grayscale, 1 = unchanged, >1 = more saturated (grayscale-
+    /// lerp against the pixel's own BT.601 luminance — same technique as CSS
+    /// `filter: saturate()`).
+    pub fn adjust_saturation(&mut self, factor: f64) {
+        self.snap("Saturation");
+        filters::adjust_saturation(&mut self.layers[self.active].buf.data, factor);
+    }
+
+    /// Shadows: additive brightness shift masked to peak in dark tones.
+    /// Positive `amount` lifts (brightens) shadows.
+    pub fn adjust_shadows(&mut self, amount: f64) {
+        self.snap("Shadows");
+        filters::adjust_shadows(&mut self.layers[self.active].buf.data, amount);
+    }
+
+    /// Highlights: additive brightness shift masked to peak in bright tones.
+    /// Positive `amount` RECOVERS (darkens) blown highlights.
+    pub fn adjust_highlights(&mut self, amount: f64) {
+        self.snap("Highlights");
+        filters::adjust_highlights(&mut self.layers[self.active].buf.data, amount);
+    }
+
+    /// Unsharp-mask sharpen over the whole active layer. `amount` 0 = no
+    /// sharpening; reasonable range ~0..3.
+    pub fn adjust_sharpen(&mut self, amount: f64) {
+        self.snap("Sharpen");
+        filters::sharpen(
+            &mut self.layers[self.active].buf.data,
+            self.width,
+            self.height,
+            amount,
+        );
     }
 
     /// Stamp raw RGBA emoji pixels onto the image buffer at (dest_x, dest_y).

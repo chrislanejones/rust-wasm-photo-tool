@@ -228,6 +228,15 @@ declare module "stamp_tool" {
     push_compress_marker(): void;
     adjust_brightness(delta: number): void;
     adjust_contrast(factor: number): void;
+    /** 0 = grayscale, 1 = unchanged, >1 = more saturated (grayscale-lerp
+     *  against the pixel's own luminance, like CSS `filter: saturate()`). */
+    adjust_saturation(factor: number): void;
+    /** Lifts (brightens) shadows, luminance-masked to peak in dark tones. */
+    adjust_shadows(amount: number): void;
+    /** Recovers (darkens) blown highlights, luminance-masked to peak in bright tones. */
+    adjust_highlights(amount: number): void;
+    /** Unsharp-mask sharpen over the whole active layer. 0 = no sharpening. */
+    adjust_sharpen(amount: number): void;
     blur_region(
       cx: number,
       cy: number,

@@ -1056,6 +1056,67 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [flushToCanvas, syncState],
   );
 
+  /**
+   * Adjusts saturation by `factor` (0 = grayscale, 1 = unchanged, >1 = more
+   * saturated) — grayscale-lerp against the pixel's own luminance, same
+   * technique as CSS `filter: saturate()`. Each call is individually undo-able.
+   */
+  const adjustSaturation = useCallback(
+    (factor: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      t.adjust_saturation(factor);
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
+  /**
+   * Lifts (brightens) shadows by `amount`, masked to peak in dark tones and
+   * taper to ~0 in bright tones. Each call is individually undo-able.
+   */
+  const adjustShadows = useCallback(
+    (amount: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      t.adjust_shadows(amount);
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
+  /**
+   * Recovers (darkens) blown highlights by `amount`, masked to peak in bright
+   * tones and taper to ~0 in dark tones. Each call is individually undo-able.
+   */
+  const adjustHighlights = useCallback(
+    (amount: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      t.adjust_highlights(amount);
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
+  /**
+   * Unsharp-mask sharpen over the whole image. `amount` 0 = no sharpening.
+   * Each call is individually undo-able.
+   */
+  const adjustSharpen = useCallback(
+    (amount: number) => {
+      const t = toolRef.current;
+      if (!t) return;
+      t.adjust_sharpen(amount);
+      flushToCanvas();
+      syncState();
+    },
+    [flushToCanvas, syncState],
+  );
+
   // ── Layers ────────────────────────────────────────────────────────────────
   // Each mutates the Rust layer stack, then repaints the composite and re-syncs
   // the mirrored layer list into React state.
@@ -1261,6 +1322,10 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     adjustBrightness,
     adjustContrast,
     applyGlobalBlur,
+    adjustSaturation,
+    adjustShadows,
+    adjustHighlights,
+    adjustSharpen,
     // Layers
     addLayer,
     removeLayer,
