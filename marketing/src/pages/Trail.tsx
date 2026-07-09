@@ -27,6 +27,17 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.54",
+    date: "2026-07-09",
+    headline: "Four new editing tools, plus two real bugs fixed",
+    entries: [
+      { tag: "feature", text: "Four new ways to adjust a photo, right next to Brightness, Contrast, and Blur: Saturation dials color intensity up or down without shifting hue. Shadows and Highlights let you brighten just the dark parts of a photo or pull back just the bright parts, instead of moving the whole image at once. Sharpen adds crispness back to a soft or slightly blurry photo." },
+      { tag: "fix", text: "If you're on a paid plan, the app now recognizes that the moment you sign in. Some paid accounts were staying locked out of their own features because the app was only checking whether you were signed in, not what plan you were actually on." },
+      { tag: "fix", text: "If you ran an AI tool — background removal, text extraction, object removal — and got back a blank or broken image, that's fixed. A browser quirk was reporting the result as zero pixels wide right after processing finished, and that zero was making it onto your canvas." },
+      { tag: "infra", text: "Corrected some inaccurate claims on the public Architecture page — it was describing API routes and storage that never actually existed." },
+    ],
+  },
+  {
     version: "v0.9.53",
     date: "2026-07-09",
     headline: "A green light for faster processing",

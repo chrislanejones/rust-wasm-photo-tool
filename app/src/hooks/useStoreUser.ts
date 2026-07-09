@@ -1,7 +1,21 @@
 import { useEffect, useRef } from "react";
-import { useConvexAuth, useMutation } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
+
+/**
+ * The signed-in user's REAL tier from their Convex users row (null while
+ * logged out / loading). This is what lifts the client's user mode to "paid"
+ * for actual pro/team accounts — without it, tier gating (the AI panel, caps)
+ * only ever saw "loggedIn" and paid features stayed locked in the UI even
+ * though the server would have allowed them. Reactive: a tier grant or
+ * upgrade flips the UI live, no reload.
+ */
+export function useRealTier(): string | null {
+  const { isAuthenticated } = useConvexAuth();
+  const me = useQuery(api.users.me, isAuthenticated ? {} : "skip");
+  return me?.tier ?? null;
+}
 
 /**
  * Ensure a Convex `users` row exists for the signed-in Clerk user.

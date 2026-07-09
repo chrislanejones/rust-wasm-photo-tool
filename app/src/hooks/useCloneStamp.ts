@@ -256,6 +256,15 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       height: number,
       artboard?: { pad: number; r: number; g: number; b: number; a: number },
     ) => {
+      // A zero-size buffer must never reach the engine — it would resize the
+      // canvas to 0×0 and blank the app (seen when a caller passed dimensions
+      // read from a closed ImageBitmap).
+      if (!width || !height || pixels.length < width * height * 4) {
+        console.error(
+          `loadImageFromPixels: rejected invalid input ${width}×${height} (${pixels.length} bytes)`,
+        );
+        return;
+      }
       const { default: init, ImageHorseTool: Tool } = await import("stamp_tool");
       const wasmExports = (await init()) as unknown as {
         memory: WebAssembly.Memory;

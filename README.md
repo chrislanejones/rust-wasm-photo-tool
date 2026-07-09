@@ -50,11 +50,13 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.9 — 2026-07-09
+### v7.10 — 2026-07-09
 
-Internal-only release, nothing user-visible changed. The tile-buffer + operation-log engine core (`src/tiles.rs`, `src/ops.rs`) merged to master behind an off-by-default Cargo feature — groundwork for future infinite-undo, not wired into the render path yet. `docs/adr/` got a full status audit against actual v7.8 code (four ADRs confirmed shipped and flipped to Accepted; the tile/op-log ADRs correctly stay Draft since merged-but-unwired isn't shipped), and `docs/Architecture.md` was rewritten to describe what's actually live versus planned. A timeboxed spike (ADR-009) confirmed the COOP/COEP headers needed for future multi-core (rayon) processing don't break Clerk sign-in.
+**Four new Levels adjustments**: Saturation, Shadows, Highlights, and Sharpen join Brightness/Contrast/Blur in the Effects panel, each a new SIMD128+scalar Rust kernel (`simd/color.rs`) exposed through the same undo-able wasm-bindgen pattern as the existing sliders. Saturation is a grayscale-lerp against pixel luminance (0 = grayscale, 1 = unchanged, matching CSS `filter: saturate()`); Shadows/Highlights are luminance-masked additive brightness (peaks in dark/bright tones respectively, tapers to ~0 elsewhere); Sharpen is a standard unsharp mask built on the existing Gaussian blur kernel. Verified end-to-end against real pixel math via headless-browser smoke test, not just unit tests. WASM: +3,086 B (+0.56%).
 
-> **About this release.** No feature work — this is the paperwork and one inert engine merge catching up to what's already shipped, plus clearing a blocker for the next real performance push.
+Also: two real bugs fixed. **AI results (background removal, etc.) no longer blank the canvas**: `useAIJob`'s `urlToPixels` was reading `bitmap.width`/`height` *after* calling `bitmap.close()`, and a closed `ImageBitmap` reports 0×0 — that 0×0 result was reaching `loadImageFromPixels`, which resized the canvas to nothing. Width/height are now captured before close, and `useCloneStamp.loadImageFromPixels` additionally rejects any zero-size or undersized pixel buffer outright rather than forwarding it to the engine. **Paid accounts now unlock immediately**: a new `useRealTier()` hook reads the signed-in user's actual Convex tier and lifts the client's UI mode to "paid" for real pro/team accounts — previously tier gating only ever saw "loggedIn," so entitled paying users still saw locked AI/paid features in the UI. Also corrected the public Architecture page, which had drifted into describing fictional API routes and storage that never existed; browser QC pass found and logged one new bug (canvas border grows +20px after a compress→reload cycle — tracked, not yet fixed).
+
+> **About this release.** Four new professional-grade adjustment sliders, plus: if you ever ran an AI tool and got a blank result, or paid and still saw things locked, both are fixed now.
 
 ## License
 

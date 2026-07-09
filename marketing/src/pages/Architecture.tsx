@@ -24,6 +24,7 @@ const BADGE_COLORS: Record<string, string> = {
   pro: "bg-violet-500/20 text-violet-400",
   free: "bg-zinc-700 text-zinc-400",
   new: "bg-orange-500/20 text-orange-400",
+  soon: "bg-amber-500/20 text-amber-400",
 };
 
 function Node({
@@ -231,13 +232,25 @@ export default function Architecture() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8 overflow-x-auto">
       {/* Header */}
       <header className="max-w-7xl mx-auto mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">Image Horse</h1>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Image Horse</h1>
+          <a
+            href="/system-architecture.mermaid"
+            download
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download diagram (.mermaid)
+          </a>
         </div>
         <p className="text-zinc-500 text-sm">
           Backend Architecture — <span className="text-orange-400 font-medium">WASM / Rust</span>
@@ -248,25 +261,35 @@ export default function Architecture() {
 
       <div className="max-w-7xl mx-auto relative">
         {/* ROW 1: Client Layer */}
-        <Label color="blue">Client Layer (Vercel Edge)</Label>
-        <div className="grid grid-cols-2 gap-4 mb-4 mt-2">
-          <Node title="React App" subtitle="Vite + React 19" color="blue" />
-          <Node title="Canvas Engine" subtitle="JS ↔ WASM Bridge" color="blue" />
+        <Label color="blue">Client Layer (runs entirely in the browser)</Label>
+        <div className="grid grid-cols-3 gap-4 mb-4 mt-2">
+          <Node title="React App" subtitle="Vite + React 19 · Netlify static SPA" color="blue" />
+          <Node title="Canvas Engine" subtitle="JS ↔ WASM bridge · zero-copy blit" color="blue" />
+          <Node title="Zustand State" subtitle="5 stores · atomic selectors" color="blue" />
+        </div>
+
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 px-4 py-3 mb-4 text-xs text-zinc-400 leading-relaxed">
+          No account needed — every tool above runs client-side, no server round-trip. Signed-out
+          originals and edits live in IndexedDB (SHA-256 content-addressed, read through a Dexie
+          adapter); "remember my choice" UI prefs persist to their own{" "}
+          <code className="text-blue-300/80 bg-blue-500/10 px-1 rounded">image-horse-zustand</code>{" "}
+          IndexedDB database. Nothing here talks to Convex until you sign in.
         </div>
 
         <ArrowDown />
 
         {/* ROW 2: WASM + Rust Layer — ONE binary, internal modules */}
         <Label color="orange">WASM Processing Layer (Client-Side Rust · single binary)</Label>
-        <div className="grid grid-cols-4 gap-4 mb-4 mt-2">
-          <Node title="core · layer" subtitle="ImageBuffer · layer stack · composite / mask" color="orange" badge="new" />
-          <Node title="paint · effects" subtitle="Brush / eraser / mask · blur / pixelate / redact" color="orange" badge="new" />
-          <Node title="annotations · selection" subtitle="Live text & shape overlays · magic-wand" color="orange" badge="new" />
+        <div className="grid grid-cols-3 gap-4 mb-4 mt-2">
+          <Node title="core · layer" subtitle="ImageBuffer · layer stack · composite / mask" color="orange" />
+          <Node title="paint · effects" subtitle="Brush / eraser / mask · blur / pixelate / redact" color="orange" />
+          <Node title="annotations · selection" subtitle="Live text & shape overlays · magic-wand" color="orange" />
           <Node title="stamp · transform" subtitle="Clone brush · flip / rotate / resize / crop" color="orange" />
           <Node title="filters" subtitle="Brightness · contrast · gaussian blur" color="orange" />
           <Node title="drawing · text" subtitle="Arrows / shapes / bézier · embedded fonts" color="orange" />
-          <Node title="codec · history" subtitle="PNG encode · thumbnails · undo snapshots" color="orange" />
-          <Node title="utils" subtitle="json · point math · pin / ink helpers" color="orange" badge="new" />
+          <Node title="codec · history" subtitle="PNG encode (Rust) · undo snapshots" color="orange" />
+          <Node title="simd" subtitle="v128/f32x4 kernels · scalar fallback" color="orange" />
+          <Node title="utils" subtitle="json · point math · shared helpers" color="orange" />
         </div>
 
         {/* WASM detail callout */}
@@ -280,9 +303,16 @@ export default function Architecture() {
               <span className="mx-2 text-zinc-600">|</span>
               One binary so every module shares a single pixel buffer in linear memory — zero-copy between tools
               <span className="mx-2 text-zinc-600">|</span>
-              <span className="text-emerald-400">443 KB (60% smaller after font subsetting)</span>
+              <span className="text-emerald-400">~540 KB</span> (font subsetting once cut it 1.1 MB → 443 KB; new tools have grown it back up some since)
             </div>
           </div>
+        </div>
+
+        <div className="rounded-lg border border-orange-500/20 bg-zinc-900/40 px-4 py-3 mb-4 text-xs text-zinc-400 leading-relaxed">
+          <span className="text-orange-300 font-medium">Codec worker</span> — a Vite module Web Worker
+          (Comlink-wrapped) handles WebP/JPEG export encode and gallery thumbnails off the main thread,
+          with a silent main-thread fallback if the worker fails to start. PNG export stays on the Rust
+          encoder above.
         </div>
 
         <WasmSplitArrow />
@@ -298,16 +328,20 @@ export default function Architecture() {
 
         <ArrowDown />
 
-        {/* ROW 4: API Layer */}
-        <Label color="emerald">API Layer (Vercel Functions)</Label>
+        {/* ROW 4: Convex functions */}
+        <Label color="emerald">Convex Functions (signed-in only)</Label>
         <div className="grid grid-cols-6 gap-3 mb-4 mt-2">
-          <Node title="/api/upload" size="sm" color="emerald" />
-          <Node title="/api/process" size="sm" color="emerald" />
-          <Node title="/api/ai/*" size="sm" color="violet" />
-          <Node title="/api/history" size="sm" color="amber" />
-          <Node title="/api/export" size="sm" color="rose" />
-          <Node title="Middleware" subtitle="Rate Limit" size="sm" color="zinc" />
+          <Node title="photoEdits.ts" subtitle="save / getEdit" size="sm" color="emerald" />
+          <Node title="ai.ts" subtitle="dispatch to Replicate" size="sm" color="violet" />
+          <Node title="aiJobs.ts" subtitle="job status (useQuery)" size="sm" color="violet" />
+          <Node title="shares.ts" subtitle="public share links" size="sm" color="amber" />
+          <Node title="textHistory.ts" subtitle="recent texts" size="sm" color="rose" />
+          <Node title="stripe.ts" subtitle="checkout / portal" size="sm" color="zinc" />
         </div>
+        <p className="text-[11px] text-zinc-500 mb-4 leading-relaxed">
+          WASM does the pixel work locally — this layer only syncs metadata and edit archives for
+          signed-in users. None of it sits on the critical editing path; the app works fully logged out.
+        </p>
 
         <BranchingArrows />
 
@@ -317,13 +351,15 @@ export default function Architecture() {
           <div>
             <Label color="amber">Storage Layer</Label>
             <div className="space-y-2 mt-2">
-              <Node title="UploadThing" subtitle="Original Uploads · Test Images" color="red" />
+              <Node title="IndexedDB (Dexie)" subtitle="Originals · SHA-256 content-addressed" color="red" />
               <ArrowDownSmall />
-              <Node title="CDN Edge Cache" subtitle="Processed Images" color="amber" />
+              <Node title="Convex File Storage" subtitle="Edit archives · shares · AI frames" color="amber" />
             </div>
             <div className="mt-2 text-[10px] text-zinc-500 leading-relaxed">
-              UploadThing also hosts the demo's <span className="text-zinc-400">Test Images</span> set —
-              the royalty-free photos behind the upload dialog's Test Images button.
+              UploadThing hosts exactly one thing: the built-in <span className="text-zinc-400">Test Images</span> set
+              behind the upload dialog's button — royalty-free demo photos, not user uploads. Cloud
+              storage for a Pro user's own originals (S3 / UploadThing / R2) is designed but not wired —
+              the Connect buttons in Settings are disabled today.
             </div>
           </div>
 
@@ -335,24 +371,22 @@ export default function Architecture() {
             </div>
             <div className="space-y-1">
               <TableMini name="users" icon="👤" />
-              <TableMini name="projects" icon="📁" />
-              <TableMini name="images" icon="🖼" />
-              <TableMini name="annotations" icon="✏️" />
-              <TableMini name="layers" icon="📚" />
-              <TableMini name="history" icon="⏱" />
-              <TableMini name="ai_jobs" icon="🤖" />
               <TableMini name="subscriptions" icon="💳" />
+              <TableMini name="photo_edits" icon="🖼" />
+              <TableMini name="recent_texts" icon="📝" />
+              <TableMini name="shares" icon="🔗" />
+              <TableMini name="ai_jobs" icon="🤖" />
             </div>
           </div>
 
           {/* AI Column */}
           <div>
-            <Label color="violet">AI (Replicate)</Label>
+            <Label color="violet">AI (Replicate, Pro only)</Label>
             <div className="space-y-2 mt-2">
-              <Node title="rembg" subtitle="Background Removal" size="sm" color="violet" badge="free" />
-              <Node title="Real-ESRGAN" subtitle="4x Upscaling" size="sm" color="violet" badge="pro" />
-              <Node title="SD Inpaint" subtitle="Object Removal" size="sm" color="violet" badge="pro" />
-              <Node title="BLIP" subtitle="Auto Alt Text" size="sm" color="violet" badge="free" />
+              <Node title="cjwbw/rembg" subtitle="Background Removal" size="sm" color="violet" badge="pro" />
+              <Node title="abiruyt/text-extract-ocr" subtitle="Text Extract" size="sm" color="violet" badge="pro" />
+              <Node title="zylim0702/remove-object" subtitle="Object Removal (masked)" size="sm" color="violet" badge="pro" />
+              <Node title="Real-ESRGAN" subtitle="4x Upscale" size="sm" color="violet" badge="soon" />
             </div>
           </div>
         </div>
@@ -367,18 +401,20 @@ export default function Architecture() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <TableCard
               name="users"
               fields={[
                 { name: "_id", type: "Id<'users'>", key: "pk" },
                 { name: "clerkId", type: "string", key: "unique", indexed: true },
-                { name: "email", type: "string", indexed: true },
+                { name: "email", type: "string?", indexed: true },
                 { name: "name", type: "string?" },
                 { name: "avatarUrl", type: "string?" },
                 { name: "tier", type: "'free' | 'pro' | 'team'" },
                 { name: "dailyUsage", type: "number" },
                 { name: "usageResetAt", type: "number" },
+                { name: "settings", type: "string?", comment: "JSON blob, app prefs" },
+                { name: "settingsHash", type: "string?", comment: "SHA-256, skips redundant writes" },
                 { name: "createdAt", type: "number" },
                 { name: "updatedAt", type: "number" },
               ]}
@@ -396,134 +432,103 @@ export default function Architecture() {
                 { name: "currentPeriodEnd", type: "number" },
                 { name: "cancelAtPeriodEnd", type: "boolean" },
               ]}
-              indexes={["by_userId", "by_stripeCustomerId"]}
+              indexes={["by_userId", "by_stripeCustomerId", "by_stripeSubId"]}
             />
             <TableCard
-              name="projects"
+              name="photo_edits"
               fields={[
-                { name: "_id", type: "Id<'projects'>", key: "pk" },
-                { name: "userId", type: "Id<'users'>", key: "fk", indexed: true },
-                { name: "name", type: "string" },
-                { name: "description", type: "string?" },
-                { name: "thumbnail", type: "string?" },
-                { name: "isPublic", type: "boolean" },
-                { name: "shareToken", type: "string?", key: "unique" },
-                { name: "imageCount", type: "number" },
-                { name: "createdAt", type: "number", indexed: true },
+                { name: "_id", type: "Id<'photo_edits'>", key: "pk" },
+                { name: "userId", type: "Id<'users'>", key: "fk" },
+                { name: "photoKey", type: "string", comment: "the editor's own photo id" },
+                { name: "storageId", type: "Id<'_storage'>", key: "fk", comment: "binary canvas archive" },
+                { name: "canvasW", type: "number" },
+                { name: "canvasH", type: "number" },
                 { name: "updatedAt", type: "number" },
               ]}
-              indexes={["by_userId", "by_userId_createdAt", "by_shareToken"]}
+              indexes={["by_userId_photoKey"]}
+              note="Real per-photo edit persistence path (useEditPersistence.ts)"
             />
             <TableCard
-              name="images"
+              name="recent_texts"
               fields={[
-                { name: "_id", type: "Id<'images'>", key: "pk" },
-                { name: "projectId", type: "Id<'projects'>", key: "fk", indexed: true },
-                { name: "userId", type: "Id<'users'>", key: "fk", indexed: true },
-                { name: "originalUrl", type: "string" },
-                { name: "processedUrl", type: "string?" },
-                { name: "thumbnailUrl", type: "string?" },
-                { name: "filename", type: "string" },
-                { name: "mimeType", type: "string" },
-                { name: "width", type: "number" },
-                { name: "height", type: "number" },
-                { name: "sizeBytes", type: "number" },
-                { name: "altText", type: "string?" },
-                { name: "order", type: "number" },
-                { name: "createdAt", type: "number" },
-              ]}
-              indexes={["by_projectId", "by_userId", "by_projectId_order"]}
-            />
-            <TableCard
-              name="annotations"
-              fields={[
-                { name: "_id", type: "Id<'annotations'>", key: "pk" },
-                { name: "imageId", type: "Id<'images'>", key: "fk", indexed: true },
-                { name: "layerId", type: "Id<'layers'>", key: "fk", indexed: true },
-                { name: "type", type: "'rect' | 'ellipse' | 'path' | 'text' | 'arrow'" },
-                { name: "data", type: "JsonValue", comment: "shape-specific props" },
-                { name: "style", type: "{ stroke, fill, opacity, ... }" },
-                { name: "transform", type: "{ x, y, rotation, scale }" },
-                { name: "locked", type: "boolean" },
-                { name: "createdAt", type: "number" },
-              ]}
-              indexes={["by_imageId", "by_layerId"]}
-            />
-            <TableCard
-              name="layers"
-              fields={[
-                { name: "_id", type: "Id<'layers'>", key: "pk" },
-                { name: "imageId", type: "Id<'images'>", key: "fk", indexed: true },
-                { name: "name", type: "string" },
-                { name: "order", type: "number" },
-                { name: "visible", type: "boolean" },
-                { name: "locked", type: "boolean" },
-                { name: "opacity", type: "number" },
-                { name: "blendMode", type: "'normal' | 'multiply' | 'screen' | ..." },
-              ]}
-              indexes={["by_imageId", "by_imageId_order"]}
-            />
-            <TableCard
-              name="history"
-              fields={[
-                { name: "_id", type: "Id<'history'>", key: "pk" },
-                { name: "imageId", type: "Id<'images'>", key: "fk", indexed: true },
+                { name: "_id", type: "Id<'recent_texts'>", key: "pk" },
                 { name: "userId", type: "Id<'users'>", key: "fk" },
-                { name: "action", type: "'create' | 'update' | 'delete' | 'ai_*'" },
-                { name: "target", type: "'annotation' | 'layer' | 'image'" },
-                { name: "targetId", type: "string" },
-                { name: "prevState", type: "JsonValue?" },
-                { name: "nextState", type: "JsonValue?" },
-                { name: "createdAt", type: "number", indexed: true },
+                { name: "text", type: "string" },
+                { name: "fontSize", type: "number" },
+                { name: "fontFamily", type: "string?" },
+                { name: "fontWeight", type: "'normal' | 'bold'" },
+                { name: "textColor", type: "string" },
+                { name: "usedAt", type: "number" },
               ]}
-              indexes={["by_imageId", "by_imageId_createdAt"]}
-              note="Undo/redo stack per image"
+              indexes={["by_userId", "by_userId_usedAt"]}
+              note="Text-tool history, per signed-in user"
+            />
+            <TableCard
+              name="shares"
+              fields={[
+                { name: "_id", type: "Id<'shares'>", key: "pk" },
+                { name: "token", type: "string", indexed: true, comment: "unguessable, public lookup key" },
+                { name: "userId", type: "Id<'users'>", key: "fk", indexed: true },
+                { name: "storageId", type: "Id<'_storage'>", key: "fk", comment: "flattened canvas PNG" },
+                { name: "canvasW", type: "number" },
+                { name: "canvasH", type: "number" },
+                { name: "title", type: "string?" },
+                { name: "views", type: "number" },
+                { name: "createdAt", type: "number" },
+              ]}
+              indexes={["by_token", "by_userId"]}
+              note="Public, no-auth read — anyone with the link can view/download"
             />
             <TableCard
               name="ai_jobs"
               fields={[
                 { name: "_id", type: "Id<'ai_jobs'>", key: "pk" },
                 { name: "userId", type: "Id<'users'>", key: "fk", indexed: true },
-                { name: "imageId", type: "Id<'images'>", key: "fk", indexed: true },
-                { name: "type", type: "'rembg' | 'upscale' | 'inpaint' | 'alt'" },
+                { name: "photoKey", type: "string", indexed: true },
+                { name: "type", type: "'rembg' | 'upscale' | 'inpaint' | 'ocr' | 'alt'" },
                 { name: "status", type: "'pending' | 'running' | 'done' | 'failed'" },
                 { name: "replicateId", type: "string?", indexed: true },
-                { name: "input", type: "JsonValue" },
-                { name: "output", type: "JsonValue?" },
+                { name: "inputStorageId", type: "Id<'_storage'>?" },
+                { name: "maskStorageId", type: "Id<'_storage'>?", comment: "inpaint mask" },
+                { name: "outputStorageId", type: "Id<'_storage'>?" },
+                { name: "output", type: "JsonValue?", comment: "non-image result, e.g. OCR text" },
                 { name: "error", type: "string?" },
                 { name: "startedAt", type: "number?" },
                 { name: "completedAt", type: "number?" },
                 { name: "createdAt", type: "number" },
               ]}
-              indexes={["by_userId", "by_imageId", "by_replicateId", "by_status"]}
-              note="Webhook updates status"
+              indexes={["by_userId", "by_userId_photoKey", "by_replicateId", "by_status"]}
+              note="Keyed by photoKey, not a real images row — Replicate webhook updates status"
             />
           </div>
 
           {/* Relationship Diagram */}
           <div className="mt-6 rounded-lg border border-pink-500/20 bg-pink-500/5 p-4">
             <div className="text-pink-400 text-xs font-semibold mb-3">Entity Relationships</div>
+            <p className="text-[10px] text-zinc-500 mb-3">
+              Flatter than a typical projects→images tree: every row below hangs straight off{" "}
+              <code className="text-pink-300/70">users</code>, keyed by the client's own{" "}
+              <code className="text-pink-300/70">photoKey</code> string rather than a server-side image id.
+            </p>
             <div className="flex items-center justify-center gap-2 text-xs text-zinc-400 flex-wrap">
-              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">users</span>
-              <span className="text-zinc-600">1 ─── ∞</span>
-              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">projects</span>
-              <span className="text-zinc-600">1 ─── ∞</span>
-              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">images</span>
-              <span className="text-zinc-600">1 ─── ∞</span>
-              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">layers</span>
-              <span className="text-zinc-600">1 ─── ∞</span>
-              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">annotations</span>
-            </div>
-            <div className="flex items-center justify-center gap-2 text-xs text-zinc-400 mt-2 flex-wrap">
               <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">users</span>
               <span className="text-zinc-600">1 ─── 1</span>
               <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">subscriptions</span>
               <span className="mx-4 text-zinc-700">|</span>
-              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">images</span>
+              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">users</span>
               <span className="text-zinc-600">1 ─── ∞</span>
-              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">history</span>
+              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">photo_edits</span>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-xs text-zinc-400 mt-2 flex-wrap">
+              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">users</span>
+              <span className="text-zinc-600">1 ─── ∞</span>
+              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">recent_texts</span>
               <span className="mx-4 text-zinc-700">|</span>
-              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">images</span>
+              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">users</span>
+              <span className="text-zinc-600">1 ─── ∞</span>
+              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">shares</span>
+              <span className="mx-4 text-zinc-700">|</span>
+              <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">users</span>
               <span className="text-zinc-600">1 ─── ∞</span>
               <span className="px-2 py-1 rounded bg-pink-500/20 text-pink-300">ai_jobs</span>
             </div>
@@ -544,8 +549,8 @@ export default function Architecture() {
               <div className="text-zinc-500">Integrated blob storage for images via storage.getUrl().</div>
             </div>
             <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
-              <div className="text-pink-400 font-medium mb-1">🕐 Scheduled Jobs</div>
-              <div className="text-zinc-500">Cron for daily usage reset, AI job cleanup, 3-day session-edit expiry.</div>
+              <div className="text-pink-400 font-medium mb-1">🔗 Webhooks</div>
+              <div className="text-zinc-500">Replicate + Stripe post back to convex/http.ts (HMAC-verified), updating ai_jobs / subscriptions.</div>
             </div>
           </div>
         </div>
@@ -554,19 +559,22 @@ export default function Architecture() {
 
         {/* ROW 6: Webhooks */}
         <Label color="zinc">Event Handlers (Webhooks)</Label>
-        <div className="grid grid-cols-4 gap-4 mt-2">
-          <Node title="Clerk Webhook" subtitle="User Sync → users table" size="sm" color="zinc" />
+        <div className="grid grid-cols-2 gap-4 mt-2 max-w-xl">
           <Node title="Stripe Webhook" subtitle="Sub changes → subscriptions" size="sm" color="zinc" />
-          <Node title="UploadThing Webhook" subtitle="File Ready → images table" size="sm" color="zinc" />
-          <Node title="Replicate Webhook" subtitle="AI Complete → ai_jobs table" size="sm" color="zinc" />
+          <Node title="Replicate Webhook" subtitle="AI complete → ai_jobs.status" size="sm" color="zinc" />
         </div>
+        <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">
+          Clerk sign-in isn't a webhook here — the client calls{" "}
+          <code className="text-zinc-400">users.upsert</code> once Convex's own auth bridge comes up,
+          which is what actually creates the <code className="text-zinc-400">users</code> row.
+        </p>
 
         {/* Legend */}
         <div className="mt-10 pt-6 border-t border-zinc-800">
           <div className="flex flex-wrap gap-6 text-xs text-zinc-500">
             <LegendItem color="#3b82f6" label="Client Flow" />
             <LegendItem color="#f97316" label="WASM / Rust" />
-            <LegendItem color="#10b981" label="API Flow" />
+            <LegendItem color="#10b981" label="Convex Functions" />
             <LegendItem color="#8b5cf6" label="AI Processing" />
             <LegendItem color="#f59e0b" label="Storage" />
             <LegendItem color="#ec4899" label="Database" />

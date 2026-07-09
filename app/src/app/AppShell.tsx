@@ -6,7 +6,7 @@
 //   All other existing functionality preserved
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
-import { useStoreUser } from "@/hooks/useStoreUser";
+import { useStoreUser, useRealTier } from "@/hooks/useStoreUser";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
@@ -200,11 +200,20 @@ function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
   const { isLoaded, isSignedIn } = useUser();
   // Create/refresh the Convex users row on sign-in (tier lives there).
   useStoreUser();
+  // Real DB tier: pro/team lifts the mode to "paid" so client gating matches
+  // what the server will actually allow (AI panel, caps). Without this, paid
+  // accounts stayed visually locked — only the Super User override could
+  // reach "paid".
+  const tier = useRealTier();
 
   useEffect(() => {
     if (!isLoaded) return;
-    onMode(isSignedIn ? "loggedIn" : "demo");
-  }, [isLoaded, isSignedIn, onMode]);
+    if (!isSignedIn) {
+      onMode("demo");
+      return;
+    }
+    onMode(tier === "pro" || tier === "team" ? "paid" : "loggedIn");
+  }, [isLoaded, isSignedIn, tier, onMode]);
 
   return null;
 }

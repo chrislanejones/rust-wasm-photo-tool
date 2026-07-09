@@ -17,15 +17,20 @@ type Phase = "idle" | "uploading" | "running" | "done" | "error";
 async function urlToPixels(url: string): Promise<AIResultPixels> {
   const blob = await (await fetch(url)).blob();
   const bitmap = await createImageBitmap(blob);
+  // Capture BEFORE close() — a closed ImageBitmap reports width/height 0,
+  // which used to propagate a 0×0 "result" into loadImageFromPixels and
+  // blank the canvas.
+  const width = bitmap.width;
+  const height = bitmap.height;
   const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
+  canvas.width = width;
+  canvas.height = height;
   const cx = canvas.getContext("2d");
   if (!cx) throw new Error("2D canvas unavailable");
   cx.drawImage(bitmap, 0, 0);
-  const data = cx.getImageData(0, 0, bitmap.width, bitmap.height);
+  const data = cx.getImageData(0, 0, width, height);
   bitmap.close?.();
-  return { pixels: data.data, width: bitmap.width, height: bitmap.height };
+  return { pixels: data.data, width, height };
 }
 
 /**

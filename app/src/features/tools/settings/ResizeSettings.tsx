@@ -11,6 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { getWebPerfMetrics } from "@/lib/webPerf";
 import { settingsPanelMotion } from "@/lib/animations";
 import type { ExportFormat } from "@/lib/exportImage";
@@ -332,6 +333,7 @@ export function ResizeSettings({
               {/* ── Quality ── */}
               <SizeSlider
                 label="Quality"
+                labelInfo="Lower quality = smaller file. Drag & release — recalculates Web Performance Gain and PageSpeed Insights Score below."
                 value={quality}
                 onChange={handleQualityChange}
                 min={10}
@@ -344,9 +346,13 @@ export function ResizeSettings({
               {/* ── Web Performance Gain ── */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between text-2xs">
-                  <h4 className="text-theme-muted-foreground">
+                  <span className="flex items-center gap-1 text-theme-muted-foreground">
                     Web Performance Gain
-                  </h4>
+                    <InfoTooltip
+                      info="Estimated byte savings vs. the current file, based on the pending size/quality/format below."
+                      label="Web Performance Gain"
+                    />
+                  </span>
                   <span className="text-theme-foreground tabular-nums">
                     +{savingsPercent}%
                   </span>
@@ -362,9 +368,13 @@ export function ResizeSettings({
               {/* ── PageSpeed Insights Score ── */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between text-2xs">
-                  <h4 className="text-theme-muted-foreground">
+                  <span className="flex items-center gap-1 text-theme-muted-foreground">
                     PageSpeed Insights Score
-                  </h4>
+                    <InfoTooltip
+                      info="Estimated Lighthouse score (0–100) for the pending output — weighs dimensions, format, and quality the way the real audit does."
+                      label="PageSpeed Insights Score"
+                    />
+                  </span>
                   <span className="text-theme-foreground tabular-nums">
                     {lighthouseScore}%
                   </span>
