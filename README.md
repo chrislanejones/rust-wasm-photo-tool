@@ -50,13 +50,15 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.11 — 2026-07-09
+### v7.12 — 2026-07-09
 
-**OpenRaster (.ora) export/import** ships: round-trip the full layer stack (per-layer PNGs + `stack.xml` + merged composite + thumbnail) with Krita, GIMP, and other editors, via Settings → Import/Export. Import always lands as a **new gallery photo** — it never overwrites the currently open one, matching every other import path (Browse Files, Paste, Sample Images, drag-drop). Found and fixed a real race during implementation: AppShell's "auto-select first photo when none is active" effect can fire in the await gap inside `handleAddPhotos`, redundantly reloading the just-created photo and discarding the layer restore — `importOraAsNewPhoto` now detects and recovers from it. PNG decode-to-RGBA moved into Rust (`decode_png_to_rgba`, using the already-present `png` crate) so import's decode and export's encode are the same codec instead of two that could silently disagree on alpha handling. WASM: +83,753 B (+15.1%) — confirmed as genuine decode machinery (`fdeflate`, `StreamingDecoder`, Adam7 interlace expansion), not incidental bloat.
+**Remove Canvas** joins Resize Canvas in Settings → Layers and Canvas — a plain destructive button (side-by-side, no icon) that deletes the artboard's Background layer outright, for when you want to keep the layers above it but drop the backdrop.
 
-Also: the Review panel's History/Layers/Reselect/Histogram toggle row had no working tooltips and, in compact/icon-only mode, **no accessible name at all** — a regression from an earlier icon-only UI pass that never got the tooltip data `ToggleButtonGroup` needs. Fixed, plus `aria-label` now always set regardless of tooltip presence (was previously never set on any `ToggleButtonGroup` button).
+Every AI tool button (Remove Background, Extract Text, Remove Object) now shows a padlock icon when you're not signed in or not on the Paid plan, instead of just going quietly disabled — the tier gate was already correct, it just wasn't visible at a glance.
 
-> **About this release.** Your projects now round-trip with Krita/GIMP through `.ora`, and a batch of icon-only toolbar buttons are properly labeled again.
+Playwright end-to-end smoke tests landed (`e2e/smoke.spec.ts`): boot, image load, and core tool coverage now run against the real production build, not just unit tests.
+
+> **About this release.** A cleaner way to drop the canvas backdrop, clearer paid-tier buttons, and a real end-to-end test harness watching your back.
 
 ## License
 

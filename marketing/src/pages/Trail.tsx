@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.56",
+    date: "2026-07-09",
+    headline: "A cleaner way to drop the canvas, and clearer paid buttons",
+    entries: [
+      { tag: "feature", text: "Next to Resize Canvas, there's now a Remove Canvas button. It deletes the background layer outright, so you can keep everything you've drawn or pasted above it without a blank backdrop underneath." },
+      { tag: "ui", text: "The AI tool buttons (background removal, text extraction, object removal) now show a small padlock when you're not signed in or not on the paid plan, instead of just going faintly gray for no visible reason." },
+    ],
+  },
+  {
     version: "v0.9.55",
     date: "2026-07-09",
     headline: "Save and open real projects — full layer stacks, no flattening",

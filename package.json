@@ -9,9 +9,11 @@
     "build": "pnpm --filter stamp-tool build",
     "build:marketing": "pnpm --filter photo-horse-marketing build",
     "build:wasm": "wasm-pack build --target web --out-dir pkg",
-    "build:all": "pnpm run build:wasm && pnpm run build"
+    "build:all": "pnpm run build:wasm && pnpm run build",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "convex": "catalog:"
   }
 }

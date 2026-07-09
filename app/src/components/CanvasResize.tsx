@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { Scaling } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DimensionFields } from "@/components/DimensionFields";
 
@@ -11,6 +10,10 @@ interface Props {
   /** Apply the canvas-size change — runs in Rust (`resize_canvas`), which
    *  re-lays the photo at its native resolution (NO resample). */
   onApply: (w: number, h: number) => void;
+  /** Deletes the artboard's Background layer outright (not a resize-to-zero —
+   *  a real layer removal). Only meaningful on an artboard doc. */
+  onRemove: () => void;
+  canRemove: boolean;
 }
 
 /**
@@ -22,7 +25,14 @@ interface Props {
  * NOT resample the image. The work runs in Rust (`resize_canvas`); this only
  * collects the target dimensions.
  */
-export function CanvasResize({ width, height, disabled, onApply }: Props) {
+export function CanvasResize({
+  width,
+  height,
+  disabled,
+  onApply,
+  onRemove,
+  canRemove,
+}: Props) {
   const [w, setW] = useState(String(width));
   const [h, setH] = useState(String(height));
   const [lockAspect, setLockAspect] = useState(true);
@@ -87,14 +97,25 @@ export function CanvasResize({ width, height, disabled, onApply }: Props) {
         onToggleLock={() => setLockAspect((v) => !v)}
       />
 
-      <Button size="large"
-        className="w-full"
-        disabled={disabled || !changed}
-        onClick={() => onApply(targetW, targetH)}
-      >
-        <Scaling className="h-4 w-4" /> Resize canvas
-        {changed ? ` → ${targetW}×${targetH}` : ""}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          size="large"
+          className="flex-1"
+          disabled={disabled || !changed}
+          onClick={() => onApply(targetW, targetH)}
+        >
+          Resize canvas
+          {changed ? ` → ${targetW}×${targetH}` : ""}
+        </Button>
+        <Button
+          size="large"
+          className="flex-1 border-destructive/40 bg-destructive/15 text-destructive hover:border-destructive hover:bg-destructive/25 hover:brightness-100"
+          disabled={disabled || !canRemove}
+          onClick={onRemove}
+        >
+          Remove canvas
+        </Button>
+      </div>
     </div>
   );
 }

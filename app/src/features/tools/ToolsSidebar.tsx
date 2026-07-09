@@ -79,6 +79,9 @@ interface ToolsSidebarProps {
   onResize: (newW: number, newH: number, filter: number) => void;
   /** Photoshop-style Canvas Size resize (no resample) — Layer Settings tool. */
   onResizeCanvas: (w: number, h: number) => void;
+  /** Deletes the artboard's Background layer outright. */
+  onRemoveCanvas: () => void;
+  canRemoveCanvas: boolean;
   imageWidth: number;
   imageHeight: number;
   currentByteSize: number;
@@ -166,6 +169,8 @@ export function ToolsSidebar({
   imageReady,
   onResize,
   onResizeCanvas,
+  onRemoveCanvas,
+  canRemoveCanvas,
   imageWidth,
   imageHeight,
   currentByteSize,
@@ -324,6 +329,8 @@ export function ToolsSidebar({
             canvasWidth={imageWidth}
             canvasHeight={imageHeight}
             onResizeCanvas={onResizeCanvas}
+            onRemoveCanvas={onRemoveCanvas}
+            canRemoveCanvas={canRemoveCanvas}
           />
         )}
 

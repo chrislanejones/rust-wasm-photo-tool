@@ -112,6 +112,7 @@ export function AISettings({
           disabled={!canRun || busy}
           className="mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
+          {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
           {busy && lastType === "rembg" && (
             <Spinner size={14} />
           )}
@@ -147,6 +148,7 @@ export function AISettings({
           disabled={!canRun || busy}
           className="mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
+          {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
           {busy && lastType === "ocr" && (
             <Spinner size={14} />
           )}
@@ -203,6 +205,7 @@ export function AISettings({
           disabled={!canRun || busy}
           className="mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
+          {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
           {busy && lastType === "inpaint" && (
             <Spinner size={14} />
           )}

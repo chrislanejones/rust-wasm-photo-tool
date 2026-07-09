@@ -46,9 +46,17 @@ pkg-scalar/
 RUN_SCHEDULE.md
 NIGHT*_PROMPT.md
 DAY*_PROMPT.md
+E2E_PROMPT.md
 SESSION_LOG.md
 PARKING_LOT.md
 
 # Overnight-run tooling (any *_PROMPT.md + the status dashboard)
 *_PROMPT.md
 runs-status.sh
+
+# Playwright e2e artifacts
+/test-results/
+/playwright-report/
+/playwright/.cache/
+e2e.log
+install.log

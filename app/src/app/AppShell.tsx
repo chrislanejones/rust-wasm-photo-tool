@@ -1723,6 +1723,26 @@ export function AppShell() {
     [stamp, prefs.canvasBgColor, activePhotoId, persistActiveCanvas],
   );
 
+  // The "Remove Canvas" companion to Resize Canvas — deletes the artboard's
+  // Background layer outright (not a resize-to-zero-padding; the user chose
+  // "delete the layer" over "shrink to native size" when this was scoped).
+  // Only ever meaningful on an artboard doc (Background + Photo, or more);
+  // `remove_layer` itself already refuses to drop the last remaining layer.
+  const backgroundLayerId = stamp.state.layers.find(
+    (l) => l.name === "Background",
+  )?.id;
+  const handleRemoveCanvas = useCallback(async () => {
+    if (backgroundLayerId === undefined) return;
+    stamp.removeLayer(backgroundLayerId);
+    setHasBeenModified(true);
+    if (activePhotoId) {
+      setModifiedPhotos((prev) =>
+        prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
+      );
+    }
+    await persistActiveCanvas();
+  }, [stamp, backgroundLayerId, activePhotoId, persistActiveCanvas]);
+
   // ── Live "Canvas border" / "Backing color" re-apply ────────────────────────
   // Changing the border (canvasPadding) or backing color (canvasBgColor), or
   // toggling "Canvas on import" (canvasArtboard) on, while a photo is loaded
@@ -2486,6 +2506,8 @@ export function AppShell() {
             imageReady={hasImage}
             onResize={handleApplyCompression}
             onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
+            onRemoveCanvas={() => void handleRemoveCanvas()}
+            canRemoveCanvas={backgroundLayerId !== undefined}
             imageWidth={stamp.state.width}
             imageHeight={stamp.state.height}
             currentByteSize={activeEntry?.byteSize ?? 0}

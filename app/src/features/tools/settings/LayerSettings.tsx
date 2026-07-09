@@ -51,6 +51,9 @@ interface LayerSettingsProps {
   canvasWidth: number;
   canvasHeight: number;
   onResizeCanvas: (w: number, h: number) => void;
+  /** Deletes the artboard's Background layer outright. */
+  onRemoveCanvas: () => void;
+  canRemoveCanvas: boolean;
 }
 
 /**
@@ -72,6 +75,8 @@ export function LayerSettings({
   canvasWidth,
   canvasHeight,
   onResizeCanvas,
+  onRemoveCanvas,
+  canRemoveCanvas,
 }: LayerSettingsProps) {
   // Guide state lives in the dedicated Zustand slice (shared with the canvas
   // overlay), so we read it directly rather than prop-drilling.
@@ -271,6 +276,8 @@ export function LayerSettings({
           height={canvasHeight}
           disabled={disabled}
           onApply={onResizeCanvas}
+          onRemove={onRemoveCanvas}
+          canRemove={canRemoveCanvas}
         />
       </div>
     </div>
