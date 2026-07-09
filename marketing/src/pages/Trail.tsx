@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.57",
+    date: "2026-07-09",
+    headline: "A setting moved to where it belongs, and cleaner canvas removal",
+    entries: [
+      { tag: "ui", text: "The \"include the canvas backdrop in exports\" setting moved from General settings to the Layers and Canvas tab, right next to the other canvas-backdrop controls. Same setting, just where you'd actually go looking for it." },
+      { tag: "fix", text: "Removing the canvas backdrop now also trims the document back down to your actual photo. Before this, a removed backdrop could leave invisible extra space around your image that showed up again in exports." },
+    ],
+  },
+  {
     version: "v0.9.56",
     date: "2026-07-09",
     headline: "A cleaner way to drop the canvas, and clearer paid buttons",

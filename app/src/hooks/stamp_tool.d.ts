@@ -184,6 +184,11 @@ declare module "stamp_tool" {
     delete_history_entry(index: number): boolean;
     clear_history(): void;
     get_image_data(): Uint8Array;
+    /** Composite cropped to content with the artboard's backing "Background"
+     *  layer left out. Dimensions: export_width/height_excluding_background. */
+    get_image_data_excluding_background(): Uint8Array;
+    export_width_excluding_background(): number;
+    export_height_excluding_background(): number;
     /** Returns true if any pixel in the loaded image has alpha < 255. */
     has_transparency(): boolean;
     export_png(): Uint8Array;

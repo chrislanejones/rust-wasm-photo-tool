@@ -771,3 +771,22 @@ build clean, 3/3 Playwright smoke tests passing.
 | 1   | **Remove Canvas button** — `CanvasResize.tsx`'s single full-width "Resize canvas" button is now a side-by-side pair (no icons): Resize canvas stays as-is, and a new destructive-styled **Remove canvas** button sits next to it. Wired through `LayerSettings` → `ToolsSidebar` → `AppShell.handleRemoveCanvas`, which deletes the artboard's Background layer outright (`stamp.removeLayer(backgroundLayerId)`) — not a resize-to-zero, a real layer removal — then marks the photo modified and persists. Disabled when there's no Background layer to remove | Complete |
 | 2   | **Padlock icons on tier-gated AI buttons** — `AISettings.tsx`'s three live-AI buttons (Remove Background, Extract Text, Remove Object) now render a `Lock` icon before the label whenever `!aiEnabled`, matching the padlock already used elsewhere for paid-tier gating. The gate itself (`aiEnabled` = signed-in + Paid, from `lib/tiers.ts`) was already correct — the buttons just went quietly `disabled:opacity-40` with no visual reason why | Complete |
 | 3   | **Playwright e2e smoke suite merged** — `e2e/smoke.spec.ts` + `e2e/fixtures/checker.png` + `playwright.config.ts` (self-contained `webServer`: builds and serves `vite preview` on port 4173). Covers boot, image load via file picker, and core tool interaction against the real production build. Brought in from the `test/playwright-smoke` worktree; one trivial `.gitignore` merge conflict (kept both the `*_PROMPT.md`/`runs-status.sh` block and the new Playwright-artifacts block) | Complete |
+
+## v7.13 Change Summary — 2026-07-09
+
+Canvas background on export, relocated + finished: the setting moves from
+Settings → General to Settings → Layers and Canvas, and Remove Canvas now
+shrinks the document to content so a deleted backdrop can't linger.
+Verified: `cargo fmt --check`/`clippy -D warnings`/`test` clean (75 tests),
+`wasm-pack build` clean (639,855 → 642,054 B, +2,199 B / +0.3% — the new
+compositing/tight-bbox functions), `tsc --noEmit` clean, production build
+clean. Live-verified in a real browser: Settings → Layers and Canvas shows
+the new "Canvas background on export" section, the toggle switches state
+on click, and the General tab no longer shows it (moved, not duplicated).
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **`exportCanvasBackground` preference relocated** — `GeneralPane.tsx` → `LayersCanvasPane.tsx` (Settings → Layers and Canvas). Same `Preferences` value/onChange contract both panes already share, so this was a clean move: the toggle, its copy, and the `Frame`/`Image` icons went with it; `GeneralPane.tsx` reverted to its pre-existing baseline with no orphaned imports | Complete |
+| 2   | **Rust: crop-to-content export excluding the Background layer** — `get_image_data_excluding_background`/`export_width_excluding_background`/`export_height_excluding_background` composite every layer except the artboard's backing "Background" (bottom layer, that exact name), then crop to the tight bounding box of what's left via a new `tight_bbox` scan. A no-op (full untrimmed composite) when there's no backing layer to exclude. Backs the default (off) `exportCanvasBackground` path for clipboard copy and download/share — cropping matters, not just zeroing the fill, or JPEG/other alpha-less formats would still bake in a black border at the padded size | Complete |
+| 3   | **`remove_layer` shrinks to content when the Background layer goes** — deleting the artboard's backing layer (bottom of the stack, named "Background") now also crops the document to its remaining content's tight bounding box via a new `shrink_to_content`, so the padded canvas that layer's fill occupied doesn't linger as excess transparent space in every export afterward. Ordinary (non-backing) layer deletions are untouched — verified by a dedicated test. `crop` refactored to share the same `crop_in_place` helper so this compound delete+shrink records as a single undo step | Complete |
+| 4   | **JS wiring: clipboard copy, download/export, and Share all read the preference** — `useCanvasActions.ts`'s `handleCopyToClipboard`/`handleExport` and `AppShell.tsx`'s `ShareButton` props all branch on `exportCanvasBackground`, using the new Rust exports' own reported width/height (not `stamp.state.width/height`) when it's off, since the excluded-background composite is a different, usually smaller, size | Complete |

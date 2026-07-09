@@ -449,6 +449,124 @@ impl ImageHorseTool {
         self.stamp.source_x = None;
         self.stamp.source_y = None;
     }
+
+    /// Crop every layer + the document to `(x, y, w, h)` without pushing a
+    /// history snapshot — callers that need one push their own label first
+    /// (see `crop`) so a compound operation (e.g. delete-layer +
+    /// shrink-to-content) records as a single undo step.
+    pub(crate) fn crop_in_place(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        let (ow, oh) = (self.width, self.height);
+        let mut nw = self.width;
+        let mut nh = self.height;
+        // Mirror `transform::crop`'s own x/y clamping so the annotation offset
+        // matches the pixel crop exactly even when the requested rect
+        // overhangs the canvas.
+        let (dx, dy) = if ow == 0 || oh == 0 {
+            (0, 0)
+        } else {
+            let cx = x.min(ow - 1);
+            let cy = y.min(oh - 1);
+            (-(cx as i32), -(cy as i32))
+        };
+        for layer in &mut self.layers {
+            let (new_data, cw, ch) = transform::crop(&layer.buf.data, ow, oh, x, y, w, h);
+            layer.buf.data = new_data;
+            layer.buf.width = cw;
+            layer.buf.height = ch;
+            nw = cw;
+            nh = ch;
+            for a in &mut layer.text_annotations {
+                a.x += dx;
+                a.y += dy;
+            }
+            for s in &mut layer.shape_annotations {
+                s.x0 += dx as f64;
+                s.y0 += dy as f64;
+                s.x1 += dx as f64;
+                s.y1 += dy as f64;
+                for p in &mut s.points {
+                    p.0 += dx as f64;
+                    p.1 += dy as f64;
+                }
+            }
+        }
+        self.width = nw;
+        self.height = nh;
+        self.stamp.source_x = None;
+        self.stamp.source_y = None;
+    }
+
+    /// Shrink the document to the tight bounding box of its own composite's
+    /// opaque pixels. Used after the artboard's backing "Background" layer is
+    /// deleted — the inverse of `set_artboard_border` / `load_image_artboard`
+    /// growing one — so the padded canvas doesn't linger (and keep exporting)
+    /// once its fill is gone. No-op if the composite is fully transparent, or
+    /// already tight.
+    pub(crate) fn shrink_to_content(&mut self) {
+        let (w, h) = (self.width, self.height);
+        if w == 0 || h == 0 {
+            return;
+        }
+        let composite = composite_layers(
+            &self.layers,
+            w,
+            h,
+            self.editing_shape_id,
+            self.editing_text_id,
+        );
+        let Some((x, y, cw, ch)) = tight_bbox(&composite, w, h) else {
+            return;
+        };
+        if x == 0 && y == 0 && cw == w && ch == h {
+            return; // Already tight — nothing to shrink.
+        }
+        self.crop_in_place(x, y, cw, ch);
+    }
+
+    /// Composite every layer except the artboard's backing "Background" (see
+    /// `get_image_data_excluding_background`), cropped to the tight bounding
+    /// box of what's left. Cropping matters — leaving the full canvas with
+    /// just the fill zeroed out would still export at the padded size (a
+    /// black border baked in on any format without alpha, e.g. JPEG). Falls
+    /// back to the full, untrimmed composite when there's no backing layer
+    /// to exclude, or nothing to crop to.
+    fn composite_excluding_background(&self) -> (Vec<u8>, u32, u32) {
+        let (w, h) = (self.width, self.height);
+        let layers: &[Layer] = if self.layers.len() > 1 && self.layers[0].name == "Background" {
+            &self.layers[1..]
+        } else {
+            &self.layers[..]
+        };
+        let full = composite_layers(layers, w, h, self.editing_shape_id, self.editing_text_id);
+        match tight_bbox(&full, w, h) {
+            Some((x, y, cw, ch)) if !(x == 0 && y == 0 && cw == w && ch == h) => {
+                let (cropped, ncw, nch) = transform::crop(&full, w, h, x, y, cw, ch);
+                (cropped, ncw, nch)
+            }
+            _ => (full, w, h),
+        }
+    }
+}
+
+/// Tight bounding box `(x, y, w, h)` of every pixel with non-zero alpha in an
+/// RGBA `w×h` buffer. `None` if every pixel is fully transparent (nothing to
+/// crop to).
+fn tight_bbox(data: &[u8], w: u32, h: u32) -> Option<(u32, u32, u32, u32)> {
+    let (mut minx, mut miny, mut maxx, mut maxy) = (u32::MAX, u32::MAX, 0u32, 0u32);
+    let mut found = false;
+    for y in 0..h {
+        let row = (y * w) as usize * 4;
+        for x in 0..w {
+            if data[row + x as usize * 4 + 3] != 0 {
+                found = true;
+                minx = minx.min(x);
+                miny = miny.min(y);
+                maxx = maxx.max(x);
+                maxy = maxy.max(y);
+            }
+        }
+    }
+    found.then(|| (minx, miny, maxx - minx + 1, maxy - miny + 1))
 }
 
 #[wasm_bindgen]
@@ -609,6 +727,32 @@ impl ImageHorseTool {
             self.editing_shape_id,
             self.editing_text_id,
         )
+    }
+
+    /// Flattened composite (RGBA), cropped to its own tight content, with the
+    /// artboard's backing "Background" layer left out — same convention
+    /// `resize_canvas`/`set_artboard_border` use (bottom layer, named
+    /// "Background", only when the doc has more than one layer). Backs
+    /// Settings → General → "Canvas background on export": off by default,
+    /// the padded backing canvas is a compositional guide, not real content,
+    /// so exports crop to just the photo — not the full canvas with the fill
+    /// merely zeroed out. Its dimensions are
+    /// `export_width_excluding_background`/`export_height_excluding_background`
+    /// (same convention as `thumbnail_width`/`thumbnail_height`/
+    /// `thumbnail_data`). A no-op (full, untrimmed composite) when there's no
+    /// backing layer to exclude.
+    pub fn get_image_data_excluding_background(&self) -> Vec<u8> {
+        self.composite_excluding_background().0
+    }
+
+    /// Width of `get_image_data_excluding_background`'s cropped composite.
+    pub fn export_width_excluding_background(&self) -> u32 {
+        self.composite_excluding_background().1
+    }
+
+    /// Height of `get_image_data_excluding_background`'s cropped composite.
+    pub fn export_height_excluding_background(&self) -> u32 {
+        self.composite_excluding_background().2
     }
 
     /// Returns true if the flattened composite has any pixel with alpha < 255.
@@ -1203,45 +1347,7 @@ impl ImageHorseTool {
 
     pub fn crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
         self.snap("Crop");
-        let (ow, oh) = (self.width, self.height);
-        let mut nw = self.width;
-        let mut nh = self.height;
-        // Mirror `transform::crop`'s own x/y clamping so the annotation offset
-        // matches the pixel crop exactly even when the requested rect
-        // overhangs the canvas.
-        let (dx, dy) = if ow == 0 || oh == 0 {
-            (0, 0)
-        } else {
-            let cx = x.min(ow - 1);
-            let cy = y.min(oh - 1);
-            (-(cx as i32), -(cy as i32))
-        };
-        for layer in &mut self.layers {
-            let (new_data, cw, ch) = transform::crop(&layer.buf.data, ow, oh, x, y, w, h);
-            layer.buf.data = new_data;
-            layer.buf.width = cw;
-            layer.buf.height = ch;
-            nw = cw;
-            nh = ch;
-            for a in &mut layer.text_annotations {
-                a.x += dx;
-                a.y += dy;
-            }
-            for s in &mut layer.shape_annotations {
-                s.x0 += dx as f64;
-                s.y0 += dy as f64;
-                s.x1 += dx as f64;
-                s.y1 += dy as f64;
-                for p in &mut s.points {
-                    p.0 += dx as f64;
-                    p.1 += dy as f64;
-                }
-            }
-        }
-        self.width = nw;
-        self.height = nh;
-        self.stamp.source_x = None;
-        self.stamp.source_y = None;
+        self.crop_in_place(x, y, w, h);
     }
 
     /// Preview crop overlay in WASM.
@@ -2611,6 +2717,77 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(2, 2);
         assert!(!t.remove_layer(t.active_layer_id()));
         assert_eq!(t.layer_count(), 1);
+    }
+
+    #[test]
+    fn remove_backing_layer_shrinks_canvas_to_content() {
+        // A 4×4 photo on a 10px artboard border → 24×24 doc, Background + Photo.
+        let mut t = ImageHorseTool::new(24, 24);
+        t.load_image_artboard(&solid(4, 4, [0, 128, 0, 255]), 4, 4, 10, 200, 200, 200, 255);
+        assert_eq!((t.width, t.height), (24, 24), "jumbo doc with backing");
+        assert_eq!(t.layer_count(), 2, "Background + Photo");
+
+        let bg_id = t.layers[0].id;
+        assert!(t.remove_layer(bg_id));
+
+        assert_eq!(t.layer_count(), 1, "Background removed");
+        assert_eq!(
+            (t.width, t.height),
+            (4, 4),
+            "canvas shrinks back to the photo's tight content — the border must not \
+             linger (and reappear in every export) once its fill is gone"
+        );
+        assert_eq!(px(&t, 0, 0), [0, 128, 0, 255], "photo content preserved");
+    }
+
+    #[test]
+    fn remove_non_backing_layer_leaves_canvas_size_untouched() {
+        // Deleting an ordinary (non-backing) layer must NOT trigger a resize —
+        // only removing the bottom "Background" layer of a multi-layer doc does.
+        let mut t = ImageHorseTool::new(24, 24);
+        t.load_image_artboard(&solid(4, 4, [0, 128, 0, 255]), 4, 4, 10, 200, 200, 200, 255);
+        let photo_id = t.layers[1].id;
+
+        assert!(t.remove_layer(photo_id));
+
+        assert_eq!(t.layer_count(), 1, "Photo removed, Background remains");
+        assert_eq!((t.width, t.height), (24, 24), "canvas size untouched");
+    }
+
+    #[test]
+    fn get_image_data_excluding_background_crops_to_the_photo() {
+        // A 4×4 photo on a 2px artboard border → 8×8 doc, Background + Photo.
+        let mut t = ImageHorseTool::new(8, 8);
+        t.load_image_artboard(&solid(4, 4, [0, 128, 0, 255]), 4, 4, 2, 200, 200, 200, 255);
+
+        // The full composite still includes the padded backing fill.
+        let full = t.get_image_data();
+        assert_eq!(
+            &full[0..4],
+            &[200, 200, 200, 255][..],
+            "full composite includes backing"
+        );
+
+        // Excluding the backing crops down to just the 4×4 photo — not the
+        // full 8×8 canvas with the fill zeroed out (which would still export
+        // at the padded size, a black border baked in on formats without
+        // alpha like JPEG).
+        assert_eq!(t.export_width_excluding_background(), 4);
+        assert_eq!(t.export_height_excluding_background(), 4);
+        let excl = t.get_image_data_excluding_background();
+        assert_eq!(excl.len(), 4 * 4 * 4, "cropped to the photo's own size");
+        for px in excl.chunks_exact(4) {
+            assert_eq!(px, [0, 128, 0, 255], "every pixel is the photo, no border");
+        }
+    }
+
+    #[test]
+    fn get_image_data_excluding_background_is_a_noop_without_a_backing_layer() {
+        // Single-layer (photo-only) doc: excluding "the backing" has nothing
+        // to exclude, so both composites must match exactly.
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [10, 20, 30, 255]));
+        assert_eq!(t.get_image_data(), t.get_image_data_excluding_background());
     }
 
     #[test]

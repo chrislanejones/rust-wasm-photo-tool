@@ -15,6 +15,10 @@ import type { Preferences } from "@/lib/preferences";
  * - Backing canvas color — the Background layer's fill (`canvasBgColor`); the
  *   first swatch is the transparent/checkerboard default. The fill itself is
  *   done in Rust (`set_artboard_border`); this only picks the color.
+ * - Canvas background on export (`exportCanvasBackground`) — whether the
+ *   backing canvas is baked into downloads/shares/copies, or left out (the
+ *   default). The crop-to-content compositing is Rust-side
+ *   (`get_image_data_excluding_background`).
  */
 interface LayersCanvasPaneProps {
   /** The draft being edited (owned by the Settings modal). */
@@ -96,6 +100,39 @@ export function LayersCanvasPane({
             </p>
           </>
         )}
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">
+            Canvas background on export
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-text-muted">
+            The backing canvas above (“Canvas + photo”) is a compositional
+            guide. “Photo only” leaves it out of downloads, shares, and
+            copies — the default. “Include canvas” bakes the full padded
+            backing into the exported image too.
+          </p>
+        </div>
+        <ToggleButtonGroup
+          fill
+          items={[
+            {
+              key: "photo-only",
+              icon: ImageIcon,
+              label: "Photo only",
+              active: !value.exportCanvasBackground,
+              onToggle: () => onChange({ exportCanvasBackground: false }),
+            },
+            {
+              key: "with-canvas",
+              icon: Frame,
+              label: "Include canvas",
+              active: value.exportCanvasBackground,
+              onToggle: () => onChange({ exportCanvasBackground: true }),
+            },
+          ]}
+        />
       </section>
     </div>
   );

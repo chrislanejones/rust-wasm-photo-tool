@@ -50,15 +50,11 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.12 — 2026-07-09
+### v7.13 — 2026-07-09
 
-**Remove Canvas** joins Resize Canvas in Settings → Layers and Canvas — a plain destructive button (side-by-side, no icon) that deletes the artboard's Background layer outright, for when you want to keep the layers above it but drop the backdrop.
+**Canvas background on export** moves to Settings → Layers and Canvas, next to the other canvas-backdrop controls (Canvas on import, border, backing color) — same place, doesn't feel like an orphaned General-tab setting anymore. Off by default: your downloads, shares, and clipboard copies crop to just the photo, leaving the artboard's padded backing canvas out. Switch to "Include canvas" to bake the full padded backing into the exported image instead. The crop-to-content compositing runs in Rust (`get_image_data_excluding_background`), so it's exact — not a canvas-fill-then-crop approximation. Deleting the Background layer outright (Remove Canvas) now also shrinks the document back to the photo's own tight bounds, so a removed backdrop can't linger as excess transparent space in every export after.
 
-Every AI tool button (Remove Background, Extract Text, Remove Object) now shows a padlock icon when you're not signed in or not on the Paid plan, instead of just going quietly disabled — the tier gate was already correct, it just wasn't visible at a glance.
-
-Playwright end-to-end smoke tests landed (`e2e/smoke.spec.ts`): boot, image load, and core tool coverage now run against the real production build, not just unit tests.
-
-> **About this release.** A cleaner way to drop the canvas backdrop, clearer paid-tier buttons, and a real end-to-end test harness watching your back.
+> **About this release.** One setting moved to where it actually belongs, and removing the canvas backdrop now cleans up fully instead of leaving a ghost of its old size behind.
 
 ## License
 

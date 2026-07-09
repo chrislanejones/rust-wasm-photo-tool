@@ -629,6 +629,13 @@ impl ImageHorseTool {
 
     /// Remove the layer with `id`. Refuses to remove the last remaining layer.
     /// Pushes "Delete Layer". Returns true if removed.
+    ///
+    /// Deleting the artboard's backing "Background" layer (bottom of the
+    /// stack, the solid/transparent fill `load_image_artboard` /
+    /// `set_artboard_border` grow) also shrinks the document to the
+    /// remaining content's tight bounding box — otherwise the padded canvas
+    /// those calls added lingers after its fill is gone, and keeps showing up
+    /// (as excess transparent/bordered space) in every subsequent export.
     pub fn remove_layer(&mut self, id: u32) -> bool {
         if self.layers.len() <= 1 {
             return false;
@@ -637,11 +644,15 @@ impl ImageHorseTool {
             return false;
         };
         self.snap("Delete Layer");
+        let was_backing = idx == 0 && self.layers[idx].name == "Background";
         self.layers.remove(idx);
         if self.active >= self.layers.len() {
             self.active = self.layers.len() - 1;
         } else if self.active > idx {
             self.active -= 1;
+        }
+        if was_backing {
+            self.shrink_to_content();
         }
         true
     }

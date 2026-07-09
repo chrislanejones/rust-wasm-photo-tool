@@ -58,6 +58,12 @@ export interface Preferences {
    *  "transparent" ⇒ a fully-transparent fill (the checkerboard shows through);
    *  any #rrggbb hex ⇒ that opaque color. Only used when `canvasArtboard` is on. */
   canvasBgColor: string;
+  /** Include the artboard's backing "Background" canvas layer (the padded
+   *  fill `canvasArtboard` adds) when exporting/downloading/sharing the
+   *  image. Off (default) ⇒ the backing canvas is a compositional guide only
+   *  — exports crop to just the photo content. On ⇒ exports include the full
+   *  padded canvas, fill and all. */
+  exportCanvasBackground: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -84,6 +90,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   canvasPadding: 10,
   // Backing canvas defaults to transparent ⇒ the checkerboard shows through.
   canvasBgColor: "transparent",
+  // Default OFF: the backing canvas is a compositional guide, not real
+  // content — exports/downloads/shares crop to just the photo unless opted in.
+  exportCanvasBackground: false,
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];
@@ -153,6 +162,10 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
       p?.canvasBgColor === "transparent"
         ? "transparent"
         : safeHex(p?.canvasBgColor, DEFAULT_PREFERENCES.canvasBgColor),
+    exportCanvasBackground:
+      typeof p?.exportCanvasBackground === "boolean"
+        ? p.exportCanvasBackground
+        : DEFAULT_PREFERENCES.exportCanvasBackground,
   };
 }
 
@@ -206,6 +219,7 @@ export function serializePreferences(p: Preferences): string {
     canvasArtboard: p.canvasArtboard,
     canvasPadding: p.canvasPadding,
     canvasBgColor: p.canvasBgColor,
+    exportCanvasBackground: p.exportCanvasBackground,
   });
 }
 

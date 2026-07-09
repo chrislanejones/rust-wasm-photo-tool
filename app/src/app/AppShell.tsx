@@ -337,6 +337,9 @@ export function AppShell() {
   // EXIF keep/strip now lives in preferences (Settings → Security); all export
   // paths read this committed value.
   const exifKeep = prefs.exifKeep;
+  // Canvas background on export (Settings → General); all export/share/copy
+  // paths read this committed value.
+  const exportCanvasBackground = prefs.exportCanvasBackground;
   // Apply the saved theme to <html> (light/dark/system); index.html sets the
   // initial class pre-paint, this keeps it in sync as the choice changes.
   useTheme(prefs.theme);
@@ -950,7 +953,7 @@ export function AppShell() {
     handleZoomReset,
     handleCopyToClipboard,
     handleExport,
-  } = useCanvasActions({ stamp, exportFormat, quality, exifKeep });
+  } = useCanvasActions({ stamp, exportFormat, quality, exifKeep, exportCanvasBackground });
 
   const handleDeleteAll = useCallback(() => {
     setDeleteAllOpen(true);
@@ -2395,9 +2398,30 @@ export function AppShell() {
               }}
             />
             <ShareButton
-              exportPng={() => stamp.exportBlob("png")}
-              canvasW={stamp.state.width}
-              canvasH={stamp.state.height}
+              exportPng={() => {
+                if (exportCanvasBackground) return stamp.exportBlob("png");
+                const tool = stamp.toolRef.current;
+                if (!tool) return Promise.resolve(null);
+                return encodeRgba(
+                  new Uint8Array(tool.get_image_data_excluding_background()),
+                  tool.export_width_excluding_background(),
+                  tool.export_height_excluding_background(),
+                  "png",
+                  1,
+                );
+              }}
+              canvasW={
+                exportCanvasBackground
+                  ? stamp.state.width
+                  : (stamp.toolRef.current?.export_width_excluding_background() ??
+                    stamp.state.width)
+              }
+              canvasH={
+                exportCanvasBackground
+                  ? stamp.state.height
+                  : (stamp.toolRef.current?.export_height_excluding_background() ??
+                    stamp.state.height)
+              }
               fileName={photos.find((p) => p.id === activePhotoId)?.name}
               disabled={!hasImage}
               onShared={() => setExportDialogOpen(false)}
