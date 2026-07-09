@@ -5,6 +5,15 @@ import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import path from "path";
 
+// SPIKE (spike/coop-coep-clerk, ADR-009): opt-in COOP/COEP on the preview
+// server, to test whether cross-origin isolation (needed for
+// wasm-bindgen-rayon / SharedArrayBuffer) breaks Clerk sign-in.
+// `vite preview` is the imagehorse-qc target (CLAUDE.md), so this must be
+// a no-op unless SPIKE_COEP is explicitly set — set it to "require-corp"
+// or "credentialless" to opt in; unset (the default) leaves preview
+// headers untouched.
+const spikeCoepMode = process.env.SPIKE_COEP;
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), wasm(), topLevelAwait()],
   resolve: {
@@ -37,5 +46,13 @@ export default defineConfig({
   build: {
     outDir: "../www-dist",
     emptyOutDir: true,
+  },
+  preview: {
+    ...(spikeCoepMode && {
+      headers: {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": spikeCoepMode,
+      },
+    }),
   },
 });

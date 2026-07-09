@@ -1,5 +1,9 @@
 # ADR-008: SVG imports are rasterized to PNG at the import boundary
-Date: 2026-07-07   Status: draft
+Date: 2026-07-07   Status: Accepted (confirmed 2026-07-09)
+Shipped: v7.8 (commit `d9960f6`, current master HEAD). `lib/rasterizeSvg.ts`
+confirmed live (2026-07-09 audit) — wired into both import funnels via
+`AppShell.tsx` and `app/session/useImageSession.ts`. Confirmed Accepted
+by Chris 2026-07-09.
 
 ## Context
 SVG imports failed twice over: Chrome's `createImageBitmap()` (both

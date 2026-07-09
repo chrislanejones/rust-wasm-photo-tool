@@ -1,5 +1,11 @@
 # ADR-007: Unattended agent runs happen on disposable worktrees in auto mode
-Date: 2026-07-02 (backfilled)   Status: draft
+Date: 2026-07-02 (backfilled)   Status: Accepted (confirmed 2026-07-09)
+Verified: this is not a hypothetical — this very audit session ran
+under the described setup (dedicated worktree at `~/ai-repo/ih-adr`,
+task branch `docs/adr-status-audit`, off master). `~/ai-repo/` holds
+multiple other task worktrees (ih-tiles, ih-e2e, ih-spike) at the time
+of this audit (2026-07-09), consistent with "every unattended run gets
+one." Confirmed Accepted by Chris 2026-07-09.
 
 ## Context
 Overnight agent sessions need to run without permission prompts, on a

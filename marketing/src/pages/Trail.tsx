@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.53",
+    date: "2026-07-09",
+    headline: "A green light for faster processing",
+    entries: [
+      { tag: "rust", text: "The next building block for undo landed in the codebase — a tile-based way of tracking edits instead of full-image snapshots. It's off by default and not connected to anything yet, so nothing changes for you today." },
+      { tag: "infra", text: "Tested whether a browser security setting I need for faster multi-core image processing would break signing in. It doesn't — so that's clear to build on next. Also gave the internal docs that explain how the app is built a full pass to match what's actually shipped." },
+    ],
+  },
+  {
     version: "v0.9.52",
     date: "2026-07-08",
     headline: "Pasting big images finally behaves — and SVGs just work",

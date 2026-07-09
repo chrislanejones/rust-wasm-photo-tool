@@ -1,5 +1,13 @@
 # ADR-002: Canvas tools become registry modules instead of hand-wired hooks
 Date: 2026-07-02 (backfilled)   Status: draft
+Blocked on: Stage 4 of the AppShell dismantling (see
+`tool-module-migration` skill). Stages 1-3 shipped in v7.3 (session
+hooks + store migration), but AppShell.tsx is still 2,930 lines
+(2026-07-09) and hand-wires 8 tool hooks directly — useEmojiTool,
+usePaintTool (×3: paint/eraser/mask), useMoveLayerTool,
+usePastePlacementTool, useTextTool, useRedStampTool — via
+useEffectiveTool. No `features/tools/modules/` registry directory
+exists yet.
 
 ## Context
 AppShell.tsx (3,300 lines) manually wires ten tool hooks and threads

@@ -1,5 +1,10 @@
 # ADR-005: Encoding and thumbnailing move to a worker, with mandatory main-thread fallback
-Date: 2026-07-02 (backfilled)   Status: draft
+Date: 2026-07-02 (backfilled)   Status: Accepted (confirmed 2026-07-09)
+Shipped: v7.7 (commit `906082b`). `codecWorkerClient.ts` +
+`workers/codec.worker.ts` confirmed live on the main path (2026-07-09
+audit) — wired into `useAutoCompress.ts`, `workingCopy.ts`
+(thumbnails), and `exportImage.ts`, no feature flag gating it off.
+Confirmed Accepted by Chris 2026-07-09.
 
 ## Context
 Export encoding and thumbnail generation run on the main thread;

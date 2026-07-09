@@ -1,9 +1,15 @@
 # ADR-001 — Originals store: lazy read-through migration to Dexie
 
-- **Status:** Draft            <!-- Draft | Accepted | Rejected | Superseded by ADR-NNN -->
+- **Status:** Accepted (confirmed 2026-07-09)   <!-- Draft | Accepted | Rejected | Superseded by ADR-NNN -->
 - **Date:** 2026-07-02
 - **Deciders:** Chris (owner) — persistence / storage
 - **Supersedes:** —
+- **Shipped:** v7.5 (commit `6ccd67b`). `originalsAdapter.ts` +
+  `flags.ts` (`USE_DEXIE_ORIGINALS = true`) confirmed live on the main
+  path — wired into `useImageSession.ts`, `AppShell.tsx`,
+  `useCanvasActions.ts`, `ImageMetaPanel.tsx`, `BatchSettings.tsx`
+  (2026-07-09 audit, grep-verified). Confirmed Accepted by Chris
+  2026-07-09.
 
 ## Context
 
