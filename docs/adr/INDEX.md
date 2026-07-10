@@ -33,9 +33,10 @@ deleted.
 | [008](008-svg-rasterized-at-import.md) | SVG imports are rasterized to PNG at the import boundary | Accepted (2026-07-09) — shipped v7.8 (`d9960f6`) | 2026-07-07 |
 | [009](009-coop-coep-clerk-spike.md) | COOP/COEP vs. Clerk sign-in spike | Draft — spike, not a build; verdict: not blocked | 2026-07-09 |
 | [010](010-metadata-scrub-privacy-modes.md) | Export metadata scrub gets a GPS-only mode alongside the existing full strip | Draft | 2026-07-10 |
+| [011](011-parallel-kernels-rayon-threads.md) | Parallel kernels via wasm-bindgen-rayon, gated on COOP/COEP | Draft | 2026-07-10 |
 
 <!--
   Planned:
   - service worker, precache-only → takes the next free number
-    (011+) when written.
+    (012+) when written.
 -->
