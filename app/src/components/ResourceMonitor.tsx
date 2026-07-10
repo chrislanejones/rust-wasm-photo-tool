@@ -4,6 +4,7 @@
 // view of what the app is spending the machine on — main-thread frame load,
 // JS heap, the WASM engine's linear memory, and a per-subsystem process list.
 
+import { useState } from "react";
 import { Cpu, MemoryStick, Boxes, HardDrive, Layers } from "lucide-react";
 import {
   fmtBytes,
@@ -11,6 +12,10 @@ import {
   type ProcessRow,
 } from "@/lib/resourceMonitor";
 import type { LogSource } from "@/lib/diagnosticsLog";
+import {
+  runThreadedBlurBench,
+  type ThreadedBlurBenchResult,
+} from "@/lib/threadedBlurBench";
 
 /** Solid bar fill per subsystem, echoing the badge colors in the log table. */
 const BAR_CLASS: Record<LogSource, string> = {
@@ -102,6 +107,53 @@ function ProcRow({ p, now }: { p: ProcessRow; now: number }) {
         </div>
       </td>
     </tr>
+  );
+}
+
+/**
+ * Threaded-blur microbench row (feat/rayon-parallel-blur, Task D). Inert on
+ * the currently-shipped build — `runThreadedBlurBench` always resolves
+ * `available: false` with an honest reason today, since neither COOP/COEP
+ * headers nor a `--features threads` wasm build are shipped by this repo.
+ * Exists so flipping both of those on later (a separate, later decision) has
+ * somewhere to show the real in-browser number without any UI changes.
+ */
+function ThreadedBlurBenchRow() {
+  const [state, setState] = useState<
+    | { status: "idle" }
+    | { status: "running" }
+    | { status: "done"; result: ThreadedBlurBenchResult }
+  >({ status: "idle" });
+
+  const run = async () => {
+    setState({ status: "running" });
+    const result = await runThreadedBlurBench();
+    setState({ status: "done", result });
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-border pt-3 text-2xs text-text-muted">
+      <div className="flex items-center justify-between">
+        <span className="uppercase tracking-wider">
+          Threaded Blur (experimental)
+        </span>
+        <button
+          type="button"
+          onClick={run}
+          disabled={state.status === "running"}
+          className="rounded border border-border px-2 py-0.5 text-text-secondary hover:bg-card/50 disabled:opacity-50"
+        >
+          {state.status === "running" ? "Running…" : "Run bench"}
+        </button>
+      </div>
+      {state.status === "done" && (
+        <div className="tabular-nums">
+          {state.result.available
+            ? `${state.result.width}×${state.result.height} r${state.result.radius}: ${state.result.ms.toFixed(1)}ms (${state.result.threads} threads)`
+            : state.result.reason}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -212,6 +264,8 @@ export function ResourceMonitor({ active }: { active: boolean }) {
         %CPU = share of timed work across subsystems in the last{" "}
         {(snap.windowMs / 1000).toFixed(0)}s
       </div>
+
+      <ThreadedBlurBenchRow />
     </div>
   );
 }
