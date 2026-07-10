@@ -814,3 +814,14 @@ screen interactive again — previously frozen solid).
 > fix were built in parallel worktree sessions (`ih-scrub`, and the
 > ongoing `ih-diag` diagnostics-overhaul work respectively) and merged
 > together once independently verified.
+
+**Merge note.** Item 3 (the replay-parity harness) and item 4 (the
+repo cleanup) landed in adjacent commits and directly overlapped on
+`benches/tiles.rs` and Cargo.toml's `criterion`/`tiles`-bench wiring —
+the cleanup removed both as dead weight moments before the harness
+branch, built independently, added new verified content to that exact
+file. Resolved in favor of the harness's version; `Cargo.lock`
+regenerated (`cargo check --features tiles`) and re-verified clean
+post-merge (`fmt`/`clippy -D warnings`/`cargo test --features tiles` =
+92 passed, 3 correctly `#[ignore]`d / `cargo test` default = 60
+passed).

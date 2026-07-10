@@ -33,6 +33,7 @@ const RELEASES: Release[] = [
     entries: [
       { tag: "feature", text: "When you strip metadata on export, you can now choose \"Location only\" instead of everything — keeps your camera and lens info, drops just the GPS coordinates. Handy when you want the technical details but not your home address baked into the file." },
       { tag: "fix", text: "Opening the diagnostics window (Alt+Delete) before loading a photo could freeze the whole app solid with no way to close it. Fixed." },
+      { tag: "infra", text: "Behind the scenes: a new test suite proves the editor's operation log replays pixel-for-pixel identical to the original edit, every time — the safety net future undo work builds on." },
     ],
   },
   {
