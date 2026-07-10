@@ -198,6 +198,13 @@ main-thread fallback if the worker fails to construct or its first
 call fails. PNG export stays on the Rust encoder. Shipped v7.7. See
 [ADR-005](adr/005-codec-worker-fallback.md).
 
+### Metadata scrub (Settings → Security)
+
+Every export path can strip EXIF/GPS/XMP/IPTC (`lib/exif.ts`,
+dependency-free, JPEG/PNG/WebP) before pixels leave the device; a
+`'location'` mode removes just GPS and keeps camera/lens/timestamp. See
+[ADR-010](adr/010-metadata-scrub-privacy-modes.md).
+
 ### Why one WASM binary?
 
 Separate `.wasm` modules (image-core.wasm, filters.wasm, etc.) would
