@@ -77,6 +77,34 @@ pub fn assert_replay_parity_and_keyframe_equivalence(fixture: &Fixture, ops: &[O
     assert_buffers_identical(&fast, &full, fixture.name);
 }
 
+/// Assert that applying `ops` on top of `fixture` actually changes the
+/// canvas from the fixture-only baseline.
+///
+/// `assert_replay_parity` alone can't distinguish "this op round-trips
+/// through the op log correctly" from "this op is a no-op today, so of
+/// course both sides agree" — a no-op op trivially satisfies parity. This
+/// closes that gap: it fails for any op whose `apply()` doesn't yet mutate
+/// the buffer (see the `TODO(tile-wiring)` no-ops in `ops::apply`), which is
+/// exactly what makes the stubs in `replay_stubs.rs` an honest `#[ignore]`
+/// instead of a vacuous pass.
+pub fn assert_op_has_effect(fixture: &Fixture, ops: &[Op]) {
+    let mut baseline = TileBuffer::new(fixture.width, fixture.height);
+    for op in fixture.load_ops() {
+        apply(&op, &mut baseline);
+    }
+    let mut with_ops = baseline.clone();
+    for op in ops {
+        apply(op, &mut with_ops);
+    }
+    assert_ne!(
+        baseline.content_hash(),
+        with_ops.content_hash(),
+        "{}: op(s) had no visible effect on the canvas — apply() is still a \
+         no-op for this op",
+        fixture.name
+    );
+}
+
 /// Hash-compare first (cheap, exact); on mismatch, scan for and report the
 /// first differing pixel so a failure is debuggable instead of just "not
 /// equal".
