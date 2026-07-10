@@ -23,17 +23,33 @@ mod codec;
 mod core;
 mod drawing;
 mod effects;
-mod filters;
 mod history;
 mod layer;
 mod paint;
 mod selection;
 mod settings;
-mod simd;
 mod stamp;
 mod text;
 mod transform;
 mod utils;
+
+// `filters`/`simd` are private by default (unchanged from before this
+// session). They're only made `pub` under the `threads` feature so
+// `benches/blur_threads.rs` — compiled as a separate crate, like any Cargo
+// bench target — can reach `simd::blur`'s rayon-parallel functions and
+// `filters::build_gaussian_kernel` to build a matching kernel. Same pattern
+// already used for `ops`/`tiles` below. Zero effect on the default build's
+// emitted bytes either way (visibility is a compile-time check only) — gated
+// purely so the default build's public Rust API surface doesn't grow for a
+// bench-only need.
+#[cfg(feature = "threads")]
+pub mod filters;
+#[cfg(not(feature = "threads"))]
+mod filters;
+#[cfg(feature = "threads")]
+pub mod simd;
+#[cfg(not(feature = "threads"))]
+mod simd;
 
 // Tile engine core + operation log. Feature-gated (`tiles`) and NOT part of the
 // wasm build or the wasm-bindgen surface — see src/tiles.rs / src/ops.rs.
@@ -41,6 +57,17 @@ mod utils;
 pub mod ops;
 #[cfg(feature = "tiles")]
 pub mod tiles;
+
+// Rayon thread-pool bootstrap. Feature-gated (`threads`) and NOT part of the
+// default wasm build — see the `threads` feature comment in Cargo.toml and
+// `src/simd/blur.rs` for the parallel kernel itself. Re-exporting this is what
+// exposes an `initThreadPool(numThreads)` async function in the generated JS
+// glue *when* the crate is built with `--features threads` under the
+// nightly + atomics toolchain a real wasm32 thread pool needs (not done by
+// this crate; see the feature comment). On native, this is inert plumbing —
+// nothing calls it, `cargo test --features threads` just proves it compiles.
+#[cfg(feature = "threads")]
+pub use wasm_bindgen_rayon::init_thread_pool;
 
 use crate::annotations::{annotations_to_json, build_text_annotation};
 use crate::core::ImageBuffer;
@@ -75,6 +102,40 @@ pub fn photo_limit(tier: &str) -> u32 {
         "paid" => 100,
         _ => 12,
     }
+}
+
+/// Diagnostics-only microbench (Task D, `feat/rayon-parallel-blur`): runs the
+/// rayon-parallel two-pass Gaussian blur over a synthetic `width`×`height`
+/// RGBA buffer at kernel `radius` and discards the result. Exists purely so
+/// the Resources diagnostics panel can measure the REAL in-browser speedup
+/// once a `--features threads` wasm build + COOP/COEP headers exist (a
+/// separate, later decision — see ADR-011) — not reachable from the default
+/// build. Deliberately returns no timing itself (no `web_sys`/`js-sys` timer
+/// dependency needed for a bench-only export): the JS caller wraps this call
+/// in `performance.now()` before/after.
+#[cfg(feature = "threads")]
+#[wasm_bindgen]
+pub fn bench_blur_threaded(width: u32, height: u32, radius: u32) -> u32 {
+    let w = width as usize;
+    let h = height as usize;
+    let len = w.saturating_mul(h).saturating_mul(4);
+    if len == 0 {
+        return 0;
+    }
+    // Deterministic synthetic content — a real bench of the kernel's cost, not
+    // its input; there's nothing to visually verify here (see the byte-identical
+    // correctness tests in src/simd/blur.rs for that).
+    let mut data = vec![0u8; len];
+    for (i, px) in data.iter_mut().enumerate() {
+        *px = (i % 256) as u8;
+    }
+    let kernel = filters::build_gaussian_kernel(radius);
+    let kr = radius as i32;
+    let mut h_pass = vec![0u8; len];
+    let mut out = vec![0u8; len];
+    simd::blur::blur_horizontal_parallel(&data, &mut h_pass, w, h, kr, &kernel);
+    simd::blur::blur_vertical_parallel(&h_pass, &mut out, w, h, kr, &kernel);
+    out.len() as u32
 }
 
 /// Build a solid-color RGBA image and return it PNG-encoded.

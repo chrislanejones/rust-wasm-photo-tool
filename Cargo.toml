@@ -12,6 +12,19 @@ crate-type = ["cdylib", "rlib"]
 # pulls in serde + postcard purely for the op-log codec.
 tiles = ["dep:serde", "dep:postcard"]
 
+# Rayon-parallel kernels (blur first — see src/simd/blur.rs). OFF by default
+# and NOT compiled into the default wasm build; the default build must stay
+# byte-for-byte unchanged (verified each session — see SESSION_LOG.md on
+# feat/rayon-parallel-blur). Compiles and runs TODAY on native (std threads,
+# no special toolchain needed) — that's what `cargo test --features threads`
+# and `cargo bench --features threads` exercise. A real wasm32 build additionally
+# needs a nightly toolchain + `-Z build-std=panic_abort,std` with
+# `-C target-feature=+atomics,+bulk-memory,+mutable-globals`, AND
+# `Cross-Origin-Opener-Policy`/`Cross-Origin-Embedder-Policy` response headers
+# for `SharedArrayBuffer` (spiked clean in ADR-009) — none of that is wired by
+# this feature; it's the plumbing those later, separate decisions build on.
+threads = ["dep:wasm-bindgen-rayon", "dep:rayon"]
+
 [dependencies]
 wasm-bindgen = "0.2.108"
 png = "0.17"
@@ -25,6 +38,14 @@ console_error_panic_hook = "0.1"
 serde = { version = "1", features = ["derive"], optional = true }
 postcard = { version = "1", features = ["alloc"], optional = true }
 
+# Parallel kernels — only compiled when the `threads` feature is enabled (see
+# the feature comment above). `wasm-bindgen-rayon` supplies the `initThreadPool`
+# wasm-bindgen export the wasm32+atomics build needs to spin up its Web Worker
+# thread pool; it's a plain dependency on native (no special toolchain), which
+# is what lets `cargo build --features threads` compile here today without one.
+rayon = { version = "1.12", optional = true }
+wasm-bindgen-rayon = { version = "1.3", optional = true }
+
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false }
 
@@ -32,6 +53,14 @@ criterion = { version = "0.5", default-features = false }
 name = "tiles"
 harness = false
 required-features = ["tiles"]
+
+# Scalar vs. rayon-parallel blur, native target (OS threads — see the doc
+# comment at the top of benches/blur_threads.rs for what this can and can't
+# tell us about the real wasm32 SIMD+threads path).
+[[bench]]
+name = "blur_threads"
+harness = false
+required-features = ["threads"]
 
 # Replay-parity integration tests (tests/*.rs). Feature-gated the same way as
 # the bench above: they use stamp_tool::ops/tiles directly, which only exist
