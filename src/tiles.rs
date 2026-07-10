@@ -1,8 +1,8 @@
 //! Tile engine core — a sparse, tiled RGBA canvas.
 //!
 //! This module is **feature-gated behind `tiles`** and is *not* part of the
-//! wasm build. It is a self-contained core proven by `cargo test` + criterion,
-//! separate from the flat-buffer [`crate::core::ImageBuffer`] world. The two
+//! wasm build. It is a self-contained core proven by `cargo test`, separate
+//! from the flat-buffer [`crate::core::ImageBuffer`] world. The two
 //! interoperate through [`TileBuffer::blit_from_flat`] /
 //! [`TileBuffer::blit_to_flat`], which are byte-exact round-trips.
 //!

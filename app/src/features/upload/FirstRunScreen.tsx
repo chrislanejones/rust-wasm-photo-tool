@@ -29,6 +29,10 @@ export function FirstRunScreen({
       // Sign-in pinned top-right (new browser / cache-cleared users restore
       // here) — welcome-back-sized so it's actually visible.
       topRight={<UserMenu large />}
+      // Below z-dialog (unlike the real IdleScreen): this is just the app's
+      // empty state, so dialogs opened over it (e.g. Alt+Delete Diagnostics)
+      // must render visibly on top instead of getting trapped underneath.
+      zIndexClass="z-[var(--z-panel)]"
     >
       {children}
     </BrandRevealScreen>

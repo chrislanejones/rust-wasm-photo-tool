@@ -4,7 +4,13 @@
 // Welcome-back) and the IdleScreen, so all three share one entrance.
 //
 // While `!showContent`, it shows either a spinner (`loading`) or just the hero.
-// Covers everything at z-idle.
+// z-index is caller-supplied (`zIndexClass`) rather than hardcoded: the true
+// IdleScreen needs to ride above z-dialog (it must cover any open dialog while
+// the tab is throttled), but FirstRunScreen is just the app's empty state — it
+// must stay BELOW z-dialog so dialogs opened from it (e.g. the Alt+Delete
+// Diagnostics window) are actually visible/clickable instead of getting
+// trapped under an opaque full-viewport layer with Radix's body pointer-events
+// lock engaged and no visible way to close it.
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Spinner } from "@/components/ui/spinner";
@@ -19,6 +25,7 @@ export function BrandRevealScreen({
   ariaLabel,
   topRight,
   children,
+  zIndexClass = "z-[var(--z-idle)]",
 }: {
   show: boolean;
   /** Reveal the children + ease the hero up. */
@@ -30,6 +37,10 @@ export function BrandRevealScreen({
   /** Pinned top-right once revealed (e.g. sign-in). */
   topRight?: ReactNode;
   children?: ReactNode;
+  /** Stacking tier for the full-page layer. Defaults to z-idle (covers
+   *  dialogs too) — pass a lower tier for non-idle callers like
+   *  FirstRunScreen that should yield to dialogs opened over them. */
+  zIndexClass?: string;
 }) {
   return (
     <AnimatePresence>
@@ -40,7 +51,7 @@ export function BrandRevealScreen({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.35 }}
-          className="fixed inset-0 z-[var(--z-idle)] overflow-y-auto bg-background"
+          className={`fixed inset-0 ${zIndexClass} overflow-y-auto bg-background`}
           role={showContent ? "region" : "status"}
           aria-label={ariaLabel}
         >

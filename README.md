@@ -50,11 +50,11 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.13 — 2026-07-09
+### v7.14 — 2026-07-10
 
-**Canvas background on export** moves to Settings → Layers and Canvas, next to the other canvas-backdrop controls (Canvas on import, border, backing color) — same place, doesn't feel like an orphaned General-tab setting anymore. Off by default: your downloads, shares, and clipboard copies crop to just the photo, leaving the artboard's padded backing canvas out. Switch to "Include canvas" to bake the full padded backing into the exported image instead. The crop-to-content compositing runs in Rust (`get_image_data_excluding_background`), so it's exact — not a canvas-fill-then-crop approximation. Deleting the Background layer outright (Remove Canvas) now also shrinks the document back to the photo's own tight bounds, so a removed backdrop can't linger as excess transparent space in every export after.
+**Privacy: strip photo metadata on export.** Settings → Security's existing keep/strip EXIF toggle now has a second choice when stripping: **All metadata** (EXIF, GPS, maker notes, IPTC, XMP — everything) or **Location only** (just GPS, camera/lens info stays). Also fixes a real freeze: opening the Alt+Delete Diagnostics window while no image was loaded could leave the whole app unresponsive — a z-index conflict hid the dialog behind the "New" import screen while its modal focus-lock stayed engaged, with no visible way to close it. Internal: a byte-exact replay-parity test harness for the tile engine's op-log (proves keyframed replay is lossless before undo gets rebuilt on top of it), and a repo cleanup — removed an unused Zustand prototype directory and the old Playwright e2e harness.
 
-> **About this release.** One setting moved to where it actually belongs, and removing the canvas backdrop now cleans up fully instead of leaving a ghost of its old size behind.
+> **About this release.** A real privacy feature, a real freeze fixed, and some dead weight cleared out.
 
 ## License
 

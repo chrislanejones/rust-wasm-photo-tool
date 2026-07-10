@@ -9,6 +9,10 @@ function AppMockup() {
         src="/Rust-Wasm-Photo-Tool-App-June-2.webp"
         alt="Image Horse — Rust + WASM photo editor in the browser"
         className="w-full block"
+        width={899}
+        height={539}
+        fetchPriority="high"
+        decoding="async"
       />
     </div>
   );

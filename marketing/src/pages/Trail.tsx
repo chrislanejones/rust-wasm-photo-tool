@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.58",
+    date: "2026-07-10",
+    headline: "Strip just your photo's location, and a freeze fixed",
+    entries: [
+      { tag: "feature", text: "When you strip metadata on export, you can now choose \"Location only\" instead of everything — keeps your camera and lens info, drops just the GPS coordinates. Handy when you want the technical details but not your home address baked into the file." },
+      { tag: "fix", text: "Opening the diagnostics window (Alt+Delete) before loading a photo could freeze the whole app solid with no way to close it. Fixed." },
+    ],
+  },
+  {
     version: "v0.9.57",
     date: "2026-07-09",
     headline: "A setting moved to where it belongs, and cleaner canvas removal",
