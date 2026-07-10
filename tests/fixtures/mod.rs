@@ -11,6 +11,13 @@
 //! like any other edit, so its real keyframe/replay machinery decides where
 //! the nearest keyframe lands — see SESSION_LOG.md, DECISION: seeded input.
 
+// This module is shared across several independent integration-test
+// binaries (each `tests/*.rs` top-level file is its own crate) via
+// `mod fixtures;`. Not every binary uses every field/helper, so per-binary
+// dead-code analysis will flag some as unused even though other binaries do
+// use them. Same rationale as any shared `tests/common` module.
+#![allow(dead_code)]
+
 use stamp_tool::ops::{Op, Rect, Rgba};
 
 /// A named, deterministic test image plus its op-log reconstruction.

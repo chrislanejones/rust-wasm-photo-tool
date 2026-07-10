@@ -1,6 +1,11 @@
 //! Shared replay-parity harness, used by `replay_parity.rs`,
 //! `replay_determinism.rs`, and the ignored stubs in `replay_stubs.rs`.
 
+// Shared across multiple independent integration-test binaries; not every
+// one calls every helper here, so per-binary dead-code analysis will flag
+// some as unused even though a sibling binary does use them.
+#![allow(dead_code)]
+
 use crate::fixtures::Fixture;
 use stamp_tool::ops::{apply, Op, OpLog};
 use stamp_tool::tiles::TileBuffer;

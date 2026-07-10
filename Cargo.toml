@@ -42,6 +42,10 @@ required-features = ["tiles"]
 name = "replay_parity"
 required-features = ["tiles"]
 
+[[test]]
+name = "replay_determinism"
+required-features = ["tiles"]
+
 # Release tuning for the WASM build. wasm-pack builds in release by default;
 # LTO + a single codegen unit let the optimizer inline across modules (pairs
 # with SIMD in .cargo/config.toml). Slower to compile, faster at runtime.
