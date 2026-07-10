@@ -5,6 +5,13 @@
 //! Covers the flat-buffer bridge (`blit_from_flat` / `blit_to_flat` at
 //! 2048×2048) and op-log replay of 200 mixed ops with vs. without keyframes.
 
+//! Also covers replay of 200 mixed *implemented* ops only (FillRegion, Crop,
+//! Levels — no Stroke) with vs. without keyframes, for the tile-wiring
+//! session's "is replay under a frame?" question: `bench_replay` above mixes
+//! in `Op::Stroke`, which is currently a no-op `apply()`, so a third of that
+//! benchmark's ops cost effectively nothing — not representative of a log
+//! made entirely of ops that actually touch pixels.
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::hint::black_box;
 
@@ -106,5 +113,68 @@ fn bench_replay(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_blit, bench_replay);
+/// Deterministic log of *only* implemented ops: FillRegion and Levels every
+/// other op, with an occasional small Crop (never large enough to shrink the
+/// 2048×2048 canvas meaningfully over 200 ops) so the applied-op mix is
+/// realistic without degenerating the canvas size.
+fn build_mixed_log_implemented(n: usize) -> OpLog {
+    let mut log = OpLog::new(DIM, DIM);
+    for i in 0..n {
+        let op = if i > 0 && i % 40 == 0 {
+            let w = log.buffer().width();
+            let h = log.buffer().height();
+            Op::Crop {
+                rect: Rect {
+                    x: 1,
+                    y: 1,
+                    w: w.saturating_sub(2),
+                    h: h.saturating_sub(2),
+                },
+            }
+        } else if i % 2 == 0 {
+            Op::FillRegion {
+                rect: Rect {
+                    x: (i * 7 % 1800) as i32,
+                    y: (i * 13 % 1800) as i32,
+                    w: 128,
+                    h: 128,
+                },
+                color: Rgba {
+                    r: i as u8,
+                    g: 100,
+                    b: 50,
+                    a: 255,
+                },
+            }
+        } else {
+            Op::Levels(LevelsParams {
+                black: 8,
+                white: 240,
+                gamma: 1.05,
+            })
+        };
+        log.append(op);
+    }
+    log
+}
+
+fn bench_replay_implemented(c: &mut Criterion) {
+    let log = build_mixed_log_implemented(200);
+
+    c.bench_function("replay_200_implemented_ops_keyframed", |b| {
+        let mut out = TileBuffer::new(0, 0);
+        b.iter(|| {
+            log.replay(black_box(&mut out));
+        });
+    });
+
+    c.bench_function("replay_200_implemented_ops_full", |b| {
+        let mut out = TileBuffer::new(0, 0);
+        b.iter(|| {
+            log.replay_full(black_box(&mut out));
+        });
+    });
+}
+
+criterion_group!(benches, bench_blit, bench_replay, bench_replay_implemented);
 criterion_main!(benches);

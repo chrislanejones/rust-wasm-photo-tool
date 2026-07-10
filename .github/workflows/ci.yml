@@ -26,8 +26,12 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      # --features tiles so the tile-engine core (src/tiles.rs, src/ops.rs)
+      # and its tests/*.rs replay-parity suite actually get linted/run, not
+      # silently skipped — the feature is off by default and NOT part of the
+      # wasm build (see the wasm-pack step below, which stays feature-free).
+      - run: cargo clippy --all-targets --features tiles -- -D warnings
+      - run: cargo test --features tiles
       - uses: jetli/wasm-pack-action@v0.4.0
       - run: wasm-pack build --target web --out-dir pkg
 
