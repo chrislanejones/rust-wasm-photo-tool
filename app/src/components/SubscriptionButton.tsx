@@ -291,6 +291,10 @@ export function SubscriptionButton({
               <SecurityPane
                 value={draft.exifKeep}
                 onChange={(exifKeep) => setDraft((d) => ({ ...d, exifKeep }))}
+                stripMode={draft.exifStripMode}
+                onStripModeChange={(exifStripMode) =>
+                  setDraft((d) => ({ ...d, exifStripMode }))
+                }
               />
             ) : tab === "rulers" ? (
               <RulersGridsPane

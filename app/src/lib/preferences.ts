@@ -7,6 +7,7 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { sha256Hex } from "@/lib/originalsStore";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
+import type { MetadataStripMode } from "@/lib/exif";
 
 export type ThemeChoice = "system" | "dark" | "light";
 
@@ -46,6 +47,13 @@ export interface Preferences {
   /** Keep camera metadata (EXIF — GPS, capture time, lens) on JPEG/WebP export,
    *  or strip it for privacy. Applies to all export paths. */
   exifKeep: boolean;
+  /** When `exifKeep` is false, how aggressively to scrub a *verbatim* original
+   *  on export (re-encoded/canvas exports are already clean either way — see
+   *  `applyExifToReencoded`): 'all' drops EXIF/GPS/maker-notes/XMP/IPTC (ICC
+   *  kept — see the DECISION note in lib/exif.ts), 'location' removes only
+   *  GPS and leaves camera/lens/timestamp intact. Defaults to 'all' so this
+   *  new choice never silently changes existing export behavior. */
+  exifStripMode: MetadataStripMode;
   /** When a freshly-imported photo loads, place it on a slightly larger backing
    *  canvas as TWO layers — a "Background" canvas + the "Photo" on top —
    *  Photoshop-style. Off ⇒ the classic single full-bleed "Background" layer at
@@ -83,6 +91,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // Privacy-by-default: strip EXIF (GPS, capture time, lens, device serial) on
   // export unless the user explicitly opts in via Settings → Security.
   exifKeep: false,
+  // 'all' preserves the pre-existing full-strip behavior exactly; 'location'
+  // is an opt-in, less-aggressive choice (GPS only) surfaced alongside it.
+  exifStripMode: "all",
   // Default to the Photoshop-style "Canvas + photo" two-layer load (Background +
   // Photo); users who want the classic single full-bleed layer switch it off in
   // Settings → Layers and Canvas.
@@ -153,6 +164,10 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
         : DEFAULT_PREFERENCES.reduceMotion,
     exifKeep:
       typeof p?.exifKeep === "boolean" ? p.exifKeep : DEFAULT_PREFERENCES.exifKeep,
+    exifStripMode:
+      p?.exifStripMode === "all" || p?.exifStripMode === "location"
+        ? p.exifStripMode
+        : DEFAULT_PREFERENCES.exifStripMode,
     canvasArtboard:
       typeof p?.canvasArtboard === "boolean"
         ? p.canvasArtboard
@@ -216,6 +231,7 @@ export function serializePreferences(p: Preferences): string {
     reopenLastSession: p.reopenLastSession,
     reduceMotion: p.reduceMotion,
     exifKeep: p.exifKeep,
+    exifStripMode: p.exifStripMode,
     canvasArtboard: p.canvasArtboard,
     canvasPadding: p.canvasPadding,
     canvasBgColor: p.canvasBgColor,

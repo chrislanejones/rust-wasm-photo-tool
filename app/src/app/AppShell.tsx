@@ -337,6 +337,10 @@ export function AppShell() {
   // EXIF keep/strip now lives in preferences (Settings → Security); all export
   // paths read this committed value.
   const exifKeep = prefs.exifKeep;
+  // Strip scope when exifKeep is false: 'all' (default) or 'location' (GPS
+  // only). Only the verbatim-original export path needs this — re-encoded
+  // canvas exports are already EXIF-free unless keeping.
+  const exifStripMode = prefs.exifStripMode;
   // Canvas background on export (Settings → General); all export/share/copy
   // paths read this committed value.
   const exportCanvasBackground = prefs.exportCanvasBackground;
@@ -1969,7 +1973,12 @@ export function AppShell() {
           // bytes already live at originalKey.
           const orig = await getOriginal(photo.originalKey);
           if (!orig) continue;
-          bytes = applyExifToVerbatim(new Uint8Array(orig.bytes), orig.mimeType, mode);
+          bytes = applyExifToVerbatim(
+            new Uint8Array(orig.bytes),
+            orig.mimeType,
+            mode,
+            exifStripMode,
+          );
           mime = orig.mimeType;
           ext = extFromMime(orig.mimeType);
         }
@@ -1978,7 +1987,12 @@ export function AppShell() {
         // through verbatim; strip scrubs EXIF/GPS before they leave the device.
         const orig = await getOriginal(photo.originalKey);
         if (!orig) continue;
-        bytes = applyExifToVerbatim(new Uint8Array(orig.bytes), orig.mimeType, mode);
+        bytes = applyExifToVerbatim(
+          new Uint8Array(orig.bytes),
+          orig.mimeType,
+          mode,
+          exifStripMode,
+        );
         mime = orig.mimeType;
         ext = extFromMime(orig.mimeType);
       }
@@ -1998,6 +2012,14 @@ export function AppShell() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+
+    // Tiny confirmation so the user knows the scrub actually happened —
+    // matches the strip scope chosen in Settings → Security.
+    if (mode === "strip") {
+      toast.success(
+        exifStripMode === "location" ? "GPS removed — camera info kept" : "EXIF + GPS removed",
+      );
+    }
     },
     [
       activePhotoId,
@@ -2010,6 +2032,7 @@ export function AppShell() {
       loadPhotoEdit,
       savePhotoEdit,
       exifKeep,
+      exifStripMode,
     ],
   );
 

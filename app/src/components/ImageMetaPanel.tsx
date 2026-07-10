@@ -325,7 +325,8 @@ export function ImageMetaPanel({
                 No EXIF metadata in the original
                 {meta.mimeType &&
                 meta.mimeType !== "image/jpeg" &&
-                meta.mimeType !== "image/webp"
+                meta.mimeType !== "image/webp" &&
+                meta.mimeType !== "image/png"
                   ? ` (${meta.mimeType} carries none)`
                   : ""}
                 .
@@ -393,8 +394,8 @@ export function ImageMetaPanel({
               <div className="mt-1.5 flex items-start gap-1.5 text-2xs leading-snug text-warning/80">
                 <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
                 <span>
-                  Location is embedded. Unlock the EXIF padlock in Compress to
-                  strip it on export.
+                  Location is embedded. Strip it (or just the GPS) on export
+                  via Settings → Security.
                 </span>
               </div>
             )}
