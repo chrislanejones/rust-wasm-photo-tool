@@ -33,6 +33,15 @@ name = "tiles"
 harness = false
 required-features = ["tiles"]
 
+# Replay-parity integration tests (tests/*.rs). Feature-gated the same way as
+# the bench above: they use stamp_tool::ops/tiles directly, which only exist
+# behind `tiles`. Plain `cargo test` skips these targets entirely (no compile
+# attempt); `cargo test --features tiles` runs them for real — that's what CI
+# does (see .github/workflows/ci.yml).
+[[test]]
+name = "replay_parity"
+required-features = ["tiles"]
+
 # Release tuning for the WASM build. wasm-pack builds in release by default;
 # LTO + a single codegen unit let the optimizer inline across modules (pairs
 # with SIMD in .cargo/config.toml). Slower to compile, faster at runtime.
