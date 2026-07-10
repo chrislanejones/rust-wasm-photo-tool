@@ -825,3 +825,31 @@ regenerated (`cargo check --features tiles`) and re-verified clean
 post-merge (`fmt`/`clippy -D warnings`/`cargo test --features tiles` =
 92 passed, 3 correctly `#[ignore]`d / `cargo test` default = 60
 passed).
+
+## v7.15 Change Summary — 2026-07-10
+
+The engine's first parallel kernel: rayon-parallelized Gaussian blur,
+composing with the existing SIMD128 row math, behind a new off-by-default
+`threads` cargo feature. Zero effect on anything users see today — this is
+plumbing + proof, not activation. Verified: `cargo fmt --check`/`clippy -D
+warnings` clean for both the default and `--features threads` configs,
+`cargo test` 60 passed (default, unchanged) / 63 passed (`--features
+threads`, +3 byte-identical parallel-blur tests), `tsc --noEmit` clean,
+default `wasm-pack build` byte-identical to the pre-session baseline
+(642,054 bytes, `twiggy diff` = 0 across every item).
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **`wasm-bindgen-rayon` behind a new `threads` feature** — `rayon`/`wasm-bindgen-rayon` added as optional dependencies, fully inert unless `--features threads` is passed. Confirmed the default build's public Rust API surface, wasm byte size, and even `wasm-bindgen`'s own pinned version are all unaffected — the only default-build artifact difference is an unrelated hash shift from panic-infra line numbers moving (0 bytes of actual code/data difference, confirmed via `twiggy diff`) | Complete |
+| 2   | **Parallel blur, byte-identical to scalar/SIMD** — new `blur_horizontal_parallel`/`blur_vertical_parallel` in `src/simd/blur.rs` split rows across a rayon thread pool while keeping SIMD128 as the per-row inner loop. The original sequential functions are untouched byte-for-byte — the parallel math is a deliberate *duplicate*, not a shared refactor, because a shared-helper first attempt cost +363 B on the default build (indirection that didn't fully inline) even though the feature never compiles into that build; reverted in favor of a provable guarantee over an optimizer-dependent one. 10+ test cases (down to 1×1 and 1-row images, plus non-power-of-two sizes) assert full byte equality against the sequential output; a `bw == 0` guard prevents a real `rayon::par_chunks_mut` panic on empty input | Complete |
+| 3   | **Native benchmark: ~7.85× at 2048² and 4096²** — `benches/blur_threads.rs`, 22 logical cores, radius 8: 429.9 ms → 54.8 ms (2048×2048), 1,752.3 ms → 222.9 ms (4096×4096). The ratio holding essentially flat across a 4× pixel-count jump (rather than improving, as fixed per-call overhead would predict) points to this kernel being memory-bandwidth-bound rather than thread-overhead-bound — logged as a real finding for whichever kernel gets parallelized next, not assumed to generalize. A true three-way scalar/SIMD/SIMD+rayon comparison isn't possible on native (the SIMD128 path is wasm32-only by construction); the real number waits on the diagnostics microbench once headers are on | Complete |
+| 4   | **Gated in-browser microbench, wired into Diagnostics → Resources** — checks `crossOriginIsolated` first and fails safe to "threads unavailable" text (never throws) when headers or the threads-feature wasm build aren't present — which is every build this repo ships today. Feature-detects the `threads`-only WASM exports at runtime rather than declaring them in the shared ambient `.d.ts` (which describes what the shipped build actually has), so TypeScript can't be fooled into thinking they're always there | Complete |
+| 5   | **ADR-011 (Draft): parallel kernels via rayon, gated on COOP/COEP** — references ADR-009's spike verdict, documents the memory-bandwidth finding and the byte-identical-test requirement for every future parallel kernel, and pre-mortems both the still-open OAuth/header risk and the temptation to assume rayon = free linear speedup elsewhere | Complete |
+
+**Still needs a human, before any of this reaches users:** (1) COOP/COEP
+response headers on the actual production deploy target, gated on
+finishing ADR-009's live sign-in/OAuth verification — not something an
+agent can do, it requires a real authenticated session; (2) a nightly
+Rust toolchain + `-Z build-std` for a real wasm32+atomics build; (3)
+wiring `initThreadPool` into the app's actual init path once (1) and (2)
+exist. None of these three were started this session.

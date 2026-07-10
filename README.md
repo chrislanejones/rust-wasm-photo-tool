@@ -50,11 +50,11 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.14 — 2026-07-10
+### v7.15 — 2026-07-10
 
-**Privacy: strip photo metadata on export.** Settings → Security's existing keep/strip EXIF toggle now has a second choice when stripping: **All metadata** (EXIF, GPS, maker notes, IPTC, XMP — everything) or **Location only** (just GPS, camera/lens info stays). Also fixes a real freeze: opening the Alt+Delete Diagnostics window while no image was loaded could leave the whole app unresponsive — a z-index conflict hid the dialog behind the "New" import screen while its modal focus-lock stayed engaged, with no visible way to close it. Internal: a byte-exact replay-parity test harness for the tile engine's op-log (proves keyframed replay is lossless before undo gets rebuilt on top of it), reinstating the `criterion` bench dependency the same cleanup pass had just trimmed as dead weight — the harness gave it new, real content — and a repo cleanup that removed an unused Zustand prototype directory and the old Playwright e2e harness.
+**The engine's first parallel kernel.** Blur now has a multi-core path — SIMD128 per row, rayon across rows — behind a new, off-by-default `threads` cargo feature; the default WASM build is byte-for-byte unchanged (642,054 bytes, confirmed via `twiggy diff` = 0). Native benchmark: splitting the work across cores is a real 7.85–7.86× speedup, though well short of core-count-linear — this kernel turns out to be memory-bandwidth-bound, not overhead-bound, a finding that'll shape which kernel gets parallelized next. Nothing ships to users yet: turning this on for real needs COOP/COEP response headers in production (a separate, deliberate decision — see ADR-011) plus a nightly wasm32+atomics toolchain. A gated in-browser microbench is already wired into the Diagnostics window for when that day comes.
 
-> **About this release.** A real privacy feature, a real freeze fixed, and some dead weight cleared out.
+> **About this release.** v7.14 (metadata scrubber + Diagnostics-window freeze fix + repo cleanup) and v7.15 (parallel blur kernel) shipped back-to-back the same night.
 
 ## License
 

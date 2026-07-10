@@ -27,6 +27,14 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.59",
+    date: "2026-07-10",
+    headline: "Laying the groundwork for multi-core editing",
+    entries: [
+      { tag: "rust", text: "Behind the scenes: blur can now split its work across every core on your machine instead of just one, roughly 7.8x faster in testing. It's not switched on for anyone yet — turning it on for real needs a few more pieces in place first — but the hard part (proving the parallel version produces the exact same result, pixel for pixel, as the original) is done." },
+    ],
+  },
+  {
     version: "v0.9.58",
     date: "2026-07-10",
     headline: "Strip just your photo's location, and a freeze fixed",
