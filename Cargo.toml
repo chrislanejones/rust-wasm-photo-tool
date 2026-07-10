@@ -27,7 +27,7 @@ threads = ["dep:wasm-bindgen-rayon", "dep:rayon"]
 
 [dependencies]
 wasm-bindgen = "0.2.108"
-png = "0.17"
+png = "0.18"
 ab_glyph = "0.2"
 # Routes Rust panics to console.error with a readable message + stack instead of
 # the opaque "unreachable executed" RuntimeError. Installed once on module init
