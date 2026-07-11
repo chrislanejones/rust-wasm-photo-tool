@@ -8,7 +8,7 @@
 // handleDuplicateSelected + selectedIds/clearSelection) intentionally stay in
 // AppShell — see PARKING_LOT.md. `loadPhotoFromEntry` + `activeIdRef` are
 // returned because the AppShell-resident handleDeleteSelected still uses them.
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
@@ -23,6 +23,7 @@ import { getWorkingCopy, putWorkingCopy } from "@/lib/workingCopyCache";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { clearGalleryManifest } from "@/lib/galleryManifest";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
+import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
 
 type Preferences = ReturnType<typeof usePreferences>[0];
 type EditPersistence = ReturnType<typeof useEditPersistence>;
@@ -112,6 +113,14 @@ export function useImageSession({
   // repeated PgUp/PgDn advance correctly rather than recomputing "next" from a
   // stale id. Kept in sync at every place activePhotoId is set.
   const activeIdRef = useRef<string | null>(null);
+
+  // Op-log persistence follows the active photo through EVERY path that sets
+  // it (select, add, remove, boot auto-select) — the write path keys its
+  // saves off this. Inert unless USE_OPLOG_PERSISTENCE / ih_oplog_persist is
+  // on AND the wasm build has the op-log surface.
+  useEffect(() => {
+    setActiveOplogPhoto(activePhotoId);
+  }, [activePhotoId]);
 
   const loadPhotoFromEntry = useCallback(
     async (entry: PhotoEntry, isCurrent?: () => boolean) => {
@@ -281,6 +290,10 @@ export function useImageSession({
           return next;
         });
         if (stamp.toolRef.current) {
+          // The outgoing photo's still-debouncing op-log save would be
+          // dropped by the photo switch — land it while the engine still
+          // holds the outgoing document. No-op when persistence is off.
+          await flushPendingOplogSave(stamp.toolRef.current);
           await savePhotoEdit(outgoing, stamp.toolRef);
         }
       }
@@ -294,6 +307,27 @@ export function useImageSession({
       // points at the incoming one. The modified-dot effect gates on this so it
       // doesn't falsely dot the newly-selected photo during the transition.
       setIsImageLoading(true);
+
+      // ── Op-log resume (ADR-006) ─────────────────────────────────────────
+      // Preferred path when USE_OPLOG_PERSISTENCE / ih_oplog_persist is on:
+      // rebuild the exact document + replayable undo history from the
+      // persisted log (restoreFromOplog owns the engine lifecycle, so this
+      // works on page boot before any tool exists). A false return — flag
+      // off, nothing persisted, or invalid data — falls through to the
+      // existing archive/original paths unchanged; the working copy remains
+      // the safety net for one release.
+      setActiveOplogPhoto(entry.id);
+      const restored = await stamp.restoreFromOplog(entry.id);
+      if (!isCurrent()) return;
+      if (restored) {
+        setLoadProgress(100);
+        setTimeout(() => {
+          if (!isCurrent()) return;
+          setIsImageLoading(false);
+          setLoadProgress(0);
+        }, 400);
+        return;
+      }
 
       const saved = await loadPhotoEdit(entry.id);
       if (!isCurrent()) return;
