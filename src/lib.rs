@@ -1039,7 +1039,18 @@ impl ImageHorseTool {
     /// always BEFORE the mutation the snap precedes.
     #[cfg(feature = "tiles")]
     pub(crate) fn oplog_maybe_start(&mut self) {
-        if self.oplog_broken || self.layers.len() != 1 {
+        if self.oplog_broken {
+            return;
+        }
+        if self.layers.len() != 1 {
+            // Out of scope. An EMPTY log left over from a transient
+            // single-layer moment (e.g. mid-archive-restore, before the
+            // layer stack is rebuilt) is stale and free to drop — keeping
+            // it would make the first record on this multi-layer doc read
+            // as "broken" when the log is simply inactive.
+            if self.oplog.as_ref().is_some_and(|log| log.is_empty()) {
+                self.oplog = None;
+            }
             return;
         }
         // A missing log starts fresh; an EMPTY log rebases freely — this
@@ -1079,9 +1090,17 @@ impl ImageHorseTool {
             return;
         }
         if self.layers.len() != 1 {
-            // Document grew past the log's scope mid-session — the log can't
-            // follow layer-structure changes yet.
-            self.oplog_broken = self.oplog.is_some();
+            // Document grew past the log's scope mid-session. A log with
+            // real recorded history can't follow layer-structure changes
+            // yet → broken (snapshot undo takes over). A still-EMPTY log is
+            // just stale (transient single-layer moment during an archive
+            // restore) — drop it silently; the doc reads "inactive" in
+            // diagnostics, not "broken".
+            match self.oplog.as_ref() {
+                Some(log) if !log.is_empty() => self.oplog_broken = true,
+                Some(_) => self.oplog = None,
+                None => {}
+            }
             return;
         }
         if let Some(log) = self.oplog.as_mut() {

@@ -607,3 +607,51 @@ fn restore_rejects_torn_or_mismatched_input_without_changing_state() {
         "failed restores changed nothing"
     );
 }
+
+#[test]
+fn multi_layer_archive_restore_reads_inactive_not_broken() {
+    // Regression: the real-gallery check (2026-07-11) found archive-restored
+    // 2-layer photos reading "broken → snapshots" after the first stroke.
+    // Cause: a snap during a transient single-layer moment lazily started an
+    // EMPTY log; the layer stack then grew, and the first record marked the
+    // stale log broken. A stale EMPTY log must be dropped, not treated as
+    // desynced history.
+    let (mut t, _px) = seeded_tool(64, 48);
+    t.set_oplog_undo(true);
+
+    // Transient single-layer snap (as during loadFromSaved, pre-stack).
+    t.crop(0, 0, 64, 48); // snaps → lazily starts an empty log
+    assert!(t.oplog_op_count() >= 1 || t.oplog_active());
+
+    // Simulate the crop op making it in, then REBUILD as a 2-layer doc the
+    // way an archive restore does — via a fresh single-layer load first.
+    let (mut t2, px2) = seeded_tool(64, 48);
+    t2.set_oplog_undo(true);
+    // Force the exact stale state: start an empty log while single-layer...
+    t2.oplog_maybe_start();
+    assert!(t2.oplog.is_some());
+    // ...then grow the stack (Photo layer on top), as push_restored_layer does.
+    t2.load_image_artboard(&px2, 64, 48, 0, 0, 0, 0, 0);
+    // load_image_artboard resets the log — recreate the stale combination
+    // explicitly (log Some+empty with 2 layers):
+    t2.oplog = Some(crate::ops::OpLog::with_base(crate::ops::Document::new(
+        64, 48,
+    )));
+    assert_eq!(t2.layers.len(), 2);
+
+    // First stroke on the 2-layer doc: must NOT mark broken — the stale
+    // empty log is dropped and the doc reads inactive.
+    stroke(&mut t2, (5.0, 5.0), (30.0, 20.0), "#ff0000");
+    assert!(
+        !t2.oplog_is_broken(),
+        "stale empty log must not read as broken"
+    );
+    assert!(
+        !t2.oplog_active(),
+        "multi-layer doc is inactive, not broken"
+    );
+    assert_eq!(t2.oplog_op_count(), 0);
+
+    // Undo still works via snapshots, untouched.
+    assert!(t2.undo());
+}
