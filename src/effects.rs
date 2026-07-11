@@ -117,12 +117,29 @@ impl ImageHorseTool {
             2 => self.begin_redact_stroke(),
             _ => self.begin_blur_stroke(),
         }
+        // Op-log recorder: collect the exact dab centres (apply_effect_dab
+        // pushes each one, interpolated moves included). Only blur (mode 0)
+        // becomes an op at effect_up — pixelate/redact are unrecorded and
+        // the undo-time sync check handles them.
+        #[cfg(feature = "tiles")]
+        {
+            self.rec_effect = Some((
+                Vec::new(),
+                self.effect_radius,
+                self.effect_intensity,
+                self.effect_mode,
+            ));
+        }
         self.effect_last = Some((x, y));
         self.apply_effect_dab(x, y);
     }
 
     /// Stamp one effect dab at (x, y) using the current mode + params.
     fn apply_effect_dab(&mut self, x: f64, y: f64) {
+        #[cfg(feature = "tiles")]
+        if let Some((pts, ..)) = self.rec_effect.as_mut() {
+            pts.push((x, y));
+        }
         let r = self.effect_radius;
         match self.effect_mode {
             1 => self.pixelate_region(x, y, r, self.effect_pixel),
@@ -158,6 +175,16 @@ impl ImageHorseTool {
 
     /// End the effects stroke (the undo snapshot was taken on effect_down).
     pub fn effect_up(&mut self) {
+        #[cfg(feature = "tiles")]
+        if let Some((pts, radius, intensity, mode)) = self.rec_effect.take() {
+            if mode == 0 && !pts.is_empty() {
+                self.oplog_record(crate::ops::Op::Blur {
+                    points: pts,
+                    radius,
+                    intensity,
+                });
+            }
+        }
         self.effect_last = None;
     }
 
