@@ -5,7 +5,15 @@
 // JS heap, the WASM engine's linear memory, and a per-subsystem process list.
 
 import { useState } from "react";
-import { Cpu, MemoryStick, Boxes, HardDrive, Layers, RefreshCw } from "lucide-react";
+import {
+  Cpu,
+  MemoryStick,
+  Boxes,
+  HardDrive,
+  Layers,
+  RefreshCw,
+  Grid2x2,
+} from "lucide-react";
 import { fmtBytes } from "@/lib/resourceMonitor";
 import type { DiagnosticsSnapshot, ProcessRow } from "@/hooks/useDiagnostics";
 import type { LogSource } from "@/lib/diagnosticsLog";
@@ -161,7 +169,7 @@ export function ResourceMonitor({
   diag: DiagnosticsSnapshot;
   onRefresh: () => void;
 }) {
-  const { tier0, tier1, tier2, processes, windowMs } = diag;
+  const { tier0, tier1, tier2, processes, windowMs, tilesDirtyCount, oplog } = diag;
   const now = Date.now();
 
   if (!tier1) {
@@ -247,6 +255,28 @@ export function ResourceMonitor({
           barClass="bg-violet-500"
           value={tier1.canvasBytes != null ? fmtBytes(tier1.canvasBytes) : "—"}
         />
+        {tilesDirtyCount != null && (
+          <Gauge
+            icon={<Grid2x2 className="h-3.5 w-3.5" />}
+            label="Dirty"
+            pct={null}
+            value={`${tilesDirtyCount} tile${tilesDirtyCount === 1 ? "" : "s"}`}
+          />
+        )}
+        {oplog != null && (
+          <Gauge
+            icon={<Grid2x2 className="h-3.5 w-3.5" />}
+            label="Op Log"
+            pct={null}
+            value={
+              oplog.broken
+                ? "broken → snapshots"
+                : oplog.active
+                  ? `${oplog.cursor}/${oplog.ops} ops · ${oplog.keyframes} kf${oplog.undoEnabled ? " · undo" : ""}`
+                  : "n/a"
+            }
+          />
+        )}
       </div>
 
       <div className="text-2xs text-text-muted">
@@ -260,6 +290,10 @@ export function ResourceMonitor({
         the page is cross-origin isolated. JS Heap &amp; WASM alone miss
         canvas/image memory; WASM only grows — reload to reclaim it. CPU only
         samples while you're actively interacting with the canvas.
+        {tilesDirtyCount != null &&
+          " Dirty = tiles touched by the tile-engine flush since it was last read (verification-only, tile-wiring session — not shipped)."}
+        {oplog != null &&
+          " Op Log = recorded edits / cursor · resident keyframes; \"undo\" = replay-undo switch on (ih_oplog_undo). Broken = an unrecorded edit desynced it; snapshot undo took over."}
       </div>
 
       {/* ── Per-subsystem "process" list ─────────────────────────────────── */}

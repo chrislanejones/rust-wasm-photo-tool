@@ -14,7 +14,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDiagnostics, type LogSource } from "@/lib/diagnosticsLog";
-import { getWasmMemoryBytes } from "@/lib/resourceMonitor";
+import {
+  getOplogStats,
+  getTilesDirtyCount,
+  getWasmMemoryBytes,
+  type OplogStats,
+} from "@/lib/resourceMonitor";
 
 const TIER1_INTERVAL_MS = 1500;
 const INTERACTION_POLL_MS = 150;
@@ -126,6 +131,15 @@ export interface DiagnosticsSnapshot {
   interacting: boolean;
   processes: ProcessRow[];
   windowMs: number;
+  /** Tiles marked dirty by the most recent tile-engine flush, read on the
+   *  Tier-1 cadence; `null` when the tile path isn't active this flush
+   *  (see `registerTilesDirtyCount` in lib/resourceMonitor.ts). Verification
+   *  instrument for the tile-wiring session — not shipped/user-facing. */
+  tilesDirtyCount: number | null;
+  /** Op-log recorder state as of the last flush, or `null` when the build
+   *  lacks the op-log exports (see `registerOplogStats`). Same
+   *  verification-only status as `tilesDirtyCount`. */
+  oplog: OplogStats | null;
   /** Re-reads every Tier-0 field immediately. */
   refresh: () => void;
 }
@@ -144,6 +158,8 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
   const [tier1, setTier1] = useState<DiagTier1 | null>(null);
   const [tier2, setTier2] = useState<DiagTier2 | null>(null);
   const [processes, setProcesses] = useState<ProcessRow[]>([]);
+  const [tilesDirtyCount, setTilesDirtyCount] = useState<number | null>(null);
+  const [oplog, setOplog] = useState<OplogStats | null>(null);
   const [interacting, setInteracting] = useState(false);
   const lastInteractionRef = useRef(0);
 
@@ -188,6 +204,8 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
     if (!active) {
       setTier1(null);
       setProcesses([]);
+      setTilesDirtyCount(null);
+      setOplog(null);
       return;
     }
     const perf = performance as Performance & { memory?: PerfMemory };
@@ -200,6 +218,8 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
         canvasBytes: estimateCanvasBytes(),
       });
       setProcesses(buildProcesses(Date.now()));
+      setTilesDirtyCount(getTilesDirtyCount());
+      setOplog(getOplogStats());
     };
     build();
     const id = window.setInterval(build, TIER1_INTERVAL_MS);
@@ -275,6 +295,8 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
     interacting,
     processes,
     windowMs: PROCESS_WINDOW_MS,
+    tilesDirtyCount,
+    oplog,
     refresh,
   };
 }
