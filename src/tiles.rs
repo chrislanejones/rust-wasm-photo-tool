@@ -222,6 +222,55 @@ impl TileBuffer {
         true
     }
 
+    /// Sync from a flat RGBA buffer (`width * height * 4` bytes, same logical
+    /// bounds as `self` — resize goes through [`Self::blit_from_flat`]
+    /// instead), touching only the tiles whose content actually changed.
+    ///
+    /// Unlike [`Self::blit_from_flat`] (unconditional clear + full rewrite —
+    /// every tile ends up dirty, appropriate for an initial load), this is
+    /// the steady-state "something changed somewhere in `src`, tell me
+    /// exactly which tiles" entry point: each intersecting tile's current
+    /// pixels are compared against `src`'s corresponding region, and only
+    /// tiles that actually differ are rewritten (and thus marked dirty) via
+    /// [`Self::set_region`]. This is the property the dirty-rect flush
+    /// depends on — a tile that's untouched by the edit must not show up in
+    /// [`Self::dirty_tiles`].
+    ///
+    /// Returns `false` (doing nothing) if `src`'s length doesn't match the
+    /// buffer's current logical bounds.
+    pub fn sync_from_flat_diffing(&mut self, src: &[u8]) -> bool {
+        if src.len() != (self.width as usize) * (self.height as usize) * 4 {
+            return false;
+        }
+        let edge = TILE_EDGE as i32;
+        let tiles_x = ((self.width as i32 + edge - 1) / edge).max(1);
+        let tiles_y = ((self.height as i32 + edge - 1) / edge).max(1);
+        for ty in 0..tiles_y {
+            for tx in 0..tiles_x {
+                let x0 = tx * edge;
+                let y0 = ty * edge;
+                let w = edge.min(self.width as i32 - x0) as u32;
+                let h = edge.min(self.height as i32 - y0) as u32;
+                if w == 0 || h == 0 {
+                    continue;
+                }
+                let current = self.get_region(x0, y0, w, h);
+                let mut incoming = vec![0u8; (w as usize) * (h as usize) * 4];
+                let row_bytes = w as usize * 4;
+                for ry in 0..h as usize {
+                    let src_row_start =
+                        ((y0 as usize + ry) * self.width as usize + x0 as usize) * 4;
+                    incoming[ry * row_bytes..ry * row_bytes + row_bytes]
+                        .copy_from_slice(&src[src_row_start..src_row_start + row_bytes]);
+                }
+                if current != incoming {
+                    self.set_region(x0, y0, w, h, &incoming);
+                }
+            }
+        }
+        true
+    }
+
     /// Visit every pixel of every materialised tile, replacing it with the
     /// closure's return value. All visited tiles are marked dirty. Used by
     /// pure per-pixel ops (e.g. Levels). Absent tiles stay absent — this does
@@ -422,5 +471,72 @@ mod tests {
         tb.set_pixel(6, 6, [2, 2, 2, 2]);
         let g2 = tb.tile(0, 0).unwrap().generation();
         assert!(g2 > g1);
+    }
+
+    #[test]
+    fn diffing_sync_only_dirties_tiles_that_actually_changed() {
+        // 3x3 tiles worth of canvas, loaded once, then cleared of dirty flags
+        // to simulate "flushed, nothing pending" steady state.
+        let side = TILE_EDGE * 3;
+        let base = make_flat(side, side, 1);
+        let mut tb = TileBuffer::new(0, 0);
+        assert!(tb.blit_from_flat(&base, side, side));
+        tb.clear_dirty();
+        assert_eq!(tb.dirty_tiles().count(), 0);
+
+        // Edit a small region entirely inside tile (2,1) only.
+        let mut edited = base.clone();
+        let (x, y, w, h) = (610i32, 310i32, 5u32, 5u32);
+        for ry in 0..h as usize {
+            for rx in 0..w as usize {
+                let i = (((y as usize + ry) * side as usize) + x as usize + rx) * 4;
+                edited[i..i + 4].copy_from_slice(&[9, 9, 9, 255]);
+            }
+        }
+        assert!(tb.sync_from_flat_diffing(&edited));
+
+        let dirty: Vec<(i32, i32)> = tb.dirty_tiles().collect();
+        assert_eq!(dirty, vec![(2, 1)], "only the touched tile should be dirty");
+
+        // Content is fully caught up with `edited`, not just the touched tile.
+        let mut out = vec![0u8; edited.len()];
+        assert!(tb.blit_to_flat(&mut out));
+        assert_eq!(out, edited);
+    }
+
+    #[test]
+    fn diffing_sync_with_no_changes_dirties_nothing() {
+        let side = TILE_EDGE * 2;
+        let flat = make_flat(side, side, 42);
+        let mut tb = TileBuffer::new(0, 0);
+        assert!(tb.blit_from_flat(&flat, side, side));
+        tb.clear_dirty();
+
+        // Same content, byte-for-byte — nothing should be touched.
+        assert!(tb.sync_from_flat_diffing(&flat));
+        assert_eq!(tb.dirty_tiles().count(), 0);
+    }
+
+    #[test]
+    fn diffing_sync_rejects_mismatched_length() {
+        let mut tb = TileBuffer::new(10, 10);
+        assert!(!tb.sync_from_flat_diffing(&[0u8; 3]));
+    }
+
+    #[test]
+    fn diffing_sync_handles_sub_tile_and_odd_sizes() {
+        // Smaller than one tile, and a non-multiple-of-256 size — both must
+        // not panic and must end up byte-identical to the synced buffer.
+        for &(w, h) in &[(1u32, 1u32), (5, 5), (257, 3), (3, 257)] {
+            let a = make_flat(w, h, 7);
+            let b = make_flat(w, h, 8);
+            let mut tb = TileBuffer::new(0, 0);
+            assert!(tb.blit_from_flat(&a, w, h));
+            tb.clear_dirty();
+            assert!(tb.sync_from_flat_diffing(&b), "{w}x{h}");
+            let mut out = vec![0u8; b.len()];
+            assert!(tb.blit_to_flat(&mut out));
+            assert_eq!(out, b, "{w}x{h} content mismatch after diffing sync");
+        }
     }
 }
