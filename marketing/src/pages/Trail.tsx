@@ -27,6 +27,14 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.60",
+    date: "2026-07-11",
+    headline: "The performance monitor gets smarter about when to check",
+    entries: [
+      { tag: "infra", text: "Behind the scenes: the performance monitor (Alt+Delete → Resources) used to poll everything on one flat timer. Now it only reads the expensive stuff (tab memory) when you hit Refresh, checks memory every 1.5 seconds while the panel's open, and tracks frame rate only while you're actually drawing — freezing on your last stroke instead of measuring nothing. It's also the tab you land on first now." },
+    ],
+  },
+  {
     version: "v0.9.59",
     date: "2026-07-10",
     headline: "Laying the groundwork for multi-core editing",

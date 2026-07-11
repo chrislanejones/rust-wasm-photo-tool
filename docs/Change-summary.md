@@ -853,3 +853,21 @@ agent can do, it requires a real authenticated session; (2) a nightly
 Rust toolchain + `-Z build-std` for a real wasm32+atomics build; (3)
 wiring `initThreadPool` into the app's actual init path once (1) and (2)
 exist. None of these three were started this session.
+
+## v7.16 Change Summary — 2026-07-11
+
+The `ih-diag` diagnostics-overhaul worktree (open and referenced as
+"ongoing" since v7.14) is merged: the Alt+Delete Resources tab moves off
+one flat 800ms poll-everything interval onto three tiers matched to
+actual cost. No Rust touched, no engine surface changed — this is a pure
+frontend instrumentation refactor. Verified: `tsc --noEmit` clean,
+production build succeeds (642.05 kB wasm chunk unchanged, confirms
+nothing on the Rust side moved).
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **`useDiagnostics` tiered polling hook** (`app/src/hooks/useDiagnostics.ts`) replaces `useResourceMonitor` / `ResourceSnapshot` — Tier 0 (on-open / on-demand only: cores, device RAM, whole-tab memory via `measureUserAgentSpecificMemory()`) never polls; Tier 1 (1.5s interval, panel-visible only: JS heap, WASM bytes, canvas bytes) down from the old flat 800ms; Tier 2 (per-`requestAnimationFrame`, only while the panel is visible *and* the user has pointered a canvas within the last ~500ms: fps, frame time) freezes at its last value on idle instead of continuing to sample nothing | Complete |
+| 2   | **Manual refresh** — `ResourceMonitor` takes `{diag, onRefresh}` instead of self-polling; a Refresh button drives the one-off Tier-0 read, since whole-tab memory is expensive and browser-throttled and has no business running on a timer | Complete |
+| 3   | **Resources is now the default tab** (was System Telemetry) — debugging a slowdown starts at the machine, narrows to the app/engine, then the document; tab order left-to-right documents that flow | Complete |
+| 4   | **Reconciled with v7.15's `ThreadedBlurBenchRow`** — that component shipped independently onto the pre-rewrite `ResourceMonitor` while this branch was in flight (its own commit message flagged the eventual merge); carried over unchanged onto the new tiered props, since it never read `snap`/`diag` in the first place | Complete |
+| 5   | **`ih-diag`'s own copy of the FirstRunScreen z-index fix dropped as a no-op** — v7.14 had already shipped the identical fix (`BrandRevealScreen`'s `zIndexClass` prop, `FirstRunScreen` passing `z-panel`) to master while this branch was open; the two patches were byte-identical | Complete |

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { ResourceMonitor } from "@/components/ResourceMonitor";
 import { ImageMetaPanel, type ImageMeta } from "@/components/ImageMetaPanel";
+import { useDiagnostics } from "@/hooks/useDiagnostics";
 import {
   clearDiagnostics,
   getDiagnostics,
@@ -23,7 +24,7 @@ interface Props {
   imageMeta?: ImageMeta;
 }
 
-type Tab = "telemetry" | "resources" | "imagemeta";
+type Tab = "resources" | "telemetry" | "imagemeta";
 
 const SOURCE_CLASS: Record<LogSource, string> = {
   WASM_ENGINE: "bg-warning/10 text-warning border-warning/20",
@@ -44,11 +45,21 @@ function fmtTime(ts: number): string {
 
 export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
   const entries = useSyncExternalStore(subscribeDiagnostics, getDiagnostics);
-  const [tab, setTab] = useState<Tab>("telemetry");
+  const [tab, setTab] = useState<Tab>("resources");
 
+  // Single owner of every polling timer in this panel — see useDiagnostics
+  // for the tier breakdown. Only "live" while the Resources tab is the one
+  // showing; System Telemetry is a passive event-log subscription (no
+  // timer of its own) and Current Image Meta owns its own on-open reads.
+  const diag = useDiagnostics(open && tab === "resources");
+
+  // Tab order is outside-in: Resources (the machine) → System Telemetry
+  // (the app/engine running on it) → Current Image Meta (the document
+  // you're editing right now). Debugging a slowdown starts at the machine
+  // and narrows down — keep this order, don't re-sort alphabetically.
   const tabs: { id: Tab; label: string; icon: typeof Activity }[] = [
-    { id: "telemetry", label: "System Telemetry", icon: Activity },
     { id: "resources", label: "Resources", icon: Gauge },
+    { id: "telemetry", label: "System Telemetry", icon: Activity },
     { id: "imagemeta", label: "Current Image Meta", icon: ImageIcon },
   ];
 
@@ -105,7 +116,7 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
 
         <div className="flex-1 overflow-y-auto">
           {tab === "resources" ? (
-            <ResourceMonitor active={open && tab === "resources"} />
+            <ResourceMonitor diag={diag} onRefresh={diag.refresh} />
           ) : tab === "imagemeta" ? (
             <ImageMetaPanel
               active={open && tab === "imagemeta"}

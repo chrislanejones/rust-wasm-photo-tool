@@ -50,11 +50,11 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.15 — 2026-07-10
+### v7.16 — 2026-07-11
 
-**The engine's first parallel kernel.** Blur now has a multi-core path — SIMD128 per row, rayon across rows — behind a new, off-by-default `threads` cargo feature; the default WASM build is byte-for-byte unchanged (642,054 bytes, confirmed via `twiggy diff` = 0). Native benchmark: splitting the work across cores is a real 7.85–7.86× speedup, though well short of core-count-linear — this kernel turns out to be memory-bandwidth-bound, not overhead-bound, a finding that'll shape which kernel gets parallelized next. Nothing ships to users yet: turning this on for real needs COOP/COEP response headers in production (a separate, deliberate decision — see ADR-011) plus a nightly wasm32+atomics toolchain. A gated in-browser microbench is already wired into the Diagnostics window for when that day comes.
+**The Resources tab stops polling like it's 2010.** The Alt+Delete diagnostics window's Resources tab used to read everything — cores, tab memory, JS heap, WASM bytes, FPS — off one flat 800ms timer, forever, whether the panel was useful or not. `useDiagnostics` replaces it with three tiers matched to actual cost: an on-demand tab-memory read behind a manual Refresh button (that measurement is expensive and browser-throttled, so it shouldn't run on a clock), a 1.5s poll for heap/WASM/canvas while the panel's open, and a per-frame FPS counter that only samples while you're actively drawing — frozen at its last reading the moment you stop. Resources is now the tab you land on first. Merged from the `ih-diag` worktree (open since v7.14) and reconciled with v7.15's `ThreadedBlurBenchRow`, which shipped independently on the old architecture while this branch was in flight.
 
-> **About this release.** v7.14 (metadata scrubber + Diagnostics-window freeze fix + repo cleanup) and v7.15 (parallel blur kernel) shipped back-to-back the same night.
+> **About this release.** v7.14 (metadata scrubber + Diagnostics-window freeze fix + repo cleanup), v7.15 (parallel blur kernel), and v7.16 (diagnostics tiered polling) close out the same run of overnight/parallel-worktree sessions.
 
 ## License
 

@@ -5,12 +5,9 @@
 // JS heap, the WASM engine's linear memory, and a per-subsystem process list.
 
 import { useState } from "react";
-import { Cpu, MemoryStick, Boxes, HardDrive, Layers } from "lucide-react";
-import {
-  fmtBytes,
-  useResourceMonitor,
-  type ProcessRow,
-} from "@/lib/resourceMonitor";
+import { Cpu, MemoryStick, Boxes, HardDrive, Layers, RefreshCw } from "lucide-react";
+import { fmtBytes } from "@/lib/resourceMonitor";
+import type { DiagnosticsSnapshot, ProcessRow } from "@/hooks/useDiagnostics";
 import type { LogSource } from "@/lib/diagnosticsLog";
 import {
   runThreadedBlurBench,
@@ -71,7 +68,7 @@ function Gauge({
           />
         )}
       </div>
-      <div className="w-32 shrink-0 whitespace-nowrap text-right tabular-nums text-text-secondary">
+      <div className="w-36 shrink-0 truncate text-right tabular-nums text-text-secondary">
         {value}
       </div>
     </div>
@@ -157,11 +154,17 @@ function ThreadedBlurBenchRow() {
   );
 }
 
-export function ResourceMonitor({ active }: { active: boolean }) {
-  const snap = useResourceMonitor(active);
+export function ResourceMonitor({
+  diag,
+  onRefresh,
+}: {
+  diag: DiagnosticsSnapshot;
+  onRefresh: () => void;
+}) {
+  const { tier0, tier1, tier2, processes, windowMs } = diag;
   const now = Date.now();
 
-  if (!snap) {
+  if (!tier1) {
     return (
       <div className="px-4 py-10 text-center font-mono text-xs text-text-muted">
         Sampling…
@@ -170,28 +173,44 @@ export function ResourceMonitor({ active }: { active: boolean }) {
   }
 
   const heapPct =
-    snap.jsHeapUsed != null && snap.jsHeapLimit
-      ? snap.jsHeapUsed / snap.jsHeapLimit
+    tier1.jsHeapUsed != null && tier1.jsHeapLimit
+      ? tier1.jsHeapUsed / tier1.jsHeapLimit
       : null;
   // The footprint gauges (Tab / WASM / Canvas) have no per-tab ceiling, so scale
   // them against device RAM (fallback 4 GB) — a meaningful, stable denominator,
   // unlike the old "fraction of the JS-heap limit / flat 0.1" which made a large
   // WASM heap render as a tiny bar.
-  const memBudget = (snap.deviceMemoryGB ?? 4) * 1024 ** 3;
-  const wasmPct = snap.wasmBytes != null ? snap.wasmBytes / memBudget : null;
+  const memBudget = (tier0.deviceMemoryGB ?? 4) * 1024 ** 3;
+  const wasmPct = tier1.wasmBytes != null ? tier1.wasmBytes / memBudget : null;
   const canvasPct =
-    snap.canvasBytes != null ? snap.canvasBytes / memBudget : null;
-  const tabPct = snap.tabBytes != null ? snap.tabBytes / memBudget : null;
+    tier1.canvasBytes != null ? tier1.canvasBytes / memBudget : null;
+  const tabPct = tier0.tabBytes != null ? tier0.tabBytes / memBudget : null;
 
   return (
     <div className="flex flex-col gap-3 p-4 font-mono text-xs">
+      {/* Manual refresh — the only trigger for Tier-0 reads (tab memory,
+          cores/RAM); they never poll on an interval. */}
+      <div className="flex items-center justify-end">
+        <button
+          onClick={onRefresh}
+          className="flex items-center gap-1 rounded px-2 py-1 text-2xs text-text-muted hover:bg-bg-elevated hover:text-text-primary"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Refresh
+        </button>
+      </div>
+
       {/* ── Top gauges: main thread + memory ─────────────────────────────── */}
       <div className="flex flex-col gap-2">
         <Gauge
           icon={<Cpu className="h-3.5 w-3.5" />}
           label="CPU"
-          pct={snap.cpuLoad}
-          value={`${snap.fps} fps · ${snap.frameMs.toFixed(1)}ms`}
+          pct={tier2?.cpuLoad ?? null}
+          value={
+            tier2
+              ? `${tier2.fps} fps · ${tier2.frameMs.toFixed(1)}ms`
+              : "idle — interact"
+          }
         />
         {/* Whole-tab footprint — the number that matches Chrome's task manager.
             Listed first because it's the only one that captures canvas/worker
@@ -201,7 +220,7 @@ export function ResourceMonitor({ active }: { active: boolean }) {
           label="Tab"
           pct={tabPct}
           barClass={tabPct != null ? loadBar(tabPct) : undefined}
-          value={snap.tabBytes != null ? fmtBytes(snap.tabBytes) : "n/a"}
+          value={tier0.tabBytes != null ? fmtBytes(tier0.tabBytes) : "n/a"}
         />
         <Gauge
           icon={<MemoryStick className="h-3.5 w-3.5" />}
@@ -209,8 +228,8 @@ export function ResourceMonitor({ active }: { active: boolean }) {
           pct={heapPct}
           barClass={heapPct != null ? loadBar(heapPct) : undefined}
           value={
-            snap.jsHeapUsed != null
-              ? `${fmtBytes(snap.jsHeapUsed)} / ${fmtBytes(snap.jsHeapLimit)}`
+            tier1.jsHeapUsed != null
+              ? `${fmtBytes(tier1.jsHeapUsed)} / ${fmtBytes(tier1.jsHeapLimit)}`
               : "n/a"
           }
         />
@@ -219,27 +238,28 @@ export function ResourceMonitor({ active }: { active: boolean }) {
           label="WASM"
           pct={wasmPct}
           barClass="bg-warning"
-          value={snap.wasmBytes != null ? fmtBytes(snap.wasmBytes) : "not loaded"}
+          value={tier1.wasmBytes != null ? fmtBytes(tier1.wasmBytes) : "not loaded"}
         />
         <Gauge
           icon={<Layers className="h-3.5 w-3.5" />}
           label="Canvas"
           pct={canvasPct}
           barClass="bg-violet-500"
-          value={snap.canvasBytes != null ? fmtBytes(snap.canvasBytes) : "—"}
+          value={tier1.canvasBytes != null ? fmtBytes(tier1.canvasBytes) : "—"}
         />
       </div>
 
       <div className="text-2xs text-text-muted">
-        {snap.cores} logical cores
-        {snap.deviceMemoryGB != null ? ` · ~${snap.deviceMemoryGB} GB device RAM` : ""}
+        {tier0.cores} logical cores
+        {tier0.deviceMemoryGB != null ? ` · ~${tier0.deviceMemoryGB} GB device RAM` : ""}
         {" · "}
-        {(snap.windowMs / 1000).toFixed(0)}s activity window
+        {(windowMs / 1000).toFixed(0)}s activity window
       </div>
       <div className="text-2xs leading-relaxed text-text-muted">
         Tab = whole-page footprint (JS + WASM + canvas + workers), shown only when
         the page is cross-origin isolated. JS Heap &amp; WASM alone miss
-        canvas/image memory; WASM only grows — reload to reclaim it.
+        canvas/image memory; WASM only grows — reload to reclaim it. CPU only
+        samples while you're actively interacting with the canvas.
       </div>
 
       {/* ── Per-subsystem "process" list ─────────────────────────────────── */}
@@ -254,7 +274,7 @@ export function ResourceMonitor({ active }: { active: boolean }) {
           </tr>
         </thead>
         <tbody>
-          {snap.processes.map((p) => (
+          {processes.map((p) => (
             <ProcRow key={p.source} p={p} now={now} />
           ))}
         </tbody>
@@ -262,7 +282,7 @@ export function ResourceMonitor({ active }: { active: boolean }) {
 
       <div className="text-center text-2xs text-text-muted">
         %CPU = share of timed work across subsystems in the last{" "}
-        {(snap.windowMs / 1000).toFixed(0)}s
+        {(windowMs / 1000).toFixed(0)}s
       </div>
 
       <ThreadedBlurBenchRow />
