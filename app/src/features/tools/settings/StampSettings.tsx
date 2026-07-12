@@ -54,6 +54,10 @@ export function StampSettingsPanel({
   const handleModeChange = (id: string) => {
     const m = id as StampMode;
     setInternalMode(m);
+    // Sub-mode teardown clears the armed stamp (useStampTeardown), so the
+    // panel's own selection highlight must not survive the switch either —
+    // otherwise a stamp looks selected while clicks no longer place it.
+    setSelectedStampId(null);
     onModeChange?.(m);
   };
 

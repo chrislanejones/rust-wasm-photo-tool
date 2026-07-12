@@ -80,6 +80,12 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const toolRef = useRef<ImageHorseTool | null>(null);
   const isDrawingRef = useRef(false);
   const sourcePosRef = useRef<{ x: number; y: number } | null>(null);
+  // JS-side clone-source disarm. The engine has no clear_source API (and the
+  // Rust crate is frozen for this fix), so leaving the Stamp tool / switching
+  // sub-mode "disarms" the stale engine source here instead: the stroke gate
+  // in onMouseDown and the hasSource mirrored into state both honor it, and
+  // the next Alt+Click re-arms by setting a fresh source.
+  const sourceDisarmedRef = useRef(false);
   // WASM linear memory captured from the `init()` return so flushToCanvas can
   // view the pixel buffer in-place instead of going through get_image_data()
   // which allocates a fresh Vec<u8> each frame. The view must be reconstructed
@@ -106,6 +112,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     toolRef.current = null;
     sourcePosRef.current = null;
     isDrawingRef.current = false;
+    sourceDisarmedRef.current = false;
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext("2d");
@@ -140,7 +147,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     }
     setState({
       ready: true,
-      hasSource: t.has_source(),
+      hasSource: t.has_source() && !sourceDisarmedRef.current,
       sourcePos: sourcePosRef.current,
       undoCount: t.undo_count(),
       redoCount: t.redo_count(),
@@ -788,10 +795,11 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       if (e.altKey) {
         t.set_source(x, y);
         sourcePosRef.current = { x, y };
+        sourceDisarmedRef.current = false; // fresh source re-arms the stamp
         syncState();
         return;
       }
-      if (!t.has_source()) return;
+      if (!t.has_source() || sourceDisarmedRef.current) return;
       isDrawingRef.current = true;
       t.begin_stroke(x, y);
       flushToCanvas();
@@ -816,6 +824,26 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     isDrawingRef.current = false;
     toolRef.current?.end_stroke();
     syncState();
+  }, [syncState]);
+
+  /**
+   * Clone-stamp teardown — called when the Stamp tool is deactivated or its
+   * sub-mode changes (useStampTeardown). Aborts any in-flight stroke so no
+   * pointer state leaks past the exit, then disarms the source: the engine
+   * keeps its (now stale) source point because there's no clear_source API,
+   * but the JS gate makes it inert until the user Alt+Clicks a new one, and
+   * the "Source set" badge flips back to "Alt+Click to set source".
+   */
+  const clearCloneSource = useCallback(() => {
+    if (isDrawingRef.current) {
+      isDrawingRef.current = false;
+      toolRef.current?.end_stroke();
+    }
+    if (!sourceDisarmedRef.current || sourcePosRef.current) {
+      sourceDisarmedRef.current = true;
+      sourcePosRef.current = null;
+      syncState(); // no-op until an image/engine exists
+    }
   }, [syncState]);
 
   // ── Zoom via Alt+Scroll ───────────────────────────────────────────────────
@@ -1362,6 +1390,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     onMouseDown,
     onMouseMove,
     onMouseUp,
+    clearCloneSource,
     // NEW ↓
     generateThumbnail,
     generateThumbnailUrl,

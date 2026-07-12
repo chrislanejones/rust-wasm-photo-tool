@@ -30,7 +30,14 @@ export function useRedStampTool({
   const pendingStamp = useRef<PendingStamp | null>(null);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      // Tool deactivated → drop the armed stamp. Without this the pending
+      // stamp survived leaving the Stamp tool and hijacked the next visit's
+      // clicks (useEffectiveTool routes stamp-tool mousedowns to this hook
+      // whenever hasPendingStamp() is true, even in Clone sub-mode).
+      pendingStamp.current = null;
+      return;
+    }
     const handler = (e: CustomEvent<PendingStamp>) => {
       pendingStamp.current = { label: e.detail.label, color: e.detail.color };
     };
@@ -38,6 +45,12 @@ export function useRedStampTool({
     return () =>
       window.removeEventListener("red-stamp-select", handler as EventListener);
   }, [active]);
+
+  /** Sub-mode teardown (useStampTeardown): disarm without waiting for the
+   *  whole tool to deactivate — switching Stamps→Clone must stop stamping. */
+  const clearPendingStamp = useCallback(() => {
+    pendingStamp.current = null;
+  }, []);
 
   const brushSizeRef = useRef(brushSize);
   brushSizeRef.current = brushSize;
@@ -80,5 +93,11 @@ export function useRedStampTool({
 
   const hasPendingStamp = useCallback(() => !!pendingStamp.current, []);
 
-  return { onMouseDown, onMouseMove, onMouseUp, hasPendingStamp };
+  return {
+    onMouseDown,
+    onMouseMove,
+    onMouseUp,
+    hasPendingStamp,
+    clearPendingStamp,
+  };
 }

@@ -17,6 +17,7 @@ import { usePastePlacementTool } from "@/hooks/usePastePlacementTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
 import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
+import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { panelSpacingTransition, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
@@ -1360,6 +1361,18 @@ export function AppShell() {
     syncState: stamp.syncState,
     active: activeTool === "stamp",
     brushSize: stampSettings.brushSize,
+  });
+
+  // Stamp teardown: deactivating the Stamp tool or switching its sub-mode
+  // clears the armed stamp (clone source, pending red stamp, selected emoji)
+  // so leaving stops stamping entirely and re-entering starts clean.
+  useStampTeardown({
+    activeTool,
+    stampSubMode,
+    clearCloneSource: stamp.clearCloneSource,
+    clearPendingStamp: redStampTool.clearPendingStamp,
+    clearEmoji: () =>
+      setToolSettings((p) => (p.emoji ? { ...p, emoji: "" } : p)),
   });
 
   const effectiveStamp = useEffectiveTool({
