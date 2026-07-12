@@ -1,0 +1,61 @@
+// ===== FILE: app/src/features/tools/toolModules.ts =====
+// The tool REGISTRY shape (WT2 arc). A ToolModule is the self-contained
+// description of one tool: identity, sub-modes, and its settings panel.
+// Tools are migrated into this registry one per session (see the
+// tool-module-migration skill); Paint is the first registered module and the
+// reference implementation of the ToolModeToggle pattern.
+//
+// IMPORTANT — this file only LAYS THE SHAPE. Routing (ToolsSidebar's
+// activeTool switch, keyboard shortcuts, persistence keys) is NOT wired
+// through the registry yet; that happens per-tool in later sessions. Do not
+// add AppShell wiring here or anywhere else.
+import type { ToolType } from "@/lib/types";
+import type { ToolMode } from "@/components/ui/tool-mode-toggle";
+import { Paintbrush } from "lucide-react";
+import { PaintSettings, PAINT_MODES } from "./settings/PaintSettings";
+import type { PaintMode } from "./settings/PaintSettings";
+
+/**
+ * Minimal registry entry for one tool. Kept deliberately small — fields are
+ * added only when a migration session actually needs them.
+ */
+export interface ToolModule<M extends string = string> {
+  /** Registry id. MUST equal the tool's legacy `ToolType` id (`brush`,
+   *  `stamp`, `emoji`, `arrow`, …) — ids are renamed to match labels only
+   *  during that tool's own migration session, never here (shortcuts and
+   *  persistence keys depend on them). */
+  id: ToolType;
+  /** Display label — mirrors `toolConfig.ts` TOOLS until the registry becomes
+   *  the single definition site for tool metadata. */
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  /** Sub-modes rendered by the shared ToolModeToggle (icon-row + title +
+   *  body). Empty array for single-mode tools. */
+  modes: readonly ToolMode<M>[];
+  /** The tool's settings panel (sidebar body). Props stay tool-specific until
+   *  each tool's own migration session standardizes them — `never` makes that
+   *  explicit: nothing renders panels FROM the registry yet, and anything that
+   *  tries must first give modules a standardized props contract. */
+  Settings: React.ComponentType<never>;
+}
+
+/** Paint — first registered module; consumer #1 of ToolModeToggle. */
+export const paintModule: ToolModule<PaintMode> = {
+  id: "brush", // legacy id — see ToolModule.id
+  label: "Paint",
+  icon: Paintbrush,
+  modes: PAINT_MODES,
+  Settings: PaintSettings,
+};
+
+/**
+ * The registry. Partial — tools appear here one migration session at a time
+ * (emoji/Batch next per the skill order; clone stamp last).
+ */
+export const TOOL_MODULES: Partial<Record<ToolType, ToolModule>> = {
+  brush: paintModule,
+};
+
+export function getToolModule(id: ToolType): ToolModule | undefined {
+  return TOOL_MODULES[id];
+}
