@@ -462,6 +462,9 @@ declare module "stamp_tool" {
     remove_text_annotation(id: number): boolean;
     text_annotation_at(x: number, y: number): number;
     text_annotation_count(): number;
+    /** [dx, dy] where the first line's glyph ink begins inside the
+     *  annotation tile — the overlay↔engine anchor mapping for bg-kind 0. */
+    text_ink_offset(text: string, font_size: number, bold: boolean): Int32Array;
     get_text_annotations(): string;
     flatten_text_annotations(): void;
 
@@ -519,6 +522,7 @@ declare module "stamp_tool" {
 
     // Live text annotations (non-destructive overlay layer)
     text_annotation_count(): number;
+    text_ink_offset(text: string, font_size: number, bold: boolean): Int32Array;
     add_text_annotation(
       text: string,
       font_size: number,

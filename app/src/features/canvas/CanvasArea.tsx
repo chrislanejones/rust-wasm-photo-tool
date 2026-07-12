@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTools";
 import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
+import { TEXT_OVERLAY_PAD_X, TEXT_OVERLAY_PAD_Y } from "@/hooks/useTextTool";
 import {
   lockAxisDelta,
   lockCornerDelta,
@@ -1802,7 +1803,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   color: effTextColor,
                   fontFamily: textSettings.fontFamily ?? "'Liberation Sans', Arial, sans-serif",
                   lineHeight: 1.3,
-                  padding: "2px 4px",
+                  padding: `${TEXT_OVERLAY_PAD_Y}px ${TEXT_OVERLAY_PAD_X}px`,
                   background: "transparent",
                   border: "none",
                   outline: "none",

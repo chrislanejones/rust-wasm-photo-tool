@@ -953,3 +953,29 @@ emoji font (`fc-list` = 0 matches) — the picker itself mounts fully
 | 2   | **Action registry** (`e5ec1c6`) — typed entries `{id, label, group, keywords, run()}` in Tools / Settings / Actions groups; Paint's entries derive from `paintModule.modes` (the v7.19 registry), unmigrated tools fall back to `toolConfig.ts` with a yield-to-registry guard so the palette upgrades itself as each tool migrates; persisted Recent group on empty query; state-aware labels (Show/Hide Grid) | Complete |
 | 3   | **Hot-toggle actions** (`313f71b`) — sub-mode jumps, live rulers/grid/theme via a `usePreferences` cross-instance broadcast (`lib/preferences.ts` — apply and the Convex pull now notify all hook instances), Settings-tab targeting via a `useUIStore.settingsRequest` signal, undo/redo through a `paletteActions` bridge registered from `useKeyboardShortcuts`. AppShell: zero lines changed; no new window CustomEvents | Complete |
 | 4   | **PARKING_LOT candidate logged** — the grandfathered `image-horse:open-settings` CustomEvent (Alt+S) can migrate to the new store signal | Complete |
+
+## v7.21 Change Summary — 2026-07-12
+
+Stage 0 of the tile-wiring morning plan (paired desk session): the
+text-bubble-lands-wrong bug, root-caused by in-browser pixel
+measurement rather than code reading. The engine renders glyph ink
+`0.25·font_size + ascent-inset` inside the annotation tile while the
+typing overlay shows glyphs at its content box (constant 2px/4px CSS
+padding) — a commit offset that grows with font size: measured (+5,+8)
+at default, **(+12,+23)** at a 54px canvas font. Plain typing, no crop
+or zoom needed — which is why it read as "lands in a different spot"
+in real use.
+
+Verified live before commit (user + measured): default and large font
+commits land sub-pixel on the typed position ((0.1,−0.5) / (0.3,−0.3)),
+drag-then-commit exact ((0.4,0)), re-edit→commit round-trip changes
+**zero pixels** (the mapping is symmetric, no creep), undo restores
+pixel-exact. Rust gates clean (fmt / clippy / 60 tests), wasm
+642,054 → 642,699 (+645 B, the new export + bindgen glue), tsc + prod
+build clean.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **`text_ink_offset(text, font_size, bold)` engine method** — returns `[dx, dy]` where the FIRST line's glyph ink begins inside the annotation tile, from `render_text` + `ink_bounds` (the embedded font's true metrics, no eyeballed constants). Existing annotation rendering untouched — no golden-harness / replay-parity impact | Complete |
+| 2   | **Symmetric ink-anchor mapping in `useTextTool`** — commit stores `engine(x,y) = overlayPos + cssPad − inkOffset`; `editAnnotation` applies the exact inverse so re-edit cycles are drift-free. Applied only for `background_kind 0` (plain text) — bubble/rect kinds anchor the tile, parked as a separate WYSIWYG item. Overlay CSS padding now flows from shared `TEXT_OVERLAY_PAD_X/Y` constants (`useTextTool` → CanvasArea) so the mapping can't silently desync from the box's real layout | Complete |
+| 3   | **Parked, found en route** — text box lingers (neither commits nor closes) when switching tools with it open; no-change re-edit commits push a redundant undo snapshot; bg-kind overlay WYSIWYG. All in PARKING_LOT.md | Complete |

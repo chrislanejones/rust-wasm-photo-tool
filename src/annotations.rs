@@ -1118,6 +1118,29 @@ impl ImageHorseTool {
         self.layers[self.active].text_annotations.len()
     }
 
+    /// Where the visible ink of `text`'s FIRST line begins inside the
+    /// annotation tile, as `[dx, dy]` from the tile origin — i.e. from the
+    /// annotation's stored (x, y) when `background_kind == 0` (whose tile is
+    /// exactly the `render_text` output at offset 0,0).
+    ///
+    /// The typing overlay uses this to map between "where the user sees the
+    /// glyphs" and the engine anchor, so a committed annotation lands
+    /// pixel-where-typed instead of `0.25·font_size + ascent-inset` below-
+    /// right (the mismatch grows with font size). First line only: it owns
+    /// the visual anchor the overlay shows.
+    pub fn text_ink_offset(&self, text: &str, font_size: f32, bold: bool) -> Vec<i32> {
+        let pad = (font_size * 0.25).ceil() as i32;
+        let first = text.lines().next().unwrap_or("");
+        if first.trim().is_empty() {
+            return vec![pad, pad];
+        }
+        let rendered = crate::text::render_text(first, font_size, 255, 255, 255, bold);
+        match crate::utils::ink_bounds(&rendered.pixels, rendered.width, rendered.height) {
+            Some((min_x, min_y, _, _)) => vec![min_x as i32, min_y as i32],
+            None => vec![pad, pad],
+        }
+    }
+
     /// Add a new text annotation. Pre-renders the rotated tile, stores it,
     /// returns the new annotation's id. Pushes an "Add Text" history snapshot
     /// so undo restores the state with this annotation absent.

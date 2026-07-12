@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.65",
+    date: "2026-07-12",
+    headline: "Text lands exactly where you typed it",
+    entries: [
+      { tag: "fix", text: "Committing a text bubble used to drop it slightly below and to the right of where you'd typed — barely noticeable with small text, but the bigger the font, the bigger the jump. The editor and its typing box now agree, to the pixel, on where your text goes. Re-editing a bubble and committing it again no longer nudges it either." },
+      { tag: "rust", text: "Behind the scenes: the engine now reports exactly where a line of text's ink begins, straight from the font's real measurements — that's what makes the typing box and the final result line up at any size." },
+    ],
+  },
+  {
     version: "v0.9.64",
     date: "2026-07-12",
     headline: "A command palette — press Alt+, and just type",

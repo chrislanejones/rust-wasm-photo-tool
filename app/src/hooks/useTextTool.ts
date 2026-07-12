@@ -35,6 +35,7 @@ export interface AnnotationMeta {
   tile_h: number;
   tile_offset_x: number;
   tile_offset_y: number;
+  background_kind: number;
 }
 
 interface UseTextToolOptions {
@@ -74,6 +75,12 @@ function hexToRgb(input: string): [number, number, number] {
 }
 
 const BG_KIND_MAP = { none: 0, rect: 1, bubble: 2 } as const;
+
+/** The typing overlay's CSS padding (screen px) — single source shared with
+ *  CanvasArea's textarea style so the ink-anchor mapping below can't desync
+ *  from the box's actual layout. */
+export const TEXT_OVERLAY_PAD_X = 4;
+export const TEXT_OVERLAY_PAD_Y = 2;
 
 export function useTextTool({
   toolRef,
@@ -203,12 +210,33 @@ export function useTextTool({
     const g = parseInt(hex.slice(2, 4), 16);
     const b = parseInt(hex.slice(4, 6), 16);
     const bold = ti.fontWeight === "bold";
-    const x = Math.round(ti.canvasX);
-    const y = Math.round(ti.canvasY);
 
     // Pull background settings from the current toolSettings snapshot.
     const s = settingsRef.current;
     const bgKind = BG_KIND_MAP[s.bgKind];
+
+    // Ink-anchor mapping (plain text only): the engine renders glyph ink
+    // `text_ink_offset` px inside the tile (≈0.25·fontSize pad + ascent
+    // inset — grows with font size), while the overlay shows the glyphs at
+    // its content box (constant CSS padding). Without compensation the
+    // committed text lands below-right of where it was typed, ~(12, 23)px
+    // at a 54px font. Shift the stored anchor so engine ink == overlay ink.
+    // editAnnotation applies the exact inverse, so re-edit cycles don't
+    // drift. Background kinds anchor the bubble tile, not the ink — their
+    // overlay preview is a separate WYSIWYG problem, left unchanged.
+    let x = Math.round(ti.canvasX);
+    let y = Math.round(ti.canvasY);
+    if (bgKind === 0) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const cr = canvas.getBoundingClientRect();
+        const scaleX = cr.width / canvas.width || 1;
+        const scaleY = cr.height / canvas.height || 1;
+        const ink = tool.text_ink_offset(ti.text, ti.fontSize, bold);
+        x = Math.round(ti.canvasX + TEXT_OVERLAY_PAD_X / scaleX - ink[0]);
+        y = Math.round(ti.canvasY + TEXT_OVERLAY_PAD_Y / scaleY - ink[1]);
+      }
+    }
     const [bgR, bgG, bgB] = hexToRgb(s.bgColor);
     const bgA = Math.round(
       Math.max(0, Math.min(100, s.bgOpacity)) * 2.55,
@@ -284,7 +312,7 @@ export function useTextTool({
     syncState();
     // Was a `text-committed` window CustomEvent before stage 4.
     useAnnotationStore.getState().commitText(ti.text);
-  }, [toolRef, flushToCanvas, syncState, refreshAnnotations]);
+  }, [toolRef, canvasRef, flushToCanvas, syncState, refreshAnnotations]);
 
   /** Open the textarea on top of an existing annotation for re-editing. */
   const editAnnotation = useCallback(
@@ -296,13 +324,28 @@ export function useTextTool({
       const ctr = container.getBoundingClientRect();
       const scaleX = cr.width / canvas.width;
       const scaleY = cr.height / canvas.height;
-      const screenX = cr.left - ctr.left + ann.x * scaleX;
-      const screenY = cr.top - ctr.top + ann.y * scaleY;
+      // Exact inverse of commitText's ink-anchor mapping (plain text only):
+      // the stored (x, y) is the engine tile origin; the overlay box opens
+      // shifted so its glyphs sit exactly on the baked ink. Symmetry with the
+      // commit side means edit→commit round-trips never drift.
+      let boxX = ann.x;
+      let boxY = ann.y;
+      if (ann.background_kind === 0 && toolRef.current) {
+        const ink = toolRef.current.text_ink_offset(
+          ann.text,
+          ann.font_size,
+          ann.bold,
+        );
+        boxX = ann.x + ink[0] - TEXT_OVERLAY_PAD_X / (scaleX || 1);
+        boxY = ann.y + ink[1] - TEXT_OVERLAY_PAD_Y / (scaleY || 1);
+      }
+      const screenX = cr.left - ctr.left + boxX * scaleX;
+      const screenY = cr.top - ctr.top + boxY * scaleY;
       const next: TextInput = {
         screenX,
         screenY,
-        canvasX: ann.x,
-        canvasY: ann.y,
+        canvasX: boxX,
+        canvasY: boxY,
         text: ann.text,
         rotation: ann.rotation_deg,
         fontSize: ann.font_size,
@@ -312,8 +355,8 @@ export function useTextTool({
       lastPositionRef.current = {
         screenX,
         screenY,
-        canvasX: ann.x,
-        canvasY: ann.y,
+        canvasX: boxX,
+        canvasY: boxY,
         rotation: ann.rotation_deg,
         fontSize: ann.font_size,
         fontWeight: next.fontWeight,

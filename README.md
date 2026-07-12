@@ -50,9 +50,9 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.20 — 2026-07-12
+### v7.21 — 2026-07-12
 
-**A command palette.** Alt+, opens a fuzzy-searchable palette over everything: jump to any tool or straight into a sub-mode ("Shapes › Arrows", "Stamps › Emojis"), toggle rulers, grid, or theme live, open a specific Settings tab, undo/redo, export — grouped into Tools / Settings / Actions, with your recent picks first on an empty query. Labels are state-aware ("Show Grid" becomes "Hide Grid"), it's fully keyboard-driven, and the hotkey stays quiet while you're typing in a field. Built on the tool registry from v7.19, so entries upgrade themselves as each tool migrates — and on the existing dialog primitive, with one small new dependency (`cmdk`). Verified in a real browser before merging: tool and sub-mode jumps, live grid/theme toggles, Settings-tab targeting, and palette-undo restoring the exact prior pixels.
+**Text now lands exactly where you typed it.** Committing a text annotation used to drop it below and to the right of where it sat while you were typing — barely visible at small sizes, but the offset grew with font size (about 23 pixels down at a large annotation size), because the typing overlay and the engine's renderer disagreed about where glyph ink starts relative to the anchor point. The engine now reports its true ink position (`text_ink_offset`, computed from the embedded font's real metrics), and the commit path maps the overlay position through it — with the exact inverse applied when you re-open a bubble to edit, so edit-and-commit cycles are pixel-stable instead of creeping. Measured after the fix: sub-pixel accuracy at every font size, drag-then-commit exact, re-edit round-trips changing zero pixels. Existing documents render identically — only where *new* commits land changed.
 
 ## License
 
