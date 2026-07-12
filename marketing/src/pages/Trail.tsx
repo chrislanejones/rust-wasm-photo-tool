@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.64",
+    date: "2026-07-12",
+    headline: "A command palette — press Alt+, and just type",
+    entries: [
+      { tag: "feature", text: "Press Alt+, anywhere and start typing: jump to any tool or straight into a sub-mode (type \"arrow\" and land in Shapes with Arrows selected), flip rulers, grid, or the theme live, open the exact Settings tab you want, undo, redo, export. Your recent picks surface first, labels update with state (\"Show Grid\" becomes \"Hide Grid\"), and it's fully keyboard-driven." },
+      { tag: "ui", text: "The palette knows about every tool today and gets smarter over time — as tools move onto the new registry, their sub-modes and settings show up automatically." },
+    ],
+  },
+  {
     version: "v0.9.63",
     date: "2026-07-12",
     headline: "Quiet groundwork for smarter tool panels",

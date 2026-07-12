@@ -50,9 +50,9 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.19 — 2026-07-12
+### v7.20 — 2026-07-12
 
-**The tool registry begins.** Paint's sub-mode pattern — icons on top, tool title below, body swaps per mode — is now a shared component, `ToolModeToggle`, built entirely from the existing UI primitives, and Paint is its first consumer. Alongside it, the first `ToolModule` registry entry: a typed shape every tool will migrate into, one per session, until tool wiring stops being manual. Nothing visible changed — Paint was verified identical in a real browser before merging (all four sub-modes toggle by mouse and keyboard, the brush paints, undo restores the exact prior pixels). The marketing site's home page also got a truth pass: object removal and text extraction marked live (they've been shipped for weeks), the real WASM bundle size, `.ora` interchange and the location-only GPS scrub added, and the confusing "No upload for demo" line now says what it meant — nothing leaves your device.
+**A command palette.** Alt+, opens a fuzzy-searchable palette over everything: jump to any tool or straight into a sub-mode ("Shapes › Arrows", "Stamps › Emojis"), toggle rulers, grid, or theme live, open a specific Settings tab, undo/redo, export — grouped into Tools / Settings / Actions, with your recent picks first on an empty query. Labels are state-aware ("Show Grid" becomes "Hide Grid"), it's fully keyboard-driven, and the hotkey stays quiet while you're typing in a field. Built on the tool registry from v7.19, so entries upgrade themselves as each tool migrates — and on the existing dialog primitive, with one small new dependency (`cmdk`). Verified in a real browser before merging: tool and sub-mode jumps, live grid/theme toggles, Settings-tab targeting, and palette-undo restoring the exact prior pixels.
 
 ## License
 

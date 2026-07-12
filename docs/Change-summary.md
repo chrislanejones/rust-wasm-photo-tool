@@ -931,3 +931,25 @@ screenshots in `~/ai-repo/ih-toolui/qc-evidence-s20/`.
 | 2   | **`ToolModule` type + `TOOL_MODULES` registry** (`features/tools/toolModules.ts`) — the registry shape the whole arc (and the command palette) builds on; Paint registered under its legacy `brush` id. Shape only: no routing rewired, no ids/shortcuts/persistence changed | Complete |
 | 3   | **Marketing home-page truth pass** — Hero: stale "v2.0" badge dropped, "No upload for demo" → "Free demo — nothing leaves your device", "~200KB WASM bundle" → real ~310 KB gzipped, "Real-time multi-device sync" → "Cloud edit sync when signed in". Features: AI card now says object removal + text extraction are live (card claimed "queued" for weeks), `.ora` interchange added to Format conversion, location-only GPS scrub added to Privacy. CTA: "no upload" → "nothing uploaded" | Complete |
 | 4   | **Engine-Roadmap pairing note** — Smart Brush + Magnetic Selection share one edge-detection core (build the gradient/edge map once in Rust, both features consume it); mirrored into the tool-arc plan (`ih-toolui/TOOL_ARC_PLAN.md`) under the Adjust & Select session | Complete |
+
+## v7.20 Change Summary — 2026-07-12
+
+The command palette (WT3 of the three-worktrees plan, overnight felix
+run in `ih-cmd`), verified across multiple tools in a real browser
+before merging: Stamps › Emojis and Paint › Paint jumps activate the
+right tool AND sub-mode, Show Grid rendered 68 live grid lines from
+the palette (and its label flipped to "Hide Grid"), theme switched
+dark/light live, "Security & EXIF" opened Settings directly on the
+Security pane, palette-Undo restored the exact canvas pixel hash, and
+zero console errors all session. Evidence in `ih-cmd/qc-evidence-*`.
+One investigation en route: the emoji picker "not showing" in the test
+browser turned out to be the WSL2 QC environment lacking any color-
+emoji font (`fc-list` = 0 matches) — the picker itself mounts fully
+(149 buttons, search, categories) and clicks register; not an app bug.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Palette shell** (`a923d1c`) — shadcn Command / `cmdk` (the only new dependency) composed on the existing `ui/dialog` primitive; Alt+, toggles from anywhere via `useKeyboardShortcuts`, behind the same input/textarea/contentEditable guard every other shortcut uses; Esc closes, focus is trapped and restored | Complete |
+| 2   | **Action registry** (`e5ec1c6`) — typed entries `{id, label, group, keywords, run()}` in Tools / Settings / Actions groups; Paint's entries derive from `paintModule.modes` (the v7.19 registry), unmigrated tools fall back to `toolConfig.ts` with a yield-to-registry guard so the palette upgrades itself as each tool migrates; persisted Recent group on empty query; state-aware labels (Show/Hide Grid) | Complete |
+| 3   | **Hot-toggle actions** (`313f71b`) — sub-mode jumps, live rulers/grid/theme via a `usePreferences` cross-instance broadcast (`lib/preferences.ts` — apply and the Convex pull now notify all hook instances), Settings-tab targeting via a `useUIStore.settingsRequest` signal, undo/redo through a `paletteActions` bridge registered from `useKeyboardShortcuts`. AppShell: zero lines changed; no new window CustomEvents | Complete |
+| 4   | **PARKING_LOT candidate logged** — the grandfathered `image-horse:open-settings` CustomEvent (Alt+S) can migrate to the new store signal | Complete |
