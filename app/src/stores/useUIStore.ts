@@ -45,6 +45,9 @@ interface UIState {
   exportDialogOpen: boolean;
   /** Command palette (Alt+,). Transient — never persisted. */
   showCommandPalette: boolean;
+  /** Most-recently-run palette command ids, newest first (persisted — drives
+   *  the "Recent" group shown when the palette query is empty). */
+  recentCommands: string[];
 
   // Cold-start boot splash: true until WASM is up + the session check resolves.
   booting: boolean;
@@ -79,6 +82,8 @@ interface UIState {
   setDeleteSelectedOpen: (v: SetArg<boolean>) => void;
   setExportDialogOpen: (v: SetArg<boolean>) => void;
   setShowCommandPalette: (v: SetArg<boolean>) => void;
+  /** Record a palette command run: dedupes, caps at 8. */
+  pushRecentCommand: (id: string) => void;
 
   setBooting: (v: SetArg<boolean>) => void;
   setFirstRun: (v: SetArg<boolean>) => void;
@@ -115,6 +120,7 @@ export const useUIStore = create<UIState>()(
       deleteSelectedOpen: false,
       exportDialogOpen: false,
       showCommandPalette: false,
+      recentCommands: [],
 
       booting: true,
       firstRun: true,
@@ -153,6 +159,10 @@ export const useUIStore = create<UIState>()(
         set((s) => ({ exportDialogOpen: resolveSet(v, s.exportDialogOpen) })),
       setShowCommandPalette: (v) =>
         set((s) => ({ showCommandPalette: resolveSet(v, s.showCommandPalette) })),
+      pushRecentCommand: (id) =>
+        set((s) => ({
+          recentCommands: [id, ...s.recentCommands.filter((x) => x !== id)].slice(0, 8),
+        })),
 
       setBooting: (v) => set((s) => ({ booting: resolveSet(v, s.booting) })),
       setFirstRun: (v) => set((s) => ({ firstRun: resolveSet(v, s.firstRun) })),
@@ -208,6 +218,9 @@ export const useUIStore = create<UIState>()(
       // docs/State-Management.md §6.
       partialize: (s): Partial<UIState> => ({
         masterTab: s.masterTab,
+        // Palette recents are a pure "remember my habits" pref, same class as
+        // masterTab. The palette OPEN flag stays transient.
+        recentCommands: s.recentCommands,
       }),
     },
   ),

@@ -2,7 +2,7 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "./AppShell";
 import { ShareViewer } from "@/components/ShareViewer";
-import { CommandPalette } from "@/features/commandPalette/CommandPalette";
+import { CommandPalette } from "@/features/commandPalette";
 
 export default function App() {
   // A `?v=<token>` link opens the read-only share viewer instead of the editor.
