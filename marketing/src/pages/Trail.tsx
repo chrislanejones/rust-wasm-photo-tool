@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.61",
+    date: "2026-07-11",
+    headline: "Groundwork for edits that survive a reload — and a sturdier photo list",
+    entries: [
+      { tag: "fix", text: "Your photo list can no longer vanish on its own. It used to be possible — rare, but real — for the \"Welcome back\" list to get cleared by a bad reload. Now it only ever clears when you actually delete your photos." },
+      { tag: "infra", text: "Behind the scenes: the editor can now record every brush stroke, blur, crop, and text change into a compact log, rebuild your exact image from it, and keep undo working across a page reload. A single brush stroke saves as about 75 bytes instead of rewriting megabytes. It's not switched on yet — it's being tested against real galleries first — but the pixel-for-pixel proof is done." },
+    ],
+  },
+  {
     version: "v0.9.60",
     date: "2026-07-11",
     headline: "The performance monitor gets smarter about when to check",

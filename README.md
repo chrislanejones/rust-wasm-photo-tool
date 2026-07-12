@@ -50,11 +50,9 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.16 — 2026-07-11
+### v7.17 — 2026-07-11
 
-**The Resources tab stops polling like it's 2010.** The Alt+Delete diagnostics window's Resources tab used to read everything — cores, tab memory, JS heap, WASM bytes, FPS — off one flat 800ms timer, forever, whether the panel was useful or not. `useDiagnostics` replaces it with three tiers matched to actual cost: an on-demand tab-memory read behind a manual Refresh button (that measurement is expensive and browser-throttled, so it shouldn't run on a clock), a 1.5s poll for heap/WASM/canvas while the panel's open, and a per-frame FPS counter that only samples while you're actively drawing — frozen at its last reading the moment you stop. Resources is now the tab you land on first. Merged from the `ih-diag` worktree (open since v7.14) and reconciled with v7.15's `ThreadedBlurBenchRow`, which shipped independently on the old architecture while this branch was in flight.
-
-> **About this release.** v7.14 (metadata scrubber + Diagnostics-window freeze fix + repo cleanup), v7.15 (parallel blur kernel), and v7.16 (diagnostics tiered polling) close out the same run of overnight/parallel-worktree sessions.
+**Undo gets a memory — groundwork release, everything off by default.** Every edit on a single-layer document now records into an operation log: compact, replayable descriptions of each stroke, blur, crop, and text change. Replay is byte-identical to what the live tools drew — proven against the real engine in `cargo test`, zero tolerance. Behind a DevTools switch, undo/redo runs off that log instead of full-canvas snapshots, with an automatic fallback: any edit the log can't represent yet quietly hands undo back to the snapshot path. The log also persists to IndexedDB — a brush stroke saves as a ~75-byte append instead of a multi-megabyte rewrite — and after a reload the document comes back with its undo history still working. Keyframes travel through the engine's own PNG codec, byte-exact, transparency included. None of this is on for users yet; the default build is unchanged to the byte count. One fix ships live for everyone: the gallery's resume list can no longer be cleared by anything other than you actually deleting your photos — it used to be possible for it to vanish on a bad reload.
 
 ## License
 

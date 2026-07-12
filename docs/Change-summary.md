@@ -871,3 +871,30 @@ nothing on the Rust side moved).
 | 3   | **Resources is now the default tab** (was System Telemetry) — debugging a slowdown starts at the machine, narrows to the app/engine, then the document; tab order left-to-right documents that flow | Complete |
 | 4   | **Reconciled with v7.15's `ThreadedBlurBenchRow`** — that component shipped independently onto the pre-rewrite `ResourceMonitor` while this branch was in flight (its own commit message flagged the eventual merge); carried over unchanged onto the new tiered props, since it never read `snap`/`diag` in the first place | Complete |
 | 5   | **`ih-diag`'s own copy of the FirstRunScreen z-index fix dropped as a no-op** — v7.14 had already shipped the identical fix (`BrandRevealScreen`'s `zIndexClass` prop, `FirstRunScreen` passing `z-panel`) to master while this branch was open; the two patches were byte-identical | Complete |
+
+## v7.17 Change Summary — 2026-07-11
+
+The tile-wiring arc lands: the operation log goes from feature-gated
+scaffolding to a working undo engine with persistence, all behind
+switches that ship OFF. The default wasm build is 641,619 bytes (was
+642,054 — the 435-byte drop is the brush kernels moving to shared pure
+functions, with byte-parity against the live path proven in tests, not
+assumed). One user-facing fix ships live: the gallery resume manifest
+can no longer be cleared by anything except an explicit deletion.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Flush path reads through `TileBuffer`** behind the `ih_tiles_flush` DevTools switch (single-layer docs; tiles-feature builds only) — render parity, cross-tile strokes, and undo verified live; dirty-rect counts surface in Diagnostics → Resources | Complete |
+| 2   | **`ops::apply()` implemented for every op** — Stroke (paint + erase), Blur brush, Text add/edit/remove, Shape add/edit/remove, LayerMove, joining Fill/Crop/Levels. The op log replays over a *document* (pixel plane + live annotation lists — ADR-012), and pixel ops call the engine's own kernels via shared pure functions. Engine-vs-replay byte parity proven by driving the real `paint_down`/`effect_down`/`add_text_annotation` in `src/ops_engine_parity.rs` | Complete |
+| 3   | **Op-log undo/redo** behind `ih_oplog_undo` — `undo()`/`redo()` replay from the nearest keyframe when the engine's composite hashes identical to the log's; any unrecorded edit (clone stamp, filters, masks, pixelate/redact) fails the check and falls back to snapshot undo seamlessly (ADR-013). Cursor-based redo, keyframe pruning (base + last 3 in memory), passive always-on recording, annotation ops captured by an engine-vs-log diff at `recomposite()` | Complete |
+| 4   | **Op-log persistence** behind `USE_OPLOG_PERSISTENCE` / `ih_oplog_persist` — Dexie v2 adds `opLogs`/`keyframes`/`oplogManifests` (additive; v1 untouched); ~2s-debounced saves commit chunks + keyframes + manifest in one transaction; generation counter drives append-vs-rewrite on history branches; restore replays from the base keyframe and lands on the persisted cursor, undo history intact. Persist → reload → restore proven byte-identical in Rust and live in-browser (75-byte stroke chunks) | Complete |
+| 5   | **Keyframes ride the engine's PNG codec** (`oplog_keyframe_png` / `oplog_restore_png`) — the browser-canvas PNG path corrupts pixels (color-space + premultiply transforms on decode; caught live against a real gallery). The engine codec round-trips byte-exact, transparency included; the JS canvas path survives only as a hardened fallback | Complete |
+| 6   | **Resume-manifest hardening (ships live)** — the gallery persist effect only saves; clearing happens solely at explicit user deletions (Delete All, bulk delete emptying, removing the last photo, Start fresh). Previously a non-empty → empty photos transition — reachable by dev-reload churn, not just user intent — deleted the manifest | Complete |
+| 7   | **Restored sessions read correctly** — History-panel labels synthesize from the ops after an op-log restore; multi-layer docs report the log as inactive instead of broken; archive-restored photos start their log from a clean lazy-captured base | Complete |
+| 8   | **ADR-012 + ADR-013 drafted**, ADR-003/004/006 status notes updated to the shipped state (all remain Draft pending dogfooding) | Complete |
+
+Scope honesty: op-log undo and persistence activate only on
+single-layer documents (multi-layer keeps snapshot undo untouched),
+and most existing photos load as two-layer artboards — the activation
+gap is a known, logged decision for a future release. Full QC pass
+still owed before any switch defaults flip.
