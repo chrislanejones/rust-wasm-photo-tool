@@ -11,6 +11,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { usePreferences } from "@/lib/preferences";
+import { usePaletteActionsStore } from "./paletteActions";
 import {
   buildPaletteCommands,
   type PaletteCommand,
@@ -65,7 +67,13 @@ export function CommandPalette() {
   const setOpen = useUIStore((s) => s.setShowCommandPalette);
   const recentIds = useUIStore((s) => s.recentCommands);
   const pushRecentCommand = useUIStore((s) => s.pushRecentCommand);
+  const requestSettings = useUIStore((s) => s.requestSettings);
   const photoCount = useGalleryStore((s) => s.photos.length);
+  // Same-source prefs as AppShell — usePreferences broadcasts commits across
+  // instances, so hot-toggles here update the live overlays/theme instantly.
+  const [prefs, applyPrefs] = usePreferences();
+  // AppShell session handlers (undo/redo), registered by useKeyboardShortcuts.
+  const actions = usePaletteActionsStore((s) => s.actions);
 
   const [query, setQuery] = useState("");
   // Clear the search whenever the palette closes so it reopens fresh.
@@ -74,8 +82,19 @@ export function CommandPalette() {
   }, [open]);
 
   const commands = useMemo(
-    () => buildPaletteCommands({ photoCount }),
-    [photoCount],
+    () =>
+      buildPaletteCommands({
+        photoCount,
+        prefs: {
+          rulers: prefs.rulers,
+          grid: prefs.grid,
+          theme: prefs.theme,
+          set: (patch) => applyPrefs({ ...prefs, ...patch }),
+        },
+        requestSettings,
+        actions,
+      }),
+    [photoCount, prefs, applyPrefs, requestSettings, actions],
   );
 
   const recents = useMemo(

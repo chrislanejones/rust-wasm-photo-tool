@@ -37,6 +37,8 @@ import {
   Undo2,
 } from "lucide-react";
 import type { ToolType } from "@/lib/types";
+import type { ThemeChoice } from "@/lib/preferences";
+import type { SettingsTab } from "@/components/SubscriptionButton";
 import { TOOLS, TOOL_MODULES } from "@/features/tools";
 import {
   useToolStore,
@@ -67,15 +69,18 @@ export interface PaletteCommand {
  *  TASK C plumbing — until provided, their entries render disabled. */
 export interface PaletteContext {
   photoCount: number;
-  /** Rulers/grid/theme hot-toggles (preferences live outside Zustand). */
+  /** Rulers/grid/theme hot-toggles (preferences live outside Zustand —
+   *  usePreferences broadcasts commits to every instance, AppShell included). */
   prefs?: {
     rulers: boolean;
     grid: boolean;
-    theme: "system" | "dark" | "light";
-    set: (patch: Partial<{ rulers: boolean; grid: boolean; theme: "system" | "dark" | "light" }>) => void;
+    theme: ThemeChoice;
+    set: (
+      patch: Partial<{ rulers: boolean; grid: boolean; theme: ThemeChoice }>,
+    ) => void;
   };
   /** Open the Settings modal on a given tab (Security, Rulers & Grids…). */
-  requestSettings?: (tab?: string) => void;
+  requestSettings?: (tab?: SettingsTab) => void;
   /** AppShell-scoped session handlers, bridged via useKeyboardShortcuts. */
   actions?: { undo: () => void; redo: () => void } | null;
 }

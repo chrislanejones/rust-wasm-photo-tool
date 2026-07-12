@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { ToolType } from "@/lib/types";
 import { useUIStore } from "@/stores/useUIStore";
+import { setPaletteActions } from "@/features/commandPalette";
 
 /** All ten tools in toolbar order — keys 1-9, 0 */
 const TOOL_BY_DIGIT: Record<string, ToolType> = {
@@ -111,6 +112,15 @@ export function useKeyboardShortcuts({
   onSpaceUp,
 }: KeyboardShortcutOptions) {
   const spaceHeldRef = useRef(false);
+
+  // Publish the session handlers the command palette reuses (undo/redo).
+  // This hook already receives them from AppShell for Ctrl+Z/Ctrl+Shift+Z —
+  // registering here gives the palette the same reach with zero AppShell
+  // edits and no CustomEvents.
+  useEffect(() => {
+    setPaletteActions({ undo: onUndo, redo: onRedo });
+    return () => setPaletteActions(null);
+  }, [onUndo, onRedo]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

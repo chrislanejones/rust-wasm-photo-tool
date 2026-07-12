@@ -260,6 +260,20 @@ function savePreferences(p: Preferences): void {
   }
 }
 
+// ── Cross-instance sync ──────────────────────────────────────────────────────
+// More than one component calls usePreferences() (AppShell owns the applied
+// prefs; the command palette hot-toggles rulers/grid/theme). Each instance has
+// its own useState, so a commit from one must be pushed to the others or they
+// silently drift until reload. Every instance subscribes here; `apply` and the
+// Convex pull broadcast to all of them (same-tab only — localStorage `storage`
+// events never fire in the writing tab). Listeners only setState — no
+// re-broadcast, so no loops.
+const prefListeners = new Set<(p: Preferences) => void>();
+
+function broadcastPreferences(p: Preferences): void {
+  for (const listener of prefListeners) listener(p);
+}
+
 /**
  * Live preferences + an `apply` that commits them. Reads localStorage first;
  * when signed in, pulls the Convex-saved settings (server wins on load) and
@@ -275,6 +289,15 @@ export function usePreferences() {
   // own write) and the push (skip identical writes).
   const syncedHashRef = useRef<string | null>(null);
 
+  // Stay in sync with commits made through OTHER usePreferences() instances
+  // (e.g. the command palette's rulers/grid/theme hot-toggles → AppShell).
+  useEffect(() => {
+    prefListeners.add(setPrefs);
+    return () => {
+      prefListeners.delete(setPrefs);
+    };
+  }, []);
+
   // Pull: adopt the server's settings when they differ from what we last synced.
   useEffect(() => {
     if (!me || !me.settings || !me.settingsHash) return;
@@ -282,8 +305,8 @@ export function usePreferences() {
     try {
       const remote = normalize(JSON.parse(me.settings));
       syncedHashRef.current = me.settingsHash;
-      setPrefs(remote);
       savePreferences(remote);
+      broadcastPreferences(remote); // includes this instance's setPrefs
     } catch {
       // malformed server blob — keep local
     }
@@ -292,8 +315,8 @@ export function usePreferences() {
   const apply = useCallback(
     (next: Preferences) => {
       const value = normalize(next);
-      setPrefs(value);
       savePreferences(value);
+      broadcastPreferences(value); // includes this instance's setPrefs
       if (!isAuthenticated) return;
       void (async () => {
         const hash = await hashPreferences(value);
