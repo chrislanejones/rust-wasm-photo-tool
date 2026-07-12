@@ -99,7 +99,10 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "stamp",
-    label: "Clone Stamp",
+    // DISPLAY label only — the tool does clone + red/batch stamps + emojis.
+    // The "stamp" id (shortcut, persistence, routing) is intentionally
+    // untouched; ids are renamed during the registry migration only.
+    label: "Stamps",
     description: "Clone stamp, red stamps & emojis",
     icon: Stamp,
     gradient: "from-rose-500 to-red-600",

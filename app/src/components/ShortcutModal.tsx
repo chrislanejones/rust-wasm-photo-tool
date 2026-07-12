@@ -19,7 +19,7 @@ const SHORTCUT_GROUPS = [
       { keys: ["6"], action: "AI" },
       { keys: ["7"], action: "Shapes & Arrows" },
       { keys: ["8"], action: "Effects (Levels & Color Picker)" },
-      { keys: ["9"], action: "Clone Stamp & Stamps" },
+      { keys: ["9"], action: "Stamps" },
       { keys: ["0"], action: "Batch Image Editor" },
     ],
   },
@@ -60,7 +60,7 @@ const SHORTCUT_GROUPS = [
     ],
   },
   {
-    title: "Clone Stamp",
+    title: "Stamps (Clone)",
     shortcuts: [
       { keys: ["Alt", "Click"], action: "Set Source Point" },
       { keys: ["Ctrl", "["], action: "Decrease Brush Size" },
