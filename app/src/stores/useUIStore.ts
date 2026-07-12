@@ -43,6 +43,8 @@ interface UIState {
   deletePhotoId: string | null;
   deleteSelectedOpen: boolean;
   exportDialogOpen: boolean;
+  /** Command palette (Alt+,). Transient — never persisted. */
+  showCommandPalette: boolean;
 
   // Cold-start boot splash: true until WASM is up + the session check resolves.
   booting: boolean;
@@ -76,6 +78,7 @@ interface UIState {
   setDeletePhotoId: (v: SetArg<string | null>) => void;
   setDeleteSelectedOpen: (v: SetArg<boolean>) => void;
   setExportDialogOpen: (v: SetArg<boolean>) => void;
+  setShowCommandPalette: (v: SetArg<boolean>) => void;
 
   setBooting: (v: SetArg<boolean>) => void;
   setFirstRun: (v: SetArg<boolean>) => void;
@@ -111,6 +114,7 @@ export const useUIStore = create<UIState>()(
       deletePhotoId: null,
       deleteSelectedOpen: false,
       exportDialogOpen: false,
+      showCommandPalette: false,
 
       booting: true,
       firstRun: true,
@@ -147,6 +151,8 @@ export const useUIStore = create<UIState>()(
         set((s) => ({ deleteSelectedOpen: resolveSet(v, s.deleteSelectedOpen) })),
       setExportDialogOpen: (v) =>
         set((s) => ({ exportDialogOpen: resolveSet(v, s.exportDialogOpen) })),
+      setShowCommandPalette: (v) =>
+        set((s) => ({ showCommandPalette: resolveSet(v, s.showCommandPalette) })),
 
       setBooting: (v) => set((s) => ({ booting: resolveSet(v, s.booting) })),
       setFirstRun: (v) => set((s) => ({ firstRun: resolveSet(v, s.firstRun) })),

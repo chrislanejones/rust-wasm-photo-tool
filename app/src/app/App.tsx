@@ -2,6 +2,7 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "./AppShell";
 import { ShareViewer } from "@/components/ShareViewer";
+import { CommandPalette } from "@/features/commandPalette/CommandPalette";
 
 export default function App() {
   // A `?v=<token>` link opens the read-only share viewer instead of the editor.
@@ -18,6 +19,9 @@ export default function App() {
   return (
     <TooltipProvider>
       <AppShell />
+      {/* Global chrome mounted at the composition root, NOT inside AppShell
+          (it must gain nothing new). Opened via Alt+, → useUIStore. */}
+      <CommandPalette />
     </TooltipProvider>
   );
 }

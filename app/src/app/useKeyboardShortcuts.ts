@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ToolType } from "@/lib/types";
+import { useUIStore } from "@/stores/useUIStore";
 
 /** All ten tools in toolbar order — keys 1-9, 0 */
 const TOOL_BY_DIGIT: Record<string, ToolType> = {
@@ -218,6 +219,16 @@ export function useKeyboardShortcuts({
 
       // ─── Alt combos ────────────────────────────────────
       if (e.altKey) {
+        // Alt+, toggles the command palette. Reads the UI store directly (the
+        // palette is global chrome, not an AppShell concern — no new prop).
+        // The input/textarea/contentEditable guard above already prevents this
+        // firing while the user is typing.
+        if (e.code === "Comma") {
+          e.preventDefault();
+          useUIStore.getState().setShowCommandPalette((v) => !v);
+          return;
+        }
+
         // Alt+/ toggles the shortcut modal (with or without Shift, so users
         // can press the literal "/" key or the shifted "?" interchangeably).
         if (e.code === "Slash") {
