@@ -17,6 +17,7 @@ import { usePastePlacementTool } from "@/hooks/usePastePlacementTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
 import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
+import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { panelSpacingTransition, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
@@ -71,6 +72,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { useSelectionActions } from "./session/useSelectionActions";
 import { useCanvasActions } from "./session/useCanvasActions";
+import { useCopyRegionAction } from "./session/useCopyRegionAction";
 import { useImageSession } from "./session/useImageSession";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
@@ -123,6 +125,7 @@ import {
   Redo,
   Download,
   Clipboard,
+  Copy,
   Trash2,
   ZoomIn,
   ZoomOut,
@@ -1177,6 +1180,18 @@ export function AppShell() {
     activeTool,
   });
 
+  // Region-aware copy (Ctrl+C / context menu): the active crop box, shape
+  // bbox, or magic-wand selection bounds — falls back to whole-canvas copy.
+  // Pasting a region copy re-enters via the paste flow → pastePlacement.
+  const { hasActiveRegion, handleCopyRegion } = useCopyRegionAction({
+    stamp,
+    activeTool,
+    cropSelection: drawingTools.cropSelection,
+    editState: drawingTools.editState,
+    selectionMask,
+    copyFullCanvas: handleCopyToClipboard,
+  });
+
   const textTool = useTextTool({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -1346,6 +1361,18 @@ export function AppShell() {
     syncState: stamp.syncState,
     active: activeTool === "stamp",
     brushSize: stampSettings.brushSize,
+  });
+
+  // Stamp teardown: deactivating the Stamp tool or switching its sub-mode
+  // clears the armed stamp (clone source, pending red stamp, selected emoji)
+  // so leaving stops stamping entirely and re-entering starts clean.
+  useStampTeardown({
+    activeTool,
+    stampSubMode,
+    clearCloneSource: stamp.clearCloneSource,
+    clearPendingStamp: redStampTool.clearPendingStamp,
+    clearEmoji: () =>
+      setToolSettings((p) => (p.emoji ? { ...p, emoji: "" } : p)),
   });
 
   const effectiveStamp = useEffectiveTool({
@@ -2117,6 +2144,7 @@ export function AppShell() {
     onFlipV: stamp.flipVertical,
     onRotateCw: stamp.rotate90Cw,
     onCopyToClipboard: handleCopyToClipboard,
+    onCopyRegion: handleCopyRegion,
     onNextPhoto: handleNextPhoto,
     onPrevPhoto: handlePrevPhoto,
     onSpaceDown: () => setIsPanning(true),
@@ -2864,6 +2892,13 @@ export function AppShell() {
             <ContextMenuShortcut>Ctrl+Shift+Z</ContextMenuShortcut>
           </ContextMenuItem>
           <ContextMenuSeparator />
+          <ContextMenuItem
+            onClick={handleCopyRegion}
+            disabled={!hasImage || !hasActiveRegion}
+          >
+            <Copy className="h-4 w-4 mr-2" /> Copy Selection
+            <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
+          </ContextMenuItem>
           <ContextMenuItem onClick={handleCopyToClipboard} disabled={!hasImage}>
             <Clipboard className="h-4 w-4 mr-2" /> Copy to Clipboard
             <ContextMenuShortcut>Ctrl+Shift+C</ContextMenuShortcut>

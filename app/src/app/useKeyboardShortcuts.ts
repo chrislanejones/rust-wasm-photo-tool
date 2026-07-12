@@ -61,6 +61,10 @@ interface KeyboardShortcutOptions {
   onFlipV?: () => void;
   onRotateCw?: () => void;
   onCopyToClipboard?: () => void;
+  /** Ctrl/Cmd+C — region-aware copy: the active bounding box / selection
+   *  (crop box, shape bbox, magic-wand bounds), falling back to the whole
+   *  canvas. Ctrl+Shift+C stays the explicit whole-canvas copy. */
+  onCopyRegion?: () => void;
   /** Ctrl/Cmd+M — toggle the Move-layer mode (Layer Settings tool). */
   onToggleMove?: () => void;
   /** Ctrl/Cmd+\ — pop the feature-celebration dialog (easter egg). */
@@ -99,6 +103,7 @@ export function useKeyboardShortcuts({
   onFlipV,
   onRotateCw,
   onCopyToClipboard,
+  onCopyRegion,
   onNextPhoto,
   onPrevPhoto,
   onSpaceDown,
@@ -169,9 +174,20 @@ export function useKeyboardShortcuts({
           e.shiftKey ? onRedo() : onUndo();
           return;
         }
-        if (e.shiftKey && e.code === "KeyC") {
-          e.preventDefault();
-          onCopyToClipboard?.();
+        if (e.code === "KeyC") {
+          if (e.shiftKey) {
+            // Ctrl/Cmd+Shift+C — explicit whole-canvas copy (unchanged).
+            e.preventDefault();
+            onCopyToClipboard?.();
+            return;
+          }
+          // Ctrl/Cmd+C — region-aware copy. Yield to a native DOM text
+          // selection (don't preventDefault) so copying page text still works.
+          const sel = window.getSelection();
+          if (!sel || sel.isCollapsed) {
+            e.preventDefault();
+            onCopyRegion?.();
+          }
           return;
         }
         // Ctrl/Cmd + M → toggle Move-layer (Layer Settings tool).
@@ -279,6 +295,6 @@ export function useKeyboardShortcuts({
     setShowUpload, setShowTools, setShowGallery,
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
     onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,
-    onCopyToClipboard, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
+    onCopyToClipboard, onCopyRegion, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
   ]);
 }
