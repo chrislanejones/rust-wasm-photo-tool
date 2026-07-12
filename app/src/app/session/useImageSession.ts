@@ -393,6 +393,10 @@ export function useImageSession({
           setActivePhotoId(null);
           setHasBeenModified(false);
           setCompareActive(false);
+          // The user removed the LAST photo — clear the resume manifest
+          // here, explicitly (AppShell's persist effect never clears on
+          // its own; see the 2026-07-11 incident note there).
+          void clearGalleryManifest();
         }
         return next;
       });
