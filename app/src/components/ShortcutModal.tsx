@@ -46,6 +46,7 @@ const SHORTCUT_GROUPS = [
     shortcuts: [
       { keys: ["Ctrl", "Z"], action: "Undo" },
       { keys: ["Ctrl", "Shift", "Z"], action: "Redo" },
+      { keys: ["Ctrl", "C"], action: "Copy Selection / Canvas" },
       { keys: ["Ctrl", "Shift", "C"], action: "Copy to Clipboard" },
       { keys: ["Alt", "D"], action: "Delete All Images" },
     ],
