@@ -27,6 +27,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.62",
+    date: "2026-07-12",
+    headline: "Copy any selection, and the stamp tool learns to let go",
+    entries: [
+      { tag: "feature", text: "Ctrl+C now copies whatever selection you have active — a crop box, a shape's bounds, a magic-wand selection — and Ctrl+V pastes it back through the same movable placement box you already know. There's a \"Copy Selection\" option in the right-click menu too. Before this, copy only worked on the whole canvas at once." },
+      { tag: "fix", text: "Leaving the stamp tool — or switching between its Clone, Stamps, and Emoji modes — now actually puts the stamp down. Before, the last stamp you'd picked kept firing on every click, even after you'd moved on to a different mode." },
+      { tag: "ui", text: "The toolbar button formerly called \"Clone Stamp\" is now just \"Stamps.\" It's done clone, emoji, and batch stamping for a long while — the name finally caught up. Same button, same shortcut." },
+    ],
+  },
+  {
     version: "v0.9.61",
     date: "2026-07-11",
     headline: "Groundwork for edits that survive a reload — and a sturdier photo list",

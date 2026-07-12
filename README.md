@@ -50,9 +50,9 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.17 — 2026-07-11
+### v7.18 — 2026-07-12
 
-**Undo gets a memory — groundwork release, everything off by default.** Every edit on a single-layer document now records into an operation log: compact, replayable descriptions of each stroke, blur, crop, and text change. Replay is byte-identical to what the live tools drew — proven against the real engine in `cargo test`, zero tolerance. Behind a DevTools switch, undo/redo runs off that log instead of full-canvas snapshots, with an automatic fallback: any edit the log can't represent yet quietly hands undo back to the snapshot path. The log also persists to IndexedDB — a brush stroke saves as a ~75-byte append instead of a multi-megabyte rewrite — and after a reload the document comes back with its undo history still working. Keyframes travel through the engine's own PNG codec, byte-exact, transparency included. None of this is on for users yet; the default build is unchanged to the byte count. One fix ships live for everyone: the gallery's resume list can no longer be cleared by anything other than you actually deleting your photos — it used to be possible for it to vanish on a bad reload.
+**Copy any selection, and the stamp tool learns to let go.** Ctrl+C now copies whatever bounding box is active — a crop box, a shape or arrow's bounds, a magic-wand selection — as pixels, and Ctrl+V drops the copy back in through the same placement box pasting has used since v7.8. There's a "Copy Selection" entry in the right-click menu too. Second fix: leaving the stamp tool (or switching between its Clone / Stamps / Emoji sub-modes) now actually clears the active stamp — before this, the last-selected stamp kept firing on every click, even in Clone mode, because its pending state was never torn down. And the toolbar button formerly labeled "Clone Stamp" is now just "Stamps" — it's done clone, emoji, red-marker, and batch stamps for a long while; the label caught up. All three verified on canvas against the production build before merging.
 
 ## License
 

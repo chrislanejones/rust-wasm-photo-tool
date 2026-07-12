@@ -898,3 +898,18 @@ single-layer documents (multi-layer keeps snapshot undo untouched),
 and most existing photos load as two-layer artboards — the activation
 gap is a known, logged decision for a future release. Full QC pass
 still owed before any switch defaults flip.
+
+## v7.18 Change Summary — 2026-07-12
+
+Three tool fixes from the `ih-fixes` overnight run (branch
+`fix/bbox-copy-stamp-teardown-rename`, one commit each), all verified
+on canvas against the production build before merging. TS-only —
+`rust/` and the flush path untouched (verified: all diffs confined to
+`app/src`). Gates: `tsc --noEmit` + production build clean between
+every commit.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Copy/paste for every bounding-box type** — plain Ctrl+C didn't exist (only Ctrl+Shift+C, whole canvas). New `useCopyRegionAction` session hook copies the *active* bbox — crop box, shape/arrow bounds, magic-wand selection bounds — as PNG via the engine's existing `copy_region`, from Ctrl+C or a new "Copy Selection" context-menu item. Paste needed zero changes: region copies re-enter the v7.8 paste-placement flow (placement box, Enter/Esc). DECISION: copies are active-layer bounding-rect pixels, non-mutating; mask-shaped extraction and shape rasterization would need engine APIs (out of scope, parked for Silas); text boxes copy as text natively; Ctrl+C yields to native DOM text selections | Complete |
+| 2   | **Stamp state teardown on tool/sub-mode exit** — the last-selected stamp kept firing on every click after leaving stamp mode. Root cause in three places, worst being `useRedStampTool.pendingStamp`: set by event, never cleared, and routed into clicks even in Clone sub-mode. New `useStampTeardown` hook fires on tool deactivate + sub-mode switch and clears pending stamp, selected emoji, and the clone source (JS-side disarm in `useCloneStamp` — the engine has no `clear_source`; the disarm gates `begin_stroke` and aborts in-flight strokes; Alt+Click re-arms). Within-mode behavior untouched | Complete |
+| 3   | **"Clone Stamp" → "Stamps" (display label only)** — one string in `toolConfig.ts` feeds button text, tooltip, `title`, and `aria-label`, plus two ShortcutModal copies. Tool id `stamp`, shortcut 9, and persistence keys untouched. Marketing/docs mentions flagged for a separate pass, not edited | Complete |
