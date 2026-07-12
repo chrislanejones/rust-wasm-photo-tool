@@ -314,6 +314,29 @@ pub enum Op {
     ShapeEdit(ShapeParams),
 }
 
+impl Op {
+    /// Human-facing history label — matches the labels the snapshot path
+    /// uses for the same actions, so the History panel reads identically
+    /// whichever undo engine is live.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Op::Stroke { brush, .. } if brush.erase => "Erase",
+            Op::Stroke { .. } => "Paint",
+            Op::FillRegion { .. } => "Fill",
+            Op::Blur { .. } => "Blur",
+            Op::Levels(_) => "Levels",
+            Op::Crop { .. } => "Crop",
+            Op::TextAdd(_) => "Add Text",
+            Op::TextEdit(_) => "Edit Text",
+            Op::TextRemove { .. } => "Delete Text",
+            Op::ShapeAdd(_) => "Add Shape",
+            Op::ShapeEdit(_) => "Edit Shape",
+            Op::ShapeRemove { .. } => "Delete Shape",
+            Op::LayerMove { .. } => "Move Layer",
+        }
+    }
+}
+
 /// Errors from decoding an encoded op.
 #[derive(Debug, PartialEq, Eq)]
 pub enum OpError {

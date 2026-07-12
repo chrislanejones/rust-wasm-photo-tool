@@ -294,3 +294,50 @@ describe("restore path", () => {
     expect(await restoreOplog(t, "p1")).toBe("none");
   });
 });
+
+describe("engine-PNG surface (preferred path)", () => {
+  class PngTool extends FakeTool {
+    pngRequested: number[] = [];
+    restorePngArgs: unknown[] | null = null;
+    oplog_keyframe_png(atOp: number): Uint8Array {
+      this.pngRequested.push(atOp);
+      // Distinctive bytes; must land in the blob VERBATIM.
+      return new Uint8Array([137, 80, 78, 71, atOp, 42]);
+    }
+    oplog_restore_png(
+      basePng: Uint8Array,
+      baseAnnotations: Uint8Array,
+      frames: Uint8Array,
+      cursor: number,
+    ): boolean {
+      this.restorePngArgs = [basePng, baseAnnotations, frames, cursor];
+      return true;
+    }
+  }
+
+  it("stores the engine's PNG bytes verbatim and restores through oplog_restore_png", async () => {
+    await seedPhoto("p1");
+    const writer = new PngTool();
+    writer.push(10, 11);
+    await saveOplogNow(writer, "p1");
+    expect(writer.pngRequested).toEqual([0]);
+
+    const kf = (await db.keyframes.toArray())[0];
+    expect(Array.from(new Uint8Array(await kf.blob.arrayBuffer()))).toEqual([
+      137, 80, 78, 71, 0, 42,
+    ]);
+
+    const reader = new PngTool();
+    expect(await restoreOplog(reader, "p1")).toBe("restored");
+    expect(reader.restoreArgs).toBeNull(); // RGBA entry point NOT used
+    const [png, , frames, cursor] = reader.restorePngArgs as [
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      number,
+    ];
+    expect(Array.from(png)).toEqual([137, 80, 78, 71, 0, 42]);
+    expect(Array.from(frames)).toEqual([1, 0, 0, 0, 10, 1, 0, 0, 0, 11]);
+    expect(cursor).toBe(2);
+  });
+});

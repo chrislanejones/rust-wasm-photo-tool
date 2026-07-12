@@ -1461,6 +1461,48 @@ impl ImageHorseTool {
             })
     }
 
+    /// The keyframe document's PIXEL plane as PNG bytes, encoded by the
+    /// ENGINE's own codec (byte-exact round trip proven in codec.rs tests).
+    /// This is the preferred persistence format: the browser-canvas PNG
+    /// path (`OffscreenCanvas`/`createImageBitmap`) applies color-space and
+    /// premultiplication transforms that are NOT byte-faithful — the exact
+    /// corruption the 2026-07-11 real-gallery check caught. Empty when the
+    /// keyframe isn't resident.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_keyframe_png(&self, at_op: u32) -> Vec<u8> {
+        self.oplog
+            .as_ref()
+            .and_then(|l| l.keyframe_document(at_op as usize))
+            .map_or_else(Vec::new, |d| {
+                let mut flat = vec![0u8; (d.width() as usize) * (d.height() as usize) * 4];
+                d.pixels.blit_to_flat(&mut flat);
+                crate::codec::export_png(&crate::core::ImageBuffer {
+                    width: d.width(),
+                    height: d.height(),
+                    data: flat,
+                })
+            })
+    }
+
+    /// [`oplog_restore`] with the base as PNG bytes — decoded by the
+    /// engine's own codec, so the whole persist→restore pixel path stays
+    /// inside proven byte-exact code. Returns false (changing nothing) on
+    /// a corrupt/undecodable PNG, exactly like the other validation
+    /// failures.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_restore_png(
+        &mut self,
+        base_png: &[u8],
+        base_annotations: &[u8],
+        frames: &[u8],
+        cursor: u32,
+    ) -> bool {
+        let Ok((rgba, w, h)) = crate::codec::decode_png(base_png) else {
+            return false;
+        };
+        self.oplog_restore(&rgba, w, h, base_annotations, frames, cursor)
+    }
+
     /// Rebuild the op log from persisted parts — the resume path. `base_*`
     /// is the base document (PIXEL plane + encoded annotation lists),
     /// `frames` the full framed op stream, `cursor` the applied-op position
@@ -1687,6 +1729,32 @@ impl ImageHorseTool {
     }
 
     pub fn history_labels(&self) -> String {
+        // After an op-log RESTORE the snapshot stacks are empty (cleared —
+        // they referenced pre-reload state) while the log holds the real
+        // history. Synthesize the panel's labels from the ops so the
+        // restored session's History panel matches its undo depth instead
+        // of showing a stale/empty list.
+        #[cfg(feature = "tiles")]
+        if self.oplog_use_for_undo
+            && !self.oplog_broken
+            && self.layers.len() == 1
+            && self.hist.undo_count() == 0
+            && self.hist.redo_count() == 0
+        {
+            if let Some(log) = self.oplog.as_ref() {
+                if !log.is_empty() {
+                    let mut parts: Vec<String> = log.ops()[..log.cursor()]
+                        .iter()
+                        .map(|op| format!("undo:{}", op.label()))
+                        .collect();
+                    parts.push("current:Current State".to_string());
+                    for op in &log.ops()[log.cursor()..] {
+                        parts.push(format!("redo:{}", op.label()));
+                    }
+                    return parts.join("|");
+                }
+            }
+        }
         self.hist.labels()
     }
 

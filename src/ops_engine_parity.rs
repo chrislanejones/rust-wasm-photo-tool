@@ -655,3 +655,89 @@ fn multi_layer_archive_restore_reads_inactive_not_broken() {
     // Undo still works via snapshots, untouched.
     assert!(t2.undo());
 }
+
+#[test]
+fn persist_restore_via_engine_png_is_byte_identical_with_transparency() {
+    // The 2026-07-11 real-gallery check caught base-keyframe corruption
+    // when keyframes round-tripped through the BROWSER's PNG path
+    // (OffscreenCanvas encode / createImageBitmap decode apply color-space
+    // + premultiplication transforms). This pins the fix: the ENGINE's own
+    // PNG codec carries the base keyframe, byte-exact — including
+    // semi-transparent and fully-transparent-with-nonzero-RGB pixels,
+    // which are exactly what premultiplication mangles.
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+
+    // Real edits incl. an ERASE (creates semi/fully transparent pixels
+    // with surviving RGB) and a soft translucent stroke.
+    stroke(&mut t, (10.0, 10.0), (70.0, 30.0), "#cc3311");
+    t.erase_down(30.0, 20.0, 14.0, 0.6, 0.5, "off");
+    t.erase_move(55.0, 25.0);
+    t.erase_up();
+    t.recomposite();
+    stroke(&mut t, (15.0, 60.0), (80.0, 65.0), "#1133cc");
+    let total = t.oplog_op_count() as u32;
+    assert!(total >= 3);
+    let h_full = composite_hash(&mut t);
+
+    // Persist through the PNG surface (what the JS write path now stores).
+    let base_png = t.oplog_keyframe_png(0);
+    assert!(!base_png.is_empty(), "keyframe PNG exported");
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let frames = t.oplog_encoded_ops(0, total);
+
+    // Sanity: the PNG really decodes back to the exact keyframe pixels.
+    let (decoded, dw, dh) = crate::codec::decode_png(&base_png).expect("engine PNG decodes");
+    assert_eq!((dw, dh), (96, 80));
+    assert_eq!(
+        decoded,
+        t.oplog_keyframe_pixels_rgba(0),
+        "engine PNG round trip is byte-identical (transparency included)"
+    );
+
+    // "Reload" into a fresh engine via the PNG restore entry point.
+    let mut t2 = ImageHorseTool::new(96, 80);
+    t2.set_oplog_undo(true);
+    assert!(t2.oplog_restore_png(&base_png, &base_ann, &frames, total));
+    assert_eq!(
+        composite_hash(&mut t2),
+        h_full,
+        "PNG-carried restore == pre-reload, byte-exact"
+    );
+
+    // Corrupt PNG is rejected without touching state.
+    let before = composite_hash(&mut t2);
+    assert!(!t2.oplog_restore_png(&[1, 2, 3, 4], &base_ann, &frames, total));
+    assert_eq!(composite_hash(&mut t2), before);
+}
+
+#[test]
+fn history_labels_synthesize_from_ops_after_restore() {
+    // Post-restore, the snapshot stacks are empty but the log holds the
+    // history — the panel labels must come from the ops (and revert to the
+    // snapshot labels whenever the stacks are live again).
+    let (mut t, _px) = seeded_tool(64, 48);
+    t.set_oplog_undo(true);
+    stroke(&mut t, (5.0, 5.0), (30.0, 20.0), "#ff0000");
+    stroke(&mut t, (10.0, 30.0), (40.0, 35.0), "#00ff00");
+    let total = t.oplog_op_count() as u32;
+
+    let base_png = t.oplog_keyframe_png(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let frames = t.oplog_encoded_ops(0, total);
+
+    let mut t2 = ImageHorseTool::new(64, 48);
+    t2.set_oplog_undo(true);
+    assert!(t2.oplog_restore_png(&base_png, &base_ann, &frames, total));
+    assert_eq!(
+        t2.history_labels(),
+        "undo:Paint|undo:Paint|current:Current State",
+        "labels synthesized from the restored ops"
+    );
+    assert!(t2.undo());
+    assert_eq!(
+        t2.history_labels(),
+        "undo:Paint|current:Current State|redo:Paint",
+        "cursor position reflected as undo/redo split"
+    );
+}

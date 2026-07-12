@@ -63,6 +63,16 @@ export interface OplogPersistWasm {
     frames: Uint8Array,
     cursor: number,
   ): boolean;
+  /** Engine-codec PNG surface (preferred): byte-exact encode/decode inside
+   *  the wasm, no browser canvas involved. Optional so older tiles builds
+   *  and test fakes without it fall back to the RGBA + JS-codec path. */
+  oplog_keyframe_png?(atOp: number): Uint8Array;
+  oplog_restore_png?(
+    basePng: Uint8Array,
+    baseAnnotations: Uint8Array,
+    frames: Uint8Array,
+    cursor: number,
+  ): boolean;
 }
 
 function hasPersistExports(t: object): t is OplogPersistWasm {
@@ -97,7 +107,14 @@ async function defaultRgbaToBlob(rgba: Uint8Array, w: number, h: number): Promis
 }
 
 async function defaultBlobToRgba(blob: Blob, w: number, h: number): Promise<Uint8Array> {
-  const bitmap = await createImageBitmap(blob);
+  // Fallback path only (engine-PNG surface absent). The options matter:
+  // without them Chrome may color-convert and premultiply on decode, which
+  // is NOT byte-faithful — the exact corruption the 2026-07-11 real-gallery
+  // check caught on a restored base keyframe.
+  const bitmap = await createImageBitmap(blob, {
+    colorSpaceConversion: "none",
+    premultiplyAlpha: "none",
+  });
   try {
     const canvas = new OffscreenCanvas(w, h);
     const ctx = canvas.getContext("2d");
@@ -243,13 +260,27 @@ export async function saveOplogNow(tool: object, photoId: string): Promise<void>
       if (existing.has(atOp)) continue;
       const w = tool.oplog_keyframe_width(atOp);
       const h = tool.oplog_keyframe_height(atOp);
-      const rgba = tool.oplog_keyframe_pixels_rgba(atOp);
-      if (!w || !h || rgba.length !== w * h * 4) continue;
+      if (!w || !h) continue;
+      // Preferred: the engine's own PNG codec — byte-exact, no browser
+      // canvas transforms. Fallback: raw RGBA through the injectable JS
+      // codec (older builds / tests).
+      let blob: Blob;
+      if (typeof tool.oplog_keyframe_png === "function") {
+        const png = tool.oplog_keyframe_png(atOp);
+        if (!png.length) continue;
+        // Copy: the wasm-returned view may sit on a SharedArrayBuffer-typed
+        // buffer TS won't accept as a BlobPart.
+        blob = new Blob([new Uint8Array(png)], { type: "image/png" });
+      } else {
+        const rgba = tool.oplog_keyframe_pixels_rgba(atOp);
+        if (rgba.length !== w * h * 4) continue;
+        blob = await rgbaToBlob(rgba, w, h);
+      }
       dueKeyframes.push({
         photoId,
         branch: BRANCH,
         atOp,
-        blob: await rgbaToBlob(rgba, w, h),
+        blob,
         annotations: tool.oplog_keyframe_annotations(atOp),
         width: w,
         height: h,
@@ -315,7 +346,6 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
 
     const base = await latestKeyframeAtOrBefore(photoId, BRANCH, 0);
     if (!base || base.atOp !== 0) return "failed";
-    const baseRgba = await blobToRgba(base.blob, base.width, base.height);
 
     const framesLen = covered.reduce((n, c) => n + c.bytes.length, 0);
     const frames = new Uint8Array(framesLen);
@@ -326,14 +356,18 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
     }
 
     const cursor = Math.min(m.cursor ?? m.opCount, m.opCount);
-    const ok = tool.oplog_restore(
-      baseRgba,
-      base.width,
-      base.height,
-      base.annotations ?? new Uint8Array(0),
-      frames,
-      cursor,
-    );
+    const annotations = base.annotations ?? new Uint8Array(0);
+    // Preferred: hand the PNG bytes straight to the engine codec (the blob
+    // stores the engine's own encode when the surface exists). Fallback:
+    // decode in JS and use the RGBA entry point.
+    let ok: boolean;
+    if (typeof tool.oplog_restore_png === "function") {
+      const png = new Uint8Array(await base.blob.arrayBuffer());
+      ok = tool.oplog_restore_png(png, annotations, frames, cursor);
+    } else {
+      const baseRgba = await blobToRgba(base.blob, base.width, base.height);
+      ok = tool.oplog_restore(baseRgba, base.width, base.height, annotations, frames, cursor);
+    }
     if (!ok) throw new Error("engine rejected the persisted log");
     persistedCache.set(photoId, {
       opCount: m.opCount,
