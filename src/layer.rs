@@ -763,6 +763,15 @@ impl ImageHorseTool {
                 p.1 += dy as f64;
             }
         }
+        #[cfg(feature = "tiles")]
+        {
+            let active = self.active as u32;
+            self.oplog_record(crate::ops::Op::LayerMove {
+                layer: active,
+                dx,
+                dy,
+            });
+        }
     }
 
     // ── Paste placement (movable/resizable bounding-box preview) ──────────

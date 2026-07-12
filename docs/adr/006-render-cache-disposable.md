@@ -1,10 +1,14 @@
 # ADR-006: Working copies become a disposable render cache; truth is original + op log
 Date: 2026-07-02 (backfilled)   Status: draft
-Blocked on: ADR-003 (op-log undo) landing in the render path first —
-this decision's "truth = originals + opLogs" premise doesn't hold
-while `src/history.rs` snapshot undo is the live path. Same branch
-caveat as 003/004 applies: `feat/tile-engine-core` merging to master
-is not sufficient on its own.
+Blocked on: dogfooding + shipping. As of 2026-07-11
+(`feat/tile-wiring-oplog-undo`, unmerged) the persistence layer
+exists end to end: Dexie v2 adds opLogs/keyframes (additive; ADR-012
+document model), the debounced write path commits chunks + keyframes
++ manifest in one transaction, and restore replays from the base
+keyframe — persist→reload→restore proven byte-identical at the
+engine level (src/ops_engine_parity.rs). USE_OPLOG_PERSISTENCE ships
+OFF; the working-copy path remains the fallback. Flip to Accepted
+after the real-gallery check + a dogfooding period.
 
 ## Context
 Today the flattened working copy in IndexedDB IS the edit state:

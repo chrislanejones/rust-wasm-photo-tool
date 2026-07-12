@@ -25,18 +25,20 @@ deleted.
 | [000](000-template.md) | Template (not a decision) | — | — |
 | [001](001-originals-lazy-migration-to-dexie.md) | Originals store: lazy read-through migration to Dexie | Accepted (2026-07-09) — shipped v7.5 (`6ccd67b`) | 2026-07-02 |
 | [002](002-tool-module-registry.md) | Canvas tools become registry modules instead of hand-wired hooks | Draft — blocked (Stage 4 not started; AppShell still hand-wires 8 tool hooks) | 2026-07-02 (backfilled) |
-| [003](003-operation-log-undo.md) | Operation log replaces snapshot undo | Draft — blocked (merged to master `1703670` but feature-gated off; render path still snapshot-based) | 2026-07-02 (backfilled) |
-| [004](004-tile-buffer.md) | 256×256 tiles become the canonical image representation | Draft — blocked (merged to master `1703670` but feature-gated off; render path still flat-buffer) | 2026-07-02 (backfilled) |
+| [003](003-operation-log-undo.md) | Operation log replaces snapshot undo | Draft — IMPLEMENTED on `feat/tile-wiring-oplog-undo` (recorder + replay undo live behind `ih_oplog_undo`, engine-parity green); ready to Accept when it ships | 2026-07-02 (backfilled) |
+| [004](004-tile-buffer.md) | 256×256 tiles become the canonical image representation | Draft — flush path reads through TileBuffer on `feat/tile-wiring-oplog-undo` (single-layer scope, behind `ih_tiles_flush`); canonical-representation claim still partial | 2026-07-02 (backfilled) |
 | [005](005-codec-worker-fallback.md) | Encoding and thumbnailing move to a worker, with mandatory main-thread fallback | Accepted (2026-07-09) — shipped v7.7 (`906082b`) | 2026-07-02 (backfilled) |
-| [006](006-render-cache-disposable.md) | Working copies become a disposable render cache; truth is original + op log | Draft — blocked (depends on ADR-003) | 2026-07-02 (backfilled) |
+| [006](006-render-cache-disposable.md) | Working copies become a disposable render cache; truth is original + op log | Draft — persistence layer built on `feat/tile-wiring-oplog-undo` (Dexie v2 opLogs/keyframes + write/restore, kill switch OFF); ready to Accept once dogfooded | 2026-07-02 (backfilled) |
 | [007](007-overnight-worktree-runs.md) | Unattended agent runs happen on disposable worktrees in auto mode | Accepted (2026-07-09) — matches standing practice | 2026-07-02 (backfilled) |
 | [008](008-svg-rasterized-at-import.md) | SVG imports are rasterized to PNG at the import boundary | Accepted (2026-07-09) — shipped v7.8 (`d9960f6`) | 2026-07-07 |
 | [009](009-coop-coep-clerk-spike.md) | COOP/COEP vs. Clerk sign-in spike | Draft — spike, not a build; verdict: not blocked | 2026-07-09 |
 | [010](010-metadata-scrub-privacy-modes.md) | Export metadata scrub gets a GPS-only mode alongside the existing full strip | Draft | 2026-07-10 |
 | [011](011-parallel-kernels-rayon-threads.md) | Parallel kernels via wasm-bindgen-rayon, gated on COOP/COEP | Draft | 2026-07-10 |
+| [012](012-oplog-document-model.md) | The op log replays over a document (pixels + live annotation lists), not the flattened composite | Draft | 2026-07-11 |
+| [013](013-oplog-undo-hash-fallback.md) | Op-log undo activates behind a composite-hash sync check, with snapshot fallback | Draft | 2026-07-11 |
 
 <!--
   Planned:
   - service worker, precache-only → takes the next free number
-    (012+) when written.
+    (014+) when written.
 -->

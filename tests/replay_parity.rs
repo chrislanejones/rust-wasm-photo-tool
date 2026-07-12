@@ -22,18 +22,17 @@ use support::{assert_replay_parity, assert_replay_parity_and_keyframe_equivalenc
 // ---------------------------------------------------------------------
 #[test]
 fn fixture_load_ops_reconstruct_pixels_exactly() {
-    use stamp_tool::ops::apply;
-    use stamp_tool::tiles::TileBuffer;
+    use stamp_tool::ops::{apply, Document};
 
     for &name in fixtures::ALL_FIXTURES {
         let fx = fixture(name);
-        let mut buf = TileBuffer::new(fx.width, fx.height);
+        let mut doc = Document::new(fx.width, fx.height);
         for op in fx.load_ops() {
-            apply(&op, &mut buf);
+            apply(&op, &mut doc);
         }
         let mut out = vec![0u8; fx.pixels.len()];
         assert!(
-            buf.blit_to_flat(&mut out),
+            doc.pixels.blit_to_flat(&mut out),
             "{name}: blit_to_flat wrong length"
         );
         assert_eq!(

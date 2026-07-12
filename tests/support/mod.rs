@@ -7,25 +7,29 @@
 #![allow(dead_code)]
 
 use crate::fixtures::Fixture;
-use stamp_tool::ops::{apply, Op, OpLog};
+use stamp_tool::ops::{apply, Document, Op, OpLog};
 use stamp_tool::tiles::TileBuffer;
 
 /// Apply `ops` two independent ways starting from the same `fixture` and
-/// assert the resulting canvases are byte-identical:
+/// assert the resulting documents are byte-identical:
 ///
-/// 1. **Direct**: a blank buffer, `fixture.load_ops()` then `ops` applied
-///    directly via [`apply`], one at a time, mutating in place.
+/// 1. **Direct**: a blank [`Document`], `fixture.load_ops()` then `ops`
+///    applied directly via [`apply`], one at a time, mutating in place.
 /// 2. **Op-log replay**: the same combined op sequence recorded into a real
 ///    [`OpLog`] (`append` for each op), then reconstructed via
-///    [`OpLog::replay`] — the nearest-keyframe-then-tail-ops path.
+///    [`OpLog::replay_document`] — the nearest-keyframe-then-tail-ops path.
 ///
 /// `fixture.load_ops()` is what makes side (2) "seeded with input": since
 /// `OpLog` only ever starts blank, the fixture's pixels are themselves
 /// recorded as the log's first ops. See SESSION_LOG.md, DECISION: seeded
 /// input.
 ///
-/// On mismatch, this reports the first differing pixel coordinate and both
-/// values — hash-compare only tells you *that* it broke, not *where*.
+/// Both the PIXEL plane and the rendered COMPOSITE (pixels + annotations)
+/// must agree — the composite comparison is what makes text/shape ops a
+/// real check rather than a vacuous list copy.
+///
+/// On pixel mismatch, this reports the first differing pixel coordinate and
+/// both values — hash-compare only tells you *that* it broke, not *where*.
 pub fn assert_replay_parity(fixture: &Fixture, ops: &[Op]) {
     let combined: Vec<Op> = fixture
         .load_ops()
@@ -34,7 +38,7 @@ pub fn assert_replay_parity(fixture: &Fixture, ops: &[Op]) {
         .collect();
 
     // (1) Direct application.
-    let mut direct = TileBuffer::new(fixture.width, fixture.height);
+    let mut direct = Document::new(fixture.width, fixture.height);
     for op in &combined {
         apply(op, &mut direct);
     }
@@ -44,11 +48,17 @@ pub fn assert_replay_parity(fixture: &Fixture, ops: &[Op]) {
     for op in combined.iter().cloned() {
         log.append(op);
     }
-    let mut replayed = TileBuffer::new(0, 0);
-    log.replay(&mut replayed);
+    let replayed = log.replay_document();
 
-    // (3) Byte-identical, zero tolerance.
-    assert_buffers_identical(&direct, &replayed, fixture.name);
+    // (3) Byte-identical, zero tolerance — pixels first (debuggable), then
+    // the full composite.
+    assert_buffers_identical(&direct.pixels, &replayed.pixels, fixture.name);
+    assert_eq!(
+        direct.composite_hash(),
+        replayed.composite_hash(),
+        "{}: composite (pixels + annotations) diverged between direct apply and replay",
+        fixture.name
+    );
 }
 
 /// Same as [`assert_replay_parity`] but also asserts the keyframed replay
@@ -78,17 +88,17 @@ pub fn assert_replay_parity_and_keyframe_equivalence(fixture: &Fixture, ops: &[O
 }
 
 /// Assert that applying `ops` on top of `fixture` actually changes the
-/// canvas from the fixture-only baseline.
+/// USER-VISIBLE canvas (the rendered composite — pixels + annotations)
+/// from the fixture-only baseline.
 ///
 /// `assert_replay_parity` alone can't distinguish "this op round-trips
-/// through the op log correctly" from "this op is a no-op today, so of
-/// course both sides agree" — a no-op op trivially satisfies parity. This
-/// closes that gap: it fails for any op whose `apply()` doesn't yet mutate
-/// the buffer (see the `TODO(tile-wiring)` no-ops in `ops::apply`), which is
-/// exactly what makes the stubs in `replay_stubs.rs` an honest `#[ignore]`
-/// instead of a vacuous pass.
+/// through the op log correctly" from "this op is a no-op, so of course
+/// both sides agree" — a no-op trivially satisfies parity. This closes that
+/// gap. It compares COMPOSITE hashes (not just pixels) so annotation ops
+/// (`TextAdd` et al.), which correctly leave the pixel plane alone, still
+/// register their visible effect.
 pub fn assert_op_has_effect(fixture: &Fixture, ops: &[Op]) {
-    let mut baseline = TileBuffer::new(fixture.width, fixture.height);
+    let mut baseline = Document::new(fixture.width, fixture.height);
     for op in fixture.load_ops() {
         apply(&op, &mut baseline);
     }
@@ -97,9 +107,9 @@ pub fn assert_op_has_effect(fixture: &Fixture, ops: &[Op]) {
         apply(op, &mut with_ops);
     }
     assert_ne!(
-        baseline.content_hash(),
-        with_ops.content_hash(),
-        "{}: op(s) had no visible effect on the canvas — apply() is still a \
+        baseline.composite_hash(),
+        with_ops.composite_hash(),
+        "{}: op(s) had no visible effect on the composite — apply() is a \
          no-op for this op",
         fixture.name
     );

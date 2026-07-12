@@ -58,6 +58,13 @@ pub mod ops;
 #[cfg(feature = "tiles")]
 pub mod tiles;
 
+// Engine-vs-replay parity: unit tests that drive the REAL ImageHorseTool
+// (paint_down/effect_down/add_text_annotation) and assert op-log replay
+// reproduces the engine's own output byte-for-byte. Lives in src (not
+// tests/) because it reads the tool's composite_cache directly.
+#[cfg(all(test, feature = "tiles"))]
+mod ops_engine_parity;
+
 // Rayon thread-pool bootstrap. Feature-gated (`threads`) and NOT part of the
 // default wasm build — see the `threads` feature comment in Cargo.toml and
 // `src/simd/blur.rs` for the parallel kernel itself. Re-exporting this is what
@@ -400,6 +407,11 @@ pub struct ImageHorseTool {
     /// Cached composite of all visible layers; `data_ptr`/`data_len` expose
     /// this to JS for a zero-copy blit. Rebuilt by `recomposite()`.
     composite_cache: Vec<u8>,
+    /// Tile-engine mirror of `composite_cache`, single-document-layer scope
+    /// only (see `tiles_flush`). Feature-gated (`tiles`) and NOT part of the
+    /// default wasm build — see the `tiles`/`ops` module comments above.
+    #[cfg(feature = "tiles")]
+    tile_buf: crate::tiles::TileBuffer,
     hist: History,
     stamp: StampState,
     zoom: f64,
@@ -478,6 +490,31 @@ pub struct ImageHorseTool {
     effect_pixel: u32,          // pixelate block size
     effect_color: (u8, u8, u8), // redaction fill
     effect_last: Option<(f64, f64)>,
+
+    // ── Op-log recorder (tiles feature only — Stage 4 of tile-wiring) ─────
+    /// The live operation log for the current single-layer document. Started
+    /// by `load_image`; `None` for multi-layer documents. Recording is
+    /// always-on when present; whether UNDO consults it is
+    /// `oplog_use_for_undo` (the runtime verification switch).
+    #[cfg(feature = "tiles")]
+    oplog: Option<crate::ops::OpLog>,
+    /// Set when the log is known stale (an unrecorded edit changed the
+    /// canvas — detected by the composite-hash check at undo time, or by an
+    /// explicitly unloggable path). Broken = snapshot undo only, until the
+    /// next `load_image` starts a fresh log.
+    #[cfg(feature = "tiles")]
+    oplog_broken: bool,
+    /// JS-controlled: prefer op-log replay for undo/redo when the log is
+    /// consistent. Off = snapshot undo exactly as today.
+    #[cfg(feature = "tiles")]
+    oplog_use_for_undo: bool,
+    /// In-flight paint/erase stroke being recorded: (painted polyline, brush).
+    #[cfg(feature = "tiles")]
+    rec_stroke: Option<(Vec<(f64, f64)>, crate::ops::Brush)>,
+    /// In-flight effects stroke: (dab centres, radius, intensity, mode).
+    #[cfg(feature = "tiles")]
+    #[allow(clippy::type_complexity)]
+    rec_effect: Option<(Vec<(f64, f64)>, f64, u32, u8)>,
 }
 
 impl ImageHorseTool {
@@ -495,13 +532,28 @@ impl ImageHorseTool {
     /// Push a full-stack history snapshot. Every history-creating action
     /// (pixel edits, annotation CRUD, transforms, layer structural ops) records
     /// the whole stack so undo/redo restores layers, pixels and overlays.
+    ///
+    /// With the `tiles` feature this is ALSO the op-log's pre-mutation choke
+    /// point: every recordable edit snaps BEFORE mutating, so this is the one
+    /// safe moment to lazily capture the log's base document.
     fn snap(&mut self, label: &str) {
+        #[cfg(feature = "tiles")]
+        self.oplog_maybe_start();
         let s = self.make_snapshot(label);
         self.hist.push(s);
     }
 
     /// Replace the live state with a snapshot's layer stack (used by undo/redo).
     fn restore_snapshot(&mut self, snap: Snapshot) {
+        // A snapshot restore rewinds the engine in a way an append-only op
+        // log cannot represent — if a log with recorded ops exists, it is
+        // now stale. Mark it broken (recording + oplog-undo stop; snapshot
+        // undo continues exactly as today). An EMPTY log just rebases on
+        // the next snap(), so plain undo-after-load costs nothing.
+        #[cfg(feature = "tiles")]
+        if self.oplog.as_ref().is_some_and(|l| !l.is_empty()) {
+            self.oplog_broken = true;
+        }
         self.layers = snap.layers;
         self.active = snap.active.min(self.layers.len().saturating_sub(1));
         self.width = snap.width;
@@ -644,6 +696,8 @@ impl ImageHorseTool {
             width,
             height,
             composite_cache: Vec::new(),
+            #[cfg(feature = "tiles")]
+            tile_buf: crate::tiles::TileBuffer::new(width, height),
             hist: History::new(),
             stamp: StampState::new(),
             zoom: 1.0,
@@ -677,6 +731,16 @@ impl ImageHorseTool {
             effect_pixel: 12,
             effect_color: (0, 0, 0),
             effect_last: None,
+            #[cfg(feature = "tiles")]
+            oplog: None,
+            #[cfg(feature = "tiles")]
+            oplog_broken: false,
+            #[cfg(feature = "tiles")]
+            oplog_use_for_undo: false,
+            #[cfg(feature = "tiles")]
+            rec_stroke: None,
+            #[cfg(feature = "tiles")]
+            rec_effect: None,
         }
     }
 
@@ -708,6 +772,14 @@ impl ImageHorseTool {
         self.next_shape_id = 1;
         self.editing_shape_id = None;
         self.editing_text_id = None;
+        // Fresh document, fresh (lazily-started) op log.
+        #[cfg(feature = "tiles")]
+        {
+            self.oplog = None;
+            self.oplog_broken = false;
+            self.rec_stroke = None;
+            self.rec_effect = None;
+        }
     }
 
     /// Load an image as a two-layer "artboard" (Photoshop-style New Document with
@@ -777,6 +849,15 @@ impl ImageHorseTool {
         self.next_shape_id = 1;
         self.editing_shape_id = None;
         self.editing_text_id = None;
+        // Two-layer artboard: out of op-log scope; a log starts lazily only
+        // if/when the document becomes single-layer (e.g. Remove Canvas).
+        #[cfg(feature = "tiles")]
+        {
+            self.oplog = None;
+            self.oplog_broken = false;
+            self.rec_stroke = None;
+            self.rec_effect = None;
+        }
     }
 
     /// Flattened composite of all visible layers (RGBA).
@@ -869,6 +950,13 @@ impl ImageHorseTool {
             );
         }
         self.composite_cache = cache;
+        // Op-log annotation sync: recomposite is the one choke point every
+        // annotation mutation flows through (JS flushes after each), so a
+        // cheap engine-vs-log diff here records TextAdd/Edit/Remove and
+        // ShapeAdd/Edit/Remove for EVERY mutator — align, pins, shadows,
+        // bezier edits included — without per-method hooks.
+        #[cfg(feature = "tiles")]
+        self.oplog_sync_annotations();
     }
 
     pub fn data_ptr(&self) -> *const u8 {
@@ -877,6 +965,604 @@ impl ImageHorseTool {
 
     pub fn data_len(&self) -> usize {
         self.composite_cache.len()
+    }
+
+    /// Route `composite_cache` through the tile engine: single-document-layer
+    /// scope only (see the field doc on `tile_buf`) — multi-layer documents
+    /// return `false` and are untouched, so callers fall back to the existing
+    /// flat-buffer path with zero behavior change. Call after `recomposite()`,
+    /// before reading `data_ptr`/`data_len` (both keep working unchanged;
+    /// this only changes what feeds them, not the JS-facing read API).
+    ///
+    /// First call (or any size change, e.g. crop/resize/new load) does a full
+    /// `blit_from_flat` (every tile ends up dirty — there is no "previous
+    /// frame" to diff against). Steady-state calls use
+    /// `sync_from_flat_diffing`, so only tiles the edit actually touched end
+    /// up dirty — that's what the diagnostics dirty-tile count (below)
+    /// reports on.
+    #[cfg(feature = "tiles")]
+    pub fn tiles_flush(&mut self) -> bool {
+        if self.layers.len() != 1 {
+            return false;
+        }
+        if self.tile_buf.width() != self.width || self.tile_buf.height() != self.height {
+            self.tile_buf
+                .blit_from_flat(&self.composite_cache, self.width, self.height);
+        } else {
+            self.tile_buf.sync_from_flat_diffing(&self.composite_cache);
+        }
+        self.tile_buf.blit_to_flat(&mut self.composite_cache);
+        true
+    }
+
+    /// Number of tiles currently marked dirty (written since the last
+    /// `tiles_clear_dirty`). `0` whenever `tiles_flush` last returned `false`
+    /// (multi-layer document — the tile mirror isn't being kept in sync).
+    #[cfg(feature = "tiles")]
+    pub fn tiles_dirty_tile_count(&self) -> usize {
+        self.tile_buf.dirty_tiles().count()
+    }
+
+    /// Clear every tile's dirty flag — call once per displayed frame, after
+    /// diagnostics has read `tiles_dirty_tile_count`.
+    #[cfg(feature = "tiles")]
+    pub fn tiles_clear_dirty(&mut self) {
+        self.tile_buf.clear_dirty();
+    }
+
+    /// Whether the tile-engine flush path applies to the CURRENT document
+    /// (single-layer scope — see `tiles_flush`). JS should feature-detect
+    /// this method's existence first (absent entirely on a default,
+    /// `tiles`-feature-off build) and then check its return value per
+    /// document/layer-count change.
+    #[cfg(feature = "tiles")]
+    pub fn tiles_supported_for_document(&self) -> bool {
+        self.layers.len() == 1
+    }
+
+    // ── Op-log recorder + replay undo (tiles feature — Stage 4) ───────────
+    //
+    // Recording is passive and always-on for single-layer documents: the log
+    // lazily captures its BASE document at the first `snap()` (every
+    // recordable edit snaps before mutating), pixel ops record at their
+    // commit points (paint_up / effect_up / crop / translate), and
+    // annotation ops are diffed at `recomposite()` — one choke point instead
+    // of a hook per mutator.
+    //
+    // Undo/redo consult the log only when `oplog_use_for_undo` is on AND the
+    // engine's composite hashes identical to the log's — ANY unrecorded edit
+    // (clone stamp, filters, masks, pixelate/redact...) makes the check fail,
+    // the log marks itself broken, and undo falls back to today's snapshot
+    // path. No stage of this can strand the editor.
+
+    /// Lazily start (or rebase an empty) op log — called from `snap()`, i.e.
+    /// always BEFORE the mutation the snap precedes.
+    #[cfg(feature = "tiles")]
+    pub(crate) fn oplog_maybe_start(&mut self) {
+        if self.oplog_broken {
+            return;
+        }
+        if self.layers.len() != 1 {
+            // Out of scope. An EMPTY log left over from a transient
+            // single-layer moment (e.g. mid-archive-restore, before the
+            // layer stack is rebuilt) is stale and free to drop — keeping
+            // it would make the first record on this multi-layer doc read
+            // as "broken" when the log is simply inactive.
+            if self.oplog.as_ref().is_some_and(|log| log.is_empty()) {
+                self.oplog = None;
+            }
+            return;
+        }
+        // A missing log starts fresh; an EMPTY log rebases freely — this
+        // absorbs unlogged setup edits (auto-compress, restores, resizes)
+        // that happen before the first recorded op.
+        if self.oplog.as_ref().is_none_or(|log| log.is_empty()) {
+            self.oplog = Some(crate::ops::OpLog::with_base(self.oplog_doc_from_engine()));
+        }
+    }
+
+    /// Snapshot the engine's single-layer document into op-log form.
+    #[cfg(feature = "tiles")]
+    fn oplog_doc_from_engine(&self) -> crate::ops::Document {
+        let mut doc = crate::ops::Document::new(self.width, self.height);
+        if let Some(layer) = self.layers.first() {
+            doc.pixels
+                .blit_from_flat(&layer.buf.data, layer.buf.width, layer.buf.height);
+            doc.texts = layer
+                .text_annotations
+                .iter()
+                .map(crate::ops::TextParams::from_annotation)
+                .collect();
+            doc.shapes = layer
+                .shape_annotations
+                .iter()
+                .map(crate::ops::ShapeParams::from_annotation)
+                .collect();
+        }
+        doc
+    }
+
+    /// Append a recorded op (no-op when the log is broken/absent or the
+    /// document left single-layer scope).
+    #[cfg(feature = "tiles")]
+    pub(crate) fn oplog_record(&mut self, op: crate::ops::Op) {
+        if self.oplog_broken {
+            return;
+        }
+        if self.layers.len() != 1 {
+            // Document grew past the log's scope mid-session. A log with
+            // real recorded history can't follow layer-structure changes
+            // yet → broken (snapshot undo takes over). A still-EMPTY log is
+            // just stale (transient single-layer moment during an archive
+            // restore) — drop it silently; the doc reads "inactive" in
+            // diagnostics, not "broken".
+            match self.oplog.as_ref() {
+                Some(log) if !log.is_empty() => self.oplog_broken = true,
+                Some(_) => self.oplog = None,
+                None => {}
+            }
+            return;
+        }
+        if let Some(log) = self.oplog.as_mut() {
+            log.append(op);
+        }
+    }
+
+    /// Diff the engine's annotation lists against the log's and record the
+    /// difference as ops. Runs at every `recomposite()` — annotation counts
+    /// are tiny, so the comparison is cheap; the empty/empty fast path makes
+    /// pure-paint sessions free.
+    #[cfg(feature = "tiles")]
+    fn oplog_sync_annotations(&mut self) {
+        if self.oplog_broken || self.layers.len() != 1 || self.oplog.is_none() {
+            return;
+        }
+        let mut pending: Vec<crate::ops::Op> = Vec::new();
+        {
+            let log_doc = self.oplog.as_ref().unwrap().live_document();
+            let layer = &self.layers[0];
+            if layer.text_annotations.is_empty()
+                && layer.shape_annotations.is_empty()
+                && log_doc.texts.is_empty()
+                && log_doc.shapes.is_empty()
+            {
+                return;
+            }
+            for lt in &log_doc.texts {
+                if !layer.text_annotations.iter().any(|a| a.id == lt.id) {
+                    pending.push(crate::ops::Op::TextRemove { id: lt.id });
+                }
+            }
+            for a in &layer.text_annotations {
+                let params = crate::ops::TextParams::from_annotation(a);
+                match log_doc.texts.iter().find(|t| t.id == a.id) {
+                    None => pending.push(crate::ops::Op::TextAdd(params)),
+                    Some(t) if *t != params => pending.push(crate::ops::Op::TextEdit(params)),
+                    _ => {}
+                }
+            }
+            for ls in &log_doc.shapes {
+                if !layer.shape_annotations.iter().any(|s| s.id == ls.id) {
+                    pending.push(crate::ops::Op::ShapeRemove { id: ls.id });
+                }
+            }
+            for s in &layer.shape_annotations {
+                let params = crate::ops::ShapeParams::from_annotation(s);
+                match log_doc.shapes.iter().find(|p| p.id == s.id) {
+                    None => pending.push(crate::ops::Op::ShapeAdd(params)),
+                    Some(p) if *p != params => pending.push(crate::ops::Op::ShapeEdit(params)),
+                    _ => {}
+                }
+            }
+        }
+        for op in pending {
+            self.oplog_record(op);
+        }
+    }
+
+    /// FNV-1a over a flat byte buffer — cheap exact-sync check.
+    #[cfg(feature = "tiles")]
+    fn oplog_flat_hash(bytes: &[u8]) -> u64 {
+        let mut h = 0xcbf2_9ce4_8422_2325u64;
+        for &b in bytes {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        h
+    }
+
+    /// Is the engine's user-visible composite byte-identical to the log's?
+    /// The moment-of-truth check before any op-log undo/redo.
+    #[cfg(feature = "tiles")]
+    fn oplog_engine_in_sync(&mut self) -> bool {
+        self.recomposite();
+        let Some(log) = self.oplog.as_ref() else {
+            return false;
+        };
+        let log_flat = log.live_document().composite_flat();
+        log_flat.len() == self.composite_cache.len()
+            && Self::oplog_flat_hash(&log_flat) == Self::oplog_flat_hash(&self.composite_cache)
+    }
+
+    /// Op-log undo: verify sync, keep the snapshot stacks aligned, seek the
+    /// cursor back one, and restore the log's document into the engine.
+    /// Returns false (leaving snapshot undo to handle it) when the log is
+    /// absent/broken/at-base, a transient edit is open, or — the safety net
+    /// — the sync check fails (which also breaks the log for the session).
+    #[cfg(feature = "tiles")]
+    fn try_oplog_undo(&mut self) -> bool {
+        if self.oplog_broken || self.layers.len() != 1 {
+            return false;
+        }
+        if self.editing_text_id.is_some()
+            || self.editing_shape_id.is_some()
+            || self.move_preview.is_some()
+            || self.paste_preview.is_some()
+        {
+            return false;
+        }
+        let Some(log) = self.oplog.as_ref() else {
+            return false;
+        };
+        if log.cursor() == 0 {
+            return false;
+        }
+        if !self.oplog_engine_in_sync() {
+            self.oplog_broken = true;
+            return false;
+        }
+        // Keep the snapshot stacks moving in lockstep (each recorded op
+        // pushed exactly one snapshot), discarding the restore — the log is
+        // authoritative here. This keeps the history panel + fallback sane.
+        let current = self.make_snapshot("Current State");
+        let _ = self.hist.undo(current);
+        let n = self.oplog.as_ref().unwrap().cursor() - 1;
+        self.oplog.as_mut().unwrap().seek(n);
+        self.oplog_restore_into_engine();
+        true
+    }
+
+    /// Op-log redo — mirror of [`try_oplog_undo`].
+    #[cfg(feature = "tiles")]
+    fn try_oplog_redo(&mut self) -> bool {
+        if self.oplog_broken || self.layers.len() != 1 {
+            return false;
+        }
+        if self.editing_text_id.is_some()
+            || self.editing_shape_id.is_some()
+            || self.move_preview.is_some()
+            || self.paste_preview.is_some()
+        {
+            return false;
+        }
+        let Some(log) = self.oplog.as_ref() else {
+            return false;
+        };
+        if log.cursor() >= log.len() {
+            return false;
+        }
+        if !self.oplog_engine_in_sync() {
+            self.oplog_broken = true;
+            return false;
+        }
+        let current = self.make_snapshot("Current State");
+        let _ = self.hist.redo(current);
+        let n = self.oplog.as_ref().unwrap().cursor() + 1;
+        self.oplog.as_mut().unwrap().seek(n);
+        self.oplog_restore_into_engine();
+        true
+    }
+
+    /// Write the log's live document back into the engine: pixels into the
+    /// single layer, annotation lists rebuilt through the SAME
+    /// `build_text_annotation` tile builder the live mutators use.
+    #[cfg(feature = "tiles")]
+    fn oplog_restore_into_engine(&mut self) {
+        let (w, h, flat, texts, shapes) = {
+            let Some(log) = self.oplog.as_ref() else {
+                return;
+            };
+            let doc = log.live_document();
+            let (w, h) = (doc.width(), doc.height());
+            let mut flat = vec![0u8; (w as usize) * (h as usize) * 4];
+            doc.pixels.blit_to_flat(&mut flat);
+            (w, h, flat, doc.texts.clone(), doc.shapes.clone())
+        };
+        self.width = w;
+        self.height = h;
+        let layer = &mut self.layers[0];
+        layer.buf.data = flat;
+        layer.buf.width = w;
+        layer.buf.height = h;
+        layer.text_annotations = texts
+            .iter()
+            .map(|t| {
+                build_text_annotation(
+                    t.id,
+                    &t.text,
+                    t.font_size,
+                    t.r,
+                    t.g,
+                    t.b,
+                    t.bold,
+                    t.x,
+                    t.y,
+                    t.rotation_deg,
+                    t.background_kind,
+                    t.bg_r,
+                    t.bg_g,
+                    t.bg_b,
+                    t.bg_a,
+                    t.bg_padding,
+                    t.bg_corner_radius,
+                    t.bg_tail,
+                    t.shadow_box,
+                    t.shadow_text,
+                    t.shadow_r,
+                    t.shadow_g,
+                    t.shadow_b,
+                    t.shadow_a,
+                    t.shadow_dx,
+                    t.shadow_dy,
+                    t.shadow_blur,
+                )
+            })
+            .collect();
+        layer.shape_annotations = shapes.iter().map(|s| s.to_annotation()).collect();
+        let max_text = layer
+            .text_annotations
+            .iter()
+            .map(|a| a.id)
+            .max()
+            .unwrap_or(0);
+        self.next_text_id = self.next_text_id.max(max_text.wrapping_add(1).max(1));
+        let max_shape = layer
+            .shape_annotations
+            .iter()
+            .map(|s| s.id)
+            .max()
+            .unwrap_or(0);
+        self.next_shape_id = self.next_shape_id.max(max_shape.wrapping_add(1).max(1));
+        self.editing_shape_id = None;
+        self.editing_text_id = None;
+        self.selection = None;
+        self.stamp.source_x = None;
+        self.stamp.source_y = None;
+    }
+
+    // ── Op-log wasm surface (tiles builds only; JS feature-detects) ───────
+
+    /// Runtime switch: prefer op-log replay for undo/redo. Recording is
+    /// unaffected (always on for single-layer docs on a tiles build).
+    #[cfg(feature = "tiles")]
+    pub fn set_oplog_undo(&mut self, enabled: bool) {
+        self.oplog_use_for_undo = enabled;
+    }
+
+    /// Whether a live, unbroken log exists for the current document.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_active(&self) -> bool {
+        self.oplog.is_some() && !self.oplog_broken && self.layers.len() == 1
+    }
+
+    /// Total recorded ops (including redoable tail past the cursor).
+    #[cfg(feature = "tiles")]
+    pub fn oplog_op_count(&self) -> usize {
+        self.oplog.as_ref().map_or(0, |l| l.len())
+    }
+
+    /// Ops currently applied (undo moves this down, redo up).
+    #[cfg(feature = "tiles")]
+    pub fn oplog_cursor(&self) -> usize {
+        self.oplog.as_ref().map_or(0, |l| l.cursor())
+    }
+
+    /// Keyframes resident in memory (base + up to KEYFRAMES_IN_MEMORY).
+    #[cfg(feature = "tiles")]
+    pub fn oplog_keyframe_count(&self) -> usize {
+        self.oplog.as_ref().map_or(0, |l| l.keyframe_count())
+    }
+
+    /// True once an unrecorded edit desynced the log (snapshot undo only
+    /// until the next image load).
+    #[cfg(feature = "tiles")]
+    pub fn oplog_is_broken(&self) -> bool {
+        self.oplog_broken
+    }
+
+    // ── Op-log persistence surface (night project: op log → IndexedDB) ────
+
+    /// Persistence generation: bumps when an append drops a redo tail. The
+    /// JS write path compares this to its manifest — unchanged means the
+    /// persisted prefix is still valid (append the delta); changed means
+    /// rewrite the photo's log.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_generation(&self) -> u32 {
+        self.oplog.as_ref().map_or(0, |l| l.generation() as u32)
+    }
+
+    /// Ops `[from, to)` framed for persistence (`[u32 LE length][frame]*`).
+    /// Empty on an invalid range or no log.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_encoded_ops(&self, from: u32, to: u32) -> Vec<u8> {
+        let Some(log) = self.oplog.as_ref() else {
+            return Vec::new();
+        };
+        let (from, to) = (from as usize, to as usize);
+        if from > to || to > log.len() {
+            return Vec::new();
+        }
+        crate::ops::encode_op_frames(&log.ops()[from..to])
+    }
+
+    /// The op-counts of keyframe documents currently resident in the log
+    /// (always includes 0 — the base).
+    #[cfg(feature = "tiles")]
+    pub fn oplog_mem_keyframe_ops(&self) -> Vec<u32> {
+        self.oplog.as_ref().map_or_else(Vec::new, |l| {
+            l.keyframe_ops().iter().map(|&n| n as u32).collect()
+        })
+    }
+
+    /// Flat RGBA of the COMPOSITE of the resident keyframe at `at_op`
+    /// (empty if not resident). Pair with `oplog_keyframe_width/height` and
+    /// `oplog_keyframe_annotations` to persist a full document snapshot.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_keyframe_rgba(&self, at_op: u32) -> Vec<u8> {
+        self.oplog
+            .as_ref()
+            .and_then(|l| l.keyframe_document(at_op as usize))
+            .map_or_else(Vec::new, |d| d.composite_flat())
+    }
+
+    #[cfg(feature = "tiles")]
+    pub fn oplog_keyframe_width(&self, at_op: u32) -> u32 {
+        self.oplog
+            .as_ref()
+            .and_then(|l| l.keyframe_document(at_op as usize))
+            .map_or(0, |d| d.width())
+    }
+
+    #[cfg(feature = "tiles")]
+    pub fn oplog_keyframe_height(&self, at_op: u32) -> u32 {
+        self.oplog
+            .as_ref()
+            .and_then(|l| l.keyframe_document(at_op as usize))
+            .map_or(0, |d| d.height())
+    }
+
+    /// The keyframe document's LIVE annotation lists, postcard-encoded —
+    /// keyframe pixels alone can't restore re-editable text/shapes.
+    /// NOTE: the keyframe RGBA above is the composite (annotations drawn
+    /// in); the restore path re-renders annotations over the PIXEL plane,
+    /// so it pairs this with `oplog_keyframe_pixels_rgba`.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_keyframe_annotations(&self, at_op: u32) -> Vec<u8> {
+        self.oplog
+            .as_ref()
+            .and_then(|l| l.keyframe_document(at_op as usize))
+            .map_or_else(Vec::new, |d| {
+                crate::ops::encode_annotations(&d.texts, &d.shapes)
+            })
+    }
+
+    /// Flat RGBA of the keyframe document's PIXEL plane (no annotations) —
+    /// what `oplog_restore` takes back, so live annotations don't get baked
+    /// by a persist→restore round trip.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_keyframe_pixels_rgba(&self, at_op: u32) -> Vec<u8> {
+        self.oplog
+            .as_ref()
+            .and_then(|l| l.keyframe_document(at_op as usize))
+            .map_or_else(Vec::new, |d| {
+                let mut flat = vec![0u8; (d.width() as usize) * (d.height() as usize) * 4];
+                d.pixels.blit_to_flat(&mut flat);
+                flat
+            })
+    }
+
+    /// The keyframe document's PIXEL plane as PNG bytes, encoded by the
+    /// ENGINE's own codec (byte-exact round trip proven in codec.rs tests).
+    /// This is the preferred persistence format: the browser-canvas PNG
+    /// path (`OffscreenCanvas`/`createImageBitmap`) applies color-space and
+    /// premultiplication transforms that are NOT byte-faithful — the exact
+    /// corruption the 2026-07-11 real-gallery check caught. Empty when the
+    /// keyframe isn't resident.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_keyframe_png(&self, at_op: u32) -> Vec<u8> {
+        self.oplog
+            .as_ref()
+            .and_then(|l| l.keyframe_document(at_op as usize))
+            .map_or_else(Vec::new, |d| {
+                let mut flat = vec![0u8; (d.width() as usize) * (d.height() as usize) * 4];
+                d.pixels.blit_to_flat(&mut flat);
+                crate::codec::export_png(&crate::core::ImageBuffer {
+                    width: d.width(),
+                    height: d.height(),
+                    data: flat,
+                })
+            })
+    }
+
+    /// [`oplog_restore`] with the base as PNG bytes — decoded by the
+    /// engine's own codec, so the whole persist→restore pixel path stays
+    /// inside proven byte-exact code. Returns false (changing nothing) on
+    /// a corrupt/undecodable PNG, exactly like the other validation
+    /// failures.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_restore_png(
+        &mut self,
+        base_png: &[u8],
+        base_annotations: &[u8],
+        frames: &[u8],
+        cursor: u32,
+    ) -> bool {
+        let Ok((rgba, w, h)) = crate::codec::decode_png(base_png) else {
+            return false;
+        };
+        self.oplog_restore(&rgba, w, h, base_annotations, frames, cursor)
+    }
+
+    /// Rebuild the op log from persisted parts — the resume path. `base_*`
+    /// is the base document (PIXEL plane + encoded annotation lists),
+    /// `frames` the full framed op stream, `cursor` the applied-op position
+    /// the user last saw. Replays everything (rebuilding interior keyframes
+    /// as it goes), seeks to `cursor`, restores the document into the
+    /// engine, and clears stale history. Returns false — changing nothing —
+    /// on any decode error or dimension mismatch.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_restore(
+        &mut self,
+        base_rgba: &[u8],
+        base_w: u32,
+        base_h: u32,
+        base_annotations: &[u8],
+        frames: &[u8],
+        cursor: u32,
+    ) -> bool {
+        if base_rgba.len() != (base_w as usize) * (base_h as usize) * 4 {
+            return false;
+        }
+        let Ok(ops) = crate::ops::decode_op_frames(frames) else {
+            return false;
+        };
+        let (texts, shapes) = if base_annotations.is_empty() {
+            (Vec::new(), Vec::new())
+        } else {
+            match crate::ops::decode_annotations(base_annotations) {
+                Ok(lists) => lists,
+                Err(_) => return false,
+            }
+        };
+        if (cursor as usize) > ops.len() {
+            return false;
+        }
+        let mut base = crate::ops::Document::new(base_w, base_h);
+        base.pixels.blit_from_flat(base_rgba, base_w, base_h);
+        base.texts = texts;
+        base.shapes = shapes;
+        let mut log = crate::ops::OpLog::with_base(base);
+        for op in ops {
+            log.append(op);
+        }
+        log.seek(cursor as usize);
+        self.oplog = Some(log);
+        self.oplog_broken = false;
+        self.rec_stroke = None;
+        self.rec_effect = None;
+        self.oplog_restore_into_engine();
+        // The restored document replaces whatever was loaded; pre-restore
+        // snapshots reference the wrong state.
+        self.hist.clear();
+        true
+    }
+
+    /// FNV-1a of the current composite as hex — lets JS assert byte-exact
+    /// persist→restore parity without copying pixels out.
+    #[cfg(feature = "tiles")]
+    pub fn composite_hash_hex(&mut self) -> String {
+        self.recomposite();
+        format!("{:016x}", Self::oplog_flat_hash(&self.composite_cache))
     }
 
     /// Per-channel histogram of the current composite (the authoritative RGBA
@@ -990,6 +1676,12 @@ impl ImageHorseTool {
     // ── History ─────────────────────────────────────────────────────────
 
     pub fn undo(&mut self) -> bool {
+        // Op-log replay path first (tiles feature + runtime switch + log
+        // consistent) — falls through to snapshot undo on ANY doubt.
+        #[cfg(feature = "tiles")]
+        if self.oplog_use_for_undo && self.try_oplog_undo() {
+            return true;
+        }
         let current = self.make_snapshot("Current State");
         if let Some(snap) = self.hist.undo(current) {
             self.restore_snapshot(snap);
@@ -1000,6 +1692,10 @@ impl ImageHorseTool {
     }
 
     pub fn redo(&mut self) -> bool {
+        #[cfg(feature = "tiles")]
+        if self.oplog_use_for_undo && self.try_oplog_redo() {
+            return true;
+        }
         let current = self.make_snapshot("Current State");
         if let Some(snap) = self.hist.redo(current) {
             self.restore_snapshot(snap);
@@ -1010,14 +1706,55 @@ impl ImageHorseTool {
     }
 
     pub fn undo_count(&self) -> usize {
+        // With op-log undo enabled, the log can rewind deeper than the
+        // (count/byte-capped) snapshot stack — report the larger so the UI
+        // doesn't disable undo while log steps remain.
+        #[cfg(feature = "tiles")]
+        if self.oplog_use_for_undo && !self.oplog_broken && self.layers.len() == 1 {
+            if let Some(log) = self.oplog.as_ref() {
+                return self.hist.undo_count().max(log.cursor());
+            }
+        }
         self.hist.undo_count()
     }
 
     pub fn redo_count(&self) -> usize {
+        #[cfg(feature = "tiles")]
+        if self.oplog_use_for_undo && !self.oplog_broken && self.layers.len() == 1 {
+            if let Some(log) = self.oplog.as_ref() {
+                return self.hist.redo_count().max(log.len() - log.cursor());
+            }
+        }
         self.hist.redo_count()
     }
 
     pub fn history_labels(&self) -> String {
+        // After an op-log RESTORE the snapshot stacks are empty (cleared —
+        // they referenced pre-reload state) while the log holds the real
+        // history. Synthesize the panel's labels from the ops so the
+        // restored session's History panel matches its undo depth instead
+        // of showing a stale/empty list.
+        #[cfg(feature = "tiles")]
+        if self.oplog_use_for_undo
+            && !self.oplog_broken
+            && self.layers.len() == 1
+            && self.hist.undo_count() == 0
+            && self.hist.redo_count() == 0
+        {
+            if let Some(log) = self.oplog.as_ref() {
+                if !log.is_empty() {
+                    let mut parts: Vec<String> = log.ops()[..log.cursor()]
+                        .iter()
+                        .map(|op| format!("undo:{}", op.label()))
+                        .collect();
+                    parts.push("current:Current State".to_string());
+                    for op in &log.ops()[log.cursor()..] {
+                        parts.push(format!("redo:{}", op.label()));
+                    }
+                    return parts.join("|");
+                }
+            }
+        }
         self.hist.labels()
     }
 
@@ -1409,6 +2146,15 @@ impl ImageHorseTool {
     pub fn crop(&mut self, x: u32, y: u32, w: u32, h: u32) {
         self.snap("Crop");
         self.crop_in_place(x, y, w, h);
+        #[cfg(feature = "tiles")]
+        self.oplog_record(crate::ops::Op::Crop {
+            rect: crate::ops::Rect {
+                x: x as i32,
+                y: y as i32,
+                w,
+                h,
+            },
+        });
     }
 
     /// Preview crop overlay in WASM.

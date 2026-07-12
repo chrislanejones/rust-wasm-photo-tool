@@ -570,6 +570,9 @@ export function AppShell() {
         setHasBeenModified(false);
         setCompareActive(false);
       }
+      // Explicit user deletion emptied the gallery → clear the resume
+      // manifest here (the persist effect never clears on its own).
+      if (next.length === 0) void clearGalleryManifest();
       return next;
     });
     clearSelection();
@@ -878,7 +881,6 @@ export function AppShell() {
   // empty gallery either prompt to Resume (anonymous) or silently reopen
   // (signed in, per Settings → General → "When you return").
   const resumeChecked = useRef(false);
-  const galleryWasNonEmpty = useRef(false);
   // Live mirrors so the once-on-mount boot reads the CURRENT auth state without
   // hard-blocking on it (Clerk can take seconds to load — it must not trap the
   // splash).
@@ -937,15 +939,16 @@ export function AppShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist the manifest on every gallery change; drop it once the gallery is
-  // emptied during the session (Delete All etc.) so we never offer to resume
-  // photos the user just removed.
+  // Persist the manifest on every gallery change. This effect only ever
+  // SAVES — it must never infer deletion from a non-empty → empty
+  // transition: dev-server reloads / HMR churn can drive that transition
+  // without any user intent, and on 2026-07-11 exactly that wiped a real
+  // gallery manifest. Clearing is EXPLICIT at the user-action sites
+  // (confirmDeleteAll, handleDeleteSelected emptying, removing the last
+  // photo, Start fresh).
   useEffect(() => {
     if (photos.length > 0) {
-      galleryWasNonEmpty.current = true;
       void saveGalleryManifest(photos, activePhotoId);
-    } else if (galleryWasNonEmpty.current) {
-      void clearGalleryManifest();
     }
   }, [photos, activePhotoId]);
 
@@ -967,6 +970,9 @@ export function AppShell() {
     setDeleteAllOpen(false);
     clearAllEdits().catch(() => {});
     clearWorkingCopyCache(); // free the decoded-photo cache (all photos gone)
+    // Explicit user deletion → the resume manifest goes with the photos
+    // (the persist effect never clears on its own).
+    void clearGalleryManifest();
     setImageSavings({});
     setModifiedPhotos(new Set());
     // Blank the canvas + drop the WASM tool immediately (the empty-gallery

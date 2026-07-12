@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject, MouseEvent } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
-import { registerWasmMemory } from "@/lib/resourceMonitor";
+import { onOplogFlush } from "@/lib/oplogPersistence";
+import {
+  registerOplogStats,
+  registerTilesDirtyCount,
+  registerWasmMemory,
+} from "@/lib/resourceMonitor";
+import { syncOplog, tryTilesFlush } from "@/lib/tilesFlush";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
 /** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
@@ -165,6 +171,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     // linear memory directly — the view MUST be reconstructed every call
     // because the backing ArrayBuffer is replaced if WASM memory grows.
     t.recomposite();
+    registerTilesDirtyCount(tryTilesFlush(t));
+    registerOplogStats(syncOplog(t));
+    onOplogFlush(t);
     const wasmMem = wasmMemoryRef.current;
     if (wasmMem) {
       const ptr = t.data_ptr();
@@ -318,6 +327,44 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       syncState();
     },
     [canvasRef, syncState, flushToCanvas],
+  );
+
+  /**
+   * Restore a photo from its persisted OPERATION LOG (ADR-006) — the
+   * op-log sibling of `loadFromSaved`. Owns the engine lifecycle the same
+   * way the other load paths do: initializes wasm, creates the tool when
+   * none exists yet (page boot), and hands it to the persistence module,
+   * which rebuilds the document + replayable undo history and swaps it
+   * into the engine. Returns true only on a successful restore; false
+   * means "use the existing archive/original paths" (flag off, nothing
+   * persisted, invalid data, or a non-tiles wasm build — all inert).
+   */
+  const restoreFromOplog = useCallback(
+    async (photoId: string): Promise<boolean> => {
+      const { isOplogPersistenceEnabled, restoreOplog } = await import(
+        "@/lib/oplogPersistence"
+      );
+      if (!isOplogPersistenceEnabled()) return false;
+      const { default: init, ImageHorseTool: Tool } = await import("stamp_tool");
+      const wasmExports = (await init()) as unknown as {
+        memory: WebAssembly.Memory;
+      };
+      wasmMemoryRef.current = wasmExports.memory;
+      registerWasmMemory(wasmExports.memory);
+      // Reuse the live engine on a gallery switch; create one on boot —
+      // oplog_restore replaces the document (dimensions included) wholesale.
+      const tool = toolRef.current ?? new Tool(1, 1);
+      if ((await restoreOplog(tool, photoId)) !== "restored") return false;
+      toolRef.current = tool;
+      sourcePosRef.current = null;
+      flushToCanvas(); // resizes the canvas to the restored dimensions
+      syncState();
+      // Restored annotation lists differ from whatever was showing — same
+      // re-sync the undo path performs.
+      useAnnotationStore.getState().bumpAnnotations();
+      return true;
+    },
+    [flushToCanvas, syncState],
   );
 
   /**
@@ -1293,6 +1340,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     loadImage,
     loadImageFromPixels,
     loadFromSaved,
+    restoreFromOplog,
     flushToCanvas,
     reset,
     setBrushSize,

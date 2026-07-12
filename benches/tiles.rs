@@ -58,15 +58,15 @@ fn build_mixed_log(n: usize) -> OpLog {
                 gamma: 1.05,
             }),
             _ => Op::Stroke {
-                points: vec![(i as f32, i as f32), (i as f32 + 1.0, i as f32 + 2.0)],
+                points: vec![(i as f64, i as f64), (i as f64 + 1.0, i as f64 + 2.0)],
                 brush: Brush {
                     r: 0,
                     g: 0,
                     b: 0,
-                    a: 255,
-                    size: 4.0,
+                    radius: 2.0,
                     hardness: 1.0,
                     opacity: 1.0,
+                    erase: false,
                 },
             },
         };
