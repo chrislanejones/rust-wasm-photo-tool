@@ -48,6 +48,7 @@ import {
   serializePreferences,
   type Preferences,
 } from "@/lib/preferences";
+import { useUIStore } from "@/stores/useUIStore";
 
 const PRO_FEATURES = [
   "All AI tools — background removal, OCR, object removal",
@@ -57,7 +58,7 @@ const PRO_FEATURES = [
   "Unlimited share links",
 ];
 
-type SettingsTab =
+export type SettingsTab =
   | "general"
   | "canvas"
   | "appearance"
@@ -121,12 +122,25 @@ export function SubscriptionButton({
 
   // Alt+S (and any other caller) opens Settings via a window event — keeps the
   // open state here without threading a controlled prop through the tree.
+  // (Grandfathered Stage-3 CustomEvent — new callers use the store signal
+  // below instead.)
   useEffect(() => {
     const openSettings = () => setOpen(true);
     window.addEventListener("image-horse:open-settings", openSettings);
     return () =>
       window.removeEventListener("image-horse:open-settings", openSettings);
   }, []);
+
+  // Store-routed "open Settings on tab X" signal (command palette et al.).
+  // One-shot: handled → cleared, so a remount never replays a stale request.
+  const settingsRequest = useUIStore((s) => s.settingsRequest);
+  const clearSettingsRequest = useUIStore((s) => s.clearSettingsRequest);
+  useEffect(() => {
+    if (!settingsRequest) return;
+    setTab(settingsRequest.tab);
+    setOpen(true);
+    clearSettingsRequest();
+  }, [settingsRequest, clearSettingsRequest]);
 
   const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] = [
     { id: "general", label: "General", icon: SlidersHorizontal },

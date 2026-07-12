@@ -16,6 +16,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { resolveSet, type SetArg } from "./_shared";
 import { idbStorage } from "./storage/idbStorage";
 import type { UserMode } from "@/components/StatusBar";
+import type { SettingsTab } from "@/components/SubscriptionButton";
 
 // Module-scoped handles for the fake image-load progress interval and the
 // hide-after-finish timer. Kept out of store state (they're imperative timer
@@ -43,6 +44,16 @@ interface UIState {
   deletePhotoId: string | null;
   deleteSelectedOpen: boolean;
   exportDialogOpen: boolean;
+  /** Command palette (Alt+,). Transient — never persisted. */
+  showCommandPalette: boolean;
+  /** Most-recently-run palette command ids, newest first (persisted — drives
+   *  the "Recent" group shown when the palette query is empty). */
+  recentCommands: string[];
+  /** One-shot "open the Settings modal on tab X" request. SubscriptionButton
+   *  (the modal's owner) handles it and clears it — the store-routed
+   *  replacement for the grandfathered `image-horse:open-settings`
+   *  CustomEvent. Transient — never persisted. */
+  settingsRequest: { tab: SettingsTab } | null;
 
   // Cold-start boot splash: true until WASM is up + the session check resolves.
   booting: boolean;
@@ -76,6 +87,12 @@ interface UIState {
   setDeletePhotoId: (v: SetArg<string | null>) => void;
   setDeleteSelectedOpen: (v: SetArg<boolean>) => void;
   setExportDialogOpen: (v: SetArg<boolean>) => void;
+  setShowCommandPalette: (v: SetArg<boolean>) => void;
+  /** Record a palette command run: dedupes, caps at 8. */
+  pushRecentCommand: (id: string) => void;
+  /** Ask the Settings modal to open on `tab` (default "general"). */
+  requestSettings: (tab?: SettingsTab) => void;
+  clearSettingsRequest: () => void;
 
   setBooting: (v: SetArg<boolean>) => void;
   setFirstRun: (v: SetArg<boolean>) => void;
@@ -111,6 +128,9 @@ export const useUIStore = create<UIState>()(
       deletePhotoId: null,
       deleteSelectedOpen: false,
       exportDialogOpen: false,
+      showCommandPalette: false,
+      recentCommands: [],
+      settingsRequest: null,
 
       booting: true,
       firstRun: true,
@@ -147,6 +167,14 @@ export const useUIStore = create<UIState>()(
         set((s) => ({ deleteSelectedOpen: resolveSet(v, s.deleteSelectedOpen) })),
       setExportDialogOpen: (v) =>
         set((s) => ({ exportDialogOpen: resolveSet(v, s.exportDialogOpen) })),
+      setShowCommandPalette: (v) =>
+        set((s) => ({ showCommandPalette: resolveSet(v, s.showCommandPalette) })),
+      pushRecentCommand: (id) =>
+        set((s) => ({
+          recentCommands: [id, ...s.recentCommands.filter((x) => x !== id)].slice(0, 8),
+        })),
+      requestSettings: (tab = "general") => set({ settingsRequest: { tab } }),
+      clearSettingsRequest: () => set({ settingsRequest: null }),
 
       setBooting: (v) => set((s) => ({ booting: resolveSet(v, s.booting) })),
       setFirstRun: (v) => set((s) => ({ firstRun: resolveSet(v, s.firstRun) })),
@@ -202,6 +230,9 @@ export const useUIStore = create<UIState>()(
       // docs/State-Management.md §6.
       partialize: (s): Partial<UIState> => ({
         masterTab: s.masterTab,
+        // Palette recents are a pure "remember my habits" pref, same class as
+        // masterTab. The palette OPEN flag stays transient.
+        recentCommands: s.recentCommands,
       }),
     },
   ),

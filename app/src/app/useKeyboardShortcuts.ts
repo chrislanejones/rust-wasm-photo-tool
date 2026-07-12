@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { ToolType } from "@/lib/types";
+import { useUIStore } from "@/stores/useUIStore";
+import { setPaletteActions } from "@/features/commandPalette";
 
 /** All ten tools in toolbar order — keys 1-9, 0 */
 const TOOL_BY_DIGIT: Record<string, ToolType> = {
@@ -111,6 +113,15 @@ export function useKeyboardShortcuts({
 }: KeyboardShortcutOptions) {
   const spaceHeldRef = useRef(false);
 
+  // Publish the session handlers the command palette reuses (undo/redo).
+  // This hook already receives them from AppShell for Ctrl+Z/Ctrl+Shift+Z —
+  // registering here gives the palette the same reach with zero AppShell
+  // edits and no CustomEvents.
+  useEffect(() => {
+    setPaletteActions({ undo: onUndo, redo: onRedo });
+    return () => setPaletteActions(null);
+  }, [onUndo, onRedo]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -218,6 +229,16 @@ export function useKeyboardShortcuts({
 
       // ─── Alt combos ────────────────────────────────────
       if (e.altKey) {
+        // Alt+, toggles the command palette. Reads the UI store directly (the
+        // palette is global chrome, not an AppShell concern — no new prop).
+        // The input/textarea/contentEditable guard above already prevents this
+        // firing while the user is typing.
+        if (e.code === "Comma") {
+          e.preventDefault();
+          useUIStore.getState().setShowCommandPalette((v) => !v);
+          return;
+        }
+
         // Alt+/ toggles the shortcut modal (with or without Shift, so users
         // can press the literal "/" key or the shifted "?" interchangeably).
         if (e.code === "Slash") {
