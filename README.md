@@ -50,9 +50,9 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.18 — 2026-07-12
+### v7.19 — 2026-07-12
 
-**Copy any selection, and the stamp tool learns to let go.** Ctrl+C now copies whatever bounding box is active — a crop box, a shape or arrow's bounds, a magic-wand selection — as pixels, and Ctrl+V drops the copy back in through the same placement box pasting has used since v7.8. There's a "Copy Selection" entry in the right-click menu too. Second fix: leaving the stamp tool (or switching between its Clone / Stamps / Emoji sub-modes) now actually clears the active stamp — before this, the last-selected stamp kept firing on every click, even in Clone mode, because its pending state was never torn down. And the toolbar button formerly labeled "Clone Stamp" is now just "Stamps" — it's done clone, emoji, red-marker, and batch stamps for a long while; the label caught up. All three verified on canvas against the production build before merging.
+**The tool registry begins.** Paint's sub-mode pattern — icons on top, tool title below, body swaps per mode — is now a shared component, `ToolModeToggle`, built entirely from the existing UI primitives, and Paint is its first consumer. Alongside it, the first `ToolModule` registry entry: a typed shape every tool will migrate into, one per session, until tool wiring stops being manual. Nothing visible changed — Paint was verified identical in a real browser before merging (all four sub-modes toggle by mouse and keyboard, the brush paints, undo restores the exact prior pixels). The marketing site's home page also got a truth pass: object removal and text extraction marked live (they've been shipped for weeks), the real WASM bundle size, `.ora` interchange and the location-only GPS scrub added, and the confusing "No upload for demo" line now says what it meant — nothing leaves your device.
 
 ## License
 

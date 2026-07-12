@@ -198,6 +198,12 @@ selection-tool *types* are wanted:
 - Magnetic / edge-snapping lasso (ties to [#13 Magnetic Selection](#2-standout-feature-backlog-rustwasm-leaning)
   and [#8 Real-Time Object Selection](#2-standout-feature-backlog-rustwasm-leaning) above)
 
+**Pairing note — Smart Brush + Magnetic Selection share one core** (medium effort): both are
+edge-detection consumers. Build the edge-detection core once in Rust (gradient/edge map over the
+image buffer) and both features fall out of it — [#1 Smart Brush](#2-standout-feature-backlog-rustwasm-leaning)
+walks edges while painting, [#13 Magnetic Selection](#2-standout-feature-backlog-rustwasm-leaning)
+snaps a lasso to the same edges. Spec them together when the selection overhaul graduates.
+
 This is a **near-term design item** to be specced separately — it is the most concrete near-term
 piece of the broader engine roadmap, and the magnetic lasso is the natural bridge between the
 selection overhaul and the standout backlog.

@@ -913,3 +913,21 @@ every commit.
 | 1   | **Copy/paste for every bounding-box type** — plain Ctrl+C didn't exist (only Ctrl+Shift+C, whole canvas). New `useCopyRegionAction` session hook copies the *active* bbox — crop box, shape/arrow bounds, magic-wand selection bounds — as PNG via the engine's existing `copy_region`, from Ctrl+C or a new "Copy Selection" context-menu item. Paste needed zero changes: region copies re-enter the v7.8 paste-placement flow (placement box, Enter/Esc). DECISION: copies are active-layer bounding-rect pixels, non-mutating; mask-shaped extraction and shape rasterization would need engine APIs (out of scope, parked for Silas); text boxes copy as text natively; Ctrl+C yields to native DOM text selections | Complete |
 | 2   | **Stamp state teardown on tool/sub-mode exit** — the last-selected stamp kept firing on every click after leaving stamp mode. Root cause in three places, worst being `useRedStampTool.pendingStamp`: set by event, never cleared, and routed into clicks even in Clone sub-mode. New `useStampTeardown` hook fires on tool deactivate + sub-mode switch and clears pending stamp, selected emoji, and the clone source (JS-side disarm in `useCloneStamp` — the engine has no `clear_source`; the disarm gates `begin_stroke` and aborts in-flight strokes; Alt+Click re-arms). Within-mode behavior untouched | Complete |
 | 3   | **"Clone Stamp" → "Stamps" (display label only)** — one string in `toolConfig.ts` feeds button text, tooltip, `title`, and `aria-label`, plus two ShortcutModal copies. Tool id `stamp`, shortcut 9, and persistence keys untouched. Marketing/docs mentions flagged for a separate pass, not edited | Complete |
+
+## v7.19 Change Summary — 2026-07-12
+
+Session 2.0 of the tool-UI arc (branch `refactor/tool-mode-toggle`,
+overnight felix run) plus a marketing home-page truth pass. The
+refactor is behavior-preserving and was verified in a real browser
+against the worktree's production build before merging: all four Paint
+sub-modes toggle by mouse AND keyboard (focus-visible ring present),
+each body renders and the brush paints (canvas pixel hash changed),
+undo restored the exact prior hash, zero console errors. Evidence
+screenshots in `~/ai-repo/ih-toolui/qc-evidence-s20/`.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Shared `ToolModeToggle` component** (`ui/tool-mode-toggle.tsx`) — Paint's icon-row + title-below + body-slot pattern extracted into a generic component (`modes`/`activeMode`/`onModeChange`/`columns`/render-prop body), composed 100% from existing primitives (ToolButtonGroup stacked, HOVER_RING SSOT, SectionHeader, settingsPanelMotion) — zero new styling. Paint is the first consumer; ToolsSidebar/AppShell/stores untouched. One structural delta, verified invisible: four conditional `motion.div`s → one keyed `motion.div` under `AnimatePresence mode="wait"` | Complete |
+| 2   | **`ToolModule` type + `TOOL_MODULES` registry** (`features/tools/toolModules.ts`) — the registry shape the whole arc (and the command palette) builds on; Paint registered under its legacy `brush` id. Shape only: no routing rewired, no ids/shortcuts/persistence changed | Complete |
+| 3   | **Marketing home-page truth pass** — Hero: stale "v2.0" badge dropped, "No upload for demo" → "Free demo — nothing leaves your device", "~200KB WASM bundle" → real ~310 KB gzipped, "Real-time multi-device sync" → "Cloud edit sync when signed in". Features: AI card now says object removal + text extraction are live (card claimed "queued" for weeks), `.ora` interchange added to Format conversion, location-only GPS scrub added to Privacy. CTA: "no upload" → "nothing uploaded" | Complete |
+| 4   | **Engine-Roadmap pairing note** — Smart Brush + Magnetic Selection share one edge-detection core (build the gradient/edge map once in Rust, both features consume it); mirrored into the tool-arc plan (`ih-toolui/TOOL_ARC_PLAN.md`) under the Adjust & Select session | Complete |

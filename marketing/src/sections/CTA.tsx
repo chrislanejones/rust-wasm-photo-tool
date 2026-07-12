@@ -11,8 +11,8 @@ export default function CTA() {
           Open it in a tab. Edit a photo. Decide.
         </h2>
         <p className="mt-4 text-zinc-400 max-w-xl mx-auto">
-          No account, no email gate, no upload. Just the editor running locally
-          in your browser, talking to a Rust binary you can inspect.
+          No account, no email gate, nothing uploaded. Just the editor running
+          locally in your browser, talking to a Rust binary you can inspect.
         </p>
         <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
           <a

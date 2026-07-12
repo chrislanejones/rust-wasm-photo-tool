@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.63",
+    date: "2026-07-12",
+    headline: "Quiet groundwork for smarter tool panels",
+    entries: [
+      { tag: "infra", text: "Behind the scenes: the pattern Paint uses for its sub-modes — icons on top, panel below — is now a shared building block, and the first piece of a proper tool registry landed with it. Nothing looks different today; it's the foundation that lets every multi-mode tool get the same clean switcher, one release at a time." },
+      { tag: "ui", text: "This site's home page got a truth pass — the AI section now says object removal and text extraction are live (they have been for a while), and a few stale numbers and confusing lines were corrected." },
+    ],
+  },
+  {
     version: "v0.9.62",
     date: "2026-07-12",
     headline: "Copy any selection, and the stamp tool learns to let go",

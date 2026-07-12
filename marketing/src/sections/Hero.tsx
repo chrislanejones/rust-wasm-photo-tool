@@ -26,7 +26,7 @@ export default function Hero() {
       <div className="relative max-w-7xl mx-auto px-6 pt-20 pb-24 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/30 bg-orange-500/10 text-xs text-orange-300 mb-6">
           <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-          v2.0 — Now powered by Rust + WebAssembly
+          Powered by Rust + WebAssembly
         </div>
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-semibold tracking-tight max-w-4xl mx-auto leading-[1.05]">
           Convert and annotate images{" "}
@@ -50,14 +50,16 @@ export default function Hero() {
         </div>
         <div className="mt-10 flex items-center justify-center gap-6 text-xs text-zinc-500 flex-wrap">
           <span className="flex items-center gap-1.5">
-            <span className="text-emerald-400">●</span> No upload for demo
+            <span className="text-emerald-400">●</span> Free demo — nothing
+            leaves your device
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="text-orange-400">●</span> ~200KB WASM bundle
+            <span className="text-orange-400">●</span> ~310 KB gzipped WASM
+            engine
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="text-violet-400">●</span> Real-time multi-device
-            sync
+            <span className="text-violet-400">●</span> Cloud edit sync when
+            signed in
           </span>
           <span className="flex items-center gap-1.5">
             <span className="text-pink-400">●</span> Export PNG · JPEG · WebP ·
