@@ -81,9 +81,18 @@ export interface OplogPersistWasm {
     frames: Uint8Array,
     cursor: number,
   ): boolean;
-  /** Layer count — the op log only models a SINGLE-layer document, so >1
-   *  means the persisted log cannot describe what the user is looking at.
-   *  Optional: test fakes and older builds without it read as single-layer. */
+  /** CONTENT-layer count — the op log models a single-PIXEL-layer document, so
+   *  >1 means the persisted log cannot describe what the user is looking at.
+   *  The Canvas (the artboard fill) is document metadata and does NOT count
+   *  (ADR-016): a default Canvas + Photo document answers 1.
+   *
+   *  Optional: test fakes and older builds without it fall back to
+   *  `layer_count()`, and then to 1. */
+  content_layer_count?(): number;
+  /** TOTAL layers, Canvas included. Only the fallback for engines built before
+   *  `content_layer_count` existed — do NOT gate the log on this: on a default
+   *  document it reads 2 (Canvas + Photo), which is what kept op-log undo and
+   *  persistence dark for every user on defaults. */
   layer_count?(): number;
 }
 
@@ -95,16 +104,28 @@ function hasPersistExports(t: object): t is OplogPersistWasm {
  *
  *  False in exactly the two cases the engine can no longer reconcile:
  *  `oplog_is_broken()` (an unrecorded edit — clone stamp, filter, mask —
- *  desynced the log; snapshot undo has taken over) and a multi-layer
- *  document (out of op-log scope; `oplog_record` drops or breaks the log).
- *  In both, ANY log already on disk for this photo is now a faithful
+ *  desynced the log; snapshot undo has taken over) and a document with more
+ *  than one CONTENT layer (out of op-log scope; `oplog_record` drops or breaks
+ *  the log). In both, ANY log already on disk for this photo is now a faithful
  *  description of a document that no longer exists — persisting more of it,
  *  or restoring from it, silently hands the user back an older document.
  *  Note this is deliberately NOT `oplog_active()`: that is also false when
- *  there is simply no log yet (a freshly-loaded photo), which is harmless. */
+ *  there is simply no log yet (a freshly-loaded photo), which is harmless.
+ *
+ *  The count is CONTENT layers, not total layers (ADR-016). The artboard fill
+ *  is metadata the log carries, not content it records, so a default
+ *  Canvas + Photo document is ONE pixel layer and is trustworthy. Reading
+ *  `layer_count()` here — which answers 2 on that document — is precisely what
+ *  made this return false for every user on defaults, leaving op-log
+ *  persistence dark no matter how the flags were set. */
 function isLogTrustworthy(tool: OplogPersistWasm): boolean {
   if (tool.oplog_is_broken()) return false;
-  const layers = typeof tool.layer_count === "function" ? tool.layer_count() : 1;
+  const layers =
+    typeof tool.content_layer_count === "function"
+      ? tool.content_layer_count()
+      : typeof tool.layer_count === "function"
+        ? tool.layer_count()
+        : 1;
   return layers <= 1;
 }
 

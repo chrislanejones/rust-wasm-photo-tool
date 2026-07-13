@@ -163,3 +163,47 @@ UI (TypeScript):
    confirmation (see Export above).
 10. Re-run ADR-006's real-gallery check on a DEFAULT (2-layer) document
     — it has never been run on one, because it could not be.
+
+## Implementation notes (2026-07-13) — READ BEFORE ACCEPTING
+Steps 1-8 landed. Two deliberate deviations from the checklist, and one
+thing the checklist missed:
+
+**The log INDEXED layers, not just counted them.** Six more sites read or
+wrote `layers[0]` as "the content layer": `oplog_doc_from_engine`,
+`oplog_sync_annotations`, `oplog_restore_into_engine`, `oplog_maybe_start`,
+`try_oplog_undo`/`redo`, `oplog_active`. Counting content layers alone
+would have recorded the photo's strokes into the CANVAS's pixel plane and
+replayed them back onto the wrong layer — a silent corrupting undo, the
+exact failure the pre-mortem names. All now route through `content_idx()`.
+
+**`CanvasParams` is `{r,g,b,a,visible,opacity}`, not `(pad, size, RGBA)`.**
+Size is the document's own dims and pad isn't needed to render a
+full-document fill; storing either creates a second source of truth that can
+disagree with the layer geometry. `visible`/`opacity` ARE needed — the
+engine composites the Canvas through them, so the log's composite must too
+or the sync hash mismatches on a canvas toggle.
+
+**The legacy read (step 6) checks pixels, not just the name.** The
+checklist's rule — layer 0 named "Background" in a >1-layer doc ⇒ Canvas —
+misfires on a document this ADR itself describes: artboard OFF, so
+`load_image` named the PHOTO "Background", plus one pasted layer. By name
+that is indistinguishable from an artboard document, and reading it as a
+Canvas hands the op log the wrong content plane. The restore therefore also
+requires the layer to be a **uniform fill** (which every artboard fill is by
+construction and a photo is not). Its only misfire — a bottom content layer
+that is a perfectly solid colour — is harmless, since the Canvas metadata
+reproduces that exact plane at composite.
+
+**Found and fixed in passing (it was live):** `composite_excluding_background`
+dropped the PHOTO from the export of any artboard-OFF document that had
+gained a second layer, and AppShell's "Remove Canvas" (a FIFTH name check,
+not in the checklist — app/src/app/AppShell.tsx:1813) would have deleted the
+user's photo on that same document.
+
+**Still open:** the binary archive does not persist `kind` — restored
+documents recover it via the legacy read above. A document whose Canvas has
+been PAINTED on is no longer a uniform fill, so it restores as content (out
+of op-log scope, fill included in exports). Conservative and lossless, but
+the real fix is an archive field, which is a schema change (`dexie-migration`
+skill). Step 9 (`exportCanvasBackground`) and step 10 (the real-gallery check
+on a DEFAULT document) are NOT done.

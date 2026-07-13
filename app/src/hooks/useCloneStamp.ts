@@ -35,6 +35,14 @@ export interface HistoryEntry {
 export interface LayerInfo {
   id: number;
   name: string;
+  /** What this layer IS to the document (ADR-016). `"canvas"` is the artboard
+   *  fill — a layer the user sees and can toggle, but document METADATA to the
+   *  op log, which counts only `"content"` layers.
+   *
+   *  Always gate on this, never on `name`: "Background" means the FILL on an
+   *  artboard document and the PHOTO on a single-layer one, and the name is
+   *  user-editable besides. */
+  kind: "canvas" | "content";
   visible: boolean;
   opacity: number; // 0..1
   active: boolean;
