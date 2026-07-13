@@ -1249,3 +1249,64 @@ one thing: the fill layer. Display label only — internal ids (`blankMode`,
 ### Gates
 
 tsc clean · 122 tests · app + marketing builds green.
+
+## v7.27 Change Summary — 2026-07-13
+
+**ADR-016 implemented: the op log activates on a DEFAULT document.** The
+structural blocker found in v7.26 is gone. Ships behind unchanged OFF flags —
+this release makes the feature *reachable*, it does not turn it on.
+
+### What was broken (v7.26 found it; this release fixes it)
+
+Every default import is a two-layer document (Canvas fill + Photo, because
+`canvasArtboard: true` is the default). The op log refused multi-layer documents
+at both levels — `oplog_record` dropped the op and marked the log broken when
+`layers.len() != 1`; `isLogTrustworthy` refused any doc with `layer_count() > 1`.
+Net: **op-log undo and persistence were dark on every default document.** ADRs
+003/006/012/013 and the v7.24 data-loss fixes were unreachable by construction.
+
+### The change
+
+| Piece | What it does |
+| --- | --- |
+| **`LayerKind { Canvas, Content }`** (src/layer.rs) | Explicit kind on the `Layer` struct, set at creation, serialized with the layer. **Never inferred from a name.** |
+| **Four name checks retired** (src/lib.rs ×3, src/layer.rs ×1) | The engine identified the artboard by `layers[0].name == "Background"` — a string that meant *the fill* in artboard mode and *the photo* in `load_image` / `flatten_all` / `finish_layer_restore`. One overloaded name, four call sites, one rename away from a silent wrong-document restore. |
+| **Fill renamed "Background" → "Canvas"** | "Canvas" now means exactly one thing. Content layers keep "Background". |
+| **`oplog_record` counts CONTENT layers** | A default doc (Canvas + Photo) = ONE pixel layer ⇒ the log activates. |
+| **`isLogTrustworthy` reads the content count** | The persistence gate follows the same rule. |
+| **`Document` gains `canvas` metadata** (ADR-012's additive-field clause) | Replay reconstructs the fill, so a restored artboard doesn't come back transparent. Format version byte bumped. |
+| **Legacy read** | A persisted layer 0 named "Background" in a >1-layer doc decodes as `kind: Canvas`. Existing documents still open. |
+
+### The proof (the deliverable test)
+
+`default_artboard_document_records_ops_and_undo_replays_byte_identically` — a
+default Canvas+Photo document records **2 ops where it recorded 0**; the log's
+replayed composite is **byte-identical** to the engine's; undo and redo land
+byte-exact; the stack is not flattened (still Canvas + Photo afterwards).
+
+**Two guards, both silent-corruption paths:**
+
+- `a_second_content_layer_still_leaves_oplog_scope` — the Canvas stops counting,
+  but a genuine pasted layer still does. Out of scope ⇒ broken ⇒ snapshot undo.
+  The log must never claim a document it cannot replay.
+- `editing_the_canvas_layer_leaves_scope_instead_of_recording_onto_the_photo` —
+  the Canvas is a real, selectable layer. If the user paints **on it**, the log
+  cannot represent that edit (its document *is* the content plane), and recording
+  it would replay the stroke **onto the photo**. It leaves scope instead. Never
+  silently wrong.
+- `legacy_restore_does_not_mistake_a_photo_named_background_for_the_canvas` —
+  ADR-016's pre-mortem, pinned by a test.
+
+### Gates
+
+`cargo fmt --check` · `clippy -D warnings` · **138 Rust tests** (from 132) ·
+**123 TS tests** · tsc clean · app + marketing builds green.
+**wasm 659,367 → 659,815 bytes (+448, +0.07%)** — the op-log rework itself costs
+zero (the `tiles` feature is off by default); the 448 is the `LayerKind`
+plumbing.
+
+### Still OFF
+
+`ih_oplog_undo` and `ih_oplog_persist` are unchanged and still default OFF.
+ADR-016 stays **Draft** pending the real-gallery dogfood check — which, for the
+first time, will actually exercise the op log on a normal photo.

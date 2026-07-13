@@ -27,6 +27,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.71",
+    date: "2026-07-13",
+    headline: "Undo history finally works on an ordinary photo",
+    entries: [
+      { tag: "rust", text: "Behind the scenes: the undo history that's meant to survive a reload had a quiet problem — it only ever worked on photos with a single layer, and since every photo you open gets a canvas behind it, that meant it worked on almost nothing. The engine now understands the canvas as part of the document rather than as an extra layer, so the history records properly on a normal photo for the first time." },
+      { tag: "rust", text: "Behind the scenes: the engine used to work out which layer was the canvas by checking whether it was named \"Background\" — a name that unhelpfully meant two different things depending on how the photo was opened. It's now tracked explicitly, which closes off a way you could have renamed a layer and had the app restore the wrong picture." },
+      { tag: "fix", text: "Two safeguards came with it: if you paint directly on the canvas layer, or add a second real layer, the app quietly steps back to ordinary undo rather than recording something it can't faithfully replay. It would rather be slower than wrong." },
+    ],
+  },
+  {
     version: "v0.9.70",
     date: "2026-07-13",
     headline: "What you see is what you download",

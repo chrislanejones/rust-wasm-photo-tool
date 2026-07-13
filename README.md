@@ -50,17 +50,21 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.26 — 2026-07-13
+### v7.27 — 2026-07-13
 
-**Two decisions, one of which changes your exports.**
+**The op log wakes up on a normal photo.** This is the release that makes the last four ADRs' worth of work reachable, and it ships as an engine change nobody will see today.
 
-**Exports now include the Canvas by default.** If you import a photo with "Canvas on import" on (the default), your download now includes the padding and background colour you see on screen — what you see is what you get. Previously exports cropped to just the photo, on the theory that the backing canvas was "a compositional guide, not real content". That theory is retired: the Canvas is the document's bottom layer, so it ships. Turn it off in Settings ("Canvas background on export"), or X the layer out in the Layers panel. **This changes export output for existing users** — it is a deliberate reversal, not a regression.
+The problem, stated bluntly: the engine refused to record an op log for any document with more than one layer — and *every* default import is two layers (the Canvas fill plus your photo). So op-log undo and its persistence weren't switched off, they were **structurally unreachable**. Turning the flag on would have shipped nothing to anyone.
 
-**The Canvas is document metadata, not a logged pixel layer** (ADR-016, Draft). This one is invisible today and load-bearing tomorrow. The engine refuses to record an op log for any document with more than one layer — and *every* default import is two layers (Canvas fill + Photo). So op-log undo and its persistence, the work behind four ADRs and the v7.24 data-loss fixes, has been **dark by construction**: not switched off, structurally unreachable. ADR-016 settles the model that fixes it — the Canvas stays a layer you can see and toggle, but the log counts only *pixel* layers, so a default document becomes one pixel layer and the log activates. The engine work implementing it is in flight.
+ADR-016's fix is a reclassification, not a rewrite. The **Canvas is now document metadata**: still layer 0, still visible and toggleable in the Layers panel, but the log counts only *pixel* layers. A default document is therefore one pixel layer, and the log activates. No auto-flatten, no multi-layer op-log rewrite.
 
-Also: the create dialog's **"Blank Canvas" is now "New Canvas"** — the word "Canvas" should mean exactly one thing.
+Underneath it, the engine stopped identifying the Canvas by the string `"Background"` — a name that, awkwardly, meant *the fill* in artboard mode and *the photo* everywhere else, and was checked in four places. It now carries an explicit `LayerKind`. A user renaming a layer "Background" was one step away from a silent wrong-document restore; that door is closed, and there's a test standing in it.
 
-**And the six-session ghost is dead.** The COOP/COEP cross-origin-isolation check (ADR-009) was finally run in a real browser, with a real sign-in: `crossOriginIsolated === true` both logged out *and* logged in, Clerk clean, no COEP/CORP errors. Isolation holds *through* the auth flow — the one thing a headless spike could only infer. That was the last blocker on WASM threading, so the rayon acceleration path for the magnetic lasso and Smart Brush (built scalar in v7.25 precisely because this was unverified) is now open. Residual, honestly recorded: the OAuth-popup path and the Convex WebSocket under isolation were not separately exercised, and both want a check before COOP headers ship to production.
+**The proof:** a default Canvas+Photo document now records **2 ops where it recorded 0**, and undo replays byte-identically through the log without flattening the stack. Two guards ride along — a genuine second content layer still leaves op-log scope (the log must never claim a document it can't replay), and *painting on the Canvas itself* leaves scope too, because the log's document is the content plane and recording that stroke would replay it onto your photo. Both fall back to snapshot undo rather than being silently wrong.
+
+138 Rust tests (from 132), 123 in the frontend. The engine grew 448 bytes.
+
+`ih_oplog_undo` and `ih_oplog_persist` still ship **OFF**. This release removes the blocker; it doesn't flip the switch. That comes after dogfooding — and now dogfooding will actually exercise something.
 
 ## License
 
