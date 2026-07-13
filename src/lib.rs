@@ -26,6 +26,7 @@ mod edges;
 mod effects;
 mod history;
 mod layer;
+mod livewire;
 mod paint;
 mod selection;
 mod settings;
@@ -437,6 +438,11 @@ pub struct ImageHorseTool {
     /// nothing is selected. Built by the Selection Marker tool's flood-fill /
     /// select-all; `delete_selection` clears the masked pixels.
     selection: Option<Vec<bool>>,
+    /// In-progress magnetic-lasso session (edge cost map + anchors + the
+    /// committed path). `None` when the lasso isn't running — which is always,
+    /// unless the user is mid-loop. Ends by writing `selection` like every
+    /// other selection tool; see `selection.rs`'s lasso block.
+    lasso: Option<crate::livewire::LassoState>,
     /// Live, non-destructive offset for the Move tool: while the user drags, the
     /// ACTIVE layer is composited shifted by this (dx, dy) without touching its
     /// stored pixels. `None` when no move is in progress. Committed by
@@ -710,6 +716,7 @@ impl ImageHorseTool {
             editing_shape_id: None,
             editing_text_id: None,
             selection: None,
+            lasso: None,
             move_preview: None,
             paste_preview: None,
             paint_stab_tip: None,

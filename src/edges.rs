@@ -76,20 +76,15 @@ pub(crate) fn sobel_magnitude(buf: &[u8], w: usize, h: usize) -> Vec<u8> {
 //
 // Pure function of `sobel_magnitude`'s output. No second gradient pass — that
 // is the whole point of building it here.
-//
-// The three `allow(dead_code)`s below are TEMPORARY — this commit only. The
-// cost map has no non-test consumer yet, so `-D warnings` sees dead code; the
-// live-wire path finder lands in the very next commit and takes them off. If
-// you are reading this on master, the allows outlived their consumers.
 
 /// Cost of the cheapest possible pixel (a maximal edge). Not zero: a
 /// zero-cost pixel would let the path finder wander along an edge for free,
 /// and ties between "hug the edge" and "take a 400px detour along the edge"
 /// would be decided by heap order rather than by distance.
-#[allow(dead_code)]
 pub(crate) const COST_MIN: u16 = 1;
-/// Cost of a perfectly flat pixel. `COST_MIN + 255`.
-pub(crate) const COST_MAX: u16 = 256;
+/// Cost of a perfectly flat pixel — the full 8-bit magnitude range above the
+/// cheapest one.
+pub(crate) const COST_MAX: u16 = COST_MIN + 255;
 
 /// Below this peak magnitude an image has no edges worth following — it's flat
 /// or pure sensor noise. Normalizing against a peak of 3 would amplify that
@@ -114,7 +109,6 @@ const NOISE_FLOOR: u8 = 8;
 /// An image with no real edges (peak below [`NOISE_FLOOR`]) gets a uniform
 /// `COST_MAX` map, so a path across it degenerates to a straight line instead
 /// of chasing noise.
-#[allow(dead_code)]
 pub(crate) fn edge_cost_map(mag: &[u8]) -> Vec<u16> {
     let peak = mag.iter().copied().max().unwrap_or(0);
     if peak < NOISE_FLOOR {
@@ -136,6 +130,9 @@ pub(crate) fn edge_cost_map(mag: &[u8]) -> Vec<u16> {
 ///
 /// Higher `strength` = fewer walls (only the very hardest edges contain a
 /// brush stroke); lower = more walls, tighter containment.
+///
+/// The `allow` is temporary: the Smart Brush is this function's only non-test
+/// consumer and it lands in the next commit.
 #[inline]
 #[allow(dead_code)]
 pub(crate) fn is_wall(cost: u16, strength: u8) -> bool {
