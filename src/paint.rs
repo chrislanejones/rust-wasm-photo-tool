@@ -13,6 +13,35 @@ use wasm_bindgen::prelude::*;
 // implementation, so replay parity can never drift from what the brush
 // actually painted. Bodies are verbatim from the former methods.
 
+/// The canvas-clamped bbox a dab of this radius touches, or None if it falls
+/// off-canvas / the radius is degenerate.
+///
+/// Split out of [`dab_coverage`] (whose signature is unchanged — op-log replay
+/// calls it) because the Smart Brush needs the bbox *before* the dab is
+/// stamped, to snapshot the coverage it is about to overwrite. One formula, so
+/// the snapshot and the stamp can never disagree about which pixels were
+/// touched.
+#[inline]
+pub(crate) fn dab_bbox(
+    w: i32,
+    h: i32,
+    cx: f64,
+    cy: f64,
+    radius: f64,
+) -> Option<(i32, i32, i32, i32)> {
+    if radius as f32 <= 0.0 {
+        return None;
+    }
+    let min_x = ((cx - radius).floor() as i32).max(0);
+    let max_x = ((cx + radius).ceil() as i32).min(w - 1);
+    let min_y = ((cy - radius).floor() as i32).max(0);
+    let max_y = ((cy + radius).ceil() as i32).min(h - 1);
+    if min_x > max_x || min_y > max_y {
+        return None;
+    }
+    Some((min_x, min_y, max_x, max_y))
+}
+
 /// Stamp one dab's soft-edged profile into `cov` (max-combine, never additive
 /// — this is what kills per-dab alpha build-up). `cov` is a `w*h` coverage
 /// plane. Returns the touched bbox, or None if the dab fell outside the
@@ -27,17 +56,8 @@ pub(crate) fn dab_coverage(
     hardness: f32,
 ) -> Option<(i32, i32, i32, i32)> {
     let r_f32 = radius as f32;
-    if r_f32 <= 0.0 {
-        return None;
-    }
     let r_sq = r_f32 * r_f32;
-    let min_x = ((cx - radius).floor() as i32).max(0);
-    let max_x = ((cx + radius).ceil() as i32).min(w - 1);
-    let min_y = ((cy - radius).floor() as i32).max(0);
-    let max_y = ((cy + radius).ceil() as i32).min(h - 1);
-    if min_x > max_x || min_y > max_y {
-        return None;
-    }
+    let (min_x, min_y, max_x, max_y) = dab_bbox(w, h, cx, cy, radius)?;
 
     // Hoisted invariants: the hardened-zone radius² (full coverage, no
     // sqrt/falloff inside) and the falloff-band width. `hard_frac` is the
@@ -150,6 +170,88 @@ pub(crate) fn composite_stroke_bbox(
     }
 }
 
+// ── Smart Brush containment ─────────────────────────────────────────────────
+// The SECOND consumer of the shared edge cost map (the magnetic lasso is the
+// first). The lasso path-finds ALONG the cheap edges; the brush treats those
+// same edges as walls it cannot paint across. One cost map, two readings of it
+// — which is exactly why the two features can never disagree about where an
+// object stops.
+//
+// Region-grow from the dab centre, bounded to the dab's own bbox: coverage the
+// grow can't reach is rolled back to what it was before this dab. Bounding it
+// to the footprint is what keeps the brush O(dab area) instead of O(image) per
+// dab — a full-image flood on every dab of a 60/s stroke would be unusable.
+//
+// A region-grow rather than a straight-line visibility test, because the grow
+// respects concave shapes: paint inside a "C" and the stroke will not jump the
+// gap to the other arm, which a line test would happily do.
+
+/// Roll back the coverage this dab just laid wherever the paint could not
+/// *reach* from the dab centre without crossing a strong edge.
+///
+/// `prev` is the bbox-local snapshot of `cov` from immediately before the dab
+/// (see [`dab_bbox`]); `reach` and `stack` are caller-owned scratch, reused
+/// across dabs so a stroke allocates nothing per dab. `reach` must be `w*h`;
+/// only the bbox region is touched (and cleared) here.
+///
+/// If the dab centre is itself a wall — the user painted right on an outline —
+/// the dab is left unconstrained. Same rule the edge-aware wand uses for a seed
+/// on an edge: doing *something* beats mysteriously doing nothing.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn constrain_dab_to_region(
+    cov: &mut [u8],
+    prev: &[u8],
+    cost: &[u16],
+    w: usize,
+    bbox: (i32, i32, i32, i32),
+    centre: (i32, i32),
+    strength: u8,
+    reach: &mut [bool],
+    stack: &mut Vec<usize>,
+) {
+    let (min_x, min_y, max_x, max_y) = bbox;
+    let (x0, y0) = (min_x as usize, min_y as usize);
+    let (x1, y1) = (max_x as usize, max_y as usize);
+    let (cx, cy) = (centre.0 as usize, centre.1 as usize);
+    if cost.len() != reach.len() || cost.len() != cov.len() {
+        return; // mismatched planes: paint normally rather than corrupt the stroke
+    }
+    // Centre outside its own bbox (dab clipped by the canvas edge) or standing
+    // on a wall: leave the dab alone.
+    if cx < x0 || cx > x1 || cy < y0 || cy > y1 {
+        return;
+    }
+    let is_open = |i: usize| !crate::edges::is_wall(cost[i], strength);
+    if !is_open(cy * w + cx) {
+        return;
+    }
+
+    // Clear only the window we're about to flood — zeroing a full-image plane
+    // per dab would cost more than the flood itself.
+    for y in y0..=y1 {
+        reach[y * w + x0..=y * w + x1].fill(false);
+    }
+    crate::selection::flood_barrier_into(
+        reach,
+        w,
+        &[cy * w + cx],
+        (x0, y0, x1, y1),
+        stack,
+        is_open,
+    );
+
+    // Anything the paint couldn't reach goes back to its pre-dab coverage.
+    let bw = x1 - x0 + 1;
+    for y in y0..=y1 {
+        for x in x0..=x1 {
+            let i = y * w + x;
+            if !reach[i] {
+                cov[i] = prev[(y - y0) * bw + (x - x0)];
+            }
+        }
+    }
+}
+
 /// Interpolated dab centres for one stroke segment, exactly as
 /// `paint_stroke_to` lays them: step = max(radius/4, 1px), dabs at
 /// t = 0..=steps inclusive. Shared with op-log replay so the dab placement
@@ -188,12 +290,44 @@ impl ImageHorseTool {
         self.paint_color = (0, 0, 0);
         self.paint_opacity = 1.0;
         self.paint_erase = false;
+
+        // Smart Brush: build the edge cost map ONCE per stroke (a Sobel pass
+        // per dab would be unusable), and size the scratch planes now so the
+        // stroke itself allocates nothing per dab. Untouched — and unallocated
+        // — when the Smart Brush is off, which is the default.
+        if self.smart_brush {
+            let (w, h) = (self.width as usize, self.height as usize);
+            let mag = crate::edges::sobel_magnitude(&self.composite_cache, w, h);
+            self.smart_cost = crate::edges::edge_cost_map(&mag);
+            self.smart_reach.clear();
+            self.smart_reach.resize(n, false);
+        }
+    }
+
+    /// Turn the Smart Brush on/off and set how hard an edge has to be before it
+    /// walls the stroke in (`strength`, 0..=255 — higher = only the hardest
+    /// edges contain the paint). Takes effect from the next `paint_begin`.
+    ///
+    /// Off by default. With it off, `accumulate_dab` below is byte-for-byte the
+    /// brush that shipped.
+    pub fn set_smart_brush(&mut self, enabled: bool, strength: u32) {
+        self.smart_brush = enabled;
+        self.smart_strength = strength.min(255) as u8;
+        if !enabled {
+            // Don't sit on a multi-MB cost map after the user switches it off.
+            self.smart_cost = Vec::new();
+            self.smart_reach = Vec::new();
+        }
     }
 
     /// Stamp one dab's soft-edged profile into the coverage buffer. Thin
     /// wrapper over the pure [`dab_coverage`] kernel (shared with op-log
     /// replay); returns None additionally when the stroke isn't primed
     /// (paint_begin not run).
+    ///
+    /// With the Smart Brush on, the dab is additionally contained by the shared
+    /// edge cost map: coverage the paint can't reach from the dab centre without
+    /// crossing a strong edge is rolled back (see [`constrain_dab_to_region`]).
     fn accumulate_dab(&mut self, cx: f64, cy: f64, radius: f64) -> Option<(i32, i32, i32, i32)> {
         let w = self.width as i32;
         let h = self.height as i32;
@@ -201,6 +335,48 @@ impl ImageHorseTool {
         if self.paint_cov.len() != n {
             return None;
         }
+
+        // Smart path: snapshot the coverage this dab is about to overwrite
+        // (bbox-local, so the snapshot is dab-sized, not image-sized), stamp,
+        // then roll back whatever the paint couldn't reach.
+        if self.smart_brush && self.smart_cost.len() == n && self.smart_reach.len() == n {
+            let bbox = dab_bbox(w, h, cx, cy, radius)?;
+            let (min_x, min_y, max_x, max_y) = bbox;
+            let (bw, bh) = ((max_x - min_x + 1) as usize, (max_y - min_y + 1) as usize);
+            let wu = w as usize;
+
+            // Reused across dabs: `resize` only reallocates when the brush grows.
+            self.smart_prev.clear();
+            self.smart_prev.reserve(bw * bh);
+            for y in min_y as usize..=max_y as usize {
+                let row = y * wu + min_x as usize;
+                self.smart_prev
+                    .extend_from_slice(&self.paint_cov[row..row + bw]);
+            }
+
+            let bbox = dab_coverage(
+                &mut self.paint_cov,
+                w,
+                h,
+                cx,
+                cy,
+                radius,
+                self.paint_hardness,
+            )?;
+            constrain_dab_to_region(
+                &mut self.paint_cov,
+                &self.smart_prev,
+                &self.smart_cost,
+                wu,
+                bbox,
+                (cx.round() as i32, cy.round() as i32),
+                self.smart_strength,
+                &mut self.smart_reach,
+                &mut self.smart_stack,
+            );
+            return Some(bbox);
+        }
+
         dab_coverage(
             &mut self.paint_cov,
             w,
@@ -620,5 +796,185 @@ impl ImageHorseTool {
         };
         self.paint_stab_tip = None;
         painted
+    }
+}
+
+#[cfg(test)]
+mod smart_brush_tests {
+    use super::*;
+    use crate::edges::{edge_cost_map, sobel_magnitude};
+
+    const W: usize = 64;
+    const H: usize = 32;
+    /// The seam: x < 32 is the dark region, x >= 32 is the light one.
+    const SEAM: usize = 32;
+
+    /// Two regions, one clean hard edge down the middle — the fixture the whole
+    /// feature is judged on.
+    fn two_regions() -> Vec<u8> {
+        let mut v = vec![0u8; W * H * 4];
+        for y in 0..H {
+            for x in 0..W {
+                let c: [u8; 4] = if x < SEAM {
+                    [25, 25, 25, 255]
+                } else {
+                    [235, 235, 235, 255]
+                };
+                v[(y * W + x) * 4..(y * W + x) * 4 + 4].copy_from_slice(&c);
+            }
+        }
+        v
+    }
+
+    fn cost() -> Vec<u16> {
+        edge_cost_map(&sobel_magnitude(&two_regions(), W, H))
+    }
+
+    /// Lay one dab and contain it, exactly as `accumulate_dab` does — the pure
+    /// kernels, so the assertion is about the algorithm and not about wasm.
+    fn smart_dab(cx: f64, cy: f64, radius: f64, strength: u8) -> Vec<u8> {
+        let cost = cost();
+        let mut cov = vec![0u8; W * H];
+        let bbox = dab_bbox(W as i32, H as i32, cx, cy, radius).expect("dab is on canvas");
+        let (min_x, min_y, max_x, max_y) = bbox;
+        let bw = (max_x - min_x + 1) as usize;
+
+        // Bbox-local snapshot of the pre-dab coverage, as the brush takes.
+        let mut prev = Vec::new();
+        for y in min_y as usize..=max_y as usize {
+            let row = y * W + min_x as usize;
+            prev.extend_from_slice(&cov[row..row + bw]);
+        }
+
+        dab_coverage(&mut cov, W as i32, H as i32, cx, cy, radius, 1.0).expect("dab lands");
+        let mut reach = vec![false; W * H];
+        let mut stack = Vec::new();
+        constrain_dab_to_region(
+            &mut cov,
+            &prev,
+            &cost,
+            W,
+            bbox,
+            (cx.round() as i32, cy.round() as i32),
+            strength,
+            &mut reach,
+            &mut stack,
+        );
+        cov
+    }
+
+    /// Total coverage laid on the light side of the seam.
+    fn coverage_across_the_seam(cov: &[u8]) -> u32 {
+        let mut sum = 0u32;
+        for y in 0..H {
+            for x in SEAM..W {
+                sum += cov[y * W + x] as u32;
+            }
+        }
+        sum
+    }
+
+    #[test]
+    fn a_stroke_in_one_region_does_not_bleed_into_the_other() {
+        // A fat dab centred in the DARK region, close enough to the seam that a
+        // normal brush would spill well across it.
+        let (cx, cy, r) = (24.0, 16.0, 14.0);
+
+        // The control: the shipped brush, unconstrained. It bleeds — that is the
+        // bug the Smart Brush exists to fix, so the test asserts the bug is real
+        // before asserting it's fixed. Without this, a containment that did
+        // nothing would still pass.
+        let mut plain = vec![0u8; W * H];
+        dab_coverage(&mut plain, W as i32, H as i32, cx, cy, r, 1.0).unwrap();
+        assert!(
+            coverage_across_the_seam(&plain) > 0,
+            "fixture is wrong: the plain brush must spill across the seam"
+        );
+
+        // The Smart Brush, same dab: nothing crosses.
+        let smart = smart_dab(cx, cy, r, 128);
+        assert_eq!(
+            coverage_across_the_seam(&smart),
+            0,
+            "the stroke must not bleed across a clean edge"
+        );
+        // ...and it still painted its own side (containment, not suppression).
+        assert!(
+            smart[16 * W + 24] > 0,
+            "the dab must still paint the region it was centred in"
+        );
+    }
+
+    #[test]
+    fn containment_is_deterministic() {
+        let a = smart_dab(24.0, 16.0, 14.0, 128);
+        let b = smart_dab(24.0, 16.0, 14.0, 128);
+        assert_eq!(a, b, "same dab + same cost map -> byte-identical coverage");
+    }
+
+    #[test]
+    fn a_dab_far_from_any_edge_is_untouched_by_containment() {
+        // Deep in the dark region: containment must be a no-op, not a nibble at
+        // the brush's own footprint.
+        let (cx, cy, r) = (10.0, 16.0, 6.0);
+        let smart = smart_dab(cx, cy, r, 128);
+        let mut plain = vec![0u8; W * H];
+        dab_coverage(&mut plain, W as i32, H as i32, cx, cy, r, 1.0).unwrap();
+        assert_eq!(
+            smart, plain,
+            "away from edges the Smart Brush must lay exactly the normal dab"
+        );
+    }
+
+    #[test]
+    fn painting_on_the_edge_still_paints() {
+        // Centre the dab ON the seam. The centre is a wall, so containment backs
+        // off entirely rather than mysteriously painting nothing — the same rule
+        // the edge-aware wand uses for a seed that lands on an outline.
+        let smart = smart_dab(SEAM as f64, 16.0, 8.0, 128);
+        assert!(
+            smart.iter().any(|&c| c > 0),
+            "a dab centred on an edge must still paint something"
+        );
+    }
+
+    #[test]
+    fn strength_tunes_how_much_it_takes_to_wall_a_stroke_in() {
+        // At a strength above what this seam's edge can muster, the wall stops
+        // being a wall and the brush behaves normally. (Normalized magnitude at
+        // a hard black/white seam is 255, so only a strength above that frees
+        // it — 255 is the max the UI can send, hence: still contained.)
+        assert_eq!(
+            coverage_across_the_seam(&smart_dab(24.0, 16.0, 14.0, 255)),
+            0
+        );
+        // And at a low strength it is certainly contained.
+        assert_eq!(
+            coverage_across_the_seam(&smart_dab(24.0, 16.0, 14.0, 40)),
+            0
+        );
+    }
+
+    #[test]
+    fn degenerate_inputs_do_not_panic() {
+        let mut cov = vec![0u8; W * H];
+        let mut reach = vec![false; W * H];
+        let mut stack = Vec::new();
+        // Mismatched planes: bail out, paint normally, don't corrupt or panic.
+        constrain_dab_to_region(
+            &mut cov,
+            &[],
+            &[],
+            W,
+            (0, 0, 3, 3),
+            (1, 1),
+            128,
+            &mut reach,
+            &mut stack,
+        );
+        assert!(cov.iter().all(|&c| c == 0));
+        // Zero / negative radius has no bbox at all.
+        assert!(dab_bbox(W as i32, H as i32, 5.0, 5.0, 0.0).is_none());
+        assert!(dab_bbox(W as i32, H as i32, -50.0, -50.0, 2.0).is_none());
     }
 }
