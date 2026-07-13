@@ -376,6 +376,13 @@ export function useDrawingTools({
       // Freehand polylines (kind 6) have no bbox-handle representation — they're
       // delete-only via the Reselect panel. Ignore reselect for them.
       if (sh.kind === 6) return;
+      // Bézier pen paths (kind 7) are edited by the PenOverlay (anchors +
+      // control points), never by the rect-bbox handles. They used to fall
+      // through `SHAPE_KIND_NAME[kind] ?? "rect"` below, which hid the baked
+      // path via set_editing_shape and drew a rectangle in its place — so
+      // reselecting a path made it VANISH. AppShell routes kind 7 to the pen
+      // overlay instead (see handleSelectObject).
+      if (sh.kind === 7) return;
       // Pins (kind 5) edit as a circle handle but keep their pin kind on commit.
       const shapeName: "rect" | "circle" | "handCircle" | "line" =
         sh.kind === 4 || sh.kind === 5

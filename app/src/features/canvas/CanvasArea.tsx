@@ -157,6 +157,9 @@ interface Props {
   onPenEditStart?: (id: number) => void;
   onPenEditCommit?: (id: number, flatPoints: number[]) => void;
   onPenEditCancel?: (id: number) => void;
+  /** Reselect from the Review list → open this committed path in the overlay. */
+  penEditRequest?: { id: number; points: number[] } | null;
+  onPenEditRequestHandled?: () => void;
   /** Canvas "Rulers & Grids" config (Settings → Rulers & Grids). Renders a
    *  non-destructive grid + pixel rulers overlay when enabled. */
   guides?: {
@@ -351,6 +354,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onPenEditStart,
       onPenEditCommit,
       onPenEditCancel,
+      penEditRequest,
+      onPenEditRequestHandled,
       guides,
     },
     ref,
@@ -982,6 +987,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             onEditStart={onPenEditStart}
             onEditCommit={onPenEditCommit}
             onEditCancel={onPenEditCancel}
+            editRequest={penEditRequest}
+            onEditRequestHandled={onPenEditRequestHandled}
           />
         )}
 

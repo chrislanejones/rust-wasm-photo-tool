@@ -92,6 +92,12 @@ interface PenOverlayProps {
   onEditCommit?: (id: number, flatPoints: number[]) => void;
   /** Abandon an edit (un-hide, leave the original). */
   onEditCancel?: (id: number) => void;
+  /** Open a committed path for editing from OUTSIDE the canvas — the Reselect
+   *  list in Review. Without this, reselect had no way to reach the overlay, so
+   *  a picked path was hidden (`set_editing_shape`) with nothing drawn in its
+   *  place. Consumed once, then cleared via `onEditRequestHandled`. */
+  editRequest?: { id: number; points: number[] } | null;
+  onEditRequestHandled?: () => void;
 }
 
 /**
@@ -113,6 +119,8 @@ export function PenOverlay({
   onEditStart,
   onEditCommit,
   onEditCancel,
+  editRequest,
+  onEditRequestHandled,
 }: PenOverlayProps) {
   const [anchors, setAnchors] = useState<Anchor[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -156,6 +164,21 @@ export function PenOverlay({
     },
     [onCommit, onEditCommit, onEditCancel],
   );
+
+  // Reselect from the Review list: load the requested path's geometry into the
+  // overlay so its curve AND control points come back, editable. The baked copy
+  // is hidden by onEditStart, exactly as for a click-to-reselect on canvas.
+  useEffect(() => {
+    if (!editRequest) return;
+    const { anchors: a, closed: cl } = deserialize(editRequest.points);
+    if (a.length >= 2) {
+      onEditStart?.(editRequest.id);
+      setEditingId(editRequest.id);
+      setClosed(cl);
+      setAnchors(a);
+    }
+    onEditRequestHandled?.();
+  }, [editRequest, onEditStart, onEditRequestHandled]);
 
   // Window-level drag for every drag kind (anchors + handles, create + edit).
   useEffect(() => {
@@ -309,6 +332,21 @@ export function PenOverlay({
     (kind: "anchor" | "in" | "out", index: number) => (e: React.PointerEvent) => {
       e.stopPropagation();
       e.preventDefault();
+      // Closing a path by clicking the FIRST anchor — the Photoshop gesture, and
+      // the one `onCanvasDown` documents. That handler never saw the click: this
+      // 8×8 handle sits ON TOP of the capture rect and stops propagation, so the
+      // click started an anchor drag instead. The path then never committed, so
+      // neither the stroke NOR the Background fill ever appeared — the "closed
+      // path refuses to fill" bug. Close here, where the click actually lands.
+      if (
+        kind === "anchor" &&
+        index === 0 &&
+        editingIdRef.current === null &&
+        anchorsRef.current.length >= 2
+      ) {
+        finish("commit-close");
+        return;
+      }
       dragRef.current = { kind, index };
     };
 

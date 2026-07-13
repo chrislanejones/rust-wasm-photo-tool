@@ -13,10 +13,31 @@
 // So hash -> state -> (recompute hash) -> identical -> stop. There is no
 // second write to bounce off.
 import { useEffect } from "react";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { applyRoute, currentHash, parseHash, parseSearch } from "./routeState";
 import { dropRoutingParams, writeHash } from "./navigate";
+
+/**
+ * The fragment for the current view, or "" when there ISN'T one.
+ *
+ * Every route this app has describes a view OF AN IMAGE — a tool, a sub-mode, a
+ * settings pane. On the start screen there is no image, so there is no view to
+ * address, and the tool store's default (`#/tool/resize/compress`) describes a
+ * tool you are not using and cannot see. Advertising it in the address bar is a
+ * lie, and copying that link hands someone a URL that lands them on the start
+ * screen anyway.
+ *
+ * A deep link still survives an image-less boot: `applyRoute` has already put the
+ * state where the link asked, we merely decline to *echo* it while the app is
+ * empty. The gallery subscription below re-writes the fragment the moment a photo
+ * becomes active, so the link's tool is both applied and, once it means something,
+ * addressable.
+ */
+function routableHash(): string {
+  return useGalleryStore.getState().activePhotoId ? currentHash() : "";
+}
 
 export function useHashRoute(): void {
   useEffect(() => {
@@ -33,7 +54,7 @@ export function useHashRoute(): void {
     const initial = fromHash ?? fromSearch;
     if (initial) applyRoute(initial);
     if (fromSearch) dropRoutingParams();
-    writeHash(currentHash(), { replace: true });
+    writeHash(routableHash(), { replace: true });
 
     // ── location -> state ───────────────────────────────────────────────────
     const onHashChange = () => {
@@ -42,7 +63,7 @@ export function useHashRoute(): void {
       // Whether we honoured it or not, re-assert the canonical fragment: a
       // typo'd/garbage hash heals back to where the app actually is instead of
       // sitting in the address bar lying about the view.
-      writeHash(currentHash(), { replace: true });
+      writeHash(routableHash(), { replace: true });
     };
     window.addEventListener("hashchange", onHashChange);
 
@@ -50,14 +71,20 @@ export function useHashRoute(): void {
     // Catches every navigation that DIDN'T come through navigateTo(): a tool
     // click in the sidebar, a digit-key shortcut, closing the Settings modal.
     // Those still push a history entry, so Back walks your tool history.
-    const onStoreChange = () => writeHash(currentHash());
+    const onStoreChange = () => writeHash(routableHash());
     const unsubTool = useToolStore.subscribe(onStoreChange);
     const unsubUI = useUIStore.subscribe(onStoreChange);
+    // The gallery store too, because the ROUTABILITY of the view changes with it:
+    // opening the first photo turns "no view" into an addressable one, and closing
+    // the last photo turns it back. Without this, the URL only caught up on the
+    // next unrelated tool click.
+    const unsubGallery = useGalleryStore.subscribe(onStoreChange);
 
     return () => {
       window.removeEventListener("hashchange", onHashChange);
       unsubTool();
       unsubUI();
+      unsubGallery();
     };
   }, []);
 }

@@ -26,6 +26,15 @@ export function writeHash(hash: string, opts: { replace?: boolean } = {}): void 
   // runs, so the assertion under test is unaffected.
   if (typeof window === "undefined") return;
   if (window.location.hash === hash) return;
+  // The empty fragment means "no addressable view" — the start screen (see
+  // `routableHash` in useHashRoute). `location.hash = ""` would leave a bare "#"
+  // dangling in the address bar, so clear it through the history API. Always a
+  // replace: losing a route you can no longer be on shouldn't cost a Back press.
+  if (hash === "") {
+    const { origin, pathname, search } = window.location;
+    window.history.replaceState(null, "", `${origin}${pathname}${search}`);
+    return;
+  }
   if (opts.replace) {
     const { origin, pathname, search } = window.location;
     window.history.replaceState(null, "", `${origin}${pathname}${search}${hash}`);

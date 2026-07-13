@@ -1384,3 +1384,80 @@ OFF. This release makes them *real* — it does not turn them on. The op-log pat
 has now executed in a browser exactly once, locally. The Phase-1 dogfood
 (`~/claude-runs/DOGFOOD_default-flip.md`) is now meaningful for the first time,
 and it is what earns the default.
+
+## v7.29 Change Summary — 2026-07-13
+
+Bug-fix release. Four defects, three of them found by the user dogfooding, one of
+them shipped by me four releases ago.
+
+### Pen: a closed path never closed (the headline)
+
+Reported as *"the background never works, even if I made a full circle"*.
+
+**Root cause — a hit-test, not geometry.** Closing a path by clicking the FIRST
+anchor is the documented gesture, and `onCanvasDown` implements it. That handler
+never ran: the first anchor's 8×8 SVG handle sits ON TOP of the capture rect and
+calls `stopPropagation`, so the click started an anchor *drag* instead. The path
+never committed — so neither the stroke NOR the fill ever appeared. The close is
+now handled where the click actually lands (PenOverlay's anchor pointer-down).
+
+**The engine was innocent, and there are now tests to prove it.** Two new Rust
+tests (138 → 140):
+
+- `bezier_near_closed_circle_fills_interior` — a cubic circle whose final anchor
+  misses the first by a few px, flagged closed, FILLS. `fill_polygon` wraps the
+  contour (`(i + 1) % n`), so closure never had to be exact. The user was never
+  required to click pixel-perfectly.
+- `bezier_no_fill_leaves_interior_untouched` — `fill_kind 0` on the same geometry
+  leaves the interior alone, proving the fill above came from the fill
+  instruction and not from a fat stroke.
+
+Verified in a browser: a closed path's interior is now uniform RGB(59,130,246) —
+zero variance across a 24×24 patch. (The fill still requires fill mode **Solid**;
+it couples with the Shapes fill setting, which defaults to none.)
+
+### Pen: reselect made the path vanish
+
+Kind-7 paths fell through `SHAPE_KIND_NAME[kind] ?? "rect"` into the rectangle
+bbox handler, which hid the baked path via `set_editing_shape` and drew a
+rectangle in its place. Reselect now routes kind 7 to the PenOverlay, which
+reloads the anchors + control points, editable. The one-shot edit request lives in
+`useAnnotationStore` — **not** as new AppShell state (CLAUDE.md: nothing new goes
+into AppShell; orphan `useState` goes to the stores).
+
+### Routing: the start page advertised a tool (regression, mine, v7.25)
+
+With no image open, the address bar read `#/tool/resize/compress` — the tool
+store's default. That describes a tool you cannot see or use, and copying the link
+hands someone a URL that lands them on the start screen anyway. Routes describe a
+view OF AN IMAGE: `routableHash()` now returns "" when `activePhotoId` is null,
+and the gallery store is subscribed so the fragment reappears the moment a photo
+becomes active. A deep link still survives an image-less boot — `applyRoute` has
+already put the state where the link asked; we simply decline to echo it while
+there's nothing to echo.
+
+### Tooltips rendered under the gallery — and it was NOT the z-index
+
+`TooltipContent` carried `z-[var(--z-dialog)]` (50) and the gallery is
+`--z-panel` (40), yet the gallery still painted over it. The content was rendered
+**inline**, inside the panel that owned the trigger — and a panel is its own
+stacking context, so that z-50 only ever competed with the panel's own children.
+The missing piece was Radix's `Portal`. Bumping the number would not have fixed
+it. Now portalled to `<body>`, where the token means what it says. **Fixes every
+tooltip in the app.**
+
+Verified by hit-test, not by eye: `document.elementFromPoint()` at the tooltip's
+centre now returns the tooltip, where it previously returned a gallery node.
+
+### "Auto Compress" → "Auto Compress & Resize"
+
+Since v7.22 the button also resizes anything over 2500px on a side. The old name
+hid that from the person clicking it. A lightbulb (`InfoTooltip`, the house
+pattern) now explains the ~200 KB target, the 2500px trigger, and the 1280px floor
+below which it will not shrink a photo chasing the number.
+
+### Gates
+
+`cargo fmt --check` · `clippy -D warnings` · **140 Rust tests** · **123 TS tests**
+· tsc clean · wasm 731,595 B (unchanged — the new Rust is tests only) · app +
+marketing builds green.

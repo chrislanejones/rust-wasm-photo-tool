@@ -22,6 +22,16 @@ interface AnnotationState {
   // sets the just-committed string; AppShell records it into recent texts.
   lastCommittedText: string | null;
   commitText: (text: string) => void;
+
+  // Reselecting a Bézier pen path (kind 7) from the Review list has to reach the
+  // PenOverlay, which owns the anchors/handles — nothing else can draw a path.
+  // A one-shot request rather than persistent state: the overlay consumes it,
+  // loads the geometry, and clears it. (Lives here, not as AppShell useState —
+  // CLAUDE.md: orphan useState goes to the stores, and nothing new is added to
+  // AppShell.)
+  penEditRequest: { id: number; points: number[] } | null;
+  requestPenEdit: (req: { id: number; points: number[] }) => void;
+  clearPenEditRequest: () => void;
 }
 
 export const useAnnotationStore = create<AnnotationState>()((set) => ({
@@ -34,4 +44,8 @@ export const useAnnotationStore = create<AnnotationState>()((set) => ({
     set((s) => ({ annotationsRevision: s.annotationsRevision + 1 })),
   lastCommittedText: null,
   commitText: (text) => set({ lastCommittedText: text }),
+
+  penEditRequest: null,
+  requestPenEdit: (req) => set({ penEditRequest: req }),
+  clearPenEditRequest: () => set({ penEditRequest: null }),
 }));

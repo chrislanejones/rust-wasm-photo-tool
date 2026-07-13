@@ -27,6 +27,18 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.73",
+    date: "2026-07-13",
+    headline: "The pen tool's closed shapes actually close now",
+    entries: [
+      { tag: "fix", text: "Draw a shape with the pen, click back on the first point to close it, and… nothing happened. No outline, no fill. It turns out the little dot you click to close the path was swallowing the click, so the path never finished. It closes now — and a closed shape fills, the way it always should have." },
+      { tag: "fix", text: "Picking a pen path back out of the Reselect list used to make it disappear. It now comes back with its curve and its handles, ready to edit." },
+      { tag: "fix", text: "Tooltips were hiding behind the gallery strip at the bottom of the screen. They sit on top now — everywhere in the app, not just the one you noticed." },
+      { tag: "fix", text: "\"Auto Compress\" is now called \"Auto Compress & Resize\", because that's what it does: big photos get scaled down as well as compressed. There's a lightbulb next to it explaining what it aims for and how small it's willing to go." },
+      { tag: "fix", text: "The web address no longer claims you're using a tool when you haven't opened a photo yet." },
+    ],
+  },
+  {
     version: "v0.9.72",
     date: "2026-07-13",
     headline: "The engine was missing a piece we thought we'd shipped",

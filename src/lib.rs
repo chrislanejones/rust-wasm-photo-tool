@@ -3653,6 +3653,94 @@ mod layer_tests {
         );
     }
 
+    /// A cubic control sequence approximating a circle of radius `r` about
+    /// (cx,cy). The final anchor is offset by `gap` px from the first — the
+    /// hand-drawn "full circle" case, where the user's last click lands NEAR
+    /// the start, never exactly on it.
+    fn circle_path(cx: f64, cy: f64, r: f64, gap: f64) -> Vec<f64> {
+        let k = 0.552_284_75 * r; // cubic circle-approximation handle length
+        vec![
+            cx + r,
+            cy, // a0  (E)
+            cx + r,
+            cy + k, // out0
+            cx + k,
+            cy + r, // in1
+            cx,
+            cy + r, // a1  (S)
+            cx - k,
+            cy + r, // out1
+            cx - r,
+            cy + k, // in2
+            cx - r,
+            cy, // a2  (W)
+            cx - r,
+            cy - k, // out2
+            cx - k,
+            cy - r, // in3
+            cx,
+            cy - r, // a3  (N)
+            cx + k,
+            cy - r, // out3
+            cx + r,
+            cy - k, // in0'
+            cx + r,
+            cy + gap, // a0' — near the first anchor, NOT on it
+        ]
+    }
+
+    /// The headline pen bug: a hand-drawn closed circle must FILL even though
+    /// its last anchor misses the first by a couple of px. `fill_polygon`
+    /// wraps the contour (`(i + 1) % n`), so closure must not be exact.
+    #[test]
+    fn bezier_near_closed_circle_fills_interior() {
+        let mut t = ImageHorseTool::new(40, 40);
+        t.load_image(&solid(40, 40, [255, 255, 255, 255]));
+        // 2px short of closure — a realistic hand-drawn loop.
+        let pts = circle_path(20.0, 20.0, 12.0, 2.0);
+        t.add_bezier_annotation(&pts, "#000000", 1.0, 1, "#0000ff");
+
+        let centre = px(&t, 20, 20);
+        assert_eq!(
+            [centre[0], centre[1], centre[2]],
+            [0, 0, 255],
+            "interior of a near-closed circle should be blue fill, got {centre:?}"
+        );
+        // Well inside, off-centre, still filled.
+        let inner = px(&t, 20, 14);
+        assert_eq!(
+            [inner[0], inner[1], inner[2]],
+            [0, 0, 255],
+            "interior should fill to the edges, got {inner:?}"
+        );
+        // Outside the contour: untouched white.
+        assert_eq!(
+            px(&t, 1, 1),
+            [255, 255, 255, 255],
+            "outside the path must stay unfilled"
+        );
+        assert_eq!(
+            px(&t, 38, 38),
+            [255, 255, 255, 255],
+            "outside the path must stay unfilled"
+        );
+    }
+
+    /// fill_kind 0 on the same geometry leaves the interior alone — proving the
+    /// fill above came from the fill instruction, not from the stroke.
+    #[test]
+    fn bezier_no_fill_leaves_interior_untouched() {
+        let mut t = ImageHorseTool::new(40, 40);
+        t.load_image(&solid(40, 40, [255, 255, 255, 255]));
+        let pts = circle_path(20.0, 20.0, 12.0, 2.0);
+        t.add_bezier_annotation(&pts, "#000000", 1.0, 0, "#0000ff");
+        assert_eq!(
+            px(&t, 20, 20),
+            [255, 255, 255, 255],
+            "fill_kind 0 → interior stays white"
+        );
+    }
+
     #[test]
     fn redact_region_paints_opaque_color() {
         let mut t = ImageHorseTool::new(20, 20);

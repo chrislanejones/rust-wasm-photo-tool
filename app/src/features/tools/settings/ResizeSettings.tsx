@@ -457,10 +457,29 @@ export function ResizeSettings({
 
         <hr className="border-theme-sidebar-border" />
 
-        {/* ── Auto Compress: labelled section with explicit scope buttons ── */}
+        {/* ── Auto Compress & Resize: labelled section with explicit scope buttons.
+            The name says "& Resize" because that is what it does — since v7.22 it
+            also shrinks anything over 2500px on a side. Calling it "Auto Compress"
+            hid a resize from the person clicking it. ── */}
         <div className="flex items-center justify-center gap-1.5 text-xs font-semibold font-mono text-theme-muted-foreground">
           <Zap className="h-3.5 w-3.5" />
-          Auto Compress
+          Auto Compress &amp; Resize
+          <InfoTooltip
+            label="Auto Compress & Resize"
+            info={
+              <>
+                One click, aiming at a web-ready file (~200&nbsp;KB): it re-encodes the
+                photo, and if either side is over <strong>2500&nbsp;px</strong> it scales the
+                image down as well — big photos can&rsquo;t hit a PageSpeed-grade size on
+                quality alone.
+                <br />
+                <br />
+                It stops at 1280&nbsp;px on the long edge, so it will never shrink a photo to
+                mush chasing the target. The green badge on the thumbnail shows what you
+                saved.
+              </>
+            }
+          />
         </div>
         {/* Compression progress is surfaced via a sonner toast, not inline.
             "Compress Image" compresses whatever is in the ring — enabled as long

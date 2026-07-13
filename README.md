@@ -50,21 +50,19 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.28 — 2026-07-13
+### v7.29 — 2026-07-13
 
-**The op log was never in the binary.** Everything shipped for it — the recorder, the tile buffer, persistence, the data-loss fixes, the layer-model work of the last two releases — sat behind a cargo feature that the WASM build never enabled. The code was correct. It just wasn't *there*. The three flags (`ih_tiles_flush`, `ih_oplog_undo`, `ih_oplog_persist`) gated JavaScript calls into engine functions that did not exist in the shipped binary, so every one of them fell through to snapshot undo, silently, with no error.
+**The pen tool's closed paths never closed.** You could draw a full circle, click back on the first anchor to close it, and get nothing — no stroke, no fill. The reason turned out to be a hit-test, not geometry: the first anchor's 8×8 handle sits *on top of* the canvas capture rect and stops the click from propagating, so the handler that implements "click the first anchor to close the path" never saw it. The path never committed, so nothing was ever drawn or filled. Closing now works where the click actually lands, and a closed path fills.
 
-Measured on the old binary: **zero** `oplog` symbols in `stamp_tool_bg.wasm`, **zero** in its type definitions.
+The engine was never at fault, and there are now two tests saying so: a hand-drawn circle whose last anchor misses the first by a couple of pixels **fills correctly**, because the fill wraps the contour. It never needed pixel-perfect clicking.
 
-The Rust tests passed the entire time — because they run under `cargo test --features tiles`, a configuration the shipped artifact had never been built in. **The tests and the product were testing different programs.** That's the part worth sitting with: green tests and a dead feature, simultaneously, for months.
+**Reselecting a pen path made it disappear.** Kind-7 Bézier paths fell through to the rectangle-bbox handler, which hid the baked path and drew a *rectangle* in its place. They now re-open in the pen overlay with their curve and control points, editable.
 
-This release builds the WASM with `--features tiles` (ADR-017) and verifies the whole chain in a real browser: a default two-layer document (Canvas + Photo) records a paint stroke — **OP LOG 1/1 ops** where the gauge previously didn't even render — persistence writes it to IndexedDB, and after a reload the document comes back **restored from the op log**, not from the snapshot fallback. Zero console errors.
+**The start page no longer claims you're using a tool.** Since v7.25 the address bar showed `#/tool/resize/compress` on a page with no image open — a tool you can't see, can't use, and whose link just drops the recipient back on the start screen. Routes describe a view *of an image*; with nothing open there's no view to address, so the URL stays clean and reappears when a photo loads.
 
-**The cost, stated plainly: the engine grows 659,815 → 731,595 bytes (+71,780, +10.9%).** That's serde + postcard (the op-log codec) and the tile engine actually shipping. It supersedes every earlier size figure, including v7.27's "+448 bytes", which was measured against a binary that didn't contain the feature.
+**Tooltips rendered underneath the gallery.** Not a z-index problem, despite looking exactly like one: tooltips rendered *inline*, inside whatever panel they belonged to, and a panel is its own stacking context — so a `z-50` tooltip in the Tools panel still lost to the gallery. They now portal to the document body, where the z-index token means what it says. Raising the number would never have fixed it. This fixes every tooltip in the app.
 
-The flags still ship **OFF**. This makes them real; it doesn't turn them on. The op-log path has now run in a browser exactly once, on my machine — it earns the default only after a dogfood with real photos.
-
-*Found by checking the binary for op-log symbols before starting a multi-day dogfood — which would otherwise have "passed" while testing the fallback path it was meant to replace.*
+**"Auto Compress" is now "Auto Compress & Resize"** — because that is what it does. Since v7.22 it also shrinks anything over 2500px on a side, and the old name hid a resize from the person clicking the button. The new lightbulb explains the ~200 KB target, the resize threshold, and the 1280px floor it will not shrink below.
 
 ## License
 

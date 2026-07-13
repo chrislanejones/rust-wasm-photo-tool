@@ -726,6 +726,12 @@ export function AppShell() {
   // Bézier pen (Paint → Pen sub-mode): the PenOverlay captures the canvas and
   // commits finished paths as live kind-7 annotations.
   const penActive = activeTool === "brush" && brushMode === "pen";
+  // Reselecting a pen path from the Review list pushes its geometry into the
+  // overlay through this one-shot request (cleared as soon as it's consumed).
+  // State lives in useAnnotationStore, not here — AppShell gains nothing new.
+  const penEditRequest = useAnnotationStore((s) => s.penEditRequest);
+  const requestPenEdit = useAnnotationStore((s) => s.requestPenEdit);
+  const clearPenEditRequest = useAnnotationStore((s) => s.clearPenEditRequest);
   const handlePenCommit = useCallback(
     (flatPoints: number[]) => {
       const tool = stamp.toolRef.current;
@@ -821,6 +827,10 @@ export function AppShell() {
     stamp.flushToCanvas();
     stamp.syncState();
   }, [stamp]);
+  // One-shot: the overlay has taken the reselected path, so drop the request.
+  // The store action is already stable, so it can be passed straight down — an
+  // inline arrow here would re-run the overlay's load effect on every render.
+  const handlePenEditRequestHandled = clearPenEditRequest;
 
   useEffect(() => {
     if (activeTool !== "crop") setColorPickerActive(false);
@@ -1329,11 +1339,22 @@ export function AppShell() {
       if (o.type === "text") {
         setActiveTool("text");
         textTool.selectAnnotation(o.id);
-      } else {
-        drawingTools.selectShape(o.id);
+        return;
       }
+      // A Bézier pen path (kind 7) re-opens in the PenOverlay — switch to
+      // Paint → Pen so the overlay is mounted, then hand it the control points
+      // so the curve and its anchors come back editable. Routing it through
+      // drawingTools.selectShape (the rect-bbox editor) only hid the path.
+      const shape = drawingTools.shapes.find((s) => s.id === o.id);
+      if (shape?.kind === 7) {
+        setActiveTool("brush");
+        setBrushMode("pen");
+        requestPenEdit({ id: o.id, points: shape.points.flat() });
+        return;
+      }
+      drawingTools.selectShape(o.id);
     },
-    [textTool, drawingTools],
+    [textTool, drawingTools, setActiveTool, setBrushMode],
   );
 
   // Place the selected object into one of the nine grid cells — Rust centers the
@@ -2834,6 +2855,8 @@ export function AppShell() {
                           onPenEditStart={handlePenEditStart}
                           onPenEditCommit={handlePenEditCommit}
                           onPenEditCancel={handlePenEditCancel}
+                          penEditRequest={penEditRequest}
+                          onPenEditRequestHandled={handlePenEditRequestHandled}
                         />
                       </div>
                       {(!activePhotoId || photos.length === 0) && (
@@ -2948,6 +2971,8 @@ export function AppShell() {
                       onPenEditStart={handlePenEditStart}
                       onPenEditCommit={handlePenEditCommit}
                       onPenEditCancel={handlePenEditCancel}
+                      penEditRequest={penEditRequest}
+                      onPenEditRequestHandled={handlePenEditRequestHandled}
                     />
                   </div>
                 </div>
