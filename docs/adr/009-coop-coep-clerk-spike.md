@@ -1,8 +1,12 @@
 # ADR-009 — COOP/COEP cross-origin isolation is compatible with Clerk sign-in
 
-- **Status:** Draft
-- **Date:** 2026-07-09
-- **Deciders:** Chris (spike run by Silas, Rust/WASM agent)
+- **Status:** **Accepted (2026-07-13) — confirmed live in a real browser,
+  `credentialless`.** The spike's central inference (a real sign-in completes
+  under isolation) is now an observation. See "Live confirmation" below.
+- **Date:** 2026-07-09 (spike) · 2026-07-13 (live confirmation)
+- **Deciders:** Chris (spike run by Silas, Rust/WASM agent; live check run by
+  Chris himself — it needed real credentials, which is why it sat for six
+  sessions)
 - **Supersedes:** —
 
 ## Question
@@ -94,20 +98,41 @@ renders identically, all Clerk resources clean.
 harness itself (the COEP header is genuinely what's driving the
 isolation flag, not a false positive from Chrome's flags or the profile).
 
-## What was NOT empirically verified (gaps, stated plainly)
+## Live confirmation (2026-07-13) — the gap that mattered is now closed
 
-- **Full credential submission → authenticated session.** No test Clerk
-  account/credentials were available — no `clerk-testing` skill exists
-  in this checkout to source one, provisioning a throwaway account
-  needs email verification with no inbox access from this sandbox, and
-  the guardrails forbid real production credentials. The entire
-  pre-auth chain (script load, CORS API calls, modal render, form
-  interactivity) was observed clean; the final `POST
-  /v1/client/sign_ins` step is **inferred, not observed** — it is a
-  same-origin-to-Clerk CORS call structurally identical to the
-  `/v1/environment` and `/v1/client` calls already verified working, so
-  there is no structural reason to expect it to behave differently, but
-  this is inference.
+Run by Chris in a real browser against a production build:
+`cd app && SPIKE_COEP=credentialless pnpm exec vite preview`. Headers verified
+served: `Cross-Origin-Opener-Policy: same-origin`,
+`Cross-Origin-Embedder-Policy: credentialless`.
+
+**Observed:**
+
+- `crossOriginIsolated === true` **while logged out AND while logged in.**
+  Isolation held *through* the sign-in flow — that transition is the thing the
+  spike could only infer.
+- A **real sign-in completed.** The session authenticated; the app did not
+  degrade.
+- Clerk loaded and initialised clean. The only console output was the routine
+  "loaded with development keys" warning and a `setTimeout` performance
+  violation — neither is an isolation signal.
+- **Zero errors mentioning COEP, CORP, `SharedArrayBuffer`, blocked resources,
+  or WebSocket.**
+
+That retires this ADR's largest stated gap: *"the final `POST
+/v1/client/sign_ins` step is inferred, not observed."* It is now observed.
+`credentialless` is the confirmed mode.
+
+## What is STILL not verified (residual, stated plainly)
+
+- **The "Continue with Google" OAuth popup path.** The live check confirmed a
+  sign-in completes, but did not specifically record *which method* was used. If
+  it was email/password, the popup path remains untested — and it is the one
+  place `COOP: same-origin` is designed to interfere (it severs `window.opener`
+  from cross-origin popups). **Verify this before shipping COOP headers to
+  production**, not before starting threading work locally.
+- **Convex WebSocket under isolation, post-auth.** Not separately observed. The
+  logged-in app behaved normally, which is a good sign but not a measurement.
+  Worth one glance that the gallery/Convex data actually loads while isolated.
 - **The "Continue with Google" OAuth popup path was not exercised.**
   Popup-based OAuth relies on `window.opener`/`postMessage` across
   origins, which is exactly the mechanism `COOP: same-origin` can

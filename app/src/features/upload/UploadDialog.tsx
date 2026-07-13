@@ -26,7 +26,7 @@ export function UploadDialog({
   canClose = true,
 }: Props) {
   const controls = useAnimation();
-  // The Blank Canvas ("New Document") panel hides the logo/title header for an
+  // The New Canvas ("New Document") panel hides the logo/title header for an
   // uncluttered setup view. NewActions reports its state up to us.
   const [blankMode, setBlankMode] = useState(false);
 
@@ -76,7 +76,7 @@ export function UploadDialog({
               animate={controls}
               className="bg-bg-secondary rounded-2xl border border-border shadow-2xl overflow-hidden"
             >
-              {/* Logo + Title — top center. Hidden in Blank Canvas mode so the
+              {/* Logo + Title — top center. Hidden in New Canvas mode so the
                   "New Document" setup gets the full panel. A short top pad keeps
                   the sign-in / close buttons clear of the content. */}
               {blankMode ? (

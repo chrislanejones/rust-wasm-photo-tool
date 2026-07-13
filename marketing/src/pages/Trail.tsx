@@ -27,6 +27,17 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.70",
+    date: "2026-07-13",
+    headline: "What you see is what you download",
+    entries: [
+      { tag: "feature", text: "Exports now include the canvas behind your photo — the padding and background colour you can see on screen come with the download. Before, exports quietly cropped to just the photo. If you preferred it that way, there's a switch: Settings → \"Canvas background on export\", or just hide the canvas layer in the Layers panel." },
+      { tag: "fix", text: "\"Blank Canvas\" is now called \"New Canvas\" when you start a document. Small thing — it just means the word \"canvas\" refers to one thing throughout the app instead of two." },
+      { tag: "rust", text: "Behind the scenes: the canvas is now properly understood as part of the document rather than as a stray layer, which clears the road for undo history that survives a reload. That feature was quietly unreachable on any photo with a canvas — which, on the default settings, is every photo." },
+      { tag: "rust", text: "Behind the scenes: a long-standing question about running the engine on multiple CPU cores in the browser is finally settled — it works, and signing in still works alongside it. That opens the door to making the new Magnetic Lasso and Smart Brush faster on large photos." },
+    ],
+  },
+  {
     version: "v0.9.69",
     date: "2026-07-13",
     headline: "A lasso that finds the edge for you — and a link to every view",

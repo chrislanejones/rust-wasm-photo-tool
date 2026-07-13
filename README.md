@@ -50,21 +50,17 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.25 — 2026-07-13
+### v7.26 — 2026-07-13
 
-**The magnetic lasso is real, and every view has an address.** Two features, both landing on foundations laid earlier: v7.23's shared edge core, and v7.19's command-palette registry.
+**Two decisions, one of which changes your exports.**
 
-**Magnetic lasso + Smart Brush** (`ih_smart_edge`, **off by default** until it's been dogfooded). The disabled lasso stub from v7.23 is now wired to an actual live-wire path-finder. Drop anchors loosely around an object and the wire snaps to the edge between them, tracking your cursor as you go; double-click closes the loop and it becomes an ordinary selection — same mask, same overlay, same Delete key as the wands. The **Smart Brush** is the second consumer of the same primitive: a stroke is walled in by strong edges, so paint stays in the region you started in instead of bleeding across an outline.
+**Exports now include the Canvas by default.** If you import a photo with "Canvas on import" on (the default), your download now includes the padding and background colour you see on screen — what you see is what you get. Previously exports cropped to just the photo, on the theory that the backing canvas was "a compositional guide, not real content". That theory is retired: the Canvas is the document's bottom layer, so it ships. Turn it off in Settings ("Canvas background on export"), or X the layer out in the Layers panel. **This changes export output for existing users** — it is a deliberate reversal, not a regression.
 
-Both stand on one new shared piece — an **edge cost map** derived from the Sobel magnitude that already shipped (strong edge = cheap to travel, flat area = expensive). The lasso path-finds along it; the brush uses it as a wall. Building it once is why the brush cost almost nothing to add once the lasso existed.
+**The Canvas is document metadata, not a logged pixel layer** (ADR-016, Draft). This one is invisible today and load-bearing tomorrow. The engine refuses to record an op log for any document with more than one layer — and *every* default import is two layers (Canvas fill + Photo). So op-log undo and its persistence, the work behind four ADRs and the v7.24 data-loss fixes, has been **dark by construction**: not switched off, structurally unreachable. ADR-016 settles the model that fixes it — the Canvas stays a layer you can see and toggle, but the log counts only *pixel* layers, so a default document becomes one pixel layer and the log activates. The engine work implementing it is in flight.
 
-The honest numbers: the cost map takes **31 ms** on a 2048×2048 image, paid at the first lasso click and at the start of each smart stroke — noticeable, but not per-frame. Each path search during a drag is **1–5.6 ms**, comfortably inside a 16 ms frame; a bounded search window is what buys that, and beyond a 250k-pixel window the engine returns a straight line rather than lag. The whole feature adds **516 bytes** to the wasm. Scalar only — threading stays parked behind the COOP/COEP question (ADR-009).
+Also: the create dialog's **"Blank Canvas" is now "New Canvas"** — the word "Canvas" should mean exactly one thing.
 
-**Hash routing.** App state now has a URL: `#/tool/paint/blur`, `#/settings/security`. Back and forward work. Deep links land where they say. The palette's Alt+, actions and a pasted link now flow through **one** navigation path — the action registry is the single source of truth, and routing and the palette are two front doors onto it, not two implementations. New palette entries: **"Copy link to this view"** and **"Go to route…"**, plus a status-bar tip that says so. No router dependency was added: there are no *pages* here, just a tool/sub-mode/pane coordinate, so it's a small hash-sync layer instead.
-
-A side-effect worth naming: making the settings pane linkable meant making it *readable*, so `settingsOpen`/`settingsTab` moved into the store — which retired the last window CustomEvent in the navigation path (Stage 3 of the AppShell teardown). And the routing tests caught a crash before a browser ever saw it: `#/tool/%%%` threw a `URIError` out of `decodeURIComponent`, because the hash is untrusted input.
-
-ADR-014 (lasso/brush) and ADR-015 (routing) are both **Draft** pending a human check of the parts no test can prove: whether the wire *feels* like it's tracking your cursor, and whether back/forward feel right.
+**And the six-session ghost is dead.** The COOP/COEP cross-origin-isolation check (ADR-009) was finally run in a real browser, with a real sign-in: `crossOriginIsolated === true` both logged out *and* logged in, Clerk clean, no COEP/CORP errors. Isolation holds *through* the auth flow — the one thing a headless spike could only infer. That was the last blocker on WASM threading, so the rayon acceleration path for the magnetic lasso and Smart Brush (built scalar in v7.25 precisely because this was unverified) is now open. Residual, honestly recorded: the OAuth-popup path and the Convex WebSocket under isolation were not separately exercised, and both want a check before COOP headers ship to production.
 
 ## License
 

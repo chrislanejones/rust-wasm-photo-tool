@@ -205,5 +205,6 @@ documents recover it via the legacy read above. A document whose Canvas has
 been PAINTED on is no longer a uniform fill, so it restores as content (out
 of op-log scope, fill included in exports). Conservative and lossless, but
 the real fix is an archive field, which is a schema change (`dexie-migration`
-skill). Step 9 (`exportCanvasBackground`) and step 10 (the real-gallery check
-on a DEFAULT document) are NOT done.
+skill). Step 9 (`exportCanvasBackground`) landed separately on master in
+v7.26 (`073448e`). Step 10 — the real-gallery check on a DEFAULT document —
+is NOT done and is the gate before either flag is flipped.
