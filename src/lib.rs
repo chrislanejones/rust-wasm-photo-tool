@@ -542,6 +542,56 @@ pub struct ImageHorseTool {
 }
 
 impl ImageHorseTool {
+    // ── Canvas vs content (ADR-016) ──────────────────────────────────────
+    //
+    // The Canvas is the artboard fill at index 0. It is a LAYER to the user
+    // (visible, toggleable) and DOCUMENT METADATA to the op log, which counts
+    // and indexes only CONTENT layers. Everything that used to ask
+    // "is `layers.len()` 1?" or "is `layers[0]` the photo?" must ask these
+    // instead — a default document is Canvas + Photo, i.e. ONE content layer.
+
+    /// Index of the Canvas fill, if the document has one.
+    pub(crate) fn canvas_idx(&self) -> Option<usize> {
+        self.layers.iter().position(|l| l.is_canvas())
+    }
+
+    /// Index of the document's ONLY content layer — `None` when there are zero
+    /// or several (i.e. when the document is out of op-log scope). Every op-log
+    /// path reads/writes pixels through this, never `layers[0]`: with a Canvas
+    /// at index 0, `layers[0]` is the fill, not the photo.
+    #[cfg(feature = "tiles")]
+    pub(crate) fn content_idx(&self) -> Option<usize> {
+        let mut it = self
+            .layers
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| !l.is_canvas());
+        match (it.next(), it.next()) {
+            (Some((i, _)), None) => Some(i),
+            _ => None,
+        }
+    }
+
+    /// The Canvas as op-log document metadata: the fill's RGBA (read from its
+    /// first pixel — the fill is uniform by construction) plus the compositing
+    /// state the engine applies to it. `None` when the document has no Canvas.
+    ///
+    /// O(1): no scan, so `recomposite` can refresh this every frame without
+    /// touching the zero-copy flush budget.
+    #[cfg(feature = "tiles")]
+    pub(crate) fn canvas_params(&self) -> Option<crate::ops::CanvasParams> {
+        let l = self.layers.get(self.canvas_idx()?)?;
+        let px = l.buf.data.get(0..4).unwrap_or(&[0, 0, 0, 0]);
+        Some(crate::ops::CanvasParams {
+            r: px[0],
+            g: px[1],
+            b: px[2],
+            a: px[3],
+            visible: l.visible,
+            opacity: l.opacity,
+        })
+    }
+
     /// Build a history snapshot of the entire current layer stack.
     fn make_snapshot(&self, label: &str) -> Snapshot {
         Snapshot {
@@ -660,16 +710,25 @@ impl ImageHorseTool {
         self.crop_in_place(x, y, cw, ch);
     }
 
-    /// Composite every layer except the artboard's backing "Background" (see
+    /// Composite every layer except the Canvas fill (see
     /// `get_image_data_excluding_background`), cropped to the tight bounding
     /// box of what's left. Cropping matters — leaving the full canvas with
     /// just the fill zeroed out would still export at the padded size (a
     /// black border baked in on any format without alpha, e.g. JPEG). Falls
-    /// back to the full, untrimmed composite when there's no backing layer
-    /// to exclude, or nothing to crop to.
+    /// back to the full, untrimmed composite when there's no Canvas to
+    /// exclude, or nothing to crop to.
+    ///
+    /// Selects the Canvas by `kind`, not by name. The old name match
+    /// (`layers.len() > 1 && layers[0].name == "Background"`) dropped the
+    /// PHOTO of any artboard-off document that had gained a second layer —
+    /// `load_image` names the photo "Background" too (ADR-016).
     fn composite_excluding_background(&self) -> (Vec<u8>, u32, u32) {
         let (w, h) = (self.width, self.height);
-        let layers: &[Layer] = if self.layers.len() > 1 && self.layers[0].name == "Background" {
+        // The Canvas is the bottom layer by construction, and `move_layer`
+        // enforces it — so excluding it is a slice, not a copy (layer buffers
+        // are full-document RGBA; cloning the stack here would cost tens of MB
+        // on a large export).
+        let layers: &[Layer] = if self.canvas_idx() == Some(0) && self.layers.len() > 1 {
             &self.layers[1..]
         } else {
             &self.layers[..]
@@ -816,14 +875,20 @@ impl ImageHorseTool {
     /// Load an image as a two-layer "artboard" (Photoshop-style New Document with
     /// the photo placed on a canvas). The document grows to
     /// `(img_w + 2*pad) × (img_h + 2*pad)`, and the stack becomes:
-    ///   • a **Background** layer — a solid `bg_*` fill (`bg_a = 0` ⇒ transparent
-    ///     canvas), sized to the whole document, and
+    ///   • a **Canvas** layer (`LayerKind::Canvas`) — a solid `bg_*` fill
+    ///     (`bg_a = 0` ⇒ transparent canvas), sized to the whole document, and
     ///   • a **Photo** layer — the incoming RGBA `pixels` pasted centred at
     ///     `(pad, pad)`, transparent elsewhere.
     /// The Photo layer is left active so the first edit targets the image, not
     /// the backing canvas. Otherwise mirrors `load_image` (clears history,
     /// stamp source, annotation counters, edit state). A `pad` of 0 yields the
     /// same document size as `load_image` but still as two layers.
+    ///
+    /// This is the DEFAULT import path (`canvasArtboard`), so it is the shape
+    /// nearly every document has. The Canvas carries `LayerKind::Canvas`, which
+    /// is what keeps the document at ONE content layer and therefore inside
+    /// op-log scope (ADR-016) — before that flag, every default document was
+    /// permanently out of scope and op-log undo/persistence could never run.
     #[allow(clippy::too_many_arguments)]
     pub fn load_image_artboard(
         &mut self,
@@ -844,9 +909,9 @@ impl ImageHorseTool {
         self.width = doc_w;
         self.height = doc_h;
 
-        // Background canvas: solid fill (skip the write when transparent — the
+        // Canvas fill: solid fill (skip the write when transparent — the
         // buffer is already zero-filled).
-        let mut bg = Layer::new(1, "Background".to_string(), doc_w, doc_h);
+        let mut bg = Layer::new_canvas(1, doc_w, doc_h);
         if bg_a != 0 {
             for px in bg.buf.data.chunks_exact_mut(4) {
                 px[0] = bg_r;
@@ -880,8 +945,10 @@ impl ImageHorseTool {
         self.next_shape_id = 1;
         self.editing_shape_id = None;
         self.editing_text_id = None;
-        // Two-layer artboard: out of op-log scope; a log starts lazily only
-        // if/when the document becomes single-layer (e.g. Remove Canvas).
+        // Canvas + Photo = ONE content layer, so this document IS in op-log
+        // scope (ADR-016). Fresh document, fresh (lazily-started) log — the
+        // base is captured at the first `snap()`, which is also the first
+        // moment the log could need it.
         #[cfg(feature = "tiles")]
         {
             self.oplog = None;
@@ -988,6 +1055,8 @@ impl ImageHorseTool {
         // bezier edits included — without per-method hooks.
         #[cfg(feature = "tiles")]
         self.oplog_sync_annotations();
+        #[cfg(feature = "tiles")]
+        self.oplog_sync_canvas();
     }
 
     pub fn data_ptr(&self) -> *const u8 {
@@ -1073,7 +1142,7 @@ impl ImageHorseTool {
         if self.oplog_broken {
             return;
         }
-        if self.layers.len() != 1 {
+        if !self.oplog_in_scope() {
             // Out of scope. An EMPTY log left over from a transient
             // single-layer moment (e.g. mid-archive-restore, before the
             // layer stack is rebuilt) is stale and free to drop — keeping
@@ -1092,11 +1161,32 @@ impl ImageHorseTool {
         }
     }
 
-    /// Snapshot the engine's single-layer document into op-log form.
+    /// Is the current document one the op log can describe?
+    ///
+    /// Exactly ONE content layer, and the user is editing THAT layer. The
+    /// Canvas doesn't count (ADR-016) — so the default Canvas + Photo document
+    /// is in scope, while two content layers (a paste, an added layer) stay out
+    /// of it, as they always have.
+    ///
+    /// The active-layer clause matters: the log models the content plane, so an
+    /// edit aimed at the Canvas layer is an edit it cannot represent. Recording
+    /// it would replay the user's brush strokes onto the photo instead of the
+    /// artboard. Out of scope ⇒ unrecorded ⇒ the sync check breaks the log and
+    /// snapshot undo takes over. Safe, and never silently wrong.
+    #[cfg(feature = "tiles")]
+    fn oplog_in_scope(&self) -> bool {
+        self.content_idx() == Some(self.active)
+    }
+
+    /// Snapshot the engine's document into op-log form: the CONTENT layer's
+    /// pixels + annotations, with the Canvas captured as metadata beside them
+    /// (ADR-016). Reading `layers[0]` here — as this did before the Canvas had
+    /// a `kind` — would snapshot the artboard fill and call it the photo.
     #[cfg(feature = "tiles")]
     fn oplog_doc_from_engine(&self) -> crate::ops::Document {
         let mut doc = crate::ops::Document::new(self.width, self.height);
-        if let Some(layer) = self.layers.first() {
+        doc.canvas = self.canvas_params();
+        if let Some(layer) = self.content_idx().and_then(|i| self.layers.get(i)) {
             doc.pixels
                 .blit_from_flat(&layer.buf.data, layer.buf.width, layer.buf.height);
             doc.texts = layer
@@ -1114,19 +1204,24 @@ impl ImageHorseTool {
     }
 
     /// Append a recorded op (no-op when the log is broken/absent or the
-    /// document left single-layer scope).
+    /// document left single-CONTENT-layer scope).
     #[cfg(feature = "tiles")]
     pub(crate) fn oplog_record(&mut self, op: crate::ops::Op) {
         if self.oplog_broken {
             return;
         }
-        if self.layers.len() != 1 {
-            // Document grew past the log's scope mid-session. A log with
-            // real recorded history can't follow layer-structure changes
-            // yet → broken (snapshot undo takes over). A still-EMPTY log is
-            // just stale (transient single-layer moment during an archive
-            // restore) — drop it silently; the doc reads "inactive" in
-            // diagnostics, not "broken".
+        if !self.oplog_in_scope() {
+            // Document grew past the log's scope mid-session — a SECOND
+            // content layer (paste, added layer), or the user selected the
+            // Canvas to edit it. The Canvas itself never triggers this: it
+            // isn't counted (ADR-016), which is what keeps the default
+            // Canvas + Photo document recordable at all.
+            //
+            // A log with real recorded history can't follow layer-structure
+            // changes yet → broken (snapshot undo takes over). A still-EMPTY
+            // log is just stale (transient single-layer moment during an
+            // archive restore) — drop it silently; the doc reads "inactive"
+            // in diagnostics, not "broken".
             match self.oplog.as_ref() {
                 Some(log) if !log.is_empty() => self.oplog_broken = true,
                 Some(_) => self.oplog = None,
@@ -1145,13 +1240,16 @@ impl ImageHorseTool {
     /// pure-paint sessions free.
     #[cfg(feature = "tiles")]
     fn oplog_sync_annotations(&mut self) {
-        if self.oplog_broken || self.layers.len() != 1 || self.oplog.is_none() {
+        if self.oplog_broken || !self.oplog_in_scope() || self.oplog.is_none() {
             return;
         }
+        let Some(content) = self.content_idx() else {
+            return;
+        };
         let mut pending: Vec<crate::ops::Op> = Vec::new();
         {
             let log_doc = self.oplog.as_ref().unwrap().live_document();
-            let layer = &self.layers[0];
+            let layer = &self.layers[content];
             if layer.text_annotations.is_empty()
                 && layer.shape_annotations.is_empty()
                 && log_doc.texts.is_empty()
@@ -1191,6 +1289,28 @@ impl ImageHorseTool {
         }
     }
 
+    /// Refresh the log's Canvas metadata from the engine (ADR-016).
+    ///
+    /// The Canvas is metadata, so changing it — recolouring the artboard,
+    /// hiding it, dropping its opacity — is NOT an op. Without this the log's
+    /// composite would still carry the old fill, the sync check would find a
+    /// mismatch, and a routine canvas recolour would break op-log undo for the
+    /// rest of the session. With it, canvas changes are simply absorbed.
+    ///
+    /// O(1) and allocation-free on the flush path: `canvas_params` reads one
+    /// pixel and two scalars, and the write only happens when they differ.
+    #[cfg(feature = "tiles")]
+    fn oplog_sync_canvas(&mut self) {
+        if self.oplog_broken || self.oplog.is_none() {
+            return;
+        }
+        let params = self.canvas_params();
+        let log = self.oplog.as_mut().unwrap();
+        if log.canvas() != params {
+            log.set_canvas(params);
+        }
+    }
+
     /// FNV-1a over a flat byte buffer — cheap exact-sync check.
     #[cfg(feature = "tiles")]
     fn oplog_flat_hash(bytes: &[u8]) -> u64 {
@@ -1222,7 +1342,7 @@ impl ImageHorseTool {
     /// — the sync check fails (which also breaks the log for the session).
     #[cfg(feature = "tiles")]
     fn try_oplog_undo(&mut self) -> bool {
-        if self.oplog_broken || self.layers.len() != 1 {
+        if self.oplog_broken || !self.oplog_in_scope() {
             return false;
         }
         if self.editing_text_id.is_some()
@@ -1256,7 +1376,7 @@ impl ImageHorseTool {
     /// Op-log redo — mirror of [`try_oplog_undo`].
     #[cfg(feature = "tiles")]
     fn try_oplog_redo(&mut self) -> bool {
-        if self.oplog_broken || self.layers.len() != 1 {
+        if self.oplog_broken || !self.oplog_in_scope() {
             return false;
         }
         if self.editing_text_id.is_some()
@@ -1284,12 +1404,76 @@ impl ImageHorseTool {
         true
     }
 
+    /// Make the engine's Canvas layer agree with the document's Canvas metadata
+    /// (ADR-016), sized to `w`×`h`: refill/insert it when the document has one,
+    /// drop it when it doesn't, and guarantee a content layer survives to
+    /// receive the pixels.
+    ///
+    /// This is what lets a persisted log restore the FULL visual: the persisted
+    /// pixel plane is the content layer alone, so without rebuilding the fill a
+    /// restored artboard would come back transparent where the user had a
+    /// colour.
+    #[cfg(feature = "tiles")]
+    fn restore_canvas_layer(&mut self, canvas: Option<crate::ops::CanvasParams>, w: u32, h: u32) {
+        match canvas {
+            Some(c) => {
+                let idx = match self.canvas_idx() {
+                    Some(i) => i,
+                    None => {
+                        let id = self.next_layer_id;
+                        self.next_layer_id = self.next_layer_id.wrapping_add(1).max(1);
+                        self.layers.insert(0, Layer::new_canvas(id, w, h));
+                        self.active += 1; // every existing layer shifted up one
+                        0
+                    }
+                };
+                let layer = &mut self.layers[idx];
+                layer.visible = c.visible;
+                layer.opacity = c.opacity;
+                layer.buf = ImageBuffer::new(w, h);
+                if c.a != 0 {
+                    for px in layer.buf.data.chunks_exact_mut(4) {
+                        px[0] = c.r;
+                        px[1] = c.g;
+                        px[2] = c.b;
+                        px[3] = c.a;
+                    }
+                }
+            }
+            None => {
+                if let Some(i) = self.canvas_idx() {
+                    self.layers.remove(i);
+                    if self.active > i {
+                        self.active -= 1;
+                    }
+                    self.active = self.active.min(self.layers.len().saturating_sub(1));
+                }
+            }
+        }
+        // A document always has a content plane to write into. (Only reachable
+        // if the stack was Canvas-only — e.g. the photo layer was deleted.)
+        if self.content_idx().is_none() && self.layers.iter().all(|l| l.is_canvas()) {
+            let id = self.next_layer_id;
+            self.next_layer_id = self.next_layer_id.wrapping_add(1).max(1);
+            self.layers
+                .push(Layer::new(id, "Background".to_string(), w, h));
+            self.active = self.layers.len() - 1;
+        }
+    }
+
     /// Write the log's live document back into the engine: pixels into the
-    /// single layer, annotation lists rebuilt through the SAME
-    /// `build_text_annotation` tile builder the live mutators use.
+    /// CONTENT layer, annotation lists rebuilt through the SAME
+    /// `build_text_annotation` tile builder the live mutators use, and the
+    /// Canvas rebuilt from the document's metadata.
+    ///
+    /// The write target is `content_idx()`, never `layers[0]`: on a default
+    /// document `layers[0]` is the artboard fill, and blitting the photo into
+    /// it would hand the user back a document with the image painted onto the
+    /// canvas and the real photo layer untouched — an undo that silently
+    /// corrupts. This is the sharp edge ADR-016's pre-mortem points at.
     #[cfg(feature = "tiles")]
     fn oplog_restore_into_engine(&mut self) {
-        let (w, h, flat, texts, shapes) = {
+        let (w, h, flat, texts, shapes, canvas) = {
             let Some(log) = self.oplog.as_ref() else {
                 return;
             };
@@ -1297,11 +1481,24 @@ impl ImageHorseTool {
             let (w, h) = (doc.width(), doc.height());
             let mut flat = vec![0u8; (w as usize) * (h as usize) * 4];
             doc.pixels.blit_to_flat(&mut flat);
-            (w, h, flat, doc.texts.clone(), doc.shapes.clone())
+            (
+                w,
+                h,
+                flat,
+                doc.texts.clone(),
+                doc.shapes.clone(),
+                doc.canvas,
+            )
         };
         self.width = w;
         self.height = h;
-        let layer = &mut self.layers[0];
+        self.restore_canvas_layer(canvas, w, h);
+        // After `restore_canvas_layer` the stack has exactly the Canvas the
+        // document describes, so a content layer exists at a known index.
+        let Some(content) = self.content_idx() else {
+            return;
+        };
+        let layer = &mut self.layers[content];
         layer.buf.data = flat;
         layer.buf.width = w;
         layer.buf.height = h;
@@ -1373,7 +1570,7 @@ impl ImageHorseTool {
     /// Whether a live, unbroken log exists for the current document.
     #[cfg(feature = "tiles")]
     pub fn oplog_active(&self) -> bool {
-        self.oplog.is_some() && !self.oplog_broken && self.layers.len() == 1
+        self.oplog.is_some() && !self.oplog_broken && self.oplog_in_scope()
     }
 
     /// Total recorded ops (including redoable tail past the cursor).
@@ -1462,8 +1659,10 @@ impl ImageHorseTool {
             .map_or(0, |d| d.height())
     }
 
-    /// The keyframe document's LIVE annotation lists, postcard-encoded —
-    /// keyframe pixels alone can't restore re-editable text/shapes.
+    /// The keyframe document's LIVE annotation lists AND Canvas metadata,
+    /// postcard-encoded — keyframe pixels alone can't restore re-editable
+    /// text/shapes, nor the artboard fill (which is metadata, not pixels, and
+    /// so is absent from the persisted plane entirely — ADR-016).
     /// NOTE: the keyframe RGBA above is the composite (annotations drawn
     /// in); the restore path re-renders annotations over the PIXEL plane,
     /// so it pairs this with `oplog_keyframe_pixels_rgba`.
@@ -1473,7 +1672,7 @@ impl ImageHorseTool {
             .as_ref()
             .and_then(|l| l.keyframe_document(at_op as usize))
             .map_or_else(Vec::new, |d| {
-                crate::ops::encode_annotations(&d.texts, &d.shapes)
+                crate::ops::encode_annotations(&d.texts, &d.shapes, d.canvas)
             })
     }
 
@@ -1554,11 +1753,19 @@ impl ImageHorseTool {
         if base_rgba.len() != (base_w as usize) * (base_h as usize) * 4 {
             return false;
         }
+        // The log describes a ONE-content-layer document. If the engine is
+        // holding more than that (a paste, an extra layer), restoring would
+        // have to drop layers the log can't describe — so refuse and leave the
+        // document alone. The Canvas is not a content layer and never trips
+        // this (ADR-016).
+        if self.content_layer_count() > 1 {
+            return false;
+        }
         let Ok(ops) = crate::ops::decode_op_frames(frames) else {
             return false;
         };
-        let (texts, shapes) = if base_annotations.is_empty() {
-            (Vec::new(), Vec::new())
+        let (texts, shapes, canvas) = if base_annotations.is_empty() {
+            (Vec::new(), Vec::new(), None)
         } else {
             match crate::ops::decode_annotations(base_annotations) {
                 Ok(lists) => lists,
@@ -1572,6 +1779,7 @@ impl ImageHorseTool {
         base.pixels.blit_from_flat(base_rgba, base_w, base_h);
         base.texts = texts;
         base.shapes = shapes;
+        base.canvas = canvas;
         let mut log = crate::ops::OpLog::with_base(base);
         for op in ops {
             log.append(op);
@@ -1883,6 +2091,9 @@ impl ImageHorseTool {
         let layer = Layer {
             id: 1,
             name: "Background".to_string(),
+            // A restored snapshot is a flattened single plane — content, not a
+            // Canvas. "Background" here means the photo (ADR-016).
+            kind: crate::layer::LayerKind::Content,
             visible: true,
             opacity: 1.0,
             buf: ImageBuffer {
@@ -1908,6 +2119,7 @@ impl ImageHorseTool {
         let layer = Layer {
             id: 1,
             name: "Background".to_string(),
+            kind: crate::layer::LayerKind::Content,
             visible: true,
             opacity: 1.0,
             buf: ImageBuffer {
@@ -2352,13 +2564,13 @@ impl ImageHorseTool {
             _ => nh - oh,
         };
 
-        // Only treat the bottom layer as a solid backing canvas to refill when
-        // there's a distinct layer above it (the artboard case). A single-layer
-        // photo-only doc — even though its layer is also named "Background" —
-        // holds real content and must be anchored, not overwritten.
-        let multi = self.layers.len() > 1;
-        for (idx, layer) in self.layers.iter_mut().enumerate() {
-            let is_backing = multi && idx == 0 && layer.name == "Background";
+        // Only the Canvas fill is refilled to the new size; every content layer
+        // is anchored and preserved byte-for-byte. Keyed on `kind`, so a
+        // photo-only document (whose sole layer `load_image` also names
+        // "Background") can never be mistaken for a backing fill and
+        // overwritten — ADR-016.
+        for layer in self.layers.iter_mut() {
+            let is_backing = layer.is_canvas();
             let mut nbuf = vec![0u8; (new_w as usize) * (new_h as usize) * 4];
             if is_backing {
                 // Solid backing canvas: refill the whole new document (skip the
@@ -2448,15 +2660,15 @@ impl ImageHorseTool {
     /// repeated calls never accumulate (idempotent).
     ///
     /// The PHOTO content is the tight non-transparent bounding box of the photo
-    /// layer (the layer named "Photo"; or — for a single-layer photo-only doc —
-    /// the sole layer). The document is rebuilt to that box plus `2*pad` on every
+    /// layer (the first CONTENT layer; for a single-layer photo-only doc, the
+    /// sole layer). The document is rebuilt to that box plus `2*pad` on every
     /// side WITHOUT resampling (the photo's pixels are re-blitted at the border
-    /// offset), the bottom **Background** layer is refilled solid to the full new
+    /// offset), the bottom **Canvas** layer is refilled solid to the full new
     /// size, and the photo is placed at `(pad, pad)`. A document that has no
-    /// solid Background yet grows one (so artboard-on always ends up as a
-    /// Background + Photo pair). Per-layer masks and live text/shape annotations
-    /// travel with their layer by the same offset. Pushes one undoable
-    /// "Canvas Border" snapshot; recomposites.
+    /// Canvas yet grows one (so artboard-on always ends up as a Canvas + Photo
+    /// pair). Per-layer masks and live text/shape annotations travel with their
+    /// layer by the same offset. Pushes one undoable "Canvas Border" snapshot;
+    /// recomposites.
     pub fn set_artboard_border(&mut self, pad: u32, bg_r: u8, bg_g: u8, bg_b: u8, bg_a: u8) {
         let ow = self.width;
         let oh = self.height;
@@ -2464,19 +2676,12 @@ impl ImageHorseTool {
             return;
         }
 
-        // Identify the photo layer (content) and whether a solid backing canvas
-        // already sits at the bottom of the stack. `load_image_artboard` names
-        // the photo "Photo" and the backing "Background"; a single-layer
-        // `load_image` doc has just one "Background" layer that holds the photo.
-        let backing_present = self.layers.len() > 1 && self.layers[0].name == "Background";
-        let photo_idx = if backing_present {
-            self.layers
-                .iter()
-                .position(|l| l.name == "Photo")
-                .unwrap_or(self.layers.len() - 1)
-        } else {
-            0
-        };
+        // Whether a Canvas fill already sits at the bottom, and which layer
+        // holds the photo. Both keyed on `kind`, not name (ADR-016): the photo
+        // is the bottom-most CONTENT layer, whether it is called "Photo" (an
+        // artboard import) or "Background" (a `load_image` document).
+        let backing_present = self.canvas_idx() == Some(0);
+        let photo_idx = self.layers.iter().position(|l| !l.is_canvas()).unwrap_or(0);
 
         // Tight non-transparent bounding box of the photo layer = its native
         // size and position within the current document.
@@ -2512,14 +2717,14 @@ impl ImageHorseTool {
 
         self.snap("Canvas Border");
 
-        // Ensure a solid Background exists at the bottom. A backing-less doc
-        // (fresh single-layer photo) grows one; the former content is renamed
-        // "Photo" so later calls find it by name.
+        // Ensure a Canvas exists at the bottom. A canvas-less doc (fresh
+        // single-layer photo) grows one; the former content is renamed "Photo"
+        // — a display name now, not an identifier: `kind` is what the engine
+        // reads.
         if !backing_present {
             let id = self.next_layer_id;
             self.next_layer_id = self.next_layer_id.wrapping_add(1).max(1);
-            self.layers
-                .insert(0, Layer::new(id, "Background".to_string(), ow, oh));
+            self.layers.insert(0, Layer::new_canvas(id, ow, oh));
             self.active += 1; // every existing layer shifted up one slot
             if let Some(content) = self.layers.get_mut(1) {
                 content.name = "Photo".to_string();
@@ -2527,11 +2732,11 @@ impl ImageHorseTool {
         }
 
         // Reframe every layer into the new document. Layer 0 is now always the
-        // solid backing (refilled, never resampled); every other layer's pixels,
+        // Canvas (refilled, never resampled); every other layer's pixels,
         // overlays and mask travel by the border offset (no resample).
-        for (idx, layer) in self.layers.iter_mut().enumerate() {
+        for layer in self.layers.iter_mut() {
             let mut nbuf = vec![0u8; (new_w as usize) * (new_h as usize) * 4];
-            if idx == 0 {
+            if layer.is_canvas() {
                 if bg_a != 0 {
                     for px in nbuf.chunks_exact_mut(4) {
                         px[0] = bg_r;

@@ -603,8 +603,14 @@ declare module "stamp_tool" {
     // ── Layers (Photoshop-style stack) ──
     /** Recompute the cached composite of all visible layers (call before reading data_ptr). */
     recomposite(): void;
+    /** Every layer in the stack, Canvas included — what the Layers panel shows. */
     layer_count(): number;
-    /** JSON array bottom→top: [{id,name,visible,opacity,active,hasMask}]. */
+    /** Real PIXEL layers: the Canvas fill does NOT count (ADR-016). A default
+     *  document (Canvas + Photo) answers 1. This — not `layer_count()` — is what
+     *  decides whether the op log can describe the document (`isLogTrustworthy`). */
+    content_layer_count(): number;
+    /** JSON array bottom→top: [{id,name,kind,visible,opacity,active,hasMask}].
+     *  `kind` is "canvas" for the artboard fill, "content" otherwise. */
     get_layers(): string;
     /** Id of the active layer (receives all tool edits). */
     active_layer_id(): number;
