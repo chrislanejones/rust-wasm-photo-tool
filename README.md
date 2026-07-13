@@ -50,21 +50,21 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.27 — 2026-07-13
+### v7.28 — 2026-07-13
 
-**The op log wakes up on a normal photo.** This is the release that makes the last four ADRs' worth of work reachable, and it ships as an engine change nobody will see today.
+**The op log was never in the binary.** Everything shipped for it — the recorder, the tile buffer, persistence, the data-loss fixes, the layer-model work of the last two releases — sat behind a cargo feature that the WASM build never enabled. The code was correct. It just wasn't *there*. The three flags (`ih_tiles_flush`, `ih_oplog_undo`, `ih_oplog_persist`) gated JavaScript calls into engine functions that did not exist in the shipped binary, so every one of them fell through to snapshot undo, silently, with no error.
 
-The problem, stated bluntly: the engine refused to record an op log for any document with more than one layer — and *every* default import is two layers (the Canvas fill plus your photo). So op-log undo and its persistence weren't switched off, they were **structurally unreachable**. Turning the flag on would have shipped nothing to anyone.
+Measured on the old binary: **zero** `oplog` symbols in `stamp_tool_bg.wasm`, **zero** in its type definitions.
 
-ADR-016's fix is a reclassification, not a rewrite. The **Canvas is now document metadata**: still layer 0, still visible and toggleable in the Layers panel, but the log counts only *pixel* layers. A default document is therefore one pixel layer, and the log activates. No auto-flatten, no multi-layer op-log rewrite.
+The Rust tests passed the entire time — because they run under `cargo test --features tiles`, a configuration the shipped artifact had never been built in. **The tests and the product were testing different programs.** That's the part worth sitting with: green tests and a dead feature, simultaneously, for months.
 
-Underneath it, the engine stopped identifying the Canvas by the string `"Background"` — a name that, awkwardly, meant *the fill* in artboard mode and *the photo* everywhere else, and was checked in four places. It now carries an explicit `LayerKind`. A user renaming a layer "Background" was one step away from a silent wrong-document restore; that door is closed, and there's a test standing in it.
+This release builds the WASM with `--features tiles` (ADR-017) and verifies the whole chain in a real browser: a default two-layer document (Canvas + Photo) records a paint stroke — **OP LOG 1/1 ops** where the gauge previously didn't even render — persistence writes it to IndexedDB, and after a reload the document comes back **restored from the op log**, not from the snapshot fallback. Zero console errors.
 
-**The proof:** a default Canvas+Photo document now records **2 ops where it recorded 0**, and undo replays byte-identically through the log without flattening the stack. Two guards ride along — a genuine second content layer still leaves op-log scope (the log must never claim a document it can't replay), and *painting on the Canvas itself* leaves scope too, because the log's document is the content plane and recording that stroke would replay it onto your photo. Both fall back to snapshot undo rather than being silently wrong.
+**The cost, stated plainly: the engine grows 659,815 → 731,595 bytes (+71,780, +10.9%).** That's serde + postcard (the op-log codec) and the tile engine actually shipping. It supersedes every earlier size figure, including v7.27's "+448 bytes", which was measured against a binary that didn't contain the feature.
 
-138 Rust tests (from 132), 123 in the frontend. The engine grew 448 bytes.
+The flags still ship **OFF**. This makes them real; it doesn't turn them on. The op-log path has now run in a browser exactly once, on my machine — it earns the default only after a dogfood with real photos.
 
-`ih_oplog_undo` and `ih_oplog_persist` still ship **OFF**. This release removes the blocker; it doesn't flip the switch. That comes after dogfooding — and now dogfooding will actually exercise something.
+*Found by checking the binary for op-log symbols before starting a multi-day dogfood — which would otherwise have "passed" while testing the fallback path it was meant to replace.*
 
 ## License
 

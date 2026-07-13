@@ -27,6 +27,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.72",
+    date: "2026-07-13",
+    headline: "The engine was missing a piece we thought we'd shipped",
+    entries: [
+      { tag: "rust", text: "Behind the scenes: the work-in-progress undo history — the one meant to survive a reload — turned out not to be inside the engine the app actually downloads. It had been built and tested for months, but a single line in the build recipe left it out of the final file. It's in there now, and we watched it record an edit, save it, and bring it back after a reload." },
+      { tag: "rust", text: "The engine file is bigger as a result — about 70 KB more — because the code that saves your edit history now genuinely ships with it. Worth being upfront about: that's a real cost on first load, and it buys undo history that survives closing the tab." },
+      { tag: "fix", text: "It's still switched off by default while it gets a few days of real use. Nothing changes for you yet." },
+    ],
+  },
+  {
     version: "v0.9.71",
     date: "2026-07-13",
     headline: "Undo history finally works on an ordinary photo",

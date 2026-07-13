@@ -7,9 +7,17 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# Tile engine core + operation log. OFF by default and NOT compiled into the
-# wasm build — the default build must stay byte-for-byte unchanged. Enabling it
-# pulls in serde + postcard purely for the op-log codec.
+# Tile engine core + operation log. Still off for a bare `cargo build`, but the
+# SHIPPED WASM IS BUILT WITH IT ON — `build:wasm` passes `-- --features tiles`
+# (ADR-017). It pulls in serde + postcard for the op-log codec.
+#
+# It used to say "NOT compiled into the wasm build — the default build must stay
+# byte-for-byte unchanged", and that was true and quietly fatal: the op-log code
+# was absent from the binary users ran, so `ih_oplog_undo` / `ih_tiles_flush` /
+# `ih_oplog_persist` gated JS calls into engine functions that did not exist.
+# Everything fell back to snapshot undo, silently. Found 2026-07-13 by checking
+# the shipped binary for `oplog` symbols and getting zero. Do not restore the old
+# behaviour without also deleting the flags it strands.
 tiles = ["dep:serde", "dep:postcard"]
 
 # Rayon-parallel kernels (blur first — see src/simd/blur.rs). OFF by default

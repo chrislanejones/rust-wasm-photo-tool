@@ -1310,3 +1310,77 @@ plumbing.
 `ih_oplog_undo` and `ih_oplog_persist` are unchanged and still default OFF.
 ADR-016 stays **Draft** pending the real-gallery dogfood check — which, for the
 first time, will actually exercise the op log on a normal photo.
+
+## v7.28 Change Summary — 2026-07-13
+
+**The op-log/tile engine was never compiled into the shipped WASM.** This release
+puts it in the binary (ADR-017) and verifies the whole chain end-to-end in a real
+browser. Flags remain OFF.
+
+### The bug (a build-config line, months of dead feature)
+
+The `tiles` cargo feature carries the op log and the tile engine. `build:wasm`
+ran `wasm-pack build --target web --out-dir pkg` — **no `--features tiles`** — and
+Cargo.toml stated it as an invariant: *"NOT compiled into the wasm build — the
+default build must stay byte-for-byte unchanged."*
+
+| check, on the shipped binary | before |
+| --- | --- |
+| `strings pkg/stamp_tool_bg.wasm \| grep -c oplog` | **0** |
+| `grep -c oplog pkg/stamp_tool.d.ts` | **0** |
+
+`hasOplogExports()` (tilesFlush.ts:39-43) probes for `set_oplog_undo`. It wasn't
+there, so `syncOplog()` returned null, the diagnostics gauges hid, and nothing
+recorded. **The three flags gated JS calls into functions that did not exist in
+the binary.** Everything fell back to snapshot undo — silently, no error, no
+console warning.
+
+So ADR-003, ADR-004, ADR-006, ADR-012, ADR-013 and the v7.24 data-loss fixes were
+all shipped as dead code in a binary that never contained them. And the Rust tests
+were green the whole time, because they run under `cargo test --features tiles` —
+a configuration the shipped artifact had never been built in. **The tests and the
+product were testing different programs.**
+
+### How it was found
+
+By checking the shipped binary for `oplog` symbols *before* starting the planned
+multi-day dogfood. The dogfood itself would have "passed": undo would have worked,
+reloads would have restored, nothing would have crashed — all of it exercising the
+snapshot fallback the release was meant to replace.
+
+### The fix
+
+`build:wasm` now passes `-- --features tiles`. `cargo build` / `cargo test` stay
+feature-off by default; both configurations are gated and green. The Cargo.toml
+invariant comment is replaced with the new reality rather than left lying.
+
+### Verification (real browser, production build, flags on)
+
+| step | result |
+| --- | --- |
+| op-log exports in the binary | 17 `oplog` symbols (was 0); `set_oplog_undo` present |
+| default 2-layer import + one paint stroke | **OP LOG: 1/1 ops · 1 kf · undo** — the gauge rendered and climbed from 0 |
+| persistence | **PERSISTED: 2 ops · 1 kf · 1 chunk** — written to IndexedDB |
+| reload | **PERSISTED: … · restored** — restored FROM the op log, not the fallback |
+| console | zero errors |
+
+### The cost
+
+**wasm 659,815 → 731,595 bytes (+71,780, +10.9%).** serde + postcard (the op-log
+codec) and the tile engine now ship to every visitor. This **supersedes every
+earlier size figure**, including v7.27's "+448 bytes" for `LayerKind` — that was
+measured against a binary without the feature. `wasm-opt -Oz` reaches 730,234, so
+a further squeeze exists if the number ever matters.
+
+### Gates
+
+Feature OFF: fmt · clippy `-D warnings` · 86 tests. Feature ON: clippy · **138
+tests**. tsc clean · 123 TS tests · app + marketing builds green.
+
+### Still OFF
+
+`ih_tiles_flush` / `ih_oplog_undo` / `ih_oplog_persist` unchanged, still default
+OFF. This release makes them *real* — it does not turn them on. The op-log path
+has now executed in a browser exactly once, locally. The Phase-1 dogfood
+(`~/claude-runs/DOGFOOD_default-flip.md`) is now meaningful for the first time,
+and it is what earns the default.
