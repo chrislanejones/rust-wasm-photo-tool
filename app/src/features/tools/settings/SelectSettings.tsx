@@ -58,7 +58,10 @@ export interface SelectionControls {
   onEdgeThresholdChange: (v: number) => void;
 }
 
-const KINDS: {
+/** The three selection kinds. Exported because the command palette offers each
+ *  one as a jump-to entry — one list, so the panel and the palette can't end up
+ *  describing them differently. */
+export const SELECT_KINDS: {
   id: SelectionKind;
   label: string;
   icon: typeof Wand2;
@@ -84,9 +87,9 @@ const KINDS: {
   },
 ];
 
-/** The lasso only joins the grid when `ih_smart_edge` is on. Kept out of KINDS
- *  rather than filtered into it, so with the switch off the array — and the
- *  panel it renders — is exactly what shipped. */
+/** The lasso only joins the grid when `ih_smart_edge` is on. Kept out of
+ *  SELECT_KINDS rather than filtered into it, so with the switch off the array —
+ *  and the panel it renders — is exactly what shipped. */
 const LASSO_KIND = {
   id: "lasso" as SelectionKind,
   label: "Magnetic",
@@ -102,8 +105,8 @@ export function SelectSettings({
   selection: SelectionControls;
 }) {
   const smartEdge = isSmartEdgeEnabled();
-  const kinds = smartEdge ? [...KINDS, LASSO_KIND] : KINDS;
-  const activeKind = kinds.find((k) => k.id === selection.kind) ?? KINDS[0];
+  const kinds = smartEdge ? [...SELECT_KINDS, LASSO_KIND] : SELECT_KINDS;
+  const activeKind = kinds.find((k) => k.id === selection.kind) ?? SELECT_KINDS[0];
 
   return (
     <div className="space-y-4">

@@ -26,10 +26,16 @@
 // recency — a tool you reach for constantly stays put instead of being pushed
 // out by whatever you happened to touch last.
 import { useEffect, useMemo, useState } from "react";
-import { Command as CommandIcon, LayoutGrid } from "lucide-react";
+import { Command as CommandIcon, LayoutGrid, Navigation } from "lucide-react";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { usePreferences } from "@/lib/preferences";
+import {
+  navigateTo,
+  parseHash,
+  describeRoute,
+  formatRoute,
+} from "@/features/routing";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePaletteActionsStore } from "./paletteActions";
 import {
@@ -118,7 +124,6 @@ export function CommandPalette() {
   const recentIds = useUIStore((s) => s.recentCommands);
   const usage = useUIStore((s) => s.commandUsage);
   const pushRecentCommand = useUIStore((s) => s.pushRecentCommand);
-  const requestSettings = useUIStore((s) => s.requestSettings);
   const photoCount = useGalleryStore((s) => s.photos.length);
   // Same-source prefs as AppShell — usePreferences broadcasts commits across
   // instances, so hot-toggles here update the live overlays/theme instantly.
@@ -147,11 +152,25 @@ export function CommandPalette() {
           theme: prefs.theme,
           set: (patch) => applyPrefs({ ...prefs, ...patch }),
         },
-        requestSettings,
         actions,
+        // "Go to route…" re-arms the search field as a jump box rather than
+        // opening a second dialog for a text input the palette already has.
+        promptRoute: () => setQuery("#/"),
       }),
-    [photoCount, prefs, applyPrefs, requestSettings, actions],
+    [photoCount, prefs, applyPrefs, actions],
   );
+
+  /** Typing a route into the search field (`#/settings/security`) offers a jump
+   *  row. It parses against the SAME grammar a pasted link does, so what you
+   *  can type here and what you can put in the address bar are the same
+   *  language — and an unparseable one says so instead of silently doing
+   *  nothing. */
+  const gotoRoute = useMemo(() => {
+    const q = query.trim();
+    if (!q.startsWith("#") && !q.startsWith("/")) return null;
+    const route = parseHash(q.startsWith("#") ? q : `#${q}`);
+    return { query: q, route };
+  }, [query]);
 
   /** Top 10 by lifetime run count, ties broken toward the more recently used.
    *  A brand-new user has no counts, and an empty grid would just look broken —
@@ -180,7 +199,7 @@ export function CommandPalette() {
 
   const runCommand = (cmd: PaletteCommand) => {
     pushRecentCommand(cmd.id); // also increments the usage count
-    setOpen(false); // close first — run() may open another dialog
+    if (!cmd.keepOpen) setOpen(false); // close first — run() may open a dialog
     cmd.run();
   };
 
@@ -259,6 +278,41 @@ export function CommandPalette() {
               keystroke-search results filling the rest of the dialog. ── */}
           <CommandList className="max-h-none flex-1 px-2 py-2">
             <CommandEmpty>No matching commands.</CommandEmpty>
+
+            {/* Route jump — shown the moment the query looks like a route, so
+                `#/settings/security` typed here goes exactly where the same
+                text in the address bar would. `forceMount` because cmdk's
+                fuzzy filter would never match a raw fragment against a label. */}
+            {gotoRoute && (
+              <CommandGroup heading="Go to">
+                <CommandItem
+                  forceMount
+                  value={`goto ${gotoRoute.query}`}
+                  disabled={!gotoRoute.route}
+                  onSelect={() => {
+                    if (!gotoRoute.route) return;
+                    setOpen(false);
+                    navigateTo(gotoRoute.route);
+                  }}
+                >
+                  <Navigation className="text-text-muted" aria-hidden="true" />
+                  {gotoRoute.route ? (
+                    <>
+                      {describeRoute(gotoRoute.route)}
+                      <span className="ml-auto font-mono text-2xs text-text-muted">
+                        {formatRoute(gotoRoute.route)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-text-muted">
+                      No such route — try{" "}
+                      <span className="font-mono">#/tool/paint/blur</span> or{" "}
+                      <span className="font-mono">#/settings/security</span>
+                    </span>
+                  )}
+                </CommandItem>
+              </CommandGroup>
+            )}
 
             {showMostUsed && (
               <>

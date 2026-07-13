@@ -1,25 +1,24 @@
 // ===== FILE: app/src/features/commandPalette/commands.ts =====
-// The typed palette-command registry. Every entry is
-// { id, label, group, keywords, run() } plus display extras (icon, shortcut
-// hint) and a `disabled` precondition.
+// The typed palette-command registry — and, since routing landed, the SSOT for
+// navigation. Every entry is { id, label, group, keywords, run() } plus display
+// extras (icon, shortcut hint) and a `disabled` precondition.
 //
 // SOURCES (in priority order):
 //   1. TOOL_MODULES — the tool registry (features/tools/toolModules.ts).
-//      Paint and Resize/Compress are registered there today; their sub-mode
-//      entries derive from each module's `modes` (PAINT_MODES /
-//      RESIZE_MODES), NOT a copy.
 //   2. toolConfig.ts TOOLS — tools not yet migrated into the registry.
-//   3. LEGACY_SUBMODES below — sub-mode lists for not-yet-migrated tools.
-//      DECISION: these hardcoded lists migrate into each tool's
-//      ToolModule.modes as tools land in the registry, one per session
-//      (tool-module-migration skill). Delete the tool's row here in that
-//      same session.
+//   3. features/tools/toolModes.ts — the sub-mode axis, registry-first with
+//      hand-written lists for the not-yet-migrated tools. That table used to
+//      live in this file; it moved out when the router needed the same
+//      knowledge, because the alternative was two copies of it.
 //
-// run() routes through the existing Zustand stores only — no window
-// CustomEvents (forbidden), no AppShell coupling. Entries whose plumbing
-// arrives with the hot-toggle pass (TASK C: preferences broadcast, Settings
-// tab requests, the undo/redo action bridge) stay `disabled` until their
-// PaletteContext field is provided.
+// NAVIGATION. Any entry that moves the user calls navigateTo() — it applies the
+// route to the stores AND writes the URL. The palette does not touch
+// setActiveTool / setBrushMode / openSettings directly. Alt+, a pasted link,
+// and the Back button are three front doors onto one road; a second, private
+// path is exactly how the address bar starts lying about where you are.
+//
+// run() routes through Zustand stores and the router only — no window
+// CustomEvents (forbidden), no AppShell coupling.
 import {
   Activity,
   Download,
@@ -27,8 +26,10 @@ import {
   ImagePlus,
   Keyboard,
   Images,
+  Link2,
   Monitor,
   Moon,
+  Navigation,
   PanelLeft,
   Redo2,
   Ruler,
@@ -37,19 +38,16 @@ import {
   Sun,
   Undo2,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { ToolType } from "@/lib/types";
 import type { ThemeChoice } from "@/lib/preferences";
 import type { SettingsTab } from "@/components/SubscriptionButton";
 import { TOOLS, TOOL_MODULES } from "@/features/tools";
-import {
-  useToolStore,
-  type AdjustMode,
-  type BrushMode,
-  type ResizeMode,
-  type ShapesMode,
-  type StampSubMode,
-} from "@/stores/useToolStore";
+import { allToolModes } from "@/features/tools/toolModes";
+import { SELECT_KINDS } from "@/features/tools/settings/SelectSettings";
+import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
+import { navigateTo, currentRouteUrl, currentRouteLabel } from "@/features/routing";
 
 export type PaletteGroup = "tools" | "settings" | "actions";
 
@@ -65,11 +63,16 @@ export interface PaletteCommand {
   shortcut?: string;
   /** Precondition failed (e.g. Batch needs 2+ photos) — rendered but inert. */
   disabled?: boolean;
+  /** Leave the palette open after running. For entries that hand the palette
+   *  back to you rather than taking you somewhere (Go to route… re-arms the
+   *  search field as a jump box). */
+  keepOpen?: boolean;
   run: () => void;
 }
 
-/** Live app context the registry builder needs. The optional fields are the
- *  TASK C plumbing — until provided, their entries render disabled. */
+/** Live app context the registry builder needs. The optional fields are
+ *  plumbing the palette provides — until provided, their entries render
+ *  disabled. */
 export interface PaletteContext {
   photoCount: number;
   /** Rulers/grid/theme hot-toggles (preferences live outside Zustand —
@@ -82,53 +85,41 @@ export interface PaletteContext {
       patch: Partial<{ rulers: boolean; grid: boolean; theme: ThemeChoice }>,
     ) => void;
   };
-  /** Open the Settings modal on a given tab (Security, Rulers & Grids…). */
-  requestSettings?: (tab?: SettingsTab) => void;
   /** AppShell-scoped session handlers, bridged via useKeyboardShortcuts. */
   actions?: { undo: () => void; redo: () => void } | null;
+  /** Turn the palette's own search field into a route jump box (prefills it
+   *  with `#/`). Provided by CommandPalette. */
+  promptRoute?: () => void;
 }
 
-/** Per-tool sub-mode dispatch — the store owns the canonical mode unions. */
-const SUBMODE_SETTERS: Partial<Record<ToolType, (modeId: string) => void>> = {
-  brush: (m) => useToolStore.getState().setBrushMode(m as BrushMode),
-  compress: (m) => useToolStore.getState().setResizeMode(m as ResizeMode),
-  crop: (m) => useToolStore.getState().setAdjustMode(m as AdjustMode),
-  stamp: (m) => useToolStore.getState().setStampSubMode(m as StampSubMode),
-  shapes: (m) => useToolStore.getState().setShapesMode(m as ShapesMode),
-};
+/** Copy a link to whatever view you're looking at.
+ *
+ *  Clipboard access fails on an insecure origin or a denied permission — in
+ *  which case show the URL instead of a failure, so the link is still
+ *  selectable by hand. Same fallback the share dialog already uses. */
+async function copyRouteLink(): Promise<void> {
+  const url = currentRouteUrl();
+  try {
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copied", { description: currentRouteLabel() });
+  } catch {
+    toast.info(url, { description: "Copy this link — clipboard access was blocked" });
+  }
+}
 
-/** Sub-mode lists for tools NOT yet in TOOL_MODULES (see DECISION above). */
-const LEGACY_SUBMODES: {
-  tool: ToolType;
-  toolLabel: string;
-  modes: { id: string; label: string; keywords: string[] }[];
-}[] = [
-  {
-    tool: "stamp",
-    toolLabel: "Stamps",
-    modes: [
-      { id: "clone", label: "Clone Stamp", keywords: ["clone", "heal", "duplicate"] },
-      { id: "red", label: "Red Stamps", keywords: ["red", "batch stamp", "marker"] },
-      { id: "emojis", label: "Emojis", keywords: ["emoji", "sticker"] },
-    ],
-  },
-  {
-    tool: "shapes",
-    toolLabel: "Shapes",
-    modes: [
-      { id: "shapes", label: "Shapes", keywords: ["rectangle", "ellipse", "box"] },
-      { id: "pens", label: "Pens", keywords: ["pen", "bezier", "path", "vector"] },
-      { id: "arrows", label: "Arrows", keywords: ["arrow", "pointer", "annotate"] },
-    ],
-  },
-];
+// ── Navigation ───────────────────────────────────────────────────────────────
+// Every entry that MOVES the user goes through navigateTo(). It applies the
+// route to the stores and records it in the URL, so Alt+, and a pasted link
+// arrive by the same road and the address bar never lies about where you are.
+// The palette does NOT call setActiveTool / setBrushMode / openSettings itself:
+// a second navigation path is precisely how the URL and the app desync.
+const jumpToTool = (tool: ToolType) => navigateTo({ kind: "tool", tool });
 
-const jumpToTool = (id: ToolType) => useToolStore.getState().setActiveTool(id);
+const jumpToSubMode = (tool: ToolType, mode: string) =>
+  navigateTo({ kind: "tool", tool, mode });
 
-const jumpToSubMode = (tool: ToolType, modeId: string) => {
-  jumpToTool(tool);
-  SUBMODE_SETTERS[tool]?.(modeId);
-};
+/** Settings panes are routes too (`#/settings/security`). */
+const openSettingsTab = (tab: SettingsTab) => navigateTo({ kind: "settings", tab });
 
 export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
   const ui = () => useUIStore.getState();
@@ -152,34 +143,40 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     });
   }
 
-  // ── Tools: jump-to-sub-mode (registry modules first) ─────────────────────
-  for (const module of Object.values(TOOL_MODULES)) {
-    if (!module) continue; // Partial<Record<…>> — TS sees optional slots
-    for (const mode of module.modes) {
-      commands.push({
-        id: `mode.${module.id}.${mode.id}`,
-        label: `${module.label} › ${mode.label}`,
-        group: "tools",
-        keywords: [mode.label, module.label],
-        icon: mode.icon,
-        run: () => jumpToSubMode(module.id, mode.id),
-      });
-    }
+  // ── Tools: jump-to-sub-mode ──────────────────────────────────────────────
+  // One source: features/tools/toolModes (registry modules first, hand-written
+  // lists for the not-yet-migrated tools). The palette used to keep its own
+  // copy of both, which the router would then have had to copy again.
+  for (const { tool, mode } of allToolModes()) {
+    const module = TOOL_MODULES[tool];
+    const toolDef = TOOLS.find((t) => t.id === tool);
+    const toolLabel = module?.label ?? toolDef?.label ?? tool;
+    commands.push({
+      id: `mode.${tool}.${mode.id}`,
+      label: `${toolLabel} › ${mode.label}`,
+      group: "tools",
+      keywords: [...mode.keywords, toolLabel],
+      icon: module?.modes.find((m) => m.id === mode.id)?.icon ?? toolDef?.icon,
+      run: () => jumpToSubMode(tool, mode.id),
+    });
   }
-  // …then the not-yet-migrated tools' hardcoded lists.
-  for (const legacy of LEGACY_SUBMODES) {
-    if (TOOL_MODULES[legacy.tool]?.modes.length) continue; // migrated → registry wins
-    const toolDef = TOOLS.find((t) => t.id === legacy.tool);
-    for (const mode of legacy.modes) {
-      commands.push({
-        id: `mode.${legacy.tool}.${mode.id}`,
-        label: `${legacy.toolLabel} › ${mode.label}`,
-        group: "tools",
-        keywords: [...mode.keywords, legacy.toolLabel],
-        icon: toolDef?.icon,
-        run: () => jumpToSubMode(legacy.tool, mode.id),
-      });
-    }
+
+  // ── Tools: the selection kinds (tool-arc 2.6b, new since v7.20) ──────────
+  // Not a route segment of their own — the kind is a setting of Adjust &
+  // Select, not a view — so these navigate to `#/tool/adjust/select` and then
+  // set the kind. The navigation half still goes through the router.
+  for (const kind of SELECT_KINDS) {
+    commands.push({
+      id: `select.${kind.id}`,
+      label: `Adjust & Select › ${kind.label}`,
+      group: "tools",
+      keywords: ["selection", "wand", "magic wand", kind.label, kind.info],
+      icon: kind.icon,
+      run: () => {
+        jumpToSubMode("crop", "select");
+        useToolStore.getState().setSelectionKind(kind.id);
+      },
+    });
   }
 
   // ── Settings ─────────────────────────────────────────────────────────────
@@ -191,8 +188,7 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       keywords: ["preferences", "options", "general"],
       icon: Settings,
       shortcut: "Alt+S",
-      disabled: !ctx.requestSettings,
-      run: () => ctx.requestSettings?.("general"),
+      run: () => openSettingsTab("general"),
     },
     {
       id: "settings.security",
@@ -200,8 +196,7 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       group: "settings",
       keywords: ["security", "exif", "privacy", "metadata", "gps"],
       icon: Shield,
-      disabled: !ctx.requestSettings,
-      run: () => ctx.requestSettings?.("security"),
+      run: () => openSettingsTab("security"),
     },
     {
       id: "settings.rulers-pane",
@@ -209,8 +204,7 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       group: "settings",
       keywords: ["ruler", "grid", "guides", "overlay"],
       icon: Ruler,
-      disabled: !ctx.requestSettings,
-      run: () => ctx.requestSettings?.("rulers"),
+      run: () => openSettingsTab("rulers"),
     },
     {
       id: "settings.toggle-rulers",
@@ -332,6 +326,35 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       icon: History,
       shortcut: "Alt+R",
       run: () => ui().setShowHistory((v) => !v),
+    },
+    {
+      id: "action.copy-link",
+      label: "Copy link to this view",
+      group: "actions",
+      keywords: [
+        "copy link",
+        "share",
+        "url",
+        "permalink",
+        "deep link",
+        "bookmark",
+        "address",
+      ],
+      icon: Link2,
+      run: () => void copyRouteLink(),
+    },
+    {
+      id: "action.goto",
+      label: "Go to route…",
+      group: "actions",
+      keywords: ["goto", "jump", "navigate", "route", "url", "hash", "address"],
+      icon: Navigation,
+      // Hands the palette back to you with `#/` in the search box: type the
+      // rest and the jump row appears. No second dialog for what is, after
+      // all, a text field the palette already has.
+      keepOpen: true,
+      disabled: !ctx.promptRoute,
+      run: () => ctx.promptRoute?.(),
     },
     {
       id: "action.shortcuts",

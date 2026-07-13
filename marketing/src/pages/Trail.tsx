@@ -27,6 +27,17 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.69",
+    date: "2026-07-13",
+    headline: "A lasso that finds the edge for you — and a link to every view",
+    entries: [
+      { tag: "feature", text: "The Magnetic Lasso is here. Click a few anchors loosely around an object and the line snaps to its edge between them, following the outline you meant rather than the one you drew. Double-click to close it and you have a selection like any other. It's switched off by default while it gets a few days of real use." },
+      { tag: "feature", text: "New Smart Brush: paint right up to the edge of something and the stroke stays where you put it instead of bleeding across the outline. Same edges the lasso uses — built once, used twice." },
+      { tag: "feature", text: "Every view now has a web address. Pick a tool, open a settings pane, and the URL updates; paste that link and you land exactly there. Back and forward work the way you'd expect. There's a new \"Copy link to this view\" in the command palette (Alt+,) for sharing exactly what you're looking at." },
+      { tag: "rust", text: "Behind the scenes: the lasso finds the cheapest path along a map of the image's edges, searched within a bounded window so it keeps up with your cursor — about 1 to 6 milliseconds per move on a large photo. No AI, no server: it runs in your tab." },
+    ],
+  },
+  {
     version: "v0.9.68",
     date: "2026-07-13",
     headline: "Undo that survives a reload — and the two bugs standing in its way",

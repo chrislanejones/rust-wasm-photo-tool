@@ -49,6 +49,7 @@ import {
   type Preferences,
 } from "@/lib/preferences";
 import { useUIStore } from "@/stores/useUIStore";
+import { SETTINGS_TAB_LABELS } from "@/features/routing";
 
 const PRO_FEATURES = [
   "All AI tools — background removal, OCR, object removal",
@@ -117,46 +118,53 @@ export function SubscriptionButton({
   superUser,
   openRaster,
 }: Props) {
-  const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<SettingsTab>("general");
+  // Open state + active pane live in useUIStore, not here. The URL mirrors the
+  // current view (`#/settings/security`), so which pane is showing has to be
+  // READABLE from outside this component — and every caller (Alt+S, the
+  // palette, a deep link) now goes through the same store actions instead of
+  // the old one-shot request + grandfathered `image-horse:open-settings`
+  // CustomEvent, both of which are gone.
+  const open = useUIStore((s) => s.settingsOpen);
+  const tab = useUIStore((s) => s.settingsTab);
+  const openSettings = useUIStore((s) => s.openSettings);
+  const closeSettings = useUIStore((s) => s.closeSettings);
+  const setTab = useUIStore((s) => s.setSettingsTab);
 
-  // Alt+S (and any other caller) opens Settings via a window event — keeps the
-  // open state here without threading a controlled prop through the tree.
-  // (Grandfathered Stage-3 CustomEvent — new callers use the store signal
-  // below instead.)
-  useEffect(() => {
-    const openSettings = () => setOpen(true);
-    window.addEventListener("image-horse:open-settings", openSettings);
-    return () =>
-      window.removeEventListener("image-horse:open-settings", openSettings);
-  }, []);
-
-  // Store-routed "open Settings on tab X" signal (command palette et al.).
-  // One-shot: handled → cleared, so a remount never replays a stale request.
-  const settingsRequest = useUIStore((s) => s.settingsRequest);
-  const clearSettingsRequest = useUIStore((s) => s.clearSettingsRequest);
-  useEffect(() => {
-    if (!settingsRequest) return;
-    setTab(settingsRequest.tab);
-    setOpen(true);
-    clearSettingsRequest();
-  }, [settingsRequest, clearSettingsRequest]);
-
-  const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] = [
-    { id: "general", label: "General", icon: SlidersHorizontal },
-    { id: "appearance", label: "Appearance", icon: Palette },
-    { id: "canvas", label: "Layers and Canvas", icon: Layers },
-    { id: "security", label: "Security", icon: Shield },
-    { id: "rulers", label: "Rulers & Grids", icon: Ruler },
-    { id: "export", label: "Import / Export", icon: Package },
-    { id: "storage", label: "S3 / Image Hosting", icon: Cloud },
-    { id: "billing", label: "Plan & Billing", icon: CreditCard },
-    { id: "aiusage", label: "AI Usage", icon: Gauge },
-    { id: "devtests", label: "Dev Tests", icon: FlaskConical },
-    ...(superUser
-      ? [{ id: "superuser" as SettingsTab, label: "Super User", icon: ShieldCheck }]
-      : []),
+  // Labels come from the route table (features/routing) — one source, so the
+  // pane the URL names and the tab the rail shows can't drift apart. Icons and
+  // the super-user gate stay local.
+  const TAB_ICONS: Record<SettingsTab, typeof SlidersHorizontal> = {
+    general: SlidersHorizontal,
+    appearance: Palette,
+    canvas: Layers,
+    security: Shield,
+    rulers: Ruler,
+    export: Package,
+    storage: Cloud,
+    billing: CreditCard,
+    aiusage: Gauge,
+    devtests: FlaskConical,
+    superuser: ShieldCheck,
+  };
+  const TAB_ORDER: SettingsTab[] = [
+    "general",
+    "appearance",
+    "canvas",
+    "security",
+    "rulers",
+    "export",
+    "storage",
+    "billing",
+    "aiusage",
+    "devtests",
+    ...(superUser ? (["superuser"] as SettingsTab[]) : []),
   ];
+  const tabs: { id: SettingsTab; label: string; icon: typeof SlidersHorizontal }[] =
+    TAB_ORDER.map((id) => ({
+      id,
+      label: SETTINGS_TAB_LABELS[id],
+      icon: TAB_ICONS[id],
+    }));
 
   // Draft prefs the General pane edits; committed by the footer's Apply.
   const [draft, setDraft] = useState<Preferences>(general.current);
@@ -238,7 +246,7 @@ export function SubscriptionButton({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => openSettings(tab)}
         className="btn-icon"
         title="Settings"
         aria-label="Settings"
@@ -246,7 +254,7 @@ export function SubscriptionButton({
         <Settings className="h-4 w-4" />
       </button>
 
-      <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
+      <Dialog open={open} onOpenChange={(o) => !o && closeSettings()}>
         <DialogContent
           size="xl"
           aria-describedby={undefined}

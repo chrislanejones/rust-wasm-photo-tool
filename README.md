@@ -50,18 +50,21 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.24 — 2026-07-13
+### v7.25 — 2026-07-13
 
-**Persistent undo: the two bugs that had to die before it could ever be turned on.** Op-log persistence (`ih_oplog_persist`) is still **off by default** — this release is about making it safe enough to dogfood. Both bugs shared a nasty shape: the op log replayed *perfectly*, into a document you no longer had. Nothing threw, nothing fell back, and the damage only showed up after a reload.
+**The magnetic lasso is real, and every view has an address.** Two features, both landing on foundations laid earlier: v7.23's shared edge core, and v7.19's command-palette registry.
 
-- **A new log could be mistaken for the old one.** `OpLog::with_base` restarts its counter at zero, so a fresh log on the same photo — after an AI result, a re-load, a failed restore — looked identical to the persisted one, and the manifest cheerfully authorised an *append*. The new ops landed on the old chunks over the old base keyframe, so a restore replayed a blend of two histories. When the counters happened to match exactly it was quieter and worse: read as "nothing new", nothing written, and a reload handed you back the **pre-AI image**.
-- **A log for a document that had moved on.** The log models a single-layer image. Add a layer to a photo that has one, reload, and the layers were **gone** — replay succeeded, so the working-copy fallback was never consulted.
+**Magnetic lasso + Smart Brush** (`ih_smart_edge`, **off by default** until it's been dogfooded). The disabled lasso stub from v7.23 is now wired to an actual live-wire path-finder. Drop anchors loosely around an object and the wire snaps to the edge between them, tracking your cursor as you go; double-click closes the loop and it becomes an ordinary selection — same mask, same overlay, same Delete key as the wands. The **Smart Brush** is the second consumer of the same primitive: a stroke is walled in by strong edges, so paint stays in the region you started in instead of bleeding across an outline.
 
-The fix stops trusting the manifest. An append now requires a **binding** — a token proving *this* engine is the one holding the persisted log. Every load path builds a fresh engine, so the binding self-voids and an unbound engine rewrites instead of appending. Logs that are broken or multi-layer are never written, and any log already on disk for them is retired, which sends the restore back to the working copy where it belongs. The `stale` marker is a non-indexed field: no schema version bump, no upgrade function, and records written by the shipped v2 read as not-stale.
+Both stand on one new shared piece — an **edge cost map** derived from the Sobel magnitude that already shipped (strong edge = cheap to travel, flat area = expensive). The lasso path-finds along it; the brush uses it as a wall. Building it once is why the brush cost almost nothing to add once the lasso existed.
 
-Seven new tests, five of which fail against the old code. The Diagnostics window gained a **Persisted** gauge (ops · keyframes · chunks, or "retired → working copy").
+The honest numbers: the cost map takes **31 ms** on a 2048×2048 image, paid at the first lasso click and at the start of each smart stroke — noticeable, but not per-frame. Each path search during a drag is **1–5.6 ms**, comfortably inside a 16 ms frame; a bounded search window is what buys that, and beyond a 250k-pixel window the engine returns a straight line rather than lag. The whole feature adds **516 bytes** to the wasm. Scalar only — threading stays parked behind the COOP/COEP question (ADR-009).
 
-ADR-006 stays **Draft** on purpose: the code is complete, but the write path is new, and an ADR shouldn't certify a premise nobody has dogfooded yet.
+**Hash routing.** App state now has a URL: `#/tool/paint/blur`, `#/settings/security`. Back and forward work. Deep links land where they say. The palette's Alt+, actions and a pasted link now flow through **one** navigation path — the action registry is the single source of truth, and routing and the palette are two front doors onto it, not two implementations. New palette entries: **"Copy link to this view"** and **"Go to route…"**, plus a status-bar tip that says so. No router dependency was added: there are no *pages* here, just a tool/sub-mode/pane coordinate, so it's a small hash-sync layer instead.
+
+A side-effect worth naming: making the settings pane linkable meant making it *readable*, so `settingsOpen`/`settingsTab` moved into the store — which retired the last window CustomEvent in the navigation path (Stage 3 of the AppShell teardown). And the routing tests caught a crash before a browser ever saw it: `#/tool/%%%` threw a `URIError` out of `decodeURIComponent`, because the hash is untrusted input.
+
+ADR-014 (lasso/brush) and ADR-015 (routing) are both **Draft** pending a human check of the parts no test can prove: whether the wire *feels* like it's tracking your cursor, and whether back/forward feel right.
 
 ## License
 

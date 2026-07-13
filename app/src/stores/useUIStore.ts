@@ -55,11 +55,16 @@ interface UIState {
    *  style, top 10) ranks by this, so a tool you reach for constantly stays
    *  put instead of being pushed out by whatever you touched last. */
   commandUsage: Record<string, number>;
-  /** One-shot "open the Settings modal on tab X" request. SubscriptionButton
-   *  (the modal's owner) handles it and clears it — the store-routed
-   *  replacement for the grandfathered `image-horse:open-settings`
-   *  CustomEvent. Transient — never persisted. */
-  settingsRequest: { tab: SettingsTab } | null;
+  /** Settings modal: is it open, and on which pane. OBSERVABLE state, not a
+   *  one-shot request — the URL mirrors the current view (`#/settings/security`),
+   *  so "which pane is showing" has to be readable, not just settable.
+   *  SubscriptionButton (the modal's owner) renders from these instead of its
+   *  own `useState`, which also means a request that arrives while no
+   *  SubscriptionButton is mounted (before the top bar reveals) is honoured
+   *  when it does mount, rather than being dropped on the floor.
+   *  Transient — never persisted. */
+  settingsOpen: boolean;
+  settingsTab: SettingsTab;
 
   // Cold-start boot splash: true until WASM is up + the session check resolves.
   booting: boolean;
@@ -96,9 +101,10 @@ interface UIState {
   setShowCommandPalette: (v: SetArg<boolean>) => void;
   /** Record a palette command run: dedupes, caps at 8. */
   pushRecentCommand: (id: string) => void;
-  /** Ask the Settings modal to open on `tab` (default "general"). */
-  requestSettings: (tab?: SettingsTab) => void;
-  clearSettingsRequest: () => void;
+  /** Open the Settings modal on `tab` (default "general"). */
+  openSettings: (tab?: SettingsTab) => void;
+  closeSettings: () => void;
+  setSettingsTab: (v: SettingsTab) => void;
 
   setBooting: (v: SetArg<boolean>) => void;
   setFirstRun: (v: SetArg<boolean>) => void;
@@ -137,7 +143,8 @@ export const useUIStore = create<UIState>()(
       showCommandPalette: false,
       recentCommands: [],
       commandUsage: {},
-      settingsRequest: null,
+      settingsOpen: false,
+      settingsTab: "general",
 
       booting: true,
       firstRun: true,
@@ -184,8 +191,11 @@ export const useUIStore = create<UIState>()(
             [id]: (s.commandUsage[id] ?? 0) + 1,
           },
         })),
-      requestSettings: (tab = "general") => set({ settingsRequest: { tab } }),
-      clearSettingsRequest: () => set({ settingsRequest: null }),
+      openSettings: (tab = "general") => set({ settingsOpen: true, settingsTab: tab }),
+      // The tab is deliberately NOT reset on close: reopening lands you back
+      // where you were, and the route stays stable across an open/close/open.
+      closeSettings: () => set({ settingsOpen: false }),
+      setSettingsTab: (v) => set({ settingsTab: v }),
 
       setBooting: (v) => set((s) => ({ booting: resolveSet(v, s.booting) })),
       setFirstRun: (v) => set((s) => ({ firstRun: resolveSet(v, s.firstRun) })),

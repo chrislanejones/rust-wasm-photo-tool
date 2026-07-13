@@ -1097,3 +1097,75 @@ write path changed in this very release. Accepting the ADR would certify a
 premise nobody has verified on a real gallery. It carries a 5-step gallery check
 that gates Accepted — the layers-then-reload and AI-then-reload cases are the two
 that would have lost real work.
+
+## v7.25 Change Summary — 2026-07-13
+
+Two features, each standing on something built earlier: v7.23's shared edge core,
+and v7.19's command-palette action registry.
+
+### Magnetic lasso + Smart Brush (`ih_smart_edge`, default OFF)
+
+The disabled lasso stub shipped in v7.23 is now live. Between them sits one new
+shared primitive — an **edge cost map** derived from the Sobel magnitude that
+already shipped (strong edge = cheap to travel, flat region = expensive). The
+lasso path-finds along it; the brush uses it as a wall. Building the map once is
+why the second consumer was nearly free.
+
+| Piece | What it does |
+| --- | --- |
+| **Edge cost map** (`src/edges.rs`) | Pure function of the existing Sobel output. Shared by both consumers. |
+| **Magnetic lasso** (`src/livewire.rs`) | Live-wire: minimum-cost path from the last anchor to the cursor, bounded to a search window. `lasso_begin` / `lasso_path_to` / `lasso_commit` / `lasso_close` / `lasso_cancel`. Closing fills the loop into **the same mask + overlay the wands return** — no second selection representation. |
+| **Smart Brush** (`src/paint.rs`) | `set_smart_brush(enabled, strength)`. A stroke is contained by strong edges, so paint doesn't bleed across an outline. Off by default; with it off the brush takes its original code path. |
+
+**Performance (native release, 2048×2048).** Cost map **31 ms**, paid once per
+lasso session and at the start of each smart stroke — noticeable on a big image,
+but not per-frame. Path search during a drag: **1.0 ms** (64 px), **1.6 ms**
+(200 px), **5.6 ms** (400 px) — inside a 16 ms frame. The **bounded search window
+is what buys this**; unbounded Dijkstra on a 2048² image is ~100× that. Past a
+250k-pixel window the engine returns a straight line rather than lag.
+
+**Size:** 658,851 → **659,367 bytes** (+516 for the whole feature). The lasso
+commit in isolation *reduced* the binary by 2,321 bytes, which is not a claim
+that a Dijkstra is free — it's `-Oz` shifting inlining decisions. Recorded rather
+than dressed up.
+
+**Tests:** 86 Rust (from 66). The headline one drops anchors deliberately 3 px
+off a known ring and asserts the mid-path hugs the true edge within 2 px **and**
+costs less than a straight line across — the property the whole tool rests on.
+Plus determinism (byte-identical paths), closed-loop masks, and no-panic
+degenerates. Smart brush: a stroke in one region does not bleed into the other.
+
+**Scalar only.** Rayon stays parked behind the COOP/COEP browser-threading
+question (ADR-009); the kernels are shaped so a parallel path can drop in later.
+
+### Hash routing + one navigation path (ADR-015)
+
+App state is now URL-addressable: `#/tool/paint/blur`, `#/settings/security`.
+Back/forward work; deep links land on load; a garbage hash falls back safely
+instead of crashing.
+
+- **No router dependency.** There are no *pages* here — only a tool/sub-mode/pane
+  coordinate — so this is a small hash-sync layer (`app/src/features/routing/`),
+  not react-router.
+- **One nav path, not two.** Palette actions navigate via `navigateTo()`, so
+  Alt+, and a pasted link flow through the same registry. The duplicate sub-mode
+  tables collapsed into `features/tools/toolModes.ts`.
+- **Params:** `?v=` (the share-doc concept that already existed) outranks the
+  hash. Nothing new was invented for sharing.
+- **New palette entries:** "Copy link to this view", "Go to route…", plus a
+  rotating status-bar tip.
+- **Side-effect:** a pane you can't read is a pane you can't link, so
+  `settingsOpen`/`settingsTab` moved into `useUIStore` — retiring the
+  `image-horse:open-settings` CustomEvent, the last window event in the nav path
+  (Stage 3 of the AppShell teardown).
+- **A crash caught before a browser saw it:** `#/tool/%%%` threw `URIError` out of
+  `decodeURIComponent`. The hash is untrusted input; it's now handled.
+
+### Gates
+
+`cargo fmt --check` · `clippy -D warnings` · **86 Rust tests** · **122 TS tests**
+(from 42) · tsc clean · app + marketing builds green. ADR-014 and ADR-015 both
+stay **Draft** pending the human canvas checks — lasso feel, and back/forward.
+
+**ADR numbering note:** both features were built in parallel worktrees and both
+drafted an ADR-014. Routing was renumbered to **015** on landing.

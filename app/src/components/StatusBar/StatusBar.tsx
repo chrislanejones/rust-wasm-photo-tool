@@ -22,6 +22,10 @@ const BASE_HINTS: ShortcutHint[] = [
   { keys: "Space", label: "pan" },
   { keys: "PgUp/Dn", label: "photos" },
   { keys: "Alt+Scroll", label: "zoom" },
+  // Routing (v7.24) — the palette can copy a link straight to the view you're
+  // in. Nothing else advertises that, and a URL you never see is a URL you
+  // never use.
+  { keys: "Alt+, → copy link", label: "share this view" },
 ];
 
 /** Always pinned in the last slot — never cycles or swaps. */

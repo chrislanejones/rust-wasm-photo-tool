@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { ToolType } from "@/lib/types";
 import { useUIStore } from "@/stores/useUIStore";
 import { setPaletteActions } from "@/features/commandPalette";
+import { navigateTo } from "@/features/routing";
 
 /** All ten tools in toolbar order — keys 1-9, 0 */
 const TOOL_BY_DIGIT: Record<string, ToolType> = {
@@ -273,7 +274,10 @@ export function useKeyboardShortcuts({
           case "KeyV": e.preventDefault(); onFlipV?.(); break;
           case "KeyS":
             e.preventDefault();
-            window.dispatchEvent(new CustomEvent("image-horse:open-settings"));
+            // Store action, not the old `image-horse:open-settings` CustomEvent
+            // (Stage 3: window events are gone). Settings is a ROUTE now, so
+            // Alt+S navigates like any other view change and the URL follows.
+            navigateTo({ kind: "settings", tab: useUIStore.getState().settingsTab });
             break;
           case "KeyE": e.preventDefault(); onExport(); break;
           case "KeyA": e.preventDefault(); onSelectAll?.(); break;

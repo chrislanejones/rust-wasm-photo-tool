@@ -37,9 +37,10 @@ deleted.
 | [012](012-oplog-document-model.md) | The op log replays over a document (pixels + live annotation lists), not the flattened composite | Draft | 2026-07-11 |
 | [013](013-oplog-undo-hash-fallback.md) | Op-log undo activates behind a composite-hash sync check, with snapshot fallback | Draft | 2026-07-11 |
 | [014](014-magnetic-lasso-smart-brush-cost-map.md) | Magnetic lasso and Smart Brush both stand on one shared edge cost map | Draft — kernels tested + wired behind `ih_smart_edge` (default OFF); needs a human canvas check of the FEEL | 2026-07-13 |
+| [015](015-hash-routing-palette-nav.md) | Hash routing + URL params; the palette navigates via the route registry | Draft | 2026-07-13 |
 
 <!--
   Planned:
   - service worker, precache-only → takes the next free number
-    (014+) when written.
+    (016+) when written.
 -->
