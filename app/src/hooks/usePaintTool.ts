@@ -1,6 +1,8 @@
 import { useCallback, useRef } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
+import { isSmartEdgeEnabled } from "@/lib/smartEdge";
+import { useToolStore } from "@/stores/useToolStore";
 
 interface Opts {
   toolRef: React.RefObject<ImageHorseTool | null>;
@@ -41,6 +43,13 @@ export function usePaintTool({
 }: Opts) {
   const painting = useRef(false);
 
+  // Smart Brush (behind ih_smart_edge). Read straight from the store rather
+  // than drilled through Opts — it's the same shape of tool state as the
+  // selection kind, and every caller of this hook would otherwise have to
+  // thread two props it doesn't care about.
+  const smartBrush = useToolStore((s) => s.smartBrush);
+  const smartBrushStrength = useToolStore((s) => s.smartBrushStrength);
+
   const coords = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const c = canvasRef.current;
@@ -60,6 +69,23 @@ export function usePaintTool({
       if (!t || e.button !== 0) return;
       painting.current = true;
       const { x, y } = coords(e);
+
+      // Push the Smart Brush config before the stroke opens: `set_smart_brush`
+      // takes effect from the next `paint_begin`, and `paint_down` below is
+      // what calls it. Only for the colour brush — containing an ERASER at an
+      // edge is a different feature with a different answer, and guessing at it
+      // here would ship a behaviour nobody asked for.
+      //
+      // Called unconditionally (not just when on) so that turning the switch or
+      // the toggle OFF actually reaches the engine and frees its cost map,
+      // instead of leaving the last stroke's setting latched.
+      if (!maskMode && !erase) {
+        t.set_smart_brush(
+          isSmartEdgeEnabled() && smartBrush,
+          smartBrushStrength,
+        );
+      }
+
       if (maskMode) {
         t.mask_paint_down(
           x,
@@ -107,6 +133,8 @@ export function usePaintTool({
       settings.eraserHardness,
       settings.paintStabilizer,
       flushToCanvas,
+      smartBrush,
+      smartBrushStrength,
     ],
   );
 
