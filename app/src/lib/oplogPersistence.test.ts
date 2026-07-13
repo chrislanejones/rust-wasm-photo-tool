@@ -386,18 +386,45 @@ describe("restore path", () => {
   });
 });
 
-// An op log only describes a SINGLE-layer document, and only while every edit
-// was recorded. When that stops being true the log still REPLAYS — it just
+// An op log only describes a single-PIXEL-layer document, and only while every
+// edit was recorded. When that stops being true the log still REPLAYS — it just
 // replays into a document the user no longer has. Restoring it would silently
 // hand back an older document, and the working copy (which is current) would
 // never be consulted, because nothing "failed".
 describe("a log that stopped describing the document is retired, not persisted", () => {
   class LayeredTool extends FakeTool {
-    layers = 1;
+    /** Real pixel layers — the Canvas does NOT count (ADR-016). */
+    contentLayers = 1;
+    /** Total layers including the Canvas — what the Layers panel shows. */
+    totalLayers = 1;
+    content_layer_count(): number {
+      return this.contentLayers;
+    }
     layer_count(): number {
-      return this.layers;
+      return this.totalLayers;
     }
   }
+
+  it("the DEFAULT document (Canvas + Photo) is trustworthy — the Canvas is metadata", async () => {
+    // ADR-016, from the JS side. `canvasArtboard` is ON by default, so the
+    // artboard fill sits at index 0 of virtually every document: two layers in
+    // the panel, ONE pixel layer to the log. Gating on `layer_count()` (2)
+    // rather than `content_layer_count()` (1) is exactly what kept op-log
+    // persistence dark for every user on defaults — the log got written and
+    // then retired as untrustworthy on the very next flush.
+    await seedPhoto("p1");
+    const t = new LayeredTool();
+    t.totalLayers = 2; // Canvas + Photo
+    t.contentLayers = 1; // ...one pixel layer
+    t.push(10, 11);
+    await saveOplogNow(t, "p1");
+
+    expect(await db.oplogManifests.get("p1")).toMatchObject({
+      opCount: 2,
+      stale: false,
+    });
+    expect(await restoreOplog(new FakeTool(), "p1")).toBe("restored");
+  });
 
   it("an unrecorded edit (broken log): no write, existing log marked stale, restore falls back", async () => {
     await seedPhoto("p1");
@@ -426,12 +453,16 @@ describe("a log that stopped describing the document is retired, not persisted",
   it("a multi-layer document retires the persisted log (the layers-then-reload data-loss path)", async () => {
     await seedPhoto("p1");
     const t = new LayeredTool();
+    t.totalLayers = 2; // the default Canvas + Photo document...
+    t.contentLayers = 1; // ...which IS in scope
     t.push(10, 11);
     await saveOplogNow(t, "p1");
 
-    // The user adds a layer. oplog_active() goes false, so nothing schedules a
-    // save — the stale log used to just sit there and win the next resume.
-    t.layers = 2;
+    // The user adds a REAL layer (a paste, not the Canvas). oplog_active() goes
+    // false, so nothing schedules a save — the stale log used to just sit there
+    // and win the next resume.
+    t.totalLayers = 3;
+    t.contentLayers = 2;
     setActiveOplogPhoto("p1");
     onOplogFlush(t);
     await vi.waitFor(async () =>

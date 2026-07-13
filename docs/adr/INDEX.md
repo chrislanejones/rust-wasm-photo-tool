@@ -38,7 +38,7 @@ deleted.
 | [013](013-oplog-undo-hash-fallback.md) | Op-log undo activates behind a composite-hash sync check, with snapshot fallback | Draft | 2026-07-11 |
 | [014](014-magnetic-lasso-smart-brush-cost-map.md) | Magnetic lasso and Smart Brush both stand on one shared edge cost map | Draft — kernels tested + wired behind `ih_smart_edge` (default OFF); needs a human canvas check of the FEEL | 2026-07-13 |
 | [015](015-hash-routing-palette-nav.md) | Hash routing + URL params; the palette navigates via the route registry | Draft | 2026-07-13 |
-| [016](016-canvas-is-document-metadata.md) | The Canvas is document metadata, not a logged layer | Draft — proposal; unblocks op-log undo/persistence on the DEFAULT document (amends 006/012/013) | 2026-07-13 |
+| [016](016-canvas-is-document-metadata.md) | The Canvas is document metadata, not a logged layer | Draft — unblocks op-log undo/persistence on the DEFAULT document (amends 006/012/013); engine + UI BUILT, flags still OFF; needs the real-gallery check on a DEFAULT document | 2026-07-13 |
 
 <!--
   Planned:

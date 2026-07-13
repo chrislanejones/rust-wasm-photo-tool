@@ -32,20 +32,36 @@
 //! - Text/shape ops are list mutations of the same parameter sets the
 //!   engine stores.
 //!
+//! ## The Canvas is not content (ADR-016)
+//! [`Document::pixels`] is the document's ONE **content** layer. The artboard
+//! fill — the Canvas — is carried as [`CanvasParams`] metadata instead: ops
+//! never touch it, but [`Document::composite_flat`] renders it underneath, so
+//! the log's composite still matches what the user sees. That is what puts the
+//! DEFAULT (Canvas + Photo) document inside the log's single-layer scope; a
+//! genuinely multi-layer document (two or more content layers) remains out of
+//! scope, exactly as before.
+//!
 //! ## Serialization
 //! Each op serializes as `[format-version byte] ++ postcard(op)`. A bumped
 //! version is rejected cleanly by [`decode_op`], so old logs never silently
-//! mis-decode against a newer schema. The schema was reshaped for replay
-//! parity (f64 stroke geometry, dab-centre blur, full-fidelity text/shape
-//! params) BEFORE any log was ever persisted, so the format version stays 1
-//! — version 1 now means "the parity schema".
+//! mis-decode against a newer schema. Version **2** = the Canvas-metadata
+//! schema (see [`OP_FORMAT_VERSION`]); version 1 was the parity schema.
 
 use crate::tiles::TileBuffer;
 use serde::{Deserialize, Serialize};
 
 /// Leading byte on every encoded op. Bump when the schema changes
 /// incompatibly.
-pub const OP_FORMAT_VERSION: u8 = 1;
+///
+/// **2** — ADR-016: the base/keyframe blob gained the Canvas metadata
+/// (`encode_annotations` now serializes `(texts, shapes, canvas)`), and the
+/// persisted pixel plane is now the CONTENT layer alone rather than the whole
+/// document. A v1 log decoded under v2 rules would restore a Canvas document
+/// with no fill and a pixel plane that means something subtly different — so v1
+/// is REJECTED, not migrated. Safe: op-log persistence ships behind
+/// `ih_oplog_persist` (OFF), the log is derived state, and a rejected restore
+/// falls back to the snapshot/archive path with the image intact.
+pub const OP_FORMAT_VERSION: u8 = 2;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -421,22 +437,40 @@ pub fn decode_op_frames(bytes: &[u8]) -> Result<Vec<Op>, OpError> {
     Ok(ops)
 }
 
-/// Serialize a document's annotation lists (postcard, version-prefixed) —
-/// the piece of a base/keyframe snapshot that flat pixels can't carry.
-/// Keeping pre-log annotations LIVE across a persist→restore round trip is
-/// what lets TextEdit/TextRemove ops on them replay exactly.
-pub fn encode_annotations(texts: &[TextParams], shapes: &[ShapeParams]) -> Vec<u8> {
+/// Serialize the parts of a base/keyframe snapshot that flat pixels can't
+/// carry: the annotation lists AND the Canvas metadata (postcard,
+/// version-prefixed).
+///
+/// Keeping pre-log annotations LIVE across a persist→restore round trip is what
+/// lets TextEdit/TextRemove ops on them replay exactly. The Canvas rides along
+/// for the same reason: the persisted pixel plane is the CONTENT layer only
+/// (ADR-016), so without these params a restore would rebuild the document with
+/// a transparent artboard instead of the user's fill.
+pub fn encode_annotations(
+    texts: &[TextParams],
+    shapes: &[ShapeParams],
+    canvas: Option<CanvasParams>,
+) -> Vec<u8> {
     let mut out = Vec::with_capacity(16);
     out.push(OP_FORMAT_VERSION);
-    if let Ok(body) = postcard::to_allocvec(&(texts, shapes)) {
+    if let Ok(body) = postcard::to_allocvec(&(texts, shapes, canvas)) {
         out.extend_from_slice(&body);
     }
     out
 }
 
 /// Inverse of [`encode_annotations`].
+///
+/// A v1 blob (annotations only, no Canvas) is rejected by the version byte, not
+/// mis-decoded — the whole point of the prefix. Its log's op frames are v1 too
+/// and would be rejected alongside it, so `oplog_restore` cleanly returns false
+/// and the caller falls back to the snapshot/archive path. No silent
+/// mis-decode, and no data loss: the op log is a derived undo/persistence
+/// layer, and the image itself is persisted separately.
 #[allow(clippy::type_complexity)]
-pub fn decode_annotations(bytes: &[u8]) -> Result<(Vec<TextParams>, Vec<ShapeParams>), OpError> {
+pub fn decode_annotations(
+    bytes: &[u8],
+) -> Result<(Vec<TextParams>, Vec<ShapeParams>, Option<CanvasParams>), OpError> {
     let (&ver, body) = bytes.split_first().ok_or(OpError::Empty)?;
     if ver != OP_FORMAT_VERSION {
         return Err(OpError::UnsupportedVersion(ver));
@@ -446,13 +480,42 @@ pub fn decode_annotations(bytes: &[u8]) -> Result<(Vec<TextParams>, Vec<ShapePar
 
 // ── The replay document ─────────────────────────────────────────────────────
 
-/// The state ops replay over: the single layer's pixels plus its live
-/// annotation lists. See the module doc ("The document model").
+/// The Canvas fill as DOCUMENT METADATA (ADR-016) — everything needed to
+/// reproduce the artboard fill's contribution to the composite, and nothing
+/// more.
+///
+/// Deliberately NOT (pad, size, RGBA): the fill spans the whole document, so
+/// its size IS the document's size and `pad` is not needed to render it —
+/// storing either would be a second source of truth that can silently disagree
+/// with the layer geometry. `visible` and `opacity` ARE stored, because the
+/// engine composites the Canvas layer through them and the log's composite must
+/// match the engine's byte-for-byte or the sync check breaks the log.
+///
+/// Ops never touch this. It is refreshed from the engine (`canvas_params`) and
+/// applied uniformly across the log's base, keyframes and live document —
+/// metadata is not versioned by the op stream, so undo does not rewind the
+/// canvas colour.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct CanvasParams {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+    pub visible: bool,
+    pub opacity: f64,
+}
+
+/// The state ops replay over: the single CONTENT layer's pixels plus its live
+/// annotation lists, plus the Canvas metadata needed to reconstruct the full
+/// visual. See the module doc ("The document model") and ADR-016.
 #[derive(Clone)]
 pub struct Document {
     pub pixels: TileBuffer,
     pub texts: Vec<TextParams>,
     pub shapes: Vec<ShapeParams>,
+    /// The artboard fill under `pixels`, when the document has one. `None` for
+    /// a single-layer (`load_image`) document.
+    pub canvas: Option<CanvasParams>,
 }
 
 impl Document {
@@ -461,6 +524,7 @@ impl Document {
             pixels: TileBuffer::new(width, height),
             texts: Vec::new(),
             shapes: Vec::new(),
+            canvas: None,
         }
     }
 
@@ -479,11 +543,10 @@ impl Document {
         flat
     }
 
-    /// Render the user-visible canvas: pixels, then shapes, then text tiles —
-    /// the same order and the same rasterisation calls as the engine's
-    /// `render_layer` (single layer, no mask, opacity 1, nothing being
-    /// edited).
-    pub fn composite_flat(&self) -> Vec<u8> {
+    /// The CONTENT layer as the engine's `render_layer` would produce it:
+    /// pixels, then shapes, then text tiles — the same order and the same
+    /// rasterisation calls (no mask, opacity 1, nothing being edited).
+    fn content_flat(&self) -> Vec<u8> {
         let w = self.width();
         let h = self.height();
         let mut flat = self.pixels_flat();
@@ -504,6 +567,40 @@ impl Document {
             );
         }
         flat
+    }
+
+    /// Render the user-visible canvas — the Canvas fill (when present and
+    /// visible) with the content layer composited over it, exactly as the
+    /// engine's `composite_layers_into` does it for a Canvas + content stack:
+    /// zeroed buffer, `blend_over` the fill scaled by its opacity, `blend_over`
+    /// the rendered content.
+    ///
+    /// This calls the ENGINE's own `blend_over` rather than re-deriving the
+    /// arithmetic, so the log's composite is byte-identical to the engine's by
+    /// construction — which is what the op-log sync check hashes. Getting this
+    /// even one rounding step wrong would break every log on a Canvas document.
+    pub fn composite_flat(&self) -> Vec<u8> {
+        let content = self.content_flat();
+        let Some(c) = self.canvas.filter(|c| c.visible) else {
+            // No Canvas: the content IS the composite. (The engine's
+            // single-visible-opaque-layer fast path is a straight copy, and
+            // `blend_over` onto a transparent buffer is the identity for
+            // opacity 1 — the two agree, which is why today's single-layer
+            // logs hash equal.)
+            return content;
+        };
+        let n = content.len();
+        let mut fill = vec![0u8; n];
+        for px in fill.chunks_exact_mut(4) {
+            px[0] = c.r;
+            px[1] = c.g;
+            px[2] = c.b;
+            px[3] = c.a;
+        }
+        let mut out = vec![0u8; n];
+        crate::layer::blend_over(&mut out, &fill, c.opacity);
+        crate::layer::blend_over(&mut out, &content, 1.0);
+        out
     }
 
     /// Content hash of the user-visible canvas (composite, not just pixels)
@@ -874,6 +971,29 @@ impl OpLog {
     /// The live document as the log last computed it.
     pub fn live_document(&self) -> &Document {
         &self.live
+    }
+
+    /// The Canvas metadata currently carried by the log.
+    pub fn canvas(&self) -> Option<CanvasParams> {
+        self.live.canvas
+    }
+
+    /// Update the Canvas metadata (ADR-016) — on the live document, the base,
+    /// AND every keyframe.
+    ///
+    /// Uniform on purpose: the Canvas is metadata, not content, so it is not
+    /// versioned by the op stream. Storing it only on `live` would mean a seek
+    /// back to a keyframe resurrects an old canvas colour (undo silently
+    /// repainting the artboard); storing it only on the base would mean replay
+    /// from a keyframe loses it. Writing all three keeps replay from ANY
+    /// position byte-identical to the engine, which is what the sync check
+    /// demands. Cheap: keyframes hold at most `KEYFRAMES_IN_MEMORY` entries and
+    /// this writes one `Option<CanvasParams>` each.
+    pub fn set_canvas(&mut self, canvas: Option<CanvasParams>) {
+        self.live.canvas = canvas;
+        for (_, doc) in self.keyframes.iter_mut() {
+            doc.canvas = canvas;
+        }
     }
 
     /// Append and apply an op at the cursor. If the cursor was rewound

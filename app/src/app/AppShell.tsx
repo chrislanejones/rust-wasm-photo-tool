@@ -1805,12 +1805,18 @@ export function AppShell() {
   );
 
   // The "Remove Canvas" companion to Resize Canvas — deletes the artboard's
-  // Background layer outright (not a resize-to-zero-padding; the user chose
+  // Canvas layer outright (not a resize-to-zero-padding; the user chose
   // "delete the layer" over "shrink to native size" when this was scoped).
-  // Only ever meaningful on an artboard doc (Background + Photo, or more);
+  // Only ever meaningful on an artboard doc (Canvas + Photo, or more);
   // `remove_layer` itself already refuses to drop the last remaining layer.
+  //
+  // Selected by `kind`, not name (ADR-016). The old `name === "Background"`
+  // match was a live bug: with the artboard OFF, `load_image` names the PHOTO
+  // "Background" — so Remove Canvas would have deleted the user's image. On a
+  // document with no Canvas, this is now correctly undefined and the action
+  // no-ops.
   const backgroundLayerId = stamp.state.layers.find(
-    (l) => l.name === "Background",
+    (l) => l.kind === "canvas",
   )?.id;
   const handleRemoveCanvas = useCallback(async () => {
     if (backgroundLayerId === undefined) return;

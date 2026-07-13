@@ -12,6 +12,27 @@ use crate::PastePreview;
 use crate::{codec, transform};
 use wasm_bindgen::prelude::*;
 
+/// What a layer *is* to the document — the answer to "is this the Canvas?".
+///
+/// This is an explicit flag, set at creation and carried with the layer,
+/// because the alternative (matching `name == "Background"`) is a bug waiting
+/// to happen: the name is user-editable, and the engine has historically used
+/// "Background" for BOTH the artboard fill (`load_image_artboard`) and the
+/// photo itself (`load_image`). One rename — or one artboard-off document with
+/// a pasted layer — and a name match reads the wrong layer. See ADR-016's
+/// pre-mortem.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LayerKind {
+    /// The artboard fill at the bottom of the stack (ADR-016). A layer to the
+    /// user — visible in the Layers panel, toggleable, movable — but DOCUMENT
+    /// METADATA to the op log, which counts only `Content` layers. This is what
+    /// lets a default (Canvas + Photo) document read as ONE pixel layer and
+    /// stay in op-log scope.
+    Canvas,
+    /// Real pixel content: the photo, pastes, added layers. The default.
+    Content,
+}
+
 /// A single Photoshop-style layer: an independent RGBA pixel buffer plus its
 /// own live (non-destructive) text and shape annotations. Layers share the
 /// canvas dimensions held on `ImageHorseTool`. The display canvas is the
@@ -19,11 +40,14 @@ use wasm_bindgen::prelude::*;
 /// scaled by `opacity`.
 ///
 /// `Clone` is derived so each history snapshot can carry an independent copy of
-/// the whole stack (undo/redo restores layer structure, pixels and overlays).
+/// the whole stack (undo/redo restores layer structure, pixels and overlays) —
+/// `kind` rides along, so undo can't launder a Canvas into content.
 #[derive(Clone)]
 pub struct Layer {
     pub id: u32,
     pub name: String,
+    /// Canvas or Content — see [`LayerKind`]. Never inferred from `name`.
+    pub kind: LayerKind,
     pub visible: bool,
     pub opacity: f64, // 0.0..=1.0
     pub buf: ImageBuffer,
@@ -38,10 +62,13 @@ pub struct Layer {
 }
 
 impl Layer {
+    /// A new `Content` layer — the default for everything the user creates.
+    /// The Canvas fill is built with [`Layer::new_canvas`].
     pub(crate) fn new(id: u32, name: String, width: u32, height: u32) -> Self {
         Layer {
             id,
             name,
+            kind: LayerKind::Content,
             visible: true,
             opacity: 1.0,
             buf: ImageBuffer::new(width, height),
@@ -50,7 +77,40 @@ impl Layer {
             shape_annotations: Vec::new(),
         }
     }
+
+    /// The artboard fill (ADR-016) — `LayerKind::Canvas`, named "Canvas".
+    /// Only `load_image_artboard` / `set_artboard_border` build one.
+    pub(crate) fn new_canvas(id: u32, width: u32, height: u32) -> Self {
+        Layer {
+            kind: LayerKind::Canvas,
+            ..Layer::new(id, CANVAS_LAYER_NAME.to_string(), width, height)
+        }
+    }
+
+    /// Is this the artboard fill?
+    pub(crate) fn is_canvas(&self) -> bool {
+        self.kind == LayerKind::Canvas
+    }
+
+    /// True when every pixel is byte-identical — what an artboard fill is by
+    /// construction (`load_image_artboard` / `set_artboard_border` write one
+    /// RGBA value across the whole buffer, or leave it zeroed when `bg_a == 0`)
+    /// and what a photo essentially never is. Used ONLY at the legacy-restore
+    /// boundary, where documents predate `kind` and the name alone can't be
+    /// trusted (ADR-016 step 6).
+    pub(crate) fn is_uniform_fill(&self) -> bool {
+        let data = &self.buf.data;
+        let Some(first) = data.get(0..4) else {
+            return false;
+        };
+        data.chunks_exact(4).all(|px| px == first)
+    }
 }
+
+/// The artboard fill's layer name. "Canvas" means exactly one thing (ADR-016);
+/// "Background" now always means CONTENT (the photo of a `load_image` document,
+/// a flattened stack, a restored snapshot).
+pub(crate) const CANVAS_LAYER_NAME: &str = "Canvas";
 /// Render one layer (its pixels with shapes + text overlays composited on top)
 /// into a fresh RGBA buffer of `w×h`. The shape being edited (if any) is
 /// skipped so the JS overlay preview is the only thing drawn for it.
@@ -614,12 +674,26 @@ const PASTE_MIN_SIZE: u32 = 10;
 impl ImageHorseTool {
     // ── Layers ───────────────────────────────────────────────────────────
 
+    /// Every layer in the stack, Canvas included — what the Layers panel shows.
     pub fn layer_count(&self) -> usize {
         self.layers.len()
     }
 
+    /// How many real PIXEL layers the document has — the Canvas doesn't count
+    /// (ADR-016). A default document (Canvas + Photo) answers **1**.
+    ///
+    /// This, not `layer_count()`, is the number that decides whether the op log
+    /// can describe the document: JS's `isLogTrustworthy` reads it. Asking
+    /// `layer_count() > 1` was what kept op-log undo and persistence dark on
+    /// every default document.
+    pub fn content_layer_count(&self) -> usize {
+        self.layers.iter().filter(|l| !l.is_canvas()).count()
+    }
+
     /// JSON array of the layer stack, bottom → top:
-    /// `[{id,name,visible,opacity,active}]`.
+    /// `[{id,name,kind,visible,opacity,active,hasMask}]`.
+    /// `kind` is `"canvas"` for the artboard fill, `"content"` otherwise — the
+    /// UI labels and gates on this rather than matching the name.
     pub fn get_layers(&self) -> String {
         let mut out = String::from("[");
         for (i, l) in self.layers.iter().enumerate() {
@@ -627,9 +701,10 @@ impl ImageHorseTool {
                 out.push(',');
             }
             out.push_str(&format!(
-                "{{\"id\":{},\"name\":\"{}\",\"visible\":{},\"opacity\":{},\"active\":{},\"hasMask\":{}}}",
+                "{{\"id\":{},\"name\":\"{}\",\"kind\":\"{}\",\"visible\":{},\"opacity\":{},\"active\":{},\"hasMask\":{}}}",
                 l.id,
                 json_escape(&l.name),
+                if l.is_canvas() { "canvas" } else { "content" },
                 l.visible,
                 l.opacity,
                 i == self.active,
@@ -678,12 +753,16 @@ impl ImageHorseTool {
     /// Remove the layer with `id`. Refuses to remove the last remaining layer.
     /// Pushes "Delete Layer". Returns true if removed.
     ///
-    /// Deleting the artboard's backing "Background" layer (bottom of the
-    /// stack, the solid/transparent fill `load_image_artboard` /
-    /// `set_artboard_border` grow) also shrinks the document to the
-    /// remaining content's tight bounding box — otherwise the padded canvas
-    /// those calls added lingers after its fill is gone, and keeps showing up
-    /// (as excess transparent/bordered space) in every subsequent export.
+    /// Deleting the Canvas fill (the solid/transparent fill
+    /// `load_image_artboard` / `set_artboard_border` grow) also shrinks the
+    /// document to the remaining content's tight bounding box — otherwise the
+    /// padded canvas those calls added lingers after its fill is gone, and
+    /// keeps showing up (as excess transparent/bordered space) in every
+    /// subsequent export.
+    ///
+    /// Identified by `kind`, not name: on an artboard-off document the PHOTO is
+    /// the one named "Background" (ADR-016), and shrink-to-content after
+    /// deleting a photo is not what the old name match meant to do.
     pub fn remove_layer(&mut self, id: u32) -> bool {
         if self.layers.len() <= 1 {
             return false;
@@ -692,7 +771,7 @@ impl ImageHorseTool {
             return false;
         };
         self.snap("Delete Layer");
-        let was_backing = idx == 0 && self.layers[idx].name == "Background";
+        let was_backing = self.layers[idx].is_canvas();
         self.layers.remove(idx);
         if self.active >= self.layers.len() {
             self.active = self.layers.len() - 1;
@@ -750,11 +829,26 @@ impl ImageHorseTool {
 
     /// Move the layer with `id` to a new stack index (clamped). Bottom → top,
     /// so index 0 is the bottom of the stack. Pushes "Reorder Layer".
+    ///
+    /// The Canvas fill is pinned to the bottom (ADR-016): it can't be moved,
+    /// and nothing can be moved beneath it. A Canvas above content would hide
+    /// the photo behind an opaque fill, and the export/op-log paths take it as
+    /// an invariant that the Canvas — when present — is index 0.
     pub fn move_layer(&mut self, id: u32, new_index: usize) -> bool {
         let Some(from) = self.layers.iter().position(|l| l.id == id) else {
             return false;
         };
-        let to = new_index.min(self.layers.len() - 1);
+        if self.layers[from].is_canvas() {
+            return false;
+        }
+        let last = self.layers.len() - 1;
+        let floor = match self.canvas_idx() {
+            Some(c) => (c + 1).min(last),
+            None => 0,
+        };
+        // `min` before `max`, never `clamp`: clamp panics when floor > last,
+        // and a panic here would cross the WASM boundary.
+        let to = new_index.min(last).max(floor);
         if from == to {
             return false;
         }
@@ -1242,6 +1336,12 @@ impl ImageHorseTool {
             } else {
                 name.to_string()
             },
+            // Content by default; `finish_layer_restore` promotes the bottom
+            // layer to Canvas when the persisted document was an artboard (see
+            // its legacy-read doc). A restored layer is never assumed to be a
+            // Canvas here — at push time the stack is still incomplete, so
+            // "is this the bottom of a multi-layer document?" has no answer yet.
+            kind: LayerKind::Content,
             visible,
             opacity: opacity.clamp(0.0, 1.0),
             buf,
@@ -1324,8 +1424,29 @@ impl ImageHorseTool {
         id
     }
 
-    /// Finish a layer-restore: clamp the active layer to `active_index`,
-    /// guarantee a non-empty stack, and rebuild the composite cache.
+    /// Finish a layer-restore: recover the Canvas flag for documents persisted
+    /// before it existed, clamp the active layer to `active_index`, guarantee a
+    /// non-empty stack, and rebuild the composite cache.
+    ///
+    /// ## The legacy read (ADR-016 step 6)
+    /// Persisted documents predate `kind` — they carry only a layer NAME, and
+    /// the archive that wrote them called the artboard fill "Background". These
+    /// are real user documents with no backup, so they must still open with the
+    /// fill understood as the Canvas.
+    ///
+    /// Inferring from the name ALONE is what the ADR's pre-mortem warns
+    /// against, and it is not paranoia: an artboard-OFF document whose bottom
+    /// layer is the PHOTO is also named "Background" (`load_image`), and one
+    /// pasted layer makes it a >1-layer document — indistinguishable by name.
+    /// Calling that photo a Canvas would hand the op log the wrong content
+    /// plane and drop the photo from exports.
+    ///
+    /// So the name is necessary but not sufficient: the layer must ALSO be a
+    /// uniform fill, which every `load_image_artboard` / `set_artboard_border`
+    /// canvas is by construction and a photograph is not. The only documents
+    /// this can misread are ones whose bottom layer is a perfectly solid
+    /// colour — and there the misreading is harmless, because the Canvas
+    /// metadata reproduces that exact plane at composite time.
     pub fn finish_layer_restore(&mut self, active_index: usize) {
         if self.layers.is_empty() {
             self.layers.push(Layer::new(
@@ -1335,6 +1456,15 @@ impl ImageHorseTool {
                 self.height,
             ));
             self.next_layer_id = 2;
+        }
+        if self.layers.len() > 1 {
+            let bottom = &mut self.layers[0];
+            let named_like_a_canvas =
+                bottom.name == CANVAS_LAYER_NAME || bottom.name == "Background";
+            if named_like_a_canvas && bottom.is_uniform_fill() {
+                bottom.kind = LayerKind::Canvas;
+                bottom.name = CANVAS_LAYER_NAME.to_string();
+            }
         }
         self.active = active_index.min(self.layers.len() - 1);
         self.editing_shape_id = None;
