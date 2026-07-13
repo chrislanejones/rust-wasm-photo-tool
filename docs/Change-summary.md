@@ -1038,3 +1038,17 @@ selection methods and their wasm-bindgen glue. Trimmed 1.2 KB back by
 sharing the flood fill rather than duplicating it. The edge core is the
 foundation for two more planned features, so the cost is paid once.
 
+**Fix (same release): the compression savings badge survives a reload.**
+The green Zap badge ("-95%") on a compressed thumbnail is keyed by photo
+id and lived in `useGalleryStore` — which had **no persistence at all**.
+Every reload silently dropped it, even though the photo it described was
+restored from IndexedDB right alongside it. The store now persists
+through the same zustand IDB adapter the UI/tool stores already use,
+with `partialize` narrowed to **just** `imageSavings`: the photo list is
+rebuilt from the gallery manifest (which carries the thumbnails and
+content keys), so persisting it here too would be a second, competing
+source of truth; `selectedIds`/`modifiedPhotos` are `Set`s that don't
+survive JSON and are per-session anyway. Purely additive — a missing key
+rehydrates to `{}`, so no migration is required. Verified: compress 12
+photos, badges appear (-93% … -98%), reload, all 12 come back identical.
+

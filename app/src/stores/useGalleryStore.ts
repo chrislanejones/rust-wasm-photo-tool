@@ -5,6 +5,8 @@
 // (setPhotos / setActivePhotoId / setSelectedIds / …) so the migration is a
 // drop-in: every `setPhotos((prev) => …)` and friend keeps working via SetArg.
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { idbStorage } from "./storage/idbStorage";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { GalleryManifest } from "@/lib/galleryManifest";
 import { DEFAULT_PHOTO_LIMIT } from "@/lib/photoLimits";
@@ -39,7 +41,9 @@ interface GalleryState {
   setResumeManifest: (v: SetArg<GalleryManifest | null>) => void;
 }
 
-export const useGalleryStore = create<GalleryState>((set) => ({
+export const useGalleryStore = create<GalleryState>()(
+  persist(
+    (set) => ({
   photos: [],
   activePhotoId: null,
   selectedIds: new Set(),
@@ -62,4 +66,23 @@ export const useGalleryStore = create<GalleryState>((set) => ({
   setMaxPhotos: (v) => set((s) => ({ maxPhotos: resolveSet(v, s.maxPhotos) })),
   setResumeManifest: (v) =>
     set((s) => ({ resumeManifest: resolveSet(v, s.resumeManifest) })),
-}));
+    }),
+    {
+      name: "image-horse-gallery-v1",
+      storage: createJSONStorage(() => idbStorage),
+      // ONLY the savings map. The photo list itself is rebuilt from the gallery
+      // manifest (it carries the thumbnails and content keys); persisting it
+      // here too would be a second, competing source of truth. `selectedIds` and
+      // `modifiedPhotos` are Sets — they don't survive JSON — and they're
+      // per-session state anyway.
+      //
+      // Why this exists: the Zap savings badge is keyed by photo id and lived
+      // only in memory, so every reload silently dropped it even though the
+      // photo it describes was restored from IndexedDB. Purely additive — a
+      // missing key rehydrates to `{}`, so no migration is needed.
+      partialize: (s): Partial<GalleryState> => ({
+        imageSavings: s.imageSavings,
+      }),
+    },
+  ),
+);

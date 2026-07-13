@@ -35,6 +35,7 @@ const RELEASES: Release[] = [
       { tag: "feature", text: "New Edge-aware wand: it selects like the normal wand but stops at an object's outline instead of bleeding out into the background through a soft gradient — the exact spot the old wand always let you down." },
       { tag: "feature", text: "New Color Range: click a colour and take every pixel of it anywhere in the photo, not just the connected patch under your cursor. One click gets all the sky, including the bits peeking between buildings." },
       { tag: "rust", text: "Behind the scenes: a proper edge-detection engine now ships, and it notices colour boundaries a brightness-only detector would miss entirely (a red shape on a green background of the same brightness, say). It's built to be shared — the magnetic lasso and a future smart brush will use exactly the same edges." },
+      { tag: "fix", text: "The little green savings badge on a compressed photo (\"-95%\") used to vanish the moment you reloaded the page. It stays put now — it was only ever held in memory, even though the photo it belonged to was being restored properly." },
     ],
   },
   {

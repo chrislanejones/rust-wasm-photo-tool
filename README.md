@@ -61,6 +61,8 @@ Under it is `src/edges.rs`, a **shared edge-detection core** — Sobel over perc
 
 Verified on canvas: from one identical click, the three kinds return genuinely different selections — 290,224 px (wand), 290,170 px (edge-aware, tighter), 300,872 px (colour range, larger).
 
+**Also fixed:** the green savings badge on a compressed thumbnail ("-95%") no longer disappears when you reload. It was keyed to the photo and stored only in memory, so every refresh dropped it — even though the photo it described was restored from IndexedDB right beside it.
+
 ## License
 
 MIT
