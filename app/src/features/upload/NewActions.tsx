@@ -1,5 +1,5 @@
 // The shared "start a new image" actions — Browse / Paste / Sample / Blank
-// Canvas, the drag-and-drop zone, the Blank Canvas setup panel, and the
+// Canvas, the drag-and-drop zone, the New Canvas setup panel, and the
 // marketing links. Extracted so the SAME body renders in two places:
 //   • full-page first-run surface (FirstRunScreen) on cold start
 //   • compact modal (UploadDialog) mid-session (Alt+N)
@@ -128,7 +128,7 @@ interface Props {
   autoFocusFirst?: boolean;
   /** Hide the website/GitHub/Codeberg row. */
   showLinks?: boolean;
-  /** Notified whenever the Blank Canvas ("New Document") panel opens/closes, so
+  /** Notified whenever the New Canvas ("New Document") panel opens/closes, so
    *  the wrapper can drop its logo/title header for the uncluttered setup view. */
   onBlankModeChange?: (active: boolean) => void;
 }
@@ -148,7 +148,7 @@ export function NewActions({
   const firstButtonRef = useRef<HTMLButtonElement>(null);
   const [dragging, setDragging] = useState(false);
   const [loadingTest, setLoadingTest] = useState(false);
-  // Blank Canvas setup panel (swaps out the upload buttons when active).
+  // New Canvas setup panel (swaps out the upload buttons when active).
   const [blankMode, setBlankMode] = useState(false);
   const [blankW, setBlankW] = useState("1500");
   const [blankH, setBlankH] = useState("1000");
@@ -158,7 +158,7 @@ export function NewActions({
   // Which size-preset category tab is showing (Social / Web / Video / Paper).
   const [blankCat, setBlankCat] = useState(PRESET_CATEGORIES[0].id);
 
-  // Let the wrapper drop its logo/title header while the Blank Canvas panel is
+  // Let the wrapper drop its logo/title header while the New Canvas panel is
   // open. Fires on mount (false) too, so reopening the dialog restores it.
   useEffect(() => {
     onBlankModeChange?.(blankMode);
@@ -307,7 +307,7 @@ export function NewActions({
           }}
           onDragLeave={() => setDragging(false)}
           // Stable min-height so the surface doesn't resize/recenter (and jerk)
-          // when swapping the upload actions ⇄ Blank Canvas panel.
+          // when swapping the upload actions ⇄ New Canvas panel.
           className="rounded-xl min-h-[18rem] flex flex-col"
         >
           <AnimatePresence mode="wait" initial={false}>
@@ -320,7 +320,7 @@ export function NewActions({
                 exit="exit"
                 className="flex flex-col gap-4"
               >
-                {/* ── Blank Canvas setup (Photoshop-style "New Document") ── */}
+                {/* ── New Canvas setup (Photoshop-style "New Document") ── */}
                 <div className="flex items-end gap-2">
                   <div className="flex flex-1 flex-col gap-0.5">
                     <span className="text-xs text-text-secondary">width</span>
@@ -458,11 +458,11 @@ export function NewActions({
                   </Button>
                   <Button size="large"
                     onClick={() => setBlankMode(true)}
-                    title="Start with a blank canvas"
+                    title="Start with a new canvas"
                     className="w-full"
                   >
                     <SquarePen className="h-4 w-4" />
-                    Blank Canvas
+                    New Canvas
                   </Button>
                 </div>
 

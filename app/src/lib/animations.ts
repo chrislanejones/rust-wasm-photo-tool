@@ -72,7 +72,7 @@ export const fadeIn: Variants = {
 };
 
 // Swap between two panels occupying the same slot (e.g. the upload actions ⇄
-// the Blank Canvas setup). A subtle horizontal slide + fade; pair with
+// the New Canvas setup). A subtle horizontal slide + fade; pair with
 // <AnimatePresence mode="wait"> and a unique key per panel.
 export const panelSwap: Variants = {
   hidden: { opacity: 0, x: 12 },

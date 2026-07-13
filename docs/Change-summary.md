@@ -1169,3 +1169,83 @@ stay **Draft** pending the human canvas checks — lasso feel, and back/forward.
 
 **ADR numbering note:** both features were built in parallel worktrees and both
 drafted an ADR-014. Routing was renumbered to **015** on landing.
+
+## v7.26 Change Summary — 2026-07-13
+
+Decisions, not features. Two of them, plus the retirement of the project's
+longest-running open question.
+
+### Exports include the Canvas by default (BREAKING for existing users)
+
+`exportCanvasBackground` flips `false` → `true` (app/src/lib/preferences.ts).
+The old default cropped exports to just the photo, with the rationale "the
+backing canvas is a compositional guide, not real content." Under ADR-016 the
+Canvas IS the document's bottom layer, so what you see on screen is what you get
+on export. Users who never touched the toggle will see padded, coloured exports
+where they previously got a tight crop. Opt out in Settings → "Canvas background
+on export", or hide the layer in the Layers panel. This was put to Chris with the
+consequence named, and confirmed — it is a deliberate reversal, recorded as such
+in the ADR.
+
+### ADR-016 — the Canvas is document metadata, not a logged pixel layer (Draft)
+
+The load-bearing finding of the session, verified in code and worse than it
+looked:
+
+| Layer of the problem | Evidence |
+| --- | --- |
+| Every default import is a **two-layer** document (Canvas fill + Photo) | `canvasArtboard: true` is the default (preferences.ts:100); `set_artboard_border` yields the two-layer structure even at pad 0 (lib.rs:2460-2471) |
+| The engine **never records** an op log for a multi-layer doc | `oplog_record` returns early when `layers.len() != 1` — and marks the log **broken** if it had already recorded ops (lib.rs:1119-1136) |
+| Persistence **refuses to trust** a multi-layer doc | `isLogTrustworthy` returns false when `layer_count() > 1` (oplogPersistence.ts:105-109) |
+
+**Net: op-log undo and persistence are dark on every default document.** Not
+flag-dark — *structurally* dark. Four ADRs' worth of shipped work (003, 006, 012,
+013) plus the v7.24 data-loss fixes were unreachable by construction. Flipping
+`ih_oplog_persist` ON today would have shipped nothing to anyone.
+
+**The decision:** the Canvas stays layer index 0 and stays visible/toggleable in
+the Layers panel, but carries an explicit `LayerKind::Canvas` and the op log
+counts only **content** layers. A default document is therefore ONE pixel layer,
+and the log activates. No auto-flatten, no multi-layer op-log rewrite.
+
+**In scope as step 1, on the pre-mortem's insistence:** an explicit `LayerKind`
+flag on the engine's `Layer` struct. The engine currently identifies the artboard
+by `layers[0].name == "Background"` — a **string**, checked at four sites — and
+the name already means two opposite things (the *fill* in artboard mode; the
+*photo* in `load_image` / `flatten_all` / `finish_layer_restore`). A user
+renaming a layer "Background" is one step from a silent wrong-document restore.
+A name cannot answer "is this the Canvas?"; a kind can.
+
+**Amends prior ADRs (verified, not assumed):** ADR-012 is consistent as-is (needs
+only an additive `canvas` field under its own version-byte rule). ADR-006 and
+ADR-013 need real clause amendments — both hardcode "multi-layer" as the
+log-retirement trigger, which becomes ">1 **pixel** layer, Canvas excluded."
+
+### ADR-009 — Accepted. Cross-origin isolation is confirmed live.
+
+Run in a real browser against a production build, `SPIKE_COEP=credentialless`:
+`crossOriginIsolated === true` **logged out AND logged in**, through a real
+sign-in. Clerk loaded clean; zero COEP / CORP / SharedArrayBuffer / WebSocket
+errors. Isolation holds *through* the auth transition — precisely the step the
+original headless spike could only infer ("the final `POST /v1/client/sign_ins`
+is inferred, not observed"). It is now observed.
+
+**Consequence:** ADR-011's gate is **open**. The rayon threading path for the
+v7.25 magnetic-lasso and Smart-Brush kernels — built scalar *because* this was
+unverified — is unblocked.
+
+**Residual, stated plainly:** the "Continue with Google" OAuth popup path was not
+separately exercised (and `COOP: same-origin` is *designed* to sever
+`window.opener` from cross-origin popups), nor was the Convex WebSocket under
+isolation. Neither blocks local threading work; both want a check before COOP
+headers ship to production.
+
+### Naming
+
+The create dialog's **"Blank Canvas" → "New Canvas"**. "Canvas" now means exactly
+one thing: the fill layer. Display label only — internal ids (`blankMode`,
+`createBlank`) do not churn.
+
+### Gates
+
+tsc clean · 122 tests · app + marketing builds green.

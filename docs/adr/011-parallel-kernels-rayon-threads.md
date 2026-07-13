@@ -1,6 +1,12 @@
 # ADR-011: Parallel kernels via wasm-bindgen-rayon, gated on COOP/COEP
 
-Date: 2026-07-10   Status: Draft
+Date: 2026-07-10   Status: **Draft — the gate is now OPEN.** ADR-009 was
+confirmed live in a real browser on 2026-07-13 (`credentialless`;
+`crossOriginIsolated === true` both logged out and logged in, through a real
+sign-in). The precondition this ADR was waiting on is met. It stays Draft only
+because no parallel kernel has shipped to users yet — the *blocker* is gone, the
+*build* is not done. Residual: the OAuth-popup path must be verified before COOP
+headers go to production (see ADR-009's residual section).
 
 ## Context
 

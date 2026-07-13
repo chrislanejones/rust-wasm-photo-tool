@@ -31,16 +31,17 @@ deleted.
 | [006](006-render-cache-disposable.md) | Working copies become a disposable render cache; truth is original + op log | Draft — code COMPLETE on `feat/persist-oplog-complete` (Dexie v2 + write/restore + log-identity binding + stale-log retirement, kill switch OFF); blocked on the real-gallery dogfood check listed in the ADR | 2026-07-02 (backfilled) |
 | [007](007-overnight-worktree-runs.md) | Unattended agent runs happen on disposable worktrees in auto mode | Accepted (2026-07-09) — matches standing practice | 2026-07-02 (backfilled) |
 | [008](008-svg-rasterized-at-import.md) | SVG imports are rasterized to PNG at the import boundary | Accepted (2026-07-09) — shipped v7.8 (`d9960f6`) | 2026-07-07 |
-| [009](009-coop-coep-clerk-spike.md) | COOP/COEP vs. Clerk sign-in spike | Draft — spike, not a build; verdict: not blocked | 2026-07-09 |
+| [009](009-coop-coep-clerk-spike.md) | COOP/COEP vs. Clerk sign-in spike | **Accepted (2026-07-13)** — confirmed live in a real browser (`credentialless`; `crossOriginIsolated === true` logged out AND logged in, through a real sign-in). Residual: OAuth-popup path + Convex WS untested | 2026-07-09 |
 | [010](010-metadata-scrub-privacy-modes.md) | Export metadata scrub gets a GPS-only mode alongside the existing full strip | Draft | 2026-07-10 |
-| [011](011-parallel-kernels-rayon-threads.md) | Parallel kernels via wasm-bindgen-rayon, gated on COOP/COEP | Draft | 2026-07-10 |
+| [011](011-parallel-kernels-rayon-threads.md) | Parallel kernels via wasm-bindgen-rayon, gated on COOP/COEP | Draft — **gate now OPEN** (ADR-009 confirmed live 2026-07-13); blocker gone, build not yet shipped | 2026-07-10 |
 | [012](012-oplog-document-model.md) | The op log replays over a document (pixels + live annotation lists), not the flattened composite | Draft | 2026-07-11 |
 | [013](013-oplog-undo-hash-fallback.md) | Op-log undo activates behind a composite-hash sync check, with snapshot fallback | Draft | 2026-07-11 |
 | [014](014-magnetic-lasso-smart-brush-cost-map.md) | Magnetic lasso and Smart Brush both stand on one shared edge cost map | Draft — kernels tested + wired behind `ih_smart_edge` (default OFF); needs a human canvas check of the FEEL | 2026-07-13 |
 | [015](015-hash-routing-palette-nav.md) | Hash routing + URL params; the palette navigates via the route registry | Draft | 2026-07-13 |
+| [016](016-canvas-is-document-metadata.md) | The Canvas is document metadata, not a logged layer | Draft — proposal; unblocks op-log undo/persistence on the DEFAULT document (amends 006/012/013) | 2026-07-13 |
 
 <!--
   Planned:
   - service worker, precache-only → takes the next free number
-    (016+) when written.
+    (017+) when written.
 -->

@@ -101,9 +101,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
   canvasPadding: 10,
   // Backing canvas defaults to transparent ⇒ the checkerboard shows through.
   canvasBgColor: "transparent",
-  // Default OFF: the backing canvas is a compositional guide, not real
-  // content — exports/downloads/shares crop to just the photo unless opted in.
-  exportCanvasBackground: false,
+  // Default ON (ADR-016, 2026-07-13). This REVERSES the previous default, which
+  // treated the backing canvas as "a compositional guide, not real content" and
+  // cropped exports to just the photo. Under ADR-016 the Canvas is the document's
+  // bottom layer — what you see on screen is what you get on export — so the
+  // padding/colour ships unless the user turns this off or X's the layer out.
+  exportCanvasBackground: true,
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];
