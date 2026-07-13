@@ -1047,14 +1047,23 @@ export function AppShell() {
   const selectionMode = useToolStore((s) => s.selectionMode);
   const setSelectionMode = useToolStore((s) => s.setSelectionMode);
   const selectionMask = useToolStore((s) => s.selectionMask);
+  // Adjust & Select (tool id `crop`): sub-mode + which engine call a canvas
+  // click makes (wand / edge-aware / colour range) — tool-arc 2.6.
+  const adjustMode = useToolStore((s) => s.adjustMode);
+  const setAdjustMode = useToolStore((s) => s.setAdjustMode);
+  const selectionKind = useToolStore((s) => s.selectionKind);
+  const setSelectionKind = useToolStore((s) => s.setSelectionKind);
+  const edgeThreshold = useToolStore((s) => s.edgeThreshold);
+  const setEdgeThreshold = useToolStore((s) => s.setEdgeThreshold);
 
-  // Selection + Move now live on the Layer Settings ("arrow") tool; leaving it
-  // clears both toggles.
+  // Move lives on Layer Settings ("arrow"); the selection tools moved to
+  // Adjust & Select ("crop") in tool-arc 2.6. Each toggle clears when you leave
+  // ITS OWN tool — clearing selection on leaving `arrow` (as this did when they
+  // shared a home) would now switch it off the moment you opened the tool that
+  // owns it.
   useEffect(() => {
-    if (activeTool !== "arrow") {
-      setSelectionMode(false);
-      setMoveActive(false);
-    }
+    if (activeTool !== "arrow") setMoveActive(false);
+    if (activeTool !== "crop") setSelectionMode(false);
   }, [activeTool]);
 
   const blurDown = useCallback(
@@ -2646,7 +2655,13 @@ export function AppShell() {
               onDeselect: handleDeselect,
               onDelete: handleDeleteSelection,
               active: selectionMask !== null,
+              kind: selectionKind,
+              onKindChange: setSelectionKind,
+              edgeThreshold: edgeThreshold,
+              onEdgeThresholdChange: setEdgeThreshold,
             }}
+            adjustMode={adjustMode}
+            onAdjustModeChange={setAdjustMode}
             moveActive={moveActive}
             onToggleMove={handleToggleMove}
             toolSettings={toolSettings}
@@ -2845,10 +2860,18 @@ export function AppShell() {
                       textInput={textTool.textInput}
                       textareaRef={textTool.textareaRef}
                       onCanvasClick={textTool.onCanvasClick}
-                      selectionActive={activeTool === "arrow" && selectionMode}
+                      // Selection moved from Layer Settings (`arrow`) to Adjust
+                      // & Select (`crop`) in tool-arc 2.6; the canvas routing has
+                      // to follow the panel or click-to-select silently no-ops.
+                      // Move-layer stays on `arrow`.
+                      selectionActive={
+                        activeTool === "crop" &&
+                        adjustMode === "select" &&
+                        selectionMode
+                      }
                       layerMoveActive={activeTool === "arrow" && moveActive}
                       onSelectionClick={handleSelectionClick}
-                      selectionMask={activeTool === "arrow" ? selectionMask : null}
+                      selectionMask={activeTool === "crop" ? selectionMask : null}
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
                       onTextKeyDown={textTool.onTextKeyDown}

@@ -12,8 +12,11 @@ export function useSelectionActions(
   canvasRef: RefObject<HTMLCanvasElement | null>,
 ) {
   const selectionTolerance = useToolStore((s) => s.selectionTolerance);
+  const selectionKind = useToolStore((s) => s.selectionKind);
+  const edgeThreshold = useToolStore((s) => s.edgeThreshold);
   const setSelectionMask = useToolStore((s) => s.setSelectionMask);
   const setSelectionMode = useToolStore((s) => s.setSelectionMode);
+  const setAdjustMode = useToolStore((s) => s.setAdjustMode);
   const setMoveActive = useToolStore((s) => s.setMoveActive);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
 
@@ -28,15 +31,23 @@ export function useSelectionActions(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Which engine call a canvas click makes is the ONLY difference between the
+  // three selection kinds — all three return the same canvas-sized overlay, so
+  // everything downstream (overlay blit, Delete, Deselect) is untouched.
   const handleSelectionClick = useCallback(
     (e: ReactMouseEvent<HTMLCanvasElement>) => {
       const tool = stamp.toolRef.current;
       if (!tool) return;
       const { x, y } = getCoords(e);
-      const mask = tool.magic_wand_select(x, y, selectionTolerance);
+      const mask =
+        selectionKind === "edge"
+          ? tool.magic_wand_select_edges(x, y, selectionTolerance, edgeThreshold)
+          : selectionKind === "colorRange"
+            ? tool.color_range_select(x, y, selectionTolerance)
+            : tool.magic_wand_select(x, y, selectionTolerance);
       setSelectionMask(mask.length ? mask : null);
     },
-    [stamp, getCoords, selectionTolerance],
+    [stamp, getCoords, selectionTolerance, selectionKind, edgeThreshold],
   );
   const handleSelectAll = useCallback(() => {
     const tool = stamp.toolRef.current;
@@ -57,15 +68,22 @@ export function useSelectionActions(
     setSelectionMask(null);
   }, [stamp]);
   // Move-layer toggle (Layer Settings + Ctrl+M). Switches to the Layer Settings
-  // tool and is mutually exclusive with the Selection marker.
+  // tool. Still clears selection-click mode: the two interpret a canvas click
+  // differently, so they stay mutually exclusive even though they now live on
+  // different tools.
   const handleToggleMove = useCallback(() => {
     setActiveTool("arrow");
     setSelectionMode(false);
     setMoveActive((m) => !m);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Selection toggle — mutually exclusive with Move.
+  // Selection click-to-select toggle. Switches to Adjust & Select (its home
+  // since tool-arc 2.6) and puts it in the Select sub-mode — without that the
+  // toggle turns on but the canvas still shows the Adjust body, and the click
+  // routing (gated on adjustMode === "select") never fires.
   const handleToggleSelectionMode = useCallback(() => {
+    setActiveTool("crop");
+    setAdjustMode("select");
     setMoveActive(false);
     setSelectionMode((m) => !m);
     // eslint-disable-next-line react-hooks/exhaustive-deps

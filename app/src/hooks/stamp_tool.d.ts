@@ -867,6 +867,20 @@ declare module "stamp_tool" {
     /** Flood-select from (x,y) within per-channel `tolerance`; stores the mask,
      *  returns a canvas-sized RGBA overlay (selected pixels tinted). */
     magic_wand_select(x: number, y: number, tolerance: number): Uint8Array;
+    /** Edge-aware wand: the same flood fill, but it won't cross a pixel whose
+     *  Sobel edge strength exceeds `edge_threshold` (0..=255) — so a fill stops
+     *  at the object outline instead of leaking through a soft gradient. Shares
+     *  the edge core (src/edges.rs) with the magnetic lasso / Smart Brush. */
+    magic_wand_select_edges(
+      x: number,
+      y: number,
+      tolerance: number,
+      edge_threshold: number,
+    ): Uint8Array;
+    /** Color Range (Photoshop's Select → Color Range): every pixel within
+     *  `tolerance` of the clicked colour, anywhere in the image — not just the
+     *  connected blob the wand reaches. */
+    color_range_select(x: number, y: number, tolerance: number): Uint8Array;
     /** Select the whole canvas; returns the overlay RGBA. */
     select_all(): Uint8Array;
     /** Current selection as an RGBA overlay (empty if nothing selected). */

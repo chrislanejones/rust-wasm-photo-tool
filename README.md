@@ -50,19 +50,16 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.22 — 2026-07-13
+### v7.23 — 2026-07-13
 
-**Compression that hits a target, alignment that works, and shadows you can see.**
+**Selection grows up: "Edit and Transform" is now "Adjust & Select".** The tool splits into two sub-modes on the shared toggle — **Adjust** (crop, straighten, flip, rotate: everything that changes the frame) and **Select** (what you're working on). The magic wand moved in from Layer Settings, where it had been parked next to Move and Resize-Layer despite being a selection tool, and it brought two new siblings:
 
-**Compress Image(s) now earns its PageSpeed badge.** The old pass did one encode at quality 75 with a 2200px cap and no size target — routinely producing 300–400 KB files. It now iterates toward a 200 KB byte budget: quality steps down first (floor 0.5), then dimensions (15% at a time, never below a 1280px long edge), and anything over 2500px on a side is resized as part of the job — the toast reads "Compressing & resizing…" when that kicks in. A 9.9 MB original came out at exactly 200 KB.
+- **Edge-aware wand** — the same flood fill, but walled in by a real Sobel edge map, so it stops at an object's outline instead of leaking through a soft gradient into the background. That's the case where a plain tolerance wand has always failed.
+- **Color Range** — every pixel of that colour *anywhere* in the image, not just the connected patch you clicked (Photoshop's Select → Color Range). One click takes all the sky, islands and all.
 
-**The Align grid works from every selection path.** It only ever armed from the Reselect list, so picking an object on the canvas left all nine cells dead. Now selecting *or* creating a shape or a text arms it — and placing an object whose editor is open re-syncs that editor, which is why text placement used to look like it did nothing at all.
+Under it is `src/edges.rs`, a **shared edge-detection core** — Sobel over perceptual luminance *and* the raw channels, so a red/green boundary at matched luminance still reads as the edge a human sees. It's built once and deliberately shared: the magnetic lasso and the Smart Brush both walk these same edges when they land, and the lasso button is already in the panel, disabled and honest that the path-finding kernel is the remaining piece.
 
-**Shadows work in dark mode.** Tailwind bakes a 10%-black shadow into every `shadow-*` utility, which is invisible against the dark palette — menus, toasts, tooltips and modals all read as flat. They're now restated in dark with layered black and a hairline edge (light mode is untouched). Found while in there: `.shadow-panel` never generated a rule at all, so two surfaces had been shipping with no elevation in either theme.
-
-**The command palette grew up.** Alt+, now wears the same chrome as the Settings and Diagnostics windows instead of a stock dropdown: a real search field at the top, All / Tools / Settings / Actions tabs under it, a **Most Used** grid (top 10 by how often you actually run each command, not just what you touched last — seeded with sensible defaults until you've used it enough), and the search results filling the rest of the dialog.
-
-**Also:** text with a background box or speech bubble now commits exactly where it's placed (the bubble was landing ~71px off — the plain-text fix in v7.21 hadn't covered the bubble's tail geometry); the gallery gets **shift-click range selection**; the palette is finally listed in the Alt+/ modal and the status bar; and Resize/Compress becomes the second tool on the shared `ToolModeToggle` + registry, with its sub-modes reachable from the palette.
+Verified on canvas: from one identical click, the three kinds return genuinely different selections — 290,224 px (wand), 290,170 px (edge-aware, tighter), 300,872 px (colour range, larger).
 
 ## License
 

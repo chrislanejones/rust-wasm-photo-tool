@@ -43,6 +43,7 @@ import type { SettingsTab } from "@/components/SubscriptionButton";
 import { TOOLS, TOOL_MODULES } from "@/features/tools";
 import {
   useToolStore,
+  type AdjustMode,
   type BrushMode,
   type ResizeMode,
   type ShapesMode,
@@ -91,6 +92,7 @@ export interface PaletteContext {
 const SUBMODE_SETTERS: Partial<Record<ToolType, (modeId: string) => void>> = {
   brush: (m) => useToolStore.getState().setBrushMode(m as BrushMode),
   compress: (m) => useToolStore.getState().setResizeMode(m as ResizeMode),
+  crop: (m) => useToolStore.getState().setAdjustMode(m as AdjustMode),
   stamp: (m) => useToolStore.getState().setStampSubMode(m as StampSubMode),
   shapes: (m) => useToolStore.getState().setShapesMode(m as ShapesMode),
 };

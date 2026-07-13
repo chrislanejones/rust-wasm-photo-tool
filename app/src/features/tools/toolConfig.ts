@@ -38,9 +38,12 @@ export const TOOLS: ToolDefinition[] = [
     shortcutKey: "1",
   },
   {
+    // Display label only — the id stays `crop` (load-bearing: shortcuts,
+    // persistence, the tool registry). Renamed in the tool-arc 2.6 session
+    // when the Select sub-mode moved in alongside Adjust.
     id: "crop",
-    label: "Edit and Transform",
-    description: "Crop, transform & erase",
+    label: "Adjust & Select",
+    description: "Crop, transform & select",
     icon: SquareMousePointer,
     gradient: "from-cyan-500 to-blue-500",
     shortcutKey: "2",

@@ -22,11 +22,26 @@ export type ShapesMode = "shapes" | "pens" | "arrows";
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
 export type ResizeMode = "compress" | "resize";
+/** "Adjust & Select" (legacy id `crop`) sub-modes: Adjust = the crop /
+ *  transform controls; Select = the selection tools. */
+export type AdjustMode = "adjust" | "select";
+/** How a canvas click selects, in Select mode.
+ *  - `wand`       — 4-connected flood fill within tolerance (the original).
+ *  - `edge`       — same fill, but walled in by the Sobel edge map so it stops
+ *                   at the object outline instead of leaking through gradients.
+ *  - `colorRange` — every pixel within tolerance of the clicked colour anywhere
+ *                   in the image (Photoshop's Select → Color Range). */
+export type SelectionKind = "wand" | "edge" | "colorRange";
 
 interface ToolState {
   activeTool: ToolType;
   brushMode: BrushMode;
   resizeMode: ResizeMode;
+  adjustMode: AdjustMode;
+  selectionKind: SelectionKind;
+  /** Edge-wall strength for `selectionKind: "edge"` (0..=255). Lower = more
+   *  walls = tighter selection. */
+  edgeThreshold: number;
   /** Layer Settings → Move-layer toggle (drags reposition the layer). */
   moveActive: boolean;
   /** Layer-mask editing: Paint brush paints the active layer's mask. */
@@ -47,6 +62,9 @@ interface ToolState {
   setActiveTool: (v: SetArg<ToolType>) => void;
   setBrushMode: (v: SetArg<BrushMode>) => void;
   setResizeMode: (v: SetArg<ResizeMode>) => void;
+  setAdjustMode: (v: SetArg<AdjustMode>) => void;
+  setSelectionKind: (v: SetArg<SelectionKind>) => void;
+  setEdgeThreshold: (v: SetArg<number>) => void;
   setMoveActive: (v: SetArg<boolean>) => void;
   setMaskEditing: (v: SetArg<boolean>) => void;
   setMaskPaintValue: (v: SetArg<number>) => void;
@@ -67,6 +85,10 @@ export const useToolStore = create<ToolState>()(
       activeTool: "compress",
       brushMode: "paint",
       resizeMode: "compress",
+      adjustMode: "adjust",
+      selectionKind: "wand",
+      // 90/255: walls off hard outlines while ignoring film grain / JPEG noise.
+      edgeThreshold: 90,
       moveActive: false,
       maskEditing: false,
       maskPaintValue: 0,
@@ -84,6 +106,12 @@ export const useToolStore = create<ToolState>()(
       setBrushMode: (v) => set((s) => ({ brushMode: resolveSet(v, s.brushMode) })),
       setResizeMode: (v) =>
         set((s) => ({ resizeMode: resolveSet(v, s.resizeMode) })),
+      setAdjustMode: (v) =>
+        set((s) => ({ adjustMode: resolveSet(v, s.adjustMode) })),
+      setSelectionKind: (v) =>
+        set((s) => ({ selectionKind: resolveSet(v, s.selectionKind) })),
+      setEdgeThreshold: (v) =>
+        set((s) => ({ edgeThreshold: resolveSet(v, s.edgeThreshold) })),
       setMoveActive: (v) => set((s) => ({ moveActive: resolveSet(v, s.moveActive) })),
       setMaskEditing: (v) => set((s) => ({ maskEditing: resolveSet(v, s.maskEditing) })),
       setMaskPaintValue: (v) =>

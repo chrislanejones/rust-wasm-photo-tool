@@ -21,7 +21,8 @@ import { ToolGrid } from "./ToolGrid";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import { LayerSettings } from "./settings/LayerSettings";
-import type { SelectionControls } from "./settings/LayerSettings";
+import type { SelectionControls } from "./settings/SelectSettings";
+import type { AdjustMode } from "@/stores/useToolStore";
 import type { PlacementCell } from "@/components/PlacementGrid";
 import { ResizeSettings } from "./settings/ResizeSettings";
 import { EffectsSettings } from "./settings/EffectsSettings";
@@ -46,8 +47,11 @@ interface ToolsSidebarProps {
   /** Kind of the currently-selected object — gates the placement grid to the
    *  matching panel (text grid only when a text is selected, etc.). */
   selectedKind?: "text" | "shape" | null;
-  /** Selection Marker (magic-wand) controls — Layer Settings tool. */
+  /** Selection tools — Adjust & Select → Select sub-mode. */
   selection?: SelectionControls;
+  /** Adjust & Select sub-mode (Adjust = crop/transform, Select = selection). */
+  adjustMode: AdjustMode;
+  onAdjustModeChange: (m: AdjustMode) => void;
   /** Move-layer toggle — Layer Settings tool. */
   moveActive?: boolean;
   onToggleMove?: () => void;
@@ -148,6 +152,8 @@ export function ToolsSidebar({
   onPlace,
   selectedKind,
   selection,
+  adjustMode,
+  onAdjustModeChange,
   moveActive,
   onToggleMove,
   embedded = false,
@@ -283,6 +289,9 @@ export function ToolsSidebar({
             colorPickerActive={colorPickerActive}
             onSetColorPickerActive={onSetColorPickerActive}
             pickedColor={pickedColor}
+            activeMode={adjustMode}
+            onModeChange={onAdjustModeChange}
+            selection={selection!}
           />
         )}
 
@@ -317,13 +326,12 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "arrow" && selection && (
+        {activeTool === "arrow" && (
           <LayerSettings
             disabled={!imageReady}
             moveActive={moveActive ?? false}
             onToggleMove={onToggleMove ?? (() => {})}
             onResizeLayer={onResizeLayer}
-            selection={selection}
             imgW={imageWidth}
             imgH={imageHeight}
             canvasWidth={imageWidth}

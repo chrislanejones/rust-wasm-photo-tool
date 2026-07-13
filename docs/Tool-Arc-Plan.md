@@ -24,8 +24,8 @@ green build.
 | 2.3 | **Text & Background** → `[Text] \| [Background]` | |
 | 2.4 | **Shapes** → `[Shapes] \| [Pins] \| [Arrows]` | |
 | 2.5 | **Logo/Batch** → `[Logo] \| [Text] \| [Rename]` | |
-| 2.6a | **Edit & Transform** → rename to **"Adjust & Select"**, restructure, move the magic wand | |
-| 2.6b | The **[Select]** sub-mode — the new selection tools | |
+| **2.6a** | **Edit & Transform** → **"Adjust & Select"**, restructured, magic wand moved in | ✅ **Shipped v7.23** |
+| **2.6b** | The **[Select]** sub-mode — edge-aware wand, Color Range, shared edge core; magnetic lasso stubbed | ✅ **Shipped v7.23** |
 
 The reference implementation is **Paint** (`PaintSettings.tsx` consuming
 `ui/tool-mode-toggle.tsx`). **Resize** (`ResizeSettings.tsx`) is the second, and

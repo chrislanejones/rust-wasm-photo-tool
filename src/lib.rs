@@ -22,6 +22,7 @@ mod annotations;
 mod codec;
 mod core;
 mod drawing;
+mod edges;
 mod effects;
 mod history;
 mod layer;

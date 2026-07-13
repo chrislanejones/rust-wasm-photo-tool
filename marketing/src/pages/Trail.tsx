@@ -27,6 +27,17 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.67",
+    date: "2026-07-13",
+    headline: "Smarter selections — and a wand that knows where objects end",
+    entries: [
+      { tag: "feature", text: "\"Edit and Transform\" is now \"Adjust & Select\", split in two: Adjust for cropping, flipping and rotating, and Select for choosing what you're working on. The magic wand moved in here (it used to live under Layer Settings, oddly), and it brought company." },
+      { tag: "feature", text: "New Edge-aware wand: it selects like the normal wand but stops at an object's outline instead of bleeding out into the background through a soft gradient — the exact spot the old wand always let you down." },
+      { tag: "feature", text: "New Color Range: click a colour and take every pixel of it anywhere in the photo, not just the connected patch under your cursor. One click gets all the sky, including the bits peeking between buildings." },
+      { tag: "rust", text: "Behind the scenes: a proper edge-detection engine now ships, and it notices colour boundaries a brightness-only detector would miss entirely (a red shape on a green background of the same brightness, say). It's built to be shared — the magnetic lasso and a future smart brush will use exactly the same edges." },
+    ],
+  },
+  {
     version: "v0.9.66",
     date: "2026-07-13",
     headline: "Real compression targets, working alignment, and shadows you can actually see",

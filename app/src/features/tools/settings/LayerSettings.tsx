@@ -2,9 +2,6 @@ import { useEffect } from "react";
 import {
   Move,
   Scaling,
-  MousePointerClick,
-  BoxSelect,
-  SquareDashed,
   Trash2,
   Minus,
   Lock,
@@ -14,23 +11,8 @@ import { ToolButton } from "@/components/ui/tool-button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { SectionHeader } from "@/components/ui/section-header";
-import { SizeSlider } from "@/components/SizeSlider";
 import { CanvasResize } from "@/components/CanvasResize";
 import { useGuidesStore } from "@/stores/useGuidesStore";
-
-/** Controls for the Selection Marker (magic-wand) — lives in Layer Settings. */
-export interface SelectionControls {
-  tolerance: number;
-  onToleranceChange: (v: number) => void;
-  /** Whether click-to-select mode is on (canvas clicks flood-select). */
-  mode: boolean;
-  onToggleMode: () => void;
-  onSelectAll: () => void;
-  onDeselect: () => void;
-  onDelete: () => void;
-  /** Whether something is currently selected (enables Deselect / Delete). */
-  active: boolean;
-}
 
 interface LayerSettingsProps {
   disabled: boolean;
@@ -41,8 +23,6 @@ interface LayerSettingsProps {
    *  paste placement) around the active layer's own content; drag the handles
    *  then Enter/click-away to bake the scale, Escape to cancel. */
   onResizeLayer?: () => void;
-  /** Selection Marker controls. */
-  selection: SelectionControls;
   /** Live canvas (image) dimensions — used to evenly distribute new guides. */
   imgW: number;
   imgH: number;
@@ -69,7 +49,6 @@ export function LayerSettings({
   moveActive,
   onToggleMove,
   onResizeLayer,
-  selection,
   imgW,
   imgH,
   canvasWidth,
@@ -150,58 +129,9 @@ export function LayerSettings({
         </div>
       </div>
 
-      {/* ── Selection Marker (magic-wand) — Rust flood-fill ─────────────── */}
-      <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
-        <SectionHeader
-          title="Selection Marker"
-          info={
-            <>
-              Turn on click-to-select, then click a region to flood-select
-              similar colors. <kbd>Alt+A</kbd> selects all,{" "}
-              <kbd>Alt+D</kbd> deselects.
-            </>
-          }
-        />
-        <ToolButton
-          active={selection.mode}
-          disabled={disabled}
-          onClick={selection.onToggleMode}
-          className="w-full"
-        >
-          <MousePointerClick />{" "}
-          {selection.mode ? "Click-to-select: on" : "Click-to-select"}
-        </ToolButton>
-        <SizeSlider
-          label="Tolerance"
-          value={selection.tolerance}
-          min={0}
-          max={120}
-          onChange={selection.onToleranceChange}
-        />
-        <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
-          <ToolButton
-            disabled={disabled}
-            onClick={selection.onSelectAll}
-            title="Select all (Alt+A)"
-          >
-            <BoxSelect /> All
-          </ToolButton>
-          <ToolButton
-            disabled={disabled || !selection.active}
-            onClick={selection.onDeselect}
-            title="Deselect (Alt+D)"
-          >
-            <SquareDashed /> None
-          </ToolButton>
-          <ToolButton
-            disabled={disabled || !selection.active}
-            onClick={selection.onDelete}
-            title="Delete selection"
-          >
-            <Trash2 /> Delete
-          </ToolButton>
-        </div>
-      </div>
+      {/* The Selection Marker used to live here. It moved to Adjust & Select →
+          Select in the tool-arc 2.6 session — it was always a selection tool,
+          just parked next to Move/Resize-Layer. */}
 
       {/* ── Guides (non-destructive draggable overlay lines) ─────────────── */}
       <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">

@@ -50,6 +50,84 @@ pub(crate) fn selection_overlay_rgba(mask: &[bool], w: usize, h: usize) -> Vec<u
     }
     out
 }
+/// 4-connected flood fill from `start` over `buf`, taking every pixel within
+/// `tol` (per channel) of the seed colour. When `edges` is `Some((map, wall))`
+/// the fill also refuses to cross a pixel whose edge strength exceeds `wall` —
+/// the seed itself is exempt, so clicking directly on an outline still selects
+/// something instead of nothing.
+///
+/// ONE implementation for both wands. They differ by a single `Option`, and a
+/// copy-pasted second flood fill is both ~8 KB of duplicated wasm and the kind
+/// of thing that gets fixed in one place and not the other.
+fn flood_select(
+    buf: &[u8],
+    w: usize,
+    h: usize,
+    start: usize,
+    tol: i32,
+    edges: Option<(&[u8], u8)>,
+) -> Vec<bool> {
+    let t = [
+        buf[start * 4],
+        buf[start * 4 + 1],
+        buf[start * 4 + 2],
+        buf[start * 4 + 3],
+    ];
+    let mut mask = vec![false; w * h];
+    let mut stack = vec![start];
+    while let Some(i) = stack.pop() {
+        if mask[i] {
+            continue;
+        }
+        if let Some((map, wall)) = edges {
+            if i != start && map[i] > wall {
+                continue;
+            }
+        }
+        let c = &buf[i * 4..i * 4 + 4];
+        if (c[0] as i32 - t[0] as i32).abs() > tol
+            || (c[1] as i32 - t[1] as i32).abs() > tol
+            || (c[2] as i32 - t[2] as i32).abs() > tol
+            || (c[3] as i32 - t[3] as i32).abs() > tol
+        {
+            continue;
+        }
+        mask[i] = true;
+        let (cx, cy) = (i % w, i / w);
+        if cx > 0 {
+            stack.push(i - 1);
+        }
+        if cx + 1 < w {
+            stack.push(i + 1);
+        }
+        if cy > 0 {
+            stack.push(i - w);
+        }
+        if cy + 1 < h {
+            stack.push(i + w);
+        }
+    }
+    mask
+}
+
+impl ImageHorseTool {
+    /// Validate a canvas click and turn it into a composite-buffer pixel index.
+    /// `None` when the image is empty, the click is out of bounds, or the
+    /// composite cache is short — the three guards every selection entry point
+    /// needs before it can trust `buf[i * 4]`.
+    fn seed_index(&self, x: f64, y: f64) -> Option<usize> {
+        let (w, h) = (self.width as usize, self.height as usize);
+        if w == 0 || h == 0 || self.composite_cache.len() < w * h * 4 {
+            return None;
+        }
+        let (fx, fy) = (x.round(), y.round());
+        if fx < 0.0 || fy < 0.0 || fx >= w as f64 || fy >= h as f64 {
+            return None;
+        }
+        Some(fy as usize * w + fx as usize)
+    }
+}
+
 #[wasm_bindgen]
 impl ImageHorseTool {
     /// Magic-wand select: 4-connected flood fill from (x,y) over the composite,
@@ -57,55 +135,78 @@ impl ImageHorseTool {
     /// clicked pixel. Stores the mask; returns a canvas-sized RGBA overlay for the
     /// JS selection layer to draw. Empty Vec if the click is out of bounds.
     pub fn magic_wand_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
-        let w = self.width as usize;
-        let h = self.height as usize;
-        if w == 0 || h == 0 {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let Some(start) = self.seed_index(x, y) else {
             return Vec::new();
-        }
-        let (fx, fy) = (x.round(), y.round());
-        if fx < 0.0 || fy < 0.0 || fx >= w as f64 || fy >= h as f64 {
+        };
+        let mask = flood_select(&self.composite_cache, w, h, start, tolerance as i32, None);
+        let overlay = selection_overlay_rgba(&mask, w, h);
+        self.selection = Some(mask);
+        overlay
+    }
+
+    /// Edge-aware magic wand. Same 4-connected flood fill as `magic_wand_select`,
+    /// but it also refuses to cross a pixel whose Sobel edge strength exceeds
+    /// `edge_threshold` (0..=255) — so a fill started inside an object stops at
+    /// the object's outline instead of leaking through a soft gradient into the
+    /// background, which is exactly where the plain tolerance wand fails.
+    ///
+    /// Lower threshold = more walls = tighter selection. The edge map comes from
+    /// the shared core in `edges.rs` — the same one the magnetic lasso and Smart
+    /// Brush will walk, so "what counts as an edge" stays one definition.
+    ///
+    /// The seed pixel itself is exempt: clicking directly on an outline should
+    /// still select *something* rather than silently returning nothing.
+    pub fn magic_wand_select_edges(
+        &mut self,
+        x: f64,
+        y: f64,
+        tolerance: u32,
+        edge_threshold: u32,
+    ) -> Vec<u8> {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let Some(start) = self.seed_index(x, y) else {
             return Vec::new();
-        }
+        };
+        let edges = crate::edges::sobel_magnitude(&self.composite_cache, w, h);
+        let mask = flood_select(
+            &self.composite_cache,
+            w,
+            h,
+            start,
+            tolerance as i32,
+            Some((&edges, edge_threshold.min(255) as u8)),
+        );
+        let overlay = selection_overlay_rgba(&mask, w, h);
+        self.selection = Some(mask);
+        overlay
+    }
+
+    /// Color-range select (Photoshop's Select → Color Range). Takes EVERY pixel
+    /// within `tolerance` of the clicked colour, anywhere in the image — not
+    /// just the connected blob the wand would reach. That's the whole point:
+    /// one click grabs all the sky, or every instance of a logo colour, without
+    /// shift-clicking each island.
+    pub fn color_range_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let Some(start) = self.seed_index(x, y) else {
+            return Vec::new();
+        };
         let buf = &self.composite_cache;
-        if buf.len() < w * h * 4 {
-            return Vec::new();
-        }
-        let start = fy as usize * w + fx as usize;
         let t = [
-            buf[start * 4],
-            buf[start * 4 + 1],
-            buf[start * 4 + 2],
-            buf[start * 4 + 3],
+            buf[start * 4] as i32,
+            buf[start * 4 + 1] as i32,
+            buf[start * 4 + 2] as i32,
+            buf[start * 4 + 3] as i32,
         ];
         let tol = tolerance as i32;
         let mut mask = vec![false; w * h];
-        let mut stack = vec![start];
-        while let Some(i) = stack.pop() {
-            if mask[i] {
-                continue;
-            }
+        for (i, m) in mask.iter_mut().enumerate() {
             let c = &buf[i * 4..i * 4 + 4];
-            if (c[0] as i32 - t[0] as i32).abs() > tol
-                || (c[1] as i32 - t[1] as i32).abs() > tol
-                || (c[2] as i32 - t[2] as i32).abs() > tol
-                || (c[3] as i32 - t[3] as i32).abs() > tol
-            {
-                continue;
-            }
-            mask[i] = true;
-            let (cx, cy) = (i % w, i / w);
-            if cx > 0 {
-                stack.push(i - 1);
-            }
-            if cx + 1 < w {
-                stack.push(i + 1);
-            }
-            if cy > 0 {
-                stack.push(i - w);
-            }
-            if cy + 1 < h {
-                stack.push(i + w);
-            }
+            *m = (c[0] as i32 - t[0]).abs() <= tol
+                && (c[1] as i32 - t[1]).abs() <= tol
+                && (c[2] as i32 - t[2]).abs() <= tol
+                && (c[3] as i32 - t[3]).abs() <= tol;
         }
         let overlay = selection_overlay_rgba(&mask, w, h);
         self.selection = Some(mask);

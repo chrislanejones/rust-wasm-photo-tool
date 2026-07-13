@@ -1010,3 +1010,31 @@ Ctrl+Z after typing is a visual no-op. Small engine fix; in PARKING_LOT.
 **ADR candidate flagged for Dara:** the anchor→ink convention (stored
 `(x, y) = overlay ink − text_ink_offset_bg`) is now the contract across
 plain/rect/bubble text on both the commit and re-edit paths.
+
+## v7.23 Change Summary — 2026-07-13
+
+Tool-arc session 2.6: **Edit and Transform → "Adjust & Select"**, the
+selection tools consolidated into it, and a shared Rust edge-detection
+core underneath. Verified on canvas: from ONE identical click the three
+selection kinds return genuinely different masks — wand 290,224 px,
+edge-aware 290,170 px (tighter — the edge map walls it in), colour
+range 300,872 px (larger — it takes disconnected pixels the wand can't
+reach). Gates: cargo fmt / clippy / **66 tests** (+4 for the edge core),
+tsc + prod build clean, zero console errors.
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Shared edge-detection core** (`src/edges.rs`, new module) — Sobel gradient magnitude, 0..=255 per pixel. Computed over perceptual luminance **and** the raw channels, taking the max: a red/green boundary at matched luminance is a real edge to a human and invisible to a luma-only operator, and the test suite pins exactly that case. L1 magnitude (`\|gx\| + \|gy\|`) rather than a hypot — a sqrt per channel per pixel buys a difference nobody can see once it's thresholded. Border pixels read 0 (a 3×3 kernel has no valid neighbourhood there, and treating the image frame as an edge would wall in every fill that starts near it). **Built once, deliberately shared**: the magnetic lasso and Smart Brush walk these same edges when they land — a second gradient implementation elsewhere is how those two features drift apart | Complete |
+| 2   | **Edge-aware wand** (`magic_wand_select_edges`) — the same flood fill, but it won't cross a pixel whose edge strength exceeds the threshold, so a fill stops at the object outline instead of leaking through a soft gradient. The seed pixel is exempt: clicking directly *on* an outline should still select something rather than silently nothing. An "Edge sensitivity" slider appears only for this kind — hidden, not disabled, for the others, so the panel doesn't grow dead controls | Complete |
+| 3   | **Color Range** (`color_range_select`) — every pixel within tolerance of the clicked colour anywhere in the image, not just the connected blob (Photoshop's Select → Color Range) | Complete |
+| 4   | **One flood fill, not three** — `magic_wand_select` and `magic_wand_select_edges` differ by a single `Option`, so they share one `flood_select`, and all three entry points share one `seed_index` bounds-check. The copy-pasted second fill cost ~1.2 KB of duplicated wasm and would have been the classic fixed-in-one-place-not-the-other bug | Complete |
+| 5   | **"Adjust & Select"** — `TransformCropSettings` adopts the shared `ToolModeToggle` with `[Adjust] \| [Select]`; Adjust holds the original crop/transform body verbatim, Select holds the new panel. Display label only — the tool id stays `crop` (shortcut `2`, persistence, the ToolType union all depend on it). Registered as the **third `ToolModule`** (after Paint and Resize), and the palette's sub-mode entries route through `SUBMODE_SETTERS` | Complete |
+| 6   | **The wand moved home** — out of Layer Settings, where it sat next to Move and Resize-Layer despite being a selection tool. Three routing sites had to follow it or click-to-select would silently no-op: the canvas `selectionActive` gate (was hard-coded to the old `arrow` tool), the leave-tool cleanup (which would otherwise switch selection off the moment you opened the tool that owns it), and the click-to-select toggle (now also switches to Adjust & Select → Select, since the routing is gated on the sub-mode) | Complete |
+| 7   | **Magnetic Lasso — deliberate stub.** The button is in the panel, disabled, and says why: the edge detection it needs already ships (it powers Edge-aware), the path-finding kernel is the remaining piece. It's a real algorithm (live-wire / shortest-path over the edge map) and belongs in an engine session, not a UI one — per the tool-arc plan's own scope flag | Complete |
+
+**WASM size: 643,088 → 658,851 B (+15,763, +2.4%).** Explained, not
+accidental: a whole new module (the Sobel core), two new exported
+selection methods and their wasm-bindgen glue. Trimmed 1.2 KB back by
+sharing the flood fill rather than duplicating it. The edge core is the
+foundation for two more planned features, so the cost is paid once.
+

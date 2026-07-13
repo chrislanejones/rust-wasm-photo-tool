@@ -11,11 +11,15 @@
 // add AppShell wiring here or anywhere else.
 import type { ToolType } from "@/lib/types";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
-import { Paintbrush, Shrink } from "lucide-react";
+import { Paintbrush, Shrink, SquareMousePointer } from "lucide-react";
 import { PaintSettings, PAINT_MODES } from "./settings/PaintSettings";
 import type { PaintMode } from "./settings/PaintSettings";
 import { ResizeSettings, RESIZE_MODES } from "./settings/ResizeSettings";
-import type { ResizeMode } from "@/stores/useToolStore";
+import {
+  TransformCropSettings,
+  ADJUST_MODES,
+} from "./settings/TransformCropSettings";
+import type { ResizeMode, AdjustMode } from "@/stores/useToolStore";
 
 /**
  * Minimal registry entry for one tool. Kept deliberately small — fields are
@@ -62,6 +66,18 @@ export const resizeModule: ToolModule<ResizeMode> = {
   Settings: ResizeSettings,
 };
 
+/** Adjust & Select — third registered module (tool-UI arc Session 2.6).
+ *  Registered under its legacy id `crop` (shortcut `2` + persistence depend on
+ *  it); the DISPLAY label became "Adjust & Select" when the Select sub-mode
+ *  moved in from Layer Settings. Sub-mode state: `useToolStore.adjustMode`. */
+export const adjustModule: ToolModule<AdjustMode> = {
+  id: "crop", // legacy id — see ToolModule.id
+  label: "Adjust & Select",
+  icon: SquareMousePointer,
+  modes: ADJUST_MODES,
+  Settings: TransformCropSettings,
+};
+
 /**
  * The registry. Partial — tools appear here one migration session at a time
  * (emoji/Batch next per the skill order; clone stamp last).
@@ -69,6 +85,7 @@ export const resizeModule: ToolModule<ResizeMode> = {
 export const TOOL_MODULES: Partial<Record<ToolType, ToolModule>> = {
   brush: paintModule,
   compress: resizeModule,
+  crop: adjustModule,
 };
 
 export function getToolModule(id: ToolType): ToolModule | undefined {
