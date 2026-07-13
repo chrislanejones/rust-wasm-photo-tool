@@ -1049,3 +1049,51 @@ fn the_canvas_stays_pinned_to_the_bottom_of_the_stack() {
     assert_eq!(t.canvas_idx(), Some(0));
     assert!(!t.layers[1].is_canvas());
 }
+
+// ── The path the APP actually takes ─────────────────────────────────────────
+// Every test above builds its artboard with `load_image_artboard`. The APP does
+// NOT: `useCloneStamp.loadImageFromPixels` loads the photo native with
+// `load_image` and THEN borders it with `set_artboard_border` (the idempotent,
+// absolute one), so that a fresh import, a gallery switch and an AI result all
+// normalise through the same call. Those are two different code paths into the
+// same shape, and only one of them was under test — which is exactly how a
+// feature passes its suite and is dead in the product.
+
+/// Import the way the app imports: native load, then border.
+fn app_import_tool(w: u32, h: u32, pad: u32) -> (ImageHorseTool, Vec<u8>) {
+    let px = seed_pixels(w, h);
+    let mut t = ImageHorseTool::new(w, h);
+    t.load_image(&px);
+    t.set_artboard_border(pad, 20, 40, 60, 255);
+    (t, px)
+}
+
+#[test]
+fn the_apps_own_import_path_yields_one_content_layer_with_the_photo_active() {
+    let (t, _px) = app_import_tool(64, 48, 12);
+    assert_eq!(t.layer_count(), 2, "Canvas + Photo");
+    assert_eq!(t.content_layer_count(), 1, "one PIXEL layer (ADR-016)");
+    assert!(t.layers[0].is_canvas(), "the fill is the Canvas");
+    // set_artboard_border inserts the Canvas at index 0, shifting the photo to 1.
+    // If `active` didn't shift with it, the ACTIVE layer would silently become the
+    // Canvas — and `oplog_in_scope()` (content_idx() == active) would be false
+    // forever, so nothing would ever record on a real import.
+    assert_eq!(t.active, 1, "the PHOTO stays active, not the Canvas");
+}
+
+#[test]
+fn the_apps_own_import_path_records_a_paint_stroke() {
+    let (mut t, _px) = app_import_tool(64, 48, 12);
+    t.set_oplog_undo(true);
+    stroke(&mut t, (16.0, 16.0), (60.0, 40.0), "#ff0000");
+    assert!(
+        t.oplog_active(),
+        "the log must be live on the app's own document"
+    );
+    assert!(!t.oplog_is_broken(), "and not broken");
+    assert_eq!(
+        t.oplog_op_count(),
+        1,
+        "a paint stroke on the document the app ACTUALLY creates must record"
+    );
+}

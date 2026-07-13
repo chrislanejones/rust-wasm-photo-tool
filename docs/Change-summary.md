@@ -1461,3 +1461,77 @@ below which it will not shrink a photo chasing the number.
 `cargo fmt --check` · `clippy -D warnings` · **140 Rust tests** · **123 TS tests**
 · tsc clean · wasm 731,595 B (unchanged — the new Rust is tests only) · app +
 marketing builds green.
+
+## v7.30 Change Summary — 2026-07-13
+
+The dogfood's first finding, and it was a real one.
+
+### Symptom
+
+With the three op-log flags on, painting a stroke on a normal photo left the
+Diagnostics **Op Log gauge at `0/0 ops`**. Indistinguishable from "the feature is
+dead" — which, two releases running, it had actually been.
+
+### It wasn't dead. It was unannounced.
+
+`app/src/hooks/usePaintTool.ts`:
+
+```ts
+const changed = t?.paint_up();
+if (changed) flushToCanvas();     // <-- the bug
+```
+
+`paint_up()` returns whether the **stabilizer** had catch-up pixels left to paint
+(`paint.rs`: `painted` is only set when `paint_leash > 0.0`). With the stabilizer
+off — the default — every ordinary stroke returns **false**, because the pixels
+all landed during `paint_move`.
+
+But `paint_up()` is *also* the op log's commit point (`rec_stroke.take()` →
+`oplog_record`), and `flushToCanvas()` is what publishes it:
+
+- `registerOplogStats(syncOplog(t))` → the diagnostics gauge
+- `onOplogFlush(t)` → the **debounced persistence writer**
+
+So a recorded stroke reached neither. The gauge kept showing the stats from the
+last *move*, and — the part that matters — **the op's save was never scheduled**.
+Reloading right after your last stroke could drop it. Not cosmetic: a data-loss
+window.
+
+**Fix:** always flush at stroke end. Cost is one recomposite+blit per STROKE END,
+not per frame; the zero-copy per-frame path is untouched.
+
+**Verified** (clean profile, one stroke): `OP LOG 1/1 ops · 1 kf · undo`,
+`PERSISTED 1 op`; after reload, `PERSISTED 1 op · 1 kf · 1 chunk · restored` —
+restored from the op log.
+
+### Why no test caught it — the same shape as v7.28
+
+Every op-log test builds its document with **`load_image_artboard`**. **The app
+never calls that.** `useCloneStamp.loadImageFromPixels` calls `load_image` and
+then borders it with `set_artboard_border`, so that a fresh import, a gallery
+switch and an AI result all normalise through one call. Two paths to the same
+document shape — and only the untravelled one was under test.
+
+Two new tests pin the app's real path (140 → 142):
+
+- `the_apps_own_import_path_yields_one_content_layer_with_the_photo_active` — the
+  Canvas is inserted at index 0 and `active` shifts with it, so the PHOTO stays
+  active. If it didn't, `oplog_in_scope()` (`content_idx() == active`) would be
+  false forever and nothing would ever record on a real import.
+- `the_apps_own_import_path_records_a_paint_stroke` — a stroke on the document the
+  app actually creates records.
+
+That is twice in three releases that a green suite was testing a program the
+product does not run (v7.28: the feature wasn't compiled into the binary at all).
+The lesson is cheap to state and expensive to learn: **test the path the app
+takes, not a path that reaches the same state.**
+
+### Diagnostics gotcha (not a bug)
+
+The Diagnostics window overlays the canvas — strokes painted while it is open
+never reach the image. Paint with it closed, then open it to read the gauge.
+
+### Gates
+
+`cargo fmt --check` · `clippy -D warnings` · **142 Rust tests** · **123 TS tests**
+· tsc clean · app + marketing builds green. Flags unchanged, still OFF.

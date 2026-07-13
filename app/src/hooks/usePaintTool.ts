@@ -158,12 +158,28 @@ export function usePaintTool({
     if (!painting.current) return;
     painting.current = false;
     const t = toolRef.current;
-    const changed = maskMode
-      ? t?.mask_paint_up()
-      : erase
-        ? t?.erase_up()
-        : t?.paint_up();
-    if (changed) flushToCanvas();
+    if (maskMode) t?.mask_paint_up();
+    else if (erase) t?.erase_up();
+    else t?.paint_up();
+    // ALWAYS flush at stroke end — never gate this on what *_up() returns.
+    //
+    // Those return whether the STABILIZER had catch-up pixels left to paint, and
+    // with the stabilizer off (the default) that is false for every ordinary
+    // stroke: the pixels all landed during paint_move. But `*_up()` is also where
+    // the op log COMMITS the stroke (paint.rs — `rec_stroke.take()`), and
+    // flushToCanvas is what publishes that op: it calls registerOplogStats (the
+    // diagnostics Op Log gauge) AND onOplogFlush (the debounced persistence
+    // writer).
+    //
+    // So gating the flush on the return value meant a finished stroke was
+    // recorded but never published: the gauge sat at "0 ops" on a document that
+    // had just recorded one — the 0/0 that stalled the dogfood — and, worse, the
+    // op's SAVE was never scheduled until some later interaction happened to
+    // flush. Reloading right after your last stroke could drop it.
+    //
+    // Cost of flushing unconditionally: one recomposite+blit per STROKE END. Not
+    // per frame — the zero-copy per-frame path is untouched.
+    flushToCanvas();
     syncState();
   }, [toolRef, erase, maskMode, flushToCanvas, syncState]);
 

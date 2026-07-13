@@ -50,19 +50,24 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.29 — 2026-07-13
+### v7.30 — 2026-07-13
 
-**The pen tool's closed paths never closed.** You could draw a full circle, click back on the first anchor to close it, and get nothing — no stroke, no fill. The reason turned out to be a hit-test, not geometry: the first anchor's 8×8 handle sits *on top of* the canvas capture rect and stops the click from propagating, so the handler that implements "click the first anchor to close the path" never saw it. The path never committed, so nothing was ever drawn or filled. Closing now works where the click actually lands, and a closed path fills.
+**The op log recorded your stroke and then told nobody.** Dogfooding the op-log flags, the Diagnostics gauge sat at `0/0 ops` after painting on a normal photo — which read exactly like "the feature isn't running." It was running. The stroke *was* recorded. One line of JavaScript was swallowing the news:
 
-The engine was never at fault, and there are now two tests saying so: a hand-drawn circle whose last anchor misses the first by a couple of pixels **fills correctly**, because the fill wraps the contour. It never needed pixel-perfect clicking.
+```ts
+const changed = t?.paint_up();
+if (changed) flushToCanvas();   // only flushed if the STABILIZER had catch-up pixels
+```
 
-**Reselecting a pen path made it disappear.** Kind-7 Bézier paths fell through to the rectangle-bbox handler, which hid the baked path and drew a *rectangle* in its place. They now re-open in the pen overlay with their curve and control points, editable.
+`paint_up()` returns whether the *stroke stabilizer* had leftover pixels to paint — and with the stabilizer off (the default) that's `false` for every ordinary stroke, because the pixels all landed during the drag. But `paint_up()` is also where the op log **commits** the stroke, and `flushToCanvas()` is what publishes it: it pushes the diagnostics stats **and** schedules the debounced save to IndexedDB.
 
-**The start page no longer claims you're using a tool.** Since v7.25 the address bar showed `#/tool/resize/compress` on a page with no image open — a tool you can't see, can't use, and whose link just drops the recipient back on the start screen. Routes describe a view *of an image*; with nothing open there's no view to address, so the URL stays clean and reappears when a photo loads.
+So the op existed and nothing announced it. The gauge showed a stale count, and — the part that actually mattered — **the save was never scheduled**, so reloading right after your last stroke could silently drop it. A data-loss window, found by pulling on a gauge that read zero.
 
-**Tooltips rendered underneath the gallery.** Not a z-index problem, despite looking exactly like one: tooltips rendered *inline*, inside whatever panel they belonged to, and a panel is its own stacking context — so a `z-50` tooltip in the Tools panel still lost to the gallery. They now portal to the document body, where the z-index token means what it says. Raising the number would never have fixed it. This fixes every tooltip in the app.
+Now the flush always runs at stroke end (once per stroke, not per frame; the zero-copy per-frame path is untouched). Verified on a clean profile: one stroke → `OP LOG 1/1 ops`, `PERSISTED 1 op`; reload → `restored` from the op log.
 
-**"Auto Compress" is now "Auto Compress & Resize"** — because that is what it does. Since v7.22 it also shrinks anything over 2500px on a side, and the old name hid a resize from the person clicking the button. The new lightbulb explains the ~200 KB target, the resize threshold, and the 1280px floor it will not shrink below.
+**And the reason no test caught it:** every op-log test built its document with `load_image_artboard`. **The app doesn't call that.** It calls `load_image` and then `set_artboard_border` — a different path to the same shape, and nothing was testing it. Two new tests now pin the import path the app actually uses: it yields one content layer with the *photo* active, and a paint stroke on it records. That's the second time in three releases that a green suite was testing a program the product doesn't run.
+
+**Also:** the Diagnostics window overlays the canvas, so strokes painted while it's open never reach the image. Paint with it closed, then open it to read the gauge.
 
 ## License
 

@@ -27,6 +27,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.74",
+    date: "2026-07-13",
+    headline: "A stroke that was saved, and nobody said so",
+    entries: [
+      { tag: "rust", text: "Behind the scenes: while testing the new undo-that-survives-a-reload, the counter that shows how much has been recorded kept reading zero — even though the edits were being recorded. The recording worked; the part that announces \"a stroke just finished\" only ran in one specific case." },
+      { tag: "fix", text: "That had a real consequence, not just a wrong number: the save for your most recent brush stroke wasn't being scheduled, so reloading immediately after painting could quietly lose it. It saves at the end of every stroke now." },
+      { tag: "rust", text: "Behind the scenes: the tests never caught it because they built their test image a different way than the app does. There are now tests that go through the exact path the app takes when you open a photo." },
+    ],
+  },
+  {
     version: "v0.9.73",
     date: "2026-07-13",
     headline: "The pen tool's closed shapes actually close now",
