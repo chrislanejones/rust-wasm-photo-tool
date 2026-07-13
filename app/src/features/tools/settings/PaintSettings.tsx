@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { Brush, Droplets, PenTool, Eraser } from "lucide-react";
+import { Brush, Droplets, PenTool, Eraser, Blend } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import type { BrushMode } from "@/stores/useToolStore";
+import { useToolStore } from "@/stores/useToolStore";
 import { TEXT_COLORS } from "@/lib/colors";
+import { isSmartEdgeEnabled } from "@/lib/smartEdge";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
+import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
@@ -103,6 +106,15 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
   const [internalMode, setInternalMode] = useState<PaintMode>("paint");
   const mode = activeMode ?? internalMode;
 
+  // Smart Brush lives in the tool store (like the selection kind), not in
+  // ToolSettings — it's a mode, not a brush dimension, and ToolSettings is a
+  // persisted shape I'd rather not widen for a flagged-off feature.
+  const smartEdge = isSmartEdgeEnabled();
+  const smartBrush = useToolStore((s) => s.smartBrush);
+  const setSmartBrush = useToolStore((s) => s.setSmartBrush);
+  const smartBrushStrength = useToolStore((s) => s.smartBrushStrength);
+  const setSmartBrushStrength = useToolStore((s) => s.setSmartBrushStrength);
+
   const handleModeChange = (m: PaintMode) => {
     setInternalMode(m);
     onModeChange?.(m);
@@ -175,6 +187,40 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     }
                   />
                 </div>
+
+                {/* ── Smart Brush (behind ih_smart_edge; see lib/smartEdge.ts) ──
+                    The second consumer of the edge core that already powers the
+                    edge-aware wand: the stroke is walled in by strong edges, so
+                    it can't bleed across an object's outline. Absent entirely
+                    when the switch is off — with it off the engine takes its
+                    original brush path and paints byte-for-byte what it did
+                    before. */}
+                {smartEdge && (
+                  <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+                    <ToolButton
+                      active={smartBrush}
+                      onClick={() => setSmartBrush(!smartBrush)}
+                      className="w-full"
+                      title="Stop the brush bleeding across object edges"
+                    >
+                      <Blend />{" "}
+                      {smartBrush ? "Smart Brush: on" : "Smart Brush"}
+                    </ToolButton>
+                    <p className="px-0.5 text-2xs leading-relaxed text-theme-muted-foreground">
+                      The stroke stops at strong edges instead of spilling across
+                      them — same edge detection the Edge-aware wand uses.
+                    </p>
+                    {smartBrush && (
+                      <SizeSlider
+                        label="Edge strength"
+                        value={smartBrushStrength}
+                        min={10}
+                        max={255}
+                        onChange={setSmartBrushStrength}
+                      />
+                    )}
+                  </div>
+                )}
               </>
             );
 

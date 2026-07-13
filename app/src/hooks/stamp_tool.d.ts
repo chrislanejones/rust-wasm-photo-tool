@@ -890,6 +890,38 @@ declare module "stamp_tool" {
     clear_selection(): void;
     /** Delete selected pixels (transparent) on the active layer; deselects. */
     delete_selection(): boolean;
+
+    // ── Magnetic lasso (live-wire) — behind the `ih_smart_edge` switch ──
+    // Path-finds along the SAME edge core the edge-aware wand uses, turned into
+    // a cost map (strong edge = cheap to travel). Ends where every other
+    // selection tool ends: one mask, one overlay RGBA.
+    /** Start a lasso at the first anchor. Builds the edge cost map once for the
+     *  whole session. False if the click is out of bounds / the image is empty. */
+    lasso_begin(x: number, y: number): boolean;
+    /** The live wire: minimum-cost path from the last anchor to the cursor, as
+     *  flat [x0,y0,x1,y1,…] pairs. A preview — does not mutate the session.
+     *  Empty when no lasso is running. */
+    lasso_path_to(x: number, y: number): Int32Array;
+    /** Freeze the live wire into the committed path and drop a new anchor.
+     *  Returns the new anchor count (0 = no session). */
+    lasso_commit(x: number, y: number): number;
+    /** The committed path so far, as flat [x,y,…] pairs — for redrawing after a
+     *  re-render without re-walking it. */
+    lasso_committed_path(): Int32Array;
+    /** Is a lasso session in progress? */
+    lasso_active(): boolean;
+    /** Close the loop (wire back to the first anchor), fill the enclosed region,
+     *  and store it as THE selection. Returns the same canvas-sized overlay RGBA
+     *  the wands return. Empty if there's no session or fewer than 3 anchors. */
+    lasso_close(): Uint8Array;
+    /** Abandon the session (Esc). Leaves any existing selection alone. */
+    lasso_cancel(): void;
+
+    /** Smart Brush: wall a stroke in with strong edges (`strength` 0..=255;
+     *  higher = only the hardest edges contain it). Takes effect from the next
+     *  stroke. OFF by default — with it off the brush is byte-for-byte the one
+     *  that shipped. Behind the `ih_smart_edge` switch. */
+    set_smart_brush(enabled: boolean, strength: number): void;
     /** Suppress one shape from render while its JS overlay preview is shown. Pass -1 to clear. */
     set_editing_shape(id: number): void;
     /** Suppress an in-edit text annotation's baked tile from the composite

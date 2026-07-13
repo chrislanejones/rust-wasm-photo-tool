@@ -17,9 +17,12 @@
 //                 in the image (Photoshop's Select → Color Range). One click
 //                 takes all the sky, not just the connected patch of it.
 //
-// The magnetic lasso is a deliberate stub: its kernel is a real algorithm
-// (live-wire / shortest-path over the edge map) and belongs in an engine
-// session, not a UI one. The button is here, disabled and honest about why.
+// The magnetic lasso's kernel now EXISTS (src/livewire.rs — live-wire /
+// shortest-path over the same edge map, turned into a cost map where a strong
+// edge is cheap to travel). It is wired up here behind the `ih_smart_edge`
+// switch: with the switch off you still get the honest "Coming soon" stub v7.23
+// shipped, because what nobody has verified yet is the FEEL, and that is a
+// canvas judgement a human has to make. See lib/smartEdge.ts.
 import {
   MousePointerClick,
   BoxSelect,
@@ -32,6 +35,7 @@ import {
 import { ToolButton } from "@/components/ui/tool-button";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SizeSlider } from "@/components/SizeSlider";
+import { isSmartEdgeEnabled } from "@/lib/smartEdge";
 import type { SelectionKind } from "@/stores/useToolStore";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
@@ -80,6 +84,16 @@ const KINDS: {
   },
 ];
 
+/** The lasso only joins the grid when `ih_smart_edge` is on. Kept out of KINDS
+ *  rather than filtered into it, so with the switch off the array — and the
+ *  panel it renders — is exactly what shipped. */
+const LASSO_KIND = {
+  id: "lasso" as SelectionKind,
+  label: "Magnetic",
+  icon: Lasso,
+  info: "Click anchors around an object; the wire snaps to the edge between them. Double-click to close, Esc to cancel.",
+};
+
 export function SelectSettings({
   disabled,
   selection,
@@ -87,7 +101,9 @@ export function SelectSettings({
   disabled: boolean;
   selection: SelectionControls;
 }) {
-  const activeKind = KINDS.find((k) => k.id === selection.kind) ?? KINDS[0];
+  const smartEdge = isSmartEdgeEnabled();
+  const kinds = smartEdge ? [...KINDS, LASSO_KIND] : KINDS;
+  const activeKind = kinds.find((k) => k.id === selection.kind) ?? KINDS[0];
 
   return (
     <div className="space-y-4">
@@ -103,7 +119,7 @@ export function SelectSettings({
           }
         />
         <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
-          {KINDS.map(({ id, label, icon: Icon }) => (
+          {kinds.map(({ id, label, icon: Icon }) => (
             <ToolButton
               key={id}
               active={selection.kind === id}
@@ -174,21 +190,26 @@ export function SelectSettings({
         </ToolButton>
       </div>
 
-      {/* ── Not built yet, and saying so ────────────────────────────────── */}
-      <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
-        <SectionHeader
-          title="Coming soon"
-          info="Wired up but not yet built — the button is here so the shape of the tool is honest."
-        />
-        <ToolButton disabled className="w-full" title="Not built yet">
-          <Lasso /> Magnetic Lasso
-        </ToolButton>
-        <p className="px-0.5 text-2xs leading-relaxed text-theme-muted-foreground">
-          Draw roughly and snap to the nearest edge. The edge detection it needs
-          already ships (it's what powers Edge-aware above) — the path-finding
-          kernel is the remaining piece.
-        </p>
-      </div>
+      {/* ── Not built yet, and saying so ─────────────────────────────────
+          Only while the switch is off. Once the lasso is live it's a real kind
+          in the grid above, and leaving a disabled duplicate of it down here
+          would be the panel lying about itself. */}
+      {!smartEdge && (
+        <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+          <SectionHeader
+            title="Coming soon"
+            info="Wired up but not yet built — the button is here so the shape of the tool is honest."
+          />
+          <ToolButton disabled className="w-full" title="Not built yet">
+            <Lasso /> Magnetic Lasso
+          </ToolButton>
+          <p className="px-0.5 text-2xs leading-relaxed text-theme-muted-foreground">
+            Draw roughly and snap to the nearest edge. The edge detection it
+            needs already ships (it's what powers Edge-aware above) — the
+            path-finding kernel is the remaining piece.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

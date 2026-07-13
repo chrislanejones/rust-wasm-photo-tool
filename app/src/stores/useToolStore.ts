@@ -9,6 +9,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
+import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
 import { resolveSet, type SetArg } from "./_shared";
 import { idbStorage } from "./storage/idbStorage";
 
@@ -30,8 +31,13 @@ export type AdjustMode = "adjust" | "select";
  *  - `edge`       — same fill, but walled in by the Sobel edge map so it stops
  *                   at the object outline instead of leaking through gradients.
  *  - `colorRange` — every pixel within tolerance of the clicked colour anywhere
- *                   in the image (Photoshop's Select → Color Range). */
-export type SelectionKind = "wand" | "edge" | "colorRange";
+ *                   in the image (Photoshop's Select → Color Range).
+ *  - `lasso`      — magnetic lasso: click anchors, the wire path-finds along the
+ *                   edges between them, double-click closes. Unlike the other
+ *                   three this is NOT click-once — it's a session (begin →
+ *                   commit* → close). Only reachable behind the `ih_smart_edge`
+ *                   switch; see lib/smartEdge.ts. */
+export type SelectionKind = "wand" | "edge" | "colorRange" | "lasso";
 
 interface ToolState {
   activeTool: ToolType;
@@ -42,6 +48,13 @@ interface ToolState {
   /** Edge-wall strength for `selectionKind: "edge"` (0..=255). Lower = more
    *  walls = tighter selection. */
   edgeThreshold: number;
+  /** Smart Brush: the Paint brush is walled in by strong edges (the second
+   *  consumer of the same edge core the wand + lasso use). Behind
+   *  `ih_smart_edge`; OFF by default, and with it off the engine takes its
+   *  original brush path. */
+  smartBrush: boolean;
+  /** How hard an edge must be to contain a Smart Brush stroke (0..=255). */
+  smartBrushStrength: number;
   /** Layer Settings → Move-layer toggle (drags reposition the layer). */
   moveActive: boolean;
   /** Layer-mask editing: Paint brush paints the active layer's mask. */
@@ -65,6 +78,8 @@ interface ToolState {
   setAdjustMode: (v: SetArg<AdjustMode>) => void;
   setSelectionKind: (v: SetArg<SelectionKind>) => void;
   setEdgeThreshold: (v: SetArg<number>) => void;
+  setSmartBrush: (v: SetArg<boolean>) => void;
+  setSmartBrushStrength: (v: SetArg<number>) => void;
   setMoveActive: (v: SetArg<boolean>) => void;
   setMaskEditing: (v: SetArg<boolean>) => void;
   setMaskPaintValue: (v: SetArg<number>) => void;
@@ -89,6 +104,8 @@ export const useToolStore = create<ToolState>()(
       selectionKind: "wand",
       // 90/255: walls off hard outlines while ignoring film grain / JPEG noise.
       edgeThreshold: 90,
+      smartBrush: false,
+      smartBrushStrength: SMART_BRUSH_DEFAULT_STRENGTH,
       moveActive: false,
       maskEditing: false,
       maskPaintValue: 0,
@@ -112,6 +129,9 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ selectionKind: resolveSet(v, s.selectionKind) })),
       setEdgeThreshold: (v) =>
         set((s) => ({ edgeThreshold: resolveSet(v, s.edgeThreshold) })),
+      setSmartBrush: (v) => set((s) => ({ smartBrush: resolveSet(v, s.smartBrush) })),
+      setSmartBrushStrength: (v) =>
+        set((s) => ({ smartBrushStrength: resolveSet(v, s.smartBrushStrength) })),
       setMoveActive: (v) => set((s) => ({ moveActive: resolveSet(v, s.moveActive) })),
       setMaskEditing: (v) => set((s) => ({ maskEditing: resolveSet(v, s.maskEditing) })),
       setMaskPaintValue: (v) =>

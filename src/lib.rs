@@ -26,6 +26,7 @@ mod edges;
 mod effects;
 mod history;
 mod layer;
+mod livewire;
 mod paint;
 mod selection;
 mod settings;
@@ -437,6 +438,28 @@ pub struct ImageHorseTool {
     /// nothing is selected. Built by the Selection Marker tool's flood-fill /
     /// select-all; `delete_selection` clears the masked pixels.
     selection: Option<Vec<bool>>,
+    /// In-progress magnetic-lasso session (edge cost map + anchors + the
+    /// committed path). `None` when the lasso isn't running — which is always,
+    /// unless the user is mid-loop. Ends by writing `selection` like every
+    /// other selection tool; see `selection.rs`'s lasso block.
+    lasso: Option<crate::livewire::LassoState>,
+    /// Smart Brush: when on, a stroke is walled in by strong edges (the SECOND
+    /// consumer of the shared edge cost map — the lasso is the first). Off by
+    /// default; with it off the brush is byte-for-byte the one that shipped.
+    smart_brush: bool,
+    /// How hard an edge must be to contain a stroke (0..=255; higher = fewer
+    /// walls). See `edges::is_wall`.
+    smart_strength: u8,
+    /// Edge cost map for the current stroke, built once at `paint_begin` — a
+    /// Sobel pass per dab would be unusable. Empty when the Smart Brush is off.
+    smart_cost: Vec<u16>,
+    /// Per-dab scratch for the containment region-grow: reachability plane
+    /// (`w*h`), the flood's stack, and the bbox-local snapshot of the coverage
+    /// each dab is about to overwrite. Persistent so a 60-dab/s stroke
+    /// allocates NOTHING per dab — see `accumulate_dab`.
+    smart_reach: Vec<bool>,
+    smart_stack: Vec<usize>,
+    smart_prev: Vec<u8>,
     /// Live, non-destructive offset for the Move tool: while the user drags, the
     /// ACTIVE layer is composited shifted by this (dx, dy) without touching its
     /// stored pixels. `None` when no move is in progress. Committed by
@@ -710,6 +733,13 @@ impl ImageHorseTool {
             editing_shape_id: None,
             editing_text_id: None,
             selection: None,
+            lasso: None,
+            smart_brush: false,
+            smart_strength: 128,
+            smart_cost: Vec::new(),
+            smart_reach: Vec::new(),
+            smart_stack: Vec::new(),
+            smart_prev: Vec::new(),
             move_preview: None,
             paste_preview: None,
             paint_stab_tip: None,

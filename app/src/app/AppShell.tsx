@@ -1036,6 +1036,11 @@ export function AppShell() {
     handleDeleteSelection,
     handleToggleMove,
     handleToggleSelectionMode,
+    handleLassoMove,
+    handleLassoClose,
+    // (Esc-to-cancel is bound inside the hook, only while a session is open.)
+    lassoCommitted,
+    lassoPreview,
   } = useSelectionActions(stamp, canvasRef);
 
   // ── Selection Marker (magic-wand) — Edit & Move → Selection (above Align) ──
@@ -2874,6 +2879,19 @@ export function AppShell() {
                       selectionMask={activeTool === "crop" ? selectionMask : null}
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
+                      // Magnetic lasso (behind ih_smart_edge). Same routing gate
+                      // as click-to-select — plus the kind, since the lasso is a
+                      // session and the other three kinds are click-once.
+                      lassoActive={
+                        activeTool === "crop" &&
+                        adjustMode === "select" &&
+                        selectionMode &&
+                        selectionKind === "lasso"
+                      }
+                      onLassoMove={handleLassoMove}
+                      onLassoClose={handleLassoClose}
+                      lassoCommitted={lassoCommitted}
+                      lassoPreview={lassoPreview}
                       onTextKeyDown={textTool.onTextKeyDown}
                       onTextChange={textTool.onTextChange}
                       onTextBlur={textTool.onTextBlur}

@@ -110,6 +110,64 @@ fn flood_select(
     mask
 }
 
+/// 4-connected flood from `seeds`, bounded to `bounds`, spreading through any
+/// pixel `open()` accepts. Writes reachability into `reach` (a full `w*h`
+/// plane the caller owns) and reuses the caller's `stack` — so a per-dab caller
+/// on the brush's hot path allocates **nothing** after the first stroke.
+///
+/// Deliberately NOT folded into `flood_select` above. That one is colour-keyed
+/// (seed colour + tolerance over RGBA); both new consumers need "flood the
+/// complement of a boundary set", which has no colour term at all. It *can* be
+/// faked — pass `tol = 255` and the boundary as the edge map — but that routes
+/// the shipped wands' fill through a path it never actually runs, to save
+/// twenty lines. This shares the pattern, not the punning. Used by the lasso's
+/// interior fill (loop as barrier, flood from the border, invert) and by the
+/// Smart Brush's containment (strong edges as barrier, flood from the dab
+/// centre).
+///
+/// `bounds` is inclusive `(x0, y0, x1, y1)`. The caller must have cleared
+/// `reach` over that region first — clearing only the bounded window is the
+/// point, since zeroing a full-image plane per dab would cost more than the
+/// fill itself.
+pub(crate) fn flood_barrier_into(
+    reach: &mut [bool],
+    w: usize,
+    seeds: &[usize],
+    bounds: (usize, usize, usize, usize),
+    stack: &mut Vec<usize>,
+    open: impl Fn(usize) -> bool,
+) {
+    let (x0, y0, x1, y1) = bounds;
+    stack.clear();
+    for &s in seeds {
+        if s < reach.len() && !reach[s] && open(s) {
+            reach[s] = true;
+            stack.push(s);
+        }
+    }
+    while let Some(i) = stack.pop() {
+        let (cx, cy) = (i % w, i / w);
+        let visit = |n: usize, reach: &mut [bool], stack: &mut Vec<usize>| {
+            if !reach[n] && open(n) {
+                reach[n] = true;
+                stack.push(n);
+            }
+        };
+        if cx > x0 {
+            visit(i - 1, reach, stack);
+        }
+        if cx < x1 {
+            visit(i + 1, reach, stack);
+        }
+        if cy > y0 {
+            visit(i - w, reach, stack);
+        }
+        if cy < y1 {
+            visit(i + w, reach, stack);
+        }
+    }
+}
+
 impl ImageHorseTool {
     /// Validate a canvas click and turn it into a composite-buffer pixel index.
     /// `None` when the image is empty, the click is out of bounds, or the
@@ -264,5 +322,137 @@ impl ImageHorseTool {
         }
         self.recomposite();
         true
+    }
+
+    // ── Magnetic lasso (live-wire) ──────────────────────────────────────────
+    // The stub shipped in v7.23 said "the path-finding kernel is the remaining
+    // piece". This is that piece, wired up. The kernels are in `livewire.rs`;
+    // everything here is session bookkeeping, and it ends exactly where the
+    // wands end — `self.selection = Some(Vec<bool>)` plus the same overlay RGBA.
+    // Nothing downstream (Delete, Deselect, the overlay blit) learns that a
+    // lasso produced this mask.
+
+    /// Start a lasso session at the first anchor. Computes the edge cost map
+    /// ONCE for the whole session (a Sobel pass per mouse-move would be
+    /// unusable, and a fixed map means the ground doesn't shift under the wire
+    /// while you draw). Returns false if the click is out of bounds or the
+    /// image is empty — no panic across the boundary.
+    pub fn lasso_begin(&mut self, x: f64, y: f64) -> bool {
+        let (w, h) = (self.width as usize, self.height as usize);
+        if self.seed_index(x, y).is_none() {
+            return false;
+        }
+        let anchor = (x.round() as u32, y.round() as u32);
+        let mag = crate::edges::sobel_magnitude(&self.composite_cache, w, h);
+        self.lasso = Some(crate::livewire::LassoState {
+            cost: crate::edges::edge_cost_map(&mag),
+            w,
+            h,
+            anchors: vec![anchor],
+            path: vec![anchor],
+        });
+        true
+    }
+
+    /// The live wire: the minimum-cost path from the last anchor to the cursor,
+    /// as flat `[x0, y0, x1, y1, …]` pairs for the JS overlay to draw. Does not
+    /// mutate the session — this is a *preview*, called on every mouse-move.
+    /// Empty when no lasso is running.
+    pub fn lasso_path_to(&self, x: f64, y: f64) -> Vec<i32> {
+        let Some(l) = &self.lasso else {
+            return Vec::new();
+        };
+        let Some(&from) = l.anchors.last() else {
+            return Vec::new();
+        };
+        let to = Self::clamp_to_image(x, y, l.w, l.h);
+        crate::livewire::flatten(&crate::livewire::min_cost_path(&l.cost, l.w, l.h, from, to))
+    }
+
+    /// Commit the live wire: freeze the path from the last anchor to (x,y) into
+    /// the committed polyline and drop a new anchor there. Returns the new
+    /// anchor count (0 = no session).
+    pub fn lasso_commit(&mut self, x: f64, y: f64) -> u32 {
+        let Some(l) = &mut self.lasso else {
+            return 0;
+        };
+        let Some(&from) = l.anchors.last() else {
+            return 0;
+        };
+        let to = Self::clamp_to_image(x, y, l.w, l.h);
+        let seg = crate::livewire::min_cost_path(&l.cost, l.w, l.h, from, to);
+        // `seg[0]` is the previous anchor, already the tail of `path`.
+        l.path.extend_from_slice(&seg[1..]);
+        l.anchors.push(to);
+        l.anchors.len() as u32
+    }
+
+    /// The committed path so far, as flat `[x, y, …]` pairs — lets JS redraw
+    /// the frozen part of the lasso (after a re-render) without re-walking it.
+    pub fn lasso_committed_path(&self) -> Vec<i32> {
+        match &self.lasso {
+            Some(l) => crate::livewire::flatten(&l.path),
+            None => Vec::new(),
+        }
+    }
+
+    /// Is a lasso session in progress?
+    pub fn lasso_active(&self) -> bool {
+        self.lasso.is_some()
+    }
+
+    /// Close the loop: live-wire from the last anchor back to the first, fill
+    /// the enclosed region, and store it as THE selection. Returns the same
+    /// canvas-sized overlay RGBA every other selection tool returns (empty if
+    /// there's no session, or fewer than 3 anchors — two anchors enclose no
+    /// area, and silently selecting nothing is worse than selecting nothing
+    /// loudly).
+    pub fn lasso_close(&mut self) -> Vec<u8> {
+        let Some(l) = self.lasso.take() else {
+            return Vec::new();
+        };
+        // Destructured rather than indexed: three anchors or it isn't a loop,
+        // and this way the endpoints come out of the pattern match instead of
+        // an `unwrap` that a future edit could turn into a panic across the
+        // wasm boundary.
+        let ([first, ..], [.., last]) = (&l.anchors[..], &l.anchors[..]) else {
+            return Vec::new();
+        };
+        if l.anchors.len() < 3 {
+            return Vec::new();
+        }
+        let (first, last) = (*first, *last);
+        let (w, h) = (l.w, l.h);
+        // The closing segment: last anchor → first anchor, wired like any other.
+        let mut loop_px = l.path;
+        let closing = crate::livewire::min_cost_path(&l.cost, w, h, last, first);
+        // Drop both shared endpoints: `loop_px` already ends at the last anchor,
+        // and the loop's start IS the first anchor.
+        if closing.len() > 2 {
+            loop_px.extend_from_slice(&closing[1..closing.len() - 1]);
+        }
+
+        let mask = crate::livewire::mask_from_loop(&loop_px, w, h);
+        let overlay = selection_overlay_rgba(&mask, w, h);
+        self.selection = Some(mask);
+        overlay
+    }
+
+    /// Abandon the lasso session (Esc). Drops the cost map; leaves any existing
+    /// selection alone.
+    pub fn lasso_cancel(&mut self) {
+        self.lasso = None;
+    }
+}
+
+impl ImageHorseTool {
+    /// Clamp a canvas coord into the image. The lasso tracks the cursor
+    /// continuously, and a cursor that leaves the canvas must pin to the border
+    /// rather than return nothing (which would freeze the wire) or index out of
+    /// bounds (which would panic across the wasm boundary).
+    fn clamp_to_image(x: f64, y: f64, w: usize, h: usize) -> (u32, u32) {
+        let cx = x.round().clamp(0.0, w.saturating_sub(1) as f64);
+        let cy = y.round().clamp(0.0, h.saturating_sub(1) as f64);
+        (cx as u32, cy as u32)
     }
 }

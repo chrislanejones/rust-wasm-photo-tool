@@ -17,6 +17,7 @@ import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
+import { LassoOverlay } from "./LassoOverlay";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
@@ -99,6 +100,15 @@ interface Props {
   selectionMask?: Uint8Array | null;
   selectionWidth?: number;
   selectionHeight?: number;
+  /** Magnetic lasso (behind `ih_smart_edge`): a session is open, so mouse-moves
+   *  drive the live wire and a double-click closes the loop. */
+  lassoActive?: boolean;
+  onLassoMove?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
+  onLassoClose?: () => void;
+  /** Flat [x,y,…] image-space polylines from Rust — the frozen path and the
+   *  live wire. Drawn by LassoOverlay; no geometry happens here. */
+  lassoCommitted?: Int32Array | null;
+  lassoPreview?: Int32Array | null;
   containerRef?: React.RefObject<HTMLDivElement | null>;
   onTextPositionChange?: (canvasX: number, canvasY: number) => void;
   onTextFontSizeChange?: (size: number) => void;
@@ -323,6 +333,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       selectionMask,
       selectionWidth,
       selectionHeight,
+      lassoActive,
+      onLassoMove,
+      onLassoClose,
+      lassoCommitted,
+      lassoPreview,
       drawEditState,
       onDrawEditChange,
       drawSettings,
@@ -789,12 +804,22 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const wrappedMouseDown = isPanning ? handlePanMouseDown : onMouseDown;
     const baseMouseMove = isPanning ? handlePanMouseMove : onMouseMove;
     // Text-tool hover highlight runs alongside the regular mousemove.
-    const wrappedMouseMove = isTextTool
+    const hoverMouseMove = isTextTool
       ? (e: React.MouseEvent<HTMLCanvasElement>) => {
           baseMouseMove?.(e);
           onCanvasHover?.(e);
         }
       : baseMouseMove;
+    // Magnetic lasso: while a session is open the wire chases the cursor, so it
+    // rides alongside whatever mousemove is already in play (and never while
+    // panning — spacebar still wins).
+    const wrappedMouseMove =
+      lassoActive && !isPanning
+        ? (e: React.MouseEvent<HTMLCanvasElement>) => {
+            hoverMouseMove?.(e);
+            onLassoMove?.(e);
+          }
+        : hoverMouseMove;
     const wrappedMouseUp = isPanning ? handlePanMouseUp : onMouseUp;
 
     const { width: imgW, height: imgH } = hookResult.state;
@@ -856,12 +881,28 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 ? onSelectionClick
                 : undefined
           }
+          // Double-click closes the lasso loop. Only bound while a session is
+          // actually open, so a stray double-click anywhere else behaves exactly
+          // as it always has.
+          onDoubleClick={lassoActive ? onLassoClose : undefined}
           onMouseEnter={(e) =>
             onCanvasEnter(e.currentTarget.getBoundingClientRect())
           }
           onMouseOut={onCanvasLeave}
         />
         <CompareSlider canvasEl={canvasRef.current} />
+
+        {/* ── Magnetic lasso: the frozen path + the live wire (both from Rust) ── */}
+        {(lassoCommitted || lassoPreview) && (
+          <LassoOverlay
+            committed={lassoCommitted ?? null}
+            preview={lassoPreview ?? null}
+            width={imgW}
+            height={imgH}
+            panOffset={panOffset}
+            zoom={zoom}
+          />
+        )}
 
         {/* ── Selection Marker overlay (marching-ants marker, computed in Rust) ── */}
         {selectionMask &&
