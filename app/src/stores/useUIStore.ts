@@ -46,9 +46,15 @@ interface UIState {
   exportDialogOpen: boolean;
   /** Command palette (Alt+,). Transient — never persisted. */
   showCommandPalette: boolean;
-  /** Most-recently-run palette command ids, newest first (persisted — drives
-   *  the "Recent" group shown when the palette query is empty). */
+  /** Most-recently-run palette command ids, newest first (persisted — the
+   *  recency signal; ties in the Most Used grid break toward the more
+   *  recently used command). */
   recentCommands: string[];
+  /** Lifetime run count per palette command id (persisted). Recency alone
+   *  can't answer "what do I actually use" — the Most Used grid (Win10-Start
+   *  style, top 10) ranks by this, so a tool you reach for constantly stays
+   *  put instead of being pushed out by whatever you touched last. */
+  commandUsage: Record<string, number>;
   /** One-shot "open the Settings modal on tab X" request. SubscriptionButton
    *  (the modal's owner) handles it and clears it — the store-routed
    *  replacement for the grandfathered `image-horse:open-settings`
@@ -130,6 +136,7 @@ export const useUIStore = create<UIState>()(
       exportDialogOpen: false,
       showCommandPalette: false,
       recentCommands: [],
+      commandUsage: {},
       settingsRequest: null,
 
       booting: true,
@@ -172,6 +179,10 @@ export const useUIStore = create<UIState>()(
       pushRecentCommand: (id) =>
         set((s) => ({
           recentCommands: [id, ...s.recentCommands.filter((x) => x !== id)].slice(0, 8),
+          commandUsage: {
+            ...s.commandUsage,
+            [id]: (s.commandUsage[id] ?? 0) + 1,
+          },
         })),
       requestSettings: (tab = "general") => set({ settingsRequest: { tab } }),
       clearSettingsRequest: () => set({ settingsRequest: null }),
@@ -230,9 +241,10 @@ export const useUIStore = create<UIState>()(
       // docs/State-Management.md §6.
       partialize: (s): Partial<UIState> => ({
         masterTab: s.masterTab,
-        // Palette recents are a pure "remember my habits" pref, same class as
-        // masterTab. The palette OPEN flag stays transient.
+        // Palette recents + usage counts are a pure "remember my habits" pref,
+        // same class as masterTab. The palette OPEN flag stays transient.
         recentCommands: s.recentCommands,
+        commandUsage: s.commandUsage,
       }),
     },
   ),

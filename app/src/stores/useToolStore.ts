@@ -19,10 +19,14 @@ export type BrushMode = "paint" | "blur" | "pen" | "erase";
 export type StampSubMode = "clone" | "red" | "emojis";
 /** Shapes tool sub-modes. */
 export type ShapesMode = "shapes" | "pens" | "arrows";
+/** Resize tool (legacy id `compress`) sub-modes: file-size compression
+ *  (method/format/quality) vs pixel-dimension resize. */
+export type ResizeMode = "compress" | "resize";
 
 interface ToolState {
   activeTool: ToolType;
   brushMode: BrushMode;
+  resizeMode: ResizeMode;
   /** Layer Settings → Move-layer toggle (drags reposition the layer). */
   moveActive: boolean;
   /** Layer-mask editing: Paint brush paints the active layer's mask. */
@@ -42,6 +46,7 @@ interface ToolState {
 
   setActiveTool: (v: SetArg<ToolType>) => void;
   setBrushMode: (v: SetArg<BrushMode>) => void;
+  setResizeMode: (v: SetArg<ResizeMode>) => void;
   setMoveActive: (v: SetArg<boolean>) => void;
   setMaskEditing: (v: SetArg<boolean>) => void;
   setMaskPaintValue: (v: SetArg<number>) => void;
@@ -61,6 +66,7 @@ export const useToolStore = create<ToolState>()(
     (set) => ({
       activeTool: "compress",
       brushMode: "paint",
+      resizeMode: "compress",
       moveActive: false,
       maskEditing: false,
       maskPaintValue: 0,
@@ -76,6 +82,8 @@ export const useToolStore = create<ToolState>()(
 
       setActiveTool: (v) => set((s) => ({ activeTool: resolveSet(v, s.activeTool) })),
       setBrushMode: (v) => set((s) => ({ brushMode: resolveSet(v, s.brushMode) })),
+      setResizeMode: (v) =>
+        set((s) => ({ resizeMode: resolveSet(v, s.resizeMode) })),
       setMoveActive: (v) => set((s) => ({ moveActive: resolveSet(v, s.moveActive) })),
       setMaskEditing: (v) => set((s) => ({ maskEditing: resolveSet(v, s.maskEditing) })),
       setMaskPaintValue: (v) =>

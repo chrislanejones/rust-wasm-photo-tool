@@ -50,9 +50,19 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.21 — 2026-07-12
+### v7.22 — 2026-07-13
 
-**Text now lands exactly where you typed it.** Committing a text annotation used to drop it below and to the right of where it sat while you were typing — barely visible at small sizes, but the offset grew with font size (about 23 pixels down at a large annotation size), because the typing overlay and the engine's renderer disagreed about where glyph ink starts relative to the anchor point. The engine now reports its true ink position (`text_ink_offset`, computed from the embedded font's real metrics), and the commit path maps the overlay position through it — with the exact inverse applied when you re-open a bubble to edit, so edit-and-commit cycles are pixel-stable instead of creeping. Measured after the fix: sub-pixel accuracy at every font size, drag-then-commit exact, re-edit round-trips changing zero pixels. Existing documents render identically — only where *new* commits land changed.
+**Compression that hits a target, alignment that works, and shadows you can see.**
+
+**Compress Image(s) now earns its PageSpeed badge.** The old pass did one encode at quality 75 with a 2200px cap and no size target — routinely producing 300–400 KB files. It now iterates toward a 200 KB byte budget: quality steps down first (floor 0.5), then dimensions (15% at a time, never below a 1280px long edge), and anything over 2500px on a side is resized as part of the job — the toast reads "Compressing & resizing…" when that kicks in. A 9.9 MB original came out at exactly 200 KB.
+
+**The Align grid works from every selection path.** It only ever armed from the Reselect list, so picking an object on the canvas left all nine cells dead. Now selecting *or* creating a shape or a text arms it — and placing an object whose editor is open re-syncs that editor, which is why text placement used to look like it did nothing at all.
+
+**Shadows work in dark mode.** Tailwind bakes a 10%-black shadow into every `shadow-*` utility, which is invisible against the dark palette — menus, toasts, tooltips and modals all read as flat. They're now restated in dark with layered black and a hairline edge (light mode is untouched). Found while in there: `.shadow-panel` never generated a rule at all, so two surfaces had been shipping with no elevation in either theme.
+
+**The command palette grew up.** Alt+, now wears the same chrome as the Settings and Diagnostics windows instead of a stock dropdown: a real search field at the top, All / Tools / Settings / Actions tabs under it, a **Most Used** grid (top 10 by how often you actually run each command, not just what you touched last — seeded with sensible defaults until you've used it enough), and the search results filling the rest of the dialog.
+
+**Also:** text with a background box or speech bubble now commits exactly where it's placed (the bubble was landing ~71px off — the plain-text fix in v7.21 hadn't covered the bubble's tail geometry); the gallery gets **shift-click range selection**; the palette is finally listed in the Alt+/ modal and the status bar; and Resize/Compress becomes the second tool on the shared `ToolModeToggle` + registry, with its sub-modes reachable from the palette.
 
 ## License
 

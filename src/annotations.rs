@@ -1129,16 +1129,28 @@ impl ImageHorseTool {
     /// right (the mismatch grows with font size). First line only: it owns
     /// the visual anchor the overlay shows.
     pub fn text_ink_offset(&self, text: &str, font_size: f32, bold: bool) -> Vec<i32> {
-        let pad = (font_size * 0.25).ceil() as i32;
-        let first = text.lines().next().unwrap_or("");
-        if first.trim().is_empty() {
-            return vec![pad, pad];
-        }
-        let rendered = crate::text::render_text(first, font_size, 255, 255, 255, bold);
-        match crate::utils::ink_bounds(&rendered.pixels, rendered.width, rendered.height) {
-            Some((min_x, min_y, _, _)) => vec![min_x as i32, min_y as i32],
-            None => vec![pad, pad],
-        }
+        self.text_ink_offset_bg(text, font_size, bold, 0, 0)
+    }
+
+    /// `text_ink_offset` extended to every `background_kind`: where the
+    /// first line's ink begins inside the FULL annotation tile — bubble
+    /// tail margin + background padding included (no-shadow geometry).
+    /// The typing overlay stores `(x, y) = overlay ink − this` on commit
+    /// for ALL kinds, and re-edit applies the exact inverse, so plain
+    /// text, rect and bubble all land pixel-where-typed. Geometry lives
+    /// beside `build_annotation_tile` (`layer::annotation_ink_offset`) so
+    /// the mapping can't drift from the tile builder.
+    pub fn text_ink_offset_bg(
+        &self,
+        text: &str,
+        font_size: f32,
+        bold: bool,
+        background_kind: u8,
+        bg_padding: u32,
+    ) -> Vec<i32> {
+        let (dx, dy) =
+            crate::layer::annotation_ink_offset(text, font_size, bold, background_kind, bg_padding);
+        vec![dx, dy]
     }
 
     /// Add a new text annotation. Pre-renders the rotated tile, stores it,

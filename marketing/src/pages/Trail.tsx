@@ -27,6 +27,20 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.66",
+    date: "2026-07-13",
+    headline: "Real compression targets, working alignment, and shadows you can actually see",
+    entries: [
+      { tag: "feature", text: "Compress Image(s) now works toward an actual size target — about 200 KB — stepping quality down first, then dimensions if it has to, instead of doing one pass and hoping. Images over 2500px get resized as part of the job (the progress toast tells you when that's happening). In testing, a 9.9 MB photo came out at exactly 200 KB." },
+      { tag: "fix", text: "The nine Align buttons now work no matter how you picked the thing you're aligning. Before, they only woke up if you'd selected the object from the Reselect list — pick it on the canvas and they sat there greyed out. Placing text also used to look like it did nothing; it was moving, you just couldn't see it." },
+      { tag: "fix", text: "Shadows are visible in dark mode. Menus, tooltips, toasts and dialogs were rendering flat against the dark background — they now lift off the page properly, with a subtle edge. (Two panels turned out to have had no shadow at all, in either theme.)" },
+      { tag: "fix", text: "Text in a background box or speech bubble now lands exactly where you place it. Plain text was fixed last release; the bubble was still drifting — by quite a lot, as it turns out — because of the space its tail reserves." },
+      { tag: "ui", text: "Selecting a batch of photos got quicker: tick one checkbox, hold Shift, click another — everything between them selects in one go, just like a file manager." },
+      { tag: "ui", text: "The command palette (Alt+,) got a proper home: it now looks like the Settings and Diagnostics windows — a real search bar up top, tabs for All / Tools / Settings / Actions, and a Most Used grid of the ten commands you actually reach for most (it starts with sensible picks and learns from there). You can now open it from the right-click menu too, and it's listed in the keyboard-shortcuts sheet and the status bar, so you can actually find it." },
+      { tag: "ui", text: "The Resize tool's Compress/Resize switcher now matches Paint's — the same icon-and-title toggle every multi-mode tool is moving to." },
+    ],
+  },
+  {
     version: "v0.9.65",
     date: "2026-07-12",
     headline: "Text lands exactly where you typed it",

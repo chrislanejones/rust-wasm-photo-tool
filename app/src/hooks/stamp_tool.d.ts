@@ -465,6 +465,18 @@ declare module "stamp_tool" {
     /** [dx, dy] where the first line's glyph ink begins inside the
      *  annotation tile — the overlay↔engine anchor mapping for bg-kind 0. */
     text_ink_offset(text: string, font_size: number, bold: boolean): Int32Array;
+    /** `text_ink_offset` extended to every background kind: [dx, dy] of the
+     *  first line's ink inside the FULL tile (bubble tail margin +
+     *  bg_padding included; no-shadow geometry). The overlay↔engine anchor
+     *  mapping for ALL kinds: commit stores (x,y) = overlay ink − this,
+     *  re-edit applies the exact inverse. */
+    text_ink_offset_bg(
+      text: string,
+      font_size: number,
+      bold: boolean,
+      background_kind: number,
+      bg_padding: number,
+    ): Int32Array;
     get_text_annotations(): string;
     flatten_text_annotations(): void;
 
@@ -523,6 +535,13 @@ declare module "stamp_tool" {
     // Live text annotations (non-destructive overlay layer)
     text_annotation_count(): number;
     text_ink_offset(text: string, font_size: number, bold: boolean): Int32Array;
+    text_ink_offset_bg(
+      text: string,
+      font_size: number,
+      bold: boolean,
+      background_kind: number,
+      bg_padding: number,
+    ): Int32Array;
     add_text_annotation(
       text: string,
       font_size: number,

@@ -5,8 +5,9 @@
 //
 // SOURCES (in priority order):
 //   1. TOOL_MODULES — the tool registry (features/tools/toolModules.ts).
-//      Paint is registered there today; its sub-mode entries derive from
-//      `paintModule.modes` (PAINT_MODES), NOT a copy.
+//      Paint and Resize/Compress are registered there today; their sub-mode
+//      entries derive from each module's `modes` (PAINT_MODES /
+//      RESIZE_MODES), NOT a copy.
 //   2. toolConfig.ts TOOLS — tools not yet migrated into the registry.
 //   3. LEGACY_SUBMODES below — sub-mode lists for not-yet-migrated tools.
 //      DECISION: these hardcoded lists migrate into each tool's
@@ -43,6 +44,7 @@ import { TOOLS, TOOL_MODULES } from "@/features/tools";
 import {
   useToolStore,
   type BrushMode,
+  type ResizeMode,
   type ShapesMode,
   type StampSubMode,
 } from "@/stores/useToolStore";
@@ -88,6 +90,7 @@ export interface PaletteContext {
 /** Per-tool sub-mode dispatch — the store owns the canonical mode unions. */
 const SUBMODE_SETTERS: Partial<Record<ToolType, (modeId: string) => void>> = {
   brush: (m) => useToolStore.getState().setBrushMode(m as BrushMode),
+  compress: (m) => useToolStore.getState().setResizeMode(m as ResizeMode),
   stamp: (m) => useToolStore.getState().setStampSubMode(m as StampSubMode),
   shapes: (m) => useToolStore.getState().setShapesMode(m as ShapesMode),
 };

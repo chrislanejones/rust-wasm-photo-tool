@@ -314,7 +314,7 @@ export function useDrawingTools({
       );
       tool.set_editing_shape(-1);
     } else {
-      tool.add_shape_annotation(
+      const newId = tool.add_shape_annotation(
         kind,
         es.start.x,
         es.start.y,
@@ -329,6 +329,16 @@ export function useDrawingTools({
         fillAngle,
         fillBlockVal,
       );
+      // The just-drawn shape becomes the Align/Placement target, so the
+      // grid (and numpad 1-9) can place it immediately after drawing.
+      if (newId >= 0) {
+        useAnnotationStore.getState().setSelectedObject({
+          key: `s${newId}`,
+          type: "shape",
+          id: newId,
+          label: es.style?.shape ?? "shape",
+        });
+      }
     }
     flushToCanvas();
     syncState();
@@ -403,6 +413,16 @@ export function useDrawingTools({
       editDirtyRef.current = false;
       editStateRef.current = next;
       setEditState(next);
+      // Selecting a shape — from the canvas OR the Reselect list — makes it
+      // the object the Align/Placement grid acts on. Previously only the
+      // Reselect list set this, so the grid stayed disabled for objects
+      // selected directly on canvas.
+      useAnnotationStore.getState().setSelectedObject({
+        key: `s${id}`,
+        type: "shape",
+        id,
+        label: shapeName,
+      });
     },
     [toolRef, commitEdit, flushToCanvas],
   );
@@ -418,6 +438,12 @@ export function useDrawingTools({
         tool.set_editing_shape(-1);
       }
       tool.remove_shape_annotation(id);
+      // A deleted shape can't stay the Align target.
+      useAnnotationStore
+        .getState()
+        .setSelectedObject((prev) =>
+          prev?.type === "shape" && prev.id === id ? null : prev,
+        );
       flushToCanvas();
       syncState();
       refreshShapes();

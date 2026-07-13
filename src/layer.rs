@@ -301,6 +301,24 @@ pub(crate) fn composite_drop_shadow(
     crate::drawing::blend_coverage(tile, &shifted, sr, sg, sb, sa);
 }
 
+/// Speech-bubble tail geometry (`background_kind == 2`). SSOT for these
+/// numbers: the tile builder below, `tail_margin`, and (via the
+/// `text_ink_offset_bg` export) the JS overlay's anchor mapping all flow
+/// from here — never hardcode them JS-side.
+const TAIL_LEN: f64 = 46.0; // how far the apex sticks out past the rect edge
+const TAIL_HALF: f64 = 16.0; // half-width of the tail base
+
+/// Uniform margin reserved on EVERY side of a bubble tile so the tail fits
+/// at any angle — the apex lands inside the margin no matter the direction.
+/// 0 for plain text and plain rects.
+pub(crate) fn tail_margin(background_kind: u8) -> u32 {
+    if background_kind == 2 {
+        (TAIL_LEN.ceil() as u32) + (TAIL_HALF.ceil() as u32)
+    } else {
+        0
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn build_annotation_tile(
     text: &str,
@@ -391,17 +409,10 @@ pub(crate) fn build_annotation_tile(
         return (rotated.pixels, rotated.width, rotated.height, off_x, off_y);
     }
 
-    // Background path: expand the tile by `bg_padding` on all sides. A
-    // speech-bubble tail can point in any direction (`bg_tail` is an angle in
-    // degrees), so reserve a uniform `TAIL_MARGIN` on every side — the tail
-    // apex lands inside that margin no matter the angle.
-    const TAIL_LEN: f64 = 46.0; // how far the apex sticks out past the rect edge
-    const TAIL_HALF: f64 = 16.0; // half-width of the tail base
-    let tail_margin: u32 = if background_kind == 2 {
-        (TAIL_LEN.ceil() as u32) + (TAIL_HALF.ceil() as u32)
-    } else {
-        0
-    };
+    // Background path: expand the tile by `bg_padding` on all sides, plus a
+    // uniform tail margin for bubbles (`bg_tail` is an angle in degrees, so
+    // the margin is reserved on every side — see `tail_margin`).
+    let tail_margin: u32 = tail_margin(background_kind);
     let pad = bg_padding;
     let tile_w = raw_w + pad * 2 + tail_margin * 2 + sh_margin * 2;
     let tile_h = raw_h + pad * 2 + tail_margin * 2 + sh_margin * 2;
@@ -556,6 +567,43 @@ pub(crate) fn build_annotation_tile(
     let off_x = cx - rotated.width as i32 / 2;
     let off_y = cy - rotated.height as i32 / 2;
     (rotated.pixels, rotated.width, rotated.height, off_x, off_y)
+}
+
+/// Where the FIRST line's glyph ink begins inside the tile that
+/// `build_annotation_tile` would produce for these parameters, as offsets
+/// from the tile origin — i.e. from the annotation's stored (x, y) when
+/// unrotated. Mirrors the no-shadow tile geometry above: `render_text`'s
+/// own ink inset (0.25·font_size pad + bearing/ascent inset, true embedded-
+/// font metrics) for plain text, plus `tail_margin + bg_padding` for
+/// background kinds (rect/bubble) whose text sits at `origin + bg_padding`.
+///
+/// This is the shared anchor→ink convention for the typing overlay: commit
+/// stores `(x, y) = overlay ink − this`, re-edit applies the exact inverse.
+/// Lives next to `build_annotation_tile` so the two can't drift; proven
+/// against the real tile builder in the tests below.
+pub(crate) fn annotation_ink_offset(
+    text: &str,
+    font_size: f32,
+    bold: bool,
+    background_kind: u8,
+    bg_padding: u32,
+) -> (i32, i32) {
+    let pad = (font_size * 0.25).ceil() as i32;
+    let first = text.lines().next().unwrap_or("");
+    let (ink_x, ink_y) = if first.trim().is_empty() {
+        (pad, pad)
+    } else {
+        let rendered = crate::text::render_text(first, font_size, 255, 255, 255, bold);
+        crate::utils::ink_bounds(&rendered.pixels, rendered.width, rendered.height)
+            .map(|(min_x, min_y, _, _)| (min_x as i32, min_y as i32))
+            .unwrap_or((pad, pad))
+    };
+    let margin = if background_kind == 0 {
+        0
+    } else {
+        (tail_margin(background_kind) + bg_padding) as i32
+    };
+    (ink_x + margin, ink_y + margin)
 }
 
 /// Minimum paste-placement size (px), matching the crop overlay's own floor —
@@ -1291,5 +1339,54 @@ impl ImageHorseTool {
         self.active = active_index.min(self.layers.len() - 1);
         self.editing_shape_id = None;
         self.recomposite();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `annotation_ink_offset` must agree with the REAL tile builder: build
+    /// the tile with a fully transparent background (isolates the glyph ink
+    /// inside the true bg-kind geometry — margins still apply) and no
+    /// shadow/rotation, then assert the tile's ink bounds start exactly at
+    /// the predicted offset. Covers plain / rect / bubble across paddings
+    /// and font sizes so the overlay's anchor mapping can't silently drift
+    /// from `build_annotation_tile`.
+    #[test]
+    fn ink_offset_matches_tile_geometry() {
+        for &kind in &[0u8, 1, 2] {
+            for &pad in &[0u32, 8, 24] {
+                for &fs in &[16.0f32, 24.0, 54.0] {
+                    for &bold in &[false, true] {
+                        let (tile, w, h, off_x, off_y) = build_annotation_tile(
+                            "Hg", fs, 255, 255, 255, bold, 0.0, kind, 0, 0, 0,
+                            0, // bg_a = 0: transparent bg, geometry unchanged
+                            pad, 6, 135, false, false, 0, 0, 0, 0, 0, 0, 0,
+                        );
+                        assert_eq!((off_x, off_y), (0, 0), "unrotated tile offset");
+                        let ink =
+                            crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink");
+                        let want = annotation_ink_offset("Hg", fs, bold, kind, pad);
+                        assert_eq!(
+                            (ink.0 as i32, ink.1 as i32),
+                            want,
+                            "kind={kind} pad={pad} fs={fs} bold={bold}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Bubble margin = ceil(TAIL_LEN) + ceil(TAIL_HALF); other kinds 0.
+    #[test]
+    fn tail_margin_values() {
+        assert_eq!(tail_margin(0), 0);
+        assert_eq!(tail_margin(1), 0);
+        assert_eq!(
+            tail_margin(2),
+            (TAIL_LEN.ceil() as u32) + (TAIL_HALF.ceil() as u32)
+        );
     }
 }

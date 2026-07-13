@@ -59,6 +59,8 @@ interface Props {
   selectedIds: Set<string>;
   /** Toggle a photo's selection. */
   onToggleSelect: (id: string) => void;
+  /** Add a contiguous run of photo ids to the selection (shift+click range). */
+  onSelectRange?: (ids: string[]) => void;
   /** Clear the entire selection (the "Unselect" action). */
   onClearSelection?: () => void;
   /** Vertical mode: the same gallery inverted for the compact master bar —
@@ -81,7 +83,7 @@ interface ThumbProps {
   /** True once at least one photo is selected — keeps checkboxes always visible. */
   selectionActive: boolean;
   /** Toggle this thumb's checkbox. */
-  onToggleSelect: () => void;
+  onToggleSelect: (shiftKey: boolean) => void;
   /** Vertical gallery: fill the grid column (square) instead of the fixed 96px. */
   vertical?: boolean;
 }
@@ -224,7 +226,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       {/* Multi-select checkbox — bottom-right; shows on hover, and stays
           visible for every thumb once a selection has started. */}
       <button
-        onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+        onClick={(e) => { e.stopPropagation(); onToggleSelect(e.shiftKey); }}
         title={selected ? "Deselect" : "Select"}
         className={`absolute bottom-1 right-1 z-30 flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
           selected
@@ -342,11 +344,18 @@ export function GalleryBar({
   onDuplicateSelected,
   selectedIds,
   onToggleSelect,
+  onSelectRange,
   onClearSelection,
   vertical = false,
 }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
   const selectionActive = selectedIds.size > 0;
+  // Shift+click range anchor: the index of the last checkbox the user
+  // toggled without shift. Shift+clicking another checkbox selects the whole
+  // run between the two (inclusive), like every file manager. Plain clicks
+  // move the anchor; the anchor also moves to the end of a range so chained
+  // shift-clicks extend from where you left off.
+  const rangeAnchorRef = useRef<number | null>(null);
 
   // Overflow-aware arrow state. Each arrow is enabled only when the strip can
   // actually scroll that way. When all thumbs fit (e.g. desktop, ≤12 photos)
@@ -552,7 +561,21 @@ export function GalleryBar({
                   isModified={modifiedPhotos?.has(entry.id)}
                   selected={selectedIds.has(entry.id)}
                   selectionActive={selectionActive}
-                  onToggleSelect={() => onToggleSelect(entry.id)}
+                  onToggleSelect={(shiftKey) => {
+                    if (
+                      shiftKey &&
+                      onSelectRange &&
+                      rangeAnchorRef.current !== null &&
+                      rangeAnchorRef.current !== i
+                    ) {
+                      const a = Math.min(rangeAnchorRef.current, i);
+                      const b = Math.max(rangeAnchorRef.current, i);
+                      onSelectRange(photos.slice(a, b + 1).map((p) => p.id));
+                    } else {
+                      onToggleSelect(entry.id);
+                    }
+                    rangeAnchorRef.current = i;
+                  }}
                   vertical={vertical}
                 />
               ))}

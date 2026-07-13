@@ -36,6 +36,7 @@ export interface AnnotationMeta {
   tile_offset_x: number;
   tile_offset_y: number;
   background_kind: number;
+  bg_padding: number;
 }
 
 interface UseTextToolOptions {
@@ -198,6 +199,12 @@ export function useTextTool({
       // Empty text — if we were editing an existing annotation, remove it.
       if (editingId !== null) {
         tool.remove_text_annotation(editingId);
+        // A deleted text can't stay the Align target.
+        useAnnotationStore
+          .getState()
+          .setSelectedObject((prev) =>
+            prev?.type === "text" && prev.id === editingId ? null : prev,
+          );
         refreshAnnotations();
         flushToCanvas();
         syncState();
@@ -214,29 +221,6 @@ export function useTextTool({
     // Pull background settings from the current toolSettings snapshot.
     const s = settingsRef.current;
     const bgKind = BG_KIND_MAP[s.bgKind];
-
-    // Ink-anchor mapping (plain text only): the engine renders glyph ink
-    // `text_ink_offset` px inside the tile (≈0.25·fontSize pad + ascent
-    // inset — grows with font size), while the overlay shows the glyphs at
-    // its content box (constant CSS padding). Without compensation the
-    // committed text lands below-right of where it was typed, ~(12, 23)px
-    // at a 54px font. Shift the stored anchor so engine ink == overlay ink.
-    // editAnnotation applies the exact inverse, so re-edit cycles don't
-    // drift. Background kinds anchor the bubble tile, not the ink — their
-    // overlay preview is a separate WYSIWYG problem, left unchanged.
-    let x = Math.round(ti.canvasX);
-    let y = Math.round(ti.canvasY);
-    if (bgKind === 0) {
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const cr = canvas.getBoundingClientRect();
-        const scaleX = cr.width / canvas.width || 1;
-        const scaleY = cr.height / canvas.height || 1;
-        const ink = tool.text_ink_offset(ti.text, ti.fontSize, bold);
-        x = Math.round(ti.canvasX + TEXT_OVERLAY_PAD_X / scaleX - ink[0]);
-        y = Math.round(ti.canvasY + TEXT_OVERLAY_PAD_Y / scaleY - ink[1]);
-      }
-    }
     const [bgR, bgG, bgB] = hexToRgb(s.bgColor);
     const bgA = Math.round(
       Math.max(0, Math.min(100, s.bgOpacity)) * 2.55,
@@ -245,6 +229,35 @@ export function useTextTool({
     const bgCornerRadius = Math.max(0, Math.round(s.bgCornerRadius));
     // Tail angle in degrees, normalized to 0-359 for the Rust u32 param.
     const bgTail = ((Math.round(s.bgTail) % 360) + 360) % 360;
+
+    // Ink-anchor mapping (ALL background kinds): the engine renders the
+    // first line's glyph ink `text_ink_offset_bg` px inside the tile
+    // (≈0.25·fontSize pad + ascent inset, plus the bubble tail margin +
+    // bg_padding for background kinds), while the overlay shows the glyphs
+    // at its content box (constant CSS padding). Without compensation the
+    // committed rect/bubble lands `bg_padding` / `tail margin + bg_padding`
+    // px below-right of its preview. Shift the stored anchor so engine ink
+    // == overlay ink; editAnnotation applies the exact inverse, so re-edit
+    // cycles don't drift.
+    let x = Math.round(ti.canvasX);
+    let y = Math.round(ti.canvasY);
+    {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const cr = canvas.getBoundingClientRect();
+        const scaleX = cr.width / canvas.width || 1;
+        const scaleY = cr.height / canvas.height || 1;
+        const ink = tool.text_ink_offset_bg(
+          ti.text,
+          ti.fontSize,
+          bold,
+          bgKind,
+          bgPadding,
+        );
+        x = Math.round(ti.canvasX + TEXT_OVERLAY_PAD_X / scaleX - ink[0]);
+        y = Math.round(ti.canvasY + TEXT_OVERLAY_PAD_Y / scaleY - ink[1]);
+      }
+    }
 
     let targetId: number | null = null;
     if (editingId !== null) {
@@ -312,6 +325,16 @@ export function useTextTool({
     syncState();
     // Was a `text-committed` window CustomEvent before stage 4.
     useAnnotationStore.getState().commitText(ti.text);
+    // The just-committed text becomes the Align/Placement target, so the
+    // grid (and numpad 1-9) can place it immediately after typing.
+    if (targetId !== null && targetId >= 0) {
+      useAnnotationStore.getState().setSelectedObject({
+        key: `t${targetId}`,
+        type: "text",
+        id: targetId,
+        label: "Text",
+      });
+    }
   }, [toolRef, canvasRef, flushToCanvas, syncState, refreshAnnotations]);
 
   /** Open the textarea on top of an existing annotation for re-editing. */
@@ -324,17 +347,21 @@ export function useTextTool({
       const ctr = container.getBoundingClientRect();
       const scaleX = cr.width / canvas.width;
       const scaleY = cr.height / canvas.height;
-      // Exact inverse of commitText's ink-anchor mapping (plain text only):
-      // the stored (x, y) is the engine tile origin; the overlay box opens
-      // shifted so its glyphs sit exactly on the baked ink. Symmetry with the
-      // commit side means edit→commit round-trips never drift.
+      // Exact inverse of commitText's ink-anchor mapping (ALL background
+      // kinds): the stored (x, y) is the engine tile origin; the overlay box
+      // opens shifted so its glyphs sit exactly on the baked ink. Uses the
+      // annotation's STORED kind/padding — the values its tile was built
+      // with. Symmetry with the commit side means edit→commit round-trips
+      // never drift.
       let boxX = ann.x;
       let boxY = ann.y;
-      if (ann.background_kind === 0 && toolRef.current) {
-        const ink = toolRef.current.text_ink_offset(
+      if (toolRef.current) {
+        const ink = toolRef.current.text_ink_offset_bg(
           ann.text,
           ann.font_size,
           ann.bold,
+          ann.background_kind,
+          ann.bg_padding,
         );
         boxX = ann.x + ink[0] - TEXT_OVERLAY_PAD_X / (scaleX || 1);
         boxY = ann.y + ink[1] - TEXT_OVERLAY_PAD_Y / (scaleY || 1);
@@ -369,6 +396,14 @@ export function useTextTool({
       // open, so the user doesn't see a doubled copy underneath the editor.
       toolRef.current?.set_editing_text(ann.id);
       flushToCanvas();
+      // Opening a text for editing — from the canvas OR the Reselect list —
+      // makes it the object the Align/Placement grid acts on.
+      useAnnotationStore.getState().setSelectedObject({
+        key: `t${ann.id}`,
+        type: "text",
+        id: ann.id,
+        label: "Text",
+      });
       setTimeout(() => textareaRef.current?.focus(), 10);
     },
     [canvasRef, containerRef, toolRef, flushToCanvas],

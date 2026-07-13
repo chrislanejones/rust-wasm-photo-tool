@@ -60,9 +60,20 @@ CommandDialog.displayName = "CommandDialog"
 
 const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
-  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
->(({ className, ...props }, ref) => (
-  <div className="flex items-center gap-2 border-b border-border px-4" cmdk-input-wrapper="">
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input> & {
+    /** Restyle the input's container. The default is the stock full-bleed row
+     *  with a bottom border; the command palette overrides it into a bordered,
+     *  rounded search bar sitting inside the dialog's padding. */
+    wrapperClassName?: string
+  }
+>(({ className, wrapperClassName, ...props }, ref) => (
+  <div
+    className={cn(
+      "flex items-center gap-2 border-b border-border px-4",
+      wrapperClassName
+    )}
+    cmdk-input-wrapper=""
+  >
     <Search className="h-4 w-4 shrink-0 text-text-muted" aria-hidden="true" />
     <CommandPrimitive.Input
       ref={ref}

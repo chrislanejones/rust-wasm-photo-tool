@@ -27,8 +27,15 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  /* Floating side-panel / sidebar elevation (Tools, Review). */
-  --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  /* Floating side-panel / sidebar elevation (Tools, Review, Gallery, MasterBar
+     + the `.shadow-panel` utility defined in the ELEVATION section below).
+     THEME-SCOPED: the dark counterpart lives in `.dark`. This LIGHT value is
+     new — the token used to hold the dark one for both themes, which was
+     invisible until `.shadow-panel` started generating a rule (it never did
+     before; see ELEVATION), at which point a 40%-black shadow with a white
+     hairline would have landed on the warm-paper light theme. Soft black +
+     a dark hairline is the light-mode equivalent of what dark gets. */
+  --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
 
   /* ── Z-index ladder — the single source for stacking order. Use
      var(--z-*) in CSS and z-[var(--z-*)] in JSX; no more "+1 to win". ── */
@@ -108,6 +115,11 @@
 }
 
 .dark {
+  /* Panel elevation, dark: the original value, verbatim — deep black to read
+     against #121212–#2b2b2b, plus a 1px light hairline to define the edge
+     where the shadow alone can't. Light counterpart is in `:root`. */
+  --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+
   /* ── DARK palette — original earth-tone / warm brown (verbatim) ── */
   --bg-primary: #121212;
   --bg-secondary: #181818;
@@ -229,6 +241,79 @@
   font-weight: 600;
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ELEVATION
+
+   Two separate problems, both fixed here.
+
+   1. `shadow-panel` was INERT. `--shadow-panel` is declared in plain `:root`,
+      but Tailwind v4 only mints utilities from `@theme` — so the
+      `.shadow-panel` class (IdleScreen, the `sm` dialog variant) generated no
+      rule at all and those surfaces had no elevation in EITHER theme. The
+      other consumers reach the token through `style={{ boxShadow:
+      "var(--shadow-panel)" }}`, which is why the gap went unnoticed. Defining
+      the class here keeps that one token as the single source: no @theme
+      rename, no change for the inline-style callers.
+
+   2. Tailwind's own scale is INVISIBLE IN DARK. Its utilities bake
+      `rgb(0 0 0 / 0.1)` into `--tw-shadow`, which reads as nothing against the
+      dark palette's #121212–#2b2b2b surfaces — menus, toasts, tooltips and
+      modals all render flat. Below, `.dark` restates `--tw-shadow` (the custom
+      property each utility feeds into `box-shadow`) with deeper, layered black
+      plus — on the floating tiers — the 1px light hairline `--shadow-panel`
+      already uses to define an edge where shadow alone can't.
+
+   Notes for whoever touches this next:
+   • LIGHT MODE IS DELIBERATELY UNTOUCHED — Tailwind's defaults are tuned for
+     it. Only the `.dark` tiers are restated.
+   • These rules are unlayered, so they outrank Tailwind's `utilities` layer
+     regardless of specificity. `--tw-shadow` is `@property inherits: false`,
+     so it must be set ON the shadowed element — a var flip on `.dark` alone
+     would never cascade down to it.
+   • The black layers keep their `var(--tw-shadow-color, …)` wrapper so an
+     explicit `shadow-<color>` modifier (ToolButton's `shadow-black/25`) still
+     overrides them. The hairline stays literal so a color modifier can't
+     accidentally turn it black.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The utility Tailwind never generated (see 1 above). */
+.shadow-panel {
+  box-shadow: var(--shadow-panel);
+}
+
+.dark .shadow-sm {
+  --tw-shadow: 0 1px 2px 0 var(--tw-shadow-color, rgba(0, 0, 0, 0.5));
+}
+
+.dark .shadow-md {
+  --tw-shadow:
+    0 4px 8px -2px var(--tw-shadow-color, rgba(0, 0, 0, 0.55)),
+    0 2px 4px -2px var(--tw-shadow-color, rgba(0, 0, 0, 0.45));
+}
+
+.dark .shadow-lg {
+  --tw-shadow:
+    0 10px 20px -4px var(--tw-shadow-color, rgba(0, 0, 0, 0.6)),
+    0 4px 8px -4px var(--tw-shadow-color, rgba(0, 0, 0, 0.5)),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.dark .shadow-xl {
+  --tw-shadow:
+    0 20px 30px -6px var(--tw-shadow-color, rgba(0, 0, 0, 0.65)),
+    0 8px 12px -6px var(--tw-shadow-color, rgba(0, 0, 0, 0.5)),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* The floating tier: dialogs, modals, toasts, magnifier, upload sheet. */
+.dark .shadow-2xl,
+.dark .focus\:shadow-2xl:focus {
+  --tw-shadow:
+    0 28px 56px -12px var(--tw-shadow-color, rgba(0, 0, 0, 0.75)),
+    0 8px 20px -8px var(--tw-shadow-color, rgba(0, 0, 0, 0.55)),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -513,6 +598,20 @@ select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Command-palette search field (Alt+,). The bordered WRAPPER is the visual
+   field, so it takes the focus treatment and the inner input takes none —
+   otherwise the accent outline above draws a second rounded box INSIDE the
+   border (the "orange box"). This has to live here, unlayered, for the same
+   reason the elevation rules do: the rule above is unlayered raw CSS and
+   would outrank any Tailwind focus-visible utility regardless of specificity. */
+.palette-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.palette-search input:focus-visible {
+  outline: none;
 }
 
 .source-marker::before,

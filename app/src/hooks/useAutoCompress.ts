@@ -13,6 +13,9 @@ export interface CompressionProgress {
   running: boolean;
   total: number;
   completed: number;
+  /** True once any target image exceeded the resize threshold — drives the
+   *  "Compressing & resizing…" toast wording. */
+  resizing: boolean;
 }
 
 export function useAutoCompress() {
@@ -22,6 +25,7 @@ export function useAutoCompress() {
     running: false,
     total: 0,
     completed: 0,
+    resizing: false,
   });
   const abortRef = useRef(false);
 
@@ -33,14 +37,30 @@ export function useAutoCompress() {
         maxHeight?: number;
         quality?: number;
         format?: string;
+        /** Byte budget the encode loop iterates toward (default 200 KB). */
+        targetBytes?: number;
+        /** Long-edge floor for budget-driven downscaling (default 1280). */
+        minLongEdge?: number;
       },
       onPhotoCompressed: (id: string, newFile: File, newUrl: string) => void,
     ) => {
       const {
-        maxWidth = 2200, // bumped from 1920
-        maxHeight = 2200, // bumped from 1080
+        // Resize threshold: anything over 2500px on either side gets scaled
+        // down as part of Compress Image(s) — dimensions that large are
+        // wasted bytes for a page image (the old 2200-cap single-pass encode
+        // routinely produced 300-400 KB files that tank PageSpeed). The toast
+        // switches to "Compressing & resizing…" when this kicks in.
+        maxWidth = 2500,
+        maxHeight = 2500,
         quality = 0.75,
         format = "image/webp",
+        // The actual PageSpeed lever: iterate quality (then dimensions) down
+        // until the encoded file fits this budget. ~200 KB keeps a hero-sized
+        // image comfortably inside "properly size images" territory.
+        targetBytes = 200 * 1024,
+        // Don't shrink below this long edge chasing the budget — past here
+        // the image stops being useful and we accept the best effort.
+        minLongEdge = 1280,
       } = options;
 
       abortRef.current = false;
@@ -58,6 +78,7 @@ export function useAutoCompress() {
         running: true,
         total: photos.length,
         completed: 0,
+        resizing: false,
       });
 
       let completed = 0;
@@ -94,6 +115,11 @@ export function useAutoCompress() {
             const scale = Math.min(maxWidth / tw, maxHeight / th);
             tw = Math.round(tw * scale);
             th = Math.round(th * scale);
+            // Over the resize threshold — flip the toast to
+            // "Compressing & resizing…" for the rest of the batch.
+            setProgress((prev) =>
+              prev.resizing ? prev : { ...prev, resizing: true },
+            );
           }
 
           items[photo.id] = 50;
@@ -113,12 +139,47 @@ export function useAutoCompress() {
           setProgress((prev) => ({ ...prev, items: { ...items } }));
 
           // Offload the (expensive) encode to the codec worker. It transfers
-          // the resized pixels; if the worker is unavailable, fall back to the
+          // the pixels; if the worker is unavailable, fall back to the
           // main-thread convertToBlob on the same canvas (pixels untouched).
-          const resizedPixels = rctx.getImageData(0, 0, tw, th).data;
-          const blob =
-            (await encodeViaWorker(resizedPixels, tw, th, format, quality)) ??
-            (await resized.convertToBlob({ type: format, quality }));
+          const encodeCanvas = async (
+            cv: OffscreenCanvas,
+            w: number,
+            h: number,
+            q: number,
+          ) => {
+            const px = cv.getContext("2d")!.getImageData(0, 0, w, h).data;
+            return (
+              (await encodeViaWorker(px, w, h, format, q)) ??
+              (await cv.convertToBlob({ type: format, quality: q }))
+            );
+          };
+
+          // Budget loop: step quality down to a 0.5 floor first; if still over
+          // the byte target, step dimensions down 15% at a time (quality reset
+          // to 0.7 for the smaller canvas) until the file fits or the long
+          // edge hits `minLongEdge`. Bounded so a pathological image can't
+          // spin — worst case we ship the smallest attempt.
+          let q = quality;
+          let cw = tw;
+          let ch = th;
+          let canvas = resized;
+          let blob = await encodeCanvas(canvas, cw, ch, q);
+          for (let pass = 0; blob.size > targetBytes && pass < 8; pass++) {
+            if (q > 0.52) {
+              q = Math.max(0.5, q - 0.12);
+            } else if (Math.max(cw, ch) > minLongEdge) {
+              const s = 0.85;
+              cw = Math.max(1, Math.round(cw * s));
+              ch = Math.max(1, Math.round(ch * s));
+              const next = new OffscreenCanvas(cw, ch);
+              next.getContext("2d")!.drawImage(canvas, 0, 0, cw, ch);
+              canvas = next;
+              q = 0.7;
+            } else {
+              break;
+            }
+            blob = await encodeCanvas(canvas, cw, ch, q);
+          }
 
           items[photo.id] = 90;
           setProgress((prev) => ({ ...prev, items: { ...items } }));
@@ -179,6 +240,7 @@ export function useAutoCompress() {
           running: false,
           total: 0,
           completed: 0,
+          resizing: false,
         });
       }, 3000);
     },

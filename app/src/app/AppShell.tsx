@@ -126,6 +126,7 @@ import {
   Download,
   Clipboard,
   Copy,
+  Command as CommandIcon,
   Trash2,
   ZoomIn,
   ZoomOut,
@@ -270,6 +271,8 @@ export function AppShell() {
   const setOriginalUrl = useUIStore((s) => s.setOriginalUrl);
   const compareActive = useUIStore((s) => s.compareActive);
   const setCompareActive = useUIStore((s) => s.setCompareActive);
+  // Right-click → Command Palette. Same store flag Alt+, toggles.
+  const setShowCommandPalette = useUIStore((s) => s.setShowCommandPalette);
   const hasBeenModified = useGalleryStore((s) => s.hasBeenModified);
   const setHasBeenModified = useGalleryStore((s) => s.setHasBeenModified);
   const isImageLoading = useUIStore((s) => s.isImageLoading);
@@ -528,6 +531,15 @@ export function AppShell() {
     });
   }, []);
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+  // Shift+click range from the gallery: additive — the whole run joins the
+  // selection (matching file-manager semantics), never deselects.
+  const selectRangePhotos = useCallback((ids: string[]) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }, []);
 
   // Drop selections for photos that no longer exist.
   useEffect(() => {
@@ -1325,11 +1337,22 @@ export function AppShell() {
         stamp.state.height,
       );
       if (!moved) return;
-      tool.set_editing_shape(-1);
       stamp.flushToCanvas();
       stamp.syncState();
       drawingTools.refreshShapes();
       textTool.refreshAnnotations();
+      // If an editor is open on the placed object, re-open it at the new
+      // geometry. Without this the move is invisible: an open TEXT editor
+      // suppresses the baked tile (set_editing_text) so the aligned
+      // annotation doesn't render, and an open SHAPE editor's JS overlay
+      // stays at the stale position as a ghost over the moved shape.
+      if (selectedObject.type === "text") {
+        if (textTool.textInput) textTool.selectAnnotation(selectedObject.id);
+      } else if (drawingTools.editState?.editId === selectedObject.id) {
+        drawingTools.selectShape(selectedObject.id);
+      } else {
+        tool.set_editing_shape(-1);
+      }
     },
     [stamp, selectedObject, drawingTools, textTool],
   );
@@ -1350,8 +1373,12 @@ export function AppShell() {
       } else {
         drawingTools.removeShape(o.id);
       }
+      // Either way the deleted object can't stay the Align target.
+      setSelectedObject((prev) =>
+        prev?.type === o.type && prev.id === o.id ? null : prev,
+      );
     },
-    [stamp, textTool, drawingTools, bumpAnnotations],
+    [stamp, textTool, drawingTools, bumpAnnotations, setSelectedObject],
   );
 
   const redStampTool = useRedStampTool({
@@ -1837,8 +1864,9 @@ export function AppShell() {
     compressAll(
       photosForCompress,
       {
-        maxWidth: 2200,
-        maxHeight: 2200,
+        // maxWidth/maxHeight/targetBytes ride the hook defaults (1920 long
+        // edge, 200 KB budget) — Auto Compress means "make it web-ready",
+        // and the budget loop inside the hook owns the real size decisions.
         quality: quality / 100,
         format: `image/${exportFormat === "png" ? "webp" : exportFormat}`,
       },
@@ -1908,14 +1936,14 @@ export function AppShell() {
   const compressToastRef = useRef<string | number | null>(null);
   const compressTotalRef = useRef(0);
   useEffect(() => {
-    const { running, completed, total } = compressProgress;
+    const { running, completed, total, resizing } = compressProgress;
     const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
     if (running) {
       compressTotalRef.current = total;
       const node = (
         <div className="flex w-full min-w-[220px] flex-col gap-2">
           <div className="flex items-baseline justify-between gap-3 pr-6 text-sm font-semibold">
-            <span>Compressing…</span>
+            <span>{resizing ? "Compressing & resizing…" : "Compressing…"}</span>
             <span className="font-mono text-xs tabular-nums text-theme-muted-foreground">
               {completed}/{total} · {pct}%
             </span>
@@ -2883,6 +2911,14 @@ export function AppShell() {
         </ContextMenuTrigger>
 
         <ContextMenuContent className="w-72">
+          {/* Top of the menu: the "do anything" entry point — every tool,
+              sub-mode, setting and action is reachable from here, so it
+              outranks the specific items below it. */}
+          <ContextMenuItem onClick={() => setShowCommandPalette(true)}>
+            <CommandIcon className="h-4 w-4 mr-2" /> Command Palette
+            <ContextMenuShortcut>Alt+,</ContextMenuShortcut>
+          </ContextMenuItem>
+          <ContextMenuSeparator />
           <ContextMenuItem onClick={stamp.undo} disabled={!canUndo}>
             <Undo className="h-4 w-4 mr-2" /> Undo
             <ContextMenuShortcut>Ctrl+Z</ContextMenuShortcut>
@@ -2968,6 +3004,7 @@ export function AppShell() {
             onExportSelected={handleExportClick}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelectPhoto}
+            onSelectRange={selectRangePhotos}
             onClearSelection={clearSelection}
           />
         )}

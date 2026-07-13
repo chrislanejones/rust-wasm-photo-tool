@@ -1,11 +1,11 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { SlidersHorizontal, Zap, Scaling, ChevronDown } from "lucide-react";
+import { SlidersHorizontal, Zap, Scaling, ChevronDown, FileArchive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DimensionFields } from "@/components/DimensionFields";
 import { SizeSlider } from "@/components/SizeSlider";
-import { TabGroup } from "@/components/TabGroup";
+import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
+import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import {
   Tooltip,
   TooltipContent,
@@ -13,12 +13,43 @@ import {
 } from "@/components/ui/tooltip";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { getWebPerfMetrics } from "@/lib/webPerf";
-import { settingsPanelMotion } from "@/lib/animations";
 import type { ExportFormat } from "@/lib/exportImage";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { useToolStore } from "@/stores/useToolStore";
+import type { ResizeMode } from "@/stores/useToolStore";
 
-type ResizeTab = "resize" | "compress";
+/** Resize's sub-modes for the shared ToolModeToggle (icon tiles + per-mode
+ *  SectionHeader title/info). Also consumed by the tool registry
+ *  (features/tools/toolModules.ts) as the Resize module's `modes`. The mode
+ *  union (`ResizeMode`) is canonical in `stores/useToolStore.ts`. */
+export const RESIZE_MODES: readonly ToolMode<ResizeMode>[] = [
+  {
+    id: "compress",
+    label: "Compress",
+    icon: FileArchive,
+    info: (
+      <>
+        Shrinks the file size: pick a resample Method and output Format,
+        then drag Quality. Web Performance Gain and PageSpeed Insights
+        Score preview the pending output — Apply Compression &amp; Resize
+        commits it.
+      </>
+    ),
+  },
+  {
+    id: "resize",
+    label: "Resize",
+    icon: Scaling,
+    info: (
+      <>
+        Sets new pixel dimensions. The lock keeps the aspect ratio; the
+        percent slider scales width and height proportionally. Apply
+        Compression &amp; Resize commits it.
+      </>
+    ),
+  },
+];
 
 /** Resampling method → Rust filter code (see `resize_with_filter`). */
 const FILTER_CODE = {
@@ -104,7 +135,11 @@ export function ResizeSettings({
   const [height, setHeight] = useState(String(imageHeight));
   const [lockAspect, setLockAspect] = useState(true);
   const [method, setMethod] = useState<ResampleMethod>("lanczos3");
-  const [tab, setTab] = useState<ResizeTab>("compress");
+  // Sub-mode lives in the tool store (like Paint's brushMode) so the command
+  // palette's registry-derived `mode.compress.*` entries can deep-link to a
+  // sub-mode. Was panel-local useState before Session 2.1.
+  const mode = useToolStore((s) => s.resizeMode);
+  const setMode = useToolStore((s) => s.setResizeMode);
   // A/B Compare stays locked until the user actually applies an edit —
   // either "Apply Compression & Resize" or "Auto Compress" — in this photo.
   // Pending (unapplied) changes no longer unlock it; there's nothing to
@@ -242,45 +277,32 @@ export function ResizeSettings({
 
   return (
     <div className="flex flex-col h-full -mt-2">
-      {/* Resize ↔ Compress toggle (mirrors Paint's Paint | Blur Brush tabs) */}
-      <TabGroup
-        tabs={[
-          { id: "compress", label: "Compress" },
-          { id: "resize", label: "Resize" },
-        ]}
-        active={tab}
-        onChange={(id) => setTab(id as ResizeTab)}
-      />
-
-      {/* ── Content ── */}
-      <div className="space-y-8 flex-1 mt-2.5">
-        <AnimatePresence mode="wait">
-          {tab === "resize" && (
-            <motion.div
-              key="resize"
-              {...settingsPanelMotion}
-              className="space-y-3"
-            >
-              <DimensionFields
-                width={width}
-                height={height}
-                widthPercent={widthPercent}
-                lockAspect={lockAspect}
-                disabled={disabled}
-                onWidthChange={handleWidthChange}
-                onHeightChange={handleHeightChange}
-                onPercentChange={handlePercentChange}
-                onToggleLock={() => setLockAspect((v) => !v)}
-              />
-            </motion.div>
-          )}
-
-          {tab === "compress" && (
-            <motion.div
-              key="compress"
-              {...settingsPanelMotion}
-              className="space-y-4"
-            >
+      {/* [Compress] | [Resize] — the shared ToolModeToggle (icon-top tiles +
+          title-below + body slot, same template as Paint). `mt-0` cancels the
+          toggle's baked-in -mt-2 (this panel's outer flex column already
+          carries it); `flex-1` keeps the shared footer pinned to the bottom
+          exactly like the old `space-y-8 flex-1 mt-2.5` content wrapper. */}
+      <ToolModeToggle
+        modes={RESIZE_MODES}
+        activeMode={mode}
+        onModeChange={setMode}
+        className="flex-1 mt-0"
+      >
+        {(m) =>
+          m === "resize" ? (
+            <DimensionFields
+              width={width}
+              height={height}
+              widthPercent={widthPercent}
+              lockAspect={lockAspect}
+              disabled={disabled}
+              onWidthChange={handleWidthChange}
+              onHeightChange={handleHeightChange}
+              onPercentChange={handlePercentChange}
+              onToggleLock={() => setLockAspect((v) => !v)}
+            />
+          ) : (
+            <>
               {/* ── Method / Format side by side to save vertical space ── */}
               <div className="grid grid-cols-2 gap-3">
                 {/* ── Method ── */}
@@ -386,10 +408,10 @@ export function ResizeSettings({
                   />
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            </>
+          )
+        }
+      </ToolModeToggle>
 
       {/* ── Bottom Buttons ── */}
       <div className="border-t border-theme-sidebar-border pt-4 mt-8 space-y-2">

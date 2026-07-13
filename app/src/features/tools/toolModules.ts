@@ -11,9 +11,11 @@
 // add AppShell wiring here or anywhere else.
 import type { ToolType } from "@/lib/types";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
-import { Paintbrush } from "lucide-react";
+import { Paintbrush, Shrink } from "lucide-react";
 import { PaintSettings, PAINT_MODES } from "./settings/PaintSettings";
 import type { PaintMode } from "./settings/PaintSettings";
+import { ResizeSettings, RESIZE_MODES } from "./settings/ResizeSettings";
+import type { ResizeMode } from "@/stores/useToolStore";
 
 /**
  * Minimal registry entry for one tool. Kept deliberately small — fields are
@@ -48,12 +50,25 @@ export const paintModule: ToolModule<PaintMode> = {
   Settings: PaintSettings,
 };
 
+/** Resize/Compress — second registered module (tool-UI arc Session 2.1).
+ *  Registered under its legacy id `compress` (shortcut `1` and the ToolType
+ *  union depend on it); the display label has been "Resize" since
+ *  toolConfig.ts. Sub-mode state lives in `useToolStore.resizeMode`. */
+export const resizeModule: ToolModule<ResizeMode> = {
+  id: "compress", // legacy id — see ToolModule.id
+  label: "Resize",
+  icon: Shrink,
+  modes: RESIZE_MODES,
+  Settings: ResizeSettings,
+};
+
 /**
  * The registry. Partial — tools appear here one migration session at a time
  * (emoji/Batch next per the skill order; clone stamp last).
  */
 export const TOOL_MODULES: Partial<Record<ToolType, ToolModule>> = {
   brush: paintModule,
+  compress: resizeModule,
 };
 
 export function getToolModule(id: ToolType): ToolModule | undefined {

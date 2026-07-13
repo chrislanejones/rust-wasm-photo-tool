@@ -34,6 +34,7 @@ const SHORTCUT_GROUPS = [
   {
     title: "Panels",
     shortcuts: [
+      { keys: ["Alt", ","], action: "Command Palette" },
       { keys: ["Alt", "N"], action: "Toggle New" },
       { keys: ["Alt", "T"], action: "Toggle Tools" },
       { keys: ["Alt", "G"], action: "Toggle Gallery" },

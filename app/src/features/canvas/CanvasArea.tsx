@@ -1655,15 +1655,31 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // Uniform margin on all sides so the tail fits at any angle — mirrors
           // the Rust `build_annotation_tile` tail_margin.
           const tailMargin = tailAngle !== null ? tailLen + tailHalf : 0;
-          const padL = bgPad + tailMargin;
-          const padR = bgPad + tailMargin;
-          const padT = bgPad + tailMargin;
-          const padB = bgPad + tailMargin;
+          // Engine-true rect anchor: the committed background rect is baked
+          // (ink inset + bg_padding) up-left of the first line's glyph ink,
+          // and the overlay's ink sits at the textarea content box (sx + CSS
+          // pad). Anchor the preview rect THERE — not at the textarea border
+          // — so the box doesn't jump when the ink-anchored commit lands
+          // (commitText stores (x,y) = overlay + cssPad − text_ink_offset_bg;
+          // this is the same geometry projected back onto the preview).
+          const inkBase = showBg
+            ? hookResult.toolRef.current?.text_ink_offset(
+                textInput.text || " ",
+                effFontSize,
+                effFontWeight === "bold",
+              )
+            : undefined;
+          const rectLeft = inkBase
+            ? sx + TEXT_OVERLAY_PAD_X - (inkBase[0] * scaleX + bgPad)
+            : sx - bgPad;
+          const rectTop = inkBase
+            ? sy + TEXT_OVERLAY_PAD_Y - (inkBase[1] * scaleY + bgPad)
+            : sy - bgPad;
 
-          const bgLeft = sx - padL;
-          const bgTop = sy - padT;
-          const bgW = boxW + padL + padR;
-          const bgH = boxH + padT + padB;
+          const bgLeft = rectLeft - tailMargin;
+          const bgTop = rectTop - tailMargin;
+          const bgW = boxW + (bgPad + tailMargin) * 2;
+          const bgH = boxH + (bgPad + tailMargin) * 2;
 
           // Triangle tail rendered as an SVG inside the rotated wrapper so it
           // tracks the textarea's orientation. Geometry matches the Rust path:
@@ -1746,8 +1762,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                     opacity: bgOpacity01,
                     transform: `rotate(${rotation}deg)`,
                     // Same pivot as the text, expressed relative to the BG
-                    // wrapper's own top-left (which sits padL/padT up-left of sx,sy).
-                    transformOrigin: `${pivotLocalX + padL}px ${pivotLocalY + padT}px`,
+                    // wrapper's own top-left (which sits (sx−bgLeft, sy−bgTop)
+                    // up-left of the textarea anchor).
+                    transformOrigin: `${pivotLocalX + (sx - bgLeft)}px ${pivotLocalY + (sy - bgTop)}px`,
                   }}
                 >
                   {/* The rounded rect itself — inset by the uniform tail margin.
