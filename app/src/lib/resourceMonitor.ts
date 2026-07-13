@@ -60,6 +60,38 @@ export function getOplogStats(): OplogStats | null {
   return lastOplogStats;
 }
 
+// ── Op-log PERSISTENCE stats (what's on disk, vs. the live log above) ────────
+// Pushed by @/lib/oplogPersistence on every save / restore / invalidation, so
+// the diagnostics window can answer the two questions the dogfooding period
+// actually asks: "is my work being written?" and "did this photo come back
+// from the op log?". Null whenever persistence is off (the flag's default) —
+// the row hides. Register-and-read (not an import from useDiagnostics) keeps
+// the lazily-imported persistence module out of the diagnostics import graph.
+export interface OplogPersistStats {
+  /** The photo these numbers describe. */
+  photoId: string;
+  /** How this photo's document was obtained. */
+  source: "restored" | "saved" | "retired";
+  /** Ops / keyframes / chunks currently persisted for it. */
+  ops: number;
+  keyframes: number;
+  chunks: number;
+  /** Set when the persisted log was retired (broken log / multi-layer): it is
+   *  no longer eligible for restore and the working copy carries the resume. */
+  stale: boolean;
+  at: number;
+}
+
+let lastOplogPersistStats: OplogPersistStats | null = null;
+
+export function registerOplogPersistStats(s: OplogPersistStats | null): void {
+  lastOplogPersistStats = s;
+}
+
+export function getOplogPersistStats(): OplogPersistStats | null {
+  return lastOplogPersistStats;
+}
+
 /** Format a byte count as a compact human string (e.g. "18.4 MB"). */
 export function fmtBytes(bytes: number | null): string {
   if (bytes == null) return "—";

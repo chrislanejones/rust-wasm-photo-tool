@@ -8,11 +8,18 @@
 // encoding (op frames out of the engine, keyframe RGBA → PNG blob) happens
 // BEFORE the transaction opens — IndexedDB auto-commit rule.
 //
-// Append vs rewrite: the engine's `oplog_generation()` bumps whenever an
-// append drops a redo tail (history branched). Same generation ⇒ the
-// persisted prefix is still valid and only the delta ops append as a new
-// chunk; changed generation (or a shrunk log) ⇒ the photo's chunks +
-// keyframes are rewritten from scratch inside the same transaction.
+// Append vs rewrite: appending a delta onto already-persisted chunks is only
+// sound when the engine's LIVE log is provably the same log those chunks
+// describe. That proof is the BINDING below — established by a successful
+// restore or a completed save, held against the engine object itself, and
+// voided the moment the document is reset (every load path builds a fresh
+// `ImageHorseTool`). Bound + same `oplog_generation()` (which bumps only when
+// an append drops a redo tail) + a log that has not shrunk ⇒ append the delta.
+// ANY doubt ⇒ rewrite the photo's chunks + keyframes from scratch inside the
+// same transaction. Generation alone is NOT an identity — a fresh log always
+// starts at generation 0, so trusting the on-disk manifest would let a new
+// log's ops splice onto a previous session's chunks (wrong base, mixed
+// histories). Rewriting is the only safe answer when unbound.
 //
 // RESTORE: `restoreOplog(tool, photoId)` loads manifest + chunks + the base
 // keyframe, validates counts/versions, and hands everything to the engine's
@@ -36,6 +43,7 @@ import {
   type PhotoOplogManifest,
 } from "@/lib/dexie/db";
 import { USE_OPLOG_PERSISTENCE } from "@/lib/dexie/flags";
+import { registerOplogPersistStats } from "@/lib/resourceMonitor";
 
 const BRANCH = "main";
 const DEBOUNCE_MS = 2000;
@@ -73,10 +81,31 @@ export interface OplogPersistWasm {
     frames: Uint8Array,
     cursor: number,
   ): boolean;
+  /** Layer count — the op log only models a SINGLE-layer document, so >1
+   *  means the persisted log cannot describe what the user is looking at.
+   *  Optional: test fakes and older builds without it read as single-layer. */
+  layer_count?(): number;
 }
 
 function hasPersistExports(t: object): t is OplogPersistWasm {
   return typeof (t as Partial<OplogPersistWasm>).oplog_encoded_ops === "function";
+}
+
+/** Whether the engine's log still describes the document the user has.
+ *
+ *  False in exactly the two cases the engine can no longer reconcile:
+ *  `oplog_is_broken()` (an unrecorded edit — clone stamp, filter, mask —
+ *  desynced the log; snapshot undo has taken over) and a multi-layer
+ *  document (out of op-log scope; `oplog_record` drops or breaks the log).
+ *  In both, ANY log already on disk for this photo is now a faithful
+ *  description of a document that no longer exists — persisting more of it,
+ *  or restoring from it, silently hands the user back an older document.
+ *  Note this is deliberately NOT `oplog_active()`: that is also false when
+ *  there is simply no log yet (a freshly-loaded photo), which is harmless. */
+function isLogTrustworthy(tool: OplogPersistWasm): boolean {
+  if (tool.oplog_is_broken()) return false;
+  const layers = typeof tool.layer_count === "function" ? tool.layer_count() : 1;
+  return layers <= 1;
 }
 
 /** Build-time flag OR the DevTools verification switch. */
@@ -137,7 +166,30 @@ export function setOplogCodecs(codecs: { rgbaToBlob?: RgbaToBlob; blobToRgba?: B
 
 // ── Write path ───────────────────────────────────────────────────────────────
 
-interface PersistedState {
+/** Engine identity, without holding the engine. A discarded `ImageHorseTool`
+ *  must stay collectable (wasm-bindgen frees its wasm document on GC), so the
+ *  binding stores a token, not the object: the WeakMap tags each tool the
+ *  first time it is seen and forgets it with the tool. */
+const toolTokens = new WeakMap<object, number>();
+let nextToolToken = 1;
+
+function toolToken(tool: object): number {
+  let token = toolTokens.get(tool);
+  if (token === undefined) {
+    token = nextToolToken++;
+    toolTokens.set(tool, token);
+  }
+  return token;
+}
+
+/** "The log the engine `tool` is holding RIGHT NOW is the one persisted under
+ *  `photoId`, at these counts." The only thing that licenses an append instead
+ *  of a rewrite. Every document reset constructs a new `ImageHorseTool`
+ *  (useCloneStamp's load paths), so the token comparison voids the binding
+ *  automatically — no call site has to remember to invalidate it. */
+interface Binding {
+  toolToken: number;
+  photoId: string;
   opCount: number;
   chunkCount: number;
   generation: number;
@@ -145,9 +197,50 @@ interface PersistedState {
 }
 
 let activePhotoId: string | null = null;
-const persistedCache = new Map<string, PersistedState>();
+let bound: Binding | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let saving = false;
+/** Photos whose persisted log this session has already marked stale — keeps
+ *  the invalidation to one manifest read + one write per photo, per session. */
+const invalidated = new Set<string>();
+
+/** The binding, IFF it still describes this engine + this photo. */
+function boundTo(tool: object, photoId: string): Binding | null {
+  if (!bound || bound.photoId !== photoId) return null;
+  return bound.toolToken === toolToken(tool) ? bound : null;
+}
+
+/** The engine's log no longer describes this photo's document (broken, or the
+ *  document went multi-layer). Mark the persisted log stale so `restoreOplog`
+ *  skips it and the working-copy/archive path — which IS current — carries the
+ *  resume. Non-destructive on purpose: the chunks and keyframes are left in
+ *  place (reversible, inspectable) and are reclaimed by the next healthy save
+ *  or by `deletePhoto`'s cascade. */
+async function invalidatePersistedLog(photoId: string): Promise<void> {
+  if (invalidated.has(photoId)) return;
+  invalidated.add(photoId); // claim first: at most one DB round-trip per photo
+  if (bound?.photoId === photoId) bound = null;
+  try {
+    const m = await db.oplogManifests.get(photoId);
+    if (!m || m.stale) return;
+    await db.oplogManifests.put({ ...m, stale: true, updatedAt: Date.now() });
+    registerOplogPersistStats({
+      photoId,
+      source: "retired",
+      ops: m.opCount,
+      keyframes: await db.keyframes.where("photoId").equals(photoId).count(),
+      chunks: m.chunkCount,
+      stale: true,
+      at: Date.now(),
+    });
+    console.warn(
+      `[oplog-persist] log no longer describes photo ${photoId} (unrecorded edit or multi-layer) — persisted log marked stale; resume falls back to the working copy`,
+    );
+  } catch (e) {
+    invalidated.delete(photoId); // let a later flush retry the marking
+    console.warn("[oplog-persist] could not mark the persisted log stale", e);
+  }
+}
 
 /** The photo the current engine document belongs to. `null` disables the
  *  write path (e.g. a scratch canvas that isn't in the gallery yet). */
@@ -171,7 +264,7 @@ export async function flushPendingOplogSave(tool: object): Promise<void> {
     await saveOplogNow(tool, photoId);
   } catch (e) {
     console.warn("[oplog-persist] flush-on-switch failed", e);
-    persistedCache.delete(photoId);
+    bound = null; // unknown disk state ⇒ the next save rewrites
   }
 }
 
@@ -180,11 +273,23 @@ export async function flushPendingOplogSave(tool: object): Promise<void> {
 export function onOplogFlush(tool: object): void {
   if (!isOplogPersistenceEnabled() || !hasPersistExports(tool)) return;
   const photoId = activePhotoId;
-  if (!photoId || !tool.oplog_active()) return;
+  if (!photoId) return;
+  // The log stopped describing the document ⇒ never write it, and retire
+  // whatever is already on disk (it describes a document the user no longer
+  // has). Checked BEFORE oplog_active(), which is false in this case too.
+  if (!isLogTrustworthy(tool)) {
+    void invalidatePersistedLog(photoId);
+    return;
+  }
+  if (!tool.oplog_active()) return; // no log yet — nothing to save
   const len = tool.oplog_op_count();
   const gen = tool.oplog_generation();
   const cursor = tool.oplog_cursor();
-  const seen = persistedCache.get(photoId);
+  // The no-op check is bound to the ENGINE, not just the photo id: a fresh log
+  // on the same photo (AI result, re-load) can carry byte-identical counters,
+  // and treating that as "nothing new" would silently leave the previous
+  // document persisted as this photo's truth.
+  const seen = boundTo(tool, photoId);
   if (seen && seen.opCount === len && seen.generation === gen && seen.cursor === cursor) {
     return; // nothing new
   }
@@ -195,7 +300,7 @@ export function onOplogFlush(tool: object): void {
     debounceTimer = null;
     void saveOplogNow(tool, photoId).catch((e) => {
       console.warn("[oplog-persist] save failed; will retry on next change", e);
-      persistedCache.delete(photoId); // force re-evaluation next flush
+      bound = null; // unknown disk state ⇒ the next save rewrites
     });
   }, delay);
 }
@@ -206,25 +311,26 @@ export async function saveOplogNow(tool: object, photoId: string): Promise<void>
   if (!hasPersistExports(tool) || saving) return;
   saving = true;
   try {
+    // Re-checked at fire time, not just when the save was scheduled: a save
+    // debounced BEFORE an unrecorded edit (or a new layer) would otherwise
+    // land afterwards and persist a log that is missing it.
+    if (!isLogTrustworthy(tool)) {
+      await invalidatePersistedLog(photoId);
+      return;
+    }
     const len = tool.oplog_op_count();
     const gen = tool.oplog_generation();
     const cursor = tool.oplog_cursor();
 
-    // Resolve what's already on disk (cache → manifest table).
-    let prior: PersistedState | undefined = persistedCache.get(photoId);
-    if (!prior) {
-      const m = await db.oplogManifests.get(photoId);
-      if (m && m.branch === BRANCH) {
-        prior = {
-          opCount: m.opCount,
-          chunkCount: m.chunkCount,
-          generation: m.generation ?? -1,
-          cursor: m.cursor ?? m.opCount,
-        };
-      }
-    }
+    // Append ONLY against a live binding — i.e. this engine's log is provably
+    // the persisted one. Anything else (fresh engine, reset document, restore
+    // that never happened, a save that failed) rewrites from scratch. The
+    // on-disk manifest is deliberately NOT consulted here: it cannot prove
+    // whose log it describes, and trusting it is how a new log's ops end up
+    // spliced onto a previous session's chunks.
+    const prior = boundTo(tool, photoId);
     const rewrite = !prior || prior.generation !== gen || len < prior.opCount;
-    const fromOp = rewrite ? 0 : prior!.opCount;
+    const fromOp = rewrite ? 0 : prior.opCount;
 
     // ── Encode OUTSIDE the transaction ────────────────────────────────────
     const frames = fromOp < len ? tool.oplog_encoded_ops(fromOp, len) : new Uint8Array(0);
@@ -233,7 +339,7 @@ export async function saveOplogNow(tool: object, photoId: string): Promise<void>
         ? {
             photoId,
             branch: BRANCH,
-            chunkSeq: rewrite ? 0 : prior!.chunkCount,
+            chunkSeq: rewrite || !prior ? 0 : prior.chunkCount,
             bytes: frames,
             opCount: len - fromOp,
             formatVersion: 1,
@@ -292,10 +398,14 @@ export async function saveOplogNow(tool: object, photoId: string): Promise<void>
       photoId,
       branch: BRANCH,
       opCount: len,
-      chunkCount: rewrite ? (chunk ? 1 : 0) : prior!.chunkCount + (chunk ? 1 : 0),
+      chunkCount:
+        rewrite || !prior ? (chunk ? 1 : 0) : prior.chunkCount + (chunk ? 1 : 0),
       formatVersion: 1,
       generation: gen,
       cursor,
+      // This log is healthy and (on a rewrite) freshly written — clear any
+      // stale mark a previous break left behind.
+      stale: false,
       updatedAt: Date.now(),
     };
 
@@ -310,11 +420,25 @@ export async function saveOplogNow(tool: object, photoId: string): Promise<void>
       await db.oplogManifests.put(manifest);
     });
 
-    persistedCache.set(photoId, {
+    // The engine's live log IS the persisted log now — bind, so the next save
+    // may append its delta instead of rewriting.
+    bound = {
+      toolToken: toolToken(tool),
+      photoId,
       opCount: len,
       chunkCount: manifest.chunkCount,
       generation: gen,
       cursor,
+    };
+    invalidated.delete(photoId); // healthy again; a later break re-marks it
+    registerOplogPersistStats({
+      photoId,
+      source: "saved",
+      ops: len,
+      keyframes: await db.keyframes.where("photoId").equals(photoId).count(),
+      chunks: manifest.chunkCount,
+      stale: false,
+      at: Date.now(),
     });
   } finally {
     saving = false;
@@ -336,6 +460,11 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
   try {
     const m = await db.oplogManifests.get(photoId);
     if (!m || m.branch !== BRANCH) return "none";
+    // Retired log: it replays perfectly, but into a document the user no
+    // longer has (an unrecorded edit desynced it, or the document went
+    // multi-layer). "none", not "failed" — nothing is wrong, this log simply
+    // isn't the truth any more; the working copy / archive is.
+    if (m.stale) return "none";
     if (m.formatVersion !== 1) return "failed";
 
     const chunks = await getOpLogChunks(photoId, BRANCH);
@@ -369,11 +498,26 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
       ok = tool.oplog_restore(baseRgba, base.width, base.height, annotations, frames, cursor);
     }
     if (!ok) throw new Error("engine rejected the persisted log");
-    persistedCache.set(photoId, {
+    // The engine now holds exactly the persisted log ⇒ bind it, so the next
+    // save appends its delta. The generation is read back from the ENGINE
+    // (a rebuilt log restarts at 0 — see ops.rs `with_base`), not from the
+    // manifest: it is the engine's future bumps we compare against.
+    bound = {
+      toolToken: toolToken(tool),
+      photoId,
       opCount: m.opCount,
       chunkCount: m.chunkCount,
-      generation: m.generation ?? 0,
+      generation: tool.oplog_generation(),
       cursor,
+    };
+    registerOplogPersistStats({
+      photoId,
+      source: "restored",
+      ops: m.opCount,
+      keyframes: await db.keyframes.where("photoId").equals(photoId).count(),
+      chunks: m.chunkCount,
+      stale: false,
+      at: Date.now(),
     });
     return "restored";
   } catch (e) {
@@ -391,7 +535,8 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
 /** Test seam: reset module state between tests. */
 export function __resetOplogPersistenceForTests(): void {
   activePhotoId = null;
-  persistedCache.clear();
+  bound = null;
+  invalidated.clear();
   if (debounceTimer != null) clearTimeout(debounceTimer);
   debounceTimer = null;
   saving = false;

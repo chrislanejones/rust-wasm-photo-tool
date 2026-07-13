@@ -1052,3 +1052,48 @@ survive JSON and are per-session anyway. Purely additive — a missing key
 rehydrates to `{}`, so no migration is required. Verified: compress 12
 photos, badges appear (-93% … -98%), reload, all 12 come back identical.
 
+
+## v7.24 Change Summary — 2026-07-13
+
+**Persistent undo (`ih_oplog_persist`, still OFF by default): two silent
+data-loss paths closed.**
+
+A gap-check against the original persistent-undo spec found five of the seven
+pieces already shipped and correct — schema (opLogs + keyframes), the debounced
+write path, replay-on-restore, the kill switch, and the hash-parity restore test
+that proves a replayed document is byte-identical to the one that was persisted.
+Those were left alone. The two remaining gaps were both in the *fallback* path,
+and both had the same shape: **the log replays perfectly, into a document the
+user no longer has.** Nothing throws, so nothing falls back.
+
+| # | Bug | What you'd have lost |
+| --- | --- | --- |
+| 1 | **Log identity.** `OpLog::with_base` restarts the counter at 0, so a fresh log on the same photoId (AI result, re-load, failed restore) was indistinguishable from the persisted one. The on-disk manifest therefore justified an **append**: new ops landed on the **old chunks over the old base keyframe**, and a restore replayed a mixture of two histories. With counters that happened to match exactly, it read as "nothing new" and saved nothing at all. | A reload silently returns the **pre-AI image**; or a restored document that is a blend of two edit histories. |
+| 2 | **Log retirement.** A broken log (an edit the log never recorded) or a multi-layer document still **replays cleanly — into a single-layer document**. The working-copy fallback is never consulted, because nothing failed. | Photo with a log → add a layer → reload → **layers gone**. |
+
+**The fix.** The append decision no longer consults the manifest. It requires a
+**binding**: a WeakMap token proving that *this* `ImageHorseTool` instance is the
+one holding the persisted log. Every load path constructs a new engine, so the
+binding self-voids — an unbound engine rewrites rather than appends. Logs that
+are broken or model a multi-layer document are never written, and any log already
+persisted for them is **retired** (marked stale), which routes the restore back
+to the working copy.
+
+**Schema.** `stale?: boolean` on the manifest, **non-indexed** — so no version
+bump, no upgrade function, and no reshaping of existing records. Records written
+by the shipped v2 have no such field and read as not-stale. Fixture round-trips
+cover both shipped schema versions (a `dexie-migration` skill requirement).
+
+**Tests.** 7 new (42 total, from 35). Five of them **fail against the pre-fix
+module** — verified by reverting it — so they pin the bugs rather than the code.
+`cargo test --features tiles`: 132 passed, including the byte-identical parity
+test.
+
+**Diagnostics.** New **Persisted** gauge: `ops · keyframes · chunks · restored`,
+or `retired → working copy` when a log has been stood down.
+
+**ADR-006 stays Draft.** The code is complete; the dogfooding is not, and the
+write path changed in this very release. Accepting the ADR would certify a
+premise nobody has verified on a real gallery. It carries a 5-step gallery check
+that gates Accepted — the layers-then-reload and AI-then-reload cases are the two
+that would have lost real work.

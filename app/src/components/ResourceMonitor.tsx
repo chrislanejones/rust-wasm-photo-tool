@@ -13,6 +13,7 @@ import {
   Layers,
   RefreshCw,
   Grid2x2,
+  Database,
 } from "lucide-react";
 import { fmtBytes } from "@/lib/resourceMonitor";
 import type { DiagnosticsSnapshot, ProcessRow } from "@/hooks/useDiagnostics";
@@ -169,7 +170,8 @@ export function ResourceMonitor({
   diag: DiagnosticsSnapshot;
   onRefresh: () => void;
 }) {
-  const { tier0, tier1, tier2, processes, windowMs, tilesDirtyCount, oplog } = diag;
+  const { tier0, tier1, tier2, processes, windowMs, tilesDirtyCount, oplog, oplogPersist } =
+    diag;
   const now = Date.now();
 
   if (!tier1) {
@@ -277,6 +279,20 @@ export function ResourceMonitor({
             }
           />
         )}
+        {oplogPersist != null && (
+          <Gauge
+            icon={<Database className="h-3.5 w-3.5" />}
+            label="Persisted"
+            pct={null}
+            value={
+              oplogPersist.stale
+                ? "retired → working copy"
+                : `${oplogPersist.ops} ops · ${oplogPersist.keyframes} kf · ${oplogPersist.chunks} chunk${oplogPersist.chunks === 1 ? "" : "s"}${
+                    oplogPersist.source === "restored" ? " · restored" : ""
+                  }`
+            }
+          />
+        )}
       </div>
 
       <div className="text-2xs text-text-muted">
@@ -294,6 +310,8 @@ export function ResourceMonitor({
           " Dirty = tiles touched by the tile-engine flush since it was last read (verification-only, tile-wiring session — not shipped)."}
         {oplog != null &&
           " Op Log = recorded edits / cursor · resident keyframes; \"undo\" = replay-undo switch on (ih_oplog_undo). Broken = an unrecorded edit desynced it; snapshot undo took over."}
+        {oplogPersist != null &&
+          " Persisted = what's actually in IndexedDB for this photo (ih_oplog_persist); \"restored\" = this photo came back from its op log, not the working copy. Retired = the log stopped matching the document (unrecorded edit or multi-layer), so resume falls back to the working copy."}
       </div>
 
       {/* ── Per-subsystem "process" list ─────────────────────────────────── */}

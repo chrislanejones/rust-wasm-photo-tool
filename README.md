@@ -50,18 +50,18 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.23 — 2026-07-13
+### v7.24 — 2026-07-13
 
-**Selection grows up: "Edit and Transform" is now "Adjust & Select".** The tool splits into two sub-modes on the shared toggle — **Adjust** (crop, straighten, flip, rotate: everything that changes the frame) and **Select** (what you're working on). The magic wand moved in from Layer Settings, where it had been parked next to Move and Resize-Layer despite being a selection tool, and it brought two new siblings:
+**Persistent undo: the two bugs that had to die before it could ever be turned on.** Op-log persistence (`ih_oplog_persist`) is still **off by default** — this release is about making it safe enough to dogfood. Both bugs shared a nasty shape: the op log replayed *perfectly*, into a document you no longer had. Nothing threw, nothing fell back, and the damage only showed up after a reload.
 
-- **Edge-aware wand** — the same flood fill, but walled in by a real Sobel edge map, so it stops at an object's outline instead of leaking through a soft gradient into the background. That's the case where a plain tolerance wand has always failed.
-- **Color Range** — every pixel of that colour *anywhere* in the image, not just the connected patch you clicked (Photoshop's Select → Color Range). One click takes all the sky, islands and all.
+- **A new log could be mistaken for the old one.** `OpLog::with_base` restarts its counter at zero, so a fresh log on the same photo — after an AI result, a re-load, a failed restore — looked identical to the persisted one, and the manifest cheerfully authorised an *append*. The new ops landed on the old chunks over the old base keyframe, so a restore replayed a blend of two histories. When the counters happened to match exactly it was quieter and worse: read as "nothing new", nothing written, and a reload handed you back the **pre-AI image**.
+- **A log for a document that had moved on.** The log models a single-layer image. Add a layer to a photo that has one, reload, and the layers were **gone** — replay succeeded, so the working-copy fallback was never consulted.
 
-Under it is `src/edges.rs`, a **shared edge-detection core** — Sobel over perceptual luminance *and* the raw channels, so a red/green boundary at matched luminance still reads as the edge a human sees. It's built once and deliberately shared: the magnetic lasso and the Smart Brush both walk these same edges when they land, and the lasso button is already in the panel, disabled and honest that the path-finding kernel is the remaining piece.
+The fix stops trusting the manifest. An append now requires a **binding** — a token proving *this* engine is the one holding the persisted log. Every load path builds a fresh engine, so the binding self-voids and an unbound engine rewrites instead of appending. Logs that are broken or multi-layer are never written, and any log already on disk for them is retired, which sends the restore back to the working copy where it belongs. The `stale` marker is a non-indexed field: no schema version bump, no upgrade function, and records written by the shipped v2 read as not-stale.
 
-Verified on canvas: from one identical click, the three kinds return genuinely different selections — 290,224 px (wand), 290,170 px (edge-aware, tighter), 300,872 px (colour range, larger).
+Seven new tests, five of which fail against the old code. The Diagnostics window gained a **Persisted** gauge (ops · keyframes · chunks, or "retired → working copy").
 
-**Also fixed:** the green savings badge on a compressed thumbnail ("-95%") no longer disappears when you reload. It was keyed to the photo and stored only in memory, so every refresh dropped it — even though the photo it described was restored from IndexedDB right beside it.
+ADR-006 stays **Draft** on purpose: the code is complete, but the write path is new, and an ADR shouldn't certify a premise nobody has dogfooded yet.
 
 ## License
 

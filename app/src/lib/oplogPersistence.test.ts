@@ -7,8 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/lib/dexie/db";
 import {
   __resetOplogPersistenceForTests,
+  onOplogFlush,
   restoreOplog,
   saveOplogNow,
+  setActiveOplogPhoto,
   setOplogCodecs,
   type OplogPersistWasm,
 } from "@/lib/oplogPersistence";
@@ -223,6 +225,95 @@ describe("write path", () => {
   });
 });
 
+// A fresh engine object = a document reset (every load path constructs a new
+// ImageHorseTool). The write path must treat its log as a NEW log, whatever
+// the counters happen to say — a fresh log always restarts at generation 0,
+// so counters alone can collide exactly with what is already on disk.
+describe("write path: a fresh engine log never splices onto persisted chunks", () => {
+  it("rewrites when a new engine reaches the persisted op count (same generation)", async () => {
+    await seedPhoto("p1");
+    const first = new FakeTool();
+    first.push(10, 11, 12);
+    await saveOplogNow(first, "p1");
+
+    // Document reset on the SAME photo (AI result / re-load): brand-new engine,
+    // brand-new base, log restarts at generation 0 — and the user draws enough
+    // to reach the persisted count before the first save fires.
+    const afterReset = new FakeTool();
+    afterReset.width = 6; // a visibly different base keyframe
+    afterReset.push(90, 91, 92, 93, 94);
+    await saveOplogNow(afterReset, "p1");
+
+    // ONE chunk holding only the NEW log — not [old 0..2] + [new 3..4].
+    const chunks = await db.opLogs.toArray();
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toMatchObject({ chunkSeq: 0, opCount: 5 });
+    expect(Array.from(chunks[0].bytes)).toEqual([
+      1, 0, 0, 0, 90, 1, 0, 0, 0, 91, 1, 0, 0, 0, 92, 1, 0, 0, 0, 93, 1, 0, 0, 0, 94,
+    ]);
+    expect(await db.oplogManifests.get("p1")).toMatchObject({ opCount: 5, chunkCount: 1 });
+
+    // And the base keyframe is the NEW document's, not the old one's.
+    const kfs = await db.keyframes.toArray();
+    expect(kfs).toHaveLength(1);
+    expect(kfs[0]).toMatchObject({ atOp: 0, width: 6 });
+
+    // The round trip agrees: restore replays exactly the new log.
+    const reader = new FakeTool();
+    expect(await restoreOplog(reader, "p1")).toBe("restored");
+    const [, w, , , frames] = reader.restoreArgs as [
+      Uint8Array,
+      number,
+      number,
+      Uint8Array,
+      Uint8Array,
+      number,
+    ];
+    expect(w).toBe(6);
+    expect(Array.from(frames)).toEqual([
+      1, 0, 0, 0, 90, 1, 0, 0, 0, 91, 1, 0, 0, 0, 92, 1, 0, 0, 0, 93, 1, 0, 0, 0, 94,
+    ]);
+  });
+
+  it("rewrites when a new engine's counters exactly equal the persisted ones", async () => {
+    await seedPhoto("p1");
+    const first = new FakeTool();
+    first.push(10, 11, 12);
+    await saveOplogNow(first, "p1");
+
+    // Identical op count, cursor and generation — the pathological collision.
+    const afterReset = new FakeTool();
+    afterReset.push(90, 91, 92);
+    await saveOplogNow(afterReset, "p1");
+
+    const chunks = await db.opLogs.toArray();
+    expect(chunks).toHaveLength(1);
+    expect(Array.from(chunks[0].bytes)).toEqual([
+      1, 0, 0, 0, 90, 1, 0, 0, 0, 91, 1, 0, 0, 0, 92,
+    ]);
+  });
+
+  it("still appends the delta for the SAME engine after a restore (no needless rewrite)", async () => {
+    await seedPhoto("p1");
+    const writer = new FakeTool();
+    writer.push(10, 11);
+    await saveOplogNow(writer, "p1");
+
+    const resumed = new FakeTool();
+    expect(await restoreOplog(resumed, "p1")).toBe("restored");
+    // The restored engine holds the persisted log; keep editing it.
+    resumed.push(10, 11, 12);
+    await saveOplogNow(resumed, "p1");
+
+    const chunks = await db.opLogs.toArray();
+    expect(chunks.map((c) => [c.chunkSeq, c.opCount])).toEqual([
+      [0, 2],
+      [1, 1],
+    ]);
+    expect(await db.oplogManifests.get("p1")).toMatchObject({ opCount: 3, chunkCount: 2 });
+  });
+});
+
 describe("restore path", () => {
   it("round-trips: restore hands the engine the exact base + concatenated frames + cursor", async () => {
     await seedPhoto("p1");
@@ -292,6 +383,101 @@ describe("restore path", () => {
     const t = new FakeTool();
     t.push(1, 2, 3);
     expect(await restoreOplog(t, "p1")).toBe("none");
+  });
+});
+
+// An op log only describes a SINGLE-layer document, and only while every edit
+// was recorded. When that stops being true the log still REPLAYS — it just
+// replays into a document the user no longer has. Restoring it would silently
+// hand back an older document, and the working copy (which is current) would
+// never be consulted, because nothing "failed".
+describe("a log that stopped describing the document is retired, not persisted", () => {
+  class LayeredTool extends FakeTool {
+    layers = 1;
+    layer_count(): number {
+      return this.layers;
+    }
+  }
+
+  it("an unrecorded edit (broken log): no write, existing log marked stale, restore falls back", async () => {
+    await seedPhoto("p1");
+    const t = new FakeTool();
+    t.push(10, 11, 12);
+    await saveOplogNow(t, "p1");
+    expect(await db.oplogManifests.get("p1")).toMatchObject({ opCount: 3, stale: false });
+
+    // Clone stamp / filter / mask — the engine can't express it as an op.
+    t.broken = true;
+    t.push(13); // whatever the counters say now, the log is not the document
+    await saveOplogNow(t, "p1");
+
+    // Nothing new written, and the log on disk is retired.
+    const chunks = await db.opLogs.toArray();
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].opCount).toBe(3);
+    expect(await db.oplogManifests.get("p1")).toMatchObject({ opCount: 3, stale: true });
+
+    // Resume ⇒ "none" (use the working copy), NOT a confident wrong restore.
+    const reader = new FakeTool();
+    expect(await restoreOplog(reader, "p1")).toBe("none");
+    expect(reader.restoreArgs).toBeNull();
+  });
+
+  it("a multi-layer document retires the persisted log (the layers-then-reload data-loss path)", async () => {
+    await seedPhoto("p1");
+    const t = new LayeredTool();
+    t.push(10, 11);
+    await saveOplogNow(t, "p1");
+
+    // The user adds a layer. oplog_active() goes false, so nothing schedules a
+    // save — the stale log used to just sit there and win the next resume.
+    t.layers = 2;
+    setActiveOplogPhoto("p1");
+    onOplogFlush(t);
+    await vi.waitFor(async () =>
+      expect(await db.oplogManifests.get("p1")).toMatchObject({ stale: true }),
+    );
+
+    const reader = new FakeTool();
+    expect(await restoreOplog(reader, "p1")).toBe("none");
+  });
+
+  it("recovers: a healthy log after a reset rewrites the photo and clears the stale mark", async () => {
+    await seedPhoto("p1");
+    const t = new FakeTool();
+    t.push(10, 11);
+    await saveOplogNow(t, "p1");
+    t.broken = true;
+    await saveOplogNow(t, "p1");
+    expect(await db.oplogManifests.get("p1")).toMatchObject({ stale: true });
+
+    // A load resets the document → fresh engine, fresh (healthy) log.
+    const fresh = new FakeTool();
+    fresh.push(20, 21, 22);
+    await saveOplogNow(fresh, "p1");
+
+    const m = await db.oplogManifests.get("p1");
+    expect(m).toMatchObject({ opCount: 3, chunkCount: 1, stale: false });
+    const chunks = await db.opLogs.toArray();
+    expect(chunks).toHaveLength(1);
+    expect(Array.from(chunks[0].bytes)).toEqual([1, 0, 0, 0, 20, 1, 0, 0, 0, 21, 1, 0, 0, 0, 22]);
+    expect(await restoreOplog(new FakeTool(), "p1")).toBe("restored");
+  });
+
+  it("back-compat: a manifest written by the shipped v2 code (no `stale` field) restores normally", async () => {
+    await seedPhoto("p1");
+    const t = new FakeTool();
+    t.push(10, 11);
+    await saveOplogNow(t, "p1");
+
+    // Rewrite the manifest in the exact shape the shipped code wrote: no
+    // `stale` key at all. `undefined` must read as "not stale".
+    const m = (await db.oplogManifests.get("p1"))!;
+    const { stale: _dropped, ...v2Shape } = m;
+    await db.oplogManifests.put(v2Shape as typeof m);
+    expect("stale" in (await db.oplogManifests.get("p1"))!).toBe(false);
+
+    expect(await restoreOplog(new FakeTool(), "p1")).toBe("restored");
   });
 });
 

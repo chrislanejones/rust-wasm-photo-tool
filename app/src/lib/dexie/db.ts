@@ -76,6 +76,19 @@ export interface PhotoOplogManifest {
   /** Applied-op position the user last saw — resume seeks here, keeping
    *  the persisted redo tail redoable. */
   cursor: number;
+  /** Set when the engine's log stopped describing this photo's document —
+   *  an unrecorded edit desynced it (`oplog_is_broken`) or the document
+   *  went multi-layer (out of op-log scope). The log is then a faithful
+   *  description of a document the user no longer has, so `restoreOplog`
+   *  treats it as "nothing persisted" and the working-copy/archive path
+   *  (which IS current) carries the resume. Cleared by the next save from
+   *  a healthy log, which rewrites the log wholesale.
+   *
+   *  NOT INDEXED — an optional field on an existing record needs no
+   *  `.version()` bump and no upgrade function (Dexie only versions key
+   *  paths and indexes). Manifests written by the shipped v2 code have no
+   *  `stale` field: `undefined` ⇒ falsy ⇒ they restore exactly as before. */
+  stale?: boolean;
   updatedAt: number;
 }
 

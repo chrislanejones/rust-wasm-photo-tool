@@ -27,6 +27,17 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.68",
+    date: "2026-07-13",
+    headline: "Undo that survives a reload — and the two bugs standing in its way",
+    entries: [
+      { tag: "rust", text: "Behind the scenes: work continues on undo history that survives closing the tab. It's still switched off by default, and this release is about earning the right to switch it on — two bugs were found that could quietly hand you back the wrong picture after a reload." },
+      { tag: "fix", text: "The first: after an AI edit (like Remove Background), a reload could restore the photo as it was BEFORE the AI ran, or as a blend of two different edit histories. The saved history couldn't tell an old recording from a new one, so it wrote the new edits on top of the old ones." },
+      { tag: "fix", text: "The second: a photo with saved history that you'd since added a layer to would come back with its layers gone. The history replayed without complaint — it just replayed a picture that only had one layer. It now recognises it's out of date and steps aside for the real file." },
+      { tag: "rust", text: "The Diagnostics window (Alt+Delete) now shows what's actually stored for the current photo, and says plainly when a saved history has been stood down." },
+    ],
+  },
+  {
     version: "v0.9.67",
     date: "2026-07-13",
     headline: "Smarter selections — and a wand that knows where objects end",

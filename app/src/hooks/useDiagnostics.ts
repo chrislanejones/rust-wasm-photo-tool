@@ -15,9 +15,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDiagnostics, type LogSource } from "@/lib/diagnosticsLog";
 import {
+  getOplogPersistStats,
   getOplogStats,
   getTilesDirtyCount,
   getWasmMemoryBytes,
+  type OplogPersistStats,
   type OplogStats,
 } from "@/lib/resourceMonitor";
 
@@ -140,6 +142,10 @@ export interface DiagnosticsSnapshot {
    *  lacks the op-log exports (see `registerOplogStats`). Same
    *  verification-only status as `tilesDirtyCount`. */
   oplog: OplogStats | null;
+  /** What the op log has actually PERSISTED for the active photo (and whether
+   *  that photo was restored from it), or `null` when op-log persistence is
+   *  off — the flag's default. See `registerOplogPersistStats`. */
+  oplogPersist: OplogPersistStats | null;
   /** Re-reads every Tier-0 field immediately. */
   refresh: () => void;
 }
@@ -160,6 +166,7 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
   const [processes, setProcesses] = useState<ProcessRow[]>([]);
   const [tilesDirtyCount, setTilesDirtyCount] = useState<number | null>(null);
   const [oplog, setOplog] = useState<OplogStats | null>(null);
+  const [oplogPersist, setOplogPersist] = useState<OplogPersistStats | null>(null);
   const [interacting, setInteracting] = useState(false);
   const lastInteractionRef = useRef(0);
 
@@ -206,6 +213,7 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
       setProcesses([]);
       setTilesDirtyCount(null);
       setOplog(null);
+      setOplogPersist(null);
       return;
     }
     const perf = performance as Performance & { memory?: PerfMemory };
@@ -220,6 +228,7 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
       setProcesses(buildProcesses(Date.now()));
       setTilesDirtyCount(getTilesDirtyCount());
       setOplog(getOplogStats());
+      setOplogPersist(getOplogPersistStats());
     };
     build();
     const id = window.setInterval(build, TIER1_INTERVAL_MS);
@@ -297,6 +306,7 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
     windowMs: PROCESS_WINDOW_MS,
     tilesDirtyCount,
     oplog,
+    oplogPersist,
     refresh,
   };
 }
