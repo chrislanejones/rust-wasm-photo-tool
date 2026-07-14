@@ -271,12 +271,38 @@ export function ResourceMonitor({
             label="Op Log"
             pct={null}
             value={
-              oplog.broken
-                ? "broken → snapshots"
-                : oplog.active
-                  ? `${oplog.cursor}/${oplog.ops} ops · ${oplog.keyframes} kf${oplog.undoEnabled ? " · undo" : ""}`
-                  : "n/a"
+              !oplog.supported
+                ? "NOT IN THIS BUILD"
+                : oplog.broken
+                  ? "broken → snapshots"
+                  : oplog.active
+                    ? `${oplog.cursor}/${oplog.ops} ops · ${oplog.keyframes} kf${oplog.undoEnabled ? " · undo" : ""}`
+                    : "n/a"
             }
+          />
+        )}
+        {/* WHY the count above is what it is. A log reading "0 ops" can be dead,
+            idle, out of scope or broken, and those look identical on a counter —
+            which is exactly how a dead feature survived several releases. The
+            engine says which (ImageHorseTool::oplog_status). */}
+        {oplog != null && (
+          <Gauge
+            icon={<Grid2x2 className="h-3.5 w-3.5" />}
+            label="Why"
+            pct={null}
+            value={oplog.status}
+          />
+        )}
+        {/* The document shape the log is judging. `contentLayers` — NOT `layers` —
+            is what decides scope: the Canvas doesn't count (ADR-016). And if the
+            ACTIVE layer is the Canvas, nothing records, which is invisible unless
+            it's on screen. */}
+        {oplog != null && oplog.supported && (
+          <Gauge
+            icon={<Layers className="h-3.5 w-3.5" />}
+            label="Document"
+            pct={null}
+            value={`${oplog.layers} layer${oplog.layers === 1 ? "" : "s"} · ${oplog.contentLayers} content · on "${oplog.activeLayer}"`}
           />
         )}
         {oplogPersist != null && (

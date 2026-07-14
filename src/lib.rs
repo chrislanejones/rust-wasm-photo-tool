@@ -1591,6 +1591,46 @@ impl ImageHorseTool {
         self.oplog.as_ref().map_or(0, |l| l.keyframe_count())
     }
 
+    /// WHY the log is, or is not, recording — in one short phrase for the
+    /// diagnostics panel.
+    ///
+    /// This exists because "0 ops" is ambiguous and that ambiguity has cost real
+    /// hours: a log that reads zero might be dead (the feature isn't compiled in),
+    /// out of scope (a second content layer, or the Canvas selected), broken (an
+    /// unrecorded edit desynced it), or simply idle (nothing edited yet). Every one
+    /// of those looks identical on a counter. Say which.
+    #[cfg(feature = "tiles")]
+    pub fn oplog_status(&self) -> String {
+        if self.oplog_broken {
+            return "broken — snapshot undo has taken over".into();
+        }
+        if !self.oplog_in_scope() {
+            return if self.content_layer_count() > 1 {
+                "out of scope — more than one content layer".into()
+            } else {
+                // The Canvas is selected. Its edits can't be represented (the log's
+                // document IS the content plane), so recording one would replay it
+                // onto the photo.
+                "out of scope — the Canvas layer is active".into()
+            };
+        }
+        match self.oplog.as_ref() {
+            None => "idle — no recordable edit yet".into(),
+            Some(log) if log.is_empty() => "armed — base captured, no ops yet".into(),
+            Some(_) => "recording".into(),
+        }
+    }
+
+    /// The active layer's name — so the panel can say *which* layer an edit would
+    /// land on. "Canvas" here is the tell that nothing will record.
+    #[cfg(feature = "tiles")]
+    pub fn active_layer_name(&self) -> String {
+        self.layers
+            .get(self.active)
+            .map(|l| l.name.clone())
+            .unwrap_or_default()
+    }
+
     /// True once an unrecorded edit desynced the log (snapshot undo only
     /// until the next image load).
     #[cfg(feature = "tiles")]

@@ -30,6 +30,12 @@ export interface OplogWasmExports {
   oplog_cursor(): number;
   oplog_keyframe_count(): number;
   oplog_is_broken(): boolean;
+  /** WHY it is (not) recording — "recording", "broken — …", "out of scope — …". */
+  oplog_status(): string;
+  /** Which layer an edit would land on. "Canvas" means nothing will record. */
+  active_layer_name(): string;
+  layer_count(): number;
+  content_layer_count(): number;
 }
 
 function hasTilesExports(t: object): t is TilesWasmExports {
@@ -92,23 +98,48 @@ export function tryTilesFlush(tool: object): number | null {
 }
 
 /**
- * Push the op-log-undo preference into the engine and read back the
- * recorder's state for diagnostics. Returns `null` when this wasm build has
- * no op-log surface (the default, shipped build never does) — 100% inert
- * there, same as `tryTilesFlush`.
+ * Push the op-log-undo preference into the engine and read back the recorder's
+ * state for diagnostics.
+ *
+ * `supported: false` means THE ENGINE IN THIS BUILD HAS NO OP-LOG SURFACE — the
+ * functions simply aren't in the wasm. That was silently true of every shipped
+ * binary until v7.28 (`build:wasm` didn't pass `--features tiles`), which made the
+ * three flags gate calls into code that did not exist: everything fell back to
+ * snapshot undo with no error, and the panel showed nothing at all. Reporting it
+ * loudly instead of hiding the row is the cheap insurance against that recurring.
  */
 export function syncOplog(
   tool: object,
-): import("@/lib/resourceMonitor").OplogStats | null {
-  if (!hasOplogExports(tool)) return null;
+): import("@/lib/resourceMonitor").OplogStats {
+  if (!hasOplogExports(tool)) {
+    return {
+      supported: false,
+      active: false,
+      broken: false,
+      ops: 0,
+      cursor: 0,
+      keyframes: 0,
+      undoEnabled: false,
+      status: "ABSENT — this wasm build has no op-log (see ADR-017)",
+      activeLayer: "",
+      layers: 0,
+      contentLayers: 0,
+    };
+  }
   const undoEnabled = isOplogUndoEnabled();
   tool.set_oplog_undo(undoEnabled);
   return {
+    supported: true,
     active: tool.oplog_active(),
     broken: tool.oplog_is_broken(),
     ops: tool.oplog_op_count(),
     cursor: tool.oplog_cursor(),
     keyframes: tool.oplog_keyframe_count(),
     undoEnabled,
+    // The line that answers "why is this zero?" — see ImageHorseTool::oplog_status.
+    status: tool.oplog_status(),
+    activeLayer: tool.active_layer_name(),
+    layers: tool.layer_count(),
+    contentLayers: tool.content_layer_count(),
   };
 }

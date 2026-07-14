@@ -27,6 +27,15 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.75",
+    date: "2026-07-13",
+    headline: "The diagnostics panel stopped being cryptic",
+    entries: [
+      { tag: "rust", text: "Behind the scenes: the Alt+Delete diagnostics window now explains itself. Where it used to show a bare counter sitting at zero — which could mean anything from \"nothing's happened yet\" to \"this is completely broken\" — it now says which, in plain words." },
+      { tag: "rust", text: "It also shows the shape of the document you're working on, and which layer an edit would actually land on. Two bugs this month were invisible for exactly that reason: everything looked normal, and the thing that mattered wasn't on screen anywhere." },
+    ],
+  },
+  {
     version: "v0.9.74",
     date: "2026-07-13",
     headline: "A stroke that was saved, and nobody said so",

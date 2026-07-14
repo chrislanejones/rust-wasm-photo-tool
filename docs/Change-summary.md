@@ -1535,3 +1535,69 @@ never reach the image. Paint with it closed, then open it to read the gauge.
 
 `cargo fmt --check` · `clippy -D warnings` · **142 Rust tests** · **123 TS tests**
 · tsc clean · app + marketing builds green. Flags unchanged, still OFF.
+
+## v7.31 Change Summary — 2026-07-13
+
+Diagnostics, sharpened by the week's debugging. Three rows in the Alt+Delete panel,
+each one paid for in hours.
+
+### 1. "Why" — the engine explains its own silence
+
+New `ImageHorseTool::oplog_status()` returns one phrase:
+
+| status | meaning |
+| --- | --- |
+| `recording` | ops are being logged |
+| `armed — base captured, no ops yet` | the log exists, nothing recordable has happened |
+| `out of scope — the Canvas layer is active` | edits go to the Canvas fill; the log's document IS the content plane, so recording one would replay it onto the photo |
+| `out of scope — more than one content layer` | a real second layer; snapshot undo takes over |
+| `broken — snapshot undo has taken over` | an unrecorded edit desynced the log |
+
+**Why this matters:** a counter reading `0 ops` is ambiguous across all five states.
+That ambiguity is what let the op log ship dead for several releases (v7.28: not
+compiled into the binary at all) and what stalled a day of dogfooding (v7.30: the
+op was recorded but never published). An instrument that cannot distinguish "off"
+from "idle" from "broken" is not an instrument.
+
+### 2. "Document" — the shape the log is judging
+
+`2 layers · 1 content · on "Photo"`.
+
+- **content** layers, not raw layers, decide op-log scope — the Canvas isn't
+  counted (ADR-016). Showing `layers` alone would reproduce the exact confusion
+  ADR-016 existed to end.
+- The **active layer name** is the tell: if it reads `"Canvas"`, nothing will
+  record, and until now that was invisible.
+
+### 3. "NOT IN THIS BUILD"
+
+`syncOplog()` no longer returns `null` when the wasm has no op-log surface — it
+returns `supported: false`, and the panel prints **NOT IN THIS BUILD**. Previously
+the row simply vanished, which is indistinguishable from "everything is fine, no
+edits yet". That is verbatim the v7.28 bug (ADR-017): `build:wasm` didn't pass
+`--features tiles`, so the three flags gated JS calls into engine functions that
+were not in the binary, and every path fell back to snapshot undo silently. A day
+to find. Now: ten seconds.
+
+### Verified in a browser
+
+Fresh import, flags on:
+
+```
+OP LOG    0/0 ops · 1 kf · undo
+Why       armed — base captured, no ops yet
+Document  2 layers · 1 content · on "Photo"
+```
+
+after one paint stroke:
+
+```
+OP LOG    1/1 ops · 1 kf · undo
+Why       recording
+Document  2 layers · 1 content · on "Photo"
+```
+
+### Gates
+
+`cargo fmt --check` · `clippy -D warnings` · **142 Rust tests** · **123 TS tests** ·
+tsc clean · app + marketing builds green. Flags unchanged, still OFF.
