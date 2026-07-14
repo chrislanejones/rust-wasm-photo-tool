@@ -1682,3 +1682,72 @@ week's recurring one: read the file, don't reason from the snippet.
 tsc clean · **123 TS tests** · **142 Rust tests** · app + marketing builds green.
 Op-log flags unchanged, still OFF — this fix is independent of them and helps every
 user today.
+
+## v7.33 Change Summary — 2026-07-14
+
+**A second data-loss bug, caught before it shipped.** Before flipping the op-log
+undo/persistence flags to default ON, the same build was A/B'd: flags off vs. flags
+on, on a clean profile. Import a photo, edit nothing, reload. Flags off: 220×170,
+Canvas intact. Flags on: 200×150, Canvas destroyed. Same build, same steps, only
+the flag differs — reproduced on demand, not a maybe.
+
+### Root cause
+
+The op log's base snapshot is captured lazily, at `snap()` — and `snap()` runs
+**before** the mutation it's guarding. The app's own import path
+(`load_image` then `set_artboard_border`) is a "snap-without-record" mutator: it
+snapshots, then applies the border, but never records an op for it. So an
+edit-free import armed the log against the **pre-border** document — the bare
+photo, no Canvas — and left it that way forever, since with zero edits nothing
+ever came along to rebase it.
+
+That empty, stale-based log then got persisted (its `opCount` was 0, but nothing
+stopped it from being written), and `restoreOplog` reported success on it —
+which **short-circuited** the working-copy fallback that would have restored the
+full document correctly. ADR-016's own pre-mortem named this exact shape of
+failure in advance: "restore then replays confidently into the wrong document
+and hands the user back an older image, silently."
+
+Note for the record: ADR-016's canvas-metadata field (pad, size, RGBA on the
+keyframe) was **not** missing, as first suspected — it shipped in `df5ee04` on
+2026-07-13. The bug was the stale base underneath it, not an absent field.
+
+### The fix
+
+1. **Rebase, not just record.** `recomposite()` now checks, on every frame: is
+   the log empty, in scope, and its base dimensions wrong for the live
+   document? If so, re-anchor it from the engine before anything else runs.
+   O(1) — two integer compares per frame; the rebase itself (which allocates)
+   fires only once per unlogged, dimension-changing mutation.
+2. **Incomplete restore is not success.** A zero-op log carries nothing a
+   normal reload can't already recover from the working copy, so the write
+   path no longer persists one, and the restore path no longer restores one —
+   at three separate points: `onOplogFlush`, `saveOplogNow`, and
+   `restoreOplog`. Zero-op manifests already written to a real user's disk by
+   a pre-fix build are covered too: they're read back as "none," not treated
+   as valid, and retired (stale flag only — rows kept, reversible) the next
+   time that photo is saved.
+
+### Verified
+
+| scenario | flags OFF | flags ON |
+| --- | --- | --- |
+| edit-free import → reload | 220×170 | **220×170 (was 200×150)** |
+| paint stroke → reload | stroke + Canvas survive | **stroke + Canvas survive** |
+
+A Playwright e2e regression (`e2e/oplog-canvas-restore.spec.ts`) pins both rows —
+confirmed failing against a wasm built from the pre-fix tree
+(`Expected: 276, Received: 256`), passing against the fix. A new engine test,
+`the_apps_own_import_path_arms_with_the_post_artboard_base`, pins the same fact
+at the Rust level: the log's base must be the post-artboard document, not the
+bare photo.
+
+### Gates
+
+cargo fmt/clippy clean, both feature configs · **88 default + 168 `tiles` Rust
+tests** · tsc clean · **128 TS tests** · e2e 2/2 (headless chromium) · wasm
+733,440 → 733,842 B (+402, the new rebase function) · production build green.
+
+Feature flags — `ih_tiles_flush` / `ih_oplog_undo` / `ih_oplog_persist` — remain
+OFF by default. This fix removes one of the two known blockers on flipping them;
+the real-gallery check (ADR-016) is still outstanding.

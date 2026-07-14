@@ -1048,11 +1048,14 @@ impl ImageHorseTool {
             );
         }
         self.composite_cache = cache;
-        // Op-log annotation sync: recomposite is the one choke point every
-        // annotation mutation flows through (JS flushes after each), so a
-        // cheap engine-vs-log diff here records TextAdd/Edit/Remove and
-        // ShapeAdd/Edit/Remove for EVERY mutator — align, pins, shadows,
+        // Op-log empty-base rebase FIRST (the two syncs below must run against
+        // the right base), then annotation sync: recomposite is the one choke
+        // point every annotation mutation flows through (JS flushes after
+        // each), so a cheap engine-vs-log diff here records TextAdd/Edit/Remove
+        // and ShapeAdd/Edit/Remove for EVERY mutator — align, pins, shadows,
         // bezier edits included — without per-method hooks.
+        #[cfg(feature = "tiles")]
+        self.oplog_rebase_stale_empty();
         #[cfg(feature = "tiles")]
         self.oplog_sync_annotations();
         #[cfg(feature = "tiles")]
@@ -1157,6 +1160,43 @@ impl ImageHorseTool {
         // absorbs unlogged setup edits (auto-compress, restores, resizes)
         // that happen before the first recorded op.
         if self.oplog.as_ref().is_none_or(|log| log.is_empty()) {
+            self.oplog = Some(crate::ops::OpLog::with_base(self.oplog_doc_from_engine()));
+        }
+    }
+
+    /// Rebase an EMPTY log whose base no longer matches the engine's document
+    /// DIMENSIONS — called from `recomposite()`, before the annotation/canvas
+    /// syncs (which must run against the right base).
+    ///
+    /// Why this exists: the base is captured lazily at `snap()`, which every
+    /// mutator calls BEFORE mutating. A mutator that snaps but records no op
+    /// (`set_artboard_border` — the app's own import path — `resize_canvas`,
+    /// rotate…) therefore leaves an empty log whose base is the PRE-mutation
+    /// document. "An empty log rebases freely at the next snap()" was the
+    /// design answer, but with ZERO edits no next snap ever comes — and the
+    /// persistence layer then wrote that pre-import base to disk as a
+    /// restorable document. That is the 2026-07-14 A/B data loss: a default
+    /// 220×170 import persisted (and confidently restored) as the bare
+    /// 200×150 photo, Canvas destroyed. ADR-016's pre-mortem, through the
+    /// lazy-base door.
+    ///
+    /// Scope: dims only, empty logs only, in-scope only. O(1) — two integer
+    /// compares per frame, no allocation unless a rebase actually fires (once
+    /// per unlogged dim-changing mutation). Same-dims pixel staleness (e.g. a
+    /// compress at identical dims with an empty log) is deliberately not
+    /// chased here: it cannot reach disk (zero-op logs are never persisted —
+    /// oplogPersistence.ts) and the next `snap()` rebases it anyway.
+    #[cfg(feature = "tiles")]
+    fn oplog_rebase_stale_empty(&mut self) {
+        if self.oplog_broken || !self.oplog_in_scope() {
+            return;
+        }
+        let stale = self.oplog.as_ref().is_some_and(|log| {
+            log.is_empty()
+                && (log.live_document().width() != self.width
+                    || log.live_document().height() != self.height)
+        });
+        if stale {
             self.oplog = Some(crate::ops::OpLog::with_base(self.oplog_doc_from_engine()));
         }
     }

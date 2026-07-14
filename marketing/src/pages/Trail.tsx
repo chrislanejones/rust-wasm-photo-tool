@@ -27,6 +27,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.77",
+    date: "2026-07-14",
+    headline: "Caught a second data-loss bug before anyone saw it",
+    entries: [
+      { tag: "rust", text: "Behind the scenes: before turning on the new undo-history feature by default, it got tested one more time — same build, feature off vs. on, nothing else changed. Import a photo, don't touch it, reload. Off, you get the photo back exactly as imported. On, you got it back cropped, with the border and background gone. That's a real bug, caught before it ever reached a real user." },
+      { tag: "fix", text: "The cause: the history feature takes its first snapshot a moment too early — before the app finishes setting up a new import — so a photo you hadn't edited yet got remembered in an unfinished state. Fixed so the snapshot always matches what you're actually looking at, and as a second layer of protection, an empty history entry is never saved or restored at all — there's nothing in it a normal reload can't already recover the ordinary way." },
+      { tag: "infra", text: "The undo-history feature is still off by default while this gets one more real-world check. Nothing changes for anyone today." },
+    ],
+  },
+  {
     version: "v0.9.76",
     date: "2026-07-13",
     headline: "Your edits are now actually saved",

@@ -1097,3 +1097,87 @@ fn the_apps_own_import_path_records_a_paint_stroke() {
         "a paint stroke on the document the app ACTUALLY creates must record"
     );
 }
+
+// ── The 2026-07-14 A/B data loss, pinned at the engine ──────────────────────
+// `snap()` captures an empty log's base BEFORE the mutation it precedes, and
+// `set_artboard_border` is a snap-without-record mutator — so the app's own
+// import armed the log with the PRE-artboard document (photo dims, no Canvas).
+// With zero edits nothing ever rebased it, persistence wrote it to disk, and
+// restore rebuilt it verbatim: 220×170 came back as 200×150, Canvas destroyed.
+// These tests fail on that engine.
+
+#[test]
+fn the_apps_own_import_path_arms_with_the_post_artboard_base() {
+    // The A/B repro's shape: import, edit NOTHING. The armed log's base must
+    // be the document the user is LOOKING at — 88×72 with the Canvas as
+    // metadata — not the 64×48 pre-artboard photo `snap("Canvas Border")`
+    // captured before the border was applied.
+    let (t, _px) = app_import_tool(64, 48, 12);
+    assert_eq!(t.oplog_op_count(), 0, "edit-free: the log is empty");
+    assert_eq!(
+        (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0)),
+        (88, 72),
+        "the empty log's base is the POST-artboard document"
+    );
+    let ann = t.oplog_keyframe_annotations(0);
+    let (_, _, canvas) =
+        crate::ops::decode_annotations(&ann).expect("base annotations blob decodes");
+    let canvas = canvas.expect("the base carries the Canvas as metadata");
+    assert_eq!(
+        (canvas.r, canvas.g, canvas.b, canvas.a),
+        (20, 40, 60, 255),
+        "and it is the import's actual fill"
+    );
+}
+
+#[test]
+fn a_zero_op_persisted_base_restores_the_full_artboard_document() {
+    // Defense in depth: the TS layer no longer persists (or restores) zero-op
+    // logs at all, but if a zero-op base ever DOES reach `oplog_restore`, it
+    // must rebuild the complete visual — full dims, Canvas included — not the
+    // bare content plane the A/B repro handed back.
+    let (mut t, _px) = app_import_tool(64, 48, 12);
+    let h_engine = composite_hash(&mut t);
+
+    let base_px = t.oplog_keyframe_pixels_rgba(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let (bw, bh) = (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0));
+    let frames = t.oplog_encoded_ops(0, 0);
+    assert!(frames.is_empty(), "zero ops persisted");
+
+    let mut t2 = ImageHorseTool::new(1, 1);
+    assert!(t2.oplog_restore(&base_px, bw, bh, &base_ann, &frames, 0));
+    assert_eq!(
+        (t2.width(), t2.height()),
+        (88, 72),
+        "dimensions round-trip (the repro came back 64×48)"
+    );
+    assert_eq!(t2.canvas_idx(), Some(0), "the Canvas layer is rebuilt");
+    assert_eq!(t2.layer_count(), 2, "Canvas + Photo");
+    assert_eq!(t2.content_layer_count(), 1);
+    assert_eq!(
+        composite_hash(&mut t2),
+        h_engine,
+        "restored composite byte-exact, fill included"
+    );
+}
+
+#[test]
+fn restore_rejects_a_pre_canvas_v1_annotations_blob() {
+    // A legacy base persisted before the Canvas rode the annotations blob
+    // (format version 1) must NOT be guessed at: `oplog_restore` returns
+    // false, changes nothing, and the caller falls through to the working
+    // copy — which restores the full stack correctly.
+    let (mut t, _px) = app_import_tool(64, 48, 12);
+    let before = composite_hash(&mut t);
+    let v1_blob = [1u8, 0, 0]; // version byte 1 + arbitrary body
+    assert!(
+        !t.oplog_restore(&vec![0u8; 88 * 72 * 4], 88, 72, &v1_blob, &[], 0),
+        "a v1 annotations blob is rejected by the version byte"
+    );
+    assert_eq!(
+        composite_hash(&mut t),
+        before,
+        "the rejected restore changed nothing"
+    );
+}

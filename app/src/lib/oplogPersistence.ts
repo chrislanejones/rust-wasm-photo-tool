@@ -237,7 +237,7 @@ function boundTo(tool: object, photoId: string): Binding | null {
  *  resume. Non-destructive on purpose: the chunks and keyframes are left in
  *  place (reversible, inspectable) and are reclaimed by the next healthy save
  *  or by `deletePhoto`'s cascade. */
-async function invalidatePersistedLog(photoId: string): Promise<void> {
+async function invalidatePersistedLog(photoId: string, reason: string): Promise<void> {
   if (invalidated.has(photoId)) return;
   invalidated.add(photoId); // claim first: at most one DB round-trip per photo
   if (bound?.photoId === photoId) bound = null;
@@ -255,7 +255,7 @@ async function invalidatePersistedLog(photoId: string): Promise<void> {
       at: Date.now(),
     });
     console.warn(
-      `[oplog-persist] log no longer describes photo ${photoId} (unrecorded edit or multi-layer) — persisted log marked stale; resume falls back to the working copy`,
+      `[oplog-persist] log no longer describes photo ${photoId} (${reason}) — persisted log marked stale; resume falls back to the working copy`,
     );
   } catch (e) {
     invalidated.delete(photoId); // let a later flush retry the marking
@@ -299,10 +299,22 @@ export function onOplogFlush(tool: object): void {
   // whatever is already on disk (it describes a document the user no longer
   // has). Checked BEFORE oplog_active(), which is false in this case too.
   if (!isLogTrustworthy(tool)) {
-    void invalidatePersistedLog(photoId);
+    void invalidatePersistedLog(photoId, "unrecorded edit or multi-layer");
     return;
   }
   if (!tool.oplog_active()) return; // no log yet — nothing to save
+  // A live log with ZERO ops is never persisted: it has nothing the working
+  // copy doesn't already carry, and its lazily-captured base may predate
+  // unlogged setup edits (the 2026-07-14 A/B: a default import's base was the
+  // PRE-artboard photo — persisting and then "successfully" restoring it
+  // destroyed the Canvas and shrank the document). And if a log for this
+  // photo is already on disk, an empty live log means the engine is not
+  // holding the document that log describes — retire it (stale flag only,
+  // rows kept; reversible) so the working copy carries the resume.
+  if (tool.oplog_op_count() === 0) {
+    void invalidatePersistedLog(photoId, "empty live log");
+    return;
+  }
   const len = tool.oplog_op_count();
   const gen = tool.oplog_generation();
   const cursor = tool.oplog_cursor();
@@ -336,7 +348,17 @@ export async function saveOplogNow(tool: object, photoId: string): Promise<void>
     // debounced BEFORE an unrecorded edit (or a new layer) would otherwise
     // land afterwards and persist a log that is missing it.
     if (!isLogTrustworthy(tool)) {
-      await invalidatePersistedLog(photoId);
+      await invalidatePersistedLog(photoId, "unrecorded edit or multi-layer");
+      return;
+    }
+    // Fire-time zero-op recheck (same reasoning as onOplogFlush): never write
+    // an empty log as a restorable document, and retire any on-disk log this
+    // engine is no longer holding. Covers the direct entry points too
+    // (flushPendingOplogSave, tests) — e.g. `load_image` on a live tool drops
+    // the log to None, and writing "opCount 0" for it would delete the
+    // photo's chunks and leave a confidently-restorable empty manifest.
+    if (tool.oplog_op_count() === 0) {
+      await invalidatePersistedLog(photoId, "empty live log");
       return;
     }
     const len = tool.oplog_op_count();
@@ -486,6 +508,17 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
     // multi-layer). "none", not "failed" — nothing is wrong, this log simply
     // isn't the truth any more; the working copy / archive is.
     if (m.stale) return "none";
+    // A zero-op log is not a restorable document. It has nothing to replay
+    // that the working copy doesn't already have — and the write path used to
+    // persist empty logs whose base predated unlogged setup edits, so
+    // "restoring" one could hand back a document the user never saw (the
+    // 2026-07-14 A/B: a default 220×170 import came back as the bare 200×150
+    // photo, Canvas destroyed, because this path reported success and
+    // short-circuited the working-copy fallback). The write path no longer
+    // persists them; this guard also covers zero-op manifests ALREADY on
+    // disk. "none", not "failed": nothing is corrupt — there is simply
+    // nothing here worth restoring.
+    if (m.opCount === 0) return "none";
     if (m.formatVersion !== 1) return "failed";
 
     const chunks = await getOpLogChunks(photoId, BRANCH);

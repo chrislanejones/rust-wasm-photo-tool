@@ -50,23 +50,17 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.32 — 2026-07-13
+### v7.33 — 2026-07-14
 
-**Your edits were not being saved. Not "sometimes" — at all, unless you happened to switch photos.**
+**Caught a second data-loss bug before it reached anyone — it was hiding behind a flag nobody had turned on yet.**
 
-Found by dogfooding: add a layer, reload, layer gone. The op log was blamed, and the op log was innocent — it behaved exactly as designed (retired itself when a second content layer appeared, handed off to the working copy). The working copy was the problem: **nobody was writing it.**
+Before switching the undo-log feature on by default, the same build was checked with the flag off and the flag on. Import a photo, edit nothing, reload: flag off, the canvas comes back exactly as imported. Flag on, it comes back cropped to the bare photo — border and background gone. Same build. Only the flag differs.
 
-Two bugs, stacked:
+**Root cause.** The undo log's base snapshot is captured *before* the edit it's guarding, and the app's own import — load the photo, then add the border — is exactly that kind of edit that never gets recorded as an "op." So a fresh import armed the log against the photo as it looked *before* the border was added. That empty log got saved to disk, and restoring it later handed back the smaller, plainer document it had captured — confidently, since the restore reported success and skipped the working copy that had the real thing.
 
-**1. There was no autosave.** The edit archive was written in precisely two places — when you *switch* photos, and when you *import* new ones. No `beforeunload`, no `visibilitychange`, no timer, nothing. So editing a photo and reloading the tab silently restored the **original**. Verified logged-out with every flag off: the canvas came back byte-identical to the untouched image. Strokes, layers, all of it — gone.
+**The fix.** The engine now re-anchors an empty log to the document you're actually looking at, and — belt and braces — the save/restore path refuses to ever persist or restore a log with zero recorded edits. There's nothing in an empty log a normal reload can't already recover from your working copy, so it's not worth pretending otherwise.
 
-**2. The local save was unreachable when signed in.** `savePhotoEdit` tried the **cloud first** and kept the IndexedDB write inside a `catch`. That defends against a *rejection*. It does nothing against a **hang** — and `generateUploadUrl()` (a Convex mutation) hangs indefinitely when the deployment doesn't answer. Caught live: the save function entered, and then neither resolved nor rejected, ever; the `image-horse-edits` database was never even created. Signed in with a stalled cloud, your work was written **nowhere**.
-
-**The fix.** Write locally **first, unconditionally**, then try the cloud as a bonus — IndexedDB is the restore path, Convex is a nicety, and the copy that restores your work should never be downstream of a network call that can hang. Plus a real autosave: a **2.5-second idle debounce** after your last edit (not per stroke — the archive re-encodes the whole image, so idle is when it's free) and a save on **`visibilitychange → hidden`** and `pagehide`, which fire on tab close, reload and navigation.
-
-Verified end to end, flags off, in a browser: paint a stroke → reload → **the stroke is still there**. Add a layer, paint on it → reload → **all three layers come back, and both strokes with them**.
-
-This is the most consequential fix in weeks and it has nothing to do with the feature we were testing. It was found *because* we were testing it.
+Feature flags are unchanged, still off by default. This was one of the checks that has to pass before they flip — and it didn't, the first time.
 
 ## License
 

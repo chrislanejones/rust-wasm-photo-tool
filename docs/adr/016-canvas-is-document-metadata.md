@@ -208,3 +208,56 @@ the real fix is an archive field, which is a schema change (`dexie-migration`
 skill). Step 9 (`exportCanvasBackground`) landed separately on master in
 v7.26 (`073448e`). Step 10 — the real-gallery check on a DEFAULT document —
 is NOT done and is the gate before either flag is flipped.
+
+## Amendment (2026-07-14) — the pre-mortem's failure shipped anyway, through a different door
+
+**What happened.** The 2026-07-14 flag-flip attempt A/B-proved data loss on the
+EXACT shape this ADR's pre-mortem predicted ("restore then replays confidently
+into the wrong document and hands the user back an older image, silently"):
+same build, only localStorage flags differing. Import a 200×150 photo (default
+artboard → 220×170 document with the Canvas fill), edit NOTHING, reload,
+Resume. Flags OFF: 220×170. Flags ON: **200×150 — the Canvas silently
+destroyed.** On-disk state at that point: a Dexie `keyframes` row
+{width: 200, height: 150} and a manifest {opCount: 0, stale: false}.
+
+**What was and wasn't built.** The canvas-metadata half of this ADR WAS built
+(df5ee04, 2026-07-13): `CanvasParams` rides the version-prefixed annotations
+blob (`encode_annotations`, OP_FORMAT_VERSION 2), `oplog_restore` rebuilds the
+fill via `restore_canvas_layer`, and the persist round trip was parity-tested
+(`canvas_document_persist_restore_round_trip_rebuilds_the_fill`). The failure
+came in beside it, not instead of it:
+
+1. **The empty log's base predated the import's own artboard call.** The base
+   is captured lazily at `snap()`, which runs BEFORE the mutation it precedes —
+   and `set_artboard_border` (the app's real import path: `load_image` then
+   border) is a snap-without-record mutator. So an edit-free default import
+   left an armed, in-scope, EMPTY log whose base was the PRE-artboard photo:
+   200×150, no Canvas. "An empty log rebases at the next snap()" was the design
+   answer; with zero edits, no next snap ever came.
+2. **Persistence wrote that empty log as a restorable document**, and the
+   restore path validated it (nothing was torn), replayed base + 0 ops,
+   reported success — and `useImageSession` therefore skipped `loadPhotoEdit`,
+   the archive-v5 working copy that restores the full stack correctly. The
+   safety net existed and the code jumped over it.
+
+**Fixes (fix/oplog-canvas-metadata, 2026-07-14).**
+- Engine: `oplog_rebase_stale_empty()` at `recomposite()` — an empty, in-scope
+  log whose base dims ≠ engine dims is rebased from the engine, so the base
+  can never again describe a pre-import document (parity tests:
+  `the_apps_own_import_path_arms_with_the_post_artboard_base`,
+  `a_zero_op_persisted_base_restores_the_full_artboard_document`).
+- TS (`oplogPersistence.ts`): incomplete restore ≠ success. Zero-op logs are
+  never persisted (an empty live log instead RETIRES any on-disk manifest —
+  stale flag, rows kept, reversible), and `restoreOplog` returns "none" for
+  zero-op manifests — which also neutralizes the pre-fix rows already on user
+  disks. Legacy v1 annotation blobs (no Canvas field) were already rejected by
+  the version byte → "failed" → working-copy fallback; now pinned by test.
+  No Dexie schema change: the Canvas rides the existing opaque
+  `KeyframeRecord.annotations` bytes.
+- e2e: `e2e/oplog-canvas-restore.spec.ts` pins the A/B (flags ON must equal
+  flags OFF after resume, dims + pixels) and the paint-stroke-plus-Canvas
+  resume the dogfooding missed (AI results ride a keyframe; strokes ride the
+  log).
+
+Step 10 (the real-gallery check on a DEFAULT document) REMAINS the gate before
+any flag flips — this amendment does not discharge it.

@@ -512,6 +512,101 @@ describe("a log that stopped describing the document is retired, not persisted",
   });
 });
 
+// The 2026-07-14 A/B data loss: same build, flags ON vs OFF, import a 200×150
+// photo (default artboard → 220×170 document), edit NOTHING, reload, resume.
+// Flags ON came back 200×150 — the write path had persisted the EMPTY log
+// (base captured before `set_artboard_border` grew the document), restore
+// validated it, reported success, and short-circuited the working-copy
+// archive that restores the full stack correctly. Incomplete restore ≠
+// success: zero-op logs are never persisted and never restorable.
+describe("a zero-op log is never persisted, and never restores (2026-07-14 A/B)", () => {
+  it("write path: an empty live log writes NOTHING", async () => {
+    await seedPhoto("p1");
+    const t = new FakeTool(); // armed, zero ops — the edit-free import
+    await saveOplogNow(t, "p1");
+
+    expect(await db.oplogManifests.get("p1")).toBeUndefined();
+    expect(await db.opLogs.count()).toBe(0);
+    expect(await db.keyframes.count()).toBe(0);
+  });
+
+  it("write path: an empty live log RETIRES a previously persisted log (rows kept, reversible)", async () => {
+    await seedPhoto("p1");
+    const writer = new FakeTool();
+    writer.push(10, 11, 12);
+    await saveOplogNow(writer, "p1");
+    expect(await db.oplogManifests.get("p1")).toMatchObject({ opCount: 3, stale: false });
+
+    // A load/reset on the same photo: fresh engine, fresh EMPTY log. The
+    // on-disk 3-op log now describes a document the engine is not holding —
+    // leaving it restorable would resurrect the old document on next boot.
+    const afterReset = new FakeTool();
+    await saveOplogNow(afterReset, "p1");
+
+    expect(await db.oplogManifests.get("p1")).toMatchObject({ opCount: 3, stale: true });
+    expect(await db.opLogs.count()).toBe(1); // retired, not destroyed
+    expect(await db.keyframes.count()).toBe(1);
+    expect(await restoreOplog(new FakeTool(), "p1")).toBe("none");
+  });
+
+  it("flush path: an empty live log never schedules a save, and retires the on-disk log", async () => {
+    await seedPhoto("p1");
+    const writer = new FakeTool();
+    writer.push(10, 11);
+    await saveOplogNow(writer, "p1");
+
+    const afterReset = new FakeTool(); // active, zero ops
+    setActiveOplogPhoto("p1");
+    onOplogFlush(afterReset);
+    await vi.waitFor(async () =>
+      expect(await db.oplogManifests.get("p1")).toMatchObject({ stale: true }),
+    );
+    expect(await db.oplogManifests.get("p1")).toMatchObject({ opCount: 2 });
+  });
+
+  it("restore path: a zero-op manifest ALREADY on disk (the A/B shape) falls through as 'none'", async () => {
+    // Rows exactly as the pre-fix write path left them on real user disks:
+    // manifest {opCount:0, stale:false} + a base keyframe of the PRE-artboard
+    // plane (200×150 — the document was 220×170).
+    await seedPhoto("p1");
+    await db.oplogManifests.put({
+      photoId: "p1",
+      branch: "main",
+      opCount: 0,
+      chunkCount: 0,
+      formatVersion: 1,
+      generation: 0,
+      cursor: 0,
+      stale: false,
+      updatedAt: 1,
+    });
+    await db.keyframes.put({
+      photoId: "p1",
+      branch: "main",
+      atOp: 0,
+      blob: new Blob([new Uint8Array(200 * 150 * 4)]),
+      annotations: new Uint8Array([2, 0, 0, 0]),
+      width: 200,
+      height: 150,
+      createdAt: 1,
+    });
+
+    const reader = new FakeTool();
+    expect(await restoreOplog(reader, "p1")).toBe("none");
+    expect(reader.restoreArgs, "the engine restore is never invoked").toBeNull();
+  });
+
+  it("a log with ops still persists and restores exactly as before", async () => {
+    // The guard must not over-trigger: one recorded op is a real document.
+    await seedPhoto("p1");
+    const t = new FakeTool();
+    t.push(42);
+    await saveOplogNow(t, "p1");
+    expect(await db.oplogManifests.get("p1")).toMatchObject({ opCount: 1, stale: false });
+    expect(await restoreOplog(new FakeTool(), "p1")).toBe("restored");
+  });
+});
+
 describe("engine-PNG surface (preferred path)", () => {
   class PngTool extends FakeTool {
     pngRequested: number[] = [];

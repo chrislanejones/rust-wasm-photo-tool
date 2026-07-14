@@ -54,4 +54,10 @@ PARKING_LOT.md
 *_PROMPT.md
 runs-status.sh
 
+# Playwright e2e artifacts
+/test-results/
+/playwright-report/
+/playwright/.cache/
+e2e.log
+
 install.log
