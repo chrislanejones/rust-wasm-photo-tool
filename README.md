@@ -50,15 +50,23 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.31 — 2026-07-13
+### v7.32 — 2026-07-13
 
-**The Diagnostics panel now tells you *why*.** Three new rows in the Alt+Delete window, each one earned by a bug that took hours to find:
+**Your edits were not being saved. Not "sometimes" — at all, unless you happened to switch photos.**
 
-- **Why** — a plain-language reason from the engine itself: *recording* · *armed — base captured, no ops yet* · *out of scope — the Canvas layer is active* · *out of scope — more than one content layer* · *broken — snapshot undo has taken over*. A log reading `0 ops` can be dead, idle, out of scope, or broken, and **all four look identical on a counter**. That ambiguity is precisely what let a dead feature survive several releases and what stalled a day of dogfooding. Now it says which.
-- **Document** — `2 layers · 1 content · on "Photo"`. The count that decides op-log scope is the *content* layer count, not the raw layer count (the Canvas doesn't count — ADR-016), and if the **active** layer is the Canvas then nothing will record no matter what you do. Both facts were previously invisible.
-- **Op Log → "NOT IN THIS BUILD"** — if the wasm lacks the op-log exports entirely, the panel now says so in capital letters instead of quietly hiding the row. That is exactly the v7.28 failure (the feature wasn't compiled into the shipped binary, and the flags gated calls into functions that didn't exist). It cost a day to find; it now costs ten seconds.
+Found by dogfooding: add a layer, reload, layer gone. The op log was blamed, and the op log was innocent — it behaved exactly as designed (retired itself when a second content layer appeared, handed off to the working copy). The working copy was the problem: **nobody was writing it.**
 
-The theme: an instrument that can't distinguish "off", "idle" and "broken" isn't an instrument. Every one of these rows exists because its absence cost real time.
+Two bugs, stacked:
+
+**1. There was no autosave.** The edit archive was written in precisely two places — when you *switch* photos, and when you *import* new ones. No `beforeunload`, no `visibilitychange`, no timer, nothing. So editing a photo and reloading the tab silently restored the **original**. Verified logged-out with every flag off: the canvas came back byte-identical to the untouched image. Strokes, layers, all of it — gone.
+
+**2. The local save was unreachable when signed in.** `savePhotoEdit` tried the **cloud first** and kept the IndexedDB write inside a `catch`. That defends against a *rejection*. It does nothing against a **hang** — and `generateUploadUrl()` (a Convex mutation) hangs indefinitely when the deployment doesn't answer. Caught live: the save function entered, and then neither resolved nor rejected, ever; the `image-horse-edits` database was never even created. Signed in with a stalled cloud, your work was written **nowhere**.
+
+**The fix.** Write locally **first, unconditionally**, then try the cloud as a bonus — IndexedDB is the restore path, Convex is a nicety, and the copy that restores your work should never be downstream of a network call that can hang. Plus a real autosave: a **2.5-second idle debounce** after your last edit (not per stroke — the archive re-encodes the whole image, so idle is when it's free) and a save on **`visibilitychange → hidden`** and `pagehide`, which fire on tab close, reload and navigation.
+
+Verified end to end, flags off, in a browser: paint a stroke → reload → **the stroke is still there**. Add a layer, paint on it → reload → **all three layers come back, and both strokes with them**.
+
+This is the most consequential fix in weeks and it has nothing to do with the feature we were testing. It was found *because* we were testing it.
 
 ## License
 

@@ -114,6 +114,74 @@ export function useImageSession({
   // stale id. Kept in sync at every place activePhotoId is set.
   const activeIdRef = useRef<string | null>(null);
 
+  // ── Autosave ───────────────────────────────────────────────────────────────
+  // The edit archive used to be written in exactly two places: on a photo SWITCH
+  // and on a new IMPORT. There was no beforeunload, no visibilitychange, no
+  // timer. So "edit a photo, reload the tab" silently restored the ORIGINAL —
+  // strokes, layers, everything. Verified logged-out with every flag off: the
+  // canvas came back byte-identical to the untouched original. That is live
+  // data loss in the shipped app, and it is what a dogfooder hit first.
+  //
+  // (The op log fixes this for single-content-layer documents, but it correctly
+  // retires itself the moment a second content layer appears and hands off to
+  // "the working copy" — a fallback nobody was saving.)
+  //
+  // Two triggers, and both are needed:
+  //   • IDLE DEBOUNCE — save 2.5s after the last edit. Not per stroke-move: the
+  //     archive re-encodes the whole working copy as PNG, so writing it on every
+  //     mutation would thrash a big image. Idle is when it's free.
+  //   • visibilitychange → hidden (+ pagehide) — fires on tab close, reload and
+  //     navigation. Unlike `beforeunload` this still runs when the page is
+  //     bfcached, and it doesn't cost a "leave site?" prompt. Best-effort: an
+  //     async IDB write can be cut short on unload, which is exactly why the
+  //     debounce above exists as well. Belt and braces, on purpose — this is
+  //     user data with no backup.
+  const dirtyRef = useRef(false);
+  const savingRef = useRef(false);
+  dirtyRef.current = stamp.state.undoCount > 0 || hasBeenModified;
+
+  const flushEditArchive = useCallback(async () => {
+    const id = activeIdRef.current;
+    if (!id || !dirtyRef.current || !stamp.toolRef.current) return;
+    if (savingRef.current) return; // never overlap two archive writes
+    savingRef.current = true;
+    try {
+      await savePhotoEdit(id, stamp.toolRef);
+    } catch (err) {
+      // Never let an autosave failure surface as an unhandled rejection — but
+      // never swallow it either: the Diagnostics window is where it belongs.
+      logDiagnostic(
+        "CONSOLE",
+        `Autosave failed for ${id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      savingRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stamp, savePhotoEdit]);
+
+  // Idle debounce. Keyed on the engine's undo count + the modified flag, so it
+  // re-arms on every recordable edit and fires once the user pauses.
+  useEffect(() => {
+    if (!activePhotoId || !dirtyRef.current) return;
+    const t = window.setTimeout(() => void flushEditArchive(), 2500);
+    return () => window.clearTimeout(t);
+  }, [activePhotoId, stamp.state.undoCount, hasBeenModified, flushEditArchive]);
+
+  // Leaving the page: last chance to write.
+  useEffect(() => {
+    const onLeave = () => {
+      if (document.visibilityState === "hidden") void flushEditArchive();
+    };
+    const onPageHide = () => void flushEditArchive();
+    document.addEventListener("visibilitychange", onLeave);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onLeave);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [flushEditArchive]);
+
   // Op-log persistence follows the active photo through EVERY path that sets
   // it (select, add, remove, boot auto-select) — the write path keys its
   // saves off this. Inert unless USE_OPLOG_PERSISTENCE / ih_oplog_persist is

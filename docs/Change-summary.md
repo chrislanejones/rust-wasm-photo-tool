@@ -1601,3 +1601,84 @@ Document  2 layers · 1 content · on "Photo"
 
 `cargo fmt --check` · `clippy -D warnings` · **142 Rust tests** · **123 TS tests** ·
 tsc clean · app + marketing builds green. Flags unchanged, still OFF.
+
+## v7.32 Change Summary — 2026-07-13
+
+**Edits were not being persisted.** The dogfood's real finding — and it is not the
+op log, which behaved exactly as designed throughout.
+
+### How it surfaced
+
+Dogfooding the op-log flags: *add a layer → reload → the layer is gone.* The
+diagnostics (new in v7.31) told the truth immediately: the log had said
+`out of scope — more than one content layer` and `retired → working copy`. That is
+CORRECT — a second content layer is beyond the log's model, so it stands down and
+defers to the working copy. The handoff was to a fallback nobody was saving.
+
+### Bug 1 — there was no autosave
+
+`savePhotoEdit` was called from exactly two places: a photo **switch**, and a new
+**import**. There was no `beforeunload`, no `visibilitychange`, no `pagehide`, no
+timer. Edit the active photo, reload the tab, and the app restored the **original**.
+
+Verified logged-out with all flags off (the shipping default): paint a stroke,
+reload, and the canvas came back **byte-identical to the untouched original**.
+Layers, strokes, everything — silently gone. This was live in production.
+
+### Bug 2 — the local save was unreachable when signed in
+
+```ts
+if (isAuthenticated) {
+  try   { ...cloud upload...; await idbSave(...); return; }
+  catch { logDiagnostic(...) }        // ← the local save's only other route
+}
+await idbSave(photoId, toolRef);      // ← never reached on a HANG
+```
+
+The cloud attempt ran **first**, and the local IndexedDB write lived in the
+`catch`. That is only a defence against a **rejection**. `generateUploadUrl()` is a
+Convex mutation that, when the deployment does not answer, **hangs** — neither
+resolves nor rejects. A hang never reaches a catch.
+
+Observed live: `savePhotoEdit enter { isAuthenticated: true }` logged, and then
+**nothing** — no success, no error — and the `image-horse-edits` database was never
+created. **Signed in with a stalled cloud, edits were written nowhere at all.**
+
+### The fix
+
+**Local first, unconditionally; cloud after, as a bonus.** IndexedDB is the restore
+path; Convex is a nicety. The copy that restores the user's work must never sit
+downstream of a network call that can hang.
+
+**A real autosave** (`useImageSession`):
+- **Idle debounce, 2.5s** after the last edit. Deliberately not per-mutation: the
+  archive re-encodes the whole working copy as PNG, so writing on every stroke
+  would thrash a large image. Idle is when it is free.
+- **`visibilitychange → hidden` + `pagehide`.** These fire on tab close, reload and
+  navigation, and unlike `beforeunload` they survive the bfcache and cost no
+  "leave site?" prompt. Best-effort — an async IDB write can be cut short on
+  unload, which is exactly why the debounce exists as well. Belt and braces, on
+  purpose: this is user data with no backup.
+
+### Verified in a browser (flags OFF, shipping default)
+
+| scenario | before | after |
+| --- | --- | --- |
+| paint a stroke → reload | canvas restored to the ORIGINAL | **stroke survives** |
+| add a layer, paint on it → reload | layer gone | **3 layers back, both strokes intact** |
+| `image-horse-edits` database | never created | created, one record |
+
+### A note on the analysis that didn't pan out
+
+A plausible theory said the IndexedDB path lacked layer support (that only the
+cloud path built the v5 layered archive). It doesn't hold in this codebase:
+`lib/editPersistence.ts:342` already calls `collectLayers(t)` and stores `layers` +
+`activeLayerId`. That code was correct all along — it was simply never being
+**called**, and when it was, the cloud hang got there first. The lesson is the
+week's recurring one: read the file, don't reason from the snippet.
+
+### Gates
+
+tsc clean · **123 TS tests** · **142 Rust tests** · app + marketing builds green.
+Op-log flags unchanged, still OFF — this fix is independent of them and helps every
+user today.

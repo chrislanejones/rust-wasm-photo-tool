@@ -27,6 +27,16 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: "v0.9.76",
+    date: "2026-07-13",
+    headline: "Your edits are now actually saved",
+    entries: [
+      { tag: "fix", text: "This is the big one: if you edited a photo and reloaded the page without switching to a different photo first, your work was gone — the app quietly gave you back the original. Strokes, layers, all of it. That's fixed. Your edits are now saved a couple of seconds after you stop working, and again when you close or reload the tab." },
+      { tag: "fix", text: "A second, meaner version of the same problem: when you were signed in, the app tried to save to the cloud first and only saved to your own machine afterwards. If the cloud call stalled — no error, just silence — the local save never happened either. It now always saves to your machine first, and treats the cloud as a bonus." },
+      { tag: "rust", text: "Behind the scenes: this was found by testing something else entirely. The undo-history feature was blamed, and it turned out to be innocent — it had correctly stepped aside and handed off to a backup copy that nobody was writing." },
+    ],
+  },
+  {
     version: "v0.9.75",
     date: "2026-07-13",
     headline: "The diagnostics panel stopped being cryptic",

@@ -244,6 +244,19 @@ export function useEditPersistence() {
 
   const savePhotoEdit = useCallback(
     async (photoId: string, toolRef: RefObject<ImageHorseTool | null>) => {
+      // ── LOCAL FIRST, ALWAYS ────────────────────────────────────────────────
+      // This used to try the cloud first and keep the local IndexedDB write in
+      // the `catch`. That is only safe against a REJECTION. When signed in, the
+      // cloud path can HANG — `generateUploadUrl()` is a Convex mutation that
+      // neither resolves nor rejects if the deployment is unreachable — and a
+      // hang never reaches a catch, so the local save never ran at all. The
+      // user's edit was then written NOWHERE, silently. (Observed: the
+      // `image-horse-edits` database was never even created.)
+      //
+      // IndexedDB is the restore path; Convex is a bonus. Write the copy that
+      // restores the user's work first, then try to sync it.
+      await idbSave(photoId, toolRef);
+
       if (isAuthenticated) {
         try {
           const tool = toolRef.current;
@@ -328,13 +341,11 @@ export function useEditPersistence() {
           });
           const { storageId } = await resp.json() as { storageId: string };
           await saveEdit({ photoKey: photoId, storageId: storageId as any, canvasW, canvasH });
-
-          // Also write IDB so the local machine can reload without a round-trip
-          await idbSave(photoId, toolRef);
+          // The local copy is already on disk (written before this block).
           return;
         } catch (err) {
-          // Cloud save failed (upload / storage / auth). Fall through to a local
-          // IDB save so the edit isn't lost — but record it, so the failure
+          // Cloud save failed (upload / storage / auth). The local IDB copy is
+          // ALREADY written, so nothing is lost — just record the failure so it
           // shows up in the Diagnostics Window instead of vanishing silently.
           logDiagnostic(
             "CONVEX_DB",
@@ -344,7 +355,7 @@ export function useEditPersistence() {
           );
         }
       }
-      await idbSave(photoId, toolRef);
+      // No trailing local save: it already happened at the top, unconditionally.
     },
     [isAuthenticated, generateUploadUrl, saveEdit],
   );
