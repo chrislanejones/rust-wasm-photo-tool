@@ -1,30 +1,54 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { GITHUB_URL, CODEBERG_URL, PAGES, external } from "../config";
+import { CodebergIcon, GitHubIcon } from "./Icons";
 
-export default function Footer() {
+interface FooterProps {
+  /** The closing statement. Each page ends on its own sentence. */
+  line: string;
+}
+
+export default function Footer({ line }: FooterProps) {
+  const { pathname } = useLocation();
+  // Never link a page to itself — the footer's job is where to go next.
+  const links = PAGES.filter((p) => p.to !== pathname);
+
   return (
-    <footer className="border-t border-zinc-900">
-      <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
-        <div className="flex items-center gap-2">
-          <img src="/Image-Horse-Logo.svg" alt="" className="w-5 h-5 rounded" />
-          <span>© {new Date().getFullYear()} Image Horse · Built with Rust + WASM</span>
-        </div>
-        <div className="flex items-center gap-5">
-          <Link to="/architecture" className="hover:text-zinc-300 transition">Architecture</Link>
-          <Link to="/trail-log" className="hover:text-zinc-300 transition">Trail Log</Link>
-          <Link to="/#pricing" className="hover:text-zinc-300 transition">Pricing</Link>
+    <footer className="foot-stmt">
+      <p className="foot-stmt__line">{line}</p>
+      <div className="foot-stmt__meta">
+        <Link className="foot-stmt__mark" to="/">
+          <img className="foot-stmt__logo" src="/Image-Horse-Logo.svg" alt="" width={44} height={44} />
+          <span>Image&nbsp;Horse</span>
+        </Link>
+
+        <ul className="foot-stmt__links">
+          {links.map((p) => (
+            <li key={p.to}>
+              <Link to={p.to}>{p.label}</Link>
+            </li>
+          ))}
+        </ul>
+
+        <span className="foot-stmt__source">
           <a
-            href="https://github.com/chrislanejones/rust-wasm-photo-tool"
-            className="hover:text-zinc-300 transition"
+            className="nav-pill__icon"
+            href={GITHUB_URL}
+            title="Source on GitHub"
+            aria-label="Source on GitHub"
+            {...external}
           >
-            GitHub
+            <GitHubIcon />
           </a>
           <a
-            href="https://codeberg.org/chrislanejones/rust-wasm-photo-tool"
-            className="hover:text-zinc-300 transition"
+            className="nav-pill__icon"
+            href={CODEBERG_URL}
+            title="Source on Codeberg"
+            aria-label="Source on Codeberg"
+            {...external}
           >
-            Codeberg
+            <CodebergIcon />
           </a>
-        </div>
+        </span>
       </div>
     </footer>
   );

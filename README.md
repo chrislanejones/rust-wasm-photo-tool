@@ -46,23 +46,41 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 - **Stripe** — Payments / billing
 - **Replicate** — AI image models (background removal, restore) via Convex
 
+## The marketing site
+
+`marketing/` — the five-page site at **[image-horse.vercel.app](https://image-horse.vercel.app/)**:
+home, architecture, features, pricing, trail log. Vite + React 19 + react-router,
+plain CSS off the tokens in `src/tokens.css` (no Tailwind, no UI library).
+Vercel builds it via the root `vercel.json` — **don't delete that file**, it's what
+points the deploy at `marketing/dist` instead of the app.
+
+```bash
+pnpm run dev:marketing      # local
+pnpm run build:marketing    # production → marketing/dist
+node marketing/scripts/gen-trail-data.mjs   # refresh the derived data (see below)
+```
+
+Its numbers are derived, never typed. `src/data/commits.ts` (the Trail Log's
+commit squares) and `src/data/features.ts` come from `git log` and
+`docs/Features.md` via `scripts/gen-trail-data.mjs` — **run it on every release**,
+or the graph quietly keeps drawing last month. `src/data/releases.ts` is the
+changelog itself, so that one is hand-written: add the new release at the top.
+
 ## Changelog
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.34 — 2026-07-16
+### v7.35 — 2026-07-16
 
-**A new marketing site, built next to the old one so it could be compared against it.**
+**The new marketing site is now the marketing site.**
 
-`marketing-two/` is a five-page static site — home, architecture, features, pricing, trail log. No build step, no framework, and no external JavaScript at all; the only third-party request is the webfont. It's a staging ground for replacing `marketing/`, and it is not deployed.
+The five-page site built alongside the old one is ported to React and has replaced `marketing/` — same five pages, now Vite + React 19 + react-router, plain CSS, no Tailwind and no UI library. The staging copy is deleted. Live at [image-horse.vercel.app](https://image-horse.vercel.app/).
 
-**What it says that the old site didn't.** The old headline was "your pixels never leave the tab." That isn't true once you sign in — edits sync to Convex, the AI passes go to Replicate, and Pro originals land in UploadThing. The claim was true for the tier that pays nothing and false for the one that pays ten dollars. It now reads "nothing leaves your tab by accident," and it sits directly above a table that names every operation and the machine it runs on, so the claim arrives with its receipts rather than on its own.
+**What it says that the old site didn't.** The old headline was "your pixels never leave the tab." That isn't true once you sign in — edits sync to Convex, the AI passes go to Replicate, and Pro originals land in UploadThing. The claim was true for the tier that pays nothing and false for the one that pays ten dollars. It now reads "nothing leaves your tab by accident," and it sits directly above a table naming every operation and the machine it runs on, so the claim arrives with its receipts rather than on its own.
 
-**Where the content came from.** Nothing on it is written from memory. The 82 releases come from `Trail.tsx`, the 211 commits from `git log`, the 40 features from `docs/Features.md` — a list the old site never carried, showing seven summary cards instead — the tier matrix from `Pricing.tsx`, and the Convex schema from the old architecture page. Each is generated from its source, so a number can't drift into a lie.
+**Three bugs the port turned up.** The ⌘K palette set `z-index: var(--z-modal)` and that token was never defined — so it computed to `auto` and the nav bar painted straight over the open palette. The features rail highlighted the wrong entry on 17 of 18 scroll positions: it marked whichever item most recently entered the observer's band, so the next item stole the highlight while the one you were reading still filled the screen. And a single class name did duty as both the features container and its paragraphs, which needed a workaround selector to survive.
 
-**Things you can press.** The architecture map dims everything a given tier never touches, so "logged out" visibly darkens the entire network plane and leaves the browser plane lit. The trail log filters by month and opens each one with what it amounted to, beside that month's commit graph. There's a ⌘K palette with the full keyboard model.
-
-Next: port it to React, replace `marketing/`, and delete the staging copy. Plan in `~/claude-runs/MARKETING_TWO_TO_REACT.md`.
+**Numbers can't go stale now.** The commit squares and the feature list are generated from `git log` and `docs/Features.md` by `marketing/scripts/gen-trail-data.mjs`, which runs as part of the release routine. The graph already picked up a day the hand-written copy had missed.
 
 ## License
 

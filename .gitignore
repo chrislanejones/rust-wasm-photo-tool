@@ -25,6 +25,7 @@ rolled_repo/
 # Claude Code / agent tooling
 .claude/
 .agents/
+.hallmark/
 AGENTS.md
 CLAUDE.md
 skills-lock.json

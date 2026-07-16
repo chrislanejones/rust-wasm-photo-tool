@@ -1,139 +1,210 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import Logo from "./Logo";
-import { EDITOR_URL } from "../config";
+import { EDITOR_URL, GITHUB_URL, CODEBERG_URL, PAGES, external } from "../config";
+import { BurgerIcon, CodebergIcon, GitHubIcon } from "./Icons";
 
-export default function Nav() {
-  const loc = useLocation();
-  const onHome = loc.pathname === "/";
-  const [open, setOpen] = useState(false);
+interface NavProps {
+  onOpenSearch: () => void;
+  searchOpen: boolean;
+}
 
-  // Close the mobile menu whenever the route changes (link tap, back button).
+export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
+  const { pathname } = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [condensed, setCondensed] = useState(false);
+  const burgerRef = useRef<HTMLButtonElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // ── the glide — a rule that follows the pointer across the menu ──
+  // It rests under the page you're on, and follows hover/focus away from there.
+  const moveTo = useCallback((el: HTMLElement | null) => {
+    const list = listRef.current;
+    if (!list) return;
+    if (!el) {
+      list.style.setProperty("--go", "0");
+      return;
+    }
+    // offsetLeft is relative to the list, which is the positioned ancestor
+    list.style.setProperty("--gx", `${el.offsetLeft}px`);
+    list.style.setProperty("--gw", String(el.offsetWidth));
+    list.style.setProperty("--go", "1");
+  }, []);
+
+  const rest = useCallback(() => {
+    const current = listRef.current?.querySelector<HTMLElement>('a[aria-current="page"]');
+    moveTo(current ?? null);
+  }, [moveTo]);
+
+  // Re-rest on navigation, and again once the webfont lands — a glide measured
+  // against the fallback face is the wrong width the moment Geist swaps in.
   useEffect(() => {
-    setOpen(false);
-  }, [loc.pathname]);
+    rest();
+    document.fonts?.ready.then(rest);
+    window.addEventListener("resize", rest);
+    return () => window.removeEventListener("resize", rest);
+  }, [rest, pathname]);
 
-  // Shared link set so the desktop bar and mobile dropdown never drift. On the
-  // home page the section links are in-page anchors; elsewhere they route home
-  // first (/#section).
-  const navItems = (onClick?: () => void, itemClass = "") => (
+  // ── scroll-morph — condense the pill once the top of the page is gone ──
+  // A sentinel + IntersectionObserver, never a scroll listener.
+  useEffect(() => {
+    const sentinel = document.createElement("div");
+    sentinel.setAttribute("aria-hidden", "true");
+    sentinel.style.cssText =
+      "position:absolute;top:0;left:0;width:1px;height:120px;pointer-events:none;visibility:hidden";
+    document.body.prepend(sentinel);
+
+    const io = new IntersectionObserver(([entry]) => setCondensed(!entry.isIntersecting), {
+      threshold: 0,
+    });
+    io.observe(sentinel);
+    return () => {
+      io.disconnect();
+      sentinel.remove();
+    };
+  }, []);
+
+  // The bar reflows when it condenses, so the glide's anchor moves with it.
+  useEffect(() => {
+    const id = requestAnimationFrame(rest);
+    return () => cancelAnimationFrame(id);
+  }, [condensed, rest]);
+
+  // ── the mobile sheet ──────────────────────────────────────
+  // Close on navigation, or it sits open over the page you just asked for.
+  useEffect(() => setMenuOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    // Escape closes and returns focus to the trigger — a sheet you can open
+    // with the keyboard but not close with it is a trap.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMenuOpen(false);
+      burgerRef.current?.focus();
+    };
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (sheetRef.current?.contains(t) || burgerRef.current?.contains(t)) return;
+      setMenuOpen(false);
+    };
+    // Growing back to desktop must not leave a stale open sheet behind the CSS
+    // that now hides the burger.
+    const mq = matchMedia("(min-width: 60.0625rem)");
+    const onWide = (e: MediaQueryListEvent) => e.matches && setMenuOpen(false);
+
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("click", onClick);
+    mq.addEventListener("change", onWide);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("click", onClick);
+      mq.removeEventListener("change", onWide);
+    };
+  }, [menuOpen]);
+
+  const sourceLinks = (
     <>
-      {onHome ? (
-        <>
-          <a href="#features" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>Features</a>
-          <a href="#how" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>How it works</a>
-          <a href="#pricing" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>Pricing</a>
-        </>
-      ) : (
-        <>
-          <Link to="/#features" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>Features</Link>
-          <Link to="/#how" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>How it works</Link>
-          <Link to="/#pricing" onClick={onClick} className={`hover:text-zinc-100 transition ${itemClass}`}>Pricing</Link>
-        </>
-      )}
-      <NavLink
-        to="/architecture"
-        onClick={onClick}
-        className={({ isActive }) =>
-          `${isActive ? "text-orange-400" : "hover:text-zinc-100 transition"} ${itemClass}`
-        }
+      <a
+        className="nav-pill__icon"
+        href={GITHUB_URL}
+        title="Source on GitHub"
+        aria-label="Source on GitHub"
+        {...external}
       >
-        Architecture
-      </NavLink>
-      <NavLink
-        to="/trail-log"
-        onClick={onClick}
-        className={({ isActive }) =>
-          `${isActive ? "text-orange-400" : "hover:text-zinc-100 transition"} ${itemClass}`
-        }
+        <GitHubIcon />
+      </a>
+      <a
+        className="nav-pill__icon"
+        href={CODEBERG_URL}
+        title="Source on Codeberg"
+        aria-label="Source on Codeberg"
+        {...external}
       >
-        Trail Log
-      </NavLink>
+        <CodebergIcon />
+      </a>
     </>
   );
 
   return (
-    <nav className="sticky top-0 z-50 backdrop-blur bg-zinc-950/70 border-b border-zinc-900">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-        <Logo />
-        <div className="hidden md:flex items-center gap-7 text-sm text-zinc-400">
-          {navItems()}
-        </div>
-        <div className="flex items-center gap-3">
-          <a
-            href="https://github.com/chrislanejones/rust-wasm-photo-tool"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Source on GitHub"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z" />
-            </svg>
-          </a>
-          <a
-            href="https://codeberg.org/chrislanejones/rust-wasm-photo-tool"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Source on Codeberg"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 1.5A10.5 10.5 0 0 0 1.5 12c0 2.45.84 4.71 2.25 6.5L11.9 5.55a.12.12 0 0 1 .2 0l8.15 12.95A10.46 10.46 0 0 0 22.5 12 10.5 10.5 0 0 0 12 1.5Z" />
-              <path d="M12.43 8.6l6.95 11.04a10.48 10.48 0 0 1-1.71 1.27L12 9.3l.43-.7Z" opacity=".55" />
-            </svg>
-          </a>
-          <a
-            href={EDITOR_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-medium px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-900 hover:bg-white transition"
-          >
-            Beta Version
-          </a>
-          {/* Mobile hamburger — toggles the dropdown below; hidden on md+ */}
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-label="Toggle menu"
-            aria-expanded={open}
-            className="md:hidden p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition"
-          >
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              {open ? (
-                <>
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                  <line x1="6" y1="18" x2="18" y2="6" />
-                </>
-              ) : (
-                <>
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </>
-              )}
-            </svg>
-          </button>
-        </div>
-      </div>
+    <>
+      <nav className={`nav-pill${condensed ? " is-condensed" : ""}`} aria-label="Primary">
+        <Link className="nav-pill__mark" to="/">
+          <img className="nav-pill__logo" src="/Image-Horse-Logo.svg" alt="" width={44} height={44} />
+          <span className="nav-pill__word">
+            <span>Image&nbsp;Horse</span>
+          </span>
+        </Link>
 
-      {/* Mobile dropdown panel */}
-      {open && (
-        <div className="md:hidden border-t border-zinc-900 bg-zinc-950/95 backdrop-blur">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex flex-col text-sm text-zinc-300">
-            {navItems(() => setOpen(false), "block py-2.5 border-b border-zinc-900/70 last:border-b-0")}
-          </div>
-        </div>
-      )}
-    </nav>
+        <ul className="nav-pill__links" ref={listRef} onPointerLeave={rest}>
+          {PAGES.map((p) => (
+            <li key={p.to}>
+              {/* NavLink sets aria-current="page" itself — the glide reads it */}
+              <NavLink
+                to={p.to}
+                end={p.to === "/"}
+                onPointerEnter={(e) => moveTo(e.currentTarget)}
+                onFocus={(e) => moveTo(e.currentTarget)}
+                onBlur={(e) => {
+                  if (!listRef.current?.contains(e.relatedTarget as Node)) rest();
+                }}
+              >
+                {p.label}
+              </NavLink>
+            </li>
+          ))}
+          <span className="nav-pill__glide" aria-hidden="true" />
+        </ul>
+
+        <a className="cta cta--fill nav-pill__cta" href={EDITOR_URL} {...external}>
+          Open the demo
+        </a>
+
+        {/* Condensing hides these, so they have to leave the tab order too. */}
+        <span className="nav-pill__source" inert={condensed ? true : undefined}>
+          <button
+            className="nav-pill__icon nav-pill__kbd"
+            type="button"
+            onClick={onOpenSearch}
+            aria-label="Search this site (Command K)"
+            aria-expanded={searchOpen}
+            aria-haspopup="dialog"
+            title="Search — ⌘K"
+          >
+            <kbd>⌘K</kbd>
+          </button>
+          {sourceLinks}
+        </span>
+
+        <button
+          className="nav-pill__burger"
+          type="button"
+          ref={burgerRef}
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-expanded={menuOpen}
+          aria-controls="navsheet"
+          aria-label="Menu"
+        >
+          <BurgerIcon />
+        </button>
+      </nav>
+
+      <div className="nav-sheet" id="navsheet" ref={sheetRef} hidden={!menuOpen}>
+        {/* The wordmark lives here rather than in the pill on a phone: at 20px
+            it pushed the burger to x=374 on a 375px screen — off the edge, so
+            the menu could not be opened at all. */}
+        <p className="nav-sheet__brand">
+          <img className="nav-sheet__logo" src="/Image-Horse-Logo.svg" alt="" width={32} height={32} />
+          <span>Image&nbsp;Horse</span>
+        </p>
+        {PAGES.map((p) => (
+          <NavLink key={p.to} to={p.to} end={p.to === "/"}>
+            {p.label}
+          </NavLink>
+        ))}
+        <p className="nav-sheet__source">{sourceLinks}</p>
+      </div>
+    </>
   );
 }

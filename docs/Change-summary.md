@@ -1772,6 +1772,56 @@ the real-gallery check (ADR-016) is still outstanding.
 
 **Every number is generated, not written.** Releases from `Trail.tsx` (82), commits from `git log` (211 across 42 active days), features from `docs/Features.md` (40 — a list the old site never carried), tiers from `Pricing.tsx`, schema from the old `Architecture.tsx`. Regenerate from source rather than hand-editing.
 
-**Still open.** The nav measures ~830px against the N5 floating-pill ceiling of 720 — it should either drop the Home link or become a canonical bar during the React port. `docs/Change-summary.md` lists 87 distinct versions; the trail log knows 82.
+**Still open.** The nav measures ~830px against the ~720px ceiling a content-sized floating pill wants — it should either drop the Home link or become a full-width bar during the React port. `docs/Change-summary.md` lists 87 distinct versions; the trail log knows 82.
 
 **Not deployed.** `marketing/` is untouched and still the live site. The port plan is `~/claude-runs/MARKETING_TWO_TO_REACT.md`.
+
+---
+
+## v7.35 — 2026-07-16
+
+**The new site is now the site.** The five-page build that shipped last version as
+`marketing-two/` is ported to React and has replaced `marketing/`. The staging
+copy is deleted. Live at [image-horse.vercel.app](https://image-horse.vercel.app/).
+
+| #   | Change                                                          | Status                                  |
+| --- | --------------------------------------------------------------- | --------------------------------------- |
+| 1   | Ported to Vite + React 19 + react-router — 5 routes              | Complete — `/` `/architecture` `/features` `/pricing` `/trail-log` |
+| 2   | `marketing/` replaced; `marketing-two/` deleted                  | Complete                                |
+| 3   | Tailwind dropped from the marketing app entirely                 | Complete — plain CSS off `tokens.css`   |
+| 4   | Old Tailwind sections/pages/components removed                   | Complete — 12 files                     |
+| 5   | Data → typed modules (`src/data/*.ts`)                           | Complete — releases, commits, features, schema |
+| 6   | `scripts/gen-trail-data.mjs` regenerates commits + features      | Complete — part of the release routine  |
+| 7   | **Fix:** `--z-modal` was undefined → nav painted over the ⌘K palette | Complete — token added at 400        |
+| 8   | **Fix:** features rail marked the wrong entry, 17 of 18 positions | Complete — topmost-in-band, not latest  |
+| 9   | **Fix:** one class did duty as both features container + paragraph | Complete — `.fx__text` split out       |
+| 10  | ⌘K now routes client-side instead of reloading the document      | Complete — verified no full reload      |
+| 11  | Hash targets clear the fixed nav                                 | Complete — `[id] { scroll-margin-top }` |
+
+**Three real bugs, found by measuring rather than looking.** The ⌘K palette set
+`z-index: var(--z-modal)` and nothing ever defined that token, so it computed to
+`auto` and the nav — a positioned element at `z-index: 300` — painted straight
+over the open modal. The features rail was worse: instrumenting it showed the
+highlight was wrong at 17 of 18 scroll positions, always one item ahead, because
+it marked whichever item had most recently entered the observer's band. The next
+item's top edge would peek in and steal the highlight while the item you were
+actually reading still filled the screen. It now marks the topmost item in the
+band. Both bugs existed in the static site and neither was visible without a probe.
+
+**Numbers can't go stale.** `src/data/commits.ts` (the trail-log squares) and
+`src/data/features.ts` are generated from `git log` and `docs/Features.md` by
+`marketing/scripts/gen-trail-data.mjs`. It runs as part of the release routine —
+first run already picked up a day the hand-written copy had missed (212 commits
+across 43 days, not 211/42). `releases.ts` stays hand-written, because it's the
+changelog.
+
+**Verified against the production build**, not the dev server: all 5 routes 200;
+⌘K opens, focuses, filters, routes client-side and restores scroll; trail-log
+filters (Jun→36, Feb→1, All→82) with all 6 achievement cards at an equal 400px;
+pricing tiers equal at 376px and the tier filter dims the right columns; zero
+horizontal overflow at 320 / 375 / 414 / 768 / 1280 / 1440; the mobile burger sits
+at x=308 on a 375px screen.
+
+**Still open.** The nav measures ~830px against the ~720px a content-sized pill
+wants — drop Home or go full-width. `docs/Change-summary.md` lists 88 distinct
+versions; the trail log knows 82.

@@ -1,13 +1,14 @@
-/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4
- * genre: atmospheric · macrostructure: Marquee Hero · theme: Bloom
- * tokens · paper-band: dark · display-style: weighty-sans · accent-hue: warm-amber
- * Bloom palette per the Hyperlane reference; type stack re-picked (see styles.css stamp).
+/* Design tokens — the single source for colour, type, space and motion.
+ *
+ * Every value the stylesheet uses lives here. Rule: no raw colours, no raw
+ * font-families, no magic durations anywhere else. A new value becomes a
+ * token first, then gets referenced.
  */
 
 :root {
   color-scheme: dark;
 
-  /* === Color: Bloom (atmospheric) ============================== */
+  /* === Color ==================================================== */
   --color-paper:        oklch(13% 0.018 35);
   --color-paper-2:      oklch(17% 0.020 35);
   --color-paper-3:      oklch(22% 0.022 35);
@@ -28,7 +29,7 @@
   /* Contribution-grid ramp — an amber intensity scale off --color-accent.
    * L0 is an empty day (a tinted surface, never a pure grey); L1–L4 climb
    * toward the accent. Named tokens because the grid must not improvise
-   * colour mid-render (gate 48). */
+   * colour mid-render. */
   --color-grid-0:       oklch(20% 0.012 40);
   --color-grid-1:       oklch(34% 0.070 48);
   --color-grid-2:       oklch(48% 0.115 50);
@@ -51,9 +52,9 @@
   --text-xl:      1.5rem;
   --text-2xl:     2rem;
   --text-3xl:     2.75rem;
-  /* The step-down rung for a long headline. typography.md reserves the full
-   * --text-display clamp for statements of ≤50 characters; past that it wraps
-   * into drama rather than gravity. The hero line is 60, so it caps here. */
+  /* The step-down rung for a long headline. The full --text-display clamp is
+   * for statements of ≤50 characters; past that it wraps into drama rather
+   * than gravity. The hero line is 60, so it caps here. */
   --text-4xl:     clamp(2.5rem, 4vw + 1rem, 4.5rem);
   --text-display: clamp(3rem, 9vw + 0.25rem, 8rem);
 
@@ -74,8 +75,8 @@
   --space-4xl: 9rem;
 
   --page-gutter: clamp(1.25rem, 5vw, 4rem);
-  /* gate 56 — a secondary sticky must dock BELOW the fixed nav, not at top:0,
-   * or it paints over the bar mid-scroll. 62px pill + 16px inset + air. */
+  /* A secondary sticky must dock BELOW the fixed nav, not at top:0, or it
+   * paints over the bar mid-scroll. 62px pill + 16px inset + air. */
   --banner-height: 94px;
   --measure:     65ch;
 
@@ -97,8 +98,7 @@
   --dur-short: 220ms;
   --dur-long:  420ms;
   /* The nav scroll-morph. Every morphed property shares this one duration and
-   * one curve, or the bar reads as several animations instead of one
-   * (floating-nav.md, law 4).
+   * one curve, or the bar reads as several animations instead of one.
    * The curve is --ease-in-out, NOT --ease-out: exponential ease-out is right
    * for a thing arriving, but it front-loads the travel — a collapse on it
    * dumps ~80% of the width in the first fifth of the time and then crawls,
@@ -112,4 +112,9 @@
   --z-raised:     10;
   --z-sticky:     200;
   --z-sticky-nav: 300;
+  /* The palette has to clear the nav. It sits at the end of the DOM, but the
+   * nav is a positioned element with z-index 300 — so without a number here
+   * the palette computes to `auto` and the pill paints straight through the
+   * open modal, floating on top of its own backdrop. */
+  --z-modal:      400;
 }

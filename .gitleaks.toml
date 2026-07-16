@@ -1,0 +1,59 @@
+# Gitleaks config.
+#
+# Starts from the full default ruleset and narrows exactly one thing: Clerk
+# PUBLISHABLE keys.
+#
+# A `pk_test_*` / `pk_live_*` key is not a secret. Clerk publishable keys are
+# compiled into the client bundle and served to every visitor's browser by
+# design — that is what "publishable" means. The `generic-api-key` rule fires on
+# them only because the trailing base64 is high-entropy, not because anything is
+# exposed. The one in playwright.config.ts is a test key pointed at a
+# placeholder Convex host for the smoke run.
+#
+# SECRET keys (`sk_test_*`, `sk_live_*`) are NOT allowlisted and must still fail
+# the build. If you are ever tempted to widen the regex below to cover an `sk_`,
+# the answer is to rotate the key, not to edit this file.
+#
+# Verified against gitleaks 8.24.3 (the version gitleaks-action@v2 runs) with a
+# four-case matrix — pk_test/pk_live pass, sk_test/sk_live still fail. If you
+# change this file, re-run that matrix, and make sure the sk_ control actually
+# FAILS: an allowlist that silently matches everything looks identical to a
+# working one unless something is proving the scanner still bites.
+
+title = "Image Horse"
+
+[extend]
+useDefault = true
+
+# Singular [allowlist] — this is the global allowlist table. A plural
+# [[allowlists]] block parses without error here and does nothing at all, which
+# is a quiet way to ship a config that looks right and isn't.
+[allowlist]
+description = """
+Clerk publishable keys. Public by design — they ship to every browser in the
+client bundle. Scoped to pk_ only; sk_ still fails the build.
+"""
+# regexTarget = "match" tests the whole matched string, which for generic-api-key
+# includes the pk_test_ prefix — the part that says "publishable". The default
+# target is the secret capture group, which is not what we want to reason about.
+regexTarget = "match"
+regexes = [
+  '''pk_(test|live)_[A-Za-z0-9+/=_-]{20,}''',
+  # Placeholder hosts used by the e2e smoke run — they resolve to nothing.
+  '''https://[a-z]+-placeholder-[0-9]+\.convex\.cloud''',
+  # UploadThing PUBLIC file keys in app/src/lib/testImages.ts — the "Test Free
+  # Images" demo set. These are public-CDN object ids for royalty-free photos;
+  # anyone with the URL is meant to fetch them, which is the whole point of the
+  # button. High-entropy, so generic-api-key bites. The account's actual secret
+  # (UPLOADTHING_TOKEN) is server-side and lives in a gitignored .env.local —
+  # it is NOT covered here and must still fail.
+  '''z5H6uhfIK1OU[A-Za-z0-9]{30,}''',
+]
+
+# Explicit, even though the default `stripe-access-token` rule already catches
+# sk_live_. Named so that a hit says what it is and what to do about it.
+[[rules]]
+id = "clerk-secret-key"
+description = "Clerk SECRET key — never commit; rotate immediately if this fires"
+regex = '''sk_(test|live)_[A-Za-z0-9]{20,}'''
+keywords = ["sk_test_", "sk_live_"]
