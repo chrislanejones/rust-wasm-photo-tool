@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Architecture — Image Horse</title>
+<meta name="description" content="How Image Horse is built: a browser that is a complete editor on its own, and an optional network plane you can sever without breaking it." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../tokens.css?v=25" />
+<link rel="stylesheet" href="../styles.css?v=25" />
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav-pill" aria-label="Primary">
+  <a class="nav-pill__mark" href="/">
+    <img class="nav-pill__logo" src="/Image-Horse-Logo.svg" alt="" width="44" height="44" />
+    <span class="nav-pill__word"><span>Image&nbsp;Horse</span></span>
+  </a>
+  <ul class="nav-pill__links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/architecture/">Architecture</a></li>
+    <li><a href="/features/">Features</a></li>
+    <li><a href="/pricing/">Pricing</a></li>
+    <li><a href="/trail-log/">Trail Log</a></li>
+    <span class="nav-pill__glide" aria-hidden="true"></span>
+  </ul>
+  <a class="cta cta--fill nav-pill__cta" href="https://rust-wasm-photo-tool.netlify.app" target="_blank" rel="noopener noreferrer">Open the demo</a>
+  <span class="nav-pill__source">
+    <button class="nav-pill__icon nav-pill__kbd" id="cmdk-trigger" type="button"
+            aria-label="Search this site (Command K)" aria-expanded="false" aria-haspopup="dialog"
+            title="Search — ⌘K">
+      <kbd>⌘K</kbd>
+    </button>
+    <a class="nav-pill__icon" href="https://github.com/chrislanejones/rust-wasm-photo-tool" title="Source on GitHub" aria-label="Source on GitHub" target="_blank" rel="noopener noreferrer">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z" />
+      </svg>
+    </a>
+    <a class="nav-pill__icon" href="https://codeberg.org/chrislanejones/rust-wasm-photo-tool" title="Source on Codeberg" aria-label="Source on Codeberg" target="_blank" rel="noopener noreferrer">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 1.5A10.5 10.5 0 0 0 1.5 12c0 2.45.84 4.71 2.25 6.5L11.9 5.55a.12.12 0 0 1 .2 0l8.15 12.95A10.46 10.46 0 0 0 22.5 12 10.5 10.5 0 0 0 12 1.5Z" />
+        <path d="M12.43 8.6l6.95 11.04a10.48 10.48 0 0 1-1.71 1.27L12 9.3l.43-.7Z" opacity=".55" />
+      </svg>
+    </a>
+  </span>
+  <button class="nav-pill__burger" type="button" aria-expanded="false" aria-controls="navsheet" aria-label="Menu">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <g class="bar-lines"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></g>
+      <g class="bar-x"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></g>
+    </svg>
+  </button>
+</nav>
+<div class="nav-sheet" id="navsheet" hidden>
+  <p class="nav-sheet__brand">
+    <img class="nav-sheet__logo" src="/Image-Horse-Logo.svg" alt="" width="32" height="32" />
+    <span>Image&nbsp;Horse</span>
+  </p>
+  <a href="/">Home</a>
+  <a href="/architecture/">Architecture</a>
+  <a href="/features/">Features</a>
+  <a href="/pricing/">Pricing</a>
+  <a href="/trail-log/">Trail Log</a>
+  <p class="nav-sheet__source">
+    <a class="nav-pill__icon" href="https://github.com/chrislanejones/rust-wasm-photo-tool" title="Source on GitHub" aria-label="Source on GitHub" target="_blank" rel="noopener noreferrer">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z" />
+      </svg>
+    </a>
+    <a class="nav-pill__icon" href="https://codeberg.org/chrislanejones/rust-wasm-photo-tool" title="Source on Codeberg" aria-label="Source on Codeberg" target="_blank" rel="noopener noreferrer">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 1.5A10.5 10.5 0 0 0 1.5 12c0 2.45.84 4.71 2.25 6.5L11.9 5.55a.12.12 0 0 1 .2 0l8.15 12.95A10.46 10.46 0 0 0 22.5 12 10.5 10.5 0 0 0 12 1.5Z" />
+        <path d="M12.43 8.6l6.95 11.04a10.48 10.48 0 0 1-1.71 1.27L12 9.3l.43-.7Z" opacity=".55" />
+      </svg>
+    </a>
+  </p>
+</div>
+
+<main id="main">
+
+  <!-- 19 · Map/Diagram — the map IS the page. Orientation phrase, then the map. -->
+  <header class="page-head">
+    <h1 class="page-head__title">One plane is the editor. The other is optional.</h1>
+    <p class="lede">
+      Everything inside the solid boundary runs in your tab. Cut the dashed
+      plane off entirely and what's left is still a complete, working image
+      editor — that isn't a fallback mode, it's the demo everyone gets.
+    </p>
+  </header>
+
+  <!-- Same segmented control as the Trail Log's month filter: one group, one
+       selected, icon over label. Here it dims everything a given tier never
+       touches — which is the page's argument, made pressable. -->
+  <section class="tiers-filter" aria-labelledby="tf-h">
+    <h2 class="visually-hidden" id="tf-h">Show the architecture for one kind of user</h2>
+    <div class="graph__scroll">
+      <div class="graph__group" id="tierfilter" role="group" aria-label="Show the architecture for one kind of user">
+        <button class="seg seg--tier" type="button" data-tier="all" aria-pressed="true">
+          <svg class="seg__icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />
+            <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+            <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
+          </svg>
+          <span class="seg__label">Full architecture</span>
+        </button>
+        <button class="seg seg--tier" type="button" data-tier="demo" aria-pressed="false">
+          <svg class="seg__icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <line x1="17" x2="22" y1="8" y2="13" />
+            <line x1="22" x2="17" y1="8" y2="13" />
+          </svg>
+          <span class="seg__label">Logged out</span>
+        </button>
+        <button class="seg seg--tier" type="button" data-tier="free" aria-pressed="false">
+          <svg class="seg__icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m16 11 2 2 4-4" />
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+          </svg>
+          <span class="seg__label">Logged in</span>
+        </button>
+        <button class="seg seg--tier" type="button" data-tier="pro" aria-pressed="false">
+          <svg class="seg__icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" />
+            <path d="M5 21h14" />
+          </svg>
+          <span class="seg__label">Paid users</span>
+        </button>
+      </div>
+    </div>
+    <p class="tiers-filter__note" id="tier-note" role="status"></p>
+  </section>
+
+  <section class="map" aria-labelledby="map-h">
+    <h2 class="visually-hidden" id="map-h">System map</h2>
+
+    <div class="map__plane map__plane--client" data-tier="demo free pro">
+      <div class="plane__head">
+        <span class="plane__name">Browser</span>
+        <span class="plane__note">fully functional offline</span>
+      </div>
+
+      <div class="map__row">
+        <article class="node">
+          <h3 class="node__title">UI plane</h3>
+          <p class="node__sub">React 18 · TypeScript · Vite</p>
+          <ul class="node__list">
+            <li>AppShell — composition and layout only</li>
+            <li>Tool registry — ~10 tool modules</li>
+            <li>Session hooks — image · selection · canvas · mask</li>
+            <li>Zustand stores — UI · tool · gallery · annotation · guides</li>
+          </ul>
+        </article>
+
+        <article class="node node--accent" data-tier="demo free pro">
+          <h3 class="node__title">Compute plane</h3>
+          <p class="node__sub">where the pixels are touched</p>
+          <ul class="node__list">
+            <li><strong>WASM engine — stamp_tool</strong>: kernels, TileBuffer, OpLog</li>
+            <li>Codec worker — encode · thumbnail · OffscreenCanvas</li>
+            <li class="node__planned" data-tier="planned">rayon worker pool — planned, gated on COOP/COEP</li>
+            <li class="node__planned" data-tier="planned">WebGPU backend — far off</li>
+          </ul>
+        </article>
+
+        <article class="node">
+          <h3 class="node__title">Persistence plane</h3>
+          <p class="node__sub">IndexedDB · Dexie</p>
+          <ul class="node__list">
+            <li>originals — content-addressed, immutable</li>
+            <li>opLogs + keyframes</li>
+            <li>gallery manifest</li>
+            <li>renderCache — disposable</li>
+          </ul>
+        </article>
+      </div>
+
+      <p class="plane__foot">
+        Plus <code>localStorage</code> for lightweight prefs, and a service
+        worker that precaches the shell and the WASM binary.
+      </p>
+    </div>
+
+    <div class="map__seam" aria-hidden="true">
+      <span class="map__seam-label">sever here — the editor still works</span>
+    </div>
+
+    <div class="map__plane map__plane--edge" data-tier="free pro">
+      <div class="plane__head">
+        <span class="plane__name">Network</span>
+        <span class="plane__note">optional, additive only</span>
+      </div>
+
+      <div class="map__row map__row--4">
+        <article class="node node--quiet" data-tier="free pro">
+          <h3 class="node__title">Clerk</h3>
+          <p class="node__sub">identity</p>
+        </article>
+        <article class="node node--quiet" data-tier="free pro">
+          <h3 class="node__title">Convex</h3>
+          <p class="node__sub">prefs sync · entitlements · gallery</p>
+        </article>
+        <article class="node node--quiet" data-tier="pro">
+          <h3 class="node__title">AI proxy → Replicate</h3>
+          <p class="node__sub">the server holds the provider key</p>
+        </article>
+        <article class="node node--quiet" data-tier="free pro">
+          <h3 class="node__title">Share delivery</h3>
+          <p class="node__sub">ShareViewer</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="stack">
+    <header class="head-hang">
+      <h2 class="section__title section__title--sm">What's in each plane</h2>
+    </header>
+
+    <h3 class="stack__label">Client layer <span class="muted">— runs entirely in the browser</span></h3>
+    <div class="stack__grid">
+      <article class="node" data-tier="demo free pro"><h4 class="node__title">React App</h4><p class="node__sub">Vite + React 19 · Netlify static SPA</p></article>
+      <article class="node" data-tier="demo free pro"><h4 class="node__title">Canvas Engine</h4><p class="node__sub">JS ↔ WASM bridge · zero-copy blit</p></article>
+      <article class="node" data-tier="demo free pro"><h4 class="node__title">Zustand State</h4><p class="node__sub">5 stores · atomic selectors</p></article>
+    </div>
+
+    <h3 class="stack__label">WASM processing layer <span class="muted">— client-side Rust, one binary</span></h3>
+    <div class="stack__grid stack__grid--3">
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">core · layer</h4><p class="node__sub">ImageBuffer · layer stack · composite / mask</p></article>
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">paint · effects</h4><p class="node__sub">Brush / eraser / mask · blur / pixelate / redact</p></article>
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">annotations · selection</h4><p class="node__sub">Live text &amp; shape overlays · magic-wand</p></article>
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">stamp · transform</h4><p class="node__sub">Clone brush · flip / rotate / resize / crop</p></article>
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">filters</h4><p class="node__sub">Brightness · contrast · gaussian blur</p></article>
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">drawing · text</h4><p class="node__sub">Arrows / shapes / bézier · embedded fonts</p></article>
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">codec · history</h4><p class="node__sub">PNG encode (Rust) · undo snapshots</p></article>
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">simd</h4><p class="node__sub">v128/f32x4 kernels · scalar fallback</p></article>
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">utils</h4><p class="node__sub">json · point math · shared helpers</p></article>
+    </div>
+
+    <h3 class="stack__label">Identity <span class="muted">— Clerk</span></h3>
+    <div class="stack__grid stack__grid--4">
+      <article class="node node--quiet" data-tier="free pro"><h4 class="node__title">Clerk Auth</h4><p class="node__sub">identity provider</p></article>
+      <article class="node node--quiet" data-tier="demo"><h4 class="node__title">Demo</h4><p class="node__sub">anonymous · 12 photos</p></article>
+      <article class="node node--quiet" data-tier="free"><h4 class="node__title">Free</h4><p class="node__sub">signed in · 24 photos</p></article>
+      <article class="node node--quiet" data-tier="pro"><h4 class="node__title">Pro</h4><p class="node__sub">100 photos · coming soon</p></article>
+    </div>
+
+    <h3 class="stack__label">Convex functions <span class="muted">— signed-in only</span></h3>
+    <div class="stack__grid stack__grid--3">
+      <article class="node node--quiet" data-tier="free pro"><h4 class="node__title mono">photoEdits.ts</h4><p class="node__sub">save / getEdit</p></article>
+      <article class="node node--quiet" data-tier="pro"><h4 class="node__title mono">ai.ts</h4><p class="node__sub">dispatch to Replicate</p></article>
+      <article class="node node--quiet" data-tier="pro"><h4 class="node__title mono">aiJobs.ts</h4><p class="node__sub">job status (useQuery)</p></article>
+      <article class="node node--quiet" data-tier="free pro"><h4 class="node__title mono">shares.ts</h4><p class="node__sub">public share links</p></article>
+      <article class="node node--quiet" data-tier="free pro"><h4 class="node__title mono">textHistory.ts</h4><p class="node__sub">recent texts</p></article>
+      <article class="node node--quiet" data-tier="free pro"><h4 class="node__title mono">stripe.ts</h4><p class="node__sub">checkout / portal</p></article>
+    </div>
+
+    <h3 class="stack__label">Storage</h3>
+    <div class="stack__grid">
+      <article class="node node--accent" data-tier="demo free pro"><h4 class="node__title">IndexedDB (Dexie)</h4><p class="node__sub">Originals · SHA-256 content-addressed · your machine</p></article>
+      <article class="node node--quiet" data-tier="free pro"><h4 class="node__title">Convex File Storage</h4><p class="node__sub">Edit archives · shares · AI frames · a server</p></article>
+    </div>
+
+    <h3 class="stack__label">AI <span class="muted">— Replicate, Pro only</span></h3>
+    <div class="stack__grid stack__grid--4">
+      <article class="node node--quiet" data-tier="pro"><h4 class="node__title mono">cjwbw/rembg</h4><p class="node__sub">background removal</p></article>
+      <article class="node node--quiet" data-tier="pro"><h4 class="node__title mono">abiruyt/text-extract-ocr</h4><p class="node__sub">text extract</p></article>
+      <article class="node node--quiet" data-tier="pro"><h4 class="node__title mono">zylim0702/remove-object</h4><p class="node__sub">object removal (masked)</p></article>
+      <article class="node node--quiet" data-tier="planned"><h4 class="node__title mono">Real-ESRGAN</h4><p class="node__sub">4× upscale</p><span class="tag tag--local">soon</span></article>
+    </div>
+
+    <h3 class="stack__label">Event handlers <span class="muted">— webhooks</span></h3>
+    <div class="stack__grid">
+      <article class="node node--quiet" data-tier="pro"><h4 class="node__title">Stripe webhook</h4><p class="node__sub">subscription changes → <span class="mono">subscriptions</span></p></article>
+      <article class="node node--quiet" data-tier="pro"><h4 class="node__title">Replicate webhook</h4><p class="node__sub">AI complete → <span class="mono">ai_jobs.status</span></p></article>
+    </div>
+    <p class="stack__note muted">
+      Clerk sign-in isn't a webhook here — the client calls
+      <code>users.upsert</code> once Convex's own auth bridge comes up, and that
+      is what actually creates the <code>users</code> row.
+    </p>
+  </section>
+
+  <section class="schema">
+    <header class="head-hang">
+      <h2 class="section__title section__title--sm">Convex database schema</h2>
+      <p class="lede">
+        Every table, its fields and its indexes. Flatter than a typical
+        projects → images tree: each row hangs straight off <code>users</code>,
+        keyed by the client's own <code>photoKey</code> string rather than a
+        server-side image id.
+      </p>
+    </header>
+    <div class="schema__grid" id="schema"></div>
+
+    <div class="rels">
+      <h3 class="stack__label">Entity relationships</h3>
+      <ul class="rels__list">
+        <li><span class="mono">users</span> <span class="rels__card">1 ─ 1</span> <span class="mono">subscriptions</span></li>
+        <li><span class="mono">users</span> <span class="rels__card">1 ─ ∞</span> <span class="mono">photo_edits</span></li>
+        <li><span class="mono">users</span> <span class="rels__card">1 ─ ∞</span> <span class="mono">recent_texts</span></li>
+        <li><span class="mono">users</span> <span class="rels__card">1 ─ ∞</span> <span class="mono">shares</span></li>
+        <li><span class="mono">users</span> <span class="rels__card">1 ─ ∞</span> <span class="mono">ai_jobs</span></li>
+      </ul>
+    </div>
+
+    <div class="stack__grid stack__grid--4 schema__notes">
+      <article class="node node--quiet"><h4 class="node__title">Real-time</h4><p class="node__sub"><span class="mono">useQuery</span> hooks auto-update when data changes. No polling.</p></article>
+      <article class="node node--quiet"><h4 class="node__title">Row-level auth</h4><p class="node__sub"><span class="mono">ctx.auth</span> in mutations, plus query filters for user-scoped data.</p></article>
+      <article class="node node--quiet"><h4 class="node__title">File storage</h4><p class="node__sub">Integrated blob storage for images via <span class="mono">storage.getUrl()</span>.</p></article>
+      <article class="node node--quiet"><h4 class="node__title">Webhooks</h4><p class="node__sub">Replicate + Stripe post back to <span class="mono">convex/http.ts</span>, HMAC-verified.</p></article>
+    </div>
+  </section>
+
+  <!-- The closing section: the argument, then the source that backs it, then
+       both ways out. The download used to sit in its own band above; it reads
+       better as the evidence attached to the claim than as a section of its own. -->
+  <section class="why">
+    <h2 class="section__title section__title--sm">Why draw it this way</h2>
+    <p class="lede">
+      Because the boundary is the product. An editor that needs a server is an
+      editor that can be switched off, rate-limited, or quietly trained on. The
+      dashed plane buys you sync, sharing, and the AI passes — and it is the
+      only place a photo of yours can travel. Demo mode never crosses it.
+    </p>
+    <p class="lede">
+      The map above is drawn by hand from <code>system-architecture.mermaid</code>,
+      the flowchart the repo ships. Take the original and render it wherever you
+      like — Mermaid Live, a VS&nbsp;Code preview, your own docs.
+    </p>
+    <div class="why__actions">
+      <a class="cta cta--outline cta--lg"
+         href="/system-architecture.mermaid"
+         download="system-architecture.mermaid"
+         type="text/vnd.mermaid">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" />
+        </svg>
+        Download the source
+      </a>
+      <a class="cta cta--outline cta--lg" href="https://github.com/chrislanejones/rust-wasm-photo-tool/blob/master/docs/Architecture.md" target="_blank" rel="noopener noreferrer">
+        Read the full architecture doc
+      </a>
+    </div>
+    <p class="diagram__foot muted">
+      <span class="mono">system-architecture.mermaid</span> ·
+      Mermaid <span class="mono">flowchart TB</span> · <span class="fig">79</span> lines ·
+      the dashed subgraph is the plane you can cut.
+    </p>
+  </section>
+
+</main>
+
+<footer class="foot-stmt">
+  <p class="foot-stmt__line">Sever the network plane. It still works.</p>
+  <div class="foot-stmt__meta">
+    <a class="foot-stmt__mark" href="/">
+      <img class="foot-stmt__logo" src="/Image-Horse-Logo.svg" alt="" width="44" height="44" />
+      <span>Image&nbsp;Horse</span>
+    </a>
+    <ul class="foot-stmt__links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/features/">Features</a></li>
+      <li><a href="/pricing/">Pricing</a></li>
+      <li><a href="/trail-log/">Trail Log</a></li>
+    </ul>
+    <span class="foot-stmt__source">
+      <a class="nav-pill__icon" href="https://github.com/chrislanejones/rust-wasm-photo-tool" target="_blank" rel="noopener noreferrer" title="Source on GitHub" aria-label="Source on GitHub">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z" />
+        </svg>
+      </a>
+      <a class="nav-pill__icon" href="https://codeberg.org/chrislanejones/rust-wasm-photo-tool" target="_blank" rel="noopener noreferrer" title="Source on Codeberg" aria-label="Source on Codeberg">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 1.5A10.5 10.5 0 0 0 1.5 12c0 2.45.84 4.71 2.25 6.5L11.9 5.55a.12.12 0 0 1 .2 0l8.15 12.95A10.46 10.46 0 0 0 22.5 12 10.5 10.5 0 0 0 12 1.5Z" />
+          <path d="M12.43 8.6l6.95 11.04a10.48 10.48 0 0 1-1.71 1.27L12 9.3l.43-.7Z" opacity=".55" />
+        </svg>
+      </a>
+    </span>
+  </div>
+</footer>
+
+<script src="../nav.js?v=25"></script>
+<script src="../architecture.js?v=25"></script>
+
+<!-- N13 · the ⌘K palette. The archetype's condition is that shipping the pill
+     means shipping the keyboard model, so this is a real dialog: focus in and
+     out, Esc, arrows, Enter, trapped Tab, and the body locked behind it. -->
+<div class="cmdk" id="cmdk" aria-hidden="true">
+  <div class="cmdk__backdrop" data-close></div>
+  <div class="cmdk__panel" role="dialog" aria-modal="true" aria-label="Search this site">
+    <div class="cmdk__field">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+      </svg>
+      <input id="cmdk-input" type="text" placeholder="Search pages, sections, source…" autocomplete="off" spellcheck="false" />
+      <kbd>esc</kbd>
+    </div>
+    <div class="cmdk__results" id="cmdk-results" role="listbox" aria-label="Results"></div>
+    <div class="cmdk__foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+      <span><kbd>↵</kbd> open</span>
+      <span><kbd>esc</kbd> close</span>
+    </div>
+  </div>
+</div>
+
+<script src="../cmdk.js?v=25"></script>
+</body>
+</html>

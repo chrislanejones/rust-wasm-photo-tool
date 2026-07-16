@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Trail Log — Image Horse</title>
+<meta name="description" content="Every Image Horse release, newest first. Features, performance work, and fixes — filtered by month." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../tokens.css?v=25" />
+<link rel="stylesheet" href="../styles.css?v=25" />
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav-pill" aria-label="Primary">
+  <a class="nav-pill__mark" href="/">
+    <img class="nav-pill__logo" src="/Image-Horse-Logo.svg" alt="" width="44" height="44" />
+    <span class="nav-pill__word"><span>Image&nbsp;Horse</span></span>
+  </a>
+  <ul class="nav-pill__links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/architecture/">Architecture</a></li>
+    <li><a href="/features/">Features</a></li>
+    <li><a href="/pricing/">Pricing</a></li>
+    <li><a href="/trail-log/">Trail Log</a></li>
+    <span class="nav-pill__glide" aria-hidden="true"></span>
+  </ul>
+  <a class="cta cta--fill nav-pill__cta" href="https://rust-wasm-photo-tool.netlify.app" target="_blank" rel="noopener noreferrer">Open the demo</a>
+  <span class="nav-pill__source">
+    <button class="nav-pill__icon nav-pill__kbd" id="cmdk-trigger" type="button"
+            aria-label="Search this site (Command K)" aria-expanded="false" aria-haspopup="dialog"
+            title="Search — ⌘K">
+      <kbd>⌘K</kbd>
+    </button>
+    <a class="nav-pill__icon" href="https://github.com/chrislanejones/rust-wasm-photo-tool" title="Source on GitHub" aria-label="Source on GitHub" target="_blank" rel="noopener noreferrer">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z" />
+      </svg>
+    </a>
+    <a class="nav-pill__icon" href="https://codeberg.org/chrislanejones/rust-wasm-photo-tool" title="Source on Codeberg" aria-label="Source on Codeberg" target="_blank" rel="noopener noreferrer">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 1.5A10.5 10.5 0 0 0 1.5 12c0 2.45.84 4.71 2.25 6.5L11.9 5.55a.12.12 0 0 1 .2 0l8.15 12.95A10.46 10.46 0 0 0 22.5 12 10.5 10.5 0 0 0 12 1.5Z" />
+        <path d="M12.43 8.6l6.95 11.04a10.48 10.48 0 0 1-1.71 1.27L12 9.3l.43-.7Z" opacity=".55" />
+      </svg>
+    </a>
+  </span>
+  <button class="nav-pill__burger" type="button" aria-expanded="false" aria-controls="navsheet" aria-label="Menu">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <g class="bar-lines"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></g>
+      <g class="bar-x"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></g>
+    </svg>
+  </button>
+</nav>
+<div class="nav-sheet" id="navsheet" hidden>
+  <p class="nav-sheet__brand">
+    <img class="nav-sheet__logo" src="/Image-Horse-Logo.svg" alt="" width="32" height="32" />
+    <span>Image&nbsp;Horse</span>
+  </p>
+  <a href="/">Home</a>
+  <a href="/architecture/">Architecture</a>
+  <a href="/features/">Features</a>
+  <a href="/pricing/">Pricing</a>
+  <a href="/trail-log/">Trail Log</a>
+  <p class="nav-sheet__source">
+    <a class="nav-pill__icon" href="https://github.com/chrislanejones/rust-wasm-photo-tool" title="Source on GitHub" aria-label="Source on GitHub" target="_blank" rel="noopener noreferrer">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z" />
+      </svg>
+    </a>
+    <a class="nav-pill__icon" href="https://codeberg.org/chrislanejones/rust-wasm-photo-tool" title="Source on Codeberg" aria-label="Source on Codeberg" target="_blank" rel="noopener noreferrer">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 1.5A10.5 10.5 0 0 0 1.5 12c0 2.45.84 4.71 2.25 6.5L11.9 5.55a.12.12 0 0 1 .2 0l8.15 12.95A10.46 10.46 0 0 0 22.5 12 10.5 10.5 0 0 0 12 1.5Z" />
+        <path d="M12.43 8.6l6.95 11.04a10.48 10.48 0 0 1-1.71 1.27L12 9.3l.43-.7Z" opacity=".55" />
+      </svg>
+    </a>
+  </p>
+</div>
+
+<main id="main">
+
+  <!-- 13 · Index-First — the page IS the log. No display hero. -->
+  <header class="page-head">
+    <h1 class="page-head__title">Trail Log</h1>
+    <p class="lede">
+      Every release, newest first — features, performance work, and fixes. Press a
+      month to narrow the log, or All to see everything. Each month opens with
+      what it amounted to, and the commits behind it.
+    </p>
+  </header>
+
+  <!-- The month filter, as a contribution graph. Built client-side from
+       window.RELEASES so the grid can never drift from the log beneath it. -->
+  <section class="graph" aria-labelledby="graph-h">
+    <h2 class="visually-hidden" id="graph-h">Filter releases by month</h2>
+    <p class="graph__year" id="graph-year">2026</p>
+    <div class="graph__scroll">
+      <!-- one segmented control: All, then a segment per month -->
+      <div class="graph__group" id="graph" role="group" aria-label="Filter releases by month">
+        <button class="seg seg--reset" id="reset" type="button" aria-pressed="true">
+          <span class="month__label">
+            <span>All</span>
+            <span class="month__count" id="reset-count"></span>
+          </span>
+        </button>
+      </div>
+    </div>
+    <div class="graph__foot">
+      <p class="legend">
+        <span>Commits per day</span>
+        <span>Less</span>
+        <span class="legend__scale" aria-hidden="true">
+          <span class="day" data-level="0"></span>
+          <span class="day" data-level="1"></span>
+          <span class="day" data-level="2"></span>
+          <span class="day" data-level="3"></span>
+          <span class="day" data-level="4"></span>
+        </span>
+        <span>More</span>
+      </p>
+    </div>
+  </section>
+
+  <section class="log">
+    <p class="log__count" id="count" role="status"></p>
+    <div class="log__list" id="list"></div>
+  </section>
+
+</main>
+
+<footer class="foot-stmt">
+  <p class="foot-stmt__line">Shipped in the open, one day at a time.</p>
+  <div class="foot-stmt__meta">
+    <a class="foot-stmt__mark" href="/">
+      <img class="foot-stmt__logo" src="/Image-Horse-Logo.svg" alt="" width="44" height="44" />
+      <span>Image&nbsp;Horse</span>
+    </a>
+    <ul class="foot-stmt__links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/architecture/">Architecture</a></li>
+      <li><a href="/features/">Features</a></li>
+      <li><a href="/pricing/">Pricing</a></li>
+    </ul>
+    <span class="foot-stmt__source">
+      <a class="nav-pill__icon" href="https://github.com/chrislanejones/rust-wasm-photo-tool" target="_blank" rel="noopener noreferrer" title="Source on GitHub" aria-label="Source on GitHub">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z" />
+        </svg>
+      </a>
+      <a class="nav-pill__icon" href="https://codeberg.org/chrislanejones/rust-wasm-photo-tool" target="_blank" rel="noopener noreferrer" title="Source on Codeberg" aria-label="Source on Codeberg">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 1.5A10.5 10.5 0 0 0 1.5 12c0 2.45.84 4.71 2.25 6.5L11.9 5.55a.12.12 0 0 1 .2 0l8.15 12.95A10.46 10.46 0 0 0 22.5 12 10.5 10.5 0 0 0 12 1.5Z" />
+          <path d="M12.43 8.6l6.95 11.04a10.48 10.48 0 0 1-1.71 1.27L12 9.3l.43-.7Z" opacity=".55" />
+        </svg>
+      </a>
+    </span>
+  </div>
+</footer>
+
+<script src="../releases.js?v=25"></script>
+<script src="../commits.js?v=25"></script>
+<script src="../nav.js?v=25"></script>
+<script src="../trail.js?v=25"></script>
+
+<!-- N13 · the ⌘K palette. The archetype's condition is that shipping the pill
+     means shipping the keyboard model, so this is a real dialog: focus in and
+     out, Esc, arrows, Enter, trapped Tab, and the body locked behind it. -->
+<div class="cmdk" id="cmdk" aria-hidden="true">
+  <div class="cmdk__backdrop" data-close></div>
+  <div class="cmdk__panel" role="dialog" aria-modal="true" aria-label="Search this site">
+    <div class="cmdk__field">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+      </svg>
+      <input id="cmdk-input" type="text" placeholder="Search pages, sections, source…" autocomplete="off" spellcheck="false" />
+      <kbd>esc</kbd>
+    </div>
+    <div class="cmdk__results" id="cmdk-results" role="listbox" aria-label="Results"></div>
+    <div class="cmdk__foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+      <span><kbd>↵</kbd> open</span>
+      <span><kbd>esc</kbd> close</span>
+    </div>
+  </div>
+</div>
+
+<script src="../cmdk.js?v=25"></script>
+</body>
+</html>

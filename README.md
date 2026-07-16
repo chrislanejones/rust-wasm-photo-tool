@@ -50,17 +50,19 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.33 — 2026-07-14
+### v7.34 — 2026-07-16
 
-**Caught a second data-loss bug before it reached anyone — it was hiding behind a flag nobody had turned on yet.**
+**A new marketing site, built next to the old one so it could be compared against it.**
 
-Before switching the undo-log feature on by default, the same build was checked with the flag off and the flag on. Import a photo, edit nothing, reload: flag off, the canvas comes back exactly as imported. Flag on, it comes back cropped to the bare photo — border and background gone. Same build. Only the flag differs.
+`marketing-two/` is a five-page static site — home, architecture, features, pricing, trail log. No build step, no framework, and no external JavaScript at all; the only third-party request is the webfont. It's a staging ground for replacing `marketing/`, and it is not deployed.
 
-**Root cause.** The undo log's base snapshot is captured *before* the edit it's guarding, and the app's own import — load the photo, then add the border — is exactly that kind of edit that never gets recorded as an "op." So a fresh import armed the log against the photo as it looked *before* the border was added. That empty log got saved to disk, and restoring it later handed back the smaller, plainer document it had captured — confidently, since the restore reported success and skipped the working copy that had the real thing.
+**What it says that the old site didn't.** The old headline was "your pixels never leave the tab." That isn't true once you sign in — edits sync to Convex, the AI passes go to Replicate, and Pro originals land in UploadThing. The claim was true for the tier that pays nothing and false for the one that pays ten dollars. It now reads "nothing leaves your tab by accident," and it sits directly above a table that names every operation and the machine it runs on, so the claim arrives with its receipts rather than on its own.
 
-**The fix.** The engine now re-anchors an empty log to the document you're actually looking at, and — belt and braces — the save/restore path refuses to ever persist or restore a log with zero recorded edits. There's nothing in an empty log a normal reload can't already recover from your working copy, so it's not worth pretending otherwise.
+**Where the content came from.** Nothing on it is written from memory. The 82 releases come from `Trail.tsx`, the 211 commits from `git log`, the 40 features from `docs/Features.md` — a list the old site never carried, showing seven summary cards instead — the tier matrix from `Pricing.tsx`, and the Convex schema from the old architecture page. Each is generated from its source, so a number can't drift into a lie.
 
-Feature flags are unchanged, still off by default. This was one of the checks that has to pass before they flip — and it didn't, the first time.
+**Things you can press.** The architecture map dims everything a given tier never touches, so "logged out" visibly darkens the entire network plane and leaves the browser plane lit. The trail log filters by month and opens each one with what it amounted to, beside that month's commit graph. There's a ⌘K palette with the full keyboard model.
+
+Next: port it to React, replace `marketing/`, and delete the staging copy. Plan in `~/claude-runs/MARKETING_TWO_TO_REACT.md`.
 
 ## License
 

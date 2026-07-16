@@ -1,0 +1,115 @@
+/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4
+ * genre: atmospheric · macrostructure: Marquee Hero · theme: Bloom
+ * tokens · paper-band: dark · display-style: weighty-sans · accent-hue: warm-amber
+ * Bloom palette per the Hyperlane reference; type stack re-picked (see styles.css stamp).
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* === Color: Bloom (atmospheric) ============================== */
+  --color-paper:        oklch(13% 0.018 35);
+  --color-paper-2:      oklch(17% 0.020 35);
+  --color-paper-3:      oklch(22% 0.022 35);
+  --color-paper-4:      oklch(28% 0.020 35);
+  --color-ink:          oklch(95% 0.010 70);
+  --color-ink-2:        oklch(78% 0.015 60);
+  --color-ink-3:        oklch(58% 0.015 50);
+  --color-rule:         oklch(28% 0.018 40);
+  --color-rule-strong:  oklch(40% 0.025 40);
+  --color-accent:       oklch(74% 0.180 55);
+  --color-accent-2:     oklch(68% 0.220 18);
+  --color-accent-soft:  oklch(74% 0.060 55);
+  --color-accent-ink:   oklch(15% 0.040 50);
+  --color-focus:        oklch(82% 0.180 55);
+  --color-bloom-1:      oklch(74% 0.220 50);
+  --color-bloom-2:      oklch(60% 0.220 15);
+
+  /* Contribution-grid ramp — an amber intensity scale off --color-accent.
+   * L0 is an empty day (a tinted surface, never a pure grey); L1–L4 climb
+   * toward the accent. Named tokens because the grid must not improvise
+   * colour mid-render (gate 48). */
+  --color-grid-0:       oklch(20% 0.012 40);
+  --color-grid-1:       oklch(34% 0.070 48);
+  --color-grid-2:       oklch(48% 0.115 50);
+  --color-grid-3:       oklch(61% 0.150 52);
+  --color-grid-4:       oklch(74% 0.180 55);
+
+  /* === Typography ==============================================
+   * 2 families (2+1 rule): Geist display+body, JetBrains Mono outlier.
+   * Outlier is scoped to exactly 2 slots: wordmark + spec-table figures.
+   */
+  --font-display: "Geist", system-ui, sans-serif;
+  --font-body:    "Geist", system-ui, sans-serif;
+  --font-outlier: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --text-xs:      0.75rem;
+  --text-sm:      0.8125rem;
+  --text-base:    1rem;
+  --text-md:      1.0625rem;
+  --text-lg:      1.25rem;
+  --text-xl:      1.5rem;
+  --text-2xl:     2rem;
+  --text-3xl:     2.75rem;
+  /* The step-down rung for a long headline. typography.md reserves the full
+   * --text-display clamp for statements of ≤50 characters; past that it wraps
+   * into drama rather than gravity. The hero line is 60, so it caps here. */
+  --text-4xl:     clamp(2.5rem, 4vw + 1rem, 4.5rem);
+  --text-display: clamp(3rem, 9vw + 0.25rem, 8rem);
+
+  --leading-display: 1.0;
+  --leading-tight:   1.05;
+  --leading-snug:    1.25;
+  --leading-body:    1.55;
+
+  /* === Spacing (4 pt) ========================================== */
+  --space-2xs: 0.25rem;
+  --space-xs:  0.5rem;
+  --space-sm:  0.75rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+
+  --page-gutter: clamp(1.25rem, 5vw, 4rem);
+  /* gate 56 — a secondary sticky must dock BELOW the fixed nav, not at top:0,
+   * or it paints over the bar mid-scroll. 62px pill + 16px inset + air. */
+  --banner-height: 94px;
+  --measure:     65ch;
+
+  /* === Rules =================================================== */
+  --rule-hair:   1px;
+  --rule-thick:  3px;
+
+  /* === Radius ================================================== */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-pill: 999px;
+
+  /* === Motion ================================================== */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:     cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long:  420ms;
+  /* The nav scroll-morph. Every morphed property shares this one duration and
+   * one curve, or the bar reads as several animations instead of one
+   * (floating-nav.md, law 4).
+   * The curve is --ease-in-out, NOT --ease-out: exponential ease-out is right
+   * for a thing arriving, but it front-loads the travel — a collapse on it
+   * dumps ~80% of the width in the first fifth of the time and then crawls,
+   * which reads as "too fast" no matter how long the duration is. A collapse
+   * is a state toggle, and toggles want an in-out. */
+  --dur-morph:  720ms;
+  --ease-morph: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* === Z scale ================================================= */
+  --z-base:       1;
+  --z-raised:     10;
+  --z-sticky:     200;
+  --z-sticky-nav: 300;
+}

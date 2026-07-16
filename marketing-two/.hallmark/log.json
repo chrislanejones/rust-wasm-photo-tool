@@ -1,0 +1,52 @@
+[
+  {
+    "date": "2026-07-16",
+    "page": "/trail-log",
+    "macrostructure": "Index-First",
+    "theme": "Bloom",
+    "theme_axes": "dark / weighty-sans / warm-amber",
+    "enrichment": "none — typography + a contribution graph built from real release data",
+    "nav": "N5 Floating pill",
+    "footer": "Ft5 Statement",
+    "brief": "Image Horse · release log. Segmented month filter (2026 label, large month + rel count, release squares) over 82 releases. Each month opens with an achievement row: features/releases/commits/fixes counted from the data, the two biggest perks picked by feature-count, and that month’s COMMIT graph from git log (211 commits / 42 active days) on the right.",
+    "data": "releases.js (82, from marketing/src/pages/Trail.tsx) + commits.js (211, from git log at the repo root)"
+  },
+  {
+    "date": "2026-07-16",
+    "page": "/pricing",
+    "macrostructure": "Stat-Led",
+    "theme": "Bloom",
+    "theme_axes": "dark / weighty-sans / warm-amber",
+    "enrichment": "none — typography only",
+    "nav": "N5 Floating pill",
+    "footer": "Ft5 Statement",
+    "brief": "Image Horse · pricing. The $0 figure is the argument (WASM runs on the visitor's CPU), paired with a worded headline per gate 46. Tier cards + the real access matrix."
+  },
+  {
+    "date": "2026-07-16",
+    "page": "/architecture",
+    "macrostructure": "Map/Diagram",
+    "theme": "Bloom",
+    "theme_axes": "dark / weighty-sans / warm-amber",
+    "enrichment": "none — typography + a .mermaid source download",
+    "nav": "N5 Floating pill",
+    "footer": "Ft5 Statement",
+    "brief": "Image Horse · full system reference. Two-plane map (solid client / dashed optional network, severable seam) + the complete stack from the old marketing page: 9 WASM modules, Convex functions, storage, AI models, webhooks, and the 6-table Convex schema (58 fields, 14 indexes). system-architecture.mermaid ships as a download — mermaid cannot parse OKLCH, so a live render would mean a second hex palette plus ~1MB of CDN."
+  },
+  {
+    "date": "2026-07-16",
+    "page": "/",
+    "macrostructure": "Marquee Hero",
+    "theme": "Bloom",
+    "theme_axes": "dark / weighty-sans / warm-amber",
+    "enrichment": "none — typography only",
+    "nav": "N5 Floating pill",
+    "footer": "Ft5 Statement",
+    "polish": "HP3 Cursor-spotlight",
+    "diversification": "SUSPENDED — user explicitly requested the usehallmark.com/examples/hyperlane fingerprint",
+    "brief": "Image Horse · browser image editor, Rust/WASM, local-first"
+  },
+  {
+    "_note": "This is now a multi-page site. Nav (N5) / footer (Ft5) / theme (Bloom) are deliberately SHARED across every page — the per-run diversification rule does not apply within one site, only the macrostructure rotates per page type. Say 'lock the system' to formalise this as a design.md."
+  }
+]

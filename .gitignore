@@ -61,3 +61,7 @@ runs-status.sh
 e2e.log
 
 install.log
+
+# tooling debris — MCP browser logs, stray dist copies
+.playwright-mcp/
+/www-dist-check/

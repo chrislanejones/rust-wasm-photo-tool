@@ -1751,3 +1751,27 @@ tests** · tsc clean · **128 TS tests** · e2e 2/2 (headless chromium) · wasm
 Feature flags — `ih_tiles_flush` / `ih_oplog_undo` / `ih_oplog_persist` — remain
 OFF by default. This fix removes one of the two known blockers on flipping them;
 the real-gallery check (ADR-016) is still outstanding.
+
+## v7.34 Change Summary — 2026-07-16
+
+| #   | Change                                                        | Status                                  |
+| --- | ------------------------------------------------------------- | --------------------------------------- |
+| 1   | `marketing-two/` — five-page static site, no build step        | Complete, not deployed                  |
+| 2   | Honest headline: "nothing leaves your tab **by accident**"     | Complete — claim sits above its table   |
+| 3   | Home — spec table of what runs where + local/server filter     | Complete                                |
+| 4   | Architecture — two-plane map, severable seam, Convex schema    | Complete — 6 tables, 58 fields          |
+| 5   | Architecture — tier filter dims what a tier never touches      | Complete — all/demo/free/pro            |
+| 6   | Features — sticky rail + 40 features from `docs/Features.md`   | Complete — 25 engine, 15 UI             |
+| 7   | Pricing — $0 stat hero, 3 tiers, access matrix + tier filter   | Complete                                |
+| 8   | Trail Log — month filter, achievement cards, commit graph      | Complete — 82 releases, 211 commits     |
+| 9   | ⌘K command palette with the full keyboard model                | Complete                                |
+| 10  | `system-architecture.mermaid` shipped as a download            | Complete — mermaid can't parse OKLCH    |
+| 11  | Zero external JS; webfont is the only third-party request      | Complete                                |
+
+**The headline was the point.** "Your pixels never leave the tab" was true in demo mode and false everywhere else — sign-in syncs edits to Convex, AI passes reach Replicate, Pro originals go to UploadThing. It's now "nothing leaves your tab by accident," which is defensible with what already ships: the padlock, the tier gating, and a table that names every operation and where it runs. The one hard claim the site makes now arrives attached to its evidence.
+
+**Every number is generated, not written.** Releases from `Trail.tsx` (82), commits from `git log` (211 across 42 active days), features from `docs/Features.md` (40 — a list the old site never carried), tiers from `Pricing.tsx`, schema from the old `Architecture.tsx`. Regenerate from source rather than hand-editing.
+
+**Still open.** The nav measures ~830px against the N5 floating-pill ceiling of 720 — it should either drop the Home link or become a canonical bar during the React port. `docs/Change-summary.md` lists 87 distinct versions; the trail log knows 82.
+
+**Not deployed.** `marketing/` is untouched and still the live site. The port plan is `~/claude-runs/MARKETING_TWO_TO_REACT.md`.
