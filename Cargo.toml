@@ -33,6 +33,18 @@ tiles = ["dep:serde", "dep:postcard"]
 # this feature; it's the plumbing those later, separate decisions build on.
 threads = ["dep:wasm-bindgen-rayon", "dep:rayon"]
 
+# Scalar PatchMatch nearest-neighbor-field inpainting core (object removal,
+# day 1 — see docs/adr). OFF by default and NOT compiled into the shipped
+# wasm build; `build:wasm` (`--features tiles`) is unaffected, so the default
+# build must stay byte-for-byte unchanged with this feature off. No new Cargo
+# dependency: src/patchmatch.rs carries its own tiny SplitMix64 PRNG instead
+# of pulling in `rand` (which would drag `getrandom` and its wasm32 JS-shim
+# plumbing along for a 7x7 scalar patch search that has no real need for a
+# general-purpose RNG crate). Runtime kill switch on the JS side:
+# `ih_patchmatch` localStorage flag, same pattern as `ih_tiles_flush` /
+# `ih_smart_edge`.
+patchmatch = []
+
 [dependencies]
 wasm-bindgen = "0.2.108"
 png = "0.17"

@@ -60,6 +60,15 @@ pub mod ops;
 #[cfg(feature = "tiles")]
 pub mod tiles;
 
+// PatchMatch object-removal kernel (day 1: NNF core only — see
+// src/patchmatch.rs and docs/adr). Feature-gated (`patchmatch`) and NOT part
+// of the default wasm build; the default build must stay byte-for-byte
+// unchanged with the feature off. `pub` (not just visible under `#[cfg(test)]`)
+// so a later Task wires a wasm-bindgen entry point against it the same way
+// `tiles`/`ops` do.
+#[cfg(feature = "patchmatch")]
+pub mod patchmatch;
+
 // Engine-vs-replay parity: unit tests that drive the REAL ImageHorseTool
 // (paint_down/effect_down/add_text_annotation) and assert op-log replay
 // reproduces the engine's own output byte-for-byte. Lives in src (not
