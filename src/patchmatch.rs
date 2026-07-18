@@ -5,12 +5,16 @@
 //! Scalar, single-resolution, Barnes et al.-style: for every pixel inside the
 //! masked (hole) region, find a similar 7×7 patch elsewhere in the image
 //! (the *source* region — everything NOT masked) via random init + iterative
-//! propagation + random search. This module computes ONLY the field —
-//! `nnf[i] = (x, y)` of the best-matching source patch *center* for masked
-//! pixel `i`, or an identity self-pointer for unmasked pixels (never
-//! meaningfully read, but always a defined, in-bounds, non-panicking value).
-//! Turning the field into filled pixels (voting/blending matched patches
-//! into the hole) is a separate step, built on top of this one.
+//! propagation + random search. Two stages, both here:
+//!
+//! - [`compute_nnf`] computes ONLY the field — `nnf[i] = (x, y)` of the
+//!   best-matching source patch *center* for masked pixel `i`, or an
+//!   identity self-pointer for unmasked pixels (never meaningfully read, but
+//!   always a defined, in-bounds, non-panicking value).
+//! - [`fill_from_nnf`] turns that field into actual pixels, by voting: every
+//!   hole pixel is the average of what every patch covering it believes
+//!   belongs there. [`inpaint`] composes the two into the one entry point
+//!   Task C wires behind the `ih_patchmatch` flag.
 //!
 //! Deliberately NOT parallel today (`rayon` is day 2) and NOT multi-resolution
 //! (a pyramid is day 3 — single-res will look coarse/smeary on a real photo,
@@ -434,6 +438,111 @@ pub fn compute_nnf(image: &[u8], w: usize, h: usize, mask: &[bool], seed: u64) -
     nnf
 }
 
+// ── Fill: turning the field into pixels ─────────────────────────────────
+
+/// Reconstruct the masked region of `image` from `nnf` (as returned by
+/// [`compute_nnf`]) by patch voting: every pixel `p` in the hole is the
+/// (uniform) average, over every masked patch center `p'` within
+/// `PATCH_RADIUS` of `p`, of the source pixel `nnf[p'] + (p - p')` — i.e.
+/// the pixel each covering patch's OWN match believes belongs at `p`. A
+/// masked `p'` always covers itself (`p' == p`, offset `(0, 0)`), so every
+/// masked pixel with a real match gets at least one vote; pixels with no
+/// valid vote at all (the fully-degenerate "no source anywhere" case from
+/// [`compute_nnf`]'s doc comment) are left byte-identical to the input — a
+/// safe no-op rather than a fabricated colour.
+///
+/// Returns a NEW `w*h*4` RGBA buffer, same dimensions as `image`; unmasked
+/// pixels are copied through unchanged. Malformed input (dimension
+/// mismatch) returns `image` unchanged rather than panicking.
+///
+/// Single-resolution (day 1) — see [`inpaint`]'s doc comment for the day-3
+/// pyramid TODO. Pure function of `(image, w, h, mask, nnf)`; the outer
+/// `y`/`x` loop is the same day-2 rayon seam as `compute_nnf`'s row loop
+/// (each output pixel's vote is independent of every other output pixel —
+/// this one is actually easier to parallelize than the NNF search itself,
+/// since it only ever READS `nnf`, never mutates it).
+pub fn fill_from_nnf(
+    image: &[u8],
+    w: usize,
+    h: usize,
+    mask: &[bool],
+    nnf: &[(u32, u32)],
+) -> Vec<u8> {
+    let mut out = image.to_vec();
+    if w == 0 || h == 0 || mask.len() != w * h || image.len() != w * h * 4 || nnf.len() != w * h {
+        return out;
+    }
+    let r = PATCH_RADIUS as i64;
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if !mask[i] {
+                continue;
+            }
+            let (px, py) = (x as i64, y as i64);
+            let mut sum = [0.0f64; 4];
+            let mut count = 0u32;
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    // p' = the patch center that covers (x,y) via this
+                    // offset, i.e. p' + (dx,dy) == (x,y).
+                    let (pcx, pcy) = (px - dx, py - dy);
+                    if pcx < 0 || pcy < 0 || pcx >= w as i64 || pcy >= h as i64 {
+                        continue;
+                    }
+                    let pci = pcy as usize * w + pcx as usize;
+                    if !mask[pci] {
+                        // Only vote from patches that themselves got a real
+                        // match — an unmasked p' has no `nnf` entry worth
+                        // reading (identity, unused).
+                        continue;
+                    }
+                    let (mx, my) = nnf[pci];
+                    let (sx, sy) = (mx as i64 + dx, my as i64 + dy);
+                    if sx < 0 || sy < 0 || sx >= w as i64 || sy >= h as i64 {
+                        continue;
+                    }
+                    let si = sy as usize * w + sx as usize;
+                    if mask[si] {
+                        // Defensive, mirrors `patch_distance`: the lenient
+                        // fallback validity tier only guarantees a center's
+                        // OWN pixel is unmasked, not its whole footprint.
+                        continue;
+                    }
+                    let sp = &image[si * 4..si * 4 + 4];
+                    for (c, acc) in sum.iter_mut().enumerate() {
+                        *acc += sp[c] as f64;
+                    }
+                    count += 1;
+                }
+            }
+            if count > 0 {
+                let oi = i * 4;
+                for c in 0..4 {
+                    out[oi + c] = (sum[c] / count as f64).round().clamp(0.0, 255.0) as u8;
+                }
+            }
+            // count == 0: no valid vote anywhere for this pixel — leave it
+            // byte-identical to the input (see the doc comment above).
+        }
+    }
+    out
+}
+
+/// Compute the NNF and fill the hole in one call — the entry point Task C
+/// wires behind the `ih_patchmatch` flag.
+///
+/// TODO(day 3): multi-resolution pyramid. A single pass at native
+/// resolution converges each hole pixel to a locally-plausible 7x7 patch,
+/// but with no coarse-to-fine guidance the result will look coarse/smeary
+/// on a real photo — coherent large-scale structure (a straight fence line,
+/// a horizon) isn't something one scale of small patches can reconstruct on
+/// its own. Expected for day 1; the pyramid is what fixes it.
+pub fn inpaint(image: &[u8], w: usize, h: usize, mask: &[bool], seed: u64) -> Vec<u8> {
+    let nnf = compute_nnf(image, w, h, mask, seed);
+    fill_from_nnf(image, w, h, mask, &nnf)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -635,6 +744,204 @@ mod tests {
         assert!(
             valid[14 * w + 14],
             "far from the hole, with room for the full footprint, is valid"
+        );
+    }
+
+    // ── Fill (Task B) ────────────────────────────────────────────────────
+
+    #[test]
+    fn filled_region_contains_zero_original_hole_pixels() {
+        // Every masked pixel starts as an obvious garbage colour; after
+        // inpainting, NONE of them may still hold that exact colour — every
+        // one must have actually changed.
+        const GARBAGE: [u8; 4] = [255, 0, 255, 255];
+        let (w, h) = (24, 24);
+        let mask = rect_mask(w, h, 8, 8, 16, 16);
+        let image = rgba(w, h, |x, y| {
+            if mask[y * w + x] {
+                GARBAGE
+            } else {
+                [10, 20, 200, 255]
+            }
+        });
+        let out = inpaint(&image, w, h, &mask, 21);
+        for y in 0..h {
+            for x in 0..w {
+                let i = y * w + x;
+                if !mask[i] {
+                    continue;
+                }
+                let px = &out[i * 4..i * 4 + 4];
+                assert_ne!(
+                    px, &GARBAGE,
+                    "masked pixel ({x},{y}) still holds its original garbage colour"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn output_dimensions_are_unchanged() {
+        let (w, h) = (17, 13); // deliberately non-square, no patch-radius alignment
+        let mask = rect_mask(w, h, 3, 3, 9, 9);
+        let image = rgba(w, h, |x, y| [(x * 7) as u8, (y * 5) as u8, 30, 255]);
+        let out = inpaint(&image, w, h, &mask, 4);
+        assert_eq!(out.len(), image.len());
+        assert_eq!(out.len(), w * h * 4);
+    }
+
+    #[test]
+    fn deterministic_fill_same_seed_is_byte_identical() {
+        let (w, h) = (20, 20);
+        let mask = rect_mask(w, h, 6, 6, 14, 14);
+        let image = rgba(w, h, |x, y| {
+            [(x * 11) as u8, (y * 13) as u8, (x ^ y) as u8, 255]
+        });
+        let a = inpaint(&image, w, h, &mask, 55);
+        let b = inpaint(&image, w, h, &mask, 55);
+        assert_eq!(
+            a, b,
+            "same input + same seed must give a byte-identical fill"
+        );
+    }
+
+    #[test]
+    fn unmasked_pixels_pass_through_byte_identical() {
+        let (w, h) = (18, 18);
+        let mask = rect_mask(w, h, 5, 5, 11, 11);
+        let image = rgba(w, h, |x, y| [(x * 3) as u8, (y * 9) as u8, 77, 255]);
+        let out = inpaint(&image, w, h, &mask, 8);
+        for y in 0..h {
+            for x in 0..w {
+                let i = y * w + x;
+                if mask[i] {
+                    continue;
+                }
+                assert_eq!(
+                    &out[i * 4..i * 4 + 4],
+                    &image[i * 4..i * 4 + 4],
+                    "unmasked pixel ({x},{y}) must be untouched"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn flat_color_source_fills_exactly_that_color() {
+        const BLUE: [u8; 4] = [10, 20, 200, 255];
+        const GARBAGE: [u8; 4] = [255, 0, 255, 255];
+        let (w, h) = (24, 24);
+        let mask = rect_mask(w, h, 8, 8, 16, 16);
+        let image = rgba(w, h, |x, y| if mask[y * w + x] { GARBAGE } else { BLUE });
+        let out = inpaint(&image, w, h, &mask, 3);
+        for y in 0..h {
+            for x in 0..w {
+                let i = y * w + x;
+                if !mask[i] {
+                    continue;
+                }
+                assert_eq!(
+                    &out[i * 4..i * 4 + 4],
+                    &BLUE,
+                    "masked pixel ({x},{y}) should fill to EXACTLY the flat blue \
+                     — every contributing vote agrees, so no rounding drift either"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn whole_image_masked_is_a_safe_no_op_fill() {
+        // No source pixel exists anywhere — `compute_nnf`'s one documented
+        // exception. `fill_from_nnf` must leave every pixel exactly as it
+        // was rather than fabricate a colour from nothing.
+        let (w, h) = (6, 6);
+        let image = rgba(w, h, |x, y| [(x * 40) as u8, (y * 40) as u8, 5, 255]);
+        let mask = vec![true; w * h];
+        let out = inpaint(&image, w, h, &mask, 12);
+        assert_eq!(out, image, "no source anywhere ⇒ untouched, not fabricated");
+    }
+
+    #[test]
+    fn degenerate_inputs_do_not_panic() {
+        assert_eq!(inpaint(&[], 0, 0, &[], 1).len(), 0);
+        // Mismatched mask/image lengths — an internal-API caller bug, not
+        // something that should ever panic across the eventual wasm
+        // boundary.
+        assert_eq!(
+            fill_from_nnf(&[0; 400], 10, 10, &[false; 5], &[(0, 0); 100]).len(),
+            400
+        );
+        assert_eq!(
+            fill_from_nnf(&[0; 4], 10, 10, &[false; 100], &[(0, 0); 100]).len(),
+            4
+        );
+        // A 1px mask and a mask touching the image edge, end to end.
+        let (w, h) = (10, 10);
+        let image = rgba(w, h, |x, y| [(x * 20) as u8, (y * 20) as u8, 128, 255]);
+        let mut one_px = vec![false; w * h];
+        one_px[5 * w + 5] = true;
+        assert_eq!(inpaint(&image, w, h, &one_px, 2).len(), image.len());
+        let edge_mask = rect_mask(w, h, 0, 0, 3, 3);
+        assert_eq!(inpaint(&image, w, h, &edge_mask, 2).len(), image.len());
+    }
+
+    #[test]
+    fn fill_from_nnf_matches_exactly_for_a_single_isolated_hole_pixel() {
+        // Only ONE pixel is masked, so the only patch that "covers" it is
+        // its own (dx=dy=0) — no neighbouring masked pixel exists to also
+        // vote. The expected output is therefore EXACTLY the colour at its
+        // own nnf match, not an average of several contributions — a
+        // maximally precise check of the voting arithmetic, decoupled from
+        // `compute_nnf`'s randomness (this test hand-builds the NNF).
+        let (w, h) = (10, 10);
+        let mut image = rgba(w, h, |x, y| [(x * 10) as u8, (y * 10) as u8, 50, 255]);
+        let hole_i = 5 * w + 5;
+        image[hole_i * 4..hole_i * 4 + 4].copy_from_slice(&[9, 9, 9, 9]);
+        let mut mask = vec![false; w * h];
+        mask[hole_i] = true;
+        let mut nnf = vec![(0u32, 0u32); w * h];
+        for y in 0..h {
+            for x in 0..w {
+                nnf[y * w + x] = (x as u32, y as u32);
+            }
+        }
+        let source = (1u32, 1u32);
+        nnf[hole_i] = source;
+        let out = fill_from_nnf(&image, w, h, &mask, &nnf);
+        let source_i = source.1 as usize * w + source.0 as usize;
+        assert_eq!(
+            &out[hole_i * 4..hole_i * 4 + 4],
+            &image[source_i * 4..source_i * 4 + 4]
+        );
+    }
+
+    #[test]
+    fn fill_from_nnf_blends_multiple_covering_patches() {
+        let (w, h) = (10, 10);
+        // R is a simple x-ramp so every candidate's expected contribution is
+        // easy to predict by hand; G/B/A stay flat so only R needs checking.
+        let image = rgba(w, h, |x, _| [(x * 10) as u8, 100, 100, 255]);
+        let (p0, p1) = ((5usize, 5usize), (6usize, 5usize)); // adjacent hole pixels
+        let mut mask = vec![false; w * h];
+        mask[p0.1 * w + p0.0] = true;
+        mask[p1.1 * w + p1.0] = true;
+        let mut nnf = vec![(0u32, 0u32); w * h];
+        for y in 0..h {
+            for x in 0..w {
+                nnf[y * w + x] = (x as u32, y as u32);
+            }
+        }
+        nnf[p0.1 * w + p0.0] = (1, 1); // R = 10
+        nnf[p1.1 * w + p1.0] = (3, 1); // R = 30
+        let out = fill_from_nnf(&image, w, h, &mask, &nnf);
+        // p0 blends two votes: its own match ((1,1), R=10, offset (0,0)) and
+        // p1's match shifted by the offset from p1 to p0 ((3,1) + (-1,0) =
+        // (2,1), R=20). Average of 10 and 20 is 15 — exact, no rounding.
+        let out_r0 = out[(p0.1 * w + p0.0) * 4];
+        assert_eq!(
+            out_r0, 15,
+            "average of R=10 (own match) and R=20 (neighbour's shifted match)"
         );
     }
 }
