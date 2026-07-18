@@ -1,13 +1,10 @@
 # ADR-004: 256×256 tiles become the canonical image representation
-Date: 2026-07-02 (backfilled)   Status: draft
-Blocked on: wiring into the render path — not just merging the branch.
-`src/tiles.rs` exists on `feat/tile-engine-core` (55/55 cargo tests
-passing, verified 2026-07-09, cleanly rebased on v7.8/`d9960f6`) but is
-gated behind an off-by-default `tiles` Cargo feature and is not part of
-the wasm build; flat buffers remain the only representation the app
-actually runs. Even if this branch lands on master (a decision in
-progress in parallel), that is "merged," not "shipped" — this stays
-Draft until something in the render/flush path calls into it.
+Date: 2026-07-02 (backfilled)   Status: Accepted (2026-07-17)
+Accepted with the v7.36 default flip: the tiles feature is compiled
+into the shipped WASM (ADR-017), the flush path routes through the
+tile engine by default (`ih_tiles_flush` is now a kill switch, "0"),
+and the op-log document model (ADR-012) replays over TileBuffer —
+verified by the four-check A/B and the engine parity suite.
 
 ## Context
 Flat buffers make large images all-or-nothing: full-buffer flushes,

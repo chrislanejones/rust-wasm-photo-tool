@@ -1,12 +1,11 @@
 # ADR-003: Operation log replaces snapshot undo
-Date: 2026-07-02 (backfilled)   Status: draft
-Blocked on: SHIPPING. As of 2026-07-11 (`feat/tile-wiring-oplog-undo`,
-unmerged) the render path DOES call into ops.rs: every apply() is
-implemented via the engine's own kernels (byte-parity proven in
-src/ops_engine_parity.rs), a passive recorder captures real sessions,
-and undo()/redo() replay from the log behind the `ih_oplog_undo`
-switch with a hash-checked snapshot fallback (ADR-013). Flip to
-Accepted when that branch ships in a release.
+Date: 2026-07-02 (backfilled)   Status: Accepted (2026-07-17)
+Accepted on the four-check A/B (v7.36): flags-OFF baseline dimensions
+matched flags-ON on a fresh profile, a plain paint stroke and an AI
+Remove Background both round-tripped through persist→reload→restore
+with the Canvas intact, and op-log undo moved the cursor on the
+shipped defaults. `ih_oplog_undo` is now a kill switch ("0"), not an
+opt-in; the hash-checked snapshot fallback (ADR-013) remains.
 
 ## Context
 Snapshot undo copies the full buffer per edit: 16 MB at 2048×2048,

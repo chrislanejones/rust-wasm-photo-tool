@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.79",
+    date: "2026-07-17",
+    headline: "The new undo history is on for everyone",
+    entries: [
+      { tag: "feature", text: "The undo-history feature that's been building for weeks is now on by default. Every edit is recorded as a small operation instead of a full snapshot, your work is saved a couple of seconds after you stop, and a reload brings back exactly what you left — canvas, border, and all. Anything the recorder can't handle yet quietly falls back to the old undo, so there's no way to get stranded." },
+      { tag: "rust", text: "Before flipping the switch it had to pass a four-part test on the real app: same build with the feature off and on must produce identical documents, then a paint stroke and an AI background-removal each have to survive a full save-and-reload. All four passed, checked down to the byte." },
+      { tag: "fix", text: "The test nearly failed on a ghost: after a reload the canvas looked gone. The data was fine — the checkerboard pattern behind the image was drawn by a separate element that didn't shrink when the image did, so on big photos it drifted out from under the picture. It's now painted by the image element itself and physically can't misalign. The same bug explains the stray checkerboard strip some sessions showed beside the photo." },
+    ],
+  },
+  {
     version: "v0.9.78",
     date: "2026-07-16",
     headline: "A new site — and this page now counts its own commits",

@@ -1,6 +1,8 @@
 # ADR-017: The tiles/op-log feature is compiled into the shipped WASM
 
-Date: 2026-07-13   Status: Draft — verified end-to-end in a real browser; needs the Phase-1 dogfood before the flags default ON
+Date: 2026-07-13   Status: Accepted (2026-07-17 — the Phase-1 dogfood
+happened as the four-check A/B; flags default ON in v7.36 with "0" kill
+switches per this ADR's pre-mortem)
 
 ## Context
 

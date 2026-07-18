@@ -84,6 +84,13 @@
   --rule-hair:   1px;
   --rule-thick:  3px;
 
+  /* === Shadow ==================================================
+   * One cast shadow, for the hero product shot only. It's a downward, neutral
+   * shadow — NOT an amber glow — so it grounds the screenshot as a real window
+   * above the page rather than lighting it up like the cards deliberately avoid.
+   */
+  --shadow-float: 0 1.75rem 3.5rem -1.25rem oklch(0% 0 0 / 0.55);
+
   /* === Radius ================================================== */
   --radius-sm:   6px;
   --radius-md:   10px;

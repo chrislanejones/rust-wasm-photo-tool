@@ -503,11 +503,40 @@ a { color: inherit; }
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-height: 82dvh;
   display: grid;
-  align-content: end;
-  /* bottom padding ≥ 1.3× top (6rem / 4rem = 1.5×) */
-  padding: var(--space-2xl) var(--page-gutter) var(--space-3xl);
+  justify-items: start;
+  gap: var(--space-xl);
+  /* Content used to sit at the bottom of an 82dvh well. With a product shot
+     under the headline that would push the shot below the fold, so the hero now
+     flows from the top — which means the top padding has to clear the fixed nav
+     (it no longer floats over empty space). */
+  padding: calc(var(--banner-height) + var(--space-xl)) var(--page-gutter) var(--space-3xl);
+}
+
+/* ── framed screenshots ───────────────────────────────────── */
+/* Shared frame for every product shot. A screenshot's own dark chrome would
+   bleed straight into the dark paper with no edge, so a hairline defines it and
+   the radius clips the square-cornered capture. */
+.shot-frame {
+  border-radius: var(--radius-md);
+  border: var(--rule-hair) solid var(--color-rule);
+  overflow: clip;
+  background: var(--color-paper-2);
+}
+
+/* The hero shot floats on the bloom, so it earns a real cast shadow (a floating
+   window) on top of the shared frame. Inline shots on a solid panel don't. */
+.hero__shot {
+  margin: 0;
+  width: 100%;
+  max-width: 72rem;
+  box-shadow: var(--shadow-float);
+}
+.hero__shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1800 / 1075;      /* holds the box before the image decodes */
 }
 
 .hero__spotlight {
@@ -676,6 +705,23 @@ a { color: inherit; }
   background: var(--color-paper-2);
   border-block: var(--rule-hair) solid var(--color-rule);
   padding: var(--space-2xl) var(--page-gutter);
+  /* the palette shot on the left, the tool run on the right */
+  display: grid;
+  grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+  gap: var(--space-2xl);
+  align-items: center;
+}
+
+/* on a solid panel the hairline frame is enough — no cast shadow (it would read
+   as a card floating inside a card) */
+.editor__shot { margin: 0; width: 100%; }
+.editor__shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 793 / 816;
+}
+.editor__text {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
@@ -1929,7 +1975,9 @@ a { color: inherit; }
 }
 
 @media (max-width: 40rem) {
-  .hero { min-height: 74dvh; padding-block: var(--space-3xl) var(--space-2xl); }
+  /* nav is shorter on a phone, so less top clearance is needed than the desktop
+     calc; the hero flows from the top now, so no min-height well. */
+  .hero { padding-block: var(--space-3xl) var(--space-2xl); }
   .hero__display { max-width: 100%; }
 
   /* spec-table collapse — each row becomes a stacked block, Detail last */
@@ -1951,6 +1999,7 @@ a { color: inherit; }
   .spec td + td { padding-block-start: var(--space-2xs); }
   .tag { margin-block-end: var(--space-2xs); }
 
+  .editor { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
   .editor__run { font-size: var(--text-lg); }
 }
 

@@ -29,8 +29,8 @@
 // or decode problem — callers keep the existing working-copy path as the
 // fallback for BOTH (this module never throws into the load path).
 //
-// Kill switch: build-time USE_OPLOG_PERSISTENCE (flags.ts, default OFF for
-// dogfooding) OR the localStorage verification switch `ih_oplog_persist` —
+// Kill switch: build-time USE_OPLOG_PERSISTENCE (flags.ts, ON since the
+// 2026-07-17 flip) with `ih_oplog_persist = "0"` as the per-profile disable —
 // same pattern as ih_tiles_flush / ih_oplog_undo. Off = this module is
 // completely inert and the existing persistence carries everything.
 
@@ -129,17 +129,22 @@ function isLogTrustworthy(tool: OplogPersistWasm): boolean {
   return layers <= 1;
 }
 
-/** Build-time flag OR the DevTools verification switch. */
+/** Build-time flag, with the DevTools key as a per-profile KILL switch.
+ *  Default ON since the 2026-07-17 flip; `ih_oplog_persist = "0"` disables
+ *  for one profile (ADR-017's pre-mortem requires this to stay available
+ *  until the codec has real production mileage). `"1"` still force-enables
+ *  when the build flag is off — the old dogfood semantics. */
 export function isOplogPersistenceEnabled(): boolean {
-  if (USE_OPLOG_PERSISTENCE) return true;
   try {
-    return (
-      typeof window !== "undefined" &&
-      window.localStorage.getItem("ih_oplog_persist") === "1"
-    );
+    if (typeof window !== "undefined") {
+      const v = window.localStorage.getItem("ih_oplog_persist");
+      if (v === "0") return false;
+      if (v === "1") return true;
+    }
   } catch {
-    return false;
+    // localStorage unavailable — fall through to the build flag.
   }
+  return USE_OPLOG_PERSISTENCE;
 }
 
 // ── Injectable image codecs (OffscreenCanvas by default; tests inject) ──────

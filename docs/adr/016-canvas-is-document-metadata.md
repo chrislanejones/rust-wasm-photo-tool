@@ -1,5 +1,9 @@
 # ADR-016: The Canvas is document metadata, not a logged layer
-Date: 2026-07-13   Status: draft
+Date: 2026-07-13   Status: Accepted (2026-07-17 — the real-gallery check
+this ADR was waiting on: a default Canvas + Photo document round-tripped
+persist→restore with the Canvas rebuilt from metadata, byte-exact
+composite; the 7/17 "canvas gone" report was a checkerboard-backdrop
+rendering bug, not data loss)
 
 ## Context
 `canvasArtboard: true` is the DEFAULT (app/src/lib/preferences.ts:100),

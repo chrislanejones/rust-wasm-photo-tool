@@ -66,3 +66,7 @@ install.log
 # tooling debris — MCP browser logs, stray dist copies
 .playwright-mcp/
 /www-dist-check/
+
+# Vercel CLI link (local only)
+.vercel
+.env*

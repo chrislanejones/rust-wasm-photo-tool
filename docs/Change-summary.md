@@ -1825,3 +1825,41 @@ at x=308 on a 375px screen.
 **Still open.** The nav measures ~830px against the ~720px a content-sized pill
 wants — drop Home or go full-width. `docs/Change-summary.md` lists 88 distinct
 versions; the trail log knows 82.
+
+---
+
+## v7.36 — 2026-07-17
+
+**The op log is on by default.** The four-check A/B passed and the three
+switches (`ih_tiles_flush`, `ih_oplog_undo`, `ih_oplog_persist`) flipped from
+opt-in to kill switches — `"0"` in localStorage disables each per profile;
+`USE_OPLOG_PERSISTENCE` in `app/src/lib/dexie/flags.ts` is the build-time
+revert.
+
+| #   | Change                                                              | Status                                     |
+| --- | ------------------------------------------------------------------- | ------------------------------------------ |
+| 1   | Op-log recording, replay undo, and persistence default ON            | Complete — flags now opt-OUT (`"0"` kills) |
+| 2   | Four-check A/B on the production build                              | Passed — dims parity, stroke + AI round trips |
+| 3   | **Fix:** checkerboard backdrop desynced from the CSS-fit canvas      | Complete — pattern moved onto the `<canvas>` element itself |
+| 4   | New engine parity test: the app's exact import flow + stroke + restore | Complete — `app_flow_stroke_persist_restore_keeps_the_canvas` |
+| 5   | ADRs 003 / 004 / 006 / 012 / 013 / 016 / 017 → Accepted             | Complete — INDEX updated                   |
+| 6   | `docs/Architecture.md` documents the live op-log pipeline            | Complete — supersedes the "Planned" entry  |
+
+**What check 3 actually found.** The stroke round-trip looked like it destroyed
+the artboard Canvas. It didn't: the write path had persisted the correct
+post-artboard base keyframe (verified in IndexedDB — 2068×1243, canvas metadata
+in the annotations blob), and the restore came back byte-exact, "2 layers ·
+1 content · restored" in the diagnostics. What was actually wrong: the
+transparency checkerboard was a separate backdrop div sized in raw document
+pixels, while `.main-canvas` is CSS-shrunk to fit the window (`max-width`/
+`max-height`, styles.css). On any document larger than the viewport the two
+drifted — measured 450px of horizontal mismatch — showing up as a phantom
+checkerboard strip beside the photo in one session and a "vanished" Canvas
+after reload in another. Same bug, both times. The checkerboard is now the
+canvas element's own background and shares every scaling mechanism by
+construction.
+
+**Verified on the shipped defaults** (all localStorage keys cleared): import →
+stroke → "recording · 1/1 ops · PERSISTED 1 chunk" → reload → "restored", full
+2068×1243 with the Canvas layer intact → Ctrl+Z moves the op cursor to 0/1.
+Engine gates: fmt, clippy `-D warnings`, 169 tests incl. the new parity pin.

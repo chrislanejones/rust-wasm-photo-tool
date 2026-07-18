@@ -1,8 +1,12 @@
 # ADR-006: Working copies become a disposable render cache; truth is original + op log
-Date: 2026-07-02 (backfilled)   Status: draft
-Blocked on: **dogfooding** (the code is complete; the premise is not yet
-verified on a real gallery). As of 2026-07-13 (`feat/persist-oplog-complete`,
-unmerged) the persistence layer exists end to end: Dexie v2 adds
+Date: 2026-07-02 (backfilled)   Status: Accepted (2026-07-17)
+Accepted on the four-check A/B (v7.36): a plain stroke and an AI result
+both persisted and restored from the op log on a real gallery — the
+Diagnostics read "restored", full dimensions and Canvas intact, with
+the write path inspected at the IndexedDB level (correct post-artboard
+base keyframe, 1 chunk, canvas metadata in the annotations blob). The
+working copy remains the fallback for retired/failed logs.
+The persistence layer: Dexie v2 adds
 opLogs/keyframes/oplogManifests (additive; ADR-012 document model), the
 debounced write path commits chunks + keyframes + manifest in one
 transaction, and restore replays from the base keyframe —

@@ -70,17 +70,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.35 — 2026-07-16
+### v7.36 — 2026-07-17
 
-**The new marketing site is now the marketing site.**
+**The op log is on by default.**
 
-The five-page site built alongside the old one is ported to React and has replaced `marketing/` — same five pages, now Vite + React 19 + react-router, plain CSS, no Tailwind and no UI library. The staging copy is deleted. Live at [image-horse.vercel.app](https://image-horse.vercel.app/).
+Every edit now records as an operation. Undo replays from the log, and your edits persist a couple of seconds after you stop working — then come back byte-identical on reload, artboard Canvas included. Anything the log can't record yet (clone stamp, filters, masks, multi-layer moves) fails a hash check and hands undo back to the snapshot path automatically, so no state of the rollout can strand the editor.
 
-**What it says that the old site didn't.** The old headline was "your pixels never leave the tab." That isn't true once you sign in — edits sync to Convex, the AI passes go to Replicate, and Pro originals land in UploadThing. The claim was true for the tier that pays nothing and false for the one that pays ten dollars. It now reads "nothing leaves your tab by accident," and it sits directly above a table naming every operation and the machine it runs on, so the claim arrives with its receipts rather than on its own.
+**The gate it passed.** A four-check A/B on the production build: flags-off baseline dimensions vs flags-on (must match exactly), a plain paint stroke through persist → reload → restore, and an AI Remove Background through the same round trip. All four held, with the write path inspected at the IndexedDB level — correct post-artboard base keyframe, canvas metadata in the annotations blob.
 
-**Three bugs the port turned up.** The ⌘K palette set `z-index: var(--z-modal)` and that token was never defined — so it computed to `auto` and the nav bar painted straight over the open palette. The features rail highlighted the wrong entry on 17 of 18 scroll positions: it marked whichever item most recently entered the observer's band, so the next item stole the highlight while the one you were reading still filled the screen. And a single class name did duty as both the features container and its paragraphs, which needed a workaround selector to survive.
+**The bug that nearly blocked it.** The stroke round-trip looked like it destroyed the Canvas. It didn't — the document restored perfectly. The transparency checkerboard behind the image was a separate div sized in raw document pixels while the canvas element gets CSS-shrunk to fit the window, so on any large document the two drifted apart: a phantom checkerboard strip on one side, a missing backdrop on the other. The checkerboard now lives on the canvas element itself and can't misalign.
 
-**Numbers can't go stale now.** The commit squares and the feature list are generated from `git log` and `docs/Features.md` by `marketing/scripts/gen-trail-data.mjs`, which runs as part of the release routine. The graph already picked up a day the hand-written copy had missed.
+**Paper trail.** ADRs 003, 004, 006, 012, 013, 016 and 017 move to Accepted; `docs/Architecture.md` now documents the live pipeline. Kill switches stay per ADR-017's pre-mortem: `ih_tiles_flush` / `ih_oplog_undo` / `ih_oplog_persist` set to `"0"` in localStorage disables each per profile.
 
 ## License
 

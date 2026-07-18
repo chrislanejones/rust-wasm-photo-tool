@@ -75,6 +75,21 @@ export default function Home() {
             Crop it, compress it, annotate it, gallop. That’s <mark className="mark">Rust</mark>,
             compiled to <mark className="mark">WASM</mark>.
           </h1>
+
+          {/* A real browser capture, not a redrawn frame — and it happens to show
+              the "annotate it" beat in the headline actually happening: a photo
+              marked up in the tab, nothing uploaded. It's the LCP, so it loads
+              eagerly and carries its own dimensions to hold layout. */}
+          <figure className="hero__shot shot-frame">
+            <img
+              src="/Rust-Photo-Car-Test-July-17.webp"
+              width={1800}
+              height={1075}
+              fetchPriority="high"
+              decoding="async"
+              alt="The Image Horse editor open on a photo of a white Fiat 500, a red ellipse drawn around the rusty roof and a yellow ‘Window Repair’ label beside it — annotated in the browser."
+            />
+          </figure>
         </header>
 
         <hr className="rule-thick" />
@@ -142,20 +157,35 @@ export default function Home() {
           </p>
         </section>
 
-        {/* A dense typographic run, deliberately not an icon grid. */}
+        {/* The tool run, deliberately a dense typographic list not an icon grid —
+            with the ⌘K palette beside it, which is how you actually reach any of
+            these. */}
         <section className="editor" id="editor">
-          <h2 className="section__title section__title--sm">In the editor</h2>
-          <p className="editor__run">
-            Brightness · Contrast · Blur · Crop · Align · Magic-wand select · Live histogram · Stroke
-            stabilizer · Rectangles · Ellipses · Arrows · Bézier pen with fill · Callout pins · Text
-            with drop shadows · Emoji · Blur, pixelate and black-box redaction · Layer masks ·
-            Eraser · Rulers and grids · Batch logo stamping · Grid mosaic gallery · OpenRaster export
-            · Light, dark and system themes
-          </p>
-          <p className="lede editor__lede">
-            Everything above is free and local. Sign in only when you want persistence, share links,
-            or the AI passes — and the padlock in the UI tells you which is which before you click.
-          </p>
+          <figure className="editor__shot shot-frame">
+            <img
+              src="/command-palette.webp"
+              width={793}
+              height={816}
+              loading="lazy"
+              decoding="async"
+              alt="Image Horse's ⌘K command palette, filtered to “pen” — Shapes › Pens is highlighted, with Paint, Eraser, Adjust &amp; Select, Stamps and more listed below."
+            />
+          </figure>
+          <div className="editor__text">
+            <h2 className="section__title section__title--sm">In the editor</h2>
+            <p className="editor__run">
+              Brightness · Contrast · Blur · Crop · Align · Magic-wand select · Live histogram ·
+              Stroke stabilizer · Rectangles · Ellipses · Arrows · Bézier pen with fill · Callout
+              pins · Text with drop shadows · Emoji · Blur, pixelate and black-box redaction · Layer
+              masks · Eraser · Rulers and grids · Batch logo stamping · Grid mosaic gallery ·
+              OpenRaster export · Light, dark and system themes
+            </p>
+            <p className="lede editor__lede">
+              Everything above is free and local. Sign in only when you want persistence, share
+              links, or the AI passes — and the padlock in the UI tells you which is which before you
+              click.
+            </p>
+          </div>
         </section>
 
         <section className="close">

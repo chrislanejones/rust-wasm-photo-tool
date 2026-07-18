@@ -4,6 +4,10 @@
 >
 > **Status:** describes what exists on `master` at **v7.8** (`d9960f6`),
 > verified against code and git history on 2026-07-09 — not aspirational.
+> **Amended 2026-07-17 (v7.36):** the op-log pipeline is now LIVE by
+> default — see [The op-log pipeline](#the-op-log-pipeline-live-since-v736)
+> below, which supersedes the "Tile engine + operation-log undo" entry
+> that used to sit under Planned.
 > A separate [Planned](#planned-not-yet-in-the-diagram-above) section at
 > the bottom covers what's designed or in-branch but not live. No mermaid
 > or other diagram file exists elsewhere in the repo (checked before
@@ -244,23 +248,49 @@ editing path.
 
 ---
 
+## The op-log pipeline (live since v7.36)
+
+Shipped ON by default 2026-07-17 after the four-check A/B (flags-OFF
+baseline vs flags-ON dimensions, plain-stroke round trip, AI round
+trip). ADRs [003](adr/003-operation-log-undo.md) ·
+[004](adr/004-tile-buffer.md) · [006](adr/006-render-cache-disposable.md)
+· [012](adr/012-oplog-document-model.md) ·
+[013](adr/013-oplog-undo-hash-fallback.md) ·
+[016](adr/016-canvas-is-document-metadata.md) ·
+[017](adr/017-tiles-compiled-into-shipped-wasm.md) — all Accepted.
+
+- **What records:** the WASM (`--features tiles`, ADR-017) keeps a
+  passive op log for single-CONTENT-layer documents. The base document
+  is captured lazily at `snap()` (rebased while the log is empty, so
+  unlogged setup edits like the artboard border are absorbed — the
+  v7.33 fix); pixel ops record at commit points (`paint_up`, crop…);
+  annotations are diffed at `recomposite()`. The Canvas artboard fill
+  is document METADATA riding beside the ops, not a logged layer
+  (ADR-016) — the default Canvas + Photo import is one content layer
+  and fully in scope.
+- **Undo:** `undo()`/`redo()` replay from the log only when the
+  engine's composite FNV-hashes byte-identical to the log's; any
+  unrecorded edit (clone stamp, filters, masks, layer ops) fails the
+  hash, marks the log broken, and snapshot undo takes over untouched
+  (ADR-013). No stage can strand the editor.
+- **Persistence:** `oplogPersistence.ts` debounces ~2s after each
+  flush and commits op chunks + PNG keyframes (engine codec,
+  byte-exact) + a manifest in one Dexie transaction. Restore replays
+  from the base keyframe and rebuilds the Canvas from metadata; a log
+  that stops describing the document is marked stale and the working
+  copy — which never stopped writing — carries the resume (ADR-006).
+- **Kill switches:** `localStorage` `ih_tiles_flush` / `ih_oplog_undo`
+  / `ih_oplog_persist` = `"0"` disables each per profile;
+  `USE_OPLOG_PERSISTENCE` in `app/src/lib/dexie/flags.ts` is the
+  build-time revert. Per ADR-017's pre-mortem these stay until the
+  codec has real production mileage.
+
+---
+
 ## Planned (not yet in the diagram above)
 
 Nothing in this section is live. Each item links the ADR that owns it;
 none are Accepted yet (see [ADR index](adr/INDEX.md)).
-
-- **Tile engine + operation-log undo** — `src/tiles.rs` (256×256 tile
-  buffer) and `src/ops.rs` (serialized op log with keyframed replay)
-  exist on the unmerged branch `feat/tile-engine-core`, gated behind an
-  off-by-default `tiles` Cargo feature and explicitly excluded from the
-  wasm build. 55/55 cargo tests pass on that branch (verified
-  2026-07-09). Even if/when the branch merges to master, the render
-  path (`src/history.rs` snapshot undo, flat pixel buffers) stays the
-  live implementation until something actually calls into `ops.rs`/
-  `tiles.rs` — "merged" is not "shipped." See
-  [ADR-003](adr/003-operation-log-undo.md),
-  [ADR-004](adr/004-tile-buffer.md),
-  [ADR-006](adr/006-render-cache-disposable.md).
 - **Tool registry (Stage 4)** — replace AppShell's hand-wired tool
   hooks with a `ToolModule` interface + static registry so adding a
   tool is one folder, not a shell edit. Not started; see

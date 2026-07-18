@@ -1163,6 +1163,45 @@ fn a_zero_op_persisted_base_restores_the_full_artboard_document() {
 }
 
 #[test]
+fn app_flow_stroke_persist_restore_keeps_the_canvas() {
+    // The EXACT app sequence for check 3 of the flip A/B — including the two
+    // details every other parity test skips: `clear_history()` after the
+    // border (loadImageFromPixels does this) and the TRANSPARENT default
+    // backing (bg_a = 0; the tests above all use an opaque fill).
+    let px = seed_pixels(64, 48);
+    let mut t = ImageHorseTool::new(64, 48);
+    t.load_image(&px);
+    t.set_artboard_border(12, 0, 0, 0, 0); // transparent default backing
+    t.clear_history();
+    t.set_oplog_undo(true);
+    stroke(&mut t, (16.0, 16.0), (60.0, 40.0), "#ff0000");
+
+    assert_eq!(t.oplog_op_count(), 1, "the stroke recorded");
+    let len = t.oplog_op_count() as u32;
+    let frames = t.oplog_encoded_ops(0, len);
+    let base_px = t.oplog_keyframe_pixels_rgba(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let (bw, bh) = (t.oplog_keyframe_width(0), t.oplog_keyframe_height(0));
+    assert_eq!((bw, bh), (88, 72), "the base is the POST-artboard document");
+    let h_engine = composite_hash(&mut t);
+
+    let mut t2 = ImageHorseTool::new(1, 1);
+    assert!(
+        t2.oplog_restore(&base_px, bw, bh, &base_ann, &frames, len),
+        "the persisted log restores"
+    );
+    assert_eq!((t2.width(), t2.height()), (88, 72), "dimensions round-trip");
+    assert_eq!(t2.canvas_idx(), Some(0), "the Canvas layer is rebuilt");
+    assert_eq!(t2.layer_count(), 2, "Canvas + Photo");
+    assert_eq!(t2.content_layer_count(), 1);
+    assert_eq!(
+        composite_hash(&mut t2),
+        h_engine,
+        "restored composite byte-exact, stroke and Canvas included"
+    );
+}
+
+#[test]
 fn restore_rejects_a_pre_canvas_v1_annotations_blob() {
     // A legacy base persisted before the Canvas rode the annotations blob
     // (format version 1) must NOT be guessed at: `oplog_restore` returns

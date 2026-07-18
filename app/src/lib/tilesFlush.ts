@@ -10,9 +10,9 @@
 // detect at runtime via a local interface + cast instead of widening the
 // ambient surface to something that isn't always true.
 //
-// Runtime toggle: `localStorage.setItem("ih_tiles_flush", "1")` in DevTools.
-// This is a MORNING_SESSION_tile-wiring.md Stage 1/2 verification switch,
-// not a Settings-panel preference — there is no UI for it.
+// Runtime kill switch: `localStorage.setItem("ih_tiles_flush", "0")` in
+// DevTools disables the path for one profile (default is ON since the
+// 2026-07-17 flip). Not a Settings-panel preference — there is no UI for it.
 
 export interface TilesWasmExports {
   tiles_flush(): boolean;
@@ -48,30 +48,33 @@ function hasOplogExports(t: object): t is OplogWasmExports {
   );
 }
 
-/** Whether the verification toggle is on (see module doc above). */
+/** Whether the tile flush path is on. Default ON since the 2026-07-17 flip
+ *  (four-check A/B passed); `localStorage.setItem("ih_tiles_flush", "0")` is
+ *  the per-profile kill switch. */
 export function isTilesFlushEnabled(): boolean {
   try {
     return (
-      typeof window !== "undefined" &&
-      window.localStorage.getItem("ih_tiles_flush") === "1"
+      typeof window === "undefined" ||
+      window.localStorage.getItem("ih_tiles_flush") !== "0"
     );
   } catch {
-    return false;
+    return true;
   }
 }
 
-/** Whether op-log replay should drive undo/redo. Same verification-switch
- *  pattern as `ih_tiles_flush`: `localStorage.setItem("ih_oplog_undo", "1")`
- *  in DevTools, no UI. Recording happens regardless on a tiles build; this
- *  only decides whether `undo()`/`redo()` consult the log. */
+/** Whether op-log replay should drive undo/redo. Default ON since the
+ *  2026-07-17 flip; `localStorage.setItem("ih_oplog_undo", "0")` is the
+ *  per-profile kill switch. Recording happens regardless on a tiles build;
+ *  this only decides whether `undo()`/`redo()` consult the log — and a
+ *  hash-check mismatch still falls back to snapshot undo per ADR-013. */
 export function isOplogUndoEnabled(): boolean {
   try {
     return (
-      typeof window !== "undefined" &&
-      window.localStorage.getItem("ih_oplog_undo") === "1"
+      typeof window === "undefined" ||
+      window.localStorage.getItem("ih_oplog_undo") !== "0"
     );
   } catch {
-    return false;
+    return true;
   }
 }
 

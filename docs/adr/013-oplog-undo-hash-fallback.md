@@ -1,5 +1,7 @@
 # ADR-013: Op-log undo activates behind a composite-hash sync check, with snapshot undo as the permanent fallback
-Date: 2026-07-11   Status: draft
+Date: 2026-07-11   Status: Accepted (2026-07-17 — op-log undo verified
+live on the shipped defaults; the hash-gated snapshot fallback stays
+permanent per this ADR's own decision)
 
 ## Context
 Not every edit is recordable yet (clone stamp, filters, masks,

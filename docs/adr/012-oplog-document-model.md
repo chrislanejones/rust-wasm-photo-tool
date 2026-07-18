@@ -1,5 +1,7 @@
 # ADR-012: The op log replays over a document (pixels + live annotation lists), not the flattened composite
-Date: 2026-07-11   Status: draft
+Date: 2026-07-11   Status: Accepted (2026-07-17 — four-check A/B on the
+flipped defaults; engine-vs-replay parity green incl. the app's exact
+import flow, `app_flow_stroke_persist_restore_keeps_the_canvas`)
 
 ## Context
 Op replay (ADR-003) needs a definition of "the state ops apply to."

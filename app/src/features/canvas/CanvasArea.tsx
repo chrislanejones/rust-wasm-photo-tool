@@ -842,33 +842,20 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         className="canvas-wrapper"
         ref={containerRef as React.RefObject<HTMLDivElement>}
       >
-        {/* Transparency checkerboard — the image's "canvas" backdrop, sized flush
-            (1:1) with the canvas and centered behind it; theme-aware (light grid
-            in light mode, dark in dark mode via `.checkerboard-canvas`). `imgW`/
-            `imgH` is the full document size (photo + any artboard border, which
-            Rust already bakes into the canvas bitmap via `set_artboard_border`),
-            so this div must match it exactly — any offset renders as a second,
-            visibly mismatched rectangle behind the canvas. Always rendered so
-            transparent pixels — PNG alpha, a deleted selection, an eraser stroke,
-            or a "transparent" artboard backing color — read as "empty" instead
-            of black. */}
-        {imgW > 0 && imgH > 0 && (
-          <div
-            className="checkerboard-canvas"
-            style={{
-              position: "absolute",
-              width: imgW,
-              height: imgH,
-              borderRadius: 2,
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
-              transformOrigin: "center center",
-              pointerEvents: "none",
-            }}
-          />
-        )}
+        {/* Transparency checkerboard — `.checkerboard-canvas` on the canvas
+            ELEMENT itself, so transparent pixels (PNG alpha, eraser strokes, a
+            "transparent" artboard backing) read as "empty" instead of black.
+            This used to be a separate backdrop div sized to `imgW`×`imgH`
+            document pixels — but `.main-canvas` is CSS-fit-scaled (max-width/
+            max-height) while the div was not, so on any document larger than
+            the viewport the two desynced: the checkerboard stuck out past the
+            image on one side ("two canvases") and vanished from behind the
+            artboard border on the other ("the Canvas is gone" after a reload).
+            As the element's own background it shares every scaling mechanism —
+            CSS fit, zoom transform, pan — by construction. */}
         <canvas
           ref={ref}
-          className="main-canvas"
+          className="main-canvas checkerboard-canvas"
           style={{
             // Item 3: Fixed zoom + pan transform
             transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
