@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { RefObject, MouseEvent as ReactMouseEvent } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useToolStore } from "@/stores/useToolStore";
+import { tryRemoveObject } from "@/lib/patchmatch";
 
 export function useSelectionActions(
   stamp: ReturnType<typeof useCloneStamp>,
@@ -142,6 +143,22 @@ export function useSelectionActions(
     }
     setSelectionMask(null);
   }, [stamp]);
+  // Remove Object (PatchMatch, `ih_patchmatch` flag — see lib/patchmatch.ts).
+  // Same shape as handleDeleteSelection above: `tryRemoveObject` is already
+  // the flag+export guard, so a flag-off or default (non-`patchmatch`) build
+  // just returns false here and nothing on the canvas changes. The panel
+  // only renders this action at all when the flag is on (SelectSettings.tsx),
+  // so in practice this guard is defense-in-depth, not the only thing
+  // standing between a default build and a call it can't make.
+  const handleRemoveObject = useCallback(() => {
+    const tool = stamp.toolRef.current;
+    if (!tool) return;
+    if (tryRemoveObject(tool)) {
+      stamp.flushToCanvas();
+      stamp.syncState();
+    }
+    setSelectionMask(null);
+  }, [stamp]);
   // Move-layer toggle (Layer Settings + Ctrl+M). Switches to the Layer Settings
   // tool. Still clears selection-click mode: the two interpret a canvas click
   // differently, so they stay mutually exclusive even though they now live on
@@ -170,6 +187,8 @@ export function useSelectionActions(
     handleSelectAll,
     handleDeselect,
     handleDeleteSelection,
+    // Remove Object (behind ih_patchmatch; see lib/patchmatch.ts).
+    handleRemoveObject,
     handleToggleMove,
     handleToggleSelectionMode,
     // Magnetic lasso (behind ih_smart_edge; see lib/smartEdge.ts).
