@@ -31,11 +31,13 @@ import {
   Wand2,
   Blend,
   Lasso,
+  Eraser,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SizeSlider } from "@/components/SizeSlider";
 import { isSmartEdgeEnabled } from "@/lib/smartEdge";
+import { isPatchmatchEnabled } from "@/lib/patchmatch";
 import type { SelectionKind } from "@/stores/useToolStore";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
@@ -48,6 +50,10 @@ export interface SelectionControls {
   onSelectAll: () => void;
   onDeselect: () => void;
   onDelete: () => void;
+  /** PatchMatch object removal — behind the `ih_patchmatch` verification
+   *  switch (see lib/patchmatch.ts); the panel only renders a button for
+   *  this at all when that switch is on. */
+  onRemoveObject: () => void;
   /** Whether something is currently selected (enables Deselect / Delete). */
   active: boolean;
   /** Which engine call a canvas click makes. */
@@ -105,6 +111,7 @@ export function SelectSettings({
   selection: SelectionControls;
 }) {
   const smartEdge = isSmartEdgeEnabled();
+  const patchmatch = isPatchmatchEnabled();
   const kinds = smartEdge ? [...SELECT_KINDS, LASSO_KIND] : SELECT_KINDS;
   const activeKind = kinds.find((k) => k.id === selection.kind) ?? SELECT_KINDS[0];
 
@@ -192,6 +199,32 @@ export function SelectSettings({
           <Trash2 /> Delete
         </ToolButton>
       </div>
+
+      {/* ── Remove Object (PatchMatch) ──────────────────────────────────────
+          Behind `ih_patchmatch` — a verification switch, not a shipped
+          preference (see lib/patchmatch.ts), same status as the smart-edge
+          tools above. Its own section rather than a 4th slot in the "Act on
+          the selection" grid: it's a materially different, much heavier
+          operation than Delete, and it's flagged-off-by-default WIP — giving
+          it equal visual weight to the three settled actions above would
+          overstate how done it is. Day 1 (scalar, single-resolution): fill
+          quality is coarse on a real photo until the pyramid lands. */}
+      {patchmatch && (
+        <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+          <SectionHeader
+            title="Remove Object"
+            info="Erases the selection and reconstructs it from the rest of the image (PatchMatch). Verification switch — day 1, single-resolution, so fill quality is still coarse on a full photo."
+          />
+          <ToolButton
+            disabled={disabled || !selection.active}
+            onClick={selection.onRemoveObject}
+            className="w-full"
+            title="Remove Object"
+          >
+            <Eraser /> Remove Object
+          </ToolButton>
+        </div>
+      )}
 
       {/* ── Not built yet, and saying so ─────────────────────────────────
           Only while the switch is off. Once the lasso is live it's a real kind

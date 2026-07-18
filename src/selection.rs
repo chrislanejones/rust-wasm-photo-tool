@@ -324,6 +324,58 @@ impl ImageHorseTool {
         true
     }
 
+    /// Remove Object (PatchMatch, feature `patchmatch`): reconstructs the
+    /// selected region from the surrounding image and writes the result into
+    /// the active layer, then deselects. Snaps history like every other
+    /// selection action, but deliberately does NOT record an op-log entry —
+    /// this kernel's random init/search makes it effectively nondeterministic
+    /// in real use (a fresh seed every call — see `patchmatch_seed_counter`),
+    /// so recording it as a replayable `Op` would sign up for a replay-parity
+    /// contract it can't honestly keep. Same pattern as `rotate_90_cw` /
+    /// `resize_canvas` / `set_artboard_border`: the op-log's own sync check
+    /// (`oplog_engine_in_sync`) catches the resulting mismatch on the next
+    /// op-log undo/redo attempt and falls back to snapshot undo, safely and
+    /// silently — never a wrong replay.
+    ///
+    /// Source patches are matched against the full visible composite (so a
+    /// removal can draw on context from every layer), but the reconstructed
+    /// pixels are written into the ACTIVE layer only — the same "edits always
+    /// land on the active layer" rule `delete_selection` follows just above.
+    ///
+    /// Returns false (no history pushed, nothing mutated) when nothing is
+    /// selected, the image is empty, or the composite cache is stale/short —
+    /// the same guard shape `seed_index` uses for every other selection entry
+    /// point.
+    #[cfg(feature = "patchmatch")]
+    pub fn remove_object(&mut self) -> bool {
+        let Some(mask) = self.selection.take() else {
+            return false;
+        };
+        if !mask.iter().any(|&b| b) {
+            return false;
+        }
+        let (w, h) = (self.width as usize, self.height as usize);
+        if w == 0 || h == 0 || self.composite_cache.len() < w * h * 4 {
+            return false;
+        }
+        self.snap("Remove Object");
+        let seed = self.patchmatch_seed_counter;
+        self.patchmatch_seed_counter = self.patchmatch_seed_counter.wrapping_add(1);
+        let filled = crate::patchmatch::inpaint(&self.composite_cache, w, h, &mask, seed);
+        let data = &mut self.layers[self.active].buf.data;
+        for (i, &sel) in mask.iter().enumerate() {
+            let p = i * 4;
+            if sel && p + 3 < data.len() && p + 3 < filled.len() {
+                data[p] = filled[p];
+                data[p + 1] = filled[p + 1];
+                data[p + 2] = filled[p + 2];
+                data[p + 3] = filled[p + 3];
+            }
+        }
+        self.recomposite();
+        true
+    }
+
     // ── Magnetic lasso (live-wire) ──────────────────────────────────────────
     // The stub shipped in v7.23 said "the path-finding kernel is the remaining
     // piece". This is that piece, wired up. The kernels are in `livewire.rs`;

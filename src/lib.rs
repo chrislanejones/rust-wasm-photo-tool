@@ -60,6 +60,15 @@ pub mod ops;
 #[cfg(feature = "tiles")]
 pub mod tiles;
 
+// PatchMatch object-removal kernel (day 1: NNF core only — see
+// src/patchmatch.rs and docs/adr). Feature-gated (`patchmatch`) and NOT part
+// of the default wasm build; the default build must stay byte-for-byte
+// unchanged with the feature off. `pub` (not just visible under `#[cfg(test)]`)
+// so a later Task wires a wasm-bindgen entry point against it the same way
+// `tiles`/`ops` do.
+#[cfg(feature = "patchmatch")]
+pub mod patchmatch;
+
 // Engine-vs-replay parity: unit tests that drive the REAL ImageHorseTool
 // (paint_down/effect_down/add_text_annotation) and assert op-log replay
 // reproduces the engine's own output byte-for-byte. Lives in src (not
@@ -438,6 +447,14 @@ pub struct ImageHorseTool {
     /// nothing is selected. Built by the Selection Marker tool's flood-fill /
     /// select-all; `delete_selection` clears the masked pixels.
     selection: Option<Vec<bool>>,
+    /// Monotonic counter feeding `patchmatch::compute_nnf`'s seed, one
+    /// `remove_object` call at a time (post-increment). Keeps the kernel's own
+    /// RNG seeded and deterministic (never reads system time/entropy) while
+    /// still giving successive Remove Object calls in the same session a
+    /// different starting point, so retrying after an undo isn't locked to an
+    /// identical result. Feature-gated with the kernel it feeds.
+    #[cfg(feature = "patchmatch")]
+    patchmatch_seed_counter: u64,
     /// In-progress magnetic-lasso session (edge cost map + anchors + the
     /// committed path). `None` when the lasso isn't running — which is always,
     /// unless the user is mid-loop. Ends by writing `selection` like every
@@ -792,6 +809,8 @@ impl ImageHorseTool {
             editing_shape_id: None,
             editing_text_id: None,
             selection: None,
+            #[cfg(feature = "patchmatch")]
+            patchmatch_seed_counter: 0,
             lasso: None,
             smart_brush: false,
             smart_strength: 128,
