@@ -70,17 +70,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.36 — 2026-07-17
+### v7.37 — 2026-07-18
 
-**The op log is on by default.**
+**The Features page sidebar, redone.** It used to be a flat wall of plain-text links — no icons, jammed against the page edge, and both groups hardcoded open regardless of screen size. On a phone that meant all 40 items stacked above the content before you reached a word of the page.
 
-Every edit now records as an operation. Undo replays from the log, and your edits persist a couple of seconds after you stop working — then come back byte-identical on reload, artboard Canvas included. Anything the log can't record yet (clone stamp, filters, masks, multi-layer moves) fails a hash check and hands undo back to the snapshot path automatically, so no state of the rollout can strand the editor.
+Now the rail is an inset panel with an icon on every group and every one of the 40 features, a count badge instead of a bare number, and a filled row for whatever you're reading instead of a thin underline. Body headings carry the same icon as their rail entry, so the two read as one list. The groups also respect the screen now: open on desktop, closed on mobile, switching live if you resize across that line.
 
-**The gate it passed.** A four-check A/B on the production build: flags-off baseline dimensions vs flags-on (must match exactly), a plain paint stroke through persist → reload → restore, and an AI Remove Background through the same round trip. All four held, with the write path inspected at the IndexedDB level — correct post-artboard base keyframe, canvas metadata in the annotations blob.
-
-**The bug that nearly blocked it.** The stroke round-trip looked like it destroyed the Canvas. It didn't — the document restored perfectly. The transparency checkerboard behind the image was a separate div sized in raw document pixels while the canvas element gets CSS-shrunk to fit the window, so on any large document the two drifted apart: a phantom checkerboard strip on one side, a missing backdrop on the other. The checkerboard now lives on the canvas element itself and can't misalign.
-
-**Paper trail.** ADRs 003, 004, 006, 012, 013, 016 and 017 move to Accepted; `docs/Architecture.md` now documents the live pipeline. Kill switches stay per ADR-017's pre-mortem: `ih_tiles_flush` / `ih_oplog_undo` / `ih_oplog_persist` set to `"0"` in localStorage disables each per profile.
+Checked against the production build at 320/375/414/768px plus desktop — no overflow, scroll-tracking and collapse both still work.
 
 ## License
 

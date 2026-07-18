@@ -1753,12 +1753,17 @@ a { color: inherit; }
    can afford the size; the All card's 20 columns scroll if they must. */
 .ach__grid .day { width: 20px; height: 20px; border-radius: 4px; }
 
-/* ── features — sticky rail beside the list ───────────────── */
+/* ── features — a sidebar tucked in the page's own margin ──────────────────
+ * Shape borrowed from shadcn/ui's sidebar: icon+label menu rows, a muted
+ * group label, a filled active state instead of a hairline. Living in the
+ * page gutter beside the reading column, not as a dedicated app-shell rail —
+ * so it's a panel with its own inset padding, not a column flush to the edge.
+ */
 
 .fx {
   display: grid;
-  grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
-  gap: var(--space-3xl);
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  gap: var(--space-2xl);
   padding: 0 var(--page-gutter) var(--space-3xl);
   align-items: start;
 }
@@ -1770,7 +1775,13 @@ a { color: inherit; }
   top: var(--banner-height);
   max-height: calc(100dvh - var(--banner-height) - var(--space-lg));
   overflow-y: auto;
-  padding-block: var(--space-md);
+}
+
+.fx__panel {
+  background: var(--color-paper-2);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-sm);
 }
 
 .fx__group { border-block-end: var(--rule-hair) solid var(--color-rule); }
@@ -1779,55 +1790,81 @@ a { color: inherit; }
 .fx__summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  min-height: 44px;
-  padding: var(--space-sm) 0;
+  gap: var(--space-xs);
+  min-height: 40px;
+  padding: var(--space-xs) var(--space-2xs);
   cursor: pointer;
   list-style: none;
+  color: var(--color-ink-2);
+}
+.fx__summary::-webkit-details-marker { display: none; }
+.fx__summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.fx__summary-icon { flex-shrink: 0; color: var(--color-accent); }
+.fx__summary-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-outlier);
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-accent);
 }
-.fx__summary::-webkit-details-marker { display: none; }
-.fx__summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 /* the disclosure caret, drawn rather than an icon — one glyph, rotates on open */
 .fx__summary::after {
   content: "";
   width: 7px; height: 7px;
+  margin-inline-start: auto;
   border-right: 2px solid currentColor;
   border-bottom: 2px solid currentColor;
   transform: rotate(-45deg);
   transition: transform var(--dur-micro) var(--ease-out);
   flex-shrink: 0;
+  color: var(--color-ink-3);
 }
 .fx__group[open] .fx__summary::after { transform: rotate(45deg); }
-.fx__n { margin-inline-start: auto; color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
-.fx__group[open] .fx__n { margin-inline-end: var(--space-xs); }
+.fx__n {
+  color: var(--color-ink-3);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  background: var(--color-paper-3);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-xs);
+  line-height: 1.5;
+}
 
 .fx__list {
   display: flex;
   flex-direction: column;
-  margin: 0 0 var(--space-md);
+  gap: 1px;
+  margin: 0 0 var(--space-xs);
   padding: 0;
   list-style: none;
 }
 .fx__link {
-  display: block;
-  padding: var(--space-2xs) 0 var(--space-2xs) var(--space-sm);
-  border-inline-start: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius-sm);
   color: var(--color-ink-2);
   font-size: var(--text-sm);
   text-decoration: none;
-  transition: color var(--dur-micro) var(--ease-out),
-              border-color var(--dur-micro) var(--ease-out);
+  transition: background-color var(--dur-micro) var(--ease-out),
+              color var(--dur-micro) var(--ease-out);
 }
-.fx__link:hover { color: var(--color-ink); }
+.fx__link-icon { flex-shrink: 0; color: var(--color-ink-3); transition: color var(--dur-micro) var(--ease-out); }
+.fx__link-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fx__link:hover { background: var(--color-paper-3); color: var(--color-ink); }
 .fx__link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
-/* the rail marks where you are — the same job the nav glide does up top */
-.fx__link.is-current { color: var(--color-accent); border-inline-start-color: var(--color-accent); }
+/* the rail marks where you are — a filled row, shadcn's active-menu-item voice */
+.fx__link.is-current { background: var(--color-paper-4); color: var(--color-accent); font-weight: 600; }
+.fx__link.is-current .fx__link-icon { color: var(--color-accent); }
 
 .fx__body { min-width: 0; }
 
@@ -1845,11 +1882,15 @@ a { color: inherit; }
   scroll-margin-top: calc(var(--banner-height) + var(--space-md));
 }
 .fx__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
   font-size: var(--text-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-block-end: var(--space-xs);
 }
+.fx__title-icon { flex-shrink: 0; color: var(--color-accent); }
 .fx__text {
   max-width: 72ch;
   color: var(--color-ink-2);
@@ -2028,9 +2069,10 @@ a { color: inherit; }
 }
 
 @media (max-width: 60rem) {
-  /* The rail stops being a rail. A sticky 16rem column beside a 375px viewport
+  /* The rail stops being a rail. A sticky 15rem column beside a 375px viewport
      isn't a sidebar, it's a squeeze — the groups collapse to a normal
-     accordion above the list, closed, so the page opens on the content. */
+     accordion above the list, closed (Features.tsx ties `open` to this same
+     breakpoint), so the page opens on the content. */
   .fx { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
   .fx__rail { position: static; max-height: none; overflow: visible; }
 }

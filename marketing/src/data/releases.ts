@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.80",
+    date: "2026-07-18",
+    headline: "The Features page gets a sidebar worth using",
+    entries: [
+      { tag: "ui", text: "The Features page's sidebar is rebuilt: an icon on every group and every one of the 40 features, a count badge instead of a bare number, and a filled row marking whatever you're reading instead of a thin underline. It sits as an inset panel in the page's own margin now, not a flush column of text." },
+      { tag: "fix", text: "Its two groups used to force themselves open no matter the screen size, so a phone opened onto all 40 items stacked above the content before you saw a word of the page. They now open closed on mobile and open on desktop, and switch live if you resize across that line." },
+    ],
+  },
+  {
     version: "v0.9.79",
     date: "2026-07-17",
     headline: "The new undo history is on for everyone",

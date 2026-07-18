@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import Footer from "../components/Footer";
 import { FEATURES } from "../data/features";
+import { getFeatureIcon, getGroupIcon } from "../data/featureIcons";
+
+// Same breakpoint Nav.tsx uses for its own desktop/mobile split.
+const DESKTOP_QUERY = "(min-width: 60.0625rem)";
 
 const slug = (s: string) =>
   s
@@ -15,6 +19,19 @@ export default function Features() {
   const [current, setCurrent] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLElement>(null);
+
+  // 40 items open-by-default reads fine as a desktop rail; as an accordion
+  // stacked above the content on a 375px phone it's a wall the reader has to
+  // scroll past before reaching a single word of the page. Closed on mobile,
+  // open on desktop — and re-decided on every resize across the breakpoint,
+  // same as Nav's sheet giving up its open state when the window grows back.
+  const [desktop, setDesktop] = useState(() => matchMedia(DESKTOP_QUERY).matches);
+  useEffect(() => {
+    const mq = matchMedia(DESKTOP_QUERY);
+    const onChange = (e: MediaQueryListEvent) => setDesktop(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   // The rail follows the reader. IntersectionObserver, never a scroll listener.
   // The top margin clears the fixed nav, so a feature counts as current when
@@ -73,33 +90,42 @@ export default function Features() {
 
         <div className="fx">
           <aside className="fx__rail" aria-label="Feature groups">
-            <nav ref={railRef}>
-              {FEATURES.map((g) => (
-                // <details>/<summary> rather than a JS accordion: it opens and
-                // closes, is keyboard-operable and announced correctly with no
-                // script at all.
-                <details className="fx__group" key={g.name} open>
-                  <summary className="fx__summary">
-                    <span>{g.name}</span>
-                    <span className="fx__n">{g.items.length}</span>
-                  </summary>
-                  <ul className="fx__list">
-                    {g.items.map((item) => {
-                      const id = slug(item.name);
-                      return (
-                        <li key={id}>
-                          <a
-                            className={`fx__link${current === id ? " is-current" : ""}`}
-                            href={`#${id}`}
-                          >
-                            {item.name}
-                          </a>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </details>
-              ))}
+            <nav className="fx__panel" ref={railRef}>
+              {FEATURES.map((g) => {
+                const GroupIcon = getGroupIcon(g.name);
+                return (
+                  // <details>/<summary> rather than a JS accordion: it opens
+                  // and closes, is keyboard-operable and announced correctly
+                  // with no script at all.
+                  <details className="fx__group" key={g.name} open={desktop}>
+                    <summary className="fx__summary">
+                      <GroupIcon className="fx__summary-icon" size={16} />
+                      <span className="fx__summary-label" title={g.name}>
+                        {g.name}
+                      </span>
+                      <span className="fx__n">{g.items.length}</span>
+                    </summary>
+                    <ul className="fx__list">
+                      {g.items.map((item) => {
+                        const id = slug(item.name);
+                        const ItemIcon = getFeatureIcon(item.name);
+                        return (
+                          <li key={id}>
+                            <a
+                              className={`fx__link${current === id ? " is-current" : ""}`}
+                              href={`#${id}`}
+                              title={item.name}
+                            >
+                              <ItemIcon className="fx__link-icon" size={16} />
+                              <span className="fx__link-label">{item.name}</span>
+                            </a>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </details>
+                );
+              })}
             </nav>
           </aside>
 
@@ -109,12 +135,18 @@ export default function Features() {
                 <h2 className="fx__grouphead" id={slug(g.name)}>
                   {g.name}
                 </h2>
-                {g.items.map((item) => (
-                  <article className="fx__item" id={slug(item.name)} key={item.name}>
-                    <h3 className="fx__title">{item.name}</h3>
-                    <p className="fx__text">{item.body}</p>
-                  </article>
-                ))}
+                {g.items.map((item) => {
+                  const ItemIcon = getFeatureIcon(item.name);
+                  return (
+                    <article className="fx__item" id={slug(item.name)} key={item.name}>
+                      <h3 className="fx__title">
+                        <ItemIcon className="fx__title-icon" size={18} />
+                        {item.name}
+                      </h3>
+                      <p className="fx__text">{item.body}</p>
+                    </article>
+                  );
+                })}
               </section>
             ))}
           </div>

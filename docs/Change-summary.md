@@ -1863,3 +1863,22 @@ construction.
 stroke → "recording · 1/1 ops · PERSISTED 1 chunk" → reload → "restored", full
 2068×1243 with the Canvas layer intact → Ctrl+Z moves the op cursor to 0/1.
 Engine gates: fmt, clippy `-D warnings`, 169 tests incl. the new parity pin.
+
+## v7.37 — 2026-07-18
+
+**The Features page sidebar got redesigned.** The rail listing all 40 features
+was flat text with no icons, sitting flush against the page edge, and its two
+groups were hardcoded open — so a 375px phone opened straight onto a stack of
+40 items before any real content. It's now an inset panel with a `lucide-react`
+icon per group and per feature, a badge-style count, and a filled active row.
+
+| #   | Change                                                                       | Status                                                        |
+| --- | ------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| 1   | Rail rebuilt as an inset panel — icon rows, badge count, filled active state | Complete — shadcn/ui sidebar pattern                          |
+| 2   | All 40 features + both groups mapped to a named icon                        | Complete — `src/data/featureIcons.ts`, hand-maintained (`features.ts` is generated) |
+| 3   | **Fix:** mobile accordions were hardcoded open                              | Complete — now tied to the same breakpoint `Nav.tsx` uses, closed on mobile / open on desktop |
+| 4   | Body headings carry the same icon as their rail entry                       | Complete — rail and content read as one list                 |
+
+**Verified against the production build**: `tsc -b` clean, `pnpm run build`
+succeeds, manual pass in Chrome at desktop width plus 320/375/414/768px — no
+horizontal overflow, scrollspy and the collapse both hold up.
