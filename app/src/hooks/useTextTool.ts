@@ -4,7 +4,7 @@ import type { ToolSettings } from "@/lib/types";
 import { parseColorSync, warmColorParser } from "@/lib/colorParser";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
-export interface TextInput {
+interface TextInput {
   screenX: number;
   screenY: number;
   canvasX: number;
@@ -20,7 +20,7 @@ export interface TextInput {
 }
 
 /** Shape of one entry returned from `tool.get_text_annotations()`. */
-export interface AnnotationMeta {
+interface AnnotationMeta {
   id: number;
   text: string;
   x: number;

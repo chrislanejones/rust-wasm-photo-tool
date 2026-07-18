@@ -30,14 +30,9 @@ export function ensureGridGeometry(): Promise<GridFn> {
   return promise;
 }
 
-/** Eagerly load the WASM grid fn so the first overlay render is instant. */
-export function warmGridGeometry(): void {
-  void ensureGridGeometry().catch(() => {});
-}
-
 const KIND_CODE: Record<GridKind, number> = { square: 0, golden: 1, grid: 2 };
 
-export interface GridParams {
+interface GridParams {
   kind: GridKind;
   /** Pixel spacing for the square grid. */
   spacing: number;

@@ -9,7 +9,7 @@
 // entries while no session handlers exist.
 import { create } from "zustand";
 
-export interface PaletteActions {
+interface PaletteActions {
   undo: () => void;
   redo: () => void;
 }

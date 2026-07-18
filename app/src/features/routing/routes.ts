@@ -29,7 +29,10 @@ const TOOL_SLUG: Record<ToolType, string> = {
   brush: "paint",
   text: "text",
   arrow: "layers",
-  ai: "ai",
+  // Display renamed AI -> Eraser (id stays "ai", load-bearing) — the URL
+  // slug follows the display name. "#/tool/ai" keeps resolving via the
+  // legacy-id alias below, so old links/bookmarks don't break.
+  ai: "eraser",
   shapes: "shapes",
   effects: "effects",
   stamp: "stamps",

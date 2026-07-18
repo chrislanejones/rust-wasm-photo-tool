@@ -10,7 +10,7 @@
 // `galleryLimit` here must equal what `photo_limit` returns.
 import type { UserMode } from "@/components/StatusBar";
 
-export interface TierConfig {
+interface TierConfig {
   /** Switcher / UI label, e.g. "No Login". */
   label: string;
   /** Small qualifier, e.g. "anonymous" / "free" / "$10/mo". */
@@ -76,8 +76,5 @@ export const TIERS: Record<UserMode, TierConfig> = {
   },
 };
 
-export const tierFor = (mode: UserMode): TierConfig => TIERS[mode];
-export const galleryLimitFor = (mode: UserMode): number => TIERS[mode].galleryLimit;
-export const layerLimitFor = (mode: UserMode): number => TIERS[mode].layersPerImage;
 /** Replicate AI is a Paid-only feature. */
 export const hasReplicateAI = (mode: UserMode): boolean => TIERS[mode].replicateAI;

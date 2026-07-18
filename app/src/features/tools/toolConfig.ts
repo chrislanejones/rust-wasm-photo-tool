@@ -2,11 +2,11 @@
 import type { ToolType } from "@/lib/types";
 import {
   Shrink,
-  SquareMousePointer,
+  VectorSquare,
   Paintbrush,
   Type,
   Layers,
-  Brain,
+  Eraser,
   Shapes,
   Sparkles,
   Stamp,
@@ -44,14 +44,14 @@ export const TOOLS: ToolDefinition[] = [
     id: "crop",
     label: "Adjust & Select",
     description: "Crop, transform & select",
-    icon: SquareMousePointer,
+    icon: VectorSquare,
     gradient: "from-cyan-500 to-blue-500",
     shortcutKey: "2",
   },
   {
     id: "brush",
     label: "Paint",
-    description: "Paint, blur, pen & erase",
+    description: "Paint, blur & pen",
     icon: Paintbrush,
     gradient: "from-blue-500 to-indigo-500",
     shortcutKey: "3",
@@ -77,10 +77,15 @@ export const TOOLS: ToolDefinition[] = [
     shortcutKey: "5",
   },
   {
+    // DISPLAY label only — id stays "ai" (shortcut 6, persistence, routing
+    // are load-bearing; renamed here the same way "crop"→"Adjust & Select"
+    // and "compress"→"Resize" were). Was the AI tool; OCR moved to Text,
+    // 4x Upscale moved to Effects, and this slot is now Eraser: PatchMatch/
+    // Magic Eraser + Background Removal + Object Removal (AISettings.tsx).
     id: "ai",
-    label: "AI",
-    description: "AI-powered tools (coming soon)",
-    icon: Brain,
+    label: "Eraser",
+    description: "Remove objects & backgrounds",
+    icon: Eraser,
     gradient: "from-violet-500 to-purple-600",
     shortcutKey: "6",
   },

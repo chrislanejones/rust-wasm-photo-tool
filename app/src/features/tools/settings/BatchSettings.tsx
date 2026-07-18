@@ -3,11 +3,13 @@
 // goes through the live WASM tool so it gets a normal undo entry; all other
 // photos are persisted to IDB irreversibly.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, X } from "lucide-react";
+import { ImagePlus, Type, FileEdit, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToolButton } from "@/components/ui/tool-button";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
-import { TabGroup } from "@/components/TabGroup";
+import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
+import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
@@ -23,6 +25,17 @@ import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "@/components/ui/sonner";
 
 const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
+
+/** Batch's sub-modes for the shared ToolModeToggle — same 3-column icon-grid
+ *  pattern as Stamps/Shapes/Ratio. No `info` field: each panel below already
+ *  renders its own SectionHeader (Logo inline here, Text/Rename inside their
+ *  own components), so ToolModeToggle only contributes the icon-row selector
+ *  and stays silent on the header row rather than duplicating it. */
+const BATCH_TOOL_MODES: readonly ToolMode<"logo" | "text" | "rename">[] = [
+  { id: "logo", label: "Logo", icon: ImagePlus },
+  { id: "text", label: "Text", icon: Type },
+  { id: "rename", label: "Rename", icon: FileEdit },
+];
 
 // Batch positions now use the shared 9-cell placement grid.
 type LogoPosition = PlacementCell;
@@ -521,17 +534,14 @@ export function BatchSettings({
   const [mode, setMode] = useState<"logo" | "text" | "rename">("logo");
 
   return (
-    <div className="space-y-2.5">
-      <TabGroup
-        tabs={[
-          { id: "logo", label: "Logo" },
-          { id: "text", label: "Text" },
-          { id: "rename", label: "Rename" },
-        ]}
-        active={mode}
-        onChange={(id) => setMode(id as "logo" | "text" | "rename")}
-      />
-      {mode === "text" ? (
+    <ToolModeToggle
+      modes={BATCH_TOOL_MODES}
+      columns={3}
+      activeMode={mode}
+      onModeChange={setMode}
+    >
+      {(m) =>
+        m === "text" ? (
         <TextBatchPanel
           photos={photos}
           activePhotoId={activePhotoId}
@@ -540,7 +550,7 @@ export function BatchSettings({
           flushToCanvas={flushToCanvas}
           syncState={syncState}
         />
-      ) : mode === "rename" ? (
+      ) : m === "rename" ? (
         <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
       ) : (
       <>
@@ -674,8 +684,9 @@ export function BatchSettings({
         <p className="text-2xs text-destructive leading-relaxed">{errorMsg}</p>
       )}
       </>
-      )}
-    </div>
+      )
+      }
+    </ToolModeToggle>
   );
 }
 
@@ -869,6 +880,33 @@ const TEXT_FONT_FAMILIES = [
   { label: "Palatino", value: "Palatino, serif" },
 ] as const;
 
+// Background is a plain solid box only — no speech-bubble/tail here. Batch
+// text is a disposable bake-and-export render per photo (see `applyToAll`
+// below), so there's no live overlay for a tail-direction control to edit;
+// matches the "no bubble" scope call in `commit_text`'s Rust doc comment.
+const TEXT_BG_KIND_OPTIONS = [
+  { id: "none", label: "None" },
+  { id: "background", label: "Background" },
+] as const;
+type TextBgKind = (typeof TEXT_BG_KIND_OPTIONS)[number]["id"];
+
+// Same three discrete corner presets as the regular Text tool (see
+// TextSettings.tsx) — square / rounded / pill — kept in sync by hand since
+// each panel owns its own local (non-persisted) state.
+type TextBgCornerId = "circle" | "rounded" | "square";
+const TEXT_BG_CORNER_OPTIONS = [
+  { id: "circle", label: "Circle" },
+  { id: "rounded", label: "Rounded" },
+  { id: "square", label: "Square" },
+] as const;
+const TEXT_BG_CORNER_RADIUS: Record<TextBgCornerId, number> = {
+  square: 0,
+  rounded: 16,
+  circle: 999, // pill sentinel — clamped to min(w,h)/2 when rendered
+};
+const textBgCornerIdFromRadius = (r: number): TextBgCornerId =>
+  r <= 0 ? "square" : r >= 200 ? "circle" : "rounded";
+
 function TextBatchPanel({
   photos,
   activePhotoId,
@@ -882,6 +920,13 @@ function TextBatchPanel({
   const [bold, setBold] = useState(false);
   const [fontFamily, setFontFamily] = useState("sans-serif");
   const [textColor, setTextColor] = useState("#ffffff");
+  const [bgKind, setBgKind] = useState<TextBgKind>("none");
+  const [bgColor, setBgColor] = useState("#ffffff");
+  const [bgPadding, setBgPadding] = useState(8);
+  const [bgCornerRadius, setBgCornerRadius] = useState(
+    TEXT_BG_CORNER_RADIUS.rounded,
+  );
+  const [bgOpacity, setBgOpacity] = useState(100);
   const [position, setPosition] = useState<TextPosition>("bottom-right");
   const [margin, setMargin] = useState(24);
   const [running, setRunning] = useState(false);
@@ -916,6 +961,16 @@ function TextBatchPanel({
       await init();
 
       const [r, g, b] = hexToRgb(textColor);
+      // Background params — 0 = none, 1 = solid rect (no bubble/tail on the
+      // batch path; see the Rust `commit_text` doc comment). Padding grows
+      // the box OUTWARD from the text without moving it (Rust side), so the
+      // corner/margin placement math below sizes against the padded box —
+      // otherwise the box would poke past the requested margin.
+      const bgKindNum = bgKind === "background" ? 1 : 0;
+      const [bgR, bgG, bgB] = hexToRgb(bgColor);
+      const bgA = Math.round(Math.max(0, Math.min(100, bgOpacity)) * 2.55);
+      const bgPad = bgKindNum === 1 ? Math.max(0, Math.round(bgPadding)) : 0;
+      const bgRadius = Math.max(0, Math.round(bgCornerRadius));
       let done = 0;
       let succeeded = 0;
 
@@ -951,15 +1006,36 @@ function TextBatchPanel({
             tool.load_image(targetBytes);
             // Measure in Rust so we can corner-align without knowing glyph metrics.
             const m = tool.measure_text(text, fontSize, bold);
-            const { dx, dy } = computeOffset(
+            // Corner-align the OUTER (padded) box, then inset back to the
+            // text's own top-left — commit_text always anchors to the text.
+            const { dx: outerDx, dy: outerDy } = computeOffset(
               position,
               working.width,
               working.height,
-              m[0],
-              m[1],
+              m[0] + bgPad * 2,
+              m[1] + bgPad * 2,
               margin,
             );
-            tool.commit_text(text, fontSize, r, g, b, bold, dx, dy, 0);
+            const dx = outerDx + bgPad;
+            const dy = outerDy + bgPad;
+            tool.commit_text(
+              text,
+              fontSize,
+              r,
+              g,
+              b,
+              bold,
+              dx,
+              dy,
+              0,
+              bgKindNum,
+              bgR,
+              bgG,
+              bgB,
+              bgA,
+              bgPad,
+              bgRadius,
+            );
             composited = new Uint8Array(tool.get_image_data());
           } finally {
             tool.free();
@@ -1052,16 +1128,35 @@ function TextBatchPanel({
             const workW = tool.width();
             const workH = tool.height();
             const m = tool.measure_text(text, fontSize, bold);
-            const { dx, dy } = computeOffset(
+            const { dx: outerDx, dy: outerDy } = computeOffset(
               position,
               workW,
               workH,
-              m[0],
-              m[1],
+              m[0] + bgPad * 2,
+              m[1] + bgPad * 2,
               margin,
             );
+            const dx = outerDx + bgPad;
+            const dy = outerDy + bgPad;
             // commit_text pushes a "Text" snapshot, giving us undo support.
-            tool.commit_text(text, fontSize, r, g, b, bold, dx, dy, 0);
+            tool.commit_text(
+              text,
+              fontSize,
+              r,
+              g,
+              b,
+              bold,
+              dx,
+              dy,
+              0,
+              bgKindNum,
+              bgR,
+              bgG,
+              bgB,
+              bgA,
+              bgPad,
+              bgRadius,
+            );
             flushToCanvas();
             syncState();
             succeeded++;
@@ -1089,6 +1184,11 @@ function TextBatchPanel({
     fontSize,
     bold,
     textColor,
+    bgKind,
+    bgColor,
+    bgPadding,
+    bgCornerRadius,
+    bgOpacity,
     position,
     margin,
     photos,
@@ -1158,6 +1258,53 @@ function TextBatchPanel({
         value={textColor}
         onChange={setTextColor}
       />
+
+      {/* Background — plain solid box only, no speech-bubble/tail (see the
+          module comment on TEXT_BG_KIND_OPTIONS above). */}
+      <ToolButtonGroup
+        label="Background"
+        options={TEXT_BG_KIND_OPTIONS}
+        value={bgKind}
+        onChange={setBgKind}
+        columns={2}
+      />
+
+      {bgKind !== "none" && (
+        <>
+          <ColorSwatchGrid
+            label="Background Color"
+            colors={TEXT_COLORS}
+            value={bgColor}
+            onChange={setBgColor}
+          />
+
+          <SizeSlider
+            label="Padding"
+            value={bgPadding}
+            onChange={setBgPadding}
+            min={0}
+            max={40}
+            unit="px"
+          />
+
+          <ToolButtonGroup
+            label="Corners"
+            options={TEXT_BG_CORNER_OPTIONS}
+            value={textBgCornerIdFromRadius(bgCornerRadius)}
+            onChange={(id) => setBgCornerRadius(TEXT_BG_CORNER_RADIUS[id])}
+            columns={3}
+          />
+
+          <SizeSlider
+            label="Opacity"
+            value={bgOpacity}
+            onChange={setBgOpacity}
+            min={0}
+            max={100}
+            unit="%"
+          />
+        </>
+      )}
 
       <PlacementGrid
         label="Placement"

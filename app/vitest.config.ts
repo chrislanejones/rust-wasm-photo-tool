@@ -9,6 +9,13 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Mirrors vite.config.ts: some store/lib modules reach for this behind a
+      // dynamic import() (e.g. lib/photoLimits.ts); Vite's import-analysis
+      // still needs to resolve the specifier statically to transform the file
+      // at all, even under vitest's node environment. Without this alias,
+      // importing anything upstream of that dynamic import fails to load in
+      // tests, unrelated to whether the import ever actually executes.
+      stamp_tool: path.resolve(__dirname, "../pkg/stamp_tool.js"),
     },
   },
   test: {

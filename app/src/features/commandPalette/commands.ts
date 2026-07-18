@@ -73,7 +73,7 @@ export interface PaletteCommand {
 /** Live app context the registry builder needs. The optional fields are
  *  plumbing the palette provides — until provided, their entries render
  *  disabled. */
-export interface PaletteContext {
+interface PaletteContext {
   photoCount: number;
   /** Rulers/grid/theme hot-toggles (preferences live outside Zustand —
    *  usePreferences broadcasts commits to every instance, AppShell included). */

@@ -1,14 +1,17 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import type { MutableRefObject } from "react";
+import { ChevronDown, Type, PaintBucket, ScanText, Lock, Copy } from "lucide-react";
+import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
-import { TabGroup } from "@/components/TabGroup";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import type { ToolMode } from "@/components/ui/tool-mode-toggle";
+import { SectionHeader } from "@/components/ui/section-header";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
-import { settingsPanelMotion } from "@/lib/animations";
+import { Spinner } from "@/components/ui/spinner";
+import { useAIJob } from "@/hooks/useAIJob";
 
 const FONT_FAMILIES = [
   { label: "Sans Serif", value: "sans-serif" },
@@ -67,7 +70,28 @@ export interface TextMemory {
   textColor: string;
 }
 
-type TextMode = "text" | "background";
+type TextMode = "text" | "background" | "ocr";
+
+const MODE_OPTIONS: readonly ToolMode<TextMode>[] = [
+  {
+    id: "text",
+    label: "Text",
+    icon: Type,
+    info: "Font, weight and colour for the text itself.",
+  },
+  {
+    id: "background",
+    label: "Background",
+    icon: PaintBucket,
+    info: "A fill behind the text — plain box or speech bubble, with padding, corners and a drop shadow.",
+  },
+  {
+    id: "ocr",
+    label: "OCR",
+    icon: ScanText,
+    info: "Read the text out of the photo (Replicate-backed) — extract, then copy it.",
+  },
+];
 
 interface TextSettingsProps {
   settings: ToolSettings;
@@ -76,6 +100,12 @@ interface TextSettingsProps {
   onPlace?: (cell: PlacementCell) => void;
   /** A text is selected (created & selected / clicked / Reselect) → grid enabled. */
   canPlace?: boolean;
+  /** OCR tab — same Replicate + Convex pipeline as the AI tool's Background
+   *  Removal / Object Removal, just its own dedicated job instance (moved
+   *  from AISettings.tsx: OCR is text-shaped, not image-shaped). */
+  aiEnabled?: boolean;
+  activePhotoId: string | null;
+  stampToolRef: MutableRefObject<ImageHorseTool | null>;
 }
 
 export function TextSettings({
@@ -83,27 +113,58 @@ export function TextSettings({
   onChange,
   onPlace,
   canPlace = false,
+  aiEnabled = false,
+  activePhotoId,
+  stampToolRef,
 }: TextSettingsProps) {
   const [mode, setMode] = useState<TextMode>("text");
 
+  // OCR's own job instance — never runs an image model, so onImageResult is
+  // genuinely a no-op here (useAIJob only calls it for rembg/upscale/inpaint;
+  // text models surface solely through the returned textResult).
+  const { run: runOcr, phase: ocrPhase, busy: ocrBusy, error: ocrError, textResult } =
+    useAIJob(() => {});
+  const [copied, setCopied] = useState(false);
+  const canRunOcr = aiEnabled && !!activePhotoId && !!stampToolRef.current;
+
+  const runOcrJob = () => {
+    const tool = stampToolRef.current;
+    if (!tool || !activePhotoId) return;
+    const png = new Uint8Array(tool.export_png());
+    setCopied(false);
+    void runOcr("ocr", activePhotoId, png);
+  };
+
+  const copyOcrText = async () => {
+    if (!textResult) return;
+    try {
+      await navigator.clipboard.writeText(textResult);
+      setCopied(true);
+    } catch {
+      /* clipboard blocked - no-op */
+    }
+  };
+
+  const activeModeInfo = MODE_OPTIONS.find((opt) => opt.id === mode);
+
   return (
     <div className="space-y-5 -mt-2" data-text-panel>
-      <TabGroup
-        tabs={[
-          { id: "text", label: "Text" },
-          { id: "background", label: "Background" },
-        ]}
-        active={mode}
-        onChange={(id) => setMode(id as TextMode)}
-      />
-
-      <AnimatePresence mode="wait">
-        {mode === "text" && (
-          <motion.div
-            key="text"
-            {...settingsPanelMotion}
-            className="space-y-5"
-          >
+    <ToolButtonGroup
+      stacked
+      columns={3}
+      options={MODE_OPTIONS}
+      value={mode}
+      onChange={setMode}
+    />
+    {activeModeInfo && (
+      <SectionHeader title={activeModeInfo.label} info={activeModeInfo.info} />
+    )}
+    {(() => {
+      const m = mode;
+      return (
+        <>
+        {m === "text" && (
+          <div className="space-y-5">
             {/* Font Size */}
             <SizeSlider
               label="Font Size"
@@ -138,21 +199,15 @@ export function TextSettings({
             </div>
 
             {/* Font Weight */}
-            <div className="space-y-4">
-              <label className="text-2xs text-theme-muted-foreground">
-                Font Weight
-              </label>
-              <TabGroup
-                tabs={[
-                  { id: "normal", label: "Normal" },
-                  { id: "bold", label: "Bold" },
-                ]}
-                active={settings.fontWeight ?? "normal"}
-                onChange={(id) =>
-                  onChange({ ...settings, fontWeight: id as "normal" | "bold" })
-                }
-              />
-            </div>
+            <ToolButtonGroup
+              label="Font Weight"
+              options={[
+                { id: "normal", label: "Normal" },
+                { id: "bold", label: "Bold" },
+              ] as const}
+              value={settings.fontWeight ?? "normal"}
+              onChange={(id) => onChange({ ...settings, fontWeight: id })}
+            />
 
             {/* Color */}
             <ColorSwatchGrid
@@ -160,15 +215,11 @@ export function TextSettings({
               value={settings.textColor}
               onChange={(color) => onChange({ ...settings, textColor: color })}
             />
-          </motion.div>
+          </div>
         )}
 
-        {mode === "background" && (
-          <motion.div
-            key="background"
-            {...settingsPanelMotion}
-            className="space-y-5"
-          >
+        {m === "background" && (
+          <div className="space-y-5">
             {/* Style toggle */}
             <ToolButtonGroup
               label="Style"
@@ -302,25 +353,85 @@ export function TextSettings({
                 />
               </>
             )}
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
 
-      {onPlace && (
-        <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
-          <PlacementGrid
-            label="Placement"
-            info={
-              canPlace
-                ? "Numpad 1-9 also work, spatially matched to the grid."
-                : "Select a text to place it on the canvas."
-            }
-            disabled={!canPlace}
-            numpadKeys={canPlace}
-            onChange={onPlace}
-          />
-        </div>
-      )}
+        {m === "ocr" && (
+          <div className="space-y-3">
+            {!aiEnabled && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
+                <Lock className="h-4 w-4 shrink-0 text-warning mt-0.5" />
+                <p className="text-2xs text-warning/90">
+                  OCR needs <strong>sign-in</strong> + a <strong>Paid</strong> plan.
+                </p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={runOcrJob}
+              disabled={!canRunOcr || ocrBusy}
+              className="w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
+              {ocrBusy && <Spinner size={14} />}
+              {ocrPhase === "uploading"
+                ? "Uploading..."
+                : ocrPhase === "running"
+                  ? "Reading text..."
+                  : "Extract Text"}
+            </button>
+            {ocrError && (
+              <p className="text-2xs text-destructive leading-relaxed">{ocrError}</p>
+            )}
+            {ocrPhase === "done" && !ocrError && (
+              <div>
+                {textResult && textResult.trim() ? (
+                  <>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-2xs text-theme-muted-foreground">
+                        Extracted text
+                      </span>
+                      <button
+                        type="button"
+                        onClick={copyOcrText}
+                        className="flex items-center gap-1 text-2xs text-theme-muted-foreground hover:text-theme-foreground"
+                      >
+                        <Copy className="h-3 w-3" />
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-black/20 border border-theme-sidebar-border p-2 text-2xs text-theme-foreground leading-relaxed">
+                      {textResult}
+                    </pre>
+                  </>
+                ) : (
+                  <p className="text-2xs text-theme-muted-foreground">No text detected.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        </>
+      );
+    })()}
+
+    {/* Placement only applies to the Text mode — Background/OCR aren't
+        placing a new object on the canvas. */}
+    {mode === "text" && onPlace && (
+      <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+        <PlacementGrid
+          label="Placement"
+          info={
+            canPlace
+              ? "Numpad 1-9 also work, spatially matched to the grid."
+              : "Select a text to place it on the canvas."
+          }
+          disabled={!canPlace}
+          numpadKeys={canPlace}
+          onChange={onPlace}
+        />
+      </div>
+    )}
     </div>
   );
 }

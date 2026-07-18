@@ -323,7 +323,11 @@ declare module "stamp_tool" {
       dest_y: number,
       target_size: number,
     ): void;
-    /** Render text with the embedded Liberation Sans font and composite onto the buffer. */
+    /** Render text with the embedded Liberation Sans font and composite onto the
+     *  buffer. `dest_x/dest_y` is the top-left of the TEXT itself — a background
+     *  box (kind 1) grows outward from it by `bg_padding`, text position never
+     *  shifts. `background_kind`: 0 = none, 1 = solid rect. No bubble (kind 2) —
+     *  batch text is a one-shot bake with no live overlay for a tail control. */
     commit_text(
       text: string,
       font_size: number,
@@ -334,6 +338,13 @@ declare module "stamp_tool" {
       dest_x: number,
       dest_y: number,
       angle_deg: number,
+      background_kind: number,
+      bg_r: number,
+      bg_g: number,
+      bg_b: number,
+      bg_a: number,
+      bg_padding: number,
+      bg_corner_radius: number,
     ): void;
     /** Returns [width, height] in pixels for the given text, without committing. */
     measure_text(text: string, font_size: number, bold: boolean): Uint32Array;

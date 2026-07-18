@@ -32,12 +32,6 @@ import {
 import { db, putOriginal as dexiePutOriginal } from "@/lib/dexie/db";
 import { USE_DEXIE_ORIGINALS } from "@/lib/dexie/flags";
 
-/** Re-export the kill switch for call-site visibility (defined in flags.ts). */
-export { USE_DEXIE_ORIGINALS } from "@/lib/dexie/flags";
-
-/** Re-export the legacy record shape so call sites keep one canonical type. */
-export type { StoredOriginal } from "@/lib/originalsStore";
-
 /**
  * Store an original's bytes and return its content-address key. Writes to Dexie
  * only (or the legacy store when the kill switch is off). Idempotent for

@@ -107,6 +107,18 @@ export function useEffectiveTool({
       onMouseMove: drawingTools.onMouseMove as typeof stamp.onMouseMove,
       onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
     };
+  // Eraser tool (id "ai" — the old AI slot, repurposed): dragging on the
+  // canvas always erases. No sub-mode to check; the Magic Eraser/Background
+  // Removal/Object Removal actions in that panel are click-triggered, not
+  // canvas-driven, so they don't need a branch here.
+  if (activeTool === "ai") {
+    return {
+      ...stamp,
+      onMouseDown: eraserTool.onMouseDown as typeof stamp.onMouseDown,
+      onMouseMove: eraserTool.onMouseMove as typeof stamp.onMouseMove,
+      onMouseUp: eraserTool.onMouseUp as typeof stamp.onMouseUp,
+    };
+  }
   if (activeTool === "brush") {
     if (maskEditing) {
       return {

@@ -83,13 +83,6 @@ export async function getOriginal(key: string): Promise<StoredOriginal | null> {
   });
 }
 
-export async function getOriginalAsBlobUrl(key: string): Promise<string | null> {
-  const r = await getOriginal(key);
-  if (!r) return null;
-  const blob = new Blob([r.bytes], { type: r.mimeType });
-  return URL.createObjectURL(blob);
-}
-
 export async function deleteOriginal(key: string): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {

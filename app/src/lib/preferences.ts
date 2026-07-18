@@ -130,7 +130,7 @@ export const MAX_HISTORY_MAX = 1000;
 
 const LS_KEY = "image-horse-prefs";
 
-export function clampHistory(n: number): number {
+function clampHistory(n: number): number {
   if (!Number.isFinite(n)) return DEFAULT_PREFERENCES.maxHistory;
   return Math.min(MAX_HISTORY_MAX, Math.max(MAX_HISTORY_MIN, Math.round(n)));
 }
@@ -242,11 +242,11 @@ export function serializePreferences(p: Preferences): string {
   });
 }
 
-export async function hashPreferences(p: Preferences): Promise<string> {
+async function hashPreferences(p: Preferences): Promise<string> {
   return sha256Hex(new TextEncoder().encode(serializePreferences(p)));
 }
 
-export function loadPreferences(): Preferences {
+function loadPreferences(): Preferences {
   try {
     const raw = localStorage.getItem(LS_KEY);
     return raw ? normalize(JSON.parse(raw)) : { ...DEFAULT_PREFERENCES };

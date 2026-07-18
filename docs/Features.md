@@ -33,7 +33,7 @@
 ### UI (React)
 
 - **Animated Panels** — Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)
-- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), **Batch Image Editor** (bulk logo stamp + grid mosaic view), AI (Brain)
+- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), **Batch Image Editor** (bulk logo stamp + grid mosaic view), Eraser (relabeled from AI)
 - **Tab Switchers** — Stamp (Clone / Stamps / Emojis), Shapes (Shapes / Arrows), Paint (Paint / Blur Brush / Pen), Effects (Levels / Color Picker) via shared `TabGroup` component
 - **Spacebar Pan** — Hold Space for grab-to-pan; all tool handlers bypassed during pan
 - **A/B Compare Slider** — Squoosh-style draggable divider; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned
@@ -46,7 +46,7 @@
 - **Export Dropdown** — PNG, JPEG, WebP, AVIF format selector in the top bar
 - **Keyboard Shortcut Modal** — Alt+/ opens a full reference overlay grouped by category (two columns per group)
 - **Hidden Dev Tools** — three clicks on a blank status-bar button unlock the Diagnostics Log (Alt+Delete) and the user/tier selector (Alt+L) in production, and append a Dev Tools section to the Alt+/ modal
-- **AI Panel** — Placeholder cards for: Remove Background (rembg), 4× Upscale (Real-ESRGAN), Object Removal (SD Inpaint), Auto Alt Text (BLIP), Smart Crop, Auto-Enhance — wired to Convex `ai_jobs` + Replicate when ready
+- **Eraser Panel** — the AI tool relabeled (tool id `ai` unchanged for shortcut/persistence/routing): Brush Eraser (drag on canvas to scrub the active layer to transparent, local, free, no sign-in) plus three removal modes in one panel — Magic Eraser (local PatchMatch object removal, coming soon), Background Removal (rembg) and Object Removal (SD Inpaint), both Replicate-backed and Paid-tier. 4× Upscale moved to the Effects tool; OCR/text extraction moved to the Text tool; the old Smart Crop and Auto-Enhance placeholders were retired
 - **Light / Dark / System theme** — full light & dark palettes (warm earth-tone dark, warm-paper light) driven by CSS-variable tokens in `styles.css` (`:root` light, `.dark` dark, `@custom-variant dark`); "System" follows the OS via `matchMedia` and updates live. Pre-paint guard in `index.html` (no FOUC). Set in **Settings → Appearance**, persisted to localStorage + Convex. JetBrains Mono + DM Sans throughout
 - **Rulers & Grids** — toggleable top/left pixel rulers (tick labels track zoom) + a configurable non-destructive grid overlay: square px spacing, golden-ratio lines, or N×M divisions, with color + opacity. Set in **Settings → Rulers & Grids**, persisted. The grid-layout geometry is computed in **Rust** (`grid_lines` WASM export) as the single source, projected to an SVG overlay on the canvas
 - **State management (Zustand)** — the editor's UI, tool, and gallery state lives in three Zustand stores (`useUIStore` / `useToolStore` / `useGalleryStore`) instead of `AppShell` local state; components subscribe with atomic selectors for minimal re-renders, and durable prefs (last master-bar tab, tool sub-modes) persist to IndexedDB via a write-deduped `StateStorage` adapter. Behaviour-preserving groundwork for splitting `AppShell` into feature modules. See [State Management](State-Management.md)

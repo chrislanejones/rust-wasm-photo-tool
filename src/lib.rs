@@ -90,7 +90,7 @@ pub use wasm_bindgen_rayon::init_thread_pool;
 use crate::annotations::{annotations_to_json, build_text_annotation};
 use crate::core::ImageBuffer;
 use crate::history::{History, Snapshot};
-use crate::layer::{composite_layers, composite_layers_into, Layer};
+use crate::layer::{build_annotation_tile, composite_layers, composite_layers_into, Layer};
 use crate::stamp::StampState;
 
 /// Module-init hook: route Rust panics to `console.error` with a readable
@@ -881,6 +881,13 @@ impl ImageHorseTool {
         self.next_shape_id = 1;
         self.editing_shape_id = None;
         self.editing_text_id = None;
+        // A lasso session mid-loop on the OLD document holds an edge cost map
+        // sized to the OLD width/height; left alive, `lasso_active()` would
+        // still read true on the new document and a stray commit/close would
+        // read/write out of step with `self.width`/`self.height`. Same reason
+        // `hist`/`stamp` reset here — a fresh document has no in-progress
+        // session.
+        self.lasso = None;
         // Fresh document, fresh (lazily-started) op log.
         #[cfg(feature = "tiles")]
         {
@@ -964,6 +971,9 @@ impl ImageHorseTool {
         self.next_shape_id = 1;
         self.editing_shape_id = None;
         self.editing_text_id = None;
+        // See `load_image`'s matching reset: a lingering lasso session would
+        // reference the OLD document's dimensions.
+        self.lasso = None;
         // Canvas + Photo = ONE content layer, so this document IS in op-log
         // scope (ADR-016). Fresh document, fresh (lazily-started) log — the
         // base is captured at the first `snap()`, which is also the first
@@ -1892,6 +1902,13 @@ impl ImageHorseTool {
         // The restored document replaces whatever was loaded; pre-restore
         // snapshots reference the wrong state.
         self.hist.clear();
+        // This is the one load path that can reuse a live `ImageHorseTool`
+        // across a document swap (gallery switch) rather than constructing a
+        // fresh one — see `loadImageFromPixels`'s restoreFromOplog comment.
+        // A lasso session left open on the PREVIOUS document would otherwise
+        // survive with a cost map sized to dimensions this document doesn't
+        // have.
+        self.lasso = None;
         true
     }
 
@@ -3020,13 +3037,28 @@ impl ImageHorseTool {
 
     /// DEPRECATED: prefer `add_text_annotation` + `flatten_text_annotations`
     /// for the re-editable overlay flow. Kept as a one-shot direct-to-pixels
-    /// fallback for callers that don't need re-edit.
+    /// fallback for callers (currently: Batch Text) that don't need re-edit —
+    /// Batch runs each photo through a disposable `ImageHorseTool` that's
+    /// `.free()`'d right after export, so there's no live annotation state
+    /// to speak of, just bake-and-export.
     ///
     /// Render text entirely in Rust (Liberation Sans, embedded font) and
     /// composite it onto the image buffer at (dest_x, dest_y).
     /// Replaces the JS OffscreenCanvas → stamp_pixels pipeline for the text tool.
-    /// `dest_x/dest_y` is the top-left corner of the unrotated text block.
-    /// `angle_deg` rotates the rendered text clockwise (positive) around its centre.
+    /// `dest_x/dest_y` is the top-left corner of the unrotated TEXT block —
+    /// when `background_kind` adds a background box, it grows outward from
+    /// the text by `bg_padding` on every side, so the text itself never
+    /// shifts and callers don't need to re-derive their placement math when
+    /// background is toggled on.
+    /// `angle_deg` rotates the rendered tile clockwise (positive) around its centre.
+    ///
+    /// `background_kind`: 0 = none, 1 = solid rect. NOT 2 (speech bubble) —
+    /// batch text is a one-shot flatten with no live overlay to hang a
+    /// tail-direction control off, so the bubble path is intentionally
+    /// unreachable from here. Shares `build_annotation_tile` with
+    /// `add_text_annotation`/`update_text_annotation` (shadow off, no tail)
+    /// so the rect-fill/padding/corner-radius rendering can't drift between
+    /// the live-overlay and batch entry points.
     pub fn commit_text(
         &mut self,
         text: &str,
@@ -3038,45 +3070,65 @@ impl ImageHorseTool {
         dest_x: i32,
         dest_y: i32,
         angle_deg: f32,
+        background_kind: u8,
+        bg_r: u8,
+        bg_g: u8,
+        bg_b: u8,
+        bg_a: u8,
+        bg_padding: u32,
+        bg_corner_radius: u32,
     ) {
-        let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
-        self.snap("Text");
+        // Clamp to the two kinds this entry point actually supports — any
+        // other value falls back to "none" rather than reaching
+        // `build_annotation_tile`'s speech-bubble path (kind 2) with a
+        // meaningless zero-length tail.
+        let background_kind = if background_kind == 1 { 1 } else { 0 };
 
-        if angle_deg.abs() < 0.5 {
-            transform::paste_region(
-                &mut self.layers[self.active].buf.data,
-                self.width as i32,
-                self.height as i32,
-                &rendered.pixels,
-                rendered.width,
-                rendered.height,
-                dest_x,
-                dest_y,
-            );
-        } else {
-            // Rotate around the text centre. rotate_pixels(+θ) is clockwise,
-            // matching the CSS `rotate(${angle}deg)` preview, so pass as-is.
-            let cx = dest_x + rendered.width as i32 / 2;
-            let cy = dest_y + rendered.height as i32 / 2;
-            let rotated = crate::text::rotate_pixels(
-                &rendered.pixels,
-                rendered.width,
-                rendered.height,
-                angle_deg,
-            );
-            let paste_x = cx - rotated.width as i32 / 2;
-            let paste_y = cy - rotated.height as i32 / 2;
-            transform::paste_region(
-                &mut self.layers[self.active].buf.data,
-                self.width as i32,
-                self.height as i32,
-                &rotated.pixels,
-                rotated.width,
-                rotated.height,
-                paste_x,
-                paste_y,
-            );
-        }
+        // Background rect grows outward from the text by `bg_padding`; shift
+        // the tile's base origin so the text itself stays anchored at
+        // (dest_x, dest_y) regardless of whether a background is on.
+        let pad = if background_kind == 1 { bg_padding } else { 0 };
+        let base_x = dest_x - pad as i32;
+        let base_y = dest_y - pad as i32;
+
+        let (tile_pixels, tile_w, tile_h, off_x, off_y) = build_annotation_tile(
+            text,
+            font_size,
+            r,
+            g,
+            b,
+            bold,
+            angle_deg as f64,
+            background_kind,
+            bg_r,
+            bg_g,
+            bg_b,
+            bg_a,
+            bg_padding,
+            bg_corner_radius,
+            0, // bg_tail — no speech-bubble support on this path
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0, // shadow off
+        );
+
+        self.snap("Text");
+        transform::paste_region(
+            &mut self.layers[self.active].buf.data,
+            self.width as i32,
+            self.height as i32,
+            &tile_pixels,
+            tile_w,
+            tile_h,
+            base_x + off_x,
+            base_y + off_y,
+        );
     }
 
     /// Returns [width, height] in pixels of the text as rendered by `commit_text`,
@@ -3567,6 +3619,95 @@ mod layer_tests {
         let t = ImageHorseTool::new(4, 4);
         assert_eq!(t.layer_count(), 1);
         assert_eq!(t.active, 0);
+    }
+
+    #[test]
+    fn commit_text_kind_zero_paints_no_background() {
+        // Transparent canvas, plain text with background_kind = 0 (none): a
+        // point just left of the text's left edge (inside where a rect's
+        // padding WOULD be) stays untouched.
+        let mut t = ImageHorseTool::new(200, 100);
+        let dest_x = 50i32;
+        let dest_y = 30i32;
+        let m = t.measure_text("Hi", 24.0, false);
+        let raw_h = m[1];
+        t.commit_text(
+            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0,
+        );
+        let probe = px(&t, (dest_x - 3) as u32, dest_y as u32 + raw_h / 2);
+        assert_eq!(
+            probe,
+            [0, 0, 0, 0],
+            "no background kind paints nothing outside the glyphs"
+        );
+    }
+
+    #[test]
+    fn commit_text_kind_one_paints_a_padded_background_rect() {
+        // Same call, background_kind = 1 (solid rect), padding 5: the same
+        // probe point (inside the padding, left of the text) is now the
+        // opaque background colour.
+        let mut t = ImageHorseTool::new(200, 100);
+        let dest_x = 50i32;
+        let dest_y = 30i32;
+        let m = t.measure_text("Hi", 24.0, false);
+        let raw_h = m[1];
+        t.commit_text(
+            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5, 0,
+        );
+        let probe = px(&t, (dest_x - 3) as u32, dest_y as u32 + raw_h / 2);
+        assert_eq!(
+            probe,
+            [10, 20, 30, 255],
+            "background rect fills the padding"
+        );
+    }
+
+    #[test]
+    fn commit_text_background_grows_outward_without_shifting_the_text() {
+        // The text's own glyph anchor (dest_x, dest_y) must be identical
+        // whether or not a background is drawn — the rect grows OUTWARD from
+        // the text, never displacing it. Compare the first FULLY-opaque,
+        // pure-white pixel scanning rightward from dest_x on the vertical
+        // centre row: a fully-covered glyph pixel is backdrop-independent
+        // (the `over` operator reduces to the source colour at alpha=255),
+        // so this is immune to the anti-aliased edge blending differently
+        // against a transparent vs. a coloured background.
+        let text_col = |bg_on: bool| -> u32 {
+            let mut t = ImageHorseTool::new(200, 100);
+            let dest_x = 50i32;
+            let dest_y = 30i32;
+            let m = t.measure_text("Hi", 24.0, false);
+            let raw_h = m[1];
+            if bg_on {
+                t.commit_text(
+                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5, 0,
+                );
+            } else {
+                t.commit_text(
+                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0,
+                );
+            }
+            let row = dest_y as u32 + raw_h / 2;
+            for x in (dest_x as u32)..(dest_x as u32 + m[0] + 1) {
+                if px(&t, x, row) == [255, 255, 255, 255] {
+                    return x;
+                }
+            }
+            u32::MAX
+        };
+        let without_bg = text_col(false);
+        let with_bg = text_col(true);
+        assert_ne!(
+            without_bg,
+            u32::MAX,
+            "found solid glyph ink with no background"
+        );
+        assert_ne!(with_bg, u32::MAX, "found solid glyph ink with background");
+        assert_eq!(
+            without_bg, with_bg,
+            "background must not shift the text's own pixels"
+        );
     }
 
     #[test]

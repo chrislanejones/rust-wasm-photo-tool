@@ -7,7 +7,7 @@
 // breathing gap. Keeping this in one place means a panel-width change updates
 // every consumer at once; previously the value was hard-coded in three spots, so
 // shrinking the toolbar (296→260px) left a stale 320 behind in two of them.
-export const SIDE_PANEL_WIDTH = 260;
+const SIDE_PANEL_WIDTH = 260;
 export const PANEL_OPEN_GUTTER = SIDE_PANEL_WIDTH + 24; // 260 + 12 + 12 = 284
 
 // ── Responsive breakpoints (window width, px) ────────────────────────────────

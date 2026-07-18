@@ -10,7 +10,7 @@ const DARK_BG = "#121212";
 const LIGHT_BG = "#f3efe8";
 
 /** Resolve a ThemeChoice to a concrete dark(true)/light(false). */
-export function resolveDark(theme: ThemeChoice): boolean {
+function resolveDark(theme: ThemeChoice): boolean {
   if (theme === "system") {
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   }

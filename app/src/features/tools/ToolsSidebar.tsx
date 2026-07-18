@@ -16,7 +16,7 @@ import type {
 } from "@/lib/types";
 import type { ExportFormat } from "@/lib/exportImage";
 import type { StampMode } from "./settings/StampSettings";
-import type { ShapesMode } from "./settings/ShapeSettings";
+import type { ShapesMode } from "@/stores/useToolStore";
 import { ToolGrid } from "./ToolGrid";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
@@ -379,6 +379,9 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
             onPlace={onPlace}
             canPlace={selectedKind === "text"}
+            aiEnabled={aiEnabled}
+            activePhotoId={activePhotoId}
+            stampToolRef={stampToolRef}
           />
         )}
 
@@ -388,6 +391,8 @@ export function ToolsSidebar({
             activePhotoId={activePhotoId}
             stampToolRef={stampToolRef}
             onAIResult={onAIResult}
+            settings={toolSettings}
+            onChange={onToolSettingsChange}
           />
         )}
       </div>

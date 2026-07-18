@@ -65,6 +65,9 @@ describe("parseRoute — hash to state", () => {
     expect(parse("#/tool/layers")).toMatchObject({ tool: "arrow" });
     expect(parse("#/tool/batch")).toMatchObject({ tool: "emoji" });
     expect(parse("#/tool/stamps")).toMatchObject({ tool: "stamp" });
+    // Display renamed AI -> Eraser; the canonical WRITE slug followed suit.
+    expect(parse("#/tool/eraser")).toMatchObject({ tool: "ai" });
+    expect(toolSlug("ai")).toBe("eraser");
   });
 
   it("still accepts the legacy ToolType id as an inbound alias", () => {
@@ -74,6 +77,9 @@ describe("parseRoute — hash to state", () => {
       mode: "blur",
     });
     expect(parse("#/tool/crop/select")).toMatchObject({ tool: "crop", mode: "select" });
+    // "#/tool/ai" pre-dates the Eraser rename and must keep resolving — same
+    // legacy-id-alias mechanism as #/tool/brush for Paint.
+    expect(parse("#/tool/ai")).toMatchObject({ tool: "ai" });
   });
 
   it("accepts forgiving sub-mode aliases (singular forms)", () => {

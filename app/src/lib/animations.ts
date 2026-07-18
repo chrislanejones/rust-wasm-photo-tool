@@ -109,9 +109,3 @@ export const imageLoadBarProgress = {
   initial: { width: "0%" } as const,
   transition: { duration: 0.15, ease: "easeOut" as Easing },
 };
-
-// Shake animation for invalid drop/paste (no images found)
-export const shakeAnimation: { animate: { x: number[] }; transition: Transition } = {
-  animate: { x: [0, -10, 10, -8, 8, -5, 5, 0] },
-  transition: { duration: 0.4, ease: "easeInOut" as Easing },
-};

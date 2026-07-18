@@ -4,8 +4,11 @@ import { useUIStore } from "@/stores/useUIStore";
 import { setPaletteActions } from "@/features/commandPalette";
 import { navigateTo } from "@/features/routing";
 
-/** All ten tools in toolbar order — keys 1-9, 0 */
-const TOOL_BY_DIGIT: Record<string, ToolType> = {
+/** All ten tools in toolbar order — keys 1-9, 0. Exported (test-only use) so
+ *  it can be cross-checked against toolConfig.ts's ToolDefinition.shortcutKey
+ *  — the two are meant to be the same contract stated twice and must not
+ *  drift (see useKeyboardShortcuts.test.ts). */
+export const TOOL_BY_DIGIT: Record<string, ToolType> = {
   Digit1: "compress",
   Digit2: "crop",
   Digit3: "brush",
@@ -70,6 +73,10 @@ interface KeyboardShortcutOptions {
   onCopyRegion?: () => void;
   /** Ctrl/Cmd+M — toggle the Move-layer mode (Layer Settings tool). */
   onToggleMove?: () => void;
+  /** Enter — apply the pending crop box (same action as the Apply Crop
+   *  button). Only fires while a crop selection exists. */
+  onApplyCrop?: () => void;
+  hasCropSelection?: boolean;
   /** Ctrl/Cmd+\ — pop the feature-celebration dialog (easter egg). */
   onShowCelebration?: () => void;
   // Item 4: Gallery cycling
@@ -90,6 +97,8 @@ export function useKeyboardShortcuts({
   onDeselect,
   hasSelection,
   onToggleMove,
+  onApplyCrop,
+  hasCropSelection,
   onShowCelebration,
   onAdjustBrushSize,
   setShowUpload,
@@ -146,6 +155,21 @@ export function useKeyboardShortcuts({
       // focused (:focus-visible) — preserving Tab+Space accessibility while
       // letting mouse users pan after clicking a tool.
       if (e.key === "Enter" && isActivatable(e.target)) {
+        return;
+      }
+
+      // ─── Enter → apply the pending crop ─────────────────
+      // Same action as the Apply Crop button. Guarded on an actual crop box
+      // existing, so plain Enter stays inert everywhere else; the focused-
+      // control guard above already ran, so a Tab-focused button still wins.
+      if (
+        e.key === "Enter" &&
+        !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey &&
+        hasCropSelection &&
+        onApplyCrop
+      ) {
+        e.preventDefault();
+        onApplyCrop();
         return;
       }
       if (
@@ -316,7 +340,7 @@ export function useKeyboardShortcuts({
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [
-    onUndo, onRedo, onExport, onExportAll, onDeleteAll, onSelectAll, onDeselect, hasSelection, onAdjustBrushSize,
+    onUndo, onRedo, onExport, onExportAll, onDeleteAll, onSelectAll, onDeselect, hasSelection, onApplyCrop, hasCropSelection, onAdjustBrushSize,
     setShowUpload, setShowTools, setShowGallery,
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
     onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,

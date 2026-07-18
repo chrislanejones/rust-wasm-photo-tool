@@ -3,8 +3,7 @@
  * SVG import support: rasterize to PNG at the import boundary.
  *
  * SVGs are never decoded, stored, or rendered live — they can carry
- * `<script>`/`onload`/`foreignObject` payloads (see
- * `lib/security/imageFirewall.ts`, which rejects raw SVGs outright). Instead
+ * `<script>`/`onload`/`foreignObject` payloads. Instead
  * the import funnels (`openImportDialog`, `handleAddPhotos`) convert the
  * vector to PNG pixels through an `<img>` element — scripts do not execute in
  * the `<img>` rendering context — and the original SVG bytes are discarded;

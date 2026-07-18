@@ -14,7 +14,7 @@
 // DevTools disables the path for one profile (default is ON since the
 // 2026-07-17 flip). Not a Settings-panel preference — there is no UI for it.
 
-export interface TilesWasmExports {
+interface TilesWasmExports {
   tiles_flush(): boolean;
   tiles_dirty_tile_count(): number;
   tiles_clear_dirty(): void;
@@ -23,7 +23,7 @@ export interface TilesWasmExports {
 
 /** Op-log recorder + replay-undo surface (tile-wiring Stage 4) — present
  *  only on a `--features tiles` build, same as the flush exports. */
-export interface OplogWasmExports {
+interface OplogWasmExports {
   set_oplog_undo(enabled: boolean): void;
   oplog_active(): boolean;
   oplog_op_count(): number;
@@ -51,7 +51,7 @@ function hasOplogExports(t: object): t is OplogWasmExports {
 /** Whether the tile flush path is on. Default ON since the 2026-07-17 flip
  *  (four-check A/B passed); `localStorage.setItem("ih_tiles_flush", "0")` is
  *  the per-profile kill switch. */
-export function isTilesFlushEnabled(): boolean {
+function isTilesFlushEnabled(): boolean {
   try {
     return (
       typeof window === "undefined" ||
@@ -67,7 +67,7 @@ export function isTilesFlushEnabled(): boolean {
  *  per-profile kill switch. Recording happens regardless on a tiles build;
  *  this only decides whether `undo()`/`redo()` consult the log — and a
  *  hash-check mismatch still falls back to snapshot undo per ADR-013. */
-export function isOplogUndoEnabled(): boolean {
+function isOplogUndoEnabled(): boolean {
   try {
     return (
       typeof window === "undefined" ||

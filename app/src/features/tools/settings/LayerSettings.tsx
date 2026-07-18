@@ -179,7 +179,11 @@ export function LayerSettings({
         </div>
 
         {guides.length > 0 && (
-          <div className="max-h-40 overflow-y-auto space-y-1">
+          <>
+            <span className="text-2xs font-semibold font-mono text-theme-muted-foreground">
+              Guides
+            </span>
+            <div className="history-list max-h-40">
             {guides.map((g) => (
               <ReselectBar
                 key={g.id}
@@ -191,7 +195,8 @@ export function LayerSettings({
                 deleteLabel="Delete guide"
               />
             ))}
-          </div>
+            </div>
+          </>
         )}
       </div>
 

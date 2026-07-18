@@ -92,7 +92,7 @@ export const FEATURE_ICONS: Record<string, ElementType> = {
   "Export Dropdown": FileDown,
   "Keyboard Shortcut Modal": Command,
   "Hidden Dev Tools": Wrench,
-  "AI Panel": Brain,
+  "Eraser Panel": Brain,
   "Light / Dark / System theme": SunMoon,
   "Rulers & Grids": Ruler,
   "State management (Zustand)": Database,

@@ -1902,3 +1902,23 @@ and a multi-resolution pyramid (day 3) are next.
 (fmt, clippy, `cargo test` — 88/107/188 passing depending on config), `tsc`,
 `vitest`, production build. Default (flag-off) wasm is byte-count-identical
 to the pre-merge baseline; flag-on grows the binary by 6,585 bytes (+0.90%).
+
+## v7.39 — 2026-07-18
+
+**The AI tool is relabeled Eraser, and its panel is consolidated.** Tool id
+stays `ai` internally (shortcuts, persistence, routing untouched) — only
+the label and icon change. Brush Eraser moves here from Paint; Magic Eraser
+(v7.38's PatchMatch kernel), Background Removal, and Object Removal join it
+in one panel.
+
+| #   | Change                                                                 | Status                                                       |
+| --- | ------------------------------------------------------------------------ | --------------------------------------------------------------|
+| 1   | AI tool relabeled Eraser (brain icon → eraser icon)                    | Complete — tool id `ai` unchanged                            |
+| 2   | Brush Eraser moved from Paint into this panel                          | Complete — same local/free/no-sign-in eraser                 |
+| 3   | Magic Eraser slot added for the local PatchMatch kernel                | Complete — labeled Coming Soon, not yet wired to this panel   |
+| 4   | 4× Upscale placeholder moved to Effects; text extraction moved to Text | Complete                                                     |
+| 5   | Smart Crop and Auto-Enhance placeholders removed                       | Complete — never wired to anything                           |
+
+**Verified**: `tsc --noEmit` clean, `cargo fmt`/`clippy -D warnings` clean,
+`cargo test` 96/96 passing (app-side `vitest` 164/164), production build
+succeeds against the default wasm.

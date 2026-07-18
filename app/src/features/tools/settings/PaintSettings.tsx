@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Brush, Droplets, PenTool, Eraser, Blend } from "lucide-react";
+import { Brush, Droplets, PenTool, Blend } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import type { BrushMode } from "@/stores/useToolStore";
 import { useToolStore } from "@/stores/useToolStore";
@@ -80,20 +80,13 @@ export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
       </>
     ),
   },
-  {
-    id: "erase",
-    label: "Eraser",
-    icon: Eraser,
-    info: (
-      <>
-        Drag on the canvas to scrub the active layer to
-        transparent — revealing whatever&rsquo;s beneath it. Lower
-        opacity erases gradually. <kbd>Ctrl+]</kbd>/<kbd>Ctrl+[</kbd>{" "}
-        grows/shrinks the brush.
-      </>
-    ),
-  },
 ];
+// Eraser moved out of Paint's toggle row (now Paint/Blur/Pen, 1×3) — the
+// tool formerly at the "ai" slot is now "Eraser": PatchMatch/Magic Eraser +
+// Background Removal + Object Removal (AISettings.tsx). The brush-eraser
+// case below stays intact in the switch body — dormant, not deleted — in
+// case any surviving code path (a shortcut, persisted store state) still
+// sets mode to "erase"; it just no longer has a tile in this row.
 
 interface PaintSettingsProps {
   settings: ToolSettings;
@@ -123,6 +116,7 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
   return (
     <ToolModeToggle
       modes={PAINT_MODES}
+      columns={3}
       activeMode={mode}
       onModeChange={handleModeChange}
     >

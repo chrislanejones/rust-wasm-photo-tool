@@ -24,6 +24,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.82",
+    date: "2026-07-18",
+    headline: "The AI tool becomes the Eraser tool",
+    entries: [
+      { tag: "ui", text: "The AI tool is now the Eraser tool — same spot on the toolbar, new icon, one panel. Brush Eraser moved here from Paint. Magic Eraser is a new slot for the local PatchMatch removal that just landed, marked Coming Soon until it's wired in. Background Removal and Object Removal are unchanged. Two placeholder cards that never did anything, Smart Crop and Auto-Enhance, are gone." },
+    ],
+  },
+  {
     version: "v0.9.81",
     date: "2026-07-18",
     headline: "Object removal lands — local, free, still dark",

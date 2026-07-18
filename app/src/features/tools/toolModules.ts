@@ -11,7 +11,7 @@
 // add AppShell wiring here or anywhere else.
 import type { ToolType } from "@/lib/types";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
-import { Paintbrush, Shrink, SquareMousePointer } from "lucide-react";
+import { Paintbrush, Shrink, VectorSquare } from "lucide-react";
 import { PaintSettings, PAINT_MODES } from "./settings/PaintSettings";
 import type { PaintMode } from "./settings/PaintSettings";
 import { ResizeSettings, RESIZE_MODES } from "./settings/ResizeSettings";
@@ -25,7 +25,7 @@ import type { ResizeMode, AdjustMode } from "@/stores/useToolStore";
  * Minimal registry entry for one tool. Kept deliberately small — fields are
  * added only when a migration session actually needs them.
  */
-export interface ToolModule<M extends string = string> {
+interface ToolModule<M extends string = string> {
   /** Registry id. MUST equal the tool's legacy `ToolType` id (`brush`,
    *  `stamp`, `emoji`, `arrow`, …) — ids are renamed to match labels only
    *  during that tool's own migration session, never here (shortcuts and
@@ -46,7 +46,7 @@ export interface ToolModule<M extends string = string> {
 }
 
 /** Paint — first registered module; consumer #1 of ToolModeToggle. */
-export const paintModule: ToolModule<PaintMode> = {
+const paintModule: ToolModule<PaintMode> = {
   id: "brush", // legacy id — see ToolModule.id
   label: "Paint",
   icon: Paintbrush,
@@ -58,7 +58,7 @@ export const paintModule: ToolModule<PaintMode> = {
  *  Registered under its legacy id `compress` (shortcut `1` and the ToolType
  *  union depend on it); the display label has been "Resize" since
  *  toolConfig.ts. Sub-mode state lives in `useToolStore.resizeMode`. */
-export const resizeModule: ToolModule<ResizeMode> = {
+const resizeModule: ToolModule<ResizeMode> = {
   id: "compress", // legacy id — see ToolModule.id
   label: "Resize",
   icon: Shrink,
@@ -70,10 +70,10 @@ export const resizeModule: ToolModule<ResizeMode> = {
  *  Registered under its legacy id `crop` (shortcut `2` + persistence depend on
  *  it); the DISPLAY label became "Adjust & Select" when the Select sub-mode
  *  moved in from Layer Settings. Sub-mode state: `useToolStore.adjustMode`. */
-export const adjustModule: ToolModule<AdjustMode> = {
+const adjustModule: ToolModule<AdjustMode> = {
   id: "crop", // legacy id — see ToolModule.id
   label: "Adjust & Select",
-  icon: SquareMousePointer,
+  icon: VectorSquare,
   modes: ADJUST_MODES,
   Settings: TransformCropSettings,
 };
@@ -87,7 +87,3 @@ export const TOOL_MODULES: Partial<Record<ToolType, ToolModule>> = {
   compress: resizeModule,
   crop: adjustModule,
 };
-
-export function getToolModule(id: ToolType): ToolModule | undefined {
-  return TOOL_MODULES[id];
-}

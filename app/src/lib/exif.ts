@@ -18,7 +18,7 @@
 
 import type { ExportFormat } from "@/lib/exportImage";
 
-export type ExifMode = "keep" | "strip";
+type ExifMode = "keep" | "strip";
 
 // All buffers we produce/consume are exact, ArrayBuffer-backed views.
 type Bytes = Uint8Array<ArrayBuffer>;
@@ -79,7 +79,7 @@ function findJpegExifSegment(b: Bytes): { tiffStart: number; segEnd: number } | 
 }
 
 /** Raw TIFF/Exif block (bytes after "Exif\0\0") from a JPEG, or null. */
-export function extractJpegExifTiff(b: Bytes): Bytes | null {
+function extractJpegExifTiff(b: Bytes): Bytes | null {
   if (!isJpeg(b)) return null;
   const hit = findJpegExifSegment(b);
   return hit ? b.slice(hit.tiffStart, hit.segEnd) : null;
@@ -96,7 +96,7 @@ export function extractJpegExifTiff(b: Bytes): Bytes | null {
 // opt-in — not implemented here.
 
 /** Drop EXIF/XMP (APP1) and IPTC/Photoshop (APP13); keep JFIF + ICC + image. */
-export function stripJpegMetadata(b: Bytes): Bytes {
+function stripJpegMetadata(b: Bytes): Bytes {
   if (!isJpeg(b)) return b;
   const keep: Array<[number, number]> = [[0, 2]]; // SOI
   let pos = 2;
@@ -134,7 +134,7 @@ export function stripJpegMetadata(b: Bytes): Bytes {
 }
 
 /** Insert an EXIF APP1 segment (built from a TIFF block) right after SOI. */
-export function injectJpegExif(jpeg: Bytes, tiff: Bytes): Bytes {
+function injectJpegExif(jpeg: Bytes, tiff: Bytes): Bytes {
   if (!isJpeg(jpeg)) return jpeg;
   const clean = stripJpegMetadata(jpeg); // avoid duplicate EXIF/XMP
   const segLen = 2 + EXIF_ID.length + tiff.length; // length field counts itself
@@ -189,14 +189,14 @@ function findPngChunk(b: Bytes, type: string): { dataStart: number; dataEnd: num
 
 /** Raw TIFF/Exif block from a PNG's eXIf chunk, or null. Unlike JPEG's APP1,
  *  a PNG eXIf chunk holds the raw TIFF directly — no "Exif\0\0" prefix. */
-export function extractPngExifTiff(b: Bytes): Bytes | null {
+function extractPngExifTiff(b: Bytes): Bytes | null {
   if (!isPng(b)) return null;
   const hit = findPngChunk(b, "eXIf");
   return hit ? b.slice(hit.dataStart, hit.dataEnd) : null;
 }
 
 /** Drop textual/EXIF/time chunks from a PNG (eXIf, tEXt, zTXt, iTXt, tIME). */
-export function stripPngMetadata(b: Bytes): Bytes {
+function stripPngMetadata(b: Bytes): Bytes {
   if (!isPng(b)) return b;
   const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
   const drop = new Set(["eXIf", "tEXt", "zTXt", "iTXt", "tIME"]);
@@ -288,7 +288,7 @@ export function extractWebpExifTiff(b: Bytes): Bytes | null {
 }
 
 /** Drop EXIF + XMP chunks and clear their VP8X flag bits. */
-export function stripWebpMetadata(b: Bytes): Bytes {
+function stripWebpMetadata(b: Bytes): Bytes {
   const chunks = parseWebpChunks(b);
   if (!chunks) return b;
   const parts = chunks
@@ -310,7 +310,7 @@ function vp8lHasAlpha(data: Bytes): boolean {
 }
 
 /** Inject EXIF into a (typically simple) WebP, upgrading to VP8X as needed. */
-export function injectWebpExif(
+function injectWebpExif(
   b: Bytes,
   tiff: Bytes,
   width: number,
@@ -445,7 +445,7 @@ function stripGpsFromTiff(tiff: Bytes): Bytes {
 }
 
 /** Remove GPS only from a JPEG's EXIF (APP1); camera/timestamp tags survive. */
-export function stripJpegGps(b: Bytes): Bytes {
+function stripJpegGps(b: Bytes): Bytes {
   if (!isJpeg(b)) return b;
   const hit = findJpegExifSegment(b);
   if (!hit) return b.slice(); // no EXIF APP1 found — nothing to strip
@@ -474,7 +474,7 @@ function pngCrc32(bytes: Uint8Array): number {
 }
 
 /** Remove GPS only from a PNG's eXIf chunk (if any); other chunks survive. */
-export function stripPngGps(b: Bytes): Bytes {
+function stripPngGps(b: Bytes): Bytes {
   if (!isPng(b)) return b;
   const hit = findPngChunk(b, "eXIf");
   if (!hit) return b.slice();
@@ -490,7 +490,7 @@ export function stripPngGps(b: Bytes): Bytes {
 }
 
 /** Remove GPS only from a WebP's EXIF chunk (if any); other chunks survive. */
-export function stripWebpGps(b: Bytes): Bytes {
+function stripWebpGps(b: Bytes): Bytes {
   const chunks = parseWebpChunks(b);
   if (!chunks) return b;
   const exif = chunks.find((c) => c.fourcc === "EXIF");

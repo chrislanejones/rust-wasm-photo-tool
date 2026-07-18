@@ -49,15 +49,6 @@ export function putWorkingCopy(key: string, value: WorkingCopy): void {
   }
 }
 
-/** Drop a single entry (e.g. when its photo is deleted). */
-export function evictWorkingCopy(key: string): void {
-  const v = cache.get(key);
-  if (v) {
-    cache.delete(key);
-    totalBytes -= sizeOf(v);
-  }
-}
-
 /** Drop everything (e.g. on "Delete all"). */
 export function clearWorkingCopyCache(): void {
   cache.clear();

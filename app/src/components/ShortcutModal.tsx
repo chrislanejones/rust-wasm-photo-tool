@@ -16,7 +16,7 @@ const SHORTCUT_GROUPS = [
       { keys: ["3"], action: "Paint & Blur Brush" },
       { keys: ["4"], action: "Text & Speech Bubbles" },
       { keys: ["5"], action: "Move (active layer)" },
-      { keys: ["6"], action: "AI" },
+      { keys: ["6"], action: "Eraser" },
       { keys: ["7"], action: "Shapes & Arrows" },
       { keys: ["8"], action: "Effects (Levels & Color Picker)" },
       { keys: ["9"], action: "Stamps" },

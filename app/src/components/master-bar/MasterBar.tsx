@@ -12,8 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { MASTER_BAR_CHROME_H } from "./constants";
-
-export type MasterTab = "tools" | "gallery" | "review";
+import type { MasterTab } from "@/stores/useUIStore";
 
 interface Props {
   activeTab: MasterTab;

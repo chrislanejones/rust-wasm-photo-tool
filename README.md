@@ -70,13 +70,11 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.38 — 2026-07-18
+### v7.39 — 2026-07-18
 
-**A local object-removal kernel lands, still dark.** Select a region with the wand or lasso and hit Remove Object: it reconstructs the hole from the surrounding image with a scalar PatchMatch nearest-neighbor search (Barnes et al.) — no sign-in, no network, runs entirely on your machine. Single-resolution today, so a real photo will look a bit smeary; a multi-resolution pass and parallel search are next.
+**The AI tool is now the Eraser tool.** Same toolbar slot, new icon, one consolidated panel: Brush Eraser (drag on canvas, local, free, no sign-in — it used to live under Paint) sits alongside Magic Eraser, Background Removal, and Object Removal. Magic Eraser is the local PatchMatch kernel from v7.38, marked Coming Soon until it's actually wired into this panel.
 
-It ships behind two flags (a Cargo feature and a localStorage switch), both off by default — the shipped wasm is byte-for-byte identical in size with the feature off. The result records as a history keyframe rather than a replayable undo step, since the algorithm's randomized search can't honestly promise exact replay.
-
-I flipped the flag on locally, ran it on a real canvas, and the fill held up before merging.
+4× Upscale's placeholder moved to Effects, text extraction moved to the Text tool, and two placeholder cards that never did anything — Smart Crop, Auto-Enhance — are gone. Nothing that worked before stopped working; the panel's just smaller and clearer.
 
 ## License
 

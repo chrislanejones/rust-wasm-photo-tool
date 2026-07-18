@@ -4,11 +4,11 @@ import { api } from "../../../convex/_generated/api";
 
 /** Build the public share URL for a token, anchored to wherever the app is
  *  served (origin + path, so it works on localhost and any deploy host). */
-export function shareUrlFor(token: string): string {
+function shareUrlFor(token: string): string {
   return `${window.location.origin}${window.location.pathname}?v=${token}`;
 }
 
-export interface CreateShareInput {
+interface CreateShareInput {
   /** Flattened canvas snapshot (PNG). */
   blob: Blob;
   canvasW: number;

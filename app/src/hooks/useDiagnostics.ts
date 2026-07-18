@@ -98,7 +98,7 @@ function buildProcesses(now: number): ProcessRow[] {
 }
 
 // ── Tier 0 — on-open / on-demand ─────────────────────────────────────────
-export interface DiagTier0 {
+interface DiagTier0 {
   /** Whole-tab memory footprint (JS + WASM + canvas + workers), from
    *  measureUserAgentSpecificMemory(); null unless cross-origin isolated and
    *  the API is supported. Expensive + browser-throttled — read on open and
@@ -109,7 +109,7 @@ export interface DiagTier0 {
 }
 
 // ── Tier 1 — 1.5s while visible ──────────────────────────────────────────
-export interface DiagTier1 {
+interface DiagTier1 {
   jsHeapUsed: number | null;
   jsHeapLimit: number | null;
   wasmBytes: number | null;
@@ -117,7 +117,7 @@ export interface DiagTier1 {
 }
 
 // ── Tier 2 — per-frame while visible + interacting ───────────────────────
-export interface DiagTier2 {
+interface DiagTier2 {
   fps: number;
   frameMs: number;
   cpuLoad: number;

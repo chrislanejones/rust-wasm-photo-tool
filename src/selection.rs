@@ -508,3 +508,260 @@ impl ImageHorseTool {
         (cx as u32, cy as u32)
     }
 }
+// Session-level coverage for the `#[wasm_bindgen]` lasso methods above. The
+// kernel (`livewire.rs`) has its own thorough unit tests, but nothing
+// previously drove `lasso_begin`/`lasso_path_to`/`lasso_commit`/`lasso_close`/
+// `lasso_cancel` as the JS click handler actually calls them — the session
+// bookkeeping in THIS file was untested. These are that coverage.
+#[cfg(test)]
+mod lasso_session_tests {
+    use crate::ImageHorseTool;
+
+    const CX: f64 = 40.0;
+    const CY: f64 = 40.0;
+    const R: f64 = 25.0;
+
+    fn disc(w: u32, h: u32) -> Vec<u8> {
+        let mut v = vec![0u8; (w * h * 4) as usize];
+        for y in 0..h {
+            for x in 0..w {
+                let dx = x as f64 - CX;
+                let dy = y as f64 - CY;
+                let inside = (dx * dx + dy * dy).sqrt() <= R;
+                let c: [u8; 4] = if inside {
+                    [20, 20, 20, 255]
+                } else {
+                    [230, 230, 230, 255]
+                };
+                let i = ((y * w + x) * 4) as usize;
+                v[i..i + 4].copy_from_slice(&c);
+            }
+        }
+        v
+    }
+
+    fn solid(w: u32, h: u32, c: [u8; 4]) -> Vec<u8> {
+        let mut v = vec![0u8; (w * h * 4) as usize];
+        for px in v.chunks_exact_mut(4) {
+            px.copy_from_slice(&c);
+        }
+        v
+    }
+
+    /// The exact sequence `handleSelectionClick`/`handleLassoMove`/
+    /// `handleLassoClose` drive: begin, a move-preview, three more committed
+    /// anchors, then a double-click close (which — because a real double-click
+    /// fires TWO `click` events before `dblclick` — commits one real anchor at
+    /// the close point plus one duplicate before closing). Ends by feeding the
+    /// resulting selection into `delete_selection`, the very next thing a real
+    /// session does.
+    #[test]
+    fn full_session_click_sequence_selects_the_disc() {
+        let (w, h) = (80u32, 80u32);
+        let mut t = ImageHorseTool::new(w, h);
+        t.load_image(&disc(w, h));
+        t.recomposite();
+
+        assert!(!t.lasso_active(), "no session before begin");
+
+        // Click 1: begin, loose anchor above the disc.
+        assert!(t.lasso_begin(40.0, 12.0));
+        assert!(t.lasso_active());
+
+        // Mouse-move preview toward the next anchor — must not mutate state.
+        let preview = t.lasso_path_to(68.0, 40.0);
+        assert!(!preview.is_empty(), "preview wire must draw something");
+
+        // Click 2, 3, 4: commit three more loose anchors around the disc.
+        assert_eq!(t.lasso_commit(68.0, 40.0), 2);
+        assert_eq!(t.lasso_commit(40.0, 68.0), 3);
+        assert_eq!(t.lasso_commit(12.0, 40.0), 4);
+
+        let committed = t.lasso_committed_path();
+        assert!(!committed.is_empty(), "committed path must be non-empty");
+
+        // Double-click to close: browsers fire click(anchor5) + click(anchor5
+        // dup) + dblclick, so simulate that exactly like the JS handler does.
+        assert_eq!(t.lasso_commit(40.0, 12.0), 5); // closing click #1 (real)
+        assert_eq!(t.lasso_commit(40.0, 12.0), 6); // closing click #2 (dup)
+        let overlay = t.lasso_close();
+
+        assert!(!t.lasso_active(), "session must end on close");
+        assert!(
+            !overlay.is_empty(),
+            "lasso_close must return a real overlay"
+        );
+        assert_eq!(overlay.len(), (w * h * 4) as usize);
+
+        // The overlay marks alpha>0 wherever selected. Disc centre selected,
+        // background corner not.
+        let alpha_at = |x: u32, y: u32| overlay[((y * w + x) * 4 + 3) as usize];
+        assert!(alpha_at(40, 40) > 0, "disc centre must be selected");
+        assert_eq!(alpha_at(2, 2), 0, "background corner must not be selected");
+        assert_eq!(
+            alpha_at(77, 77),
+            0,
+            "background corner must not be selected"
+        );
+
+        // And delete_selection (the very next thing a real session feeds into)
+        // must actually erase the selected disc, not silently no-op.
+        assert!(t.delete_selection());
+        let data = t.get_image_data();
+        let center_alpha = data[((40 * w + 40) * 4 + 3) as usize];
+        assert_eq!(
+            center_alpha, 0,
+            "deleting the lasso selection must erase the disc centre"
+        );
+    }
+
+    #[test]
+    fn cancel_drops_the_session_without_touching_any_existing_selection() {
+        let (w, h) = (80u32, 80u32);
+        let mut t = ImageHorseTool::new(w, h);
+        t.load_image(&disc(w, h));
+        t.recomposite();
+
+        // An existing plain selection from the wand.
+        let wand_mask = t.magic_wand_select(40.0, 40.0, 20);
+        assert!(!wand_mask.is_empty());
+
+        t.lasso_begin(10.0, 10.0);
+        t.lasso_commit(20.0, 10.0);
+        assert!(t.lasso_active());
+        t.lasso_cancel();
+        assert!(!t.lasso_active(), "Esc must end the session");
+
+        // The wand selection from before the lasso session must be untouched.
+        assert!(
+            t.delete_selection(),
+            "the pre-existing wand selection must survive an Esc-cancelled lasso"
+        );
+    }
+
+    /// Degenerate close: begin, then immediately double-click. `anchors` ends
+    /// up `[begin, dblclick-real, dblclick-dup]` — length 3, which clears the
+    /// `< 3` gate in `lasso_close` even though there are really only two
+    /// distinct positions. It must not panic and must not return a
+    /// mis-sized/garbage overlay; a thin-to-empty selection is the honest
+    /// result of two points enclosing no real area.
+    #[test]
+    fn a_two_point_close_degrades_safely_instead_of_selecting_garbage() {
+        let (w, h) = (80u32, 80u32);
+        let mut t = ImageHorseTool::new(w, h);
+        t.load_image(&disc(w, h));
+        t.recomposite();
+
+        t.lasso_begin(10.0, 10.0);
+        t.lasso_commit(60.0, 60.0); // closing click #1 (real)
+        t.lasso_commit(60.0, 60.0); // closing click #2 (dup, same pixel)
+        let overlay = t.lasso_close();
+
+        assert_eq!(
+            overlay.len(),
+            (w * h * 4) as usize,
+            "overlay stays canvas-sized"
+        );
+        let selected: u32 = overlay.chunks_exact(4).map(|p| (p[3] > 0) as u32).sum();
+        let disc_area = (std::f64::consts::PI * R * R) as u32;
+        assert!(
+            selected < disc_area / 4,
+            "two real points enclose no real area — {selected}px is not a sane disc selection"
+        );
+    }
+
+    /// Regression: a lasso session left open mid-loop used to survive
+    /// `load_image`/`load_image_artboard` — the cost map and anchors kept
+    /// referencing the OLD document's dimensions, so `lasso_active()` still
+    /// read true on the new one and a later commit/close would read past
+    /// the new document's actual size.
+    #[test]
+    fn load_image_clears_any_lasso_session_left_open_from_the_previous_document() {
+        let mut t = ImageHorseTool::new(80, 80);
+        t.load_image(&solid(80, 80, [10, 10, 10, 255]));
+        t.recomposite();
+
+        t.lasso_begin(10.0, 10.0);
+        t.lasso_commit(60.0, 10.0);
+        assert!(t.lasso_active(), "session open on document #1");
+
+        // Same-size reload — isolates "does load_image reset session state"
+        // from the separate `Layer::load` dimension-matching precondition.
+        t.load_image(&solid(80, 80, [200, 200, 200, 255]));
+        assert!(
+            !t.lasso_active(),
+            "a fresh load_image must not inherit the previous document's lasso session"
+        );
+    }
+
+    #[test]
+    fn load_image_artboard_clears_any_lasso_session_left_open_from_the_previous_document() {
+        let mut t = ImageHorseTool::new(80, 80);
+        t.load_image(&solid(80, 80, [10, 10, 10, 255]));
+        t.recomposite();
+
+        t.lasso_begin(10.0, 10.0);
+        t.lasso_commit(60.0, 10.0);
+        assert!(t.lasso_active());
+
+        t.load_image_artboard(
+            &solid(40, 40, [200, 200, 200, 255]),
+            40,
+            40,
+            4,
+            255,
+            255,
+            255,
+            255,
+        );
+        assert!(
+            !t.lasso_active(),
+            "load_image_artboard must not inherit the previous document's lasso session"
+        );
+    }
+}
+
+/// Regression coverage for the `oplog_restore` path specifically: it is the
+/// ONE load path that can reuse a live `ImageHorseTool` across a document
+/// swap (a gallery switch reuses the engine; `oplog_restore` replaces the
+/// document wholesale) rather than constructing a fresh tool — see
+/// `useCloneStamp.ts`'s `restoreFromOplog`. Gated on `tiles` like the rest of
+/// the op-log surface (ADR-017): it does not exist in a bare `cargo test`.
+#[cfg(all(test, feature = "tiles"))]
+mod lasso_oplog_restore_tests {
+    use crate::ImageHorseTool;
+
+    fn solid(w: u32, h: u32, c: [u8; 4]) -> Vec<u8> {
+        let mut v = vec![0u8; (w * h * 4) as usize];
+        for px in v.chunks_exact_mut(4) {
+            px.copy_from_slice(&c);
+        }
+        v
+    }
+
+    #[test]
+    fn oplog_restore_clears_any_lasso_session_left_open_from_the_previous_document() {
+        let mut t = ImageHorseTool::new(80, 80);
+        t.load_image(&solid(80, 80, [10, 10, 10, 255]));
+        t.recomposite();
+
+        t.lasso_begin(10.0, 10.0);
+        t.lasso_commit(60.0, 10.0);
+        assert!(
+            t.lasso_active(),
+            "session open on the document being replaced"
+        );
+
+        // A differently-sized document restored into the SAME live tool, the
+        // way a gallery switch reuses the engine.
+        let restored = t.oplog_restore(&solid(40, 40, [50, 50, 50, 255]), 40, 40, &[], &[], 0);
+        assert!(
+            restored,
+            "restore itself must succeed for this test to mean anything"
+        );
+        assert!(
+            !t.lasso_active(),
+            "oplog_restore must not inherit the previous document's lasso session"
+        );
+    }
+}

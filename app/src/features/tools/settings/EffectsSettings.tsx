@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Wand2, Flame, Cloud, Moon } from "lucide-react";
+import { Wand2, Flame, Cloud, Moon, Sparkles } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ActionTile } from "@/components/ui/action-tile";
@@ -311,6 +311,22 @@ export function EffectsSettings({
               onClick={() => applyPreset(b, c)}
             />
           ))}
+        </div>
+      </div>
+
+      {/* AI Upscale — Real-ESRGAN, not wired yet (moved from the AI tool
+          panel; belongs beside the other pixel-level effects). */}
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-bg-elevated/50 border border-border/50 opacity-60">
+        <Sparkles className="h-5 w-5 shrink-0 text-text-primary/80" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold font-mono text-text-muted">
+              4x Upscale
+            </span>
+            <span className="rounded-full bg-theme-muted/40 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-theme-foreground/70">
+              Coming Soon
+            </span>
+          </div>
         </div>
       </div>
     </div>

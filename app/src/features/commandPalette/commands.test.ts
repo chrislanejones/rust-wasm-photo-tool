@@ -41,6 +41,12 @@ describe("the registry navigates via routes", () => {
     expect(currentHash()).toBe("#/settings/security");
   });
 
+  it("the Eraser (id 'ai') jump-to-tool entry lands on the renamed '#/tool/eraser' route", () => {
+    byId(build(), "tool.ai")!.run();
+    expect(useToolStore.getState().activeTool).toBe("ai");
+    expect(currentHash()).toBe("#/tool/eraser");
+  });
+
   it("every navigating entry produces a route the URL can express", () => {
     // The guarantee behind "one nav path": if an entry moved the app somewhere
     // the grammar can't name, the address bar would quietly go stale.
@@ -62,7 +68,7 @@ describe("sub-mode entries come from the shared table", () => {
   it("covers the registry tools and the not-yet-migrated ones alike", () => {
     const ids = build().map((c) => c.id);
     // Registry modules (Paint / Resize / Adjust & Select)…
-    expect(ids).toContain("mode.brush.erase");
+    expect(ids).toContain("mode.brush.pen");
     expect(ids).toContain("mode.compress.resize");
     expect(ids).toContain("mode.crop.select");
     // …and the legacy lists (Stamps / Shapes).
@@ -73,6 +79,47 @@ describe("sub-mode entries come from the shared table", () => {
   it("labels a sub-mode with the tool's DISPLAY name, not its legacy id", () => {
     expect(byId(build(), "mode.crop.select")!.label).toBe("Adjust & Select › Select");
     expect(byId(build(), "mode.brush.blur")!.label).toBe("Paint › Blur");
+  });
+
+  it("Paint's dead Eraser sub-mode has no palette entry anymore", () => {
+    // Paint lost its 4th toggle tile tonight (now Paint/Blur/Pen, was
+    // Paint/Blur/Pen/Erase) — a stale "mode.brush.erase" entry would let a
+    // user ⌘K their way to a mode the UI no longer offers.
+    const ids = build().map((c) => c.id);
+    expect(ids).not.toContain("mode.brush.erase");
+    const brushModeIds = ids.filter((id) => id.startsWith("mode.brush."));
+    expect(brushModeIds.sort()).toEqual(["mode.brush.blur", "mode.brush.paint", "mode.brush.pen"]);
+  });
+});
+
+describe("the Eraser tool (repurposed 'ai' slot)", () => {
+  it("has exactly one jump-to-tool entry, labeled Eraser (not the old 'AI')", () => {
+    const cmd = byId(build(), "tool.ai")!;
+    expect(cmd.label).toBe("Eraser");
+    expect(cmd.shortcut).toBe("6");
+  });
+
+  it("has no jump-to-sub-mode entries — AISettings is flat buttons, not a ToolModeToggle", () => {
+    // Confirms the brief's suspicion directly: unlike Paint/Shapes/Stamps,
+    // the Eraser isn't in TOOL_MODULES and has no LEGACY_SUBMODES row, so
+    // allToolModes() never emits a "mode.ai.*" id — a user hunting for
+    // "Magic Eraser" or "Background Removal" in the palette will only ever
+    // find the one tool-level "Eraser" entry, not a sub-mode for each action.
+    const ids = build().map((c) => c.id);
+    expect(ids.some((id) => id.startsWith("mode.ai."))).toBe(false);
+  });
+});
+
+describe("Text's sub-modes are not palette-searchable (known gap, not a regression)", () => {
+  // TextSettings.tsx's mode (Text/Background/OCR) is local useState — it was
+  // never threaded through useToolStore the way Paint/Shapes/Stamps/Resize/
+  // Adjust are, so there's no store field for toolModes.ts's LEGACY_SUBMODES
+  // to read even though OCR (new tonight) would otherwise want an entry here.
+  // This predates tonight's OCR move (Text/Background already had it) —
+  // pinned as current behavior, not fixed, per this pass's scope.
+  it("emits no mode.text.* entries at all", () => {
+    const ids = build().map((c) => c.id);
+    expect(ids.some((id) => id.startsWith("mode.text."))).toBe(false);
   });
 });
 

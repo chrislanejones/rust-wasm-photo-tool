@@ -128,22 +128,29 @@ export function SelectSettings({
             </>
           }
         />
-        <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
+        {/* 2-column icon-on-top grid — same tile shape as Paint's sub-mode row
+            (ToolModeToggle/ToolButtonGroup `stacked`). With the lasso behind
+            `ih_smart_edge` this is a clean 2x2; with it off, 3 items lay out
+            2-over-1, which reads fine at this width (checked at 3 sizes). */}
+        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
           {kinds.map(({ id, label, icon: Icon }) => (
             <ToolButton
               key={id}
+              stacked
               active={selection.kind === id}
               disabled={disabled}
               onClick={() => selection.onKindChange(id)}
               title={label}
             >
-              <Icon /> {label}
+              <Icon />
+              {label}
             </ToolButton>
           ))}
         </div>
-        <p className="px-0.5 text-2xs leading-relaxed text-theme-muted-foreground">
-          {activeKind.info}
-        </p>
+        {/* Active kind's name + description — same title+lightbulb pattern as
+            "Selection Tool" above, instead of a permanent paragraph that grew
+            every time a kind's info text did. */}
+        <SectionHeader title={activeKind.label} info={activeKind.info} />
 
         <ToolButton
           active={selection.mode}
