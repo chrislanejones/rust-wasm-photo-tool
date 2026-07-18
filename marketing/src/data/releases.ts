@@ -24,6 +24,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.81",
+    date: "2026-07-18",
+    headline: "Object removal lands — local, free, still dark",
+    entries: [
+      { tag: "rust", text: "A local object-removal kernel merged in: select a region and hit Remove Object, and it reconstructs the hole from the rest of the image — no sign-in, no network, runs entirely on your device. It's PatchMatch (Barnes et al.), single-resolution for now, so a real photo will look a little smeary; that's day one of a few. Ships behind a flag that's off by default — dogfooding before it becomes anyone's default." },
+    ],
+  },
+  {
     version: "v0.9.80",
     date: "2026-07-18",
     headline: "The Features page gets a sidebar worth using",

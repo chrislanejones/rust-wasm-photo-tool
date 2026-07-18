@@ -1,5 +1,7 @@
 # ADR-018: PatchMatch object removal ships as a scalar, single-resolution kernel behind a flag
-Date: 2026-07-18   Status: Draft
+Date: 2026-07-18   Status: Accepted (2026-07-18 — Chris looked at the fill
+on a real canvas with `ih_patchmatch` on and confirmed it worked; merged
+to master with the flag staying OFF, dogfood before defaulting)
 
 ## Context
 Remove Object needs to reconstruct a masked region from the surrounding

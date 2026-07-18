@@ -1882,3 +1882,23 @@ icon per group and per feature, a badge-style count, and a filled active row.
 **Verified against the production build**: `tsc -b` clean, `pnpm run build`
 succeeds, manual pass in Chrome at desktop width plus 320/375/414/768px — no
 horizontal overflow, scrollspy and the collapse both hold up.
+
+## v7.38 — 2026-07-18
+
+**PatchMatch object removal merges to master, still off by default.** Day
+one of a multi-day arc: a scalar PatchMatch nearest-neighbor-field kernel
+(Barnes et al.) reconstructs a masked region from the rest of the image —
+free, local, no sign-in. Single-resolution only; parallel search (day 2)
+and a multi-resolution pyramid (day 3) are next.
+
+| #   | Change                                                                | Status                                                             |
+| --- | ------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| 1   | Scalar PatchMatch NNF core + inpaint fill (`src/patchmatch.rs`)       | Complete — 19 unit tests, seeded/deterministic                    |
+| 2   | Remove Object wired into Adjust & Select's Select mode                | Complete — behind `patchmatch` cargo feature + `ih_patchmatch` flag, both OFF |
+| 3   | Result recorded as a history keyframe, not a replayable op-log entry  | Complete — matches the `rotate_90_cw` / `resize_canvas` precedent  |
+| 4   | ADR-018 accepted                                                      | Complete — confirmed the fill on a real canvas before merging      |
+
+**Verified**: full gate suite green across every feature-flag combination
+(fmt, clippy, `cargo test` — 88/107/188 passing depending on config), `tsc`,
+`vitest`, production build. Default (flag-off) wasm is byte-count-identical
+to the pre-merge baseline; flag-on grows the binary by 6,585 bytes (+0.90%).

@@ -70,13 +70,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.37 — 2026-07-18
+### v7.38 — 2026-07-18
 
-**The Features page sidebar, redone.** It used to be a flat wall of plain-text links — no icons, jammed against the page edge, and both groups hardcoded open regardless of screen size. On a phone that meant all 40 items stacked above the content before you reached a word of the page.
+**A local object-removal kernel lands, still dark.** Select a region with the wand or lasso and hit Remove Object: it reconstructs the hole from the surrounding image with a scalar PatchMatch nearest-neighbor search (Barnes et al.) — no sign-in, no network, runs entirely on your machine. Single-resolution today, so a real photo will look a bit smeary; a multi-resolution pass and parallel search are next.
 
-Now the rail is an inset panel with an icon on every group and every one of the 40 features, a count badge instead of a bare number, and a filled row for whatever you're reading instead of a thin underline. Body headings carry the same icon as their rail entry, so the two read as one list. The groups also respect the screen now: open on desktop, closed on mobile, switching live if you resize across that line.
+It ships behind two flags (a Cargo feature and a localStorage switch), both off by default — the shipped wasm is byte-for-byte identical in size with the feature off. The result records as a history keyframe rather than a replayable undo step, since the algorithm's randomized search can't honestly promise exact replay.
 
-Checked against the production build at 320/375/414/768px plus desktop — no overflow, scroll-tracking and collapse both still work.
+I flipped the flag on locally, ran it on a real canvas, and the fill held up before merging.
 
 ## License
 
