@@ -56,6 +56,28 @@ const SW_MODE: "off" | "on" | "kill" =
       ? "kill"
       : "off";
 
+// One hash per `vite build` invocation, carried by BOTH sides of the skew
+// guard (lib/pwa/skew.ts): `define`d into the JS bundle as __IH_BUILD_HASH__
+// AND written to version.json (network-only — globIgnores keeps it out of
+// the precache). If a stale SW cache serves an old bundle while the server
+// has a new version.json, the pair diverges and the update banner fires.
+// Content-independence is fine here: the hash only ever compares to itself.
+const BUILD_HASH = `${Date.now().toString(36)}-${Math.random()
+  .toString(36)
+  .slice(2, 8)}`;
+
+const versionManifestPlugin = (): PluginOption => ({
+  name: "ih-version-manifest",
+  apply: "build",
+  generateBundle() {
+    this.emitFile({
+      type: "asset",
+      fileName: "version.json",
+      source: JSON.stringify({ buildHash: BUILD_HASH }),
+    });
+  },
+});
+
 const swPlugins = (): PluginOption[] => {
   if (SW_MODE !== "on") return [];
   return [
@@ -95,6 +117,7 @@ const swPlugins = (): PluginOption[] => {
         // NO runtimeCaching key — its absence is the decision (ADR-019).
       },
     }),
+    versionManifestPlugin(),
   ];
 };
 
@@ -105,6 +128,7 @@ export default defineConfig({
     // builds every SW branch is dead code and the minifier drops it — the
     // grep gate + e2e assert that empirically.
     __IH_SW_MODE__: JSON.stringify(SW_MODE),
+    __IH_BUILD_HASH__: JSON.stringify(BUILD_HASH),
   },
   resolve: {
     alias: {

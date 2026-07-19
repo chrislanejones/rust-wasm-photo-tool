@@ -1,3 +1,4 @@
+import { checkBuildSkew } from "./skew";
 import { showUpdateToast } from "./updateToast";
 
 // Service-worker bootstrap. Ships DARK: `__IH_SW_MODE__` is a build-time
@@ -44,6 +45,11 @@ export function setupServiceWorker(): void {
 }
 
 async function registerPrecacheSw(): Promise<void> {
+  // Boot-time skew check, independent of whether registration below succeeds
+  // (a stale ALREADY-INSTALLED worker is exactly the case being probed).
+  // Delayed so the Toaster is mounted if a banner needs to show.
+  window.setTimeout(() => void checkBuildSkew("boot"), BOOT_SETTLE_MS);
+
   let registration: ServiceWorkerRegistration;
   try {
     registration = await navigator.serviceWorker.register("/sw.js");
