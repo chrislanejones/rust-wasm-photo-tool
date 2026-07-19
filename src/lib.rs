@@ -522,6 +522,17 @@ pub struct ImageHorseTool {
     paint_mask: bool,
     paint_mask_value: u8,
     paint_mask_base: Vec<u8>,
+    /// When true the active stroke paints `selection` (the same `Vec<bool>`
+    /// mask wand/lasso/color-range build and `remove_object` consumes)
+    /// instead of pixels or the layer mask — the Magic Eraser brush
+    /// (`magic_eraser_brush_down/move/up`, feature `patchmatch`). Hard edge
+    /// only: a pixel is marked the moment the stroke's coverage there is
+    /// > 0, and marking only ever accumulates within the stroke, never
+    /// un-marks. No base/blend snapshot needed (unlike `paint_mask_base`)
+    /// since there's nothing to fade between — a pixel is either selected
+    /// or it isn't.
+    #[cfg(feature = "patchmatch")]
+    paint_selection_mask: bool,
 
     // ── Effects-brush (blur / pixelate / redaction) stroke state ──────────
     /// 0 = blur, 1 = pixelate, 2 = redaction (set on effect_down).
@@ -834,6 +845,8 @@ impl ImageHorseTool {
             paint_mask: false,
             paint_mask_value: 0,
             paint_mask_base: Vec::new(),
+            #[cfg(feature = "patchmatch")]
+            paint_selection_mask: false,
             effect_mode: 0,
             effect_radius: 0.0,
             effect_intensity: 8,

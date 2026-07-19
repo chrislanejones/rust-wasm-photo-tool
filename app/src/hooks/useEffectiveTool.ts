@@ -8,10 +8,11 @@ import type { useColorPicker } from "./useColorPicker";
 import type { useMoveLayerTool } from "./useMoveLayerTool";
 import type { useDrawingTools } from "./useDrawingTools";
 import type { usePaintTool } from "./usePaintTool";
+import type { useMagicEraserTool } from "./useMagicEraserTool";
 import type { useEmojiTool } from "./useEmojiTool";
 import type { useRedStampTool } from "./useRedStampTool";
 import type { ToolType } from "@/lib/types";
-import type { BrushMode, StampSubMode } from "@/stores/useToolStore";
+import type { BrushMode, EraserMode, StampSubMode } from "@/stores/useToolStore";
 
 type Stamp = ReturnType<typeof useCloneStamp>;
 
@@ -23,6 +24,11 @@ interface UseEffectiveToolParams {
   moveActive: boolean;
   moveLayerTool: ReturnType<typeof useMoveLayerTool>;
   eraserTool: ReturnType<typeof usePaintTool>;
+  /** Local Magic Eraser (PatchMatch) — routed instead of `eraserTool` when
+   *  `eraserMode === "magic"`. Behind `ih_patchmatch`; the hook itself is the
+   *  flag+export guard, so this branch is safe to route to unconditionally. */
+  magicEraserTool: ReturnType<typeof useMagicEraserTool>;
+  eraserMode: EraserMode;
   drawingTools: ReturnType<typeof useDrawingTools>;
   maskEditing: boolean;
   maskTool: ReturnType<typeof usePaintTool>;
@@ -44,6 +50,8 @@ export function useEffectiveTool({
   moveActive,
   moveLayerTool,
   eraserTool,
+  magicEraserTool,
+  eraserMode,
   drawingTools,
   maskEditing,
   maskTool,
@@ -108,10 +116,20 @@ export function useEffectiveTool({
       onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
     };
   // Eraser tool (id "ai" — the old AI slot, repurposed): dragging on the
-  // canvas always erases. No sub-mode to check; the Magic Eraser/Background
+  // canvas erases, EXCEPT in the Magic Eraser sub-mode, which paints a
+  // removal selection instead (magicEraserTool is its own flag+export
+  // guard — safe to route to even on a default build). Background
   // Removal/Object Removal actions in that panel are click-triggered, not
   // canvas-driven, so they don't need a branch here.
   if (activeTool === "ai") {
+    if (eraserMode === "magic") {
+      return {
+        ...stamp,
+        onMouseDown: magicEraserTool.onMouseDown as typeof stamp.onMouseDown,
+        onMouseMove: magicEraserTool.onMouseMove as typeof stamp.onMouseMove,
+        onMouseUp: magicEraserTool.onMouseUp as typeof stamp.onMouseUp,
+      };
+    }
     return {
       ...stamp,
       onMouseDown: eraserTool.onMouseDown as typeof stamp.onMouseDown,

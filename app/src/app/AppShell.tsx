@@ -15,6 +15,7 @@ import { useEmojiTool } from "@/hooks/useEmojiTool";
 import { useMoveLayerTool } from "@/hooks/useMoveLayerTool";
 import { usePastePlacementTool } from "@/hooks/usePastePlacementTool";
 import { usePaintTool } from "@/hooks/usePaintTool";
+import { useMagicEraserTool } from "@/hooks/useMagicEraserTool";
 import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import { useStampTeardown } from "@/hooks/useStampTeardown";
@@ -303,6 +304,10 @@ export function AppShell() {
   const setStampSubMode = useToolStore((s) => s.setStampSubMode);
   const shapesMode = useToolStore((s) => s.shapesMode);
   const setShapesMode = useToolStore((s) => s.setShapesMode);
+  // Eraser tool (id "ai") sub-mode — read here so canvas routing
+  // (useEffectiveTool) and the selection-overlay prop below can see it. The
+  // panel itself (AISettings.tsx) reads/writes the same store field.
+  const eraserMode = useToolStore((s) => s.eraserMode);
   /** Active Crop-tool aspect ratio. `null` ≡ "Free" (no constraint).
    *  Drags in useDrawingTools snap to this ratio via Rust when set. */
   const cropRatio = useToolStore((s) => s.cropRatio);
@@ -1189,6 +1194,20 @@ export function AppShell() {
     maskValue: maskPaintValue,
   });
 
+  // Magic Eraser (Eraser tool → Magic Eraser sub-mode): paints a removal
+  // selection instead of pixels, then fires the PatchMatch fill on release.
+  // Own hook (not another usePaintTool variant) — it drives different Rust
+  // exports (magic_eraser_brush_*) and owns the remove-on-release step,
+  // rather than just forwarding a stroke. Behind `ih_patchmatch`; see the
+  // hook's own doc comment for the flag+export guard.
+  const magicEraserTool = useMagicEraserTool({
+    toolRef: stamp.toolRef,
+    canvasRef,
+    settings: toolSettings,
+    flushToCanvas: stamp.flushToCanvas,
+    syncState: stamp.syncState,
+  });
+
   // Mask edit-mode handlers (wired into the Layers panel). Entering mask edit
   // selects the layer + switches to the Paint brush so strokes hit the mask.
   const { handleAddMask, handleToggleMaskEdit } = useMaskActions(stamp);
@@ -1446,6 +1465,8 @@ export function AppShell() {
     moveActive,
     moveLayerTool,
     eraserTool,
+    magicEraserTool,
+    eraserMode,
     drawingTools,
     maskEditing,
     maskTool,
@@ -2909,7 +2930,19 @@ export function AppShell() {
                       }
                       layerMoveActive={activeTool === "arrow" && moveActive}
                       onSelectionClick={handleSelectionClick}
-                      selectionMask={activeTool === "crop" ? selectionMask : null}
+                      // Gated to the tool(s) that can actually populate this
+                      // mask: Adjust & Select's wand/lasso, or the Magic
+                      // Eraser sub-mode of the Eraser tool (its brush paints
+                      // the same store field — see useMagicEraserTool).
+                      // Without the second clause the mask is still written
+                      // during a Magic Eraser stroke, but this prop zeroes
+                      // it back out before <SelectionOverlay> ever sees it.
+                      selectionMask={
+                        activeTool === "crop" ||
+                        (activeTool === "ai" && eraserMode === "magic")
+                          ? selectionMask
+                          : null
+                      }
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
                       // Magnetic lasso (behind ih_smart_edge). Same routing gate

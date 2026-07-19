@@ -2,9 +2,11 @@
 // useEffectiveTool is pure decision logic (no hooks of its own, no DOM) — it
 // just picks which set of onMouseDown/Move/Up handlers the canvas should get
 // for the currently active tool/sub-mode. Pinning the routing table directly,
-// with special attention to the "ai" (Eraser) branch: it's new tonight and
-// load-bearing — if it regresses, dragging on the Eraser tool silently does
-// nothing (see the module's own doc comment).
+// with special attention to the "ai" (Eraser) branch, which is load-bearing
+// two ways: if the base branch regresses, dragging on the Eraser tool
+// silently does nothing; if the eraserMode === "magic" branch regresses, a
+// Magic Eraser stroke either does nothing or silently falls back to the
+// destructive Brush Eraser (see the module's own doc comment).
 import { describe, it, expect, vi } from "vitest";
 import { useEffectiveTool } from "./useEffectiveTool";
 import type { useCloneStamp } from "./useCloneStamp";
@@ -12,6 +14,7 @@ import type { useColorPicker } from "./useColorPicker";
 import type { useMoveLayerTool } from "./useMoveLayerTool";
 import type { useDrawingTools } from "./useDrawingTools";
 import type { usePaintTool } from "./usePaintTool";
+import type { useMagicEraserTool } from "./useMagicEraserTool";
 import type { useEmojiTool } from "./useEmojiTool";
 import type { useRedStampTool } from "./useRedStampTool";
 import type { ToolType } from "@/lib/types";
@@ -21,6 +24,7 @@ type ColorPicker = ReturnType<typeof useColorPicker>;
 type MoveLayerTool = ReturnType<typeof useMoveLayerTool>;
 type DrawingTools = ReturnType<typeof useDrawingTools>;
 type PaintTool = ReturnType<typeof usePaintTool>;
+type MagicEraserTool = ReturnType<typeof useMagicEraserTool>;
 type EmojiTool = ReturnType<typeof useEmojiTool>;
 type RedStampTool = ReturnType<typeof useRedStampTool>;
 
@@ -59,6 +63,10 @@ function makePaintTool(): PaintTool {
   return mouseHandlers() as unknown as PaintTool;
 }
 
+function makeMagicEraserTool(): MagicEraserTool {
+  return mouseHandlers() as unknown as MagicEraserTool;
+}
+
 function makeEmojiTool(): EmojiTool {
   return mouseHandlers() as unknown as EmojiTool;
 }
@@ -81,6 +89,8 @@ function baseParams(overrides: Partial<Parameters<typeof useEffectiveTool>[0]> =
     moveActive: false,
     moveLayerTool: makeMoveLayerTool(),
     eraserTool: makePaintTool(),
+    magicEraserTool: makeMagicEraserTool(),
+    eraserMode: "brush" as const,
     drawingTools: makeDrawingTools(),
     maskEditing: false,
     maskTool: makePaintTool(),
@@ -127,14 +137,49 @@ describe("useEffectiveTool — the Eraser (ai) branch", () => {
     expect(eraserTool.onMouseDown).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores stampSubMode/brushMode/moveActive — the Eraser has no sub-mode branch", () => {
-    // AISettings is flat buttons, not a ToolModeToggle: nothing about the
-    // Eraser's routing should depend on other tools' sub-mode state.
+  it("ignores stampSubMode/brushMode/moveActive — OTHER tools' sub-mode state never leaks in", () => {
+    // AISettings is flat buttons, not a ToolModeToggle: the Eraser's routing
+    // only ever branches on its own eraserMode (see the Magic Eraser
+    // describe block below), never another tool's sub-mode/toggle state.
     const eraserTool = makePaintTool();
     const a = useEffectiveTool(
       baseParams({ activeTool: "ai", eraserTool, brushMode: "blur", moveActive: true, stampSubMode: "emojis" }),
     );
     expect(a.onMouseDown).toBe(eraserTool.onMouseDown);
+  });
+});
+
+describe("useEffectiveTool — the Magic Eraser sub-mode (ai + eraserMode)", () => {
+  it("brush mode (the default) still routes to eraserTool, not magicEraserTool", () => {
+    const eraserTool = makePaintTool();
+    const magicEraserTool = makeMagicEraserTool();
+    const result = useEffectiveTool(
+      baseParams({ activeTool: "ai", eraserMode: "brush", eraserTool, magicEraserTool }),
+    );
+    expect(result.onMouseDown).toBe(eraserTool.onMouseDown);
+    expect(result.onMouseDown).not.toBe(magicEraserTool.onMouseDown);
+  });
+
+  it("magic mode routes canvas mouse events to magicEraserTool, not eraserTool", () => {
+    const eraserTool = makePaintTool();
+    const magicEraserTool = makeMagicEraserTool();
+    const result = useEffectiveTool(
+      baseParams({ activeTool: "ai", eraserMode: "magic", eraserTool, magicEraserTool }),
+    );
+    expect(result.onMouseDown).toBe(magicEraserTool.onMouseDown);
+    expect(result.onMouseMove).toBe(magicEraserTool.onMouseMove);
+    expect(result.onMouseUp).toBe(magicEraserTool.onMouseUp);
+    expect(result.onMouseDown).not.toBe(eraserTool.onMouseDown);
+  });
+
+  it("actually invokes magicEraserTool.onMouseDown when the returned handler is called", () => {
+    const magicEraserTool = makeMagicEraserTool();
+    const result = useEffectiveTool(
+      baseParams({ activeTool: "ai", eraserMode: "magic", magicEraserTool }),
+    );
+    const fakeEvent = {} as Parameters<Stamp["onMouseDown"]>[0];
+    result.onMouseDown(fakeEvent);
+    expect(magicEraserTool.onMouseDown).toHaveBeenCalledTimes(1);
   });
 });
 

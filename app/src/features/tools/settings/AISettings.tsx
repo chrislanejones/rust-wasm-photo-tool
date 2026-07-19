@@ -14,6 +14,7 @@ import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { useAIJob, type AIResultPixels } from "@/hooks/useAIJob";
 import { useToolStore, type EraserMode } from "@/stores/useToolStore";
+import { isPatchmatchEnabled } from "@/lib/patchmatch";
 import { ObjectRemovalModal } from "./ObjectRemovalModal";
 
 const OPACITY_PRESETS = [25, 50, 75, 100] as const;
@@ -70,9 +71,11 @@ interface AISettingsProps {
   stampToolRef: MutableRefObject<ImageHorseTool | null>;
   /** Called with decoded RGBA pixels when an image model finishes. */
   onAIResult: (r: AIResultPixels) => void;
-  /** Brush Eraser settings — this tool now drives the canvas eraser directly
-   *  (useEffectiveTool routes `activeTool === "ai"` to eraserTool always),
-   *  same size/hardness/opacity fields Paint's old Eraser sub-mode used. */
+  /** Brush Eraser settings — this tool drives the canvas eraser directly
+   *  (useEffectiveTool routes `activeTool === "ai"` to eraserTool in Brush
+   *  mode, magicEraserTool in Magic Eraser mode), same size/hardness/opacity
+   *  fields Paint's old Eraser sub-mode used (Magic Eraser reuses size +
+   *  hardness only — see the `mode === "magic"` branch below). */
   settings: ToolSettings;
   onChange: (s: ToolSettings) => void;
 }
@@ -99,6 +102,16 @@ export function AISettings({
   const mode = useToolStore((s) => s.eraserMode);
   const setMode = useToolStore((s) => s.setEraserMode);
   const activeModeInfo = ERASER_MODES.find((m) => m.id === mode)!;
+  // Magic Eraser — behind `ih_patchmatch` (see lib/patchmatch.ts), same
+  // verification-switch status as SelectSettings.tsx's Remove Object button,
+  // which this mode calls on release. Flag off: ERASER_MODES' static
+  // "Coming soon" text (below), unchanged from before this landed. Flag on:
+  // a real, still-caveated description — not "coming soon" once it's live.
+  const patchmatchEnabled = isPatchmatchEnabled();
+  const headerInfo =
+    mode === "magic" && patchmatchEnabled
+      ? "Drag over an unwanted object and release — it's selected and removed in one stroke (local PatchMatch, runs on your device, no sign-in). Verification switch — day 1, single-resolution, so fill quality is still coarse on a full photo."
+      : activeModeInfo.info;
 
   const canRun = aiEnabled && !!activePhotoId && !!stampToolRef.current;
 
@@ -133,14 +146,13 @@ export function AISettings({
         value={mode}
         onChange={setMode}
       />
-      <SectionHeader title={activeModeInfo.title} info={activeModeInfo.info} />
+      <SectionHeader title={activeModeInfo.title} info={headerInfo} />
 
       {mode === "brush" && (
         <>
           {/* Local, free, no sign-in — useEffectiveTool routes activeTool
-              "ai" straight to eraserTool regardless of this panel's mode, so
-              dragging on canvas always erases even while another tile (e.g.
-              Object Removal) is selected here. */}
+              "ai" to eraserTool while this panel is in Brush mode (magic
+              mode below routes to magicEraserTool instead). */}
           <SizeSlider
             label="Brush Size"
             value={settings.eraserSize}
@@ -168,13 +180,40 @@ export function AISettings({
         </>
       )}
 
-      {mode === "magic" && (
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-theme-muted/40 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-theme-foreground/70">
-            Coming Soon
-          </span>
-        </div>
-      )}
+      {mode === "magic" &&
+        (patchmatchEnabled ? (
+          <>
+            {/* Local, free, no sign-in — drag over the object, release, it's
+                gone. No opacity control: the brush paints a binary
+                selection mask (hard-edge day-1, see the Rust doc comment on
+                `paint_selection_mask`), not alpha-blended pixels, so an
+                opacity slider would promise a gradient this mode doesn't
+                have. Same size/hardness fields Brush Eraser uses above —
+                one physical brush, two different jobs. */}
+            <SizeSlider
+              label="Brush Size"
+              value={settings.eraserSize}
+              min={1}
+              max={100}
+              onChange={(v) => onChange({ ...settings, eraserSize: v })}
+              presets={ERASER_SIZE_PRESETS}
+            />
+            <SizeSlider
+              label="Hardness"
+              value={settings.eraserHardness}
+              onChange={(v) => onChange({ ...settings, eraserHardness: v })}
+              presets={HARDNESS_PRESETS}
+              variant="numbers"
+              unit="%"
+            />
+          </>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-theme-muted/40 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-theme-foreground/70">
+              Coming Soon
+            </span>
+          </div>
+        ))}
 
       {(mode === "rembg" || mode === "inpaint") && (
         <>

@@ -395,6 +395,35 @@ impl ImageHorseTool {
         let w = self.width as i32;
         let active = self.active;
 
+        // Magic Eraser stroke: mark `selection` bits, touch no pixels or layer
+        // mask at all. Hard edge + monotonic — any nonzero coverage in this
+        // dab marks the pixel, and a pixel already marked earlier in the
+        // stroke never gets unmarked by a later dab. Handled first + returns,
+        // same shape as the `paint_mask` branch below. Gated on the same
+        // feature as the field itself — a default build never has either.
+        #[cfg(feature = "patchmatch")]
+        if self.paint_selection_mask {
+            let cov = &self.paint_cov;
+            let Some(sel) = self.selection.as_mut() else {
+                return;
+            };
+            if sel.len() != cov.len() {
+                return;
+            }
+            for py in min_y..=max_y {
+                for px in min_x..=max_x {
+                    let i = (py * w + px) as usize;
+                    if i >= sel.len() || i >= cov.len() {
+                        continue;
+                    }
+                    if cov[i] > 0 {
+                        sel[i] = true;
+                    }
+                }
+            }
+            return;
+        }
+
         // Mask stroke: scrub the dab's coverage×opacity toward `paint_mask_value`
         // over the mask snapshot, writing the active layer's grayscale mask. The
         // compositor (render_layer) turns that into a live reveal/hide. Handled
@@ -674,6 +703,76 @@ impl ImageHorseTool {
         self.paint_up()
     }
 
+    /// Magic Eraser brush (feature `patchmatch`): paints into `selection` —
+    /// the SAME `Vec<bool>` mask wand / lasso / color-range build and
+    /// `remove_object` consumes — using this same dab/coverage/stabilizer
+    /// engine, instead of painting pixels or a layer's grayscale mask. Day-1
+    /// scope is hard-edge only (see `recomposite_stroke_bbox`'s
+    /// `paint_selection_mask` branch); soft/anti-aliased masks are later
+    /// polish (arc day-4).
+    ///
+    /// Starts a FRESH selection each stroke (replaces, doesn't extend, any
+    /// prior selection) — one continuous paint gesture is one removal
+    /// region, matching "paint, release, it fills." Touches no layer pixels
+    /// or mask, and does not snap history or record an op-log entry: this
+    /// stroke marks WHAT to remove, it is not itself an edit.
+    /// `remove_object` (unchanged) is what actually mutates pixels, snaps,
+    /// and consumes this selection, once the caller confirms.
+    #[cfg(feature = "patchmatch")]
+    pub fn magic_eraser_brush_down(
+        &mut self,
+        x: f64,
+        y: f64,
+        size: f64,
+        hardness: f64,
+        stab: &str,
+    ) {
+        let n = (self.width * self.height) as usize;
+        if n == 0 {
+            return;
+        }
+        self.selection = Some(vec![false; n]);
+        self.paint_cov = vec![0u8; n];
+        self.paint_base = Vec::new();
+        self.paint_mask = false;
+        self.paint_selection_mask = true;
+        self.paint_erase = false;
+        #[cfg(feature = "tiles")]
+        {
+            self.rec_stroke = None;
+        }
+        self.paint_hardness = hardness.clamp(0.0, 1.0) as f32;
+        let radius = (size * 0.5).max(0.0);
+        self.paint_radius = radius;
+        self.paint_leash = Self::leash_for(stab);
+        self.paint_last = Some((x, y));
+        self.paint_raw = (x, y);
+        // Colour/opacity are irrelevant when marking a selection; paint_dab
+        // still routes through recomposite_stroke_bbox, which the
+        // paint_selection_mask branch intercepts before any pixel math runs.
+        self.paint_dab(x, y, radius, 0, 0, 0, 1.0);
+        if self.paint_leash > 0.0 {
+            self.paint_stab_begin(x, y);
+        }
+    }
+
+    /// Continue the active Magic Eraser stroke. True if it marked more of the mask.
+    #[cfg(feature = "patchmatch")]
+    pub fn magic_eraser_brush_move(&mut self, x: f64, y: f64) -> bool {
+        self.paint_move(x, y)
+    }
+
+    /// End the active Magic Eraser stroke. Returns whether anything ended up
+    /// selected — the caller (JS) checks this before invoking `remove_object`,
+    /// the same non-empty guard `remove_object` applies internally.
+    #[cfg(feature = "patchmatch")]
+    pub fn magic_eraser_brush_up(&mut self) -> bool {
+        self.paint_up();
+        self.selection
+            .as_ref()
+            .is_some_and(|m| m.iter().any(|&b| b))
+    }
+
     /// Continue the active stroke toward (x, y). Returns true if it painted.
     pub fn paint_move(&mut self, x: f64, y: f64) -> bool {
         self.paint_raw = (x, y);
@@ -710,10 +809,18 @@ impl ImageHorseTool {
             );
         }
         // Op-log recorder: the stroke is complete (stabilizer catch-up
-        // included) — commit it as one op. Mask strokes never record.
+        // included) — commit it as one op. Mask strokes and Magic Eraser
+        // selection strokes never record (neither touches a pixel).
         #[cfg(feature = "tiles")]
         if let Some((pts, brush)) = self.rec_stroke.take() {
-            if !self.paint_mask && !pts.is_empty() {
+            // A default (non-`patchmatch`) build never has a selection-mask
+            // stroke to exclude, so this reads as a plain `false` there —
+            // same technique used below for the field reset.
+            #[cfg(feature = "patchmatch")]
+            let is_selection_stroke = self.paint_selection_mask;
+            #[cfg(not(feature = "patchmatch"))]
+            let is_selection_stroke = false;
+            if !self.paint_mask && !is_selection_stroke && !pts.is_empty() {
                 self.oplog_record(crate::ops::Op::Stroke { points: pts, brush });
             }
         }
@@ -724,6 +831,10 @@ impl ImageHorseTool {
         self.paint_erase = false;
         self.paint_mask = false;
         self.paint_mask_base = Vec::new();
+        #[cfg(feature = "patchmatch")]
+        {
+            self.paint_selection_mask = false;
+        }
         painted
     }
 
@@ -976,5 +1087,114 @@ mod smart_brush_tests {
         // Zero / negative radius has no bbox at all.
         assert!(dab_bbox(W as i32, H as i32, 5.0, 5.0, 0.0).is_none());
         assert!(dab_bbox(W as i32, H as i32, -50.0, -50.0, 2.0).is_none());
+    }
+}
+
+/// Session-level coverage for the Magic Eraser brush
+/// (`magic_eraser_brush_down/move/up`) — drives the real wasm-bindgen
+/// methods on a full `ImageHorseTool`, same style as
+/// `selection::lasso_session_tests`, since the thing under test is the
+/// session bookkeeping (does painting actually land in `selection`, does it
+/// touch pixels, does it reset between strokes) not the pure dab kernel
+/// (already covered by `smart_brush_tests` and `patchmatch`'s own tests).
+#[cfg(all(test, feature = "patchmatch"))]
+mod magic_eraser_brush_tests {
+    use crate::ImageHorseTool;
+
+    fn solid(w: u32, h: u32, c: [u8; 4]) -> Vec<u8> {
+        let mut v = vec![0u8; (w * h * 4) as usize];
+        for px in v.chunks_exact_mut(4) {
+            px.copy_from_slice(&c);
+        }
+        v
+    }
+
+    #[test]
+    fn a_stroke_marks_selection_and_touches_no_pixels() {
+        let mut t = ImageHorseTool::new(40, 40);
+        t.load_image(&solid(40, 40, [200, 100, 50, 255]));
+        let before = t.export_png();
+
+        t.magic_eraser_brush_down(20.0, 20.0, 10.0, 1.0, "off");
+        t.magic_eraser_brush_move(22.0, 20.0);
+        let had_selection = t.magic_eraser_brush_up();
+
+        assert!(
+            had_selection,
+            "a brush stroke over the canvas should mark something"
+        );
+        assert_eq!(
+            t.export_png(),
+            before,
+            "the brush marks a mask — it must not touch a single pixel"
+        );
+    }
+
+    #[test]
+    fn the_marked_mask_is_the_same_shape_remove_object_consumes() {
+        // Not exercising remove_object itself (that's selection.rs's own
+        // tests) — just pinning that the brush leaves behind a selection
+        // (Some(Vec<bool>) sized w*h) in the exact shape `remove_object`'s
+        // `self.selection.take()` expects, same as wand/lasso already do.
+        let mut t = ImageHorseTool::new(30, 20);
+        t.load_image(&solid(30, 20, [10, 10, 10, 255]));
+        t.magic_eraser_brush_down(15.0, 10.0, 6.0, 1.0, "off");
+        t.magic_eraser_brush_up();
+        assert!(t.selection.as_ref().is_some_and(|m| m.len() == 30 * 20));
+    }
+
+    #[test]
+    fn a_new_stroke_replaces_rather_than_extends_the_previous_one() {
+        let mut t = ImageHorseTool::new(40, 40);
+        t.load_image(&solid(40, 40, [0, 0, 0, 255]));
+
+        t.magic_eraser_brush_down(5.0, 5.0, 3.0, 1.0, "off");
+        t.magic_eraser_brush_up();
+        let first_count = t.selection.as_ref().unwrap().iter().filter(|&&b| b).count();
+        assert!(first_count > 0);
+
+        // A second, disjoint stroke well away from the first.
+        t.magic_eraser_brush_down(35.0, 35.0, 3.0, 1.0, "off");
+        t.magic_eraser_brush_up();
+        let sel = t.selection.as_ref().unwrap();
+        // The first stroke's region must be gone — a fresh stroke replaces,
+        // it does not accumulate ACROSS separate press/release gestures.
+        assert!(
+            !sel[5 * 40 + 5],
+            "the previous stroke's mark should not survive a new stroke"
+        );
+        assert!(
+            sel.iter().any(|&b| b),
+            "the new stroke should have marked something"
+        );
+    }
+
+    #[test]
+    fn releasing_with_nothing_painted_reports_no_selection() {
+        let mut t = ImageHorseTool::new(20, 20);
+        t.load_image(&solid(20, 20, [0, 0, 0, 255]));
+        // down/up with a zero-radius dab that lands nothing (mirrors
+        // dab_bbox's own "no bbox at all" degenerate case above).
+        t.magic_eraser_brush_down(10.0, 10.0, 0.0, 1.0, "off");
+        let had_selection = t.magic_eraser_brush_up();
+        assert!(!had_selection);
+    }
+
+    #[test]
+    #[cfg(feature = "tiles")]
+    fn a_selection_mask_stroke_does_not_record_into_the_op_log() {
+        // Mirrors the mask-brush precedent this feature copies: neither kind
+        // of non-pixel stroke should ever show up as a replayable Op::Stroke.
+        let mut t = ImageHorseTool::new(40, 40);
+        t.load_image(&solid(40, 40, [5, 5, 5, 255]));
+        let before = t.oplog_op_count();
+        t.magic_eraser_brush_down(20.0, 20.0, 8.0, 1.0, "off");
+        t.magic_eraser_brush_move(22.0, 20.0);
+        t.magic_eraser_brush_up();
+        assert_eq!(
+            t.oplog_op_count(),
+            before,
+            "a selection-mask stroke touches no pixels, so it must not record an op"
+        );
     }
 }
