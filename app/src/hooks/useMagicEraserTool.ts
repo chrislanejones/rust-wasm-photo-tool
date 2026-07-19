@@ -76,6 +76,19 @@ export function useMagicEraserTool({
 }: Opts) {
   const painting = useRef(false);
   const setSelectionMask = useToolStore((s) => s.setSelectionMask);
+  // `selection_overlay()` is O(image size) — a full-image allocation + a
+  // boundary scan over every pixel in Rust, then a second full-image copy
+  // (`SelectionOverlay`'s own `putImageData`) downstream of every
+  // `setSelectionMask` call. Calling that on every raw mousemove event is
+  // fine on a small canvas but not on a real multi-megapixel photo: a fast
+  // drag can fire mousemove 100+ times/sec, which floods the main thread
+  // with tens of MB/sec of allocation and repaint work and hangs the tab —
+  // caught via a real freeze on a 1385x2068 test image. Coalesce the overlay
+  // refresh to at most once per animation frame via these two refs; the
+  // brush stroke itself (`magic_eraser_brush_move`) stays uncapped below
+  // since marking dabs is cheap (bounded by brush radius, not image size).
+  const rafPending = useRef(false);
+  const rafTool = useRef<MagicEraserWasmExports | null>(null);
 
   const coords = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -98,6 +111,24 @@ export function useMagicEraserTool({
     [setSelectionMask],
   );
 
+  const scheduleOverlay = useCallback(
+    (t: MagicEraserWasmExports) => {
+      rafTool.current = t;
+      if (rafPending.current) return;
+      rafPending.current = true;
+      requestAnimationFrame(() => {
+        rafPending.current = false;
+        const tool = rafTool.current;
+        rafTool.current = null;
+        // The stroke may have already ended (onMouseUp) by the time this
+        // frame callback runs — skip so a late overlay doesn't flash back in
+        // after the mask was already cleared.
+        if (tool && painting.current) pushOverlay(tool);
+      });
+    },
+    [pushOverlay],
+  );
+
   const onMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const t = toolRef.current;
@@ -118,7 +149,7 @@ export function useMagicEraserTool({
         settings.eraserHardness / 100,
         settings.paintStabilizer,
       );
-      pushOverlay(t);
+      pushOverlay(t); // one-off — fine to run immediately, it's a single call
     },
     [
       toolRef,
@@ -137,14 +168,15 @@ export function useMagicEraserTool({
       if (!t || !hasMagicEraserExports(t)) return;
       const { x, y } = coords(e);
       t.magic_eraser_brush_move(x, y);
-      pushOverlay(t);
+      scheduleOverlay(t);
     },
-    [toolRef, coords, pushOverlay],
+    [toolRef, coords, scheduleOverlay],
   );
 
   const onMouseUp = useCallback(() => {
     if (!painting.current) return;
     painting.current = false;
+    rafTool.current = null;
     const t = toolRef.current;
     if (!t || !hasMagicEraserExports(t)) {
       setSelectionMask(null);
