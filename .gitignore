@@ -32,6 +32,9 @@ skills-lock.json
 
 # Build output (Netlify builds from source)
 www-dist
+# VITE_ENABLE_SW=1 build for the SW e2e harness (playwright.sw.config.ts) —
+# kept separate so an SW-enabled build never masquerades as a default build
+www-dist-sw
 
 # Windows/WSL alternate-data-stream artifacts
 *:Zone.Identifier
