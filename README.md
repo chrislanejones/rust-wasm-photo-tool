@@ -70,11 +70,11 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.39 — 2026-07-18
+### v7.40 — 2026-07-18
 
-**The AI tool is now the Eraser tool.** Same toolbar slot, new icon, one consolidated panel: Brush Eraser (drag on canvas, local, free, no sign-in — it used to live under Paint) sits alongside Magic Eraser, Background Removal, and Object Removal. Magic Eraser is the local PatchMatch kernel from v7.38, marked Coming Soon until it's actually wired into this panel.
+**Preference storage got a real safety net.** The three Zustand stores that remember your preferences across reloads (which sub-mode each tool was on, your command-palette habits, the savings badge) used to trust whatever came back out of IndexedDB verbatim. Since that storage is writable by any script on the origin, a stale or corrupted value could silently land in state as something the running code no longer recognizes. Each store now validates every remembered field on load and falls back to the default for anything it doesn't recognize.
 
-4× Upscale's placeholder moved to Effects, text extraction moved to the Text tool, and two placeholder cards that never did anything — Smart Crop, Auto-Enhance — are gone. Nothing that worked before stopped working; the panel's just smaller and clearer.
+The Eraser panel's own mode (Eraser / Magic Eraser / Background Removal / Object Removal) also moved out of that panel's own memory and into the shared store, alongside the other tools' sub-modes — a small internal move, no visible change, but it's what lets the canvas eventually know which of the four is selected.
 
 ## License
 

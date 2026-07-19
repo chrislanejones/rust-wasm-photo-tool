@@ -87,11 +87,25 @@ These come **after** the store migration: once state lives in stores, the big ef
 
 Stores that hold "remember my choice" preferences are backed by **IndexedDB** via a hand-rolled Zustand adapter (`app/src/stores/storage/idbStorage.ts`, DB `image-horse-zustand`) — see [IndexedDB Investigation](IndexedDB-Investigation.md). The adapter de-dupes writes (§7.5).
 
-- **`useUIStore`** persists **only `masterTab`** — a pure "remember my last view" pref. The notice-dismissed flags are **not** persisted: they're session/stretch-scoped by design (re-armed on resize), so persisting them would contradict that. Transient flags (dialogs, celebration, diagnostics, upload) are never persisted — they'd re-open on reload.
-- **`useToolStore`** persists only the **pure sub-mode prefs** (`brushMode`, `effectsMode`, `stampSubMode`, `shapesMode`) — UI routing flags with no engine coupling, so no rehydrate→WASM sync is needed.
+- **`useUIStore`** persists **`masterTab`** (a pure "remember my last view" pref) plus **`recentCommands`/`commandUsage`** (the command-palette recency/usage prefs). The notice-dismissed flags are **not** persisted: they're session/stretch-scoped by design (re-armed on resize), so persisting them would contradict that. Transient flags (dialogs, celebration, diagnostics, upload) are never persisted — they'd re-open on reload.
+- **`useToolStore`** persists only the **pure sub-mode prefs** (`brushMode`, `stampSubMode`, `shapesMode`, `eraserMode`) — UI routing flags with no engine coupling, so no rehydrate→WASM sync is needed.
   - **Not yet persisted (engine-coupled):** `stampSettings` / `toolSettings` push into the WASM engine (`stamp.setBrushSize/…`), so persisting them needs a one-time sync of the rehydrated value into the engine (via `persist`'s `onRehydrateStorage`, or an effect after hydration). Deferred to the AppShell wiring.
   - **Never persisted:** `activeTool` (start on the default tool, not mid-edit), `selectionMask` / `selectionMode` (transient).
-- **`useGalleryStore`** is **not** persisted through Zustand at all — the gallery is large and dynamic; its data lives in the dedicated content databases (and, going forward, the [Dexie](IndexedDB-Investigation.md) `photos` table) / WASM memory.
+- **`useGalleryStore`** persists only **`imageSavings`** (the Zap-savings badge, keyed by photo id) through Zustand. The photo list itself is **not** persisted here — it's rebuilt from the gallery manifest / dedicated content databases (and, going forward, the [Dexie](IndexedDB-Investigation.md) `photos` table), which stay the source of truth for anything beyond that one badge.
+
+### 6.1 Hydration is validated, not trusted
+
+IndexedDB is same-origin-writable — another tab, a stale cached build, or a
+future rename/narrowing of one of the union types above can leave a
+rehydrated blob carrying a value the running code doesn't recognize. All
+three persisted stores guard against this in their `persist` config's
+`merge` (not `migrate` — `migrate` only runs on a version bump; `merge` runs
+on **every** rehydrate, which is what a standing guard needs): each
+partialized field is checked against its current allowed values
+(`validated`/`validatedStringArray`/`validatedNumberRecord`/`validatedRecord`
+in `stores/_shared.ts`) and falls back to the freshly-constructed default
+rather than rehydrating as-is. See `stores/persistence.test.ts` for the
+partialize-contract + fallback-behavior tests.
 
 ---
 

@@ -10,7 +10,7 @@ import { idbStorage } from "./storage/idbStorage";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { GalleryManifest } from "@/lib/galleryManifest";
 import { DEFAULT_PHOTO_LIMIT } from "@/lib/photoLimits";
-import { resolveSet, type SetArg } from "./_shared";
+import { resolveSet, validatedRecord, type SetArg } from "./_shared";
 
 interface GalleryState {
   photos: PhotoEntry[];
@@ -83,6 +83,20 @@ export const useGalleryStore = create<GalleryState>()(
       partialize: (s): Partial<GalleryState> => ({
         imageSavings: s.imageSavings,
       }),
+      // Same hydration guard as the other persisted stores (runs every
+      // rehydrate, not just on a version bump). imageSavings has no fixed key
+      // set — it's keyed by photo id — so this only checks it's actually a
+      // plain object; a corrupted/non-object blob falls back to `{}` rather
+      // than rehydrating as something the savings badge can't read.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<GalleryState>;
+        return {
+          ...current,
+          imageSavings: p.imageSavings
+            ? (validatedRecord(p.imageSavings) as GalleryState["imageSavings"])
+            : current.imageSavings,
+        };
+      },
     },
   ),
 );

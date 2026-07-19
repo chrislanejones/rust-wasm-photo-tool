@@ -13,6 +13,7 @@ import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { useAIJob, type AIResultPixels } from "@/hooks/useAIJob";
+import { useToolStore, type EraserMode } from "@/stores/useToolStore";
 import { ObjectRemovalModal } from "./ObjectRemovalModal";
 
 const OPACITY_PRESETS = [25, 50, 75, 100] as const;
@@ -20,8 +21,6 @@ const HARDNESS_PRESETS = [25, 50, 75, 100] as const;
 const ERASER_SIZE_PRESETS = [8, 16, 32, 64] as const;
 
 type LiveType = "rembg" | "inpaint";
-
-type EraserMode = "brush" | "magic" | "rembg" | "inpaint";
 
 // Deliberately NOT ToolModeToggle — that component mysteriously fails to
 // re-render its render-prop body in this file's sibling TextSettings.tsx
@@ -94,7 +93,11 @@ export function AISettings({
   const [lastType, setLastType] = useState<LiveType | null>(null);
   const [showObjModal, setShowObjModal] = useState(false);
   const [objSource, setObjSource] = useState<Uint8Array | null>(null);
-  const [mode, setMode] = useState<EraserMode>("brush");
+  // Lives in the shared tool store (not local state) so canvas routing
+  // (useEffectiveTool) can see which sub-mode is selected — the prerequisite
+  // for Magic Eraser to receive paint strokes once that routing lands.
+  const mode = useToolStore((s) => s.eraserMode);
+  const setMode = useToolStore((s) => s.setEraserMode);
   const activeModeInfo = ERASER_MODES.find((m) => m.id === mode)!;
 
   const canRun = aiEnabled && !!activePhotoId && !!stampToolRef.current;

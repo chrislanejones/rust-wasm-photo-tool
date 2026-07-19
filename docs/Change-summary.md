@@ -1922,3 +1922,26 @@ in one panel.
 **Verified**: `tsc --noEmit` clean, `cargo fmt`/`clippy -D warnings` clean,
 `cargo test` 96/96 passing (app-side `vitest` 164/164), production build
 succeeds against the default wasm.
+
+## v7.40 — 2026-07-18
+
+**The three persisted Zustand stores stopped trusting IndexedDB blindly.**
+An audit of `useToolStore` / `useUIStore` / `useGalleryStore` found that
+`persist`'s default hydration merges whatever comes back from storage
+verbatim — but that storage is same-origin-writable (another tab, a stale
+cached build, a future rename or narrowing of one of the sub-mode unions),
+and nothing re-checked it against the running code's current types.
+
+| #   | Change                                                                    | Status                                                                    |
+| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | Each store's `persist` config gained a `merge` that validates every partialized field against its current allowed values | Complete — falls back to the in-code default for anything stale/corrupted; runs every rehydrate, not just on a version bump |
+| 2   | New `validated` / `validatedStringArray` / `validatedNumberRecord` / `validatedRecord` helpers in `stores/_shared.ts` | Complete                                                                  |
+| 3   | Eraser panel's mode (Eraser / Magic Eraser / Background Removal / Object Removal) lifted from `AISettings.tsx` local state into `useToolStore.eraserMode` | Complete — matches `brushMode`/`stampSubMode`/`shapesMode`; pure relocation, routing unchanged |
+| 4   | `stores/persistence.test.ts` — partialize key-set + fallback-behavior tests for all three stores | Complete — 12 new tests                                                   |
+| 5   | `docs/State-Management.md` §6 corrected (it had drifted — claimed `useGalleryStore` wasn't persisted at all, and listed a `useUIStore` partialize set missing `recentCommands`/`commandUsage`) and a new §6.1 documents the guard | Complete |
+
+**Verified**: `tsc --noEmit` clean, 176/176 vitest passing (12 new),
+production build succeeds. Live-checked in Chrome: `eraserMode` round-trips
+through a real page reload via IndexedDB, and canvas routing
+(`useEffectiveTool`) keeps sending the brush eraser regardless of which
+panel tile is selected.

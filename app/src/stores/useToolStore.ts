@@ -10,16 +10,31 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
-import { resolveSet, type SetArg } from "./_shared";
+import { resolveSet, validated, type SetArg } from "./_shared";
 import { idbStorage } from "./storage/idbStorage";
 
 /** Paint sub-modes (Paint tool): freehand paint, blur brush, Bézier pen, or
  *  the eraser (scrubs the active layer's alpha). */
-export type BrushMode = "paint" | "blur" | "pen" | "erase";
+export const BRUSH_MODES = ["paint", "blur", "pen", "erase"] as const;
+export type BrushMode = (typeof BRUSH_MODES)[number];
 /** Stamp tool sub-modes. */
-export type StampSubMode = "clone" | "red" | "emojis";
+export const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;
+export type StampSubMode = (typeof STAMP_SUB_MODES)[number];
 /** Shapes tool sub-modes. */
-export type ShapesMode = "shapes" | "pens" | "arrows";
+export const SHAPES_MODES = ["shapes", "pens", "arrows"] as const;
+export type ShapesMode = (typeof SHAPES_MODES)[number];
+/** Eraser tool (id "ai") sub-modes: `brush` = drag-to-erase on the canvas;
+ *  `magic` = local Magic Eraser (PatchMatch); `rembg` = Background Removal and
+ *  `inpaint` = Object Removal (both Replicate-backed). Lifted out of
+ *  AISettings.tsx local state so the selected mode is visible to canvas
+ *  routing (useEffectiveTool) — the prerequisite for Magic Eraser to receive
+ *  paint strokes. Routing still sends "ai" straight to the brush eraser
+ *  today; the magic branch lands with the canvas-interaction wiring.
+ *  Named `ERASER_MODE_VALUES` (not `ERASER_MODES`) — AISettings.tsx already
+ *  has a richer `ERASER_MODES` (icon/label/info per tile); this is just the
+ *  bare value tuple for hydration validation. */
+export const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
+export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
 export type ResizeMode = "compress" | "resize";
@@ -64,6 +79,7 @@ interface ToolState {
   colorPickerActive: boolean;
   stampSubMode: StampSubMode;
   shapesMode: ShapesMode;
+  eraserMode: EraserMode;
   /** Active Crop aspect ratio; `null` ≡ "Free" (no constraint). */
   cropRatio: [number, number] | null;
   selectionTolerance: number;
@@ -86,6 +102,7 @@ interface ToolState {
   setColorPickerActive: (v: SetArg<boolean>) => void;
   setStampSubMode: (v: SetArg<StampSubMode>) => void;
   setShapesMode: (v: SetArg<ShapesMode>) => void;
+  setEraserMode: (v: SetArg<EraserMode>) => void;
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
   setSelectionMode: (v: SetArg<boolean>) => void;
@@ -112,6 +129,7 @@ export const useToolStore = create<ToolState>()(
       colorPickerActive: false,
       stampSubMode: "clone",
       shapesMode: "shapes",
+      eraserMode: "brush",
       cropRatio: null,
       selectionTolerance: 24,
       selectionMode: false,
@@ -141,6 +159,7 @@ export const useToolStore = create<ToolState>()(
       setStampSubMode: (v) =>
         set((s) => ({ stampSubMode: resolveSet(v, s.stampSubMode) })),
       setShapesMode: (v) => set((s) => ({ shapesMode: resolveSet(v, s.shapesMode) })),
+      setEraserMode: (v) => set((s) => ({ eraserMode: resolveSet(v, s.eraserMode) })),
       setCropRatio: (v) => set((s) => ({ cropRatio: resolveSet(v, s.cropRatio) })),
       setSelectionTolerance: (v) =>
         set((s) => ({ selectionTolerance: resolveSet(v, s.selectionTolerance) })),
@@ -169,7 +188,25 @@ export const useToolStore = create<ToolState>()(
         brushMode: s.brushMode,
         stampSubMode: s.stampSubMode,
         shapesMode: s.shapesMode,
+        eraserMode: s.eraserMode,
       }),
+      // Runs on every rehydrate (unlike `migrate`, which only fires on a
+      // version bump) — the persisted blob is same-origin-writable IndexedDB,
+      // not a value this code just wrote, so each partialized field is
+      // checked against ITS CURRENT union before it's allowed to overwrite
+      // the freshly-constructed default. A value from an old build that
+      // dropped/renamed a sub-mode rehydrates to the default instead of
+      // silently landing in state as a value the running code can't switch on.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<ToolState>;
+        return {
+          ...current,
+          brushMode: validated(p.brushMode, BRUSH_MODES, current.brushMode),
+          stampSubMode: validated(p.stampSubMode, STAMP_SUB_MODES, current.stampSubMode),
+          shapesMode: validated(p.shapesMode, SHAPES_MODES, current.shapesMode),
+          eraserMode: validated(p.eraserMode, ERASER_MODE_VALUES, current.eraserMode),
+        };
+      },
     },
   ),
 );

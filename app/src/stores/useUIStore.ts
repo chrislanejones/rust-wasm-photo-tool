@@ -13,7 +13,13 @@
 // evicted from AppShell's local useState in the stage-1 dismantle.
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { resolveSet, type SetArg } from "./_shared";
+import {
+  resolveSet,
+  validated,
+  validatedNumberRecord,
+  validatedStringArray,
+  type SetArg,
+} from "./_shared";
 import { idbStorage } from "./storage/idbStorage";
 import type { UserMode } from "@/components/StatusBar";
 import type { SettingsTab } from "@/components/SubscriptionButton";
@@ -25,7 +31,8 @@ let loadInterval: ReturnType<typeof setInterval> | null = null;
 let finishTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Compact master-bar active tab (≤1000px). */
-export type MasterTab = "tools" | "gallery" | "review";
+export const MASTER_TABS = ["tools", "gallery", "review"] as const;
+export type MasterTab = (typeof MASTER_TABS)[number];
 
 interface UIState {
   showUpload: boolean;
@@ -256,6 +263,25 @@ export const useUIStore = create<UIState>()(
         recentCommands: s.recentCommands,
         commandUsage: s.commandUsage,
       }),
+      // Same hydration guard as useToolStore: runs every rehydrate, not just
+      // on a version bump. masterTab is checked against its current union;
+      // recentCommands/commandUsage have no fixed key set (command ids come
+      // from the palette registry, which changes), so they're only shape-
+      // checked — a non-array/non-object blob falls back to empty rather than
+      // rehydrating as something the reducers below don't expect.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<UIState>;
+        return {
+          ...current,
+          masterTab: validated(p.masterTab, MASTER_TABS, current.masterTab),
+          recentCommands: p.recentCommands
+            ? validatedStringArray(p.recentCommands)
+            : current.recentCommands,
+          commandUsage: p.commandUsage
+            ? validatedNumberRecord(p.commandUsage)
+            : current.commandUsage,
+        };
+      },
     },
   ),
 );

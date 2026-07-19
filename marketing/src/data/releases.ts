@@ -24,6 +24,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.83",
+    date: "2026-07-18",
+    headline: "Preferences stop trusting storage blindly",
+    entries: [
+      { tag: "infra", text: "The three stores that remember your preferences across a reload — which tool sub-mode you were on, your command-palette habits, the savings badge — used to trust whatever came back out of browser storage as-is. They now check it against what the app actually understands before using it, and fall back to a sane default for anything they don't recognize." },
+    ],
+  },
+  {
     version: "v0.9.82",
     date: "2026-07-18",
     headline: "The AI tool becomes the Eraser tool",
