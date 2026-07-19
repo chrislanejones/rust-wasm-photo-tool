@@ -19,6 +19,7 @@ import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { useGuidesStore } from "@/stores/useGuidesStore";
+import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
@@ -368,6 +369,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // Spacebar-pan now comes straight from the UI store — it was prop-drilled
     // from AppShell before stage 1. (Compare state is read inside CompareSlider.)
     const isPanning = useUIStore((s) => s.isPanning);
+    // Eraser-tool sub-mode, for the brush-size ring below: the brush eraser
+    // and Magic Eraser are canvas brushes (ring shown), rembg/inpaint are
+    // click-actions (arrow kept). Read from the store — `activeTool` arrives
+    // as a prop but the sub-mode never did, and threading a new prop through
+    // both CanvasArea call sites for one gate would be drilling for its own
+    // sake.
+    const eraserMode = useToolStore((s) => s.eraserMode);
 
     // ── Rulers & Grids: grid geometry comes from Rust (gridLinesSync). Warm the
     // WASM fn once the grid is enabled, then recompute segments when the image
@@ -1422,12 +1430,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         })()}
 
         {/* Brush-size ring — only for the size-based brush tools (Paint/Blur/
-            Eraser brush + the Effects blur brush). Other tools (Resize/compress,
-            Layer-Settings arrow, AI, …) keep the standard default arrow, on the
-            canvas and over the panels. `!cursor` still hides it while the Effects
-            color-picker shows its crosshair. Hidden during pan. */}
+            Eraser brush + the Effects blur brush, plus the Eraser tool's two
+            canvas-brush modes: brush + Magic Eraser). Other tools (Resize/
+            compress, Layer-Settings arrow, the Eraser tool's click-action
+            modes, …) keep the standard default arrow, on the canvas and over
+            the panels. `!cursor` still hides it while the Effects color-picker
+            shows its crosshair. Hidden during pan. */}
         {cursorVisible &&
-          (activeTool === "brush" || activeTool === "effects") &&
+          (activeTool === "brush" ||
+            activeTool === "effects" ||
+            (activeTool === "ai" &&
+              (eraserMode === "brush" || eraserMode === "magic"))) &&
           !cursor &&
           !isPanning && (
           <div

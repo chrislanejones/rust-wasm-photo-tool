@@ -852,6 +852,10 @@ export function AppShell() {
         return toolSettings.brushSize / 2;
       case "crop":
         return 0;
+      case "ai":
+        // Eraser tool: the brush eraser and the Magic Eraser share the same
+        // eraserSize field (one physical brush, two jobs — see AISettings).
+        return toolSettings.eraserSize / 2;
       case "stamp":
         if (stampSubMode === "emojis") return (toolSettings.emojiSize * 1.2) / 2;
         return stampSettings.brushSize;
@@ -2187,6 +2191,13 @@ export function AppShell() {
           setToolSettings((p) => ({ ...p, eraserSize: clamp(p.eraserSize + step, 1, 100) }));
         }
         // pen mode draws vector paths — no brush size
+      } else if (activeTool === "ai") {
+        // Eraser tool: brush + Magic Eraser both size via eraserSize (the
+        // rembg/inpaint modes are click-actions with no canvas brush — a
+        // size nudge there is harmless but meaningless, so gate it).
+        if (eraserMode === "brush" || eraserMode === "magic") {
+          setToolSettings((p) => ({ ...p, eraserSize: clamp(p.eraserSize + step, 1, 100) }));
+        }
       } else if (activeTool === "stamp") {
         if (stampSubMode === "emojis") {
           setToolSettings((p) => ({ ...p, emojiSize: clamp(p.emojiSize + step, 16, 128) }));
@@ -2200,7 +2211,7 @@ export function AppShell() {
         }
       }
     },
-    [activeTool, brushMode, stampSubMode, setToolSettings, setStampSettings, stamp],
+    [activeTool, brushMode, stampSubMode, eraserMode, setToolSettings, setStampSettings, stamp],
   );
 
   useKeyboardShortcuts({
@@ -3180,13 +3191,17 @@ export function AppShell() {
         />
       )}
 
-      {/* Brush cursor — hidden during pan mode */}
+      {/* Brush cursor — hidden during pan mode. The Eraser tool ("ai") shows
+          it only in its two canvas-brush modes (brush + Magic Eraser); the
+          rembg/inpaint modes are click-actions and keep the arrow. */}
       {visible &&
         !isPanning &&
         !colorPickerActive &&
         (activeTool === "stamp" ||
           activeTool === "brush" ||
-          activeTool === "emoji") && (
+          activeTool === "emoji" ||
+          (activeTool === "ai" &&
+            (eraserMode === "brush" || eraserMode === "magic"))) && (
           <div
             className="brush-cursor"
             style={{
