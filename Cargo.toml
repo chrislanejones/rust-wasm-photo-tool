@@ -82,6 +82,14 @@ name = "blur_threads"
 harness = false
 required-features = ["threads"]
 
+# Scalar vs. rayon-parallel PatchMatch inpaint, native target (OS threads —
+# same caveats as blur_threads.rs's doc comment: this measures the threading
+# win of the anti-diagonal wavefront, not the eventual wasm32 build).
+[[bench]]
+name = "patchmatch_nnf"
+harness = false
+required-features = ["patchmatch", "threads"]
+
 # Replay-parity integration tests (tests/*.rs). Feature-gated the same way as
 # the bench above: they use stamp_tool::ops/tiles directly, which only exist
 # behind `tiles`. Plain `cargo test` skips these targets entirely (no compile
