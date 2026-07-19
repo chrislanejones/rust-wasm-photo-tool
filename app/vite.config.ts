@@ -78,7 +78,43 @@ const versionManifestPlugin = (): PluginOption => ({
   },
 });
 
+// The kill switch (VITE_ENABLE_SW=kill): a build whose /sw.js is a
+// SELF-DESTRUCTING worker. It takes over immediately (skipWaiting — the one
+// place that's correct: eviction must not wait politely), wipes every Cache
+// Storage entry, unregisters itself, and reloads its clients out of SW
+// control. Deployed at the same URL the "on" builds registered, so both the
+// browser's own sw.js update check and the explicit kill-mode registration
+// in swBoot.ts pick it up. This is how a bad SW already in the wild is
+// evicted — see the EVICTION PROCEDURE block above.
+const KILL_SW_SOURCE = `// Image Horse self-destructing service worker (VITE_ENABLE_SW=kill build).
+// Evicts any previously installed precache SW: takes over, wipes caches,
+// unregisters, reloads clients. See vite.config.ts EVICTION PROCEDURE.
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+      await self.registration.unregister();
+      const clients = await self.clients.matchAll({ type: "window" });
+      for (const client of clients) client.navigate(client.url);
+    })(),
+  );
+});
+`;
+
+const killSwPlugin = (): PluginOption => ({
+  name: "ih-kill-sw",
+  apply: "build",
+  generateBundle() {
+    this.emitFile({ type: "asset", fileName: "sw.js", source: KILL_SW_SOURCE });
+  },
+});
+
 const swPlugins = (): PluginOption[] => {
+  if (SW_MODE === "kill") return [killSwPlugin()];
   if (SW_MODE !== "on") return [];
   return [
     VitePWA({
