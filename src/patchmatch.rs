@@ -16,25 +16,31 @@
 //!   belongs there. [`inpaint`] composes the two into the one entry point
 //!   Task C wires behind the `ih_patchmatch` flag.
 //!
-//! Deliberately NOT parallel today (`rayon` is day 2) and NOT multi-resolution
-//! (a pyramid is day 3 — single-res will look coarse/smeary on a real photo,
-//! which is expected). What today's structure buys ahead of that: every
-//! per-pixel/per-row computation here is a pure function of explicit
-//! arguments — no method reaches into shared mutable state, and the one
-//! piece of read-only, per-call context every function needs is bundled into
-//! [`MatchCtx`], which is trivially `Sync` (shared slices + `Copy` scalars
-//! only). A day-2 rayon pass is a rewrite of the row-iteration DRIVER (split
-//! `nnf` into a read buffer and a write buffer so rows no longer have an
-//! in-pass ordering dependency, then `par_iter` over rows) — the distance,
-//! propagation-candidate, and random-search logic in this file does not need
-//! to change at all.
+//! Day 2 (feature `threads`, in addition to `patchmatch`): rayon-parallel
+//! drivers — [`compute_nnf_parallel`] / [`fill_from_nnf_parallel`] /
+//! [`inpaint_parallel`] — live at the bottom of this file, gated so the
+//! scalar path and every non-`threads` build are provably unaffected. What
+//! day 1's structure bought them: every per-pixel computation here is a pure
+//! function of explicit arguments — no method reaches into shared mutable
+//! state, and the one piece of read-only, per-call context every function
+//! needs is bundled into [`MatchCtx`], which is trivially `Sync` (shared
+//! slices + `Copy` scalars only). Note the parallel driver is a WAVEFRONT
+//! over anti-diagonals, NOT the read-buffer/write-buffer row `par_iter` this
+//! comment originally sketched — that sketch was a Jacobi rewrite, and its
+//! output could never be byte-identical to this file's in-place Gauss-Seidel
+//! scan (day 2's hard gate). See the parallel section's own comment for the
+//! dependency argument. The distance, propagation-candidate, and
+//! random-search logic is shared verbatim between both drivers.
+//!
+//! Still NOT multi-resolution (a pyramid is day 3 — single-res will look
+//! coarse/smeary on a real photo, which is expected).
 //!
 //! Randomness is seeded and deterministic throughout (no `rand`/`getrandom`
 //! dependency — see the `patchmatch` feature comment in Cargo.toml for why):
 //! every random draw is independently derived from `(seed, x, y, salt)` via
 //! [`splitmix64`], so it does not matter what order pixels are visited in —
-//! another property day 2's parallel rewrite gets for free rather than having
-//! to engineer later.
+//! the property that lets the day-2 parallel driver reuse every draw
+//! unchanged, with no per-thread RNG streams to reconcile.
 
 /// Patch half-width: patches are `(2*PATCH_RADIUS+1)²` = 7×7 by default.
 pub const PATCH_RADIUS: usize = 3;
@@ -347,10 +353,12 @@ fn best_match_for_pixel(
 /// what makes one pass spread a good match fast. Unmasked pixels are
 /// skipped — there is nothing to search for outside the hole.
 ///
-/// This row loop — not the per-pixel logic above — is the piece a day-2
-/// rayon rewrite touches: swap the in-place `nnf` for a `nnf_prev`/`nnf_next`
-/// pair (read old values everywhere, including for "already visited"
-/// neighbours) and this becomes embarrassingly parallel per row.
+/// This row loop — not the per-pixel logic above — is the piece day 2's
+/// rayon driver replaces. NOT by the `nnf_prev`/`nnf_next` buffer pair this
+/// comment originally proposed (that changes which values neighbours read,
+/// so its output can't match this scan byte-for-byte) but by an
+/// anti-diagonal wavefront that preserves this exact dependency order — see
+/// `compute_nnf_parallel` at the bottom of the file.
 fn propagate_and_search_row(
     ctx: &MatchCtx,
     nnf: &mut [(u32, u32)],
@@ -419,9 +427,9 @@ pub fn compute_nnf(image: &[u8], w: usize, h: usize, mask: &[bool], seed: u64) -
         seed,
     };
 
-    // Sequential today (day 1 scope) — see the module doc comment and
-    // `propagate_and_search_row` for exactly where day 2's rayon rewrite
-    // lands.
+    // Sequential Gauss-Seidel scan — the scalar reference path, kept intact
+    // by day 2 (see `compute_nnf_parallel` for the wavefront driver that
+    // reproduces this scan's dependency order in parallel, byte for byte).
     for iter in 0..NUM_ITERATIONS {
         let reverse = iter % 2 == 1;
         if reverse {
@@ -456,11 +464,11 @@ pub fn compute_nnf(image: &[u8], w: usize, h: usize, mask: &[bool], seed: u64) -
 /// mismatch) returns `image` unchanged rather than panicking.
 ///
 /// Single-resolution (day 1) — see [`inpaint`]'s doc comment for the day-3
-/// pyramid TODO. Pure function of `(image, w, h, mask, nnf)`; the outer
-/// `y`/`x` loop is the same day-2 rayon seam as `compute_nnf`'s row loop
-/// (each output pixel's vote is independent of every other output pixel —
-/// this one is actually easier to parallelize than the NNF search itself,
-/// since it only ever READS `nnf`, never mutates it).
+/// pyramid TODO. Pure function of `(image, w, h, mask, nnf)`; each output
+/// pixel's vote is independent of every other output pixel (this function
+/// only ever READS `nnf`), which is why the day-2 parallel counterpart
+/// ([`fill_from_nnf_parallel`]) is a plain row `par_chunks_mut`, no
+/// wavefront needed.
 pub fn fill_from_nnf(
     image: &[u8],
     w: usize,
@@ -541,6 +549,283 @@ pub fn fill_from_nnf(
 pub fn inpaint(image: &[u8], w: usize, h: usize, mask: &[bool], seed: u64) -> Vec<u8> {
     let nnf = compute_nnf(image, w, h, mask, seed);
     fill_from_nnf(image, w, h, mask, &nnf)
+}
+
+// ── Rayon-parallel path (feature `threads`, day 2) ──────────────────────────
+//
+// Everything below this line is gated behind `#[cfg(feature = "threads")]`, so
+// no build without that feature — including the shipped wasm, which compiles
+// this whole MODULE out (`patchmatch` off) — is affected. The scalar functions
+// above are byte-for-byte the day-1 code (src/simd/blur.rs's discipline, minus
+// its duplication cost: the helpers here were already free functions, so the
+// parallel drivers call the SAME `best_match_for_pixel` / `init_nnf` /
+// `valid_source_centers` the scalar drivers call — no per-row math is
+// duplicated, and no scalar code moved).
+//
+// WHY A WAVEFRONT, NOT PARALLEL ROWS. The scalar NNF pass is an in-place
+// Gauss-Seidel scan: a forward-pass pixel reads its own previous-pass value
+// plus `(x-1, y)` and `(x, y-1)` — both already updated THIS pass. Rows are
+// therefore not independent, and the once-sketched fix (read all neighbours
+// from a previous-pass buffer, `par_iter` rows) is a Jacobi rewrite whose
+// output CANNOT match the scalar scan byte-for-byte — it changes which values
+// propagation reads. Day 2's hard gate is byte-identity with the scalar path
+// intact, so that option is out.
+//
+// Instead, note both reads sit on anti-diagonal `d - 1` where `d = x + y`
+// (reverse passes read `(x+1, y)` / `(x, y+1)`, both on `d + 1`). So: process
+// diagonals sequentially in scan direction (ascending on forward passes,
+// descending on reverse), and compute all masked pixels WITHIN a diagonal in
+// parallel. Every pixel then reads exactly the `nnf` state the scalar scan
+// would have shown it — same-diagonal pixels never read each other — and each
+// result is a pure function of that state (`best_match_for_pixel`, whose RNG
+// draws derive from `(seed, x, y, salt)`, never from visit order). Output is
+// byte-identical to scalar at EVERY thread count and every work-stealing
+// schedule, structurally — the tests at the bottom then prove it at pools of
+// 1/2/4/8.
+//
+// Parallelism is bounded by each diagonal's masked width (a 20%-area hole at
+// 512² has ~229-pixel diagonals; each element costs ~a-dozen 7×7 patch
+// distances, so a diagonal is comfortably larger than rayon's dispatch
+// overhead). Per-diagonal results land in ONE reused buffer
+// (`collect_into_vec`) and are scattered back sequentially — allocations here
+// are per `remove_object` click, not per frame; the zero-copy flush path is
+// untouched.
+
+/// Below this many masked pixels on a diagonal, dispatching to rayon costs
+/// more than it buys — process the diagonal inline instead. Any threshold
+/// yields identical bytes (both paths are the same pure function per pixel);
+/// this is purely a scheduling knob.
+#[cfg(feature = "threads")]
+const PAR_DIAGONAL_MIN: usize = 4;
+
+/// Masked pixels grouped by anti-diagonal (`d = x + y`), CSR-style: diagonal
+/// `d` is `pixels[offsets[d]..offsets[d + 1]]`, in scan order. Built once per
+/// [`compute_nnf_parallel`] call — the mask never changes mid-computation.
+#[cfg(feature = "threads")]
+struct DiagBuckets {
+    offsets: Vec<usize>,
+    pixels: Vec<(u32, u32)>,
+}
+
+#[cfg(feature = "threads")]
+fn diag_buckets(mask: &[bool], w: usize, h: usize) -> DiagBuckets {
+    let ndiag = w + h - 1;
+    // counts[d + 1] = masked pixels on diagonal d; prefix-summed into offsets.
+    let mut offsets = vec![0usize; ndiag + 1];
+    for y in 0..h {
+        for x in 0..w {
+            if mask[y * w + x] {
+                offsets[x + y + 1] += 1;
+            }
+        }
+    }
+    for d in 0..ndiag {
+        offsets[d + 1] += offsets[d];
+    }
+    let mut cursors = offsets.clone();
+    let mut pixels = vec![(0u32, 0u32); offsets[ndiag]];
+    for y in 0..h {
+        for x in 0..w {
+            if mask[y * w + x] {
+                let d = x + y;
+                pixels[cursors[d]] = (x as u32, y as u32);
+                cursors[d] += 1;
+            }
+        }
+    }
+    DiagBuckets { offsets, pixels }
+}
+
+/// [`compute_nnf`], parallelized over anti-diagonal wavefronts (see the
+/// section comment above for why this schedule and no other). Byte-identical
+/// to the scalar function for every input, seed, thread count, and
+/// work-stealing schedule; same validation, same degenerate-input behavior.
+/// Runs on whatever rayon pool is current (`ThreadPool::install` to choose).
+#[cfg(feature = "threads")]
+pub fn compute_nnf_parallel(
+    image: &[u8],
+    w: usize,
+    h: usize,
+    mask: &[bool],
+    seed: u64,
+) -> Vec<(u32, u32)> {
+    use rayon::prelude::*;
+
+    if w == 0 || h == 0 || mask.len() != w * h || image.len() != w * h * 4 {
+        return Vec::new();
+    }
+
+    // Identical setup to `compute_nnf` — literally the same helper calls.
+    let mut valid = valid_source_centers(mask, w, h, PATCH_RADIUS);
+    if !valid.iter().any(|&v| v) {
+        valid = valid_source_centers(mask, w, h, 0);
+    }
+    let source_list = source_center_list(&valid, w);
+    let mut nnf = init_nnf(mask, w, h, &source_list, seed);
+    if source_list.is_empty() {
+        return nnf;
+    }
+
+    let ctx = MatchCtx {
+        image,
+        w,
+        h,
+        mask,
+        valid: &valid,
+        radius: PATCH_RADIUS as i64,
+        search_radius_max: w.max(h) as f64,
+        seed,
+    };
+
+    let buckets = diag_buckets(mask, w, h);
+    let ndiag = w + h - 1;
+    // One reused results buffer for every diagonal of every iteration —
+    // `collect_into_vec` grows it once to the longest diagonal and then
+    // recycles the allocation.
+    let mut results: Vec<(u32, u32)> = Vec::new();
+
+    for iter in 0..NUM_ITERATIONS {
+        let reverse = iter % 2 == 1;
+        for step in 0..ndiag {
+            let d = if reverse { ndiag - 1 - step } else { step };
+            let bucket = &buckets.pixels[buckets.offsets[d]..buckets.offsets[d + 1]];
+            if bucket.is_empty() {
+                continue;
+            }
+            if bucket.len() < PAR_DIAGONAL_MIN {
+                // Inline: same pure function, no dispatch. Writing during
+                // the walk is safe for the same reason the parallel arm is —
+                // no pixel on this diagonal reads any other pixel on it.
+                for &(x, y) in bucket {
+                    nnf[y as usize * w + x as usize] = best_match_for_pixel(
+                        &ctx,
+                        &nnf,
+                        x as usize,
+                        y as usize,
+                        iter as u32,
+                        reverse,
+                    );
+                }
+                continue;
+            }
+            let nnf_read: &[(u32, u32)] = &nnf;
+            bucket
+                .par_iter()
+                .map(|&(x, y)| {
+                    best_match_for_pixel(
+                        &ctx,
+                        nnf_read,
+                        x as usize,
+                        y as usize,
+                        iter as u32,
+                        reverse,
+                    )
+                })
+                .collect_into_vec(&mut results);
+            for (&(x, y), &best) in bucket.iter().zip(results.iter()) {
+                nnf[y as usize * w + x as usize] = best;
+            }
+        }
+    }
+
+    nnf
+}
+
+/// One hole pixel's vote — the exact inner body of [`fill_from_nnf`]'s loop
+/// (same iteration order, same f64 accumulation order, same rounding), lifted
+/// so the row-parallel driver below can call it per pixel. Returns `None`
+/// when no valid vote exists (the caller leaves the pixel untouched, matching
+/// the scalar path's `count == 0` behavior).
+#[cfg(feature = "threads")]
+fn vote_for_pixel(
+    image: &[u8],
+    w: usize,
+    h: usize,
+    mask: &[bool],
+    nnf: &[(u32, u32)],
+    x: usize,
+    y: usize,
+) -> Option<[u8; 4]> {
+    let r = PATCH_RADIUS as i64;
+    let (px, py) = (x as i64, y as i64);
+    let mut sum = [0.0f64; 4];
+    let mut count = 0u32;
+    for dy in -r..=r {
+        for dx in -r..=r {
+            let (pcx, pcy) = (px - dx, py - dy);
+            if pcx < 0 || pcy < 0 || pcx >= w as i64 || pcy >= h as i64 {
+                continue;
+            }
+            let pci = pcy as usize * w + pcx as usize;
+            if !mask[pci] {
+                continue;
+            }
+            let (mx, my) = nnf[pci];
+            let (sx, sy) = (mx as i64 + dx, my as i64 + dy);
+            if sx < 0 || sy < 0 || sx >= w as i64 || sy >= h as i64 {
+                continue;
+            }
+            let si = sy as usize * w + sx as usize;
+            if mask[si] {
+                continue;
+            }
+            let sp = &image[si * 4..si * 4 + 4];
+            for (c, acc) in sum.iter_mut().enumerate() {
+                *acc += sp[c] as f64;
+            }
+            count += 1;
+        }
+    }
+    if count == 0 {
+        return None;
+    }
+    let mut out = [0u8; 4];
+    for (c, out_c) in out.iter_mut().enumerate() {
+        *out_c = (sum[c] / count as f64).round().clamp(0.0, 255.0) as u8;
+    }
+    Some(out)
+}
+
+/// [`fill_from_nnf`], parallelized over output rows (`par_chunks_mut`, the
+/// src/simd/blur.rs pattern): every output pixel's vote reads only the
+/// immutable `image`/`mask`/`nnf` and writes only its own row's chunk, so
+/// row order cannot affect any pixel's value — byte-identical to the scalar
+/// fill at every thread count, per the tests below.
+#[cfg(feature = "threads")]
+pub fn fill_from_nnf_parallel(
+    image: &[u8],
+    w: usize,
+    h: usize,
+    mask: &[bool],
+    nnf: &[(u32, u32)],
+) -> Vec<u8> {
+    use rayon::prelude::*;
+
+    let mut out = image.to_vec();
+    if w == 0 || h == 0 || mask.len() != w * h || image.len() != w * h * 4 || nnf.len() != w * h {
+        return out;
+    }
+    out.par_chunks_mut(w * 4).enumerate().for_each(|(y, row)| {
+        for x in 0..w {
+            if !mask[y * w + x] {
+                continue;
+            }
+            if let Some(px) = vote_for_pixel(image, w, h, mask, nnf, x, y) {
+                row[x * 4..x * 4 + 4].copy_from_slice(&px);
+            }
+        }
+    });
+    out
+}
+
+/// [`inpaint`], with both stages parallel — the drop-in the eventual
+/// `--features threads` wasm build (COOP/COEP permitting — a separate,
+/// later release decision) wires behind `remove_object` in place of the
+/// scalar call. Byte-identical to [`inpaint`] for every input and seed.
+#[cfg(feature = "threads")]
+pub fn inpaint_parallel(image: &[u8], w: usize, h: usize, mask: &[bool], seed: u64) -> Vec<u8> {
+    let nnf = compute_nnf_parallel(image, w, h, mask, seed);
+    fill_from_nnf_parallel(image, w, h, mask, &nnf)
 }
 
 #[cfg(test)]
@@ -943,5 +1228,234 @@ mod tests {
             out_r0, 15,
             "average of R=10 (own match) and R=20 (neighbour's shifted match)"
         );
+    }
+
+    // ── Parallel path (day 2): byte-identity against the scalar path ─────
+    //
+    // The hard gate: `compute_nnf_parallel` / `fill_from_nnf_parallel` /
+    // `inpaint_parallel` must equal their scalar counterparts BYTE FOR BYTE,
+    // same seed, at every thread count — 1, 2, 4 and 8 are pinned explicitly
+    // via local `ThreadPoolBuilder` pools (the global pool would only ever
+    // test one width). Nested inside `mod tests` to share the fixture
+    // helpers above.
+    #[cfg(feature = "threads")]
+    mod threaded {
+        use super::*;
+
+        /// Run `f` on a freshly built rayon pool of exactly `n` threads.
+        fn with_pool<T: Send>(n: usize, f: impl FnOnce() -> T + Send) -> T {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(n)
+                .build()
+                .expect("building a local test pool")
+                .install(f)
+        }
+
+        /// One byte-identity fixture: `(w, h, image, mask, seed)`.
+        type Fixture = (usize, usize, Vec<u8>, Vec<bool>, u64);
+
+        /// The fixture set every byte-identity test sweeps. Geometry mirrors
+        /// the scalar suite above plus shapes chosen to stress the wavefront
+        /// specifically — ragged/short diagonals, the lenient validity tier,
+        /// and the no-source fallback.
+        fn fixtures() -> Vec<Fixture> {
+            let mut out: Vec<Fixture> = Vec::new();
+            // Centered hole, plenty of source (the scalar suite's staple).
+            let (w, h) = (20, 20);
+            out.push((
+                w,
+                h,
+                rgba(w, h, |x, y| {
+                    [(x * 7 % 256) as u8, (y * 11 % 256) as u8, 90, 255]
+                }),
+                rect_mask(w, h, 7, 7, 13, 13),
+                42,
+            ));
+            // Hole hugging the top-left corner — short diagonals start masked.
+            let (w, h) = (12, 12);
+            out.push((
+                w,
+                h,
+                rgba(w, h, |x, y| [(x * 9) as u8, (y * 9) as u8, 60, 255]),
+                rect_mask(w, h, 0, 0, 4, 4),
+                5,
+            ));
+            // Single-pixel mask — every diagonal below PAR_DIAGONAL_MIN.
+            let (w, h) = (10, 10);
+            let mut m = vec![false; w * h];
+            m[5 * w + 5] = true;
+            out.push((
+                w,
+                h,
+                rgba(w, h, |x, y| [(x * 20) as u8, (y * 20) as u8, 128, 255]),
+                m,
+                3,
+            ));
+            // Non-square, dimensions with no thread-count alignment.
+            let (w, h) = (17, 13);
+            out.push((
+                w,
+                h,
+                rgba(w, h, |x, y| [(x * 7) as u8, (y * 5) as u8, 30, 255]),
+                rect_mask(w, h, 3, 3, 9, 9),
+                4,
+            ));
+            // Sparse scatter: disjoint holes + stray pixels → ragged
+            // diagonals mixing inline and parallel arms in one pass.
+            let (w, h) = (24, 24);
+            let mut m = rect_mask(w, h, 2, 2, 5, 4);
+            for (x, y) in [(20, 3), (9, 12), (10, 12), (3, 20)] {
+                m[y * w + x] = true;
+            }
+            for y in 15..19 {
+                for x in 14..21 {
+                    m[y * w + x] = true;
+                }
+            }
+            out.push((
+                w,
+                h,
+                rgba(w, h, |x, y| {
+                    [(x * 5) as u8, (y * 3) as u8, (x ^ y) as u8, 255]
+                }),
+                m,
+                77,
+            ));
+            // Lenient-tier fallback: 8×8 with a centered hole leaves NO
+            // position a full 7×7 unmasked footprint, so validity falls back
+            // to the radius-0 tier.
+            let (w, h) = (8, 8);
+            out.push((
+                w,
+                h,
+                rgba(w, h, |x, y| [(x * 31) as u8, (y * 29) as u8, 10, 255]),
+                rect_mask(w, h, 2, 2, 6, 6),
+                13,
+            ));
+            // Whole image masked — the documented identity-fallback case.
+            let (w, h) = (6, 6);
+            out.push((
+                w,
+                h,
+                rgba(w, h, |_, _| [1, 2, 3, 255]),
+                vec![true; w * h],
+                11,
+            ));
+            out
+        }
+
+        #[test]
+        fn nnf_parallel_is_byte_identical_to_scalar_at_1_2_4_8_threads() {
+            for (w, h, image, mask, seed) in fixtures() {
+                let scalar = compute_nnf(&image, w, h, &mask, seed);
+                for threads in [1usize, 2, 4, 8] {
+                    let par =
+                        with_pool(threads, || compute_nnf_parallel(&image, w, h, &mask, seed));
+                    assert_eq!(
+                        scalar, par,
+                        "NNF diverged from scalar at {w}x{h} seed {seed} on {threads} threads"
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn inpaint_parallel_is_byte_identical_to_scalar_at_1_2_4_8_threads() {
+            for (w, h, image, mask, seed) in fixtures() {
+                let scalar = inpaint(&image, w, h, &mask, seed);
+                for threads in [1usize, 2, 4, 8] {
+                    let par = with_pool(threads, || inpaint_parallel(&image, w, h, &mask, seed));
+                    assert_eq!(
+                        scalar, par,
+                        "fill diverged from scalar at {w}x{h} seed {seed} on {threads} threads"
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn fill_parallel_matches_scalar_on_a_hand_built_nnf() {
+            // Decoupled from `compute_nnf`'s randomness, mirroring the
+            // scalar `fill_from_nnf_blends_multiple_covering_patches` set-up.
+            let (w, h) = (10, 10);
+            let image = rgba(w, h, |x, _| [(x * 10) as u8, 100, 100, 255]);
+            let mut mask = vec![false; w * h];
+            mask[5 * w + 5] = true;
+            mask[5 * w + 6] = true;
+            let mut nnf = vec![(0u32, 0u32); w * h];
+            for y in 0..h {
+                for x in 0..w {
+                    nnf[y * w + x] = (x as u32, y as u32);
+                }
+            }
+            nnf[5 * w + 5] = (1, 1);
+            nnf[5 * w + 6] = (3, 1);
+            let scalar = fill_from_nnf(&image, w, h, &mask, &nnf);
+            for threads in [1usize, 2, 4, 8] {
+                let par = with_pool(threads, || {
+                    fill_from_nnf_parallel(&image, w, h, &mask, &nnf)
+                });
+                assert_eq!(scalar, par, "hand-built fill diverged on {threads} threads");
+            }
+        }
+
+        #[test]
+        fn parallel_same_seed_twice_is_identical_on_the_global_pool() {
+            // Determinism under real work-stealing (whatever width the global
+            // pool has on this machine), not just under pinned pools.
+            let (w, h) = (24, 24);
+            let image = rgba(w, h, |x, y| {
+                [(x * 11) as u8, (y * 13) as u8, (x ^ y) as u8, 255]
+            });
+            let mask = rect_mask(w, h, 6, 6, 18, 18);
+            let a = inpaint_parallel(&image, w, h, &mask, 55);
+            let b = inpaint_parallel(&image, w, h, &mask, 55);
+            assert_eq!(a, b, "same seed twice must be byte-identical");
+        }
+
+        #[test]
+        fn parallel_degenerate_inputs_do_not_panic_and_match_scalar() {
+            assert_eq!(
+                compute_nnf_parallel(&[], 0, 0, &[], 1),
+                compute_nnf(&[], 0, 0, &[], 1)
+            );
+            assert_eq!(
+                compute_nnf_parallel(&[0; 400], 10, 10, &[false; 5], 1).len(),
+                0
+            );
+            assert_eq!(
+                compute_nnf_parallel(&[0; 4], 10, 10, &[false; 100], 1).len(),
+                0
+            );
+            assert_eq!(inpaint_parallel(&[], 0, 0, &[], 1).len(), 0);
+            assert_eq!(
+                fill_from_nnf_parallel(&[0; 400], 10, 10, &[false; 5], &[(0, 0); 100]).len(),
+                400
+            );
+            assert_eq!(
+                fill_from_nnf_parallel(&[0; 4], 10, 10, &[false; 100], &[(0, 0); 100]).len(),
+                4
+            );
+        }
+
+        #[test]
+        fn parallel_matches_scalar_at_realistic_hole_scale() {
+            // 64×64 with a centered ~20% hole (29×29 = 841 masked pixels):
+            // long ragged diagonals and real propagation depth — the closest
+            // a unit test gets to bench scale.
+            let (w, h) = (64, 64);
+            let image = rgba(w, h, |x, y| {
+                [
+                    (x * 3 % 251) as u8,
+                    (y * 7 % 253) as u8,
+                    ((x * y) % 255) as u8,
+                    255,
+                ]
+            });
+            let mask = rect_mask(w, h, 17, 17, 46, 46);
+            let scalar = inpaint(&image, w, h, &mask, 1234);
+            let par = with_pool(8, || inpaint_parallel(&image, w, h, &mask, 1234));
+            assert_eq!(scalar, par, "bench-scale fill diverged on 8 threads");
+        }
     }
 }
