@@ -1945,3 +1945,34 @@ production build succeeds. Live-checked in Chrome: `eraserMode` round-trips
 through a real page reload via IndexedDB, and canvas routing
 (`useEffectiveTool`) keeps sending the brush eraser regardless of which
 panel tile is selected.
+
+## v7.41 — 2026-07-19
+
+**The app shell gets a precache-only service worker, merged dark.** Every
+visit re-downloaded the full shell — ~3.6 MB across 9 assets, including the
+734 KB WASM engine — and a network drop mid-session made the next boot fail
+entirely, despite every original and edit already living in IndexedDB. The
+service worker that landed caches the build's own hashed assets and nothing
+else: zero `runtimeCaching`, so Clerk, Convex, share URLs and every API call
+pass through untouched, and IndexedDB is not involved at any point.
+
+It is opt-in at build time and ships off. `VITE_ENABLE_SW` unset — the
+default — emits no `sw.js`, no workbox chunk, no `version.json`, and no
+registration code; `setupServiceWorker()` in `main.tsx` is statically
+eliminated. Decision recorded in
+[ADR-019](adr/019-opt-in-precache-service-worker.md).
+
+| #   | Change                                                                    | Status                                                                    |
+| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | `vite-plugin-pwa` (generateSW) wired into `app/vite.config.ts` behind a three-state `SW_MODE` — `off` (default) / `on` / `kill` | Complete — precache-only, `registerType: 'prompt'`, zero `runtimeCaching` |
+| 2   | `lib/pwa/swBoot.ts` + `updateToast.ts` — registration, hourly `registration.update()`, and an update prompt that never calls `skipWaiting` under an active edit | Complete — a new build waits for an explicit Reload |
+| 3   | `lib/pwa/skew.ts` + `skewVerdict.ts` — per-build hash in both the bundle and a never-precached `version.json`; a mismatch means a stale cache is serving old JS/WASM | Complete — raises the update toast plus one `console.error`, re-checked on every engine init rather than boot only |
+| 4   | `VITE_ENABLE_SW=kill` emits a self-destructing `sw.js` | Complete — the only correct way off once an ON build has shipped; unsetting the flag strands installed workers with no code left to evict them |
+| 5   | `e2e/no-sw-default.spec.ts` — asserts a default build registers nothing | Complete |
+| 6   | `e2e/sw/sw-lifecycle.spec.ts` + `playwright.sw.config.ts` — second harness covering install, precache, offline boot, update prompt and the kill build | Complete — the e2e stage now runs two configs |
+| 7   | `lib/pwa/skewVerdict.test.ts` — unit coverage for the skew verdict | Complete — 8 new tests |
+
+**Verified**: ship-dark re-checked on the production build at merge — no
+`sw.js`, no workbox chunk, no `version.json`, and zero occurrences of
+`serviceWorker` in the emitted bundle. `tsc --noEmit` clean, 184/184 vitest
+passing, production build succeeds.

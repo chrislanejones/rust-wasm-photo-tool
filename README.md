@@ -70,11 +70,11 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.40 — 2026-07-18
+### v7.41 — 2026-07-19
 
-**Preference storage got a real safety net.** The three Zustand stores that remember your preferences across reloads (which sub-mode each tool was on, your command-palette habits, the savings badge) used to trust whatever came back out of IndexedDB verbatim. Since that storage is writable by any script on the origin, a stale or corrupted value could silently land in state as something the running code no longer recognizes. Each store now validates every remembered field on load and falls back to the default for anything it doesn't recognize.
+**The app can cache itself for offline use now — and the switch is off.** Every visit re-downloads about 3.6 MB of app shell, the 734 KB Rust engine included, and a network drop mid-session means the next boot fails outright. That's a strange way for an editor to behave when all of your originals and edits already live in the browser. A service worker fixes both. The one that landed is precache-only: it stores the build's own hashed files and nothing else. Sign-in, cloud sync and share links always go to the network, so nothing about your account or your documents can ever be served stale.
 
-The Eraser panel's own mode (Eraser / Magic Eraser / Background Removal / Object Removal) also moved out of that panel's own memory and into the shared store, alongside the other tools' sub-modes — a small internal move, no visible change, but it's what lets the canvas eventually know which of the four is selected.
+It ships off. A default build contains no service worker at all — nothing registered, nothing emitted, no bytes. Turning it on is a separate, deliberate decision, because a bad service worker is the worst thing this app could ship: it strands people on an old version without ever saying so. When it is on, a new build waits for an explicit Reload instead of swapping code out from under an open edit, and a per-build hash check raises the prompt again if a stale cache is still serving old files.
 
 ## License
 

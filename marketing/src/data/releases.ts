@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.84",
+    date: "2026-07-19",
+    headline: "The app learns to cache itself — switch still off",
+    entries: [
+      { tag: "infra", text: "Every visit re-downloads about 3.6 MB of the app, the Rust engine included, and losing your connection mid-session means the next boot fails outright — odd behaviour for an editor whose photos and edits already live on your own machine. A service worker fixes both. This one only caches the app's own files: signing in, cloud sync and share links always go straight to the network, so nothing about your account or your documents can be served stale." },
+      { tag: "infra", text: "It ships turned off, and a default build contains none of it — nothing registered, no bytes. Switching it on is a separate decision, because a misbehaving service worker is the worst thing this app could ship: it leaves people on an old version without ever saying so. Once on, a new build waits for you to click Reload rather than swapping code out from under an open edit." },
+    ],
+  },
+  {
     version: "v0.9.83",
     date: "2026-07-18",
     headline: "Preferences stop trusting storage blindly",
