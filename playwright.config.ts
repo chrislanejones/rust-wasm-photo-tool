@@ -27,6 +27,12 @@ const DEMO_ENV =
 
 export default defineConfig({
   testDir: "./e2e",
+  // e2e/sw/* needs a DIFFERENT build (VITE_ENABLE_SW=1) and runs under its
+  // own harness: playwright.sw.config.ts (pnpm run test:e2e:sw). This
+  // default harness builds WITHOUT the flag, which is itself part of the
+  // gate — e2e/no-sw-default.spec.ts pins that a default build never
+  // registers a service worker.
+  testIgnore: ["**/sw/**"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,

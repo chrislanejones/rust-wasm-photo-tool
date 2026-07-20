@@ -41,9 +41,4 @@ deleted.
 | [016](016-canvas-is-document-metadata.md) | The Canvas is document metadata, not a logged layer | **Accepted (2026-07-17)** — the real-gallery DEFAULT-document check passed: Canvas rebuilt from metadata on restore, composite byte-exact (the 07-14 data loss was fixed in v7.33; the 07-17 "canvas gone" report was a checkerboard-backdrop rendering bug, not data loss) | 2026-07-13 |
 | [017](017-tiles-compiled-into-shipped-wasm.md) | The tiles/op-log feature is compiled into the shipped WASM | **Accepted (2026-07-17)** — Phase-1 dogfood = the four-check A/B; flags default ON in v7.36 with "0" kill switches. Size baseline 731,595 B (+71,780) | 2026-07-13 |
 | [018](018-patchmatch-object-removal-scalar-day-1.md) | PatchMatch object removal ships as a scalar, single-resolution kernel behind a flag | **Accepted (2026-07-18)** — Chris confirmed the fill on a real canvas; merged to master, `ih_patchmatch` stays OFF by default (dogfood before defaulting, same as op-log) | 2026-07-18 |
-
-<!--
-  Planned:
-  - service worker, precache-only → takes the next free number
-    (019+) when written.
--->
+| [019](019-opt-in-precache-service-worker.md) | The app shell ships behind an opt-in, precache-only service worker | **Accepted (2026-07-19)** — merged dark; ship-dark re-verified on the production build at merge (no `sw.js`/workbox/`version.json`, zero `serviceWorker` refs in the bundle). ⚠️ Once an ON build ever ships, turning it off means deploying `VITE_ENABLE_SW=kill` — **never** unsetting the flag | 2026-07-19 |

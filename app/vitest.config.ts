@@ -6,6 +6,14 @@ import path from "path";
 // adapter tests — they exercise IndexedDB + crypto.subtle + Blob, no DOM. The
 // `@` alias mirrors vite.config.ts / tsconfig so `@/lib/...` imports resolve.
 export default defineConfig({
+  define: {
+    // Mirrors the `define` block in vite.config.ts. Under vitest the SW mode
+    // is always "off" (the skew guard's PURE logic is what's under test —
+    // skewVerdict.test.ts — not the browser wiring), but any module that
+    // references these globals must still evaluate in the node environment.
+    __IH_SW_MODE__: JSON.stringify("off"),
+    __IH_BUILD_HASH__: JSON.stringify("vitest"),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

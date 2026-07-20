@@ -3,6 +3,7 @@ import type { RefObject, MouseEvent } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
 import { onOplogFlush } from "@/lib/oplogPersistence";
+import { checkBuildSkew } from "@/lib/pwa/skew";
 import {
   registerOplogStats,
   registerTilesDirtyCount,
@@ -245,6 +246,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       };
       wasmMemoryRef.current = wasmExports.memory;
       registerWasmMemory(wasmExports.memory);
+      // Skew guard (no-op in default builds): stale cached WASM/JS must not
+      // start real work silently — see lib/pwa/skew.ts.
+      void checkBuildSkew("engine-init");
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
@@ -295,6 +299,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       };
       wasmMemoryRef.current = wasmExports.memory;
       registerWasmMemory(wasmExports.memory);
+      // Skew guard (no-op in default builds): stale cached WASM/JS must not
+      // start real work silently — see lib/pwa/skew.ts.
+      void checkBuildSkew("engine-init");
       const canvas = canvasRef.current;
       if (!canvas) return;
       const src = new Uint8Array(pixels.buffer as ArrayBuffer);
@@ -366,6 +373,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       };
       wasmMemoryRef.current = wasmExports.memory;
       registerWasmMemory(wasmExports.memory);
+      // Skew guard (no-op in default builds): stale cached WASM/JS must not
+      // start real work silently — see lib/pwa/skew.ts.
+      void checkBuildSkew("engine-init");
       // Reuse the live engine on a gallery switch; create one on boot —
       // oplog_restore replaces the document (dimensions included) wholesale.
       const tool = toolRef.current ?? new Tool(1, 1);
@@ -395,6 +405,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       };
       wasmMemoryRef.current = wasmExports.memory;
       registerWasmMemory(wasmExports.memory);
+      // Skew guard (no-op in default builds): stale cached WASM/JS must not
+      // start real work silently — see lib/pwa/skew.ts.
+      void checkBuildSkew("engine-init");
 
       // Decode current canvas PNG → raw RGBA
       const { rgba: canvasRgba } = await decodePngToRgba(saved.canvasPng);

@@ -10,7 +10,8 @@
     "build:marketing": "pnpm --filter photo-horse-marketing build",
     "build:wasm": "wasm-pack build --target web --out-dir pkg -- --features tiles",
     "build:all": "pnpm run build:wasm && pnpm run build",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:sw": "playwright test --config playwright.sw.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
