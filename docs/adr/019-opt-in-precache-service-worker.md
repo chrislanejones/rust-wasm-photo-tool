@@ -1,5 +1,9 @@
 # ADR-019: The app shell ships behind an opt-in, precache-only service worker
-Date: 2026-07-19   Status: draft
+Date: 2026-07-19   Status: **Accepted (2026-07-19)** — ship-dark verified on
+the production build at merge: no `sw.js`, no workbox chunk, no
+`version.json`, and zero occurrences of `serviceWorker` in the bundle
+(`setupServiceWorker()` statically eliminated). Merged to master dark;
+`VITE_ENABLE_SW` stays unset until a deliberate on-build.
 
 ## Context
 Every visit re-downloads the full app shell — ~3.6 MB across 9 assets,
