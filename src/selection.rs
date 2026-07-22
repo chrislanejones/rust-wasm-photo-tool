@@ -343,9 +343,17 @@ impl ImageHorseTool {
     /// land on the active layer" rule `delete_selection` follows just above.
     ///
     /// Returns false (no history pushed, nothing mutated) when nothing is
-    /// selected, the image is empty, or the composite cache is stale/short —
-    /// the same guard shape `seed_index` uses for every other selection entry
-    /// point.
+    /// selected or the image is empty — the same guard shape `seed_index` uses
+    /// for every other selection entry point.
+    ///
+    /// A cold composite cache is NOT one of those cases. It used to be: the
+    /// guard lumped "cache shorter than the image" in with "nothing selected"
+    /// and returned the same `false`, so a caller that removed before the first
+    /// composite got a silent no-op it could not tell from an empty selection.
+    /// In the browser JS calls `recomposite()` before every blit, so the cache
+    /// is always warm by the time a user can brush anything and the path never
+    /// fired — but headless callers and tests hit it every time, and it cost a
+    /// diagnostic session. The cache is derived state; rebuild it and continue.
     #[cfg(feature = "patchmatch")]
     pub fn remove_object(&mut self) -> bool {
         let Some(mask) = self.selection.take() else {
@@ -355,7 +363,16 @@ impl ImageHorseTool {
             return false;
         }
         let (w, h) = (self.width as usize, self.height as usize);
-        if w == 0 || h == 0 || self.composite_cache.len() < w * h * 4 {
+        if w == 0 || h == 0 {
+            return false;
+        }
+        if self.composite_cache.len() < w * h * 4 {
+            self.recomposite();
+        }
+        // Still short means the layer stack itself cannot fill the frame — a
+        // genuinely broken document, not a cold cache. Refuse rather than
+        // index past the end below.
+        if self.composite_cache.len() < w * h * 4 {
             return false;
         }
         self.snap("Remove Object");
