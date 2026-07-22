@@ -1229,8 +1229,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             onPointerDown: (e: React.PointerEvent<SVGElement>) =>
               handleDrawPointerDown(e, "move", "body"),
           };
-          let preview: React.ReactNode = null;
-          let bodyHit: React.ReactNode = null;
+          let preview: React.ReactNode;
+          let bodyHit: React.ReactNode;
 
           if (kind === "arrow") {
             const g = arrowGeometry(

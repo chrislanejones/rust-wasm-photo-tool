@@ -152,7 +152,6 @@ export function ResizeSettings({
   useEffect(() => {
     setWidth(String(imageWidth));
     setHeight(String(imageHeight));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     baseQualityRef.current = quality;
     baseFormatRef.current = exportFormat;
     baseMethodRef.current = method;

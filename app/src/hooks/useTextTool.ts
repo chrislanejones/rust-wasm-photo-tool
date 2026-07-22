@@ -259,7 +259,7 @@ export function useTextTool({
       }
     }
 
-    let targetId: number | null = null;
+    let targetId: number | null;
     if (editingId !== null) {
       tool.update_text_annotation(
         editingId,
@@ -415,7 +415,7 @@ export function useTextTool({
     (id: number) => {
       const tool = toolRef.current;
       if (!tool) return;
-      let list: AnnotationMeta[] = [];
+      let list: AnnotationMeta[];
       try {
         list = JSON.parse(tool.get_text_annotations());
       } catch {
@@ -450,7 +450,7 @@ export function useTextTool({
         if (hitId >= 0) {
           if (textInputRef.current) commitText();
           // Parse fresh list so we pick up the latest geometry.
-          let list: AnnotationMeta[] = [];
+          let list: AnnotationMeta[];
           try {
             list = JSON.parse(tool.get_text_annotations());
           } catch {

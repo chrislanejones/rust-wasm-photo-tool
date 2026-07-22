@@ -59,3 +59,35 @@ more days get built on a wrong foundation before anyone notices.
 Early warning sign: Remove Object shipping (even flag-off, even to
 dogfooders) without a recorded "I looked at the fill and it's plausible"
 confirmation from Chris in this ADR or SESSION_LOG.
+
+## Follow-up: day 2 (rayon) REJECTED — 2026-07-19
+The parallel NNF rewrite this ADR anticipated was built, measured, and
+thrown away. It lives unmerged on `perf/patchmatch-rayon`
+(`c6b5399` implementation, `520f6b3` bench) and is kept deliberately —
+a recorded negative result, not dead weight. Do not delete the branch,
+and do not re-attempt the same shape.
+
+**Result: 8–31× SLOWER than the scalar kernel, while byte-identical in
+output.** The anti-diagonal wavefront is correct — same pixels, same
+seed, same answer — so this is not a bug to fix. The cost is structural:
+per-row rayon dispatch on a kernel whose inner work is small relative to
+the join overhead, and it does not tune away. The slowdown is fixed-cost,
+so it is worst exactly where the kernel is already fast.
+
+Consequences for this ADR: the "slow on real photos until day-2 rayon"
+consequence above **no longer has a day-2 remedy**. Fill speed now rests
+entirely on day 3's multi-resolution pyramid, which is also the more
+likely fix for fill *quality* — a single-resolution kernel is what makes
+a large hole look smeary, and the pyramid addresses both. Nothing should
+build on an assumed parallel speedup.
+
+The pre-mortem's early-warning sign was, separately, borne out: the
+interactive fill-quality check it asked for still has an untested case —
+a generous full-object mask. The X-stroke tried so far masks a fraction
+of the object and so copies the object back into the hole, which is
+worst-case input, not a verdict on the kernel. No pyramid verdict should
+be recorded until that generous-mask test runs.
+
+Also found while investigating, still open: `remove_object` returns
+`false` silently when `composite_cache` is cold — a real latent bug,
+independent of fill quality.

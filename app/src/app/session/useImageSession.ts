@@ -157,7 +157,6 @@ export function useImageSession({
     } finally {
       savingRef.current = false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp, savePhotoEdit]);
 
   // Idle debounce. Keyed on the engine's undo count + the modified flag, so it

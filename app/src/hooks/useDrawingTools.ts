@@ -185,9 +185,9 @@ export function useDrawingTools({
       const dx = end.x - start.x;
       const dy = end.y - start.y;
       const r = ratio[0] / ratio[1];
-      let w = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
+      const w = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
         ? Math.abs(dx) : Math.abs(dy) * r;
-      let h = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
+      const h = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
         ? Math.abs(dx) / r : Math.abs(dy);
       let x = start.x;
       let y = start.y;
@@ -365,7 +365,7 @@ export function useDrawingTools({
       const tool = toolRef.current;
       if (!tool) return;
       if (editStateRef.current) commitEdit();
-      let list: ShapeMeta[] = [];
+      let list: ShapeMeta[];
       try {
         list = JSON.parse(tool.get_shape_annotations()) as ShapeMeta[];
       } catch {
@@ -506,7 +506,7 @@ export function useDrawingTools({
     const editId = editStateRef.current?.editId;
     if (editId == null) return;
     const tool = toolRef.current;
-    let stillThere = false;
+    let stillThere: boolean;
     try {
       stillThere = (JSON.parse(tool?.get_shape_annotations() ?? "[]") as ShapeMeta[])
         .some((s) => s.id === editId);

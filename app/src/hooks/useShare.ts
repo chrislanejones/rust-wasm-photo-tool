@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 /** Build the public share URL for a token, anchored to wherever the app is
  *  served (origin + path, so it works on localhost and any deploy host). */
@@ -37,7 +38,7 @@ export function useShare() {
       const { storageId } = (await resp.json()) as { storageId: string };
 
       const { token } = await createShareMutation({
-        storageId: storageId as any,
+        storageId: storageId as Id<"_storage">,
         canvasW: input.canvasW,
         canvasH: input.canvasH,
         title: input.title,

@@ -39,7 +39,9 @@ export function useRecentTexts() {
         id: i,
         text: t.text,
         fontSize: t.fontSize,
-        fontFamily: (t as any).fontFamily ?? "sans-serif",
+        // `fontFamily` post-dates the Convex table, so older rows lack it and
+        // the generated type does not carry it.
+        fontFamily: (t as { fontFamily?: string }).fontFamily ?? "sans-serif",
         fontWeight: t.fontWeight,
         textColor: t.textColor,
       }))

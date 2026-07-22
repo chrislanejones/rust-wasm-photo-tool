@@ -207,7 +207,8 @@ export function useKeyboardShortcuts({
       if (e.metaKey || e.ctrlKey) {
         if (e.key === "z" || e.key === "Z") {
           e.preventDefault();
-          e.shiftKey ? onRedo() : onUndo();
+          if (e.shiftKey) onRedo();
+          else onUndo();
           return;
         }
         if (e.code === "KeyC") {

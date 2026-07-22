@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.85",
+    date: "2026-07-22",
+    headline: "A check that was never running, now runs",
+    entries: [
+      { tag: "infra", text: "Nothing you can see changed in this one. The project's checklist has required a code linter to pass before anything ships, and it turned out the linter had never actually run — it was never installed, and there was no configuration for it to read, so every attempt quietly failed and got treated as a pass. That is worse than not having the check at all, because everyone assumed it was working." },
+      { tag: "fix", text: "It runs now, and the first real pass over 207 files found 26 things worth fixing — all of them fixed here. Mostly harmless leftovers: values computed and then thrown away before anything read them, a few places where the code had stopped describing what type it was really handling. The test files turned out to have had no automated checking of any kind until now." },
+    ],
+  },
+  {
     version: "v0.9.84",
     date: "2026-07-19",
     headline: "The app learns to cache itself — switch still off",

@@ -146,7 +146,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
           index: i,
         };
       });
-    let layers: LayerInfo[] = [];
+    let layers: LayerInfo[];
     let activeLayerId = 0;
     try {
       layers = JSON.parse(t.get_layers()) as LayerInfo[];
@@ -885,7 +885,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
-        e.shiftKey ? redo() : undo();
+        if (e.shiftKey) redo();
+        else undo();
       }
     };
     window.addEventListener("keydown", handler);

@@ -1976,3 +1976,60 @@ eliminated. Decision recorded in
 `sw.js`, no workbox chunk, no `version.json`, and zero occurrences of
 `serviceWorker` in the emitted bundle. `tsc --noEmit` clean, 184/184 vitest
 passing, production build succeeds.
+
+## v7.42 — 2026-07-22
+
+**The lint gate becomes real.** The definition of done in `CLAUDE.md` has
+listed `npx eslint app/src --max-warnings 0` for months. There was no
+`eslint.config.*` anywhere in the repo — master or any worktree — and ESLint
+was not a dependency in either `package.json`, so every invocation had `npx`
+fetch ESLint from the registry and then exit on config-not-found. The gate
+had never once run. It was worse than having no gate, because the checklist
+implied it had.
+
+A flat config now lives at the workspace root: `@eslint/js` recommended,
+`typescript-eslint` recommended, and the two classic React hook rules, plus
+`react-refresh/only-export-components` for Vite HMR. Correctness only — no
+formatting or style rules. The gate is **errors-only**: `pnpm lint` exits
+non-zero on any error, and warnings stay visible as a tracked backlog rather
+than being silenced.
+
+First honest run over 207 files: **90 problems, 26 errors and 64 warnings,
+with 182 files completely clean.** All 26 errors are fixed in this release.
+
+| #   | Change                                                                    | Status                                                                    |
+| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | `eslint.config.mjs` at the workspace root — flat config, ESLint 10 (`.mjs` because the root `package.json` is CJS) | Complete — `pnpm lint` and `npx eslint app/src` both work |
+| 2   | ESLint 10.7 + `typescript-eslint` 8.65 + `eslint-plugin-react-hooks` 7.1 + `eslint-plugin-react-refresh` 0.5 added as root devDependencies | Complete — none of them were installed before |
+| 3   | 11 `no-useless-assignment` dead stores removed — initializers overwritten on every path before any read | Complete — `tsc` definite-assignment verified each one |
+| 4   | 3 `no-explicit-any` casts replaced — two `storageId as any` become `Id<"_storage">`, one Convex row field gets a narrow inline type | Complete |
+| 5   | 2 `no-unused-expressions` — `cond ? a() : b()` used as a statement became `if/else` | Complete — behaviour identical |
+| 6   | 3 empty `catch {}` blocks documented; 2 dead test helpers deleted; 2 `prefer-const` | Complete |
+| 7   | 2 stale `eslint-disable` comments removed — written for a linter that had never run | Complete |
+| 8   | `no-unused-vars` configured to honour the existing `^_` convention (`_settings`, `_onChange`, `_dropped`) | Complete — the code already marked intent; the rule now reads it |
+| 9   | `CLAUDE.md` definition of done corrected — `--max-warnings 0` replaced with `pnpm lint`, with a note on why it must not come back | Complete |
+
+**Deliberately deferred**, each its own decision rather than a side effect of
+wiring a linter:
+
+- **`max-lines` and the entropy/drift rules.** The tripwire that would catch
+  the next AppShell, but enabling it the same day as the config buries the
+  signal under the current one. Needs a ratchet baseline first.
+- **The React Compiler rule set.** `eslint-plugin-react-hooks` v7's
+  `recommended` is no longer the two classic rules — it now carries 17,
+  14 of them `error`. Measured against this codebase it reports **123
+  react-hooks problems (66 errors)** versus 57 warnings for the classic
+  pair: `refs` 35, `set-state-in-effect` 18, `purity` 10,
+  `static-components` 2, `preserve-manual-memoization` 1. Real correctness
+  rules and worth a session of their own; enabling them here would have made
+  the gate red on day one.
+- **Type-aware linting** (`recommendedTypeChecked`) — needs a TS program per
+  run and produces a much larger initial wave.
+
+**Test files had no static analysis before this.** `app/tsconfig.json`
+excludes `src/**/*.test.ts(x)` from the `noEmit` pass, so `tsc` — including
+`noUnusedLocals` and `noUnusedParameters` — has never seen the 13 spec files.
+ESLint is the first checker to read them; 3 of the 26 errors were there.
+
+**Verified**: `pnpm lint` reports 0 errors / 62 warnings, `tsc --noEmit`
+clean, 184/184 vitest passing, app and marketing production builds succeed.

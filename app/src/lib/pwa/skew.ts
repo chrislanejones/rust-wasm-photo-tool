@@ -26,7 +26,7 @@ export async function checkBuildSkew(context: string): Promise<void> {
   if (__IH_SW_MODE__ !== "on") return; // statically removed in default builds
   if (skewReported) return; // one error + one banner per session, not per init
 
-  let manifestHash: string | null = null;
+  let manifestHash: string | null;
   try {
     const res = await fetch("/version.json", { cache: "no-store" });
     if (!res.ok) return; // deploy target without a manifest — unknown, no banner

@@ -70,11 +70,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.41 — 2026-07-19
+### v7.42 — 2026-07-22
 
-**The app can cache itself for offline use now — and the switch is off.** Every visit re-downloads about 3.6 MB of app shell, the 734 KB Rust engine included, and a network drop mid-session means the next boot fails outright. That's a strange way for an editor to behave when all of your originals and edits already live in the browser. A service worker fixes both. The one that landed is precache-only: it stores the build's own hashed files and nothing else. Sign-in, cloud sync and share links always go to the network, so nothing about your account or your documents can ever be served stale.
+**The lint gate was fiction. Now it runs.** The project's own checklist has required `npx eslint app/src --max-warnings 0` for months. There was no ESLint config anywhere in the repo, and ESLint wasn't a dependency either — so every "run" downloaded ESLint fresh and exited on config-not-found. A gate nobody can run is worse than no gate, because everyone assumes it ran.
 
-It ships off. A default build contains no service worker at all — nothing registered, nothing emitted, no bytes. Turning it on is a separate, deliberate decision, because a bad service worker is the worst thing this app could ship: it strands people on an old version without ever saying so. When it is on, a new build waits for an explicit Reload instead of swapping code out from under an open edit, and a per-build hash check raises the prompt again if a stale cache is still serving old files.
+There's a real flat config now: TypeScript, React hooks, and Vite fast-refresh rules. Correctness only, no formatting opinions. The first honest run over 207 files found 26 errors and 64 warnings, with 182 files completely clean. The 26 errors are fixed — mostly dead stores, where a variable is initialized and then overwritten on every path before anything reads it, plus three `any` casts that now name the type they always meant and two silent `catch {}` blocks that now say why they swallow.
+
+Two things only turned up once the linter actually ran. The source contained `eslint-disable` comments written for a linter that had never run. And the 13 test files had never been statically analysed at all — `tsconfig.json` excludes them from the type pass, so until now nothing checked them. The 57 remaining `react-hooks/exhaustive-deps` warnings are left visible on purpose: errors block the gate, warnings are a backlog to work down deliberately. Rewriting a dependency array can change behaviour, so each one gets a human.
 
 ## License
 
