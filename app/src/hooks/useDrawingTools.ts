@@ -155,12 +155,21 @@ export function useDrawingTools({
       ) => Uint32Array | undefined)
     | null
   >(null);
-  if (!constrainRef.current) {
-    void import("stamp_tool").then(async (mod) => {
-      await mod.default();
-      constrainRef.current = mod.constrain_crop_to_ratio;
-    }).catch(() => {});
-  }
+  // Warm the cache from an effect, not from the render body. The import is
+  // async either way, so `constrainRef.current` is null immediately after the
+  // first render in both versions, and the only reader (`constrainDrag`) runs
+  // from pointer handlers long after mount — with a JS fallback if the cache is
+  // still cold. Starting it during render was a side effect in the render
+  // phase, which a discarded/replayed render would fire spuriously.
+  useEffect(() => {
+    if (constrainRef.current) return;
+    void import("stamp_tool")
+      .then(async (mod) => {
+        await mod.default();
+        constrainRef.current = mod.constrain_crop_to_ratio;
+      })
+      .catch(() => {});
+  }, []);
 
   /** Apply the locked-ratio constraint to a raw drag rect. Returns null
    *  when no ratio is locked so callers fall back to the free path. */

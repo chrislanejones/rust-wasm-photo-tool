@@ -711,6 +711,9 @@ export function useTextTool({
     refreshAnnotations,
     selectAnnotation,
     hoveredAnnotationId,
-    editingAnnotationId: editingAnnotationId.current,
+    // NB: `editingAnnotationId` is deliberately NOT returned. It used to be
+    // exposed as `editingAnnotationId.current`, which read a ref during render:
+    // the value could never trigger a re-render in the consumer, so it was
+    // guaranteed to go stale. AppShell (the only caller) never read it.
   };
 }

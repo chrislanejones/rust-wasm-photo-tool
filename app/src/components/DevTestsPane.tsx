@@ -6,29 +6,33 @@ import { MonitorPause, RotateCcw } from "lucide-react";
 import { IdleScreenDialog } from "@/components/IdleScreenDialog";
 import { ResumeDialog } from "@/components/ResumeDialog";
 
+// Declared at module scope, not inside DevTestsPane: a component defined during
+// render gets a fresh type identity every render, so React unmounts and remounts
+// the whole subtree each time. Row closes over nothing from the parent (icon,
+// label and onClick all arrive as props), so hoisting is a pure move.
+const Row = ({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: typeof MonitorPause;
+  label: string;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex w-full items-center gap-3 rounded-lg border border-border bg-bg-elevated px-4 py-3 text-left text-sm font-medium text-text-primary transition-colors hover:bg-bg-elevated/70"
+  >
+    <Icon className="h-4 w-4 shrink-0 text-text-secondary" />
+    <span className="flex-1">{label}</span>
+    <span className="text-2xs text-text-muted">Open</span>
+  </button>
+);
+
 export function DevTestsPane() {
   const [idleOpen, setIdleOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
-
-  const Row = ({
-    icon: Icon,
-    label,
-    onClick,
-  }: {
-    icon: typeof MonitorPause;
-    label: string;
-    onClick: () => void;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-lg border border-border bg-bg-elevated px-4 py-3 text-left text-sm font-medium text-text-primary transition-colors hover:bg-bg-elevated/70"
-    >
-      <Icon className="h-4 w-4 shrink-0 text-text-secondary" />
-      <span className="flex-1">{label}</span>
-      <span className="text-2xs text-text-muted">Open</span>
-    </button>
-  );
 
   return (
     <div className="space-y-4">
