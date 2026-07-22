@@ -132,6 +132,9 @@ export interface DiagnosticsSnapshot {
   tier2: DiagTier2 | null;
   interacting: boolean;
   processes: ProcessRow[];
+  /** Wall clock at which `processes` was sampled; 0 before the first sample.
+   *  Consumers render relative ages from this instead of `Date.now()`. */
+  sampledAt: number;
   windowMs: number;
   /** Tiles marked dirty by the most recent tile-engine flush, read on the
    *  Tier-1 cadence; `null` when the tile path isn't active this flush
@@ -164,6 +167,11 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
   const [tier1, setTier1] = useState<DiagTier1 | null>(null);
   const [tier2, setTier2] = useState<DiagTier2 | null>(null);
   const [processes, setProcesses] = useState<ProcessRow[]>([]);
+  /** Wall clock at the moment `processes` was sampled. Published so consumers
+   *  can render "Xs ago" without calling `Date.now()` during their own render
+   *  (impure — see ADR-020). It is the SAME instant `buildProcesses` used, so
+   *  the ages are now consistent with the rows that produced them. */
+  const [sampledAt, setSampledAt] = useState(0);
   const [tilesDirtyCount, setTilesDirtyCount] = useState<number | null>(null);
   const [oplog, setOplog] = useState<OplogStats | null>(null);
   const [oplogPersist, setOplogPersist] = useState<OplogPersistStats | null>(null);
@@ -225,7 +233,9 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
         wasmBytes: getWasmMemoryBytes(),
         canvasBytes: estimateCanvasBytes(),
       });
-      setProcesses(buildProcesses(Date.now()));
+      const sampleTs = Date.now();
+      setProcesses(buildProcesses(sampleTs));
+      setSampledAt(sampleTs);
       setTilesDirtyCount(getTilesDirtyCount());
       setOplog(getOplogStats());
       setOplogPersist(getOplogPersistStats());
@@ -303,6 +313,7 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
     tier2,
     interacting,
     processes,
+    sampledAt,
     windowMs: PROCESS_WINDOW_MS,
     tilesDirtyCount,
     oplog,

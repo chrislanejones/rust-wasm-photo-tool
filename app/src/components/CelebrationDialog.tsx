@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   PartyPopper,
@@ -64,10 +64,20 @@ interface Particle {
   left: number;
 }
 
-/** A one-shot center-burst confetti popper, generated once per mount. */
+/** A one-shot center-burst confetti popper, generated once per mount.
+ *
+ *  Geometry is random, and `useMemo`'s callback runs in the RENDER phase, so
+ *  the old version called `Math.random()` nine times during render — impure
+ *  (ADR-020). Generating on mount instead costs exactly one frame before the
+ *  burst, which is invisible against the 0-120ms stagger the particles already
+ *  carry, and every span still animates from `initial` to `animate` when it
+ *  mounts. Confetti itself only mounts while the dialog is open. */
 function Confetti() {
-  const particles = useMemo<Particle[]>(() => {
-    return Array.from({ length: 48 }, () => {
+  const [particles, setParticles] = useState<Particle[]>([]);
+
+  useEffect(() => {
+    setParticles(
+      Array.from({ length: 48 }, () => {
       const angle = Math.random() * Math.PI * 2;
       const dist = 120 + Math.random() * 220;
       return {
@@ -81,8 +91,9 @@ function Confetti() {
         delay: Math.random() * 0.12,
         duration: 0.9 + Math.random() * 0.7,
         left: 50 + (Math.random() - 0.5) * 12,
-      };
-    });
+        };
+      }),
+    );
   }, []);
 
   return (

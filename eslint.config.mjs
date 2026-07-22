@@ -74,6 +74,19 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
 
+      // Two rules ADOPTED from the React Compiler set — see ADR-020. Both are
+      // at zero violations as of this commit, so they gate against regression
+      // rather than describing a backlog.
+      //   static-components: a component defined during render remounts on
+      //     every parent render, silently resetting its own state.
+      //   purity: randomness/clock reads during render make output depend on
+      //     WHEN React chose to render, which is not something a caller controls.
+      // The rest of the set stays off: `refs` (31 open, held pending a
+      // useLatestRef/useEffectEvent migration) and `set-state-in-effect`
+      // (18 open, 15 of which are correct code that would need suppressions).
+      "react-hooks/static-components": "error",
+      "react-hooks/purity": "error",
+
       // Vite HMR: a module mixing component and non-component exports silently
       // breaks fast refresh for that file.
       "react-refresh/only-export-components": [

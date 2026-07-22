@@ -170,9 +170,20 @@ export function ResourceMonitor({
   diag: DiagnosticsSnapshot;
   onRefresh: () => void;
 }) {
-  const { tier0, tier1, tier2, processes, windowMs, tilesDirtyCount, oplog, oplogPersist } =
-    diag;
-  const now = Date.now();
+  const {
+    tier0,
+    tier1,
+    tier2,
+    processes,
+    windowMs,
+    tilesDirtyCount,
+    oplog,
+    oplogPersist,
+  } = diag;
+  // The instant the rows were sampled, not the instant we render them —
+  // `Date.now()` during render is impure (ADR-020) and made the ages drift
+  // against the data they describe on any unrelated re-render.
+  const now = diag.sampledAt;
 
   if (!tier1) {
     return (
