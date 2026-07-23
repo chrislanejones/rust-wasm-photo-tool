@@ -200,6 +200,16 @@ declare module "stamp_tool" {
     thumbnail_height(max_px: number): number;
     thumbnail_data(max_px: number): Uint8Array;
     copy_region(x: number, y: number, w: number, h: number): Uint8Array;
+    /** Copy a region out of the VISIBLE COMPOSITE rather than the active
+     *  layer. `include_background` mirrors the `exportCanvasBackground`
+     *  preference. Not tight-cropped — the rect is in document coordinates. */
+    copy_region_composited(
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      include_background: boolean,
+    ): Uint8Array;
     paste_region(
       pixels: Uint8Array,
       src_w: number,
@@ -907,8 +917,14 @@ declare module "stamp_tool" {
     clear_selection(): void;
     /** Delete selected pixels (transparent) on the active layer; deselects. */
     delete_selection(): boolean;
+    /** Place the selected pixels of the ACTIVE layer on a new layer directly
+     *  above it (Layer Via Copy / Layer Via Cut — Ctrl+J / Ctrl+Shift+J).
+     *  `cut` additionally clears them from the source layer. One history step;
+     *  deselects after. Returns the new layer id, or 0 when nothing is
+     *  selected (no history, no mutation). */
+    selection_to_new_layer(cut: boolean): number;
 
-    // ── Magnetic lasso (live-wire) — behind the `ih_smart_edge` switch ──
+    // ── Magnetic lasso (live-wire) — always available ──
     // Path-finds along the SAME edge core the edge-aware wand uses, turned into
     // a cost map (strong edge = cheap to travel). Ends where every other
     // selection tool ends: one mask, one overlay RGBA.

@@ -168,6 +168,7 @@ export function CanvasGuidesOverlay({
 
   return (
     <svg
+      data-testid="canvas-guides-overlay"
       style={{
         position: "fixed",
         inset: 0,

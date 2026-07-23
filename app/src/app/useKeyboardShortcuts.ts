@@ -71,6 +71,13 @@ interface KeyboardShortcutOptions {
    *  (crop box, shape bbox, magic-wand bounds), falling back to the whole
    *  canvas. Ctrl+Shift+C stays the explicit whole-canvas copy. */
   onCopyRegion?: () => void;
+  /** Ctrl/Cmd+J — place the selection on a new layer, leaving the original
+   *  (Layer Via Copy). Only fires while something is selected (`hasSelection`)
+   *  — otherwise the browser keeps its own Ctrl+J. */
+  onNewLayerCopy?: () => void;
+  /** Ctrl/Cmd+Shift+J — same, but clears the selected pixels off the source
+   *  layer (Layer Via Cut). */
+  onNewLayerCut?: () => void;
   /** Ctrl/Cmd+M — toggle the Move-layer mode (Layer Settings tool). */
   onToggleMove?: () => void;
   /** Enter — apply the pending crop box (same action as the Apply Crop
@@ -116,6 +123,8 @@ export function useKeyboardShortcuts({
   onRotateCw,
   onCopyToClipboard,
   onCopyRegion,
+  onNewLayerCopy,
+  onNewLayerCut,
   onNextPhoto,
   onPrevPhoto,
   onSpaceDown,
@@ -225,6 +234,17 @@ export function useKeyboardShortcuts({
             e.preventDefault();
             onCopyRegion?.();
           }
+          return;
+        }
+        // Ctrl/Cmd + J → selection to a new layer (Copy); +Shift → Cut.
+        // Only claims the key while something is actually selected — with no
+        // selection the browser keeps its own Ctrl+J (downloads/etc.), same
+        // spirit as Ctrl+C yielding to a native text selection above.
+        if (e.code === "KeyJ") {
+          if (!hasSelection) return;
+          e.preventDefault();
+          if (e.shiftKey) onNewLayerCut?.();
+          else onNewLayerCopy?.();
           return;
         }
         // Ctrl/Cmd + M → toggle Move-layer (Layer Settings tool).
@@ -345,6 +365,6 @@ export function useKeyboardShortcuts({
     setShowUpload, setShowTools, setShowGallery,
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
     onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,
-    onCopyToClipboard, onCopyRegion, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
+    onCopyToClipboard, onCopyRegion, onNewLayerCopy, onNewLayerCut, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
   ]);
 }

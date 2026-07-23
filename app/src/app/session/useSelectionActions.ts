@@ -7,6 +7,7 @@ import type { RefObject, MouseEvent as ReactMouseEvent } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useToolStore } from "@/stores/useToolStore";
 import { tryRemoveObject } from "@/lib/patchmatch";
+import { toast } from "@/components/ui/sonner";
 
 export function useSelectionActions(
   stamp: ReturnType<typeof useCloneStamp>,
@@ -111,7 +112,7 @@ export function useSelectionActions(
   // Bound here rather than in useKeyboardShortcuts: the listener only exists
   // while a lasso session is actually open, so Escape keeps its existing
   // meaning everywhere else in the app and the shared shortcut hook doesn't
-  // grow a case for a flagged-off feature.
+  // grow a session-scoped case.
   useEffect(() => {
     if (!lassoCommitted) return;
     const onKey = (e: KeyboardEvent) => {
@@ -143,6 +144,34 @@ export function useSelectionActions(
     }
     setSelectionMask(null);
   }, [stamp]);
+  // "New Layer" — place the selection on a new layer above the active one
+  // (Layer Via Copy / Layer Via Cut; Ctrl+J / Ctrl+Shift+J). Same publish
+  // shape as handleDeleteSelection: the engine snaps + deselects + returns
+  // 0-on-nothing, JS flushes, syncs (so the Layers panel sees the new layer)
+  // and drops the overlay mask.
+  const handleNewLayerFromSelection = useCallback(
+    (cut: boolean) => {
+      const tool = stamp.toolRef.current;
+      if (!tool) return;
+      if (tool.selection_to_new_layer(cut)) {
+        stamp.flushToCanvas();
+        stamp.syncState();
+        toast.success(
+          cut ? "Selection cut to a new layer" : "Selection copied to a new layer",
+        );
+      }
+      setSelectionMask(null);
+    },
+    [stamp, setSelectionMask],
+  );
+  const handleNewLayerCopy = useCallback(
+    () => handleNewLayerFromSelection(false),
+    [handleNewLayerFromSelection],
+  );
+  const handleNewLayerCut = useCallback(
+    () => handleNewLayerFromSelection(true),
+    [handleNewLayerFromSelection],
+  );
   // Remove Object (PatchMatch, `ih_patchmatch` flag — see lib/patchmatch.ts).
   // Same shape as handleDeleteSelection above: `tryRemoveObject` is already
   // the flag+export guard, so a flag-off or default (non-`patchmatch`) build
@@ -187,11 +216,15 @@ export function useSelectionActions(
     handleSelectAll,
     handleDeselect,
     handleDeleteSelection,
+    // Selection → new layer (Copy = Ctrl+J, Cut = Ctrl+Shift+J).
+    handleNewLayerCopy,
+    handleNewLayerCut,
     // Remove Object (behind ih_patchmatch; see lib/patchmatch.ts).
     handleRemoveObject,
     handleToggleMove,
     handleToggleSelectionMode,
-    // Magnetic lasso (behind ih_smart_edge; see lib/smartEdge.ts).
+    // Magnetic lasso — shipped by default since the selection-tool overhaul
+    // (`ih_smart_edge` now gates only the Paint Smart Brush).
     handleLassoMove,
     handleLassoClose,
     handleLassoCancel,

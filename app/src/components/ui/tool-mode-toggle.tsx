@@ -36,6 +36,8 @@ export interface ToolModeToggleProps<T extends string> {
   onModeChange: (mode: T) => void;
   /** Icon-row grid columns (ToolButtonGroup). Default 2 — Paint's 2×2. */
   columns?: 2 | 3 | 4 | 5;
+  /** Disable the mode tiles (forwarded to ToolButtonGroup). Default false. */
+  disabled?: boolean;
   /** Body slot — renders the active mode's settings. Mounted inside the
    *  per-mode `motion.div` (space-y-4), below the SectionHeader, so returning
    *  a fragment of siblings reproduces the pre-extraction DOM exactly. */
@@ -56,6 +58,7 @@ export function ToolModeToggle<T extends string>({
   activeMode,
   onModeChange,
   columns = 2,
+  disabled = false,
   children,
   className,
 }: ToolModeToggleProps<T>) {
@@ -68,6 +71,7 @@ export function ToolModeToggle<T extends string>({
         options={modes}
         value={activeMode}
         onChange={onModeChange}
+        disabled={disabled}
       />
 
       <AnimatePresence mode="wait">

@@ -44,7 +44,7 @@ import type { ThemeChoice } from "@/lib/preferences";
 import type { SettingsTab } from "@/components/SubscriptionButton";
 import { TOOLS, TOOL_MODULES } from "@/features/tools";
 import { allToolModes } from "@/features/tools/toolModes";
-import { SELECT_KINDS } from "@/features/tools/settings/SelectSettings";
+import { SELECT_MODES } from "@/features/tools/settings/SelectSettings";
 import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { navigateTo, currentRouteUrl, currentRouteLabel } from "@/features/routing";
@@ -165,7 +165,7 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
   // Not a route segment of their own — the kind is a setting of Adjust &
   // Select, not a view — so these navigate to `#/tool/adjust/select` and then
   // set the kind. The navigation half still goes through the router.
-  for (const kind of SELECT_KINDS) {
+  for (const kind of SELECT_MODES) {
     commands.push({
       id: `select.${kind.id}`,
       label: `Adjust & Select › ${kind.label}`,

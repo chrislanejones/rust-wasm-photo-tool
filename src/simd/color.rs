@@ -34,6 +34,10 @@
 //!     buffer (see `filters::sharpen`, which reuses the existing separable
 //!     Gaussian blur passes in `simd::blur`); alpha is copied through
 //!     unchanged, not sharpened.
+//!   * The selection-masked clear (`mask_clear_rgba`) zeroes the 4 RGBA bytes
+//!     of every pixel whose mask bool equals `clear_where` — an AND against a
+//!     per-pixel 0x00/0xFF selector, so the SIMD path is bit-identical to the
+//!     scalar baseline by construction. Powers `selection_to_new_layer`.
 
 // ── Public API: target-dispatched at compile time ─────────────────────────────
 
@@ -156,6 +160,27 @@ pub fn invert_u8(buf: &mut [u8]) {
     scalar::invert_u8(buf)
 }
 
+/// Masked clear: for each pixel `i`, if `mask[i] == clear_where`, zero all 4
+/// of its RGBA bytes (fully transparent); otherwise leave the pixel untouched.
+/// `buf.len()` must equal `mask.len() * 4`. Used by `selection_to_new_layer`:
+/// `clear_where = false` keeps only the selected pixels on the copied layer,
+/// `clear_where = true` cuts the selected pixels out of the source layer.
+///
+/// The SIMD path is **bit-identical** to the scalar baseline by construction —
+/// it is just an AND against a per-pixel all-0xFF (keep) / all-0x00 (clear)
+/// selector, which cannot differ from "write zeros or don't touch".
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+pub fn mask_clear_rgba(buf: &mut [u8], mask: &[bool], clear_where: bool) {
+    debug_assert_eq!(buf.len(), mask.len() * 4);
+    unsafe { simd::mask_clear_rgba(buf, mask, clear_where) }
+}
+
+#[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
+pub fn mask_clear_rgba(buf: &mut [u8], mask: &[bool], clear_where: bool) {
+    debug_assert_eq!(buf.len(), mask.len() * 4);
+    scalar::mask_clear_rgba(buf, mask, clear_where)
+}
+
 // ── Scalar reference (native builds + correctness baseline) ───────────────────
 
 #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
@@ -269,6 +294,15 @@ mod scalar {
     pub fn invert_u8(buf: &mut [u8]) {
         for m in buf.iter_mut() {
             *m = 255 - *m;
+        }
+    }
+
+    /// Correctness baseline for the masked clear (see the dispatch doc above).
+    pub fn mask_clear_rgba(buf: &mut [u8], mask: &[bool], clear_where: bool) {
+        for (px, &m) in buf.chunks_exact_mut(4).zip(mask.iter()) {
+            if m == clear_where {
+                px.fill(0);
+            }
         }
     }
 }
@@ -456,6 +490,41 @@ mod simd {
             i += 1;
         }
     }
+
+    /// Masked clear, 4 pixels (16 bytes) per step: build a 16-byte keep
+    /// selector from the 4 mask bools — an all-0xFF i32 lane for a pixel to
+    /// KEEP, all-0x00 for a pixel to clear — then `v128_and` it with the
+    /// original block. AND with all-ones/all-zeros bytes is trivially
+    /// bit-identical to the scalar "fill(0) or skip". Tail (< 4 pixels)
+    /// handled scalar with the same predicate.
+    pub unsafe fn mask_clear_rgba(buf: &mut [u8], mask: &[bool], clear_where: bool) {
+        let n = mask.len().min(buf.len() / 4);
+        let mut p = 0;
+        while p + 4 <= n {
+            let lane = |k: usize| -> i32 {
+                if *mask.get_unchecked(p + k) == clear_where {
+                    0
+                } else {
+                    -1
+                }
+            };
+            let keep = i32x4(lane(0), lane(1), lane(2), lane(3));
+            let ptr = buf.as_mut_ptr().add(p * 4);
+            let orig = v128_load(ptr as *const v128);
+            v128_store(ptr as *mut v128, v128_and(orig, keep));
+            p += 4;
+        }
+        while p < n {
+            if *mask.get_unchecked(p) == clear_where {
+                let i = p * 4;
+                buf[i] = 0;
+                buf[i + 1] = 0;
+                buf[i + 2] = 0;
+                buf[i + 3] = 0;
+            }
+            p += 1;
+        }
+    }
 }
 
 // ── Tests (native target → exercise the scalar reference path, which is the
@@ -551,5 +620,39 @@ mod color_tests {
         let blurred = vec![50u8, 40, 30, 255];
         unsharp_combine(&mut data, &blurred, 0.0);
         assert_eq!(data, vec![100, 90, 80, 255]);
+    }
+
+    #[test]
+    fn mask_clear_where_true_zeroes_exactly_the_selected_pixels() {
+        // 5 pixels (odd count → exercises the SIMD tail on wasm too), each with
+        // a distinct value so a wrong index is visible in the assertion.
+        let mut buf: Vec<u8> = (0u8..20).collect();
+        let mask = [true, false, true, false, true];
+        mask_clear_rgba(&mut buf, &mask, true);
+        assert_eq!(
+            buf,
+            vec![0, 0, 0, 0, 4, 5, 6, 7, 0, 0, 0, 0, 12, 13, 14, 15, 0, 0, 0, 0],
+            "selected pixels zeroed, non-selected untouched"
+        );
+    }
+
+    #[test]
+    fn mask_clear_where_false_zeroes_exactly_the_non_selected_pixels() {
+        let mut buf: Vec<u8> = (0u8..20).collect();
+        let mask = [true, false, true, false, true];
+        mask_clear_rgba(&mut buf, &mask, false);
+        assert_eq!(
+            buf,
+            vec![0, 1, 2, 3, 0, 0, 0, 0, 8, 9, 10, 11, 0, 0, 0, 0, 16, 17, 18, 19],
+            "non-selected pixels zeroed, selected untouched"
+        );
+    }
+
+    #[test]
+    fn mask_clear_all_false_mask_with_clear_where_true_is_identity() {
+        let mut buf: Vec<u8> = (0u8..16).collect();
+        let before = buf.clone();
+        mask_clear_rgba(&mut buf, &[false; 4], true);
+        assert_eq!(buf, before);
     }
 }

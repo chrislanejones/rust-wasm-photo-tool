@@ -15,10 +15,12 @@ import type { Preferences } from "@/lib/preferences";
  * - Backing canvas color — the Background layer's fill (`canvasBgColor`); the
  *   first swatch is the transparent/checkerboard default. The fill itself is
  *   done in Rust (`set_artboard_border`); this only picks the color.
- * - Canvas background on export (`exportCanvasBackground`) — whether the
- *   backing canvas is baked into downloads/shares/copies, or left out (the
- *   default). The crop-to-content compositing is Rust-side
- *   (`get_image_data_excluding_background`).
+ * - Canvas background on export and copy to clipboard
+ *   (`exportCanvasBackground`) — whether the backing canvas is baked into
+ *   downloads/shares/copies, or left out (the default). The crop-to-content
+ *   compositing is Rust-side (`get_image_data_excluding_background`);
+ *   selection copies use `copy_region_composited`, which takes the same flag
+ *   without tight-cropping (its rect is in document coordinates).
  */
 interface LayersCanvasPaneProps {
   /** The draft being edited (owned by the Settings modal). */
@@ -47,7 +49,7 @@ export function LayersCanvasPane({
       <section className="space-y-3">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">
-            Canvas on import
+            Importing: Canvas on every new image or background
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-text-muted">
             How a freshly-opened photo lands. “Canvas + photo” places the image
@@ -105,13 +107,14 @@ export function LayersCanvasPane({
       <section className="space-y-3">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">
-            Canvas background on export
+            Exporting: Export Canvas as a background (copy canvas to clipboard)
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-text-muted">
             The backing canvas above (“Canvas + photo”) is a compositional
             guide. “Photo only” leaves it out of downloads, shares, and
             copies — the default. “Include canvas” bakes the full padded
-            backing into the exported image too.
+            backing into the exported image too. This applies to copying a
+            selection as well as the whole canvas.
           </p>
         </div>
         <ToggleButtonGroup

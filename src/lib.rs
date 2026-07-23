@@ -2569,6 +2569,42 @@ impl ImageHorseTool {
         )
     }
 
+    /// Copy a region out of the VISIBLE COMPOSITE instead of the active layer.
+    ///
+    /// `copy_region` above reads `layers[active]` only, so copying a selection
+    /// on a multi-layer document yielded that one layer's pixels rather than
+    /// what the user could see — and it ignored the "Canvas background on
+    /// export" preference that every other export/share/copy path honours.
+    ///
+    /// `include_background` mirrors that preference: `true` bakes the Canvas
+    /// fill in, `false` composites every layer except it. Unlike
+    /// `composite_excluding_background`, the result is NOT tight-cropped —
+    /// the caller's rect is in full-document coordinates, so cropping first
+    /// would shift the region out from under it.
+    pub fn copy_region_composited(
+        &self,
+        x: i32,
+        y: i32,
+        w: u32,
+        h: u32,
+        include_background: bool,
+    ) -> Vec<u8> {
+        let (iw, ih) = (self.width, self.height);
+        // Same Canvas selection rule as `composite_excluding_background`: by
+        // `kind` via `canvas_idx()`, never by layer name — `load_image` names
+        // the photo "Background" too (ADR-016).
+        let layers: &[Layer] = if include_background {
+            &self.layers[..]
+        } else if self.canvas_idx() == Some(0) && self.layers.len() > 1 {
+            &self.layers[1..]
+        } else {
+            &self.layers[..]
+        };
+        let composite =
+            composite_layers(layers, iw, ih, self.editing_shape_id, self.editing_text_id);
+        transform::copy_region(&composite, iw as i32, ih as i32, x, y, w, h)
+    }
+
     pub fn paste_region(
         &mut self,
         pixels: &[u8],

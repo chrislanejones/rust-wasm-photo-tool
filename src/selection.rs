@@ -324,6 +324,54 @@ impl ImageHorseTool {
         true
     }
 
+    /// Place the selected pixels on a NEW layer directly above the active one
+    /// (Photoshop's Layer Via Copy / Layer Via Cut — Ctrl+J / Ctrl+Shift+J).
+    /// Source pixels come from the ACTIVE layer only, matching the "edits
+    /// always land on the active layer" rule `delete_selection` follows.
+    ///
+    /// `cut = false`: the source layer is left intact. `cut = true`: the
+    /// selected pixels are additionally cleared (made transparent) on the
+    /// source layer, exactly as `delete_selection` would clear them.
+    ///
+    /// One history step for the whole operation — the layer insertion reuses
+    /// `add_layer`'s id/insert-above-active core via the snap-free
+    /// `insert_layer_above_active`, so there is no second "Add Layer" entry.
+    /// Deselects after (like `delete_selection`) so no stale mask hangs over
+    /// the moved pixels. Returns the new layer id, or 0 when nothing is
+    /// selected / the mask is all-false (no history, no mutation).
+    pub fn selection_to_new_layer(&mut self, cut: bool) -> u32 {
+        // Guard without mutating: `delete_selection`'s take-first shape would
+        // drop an all-false selection on the way out; this must be a pure
+        // no-op when it returns 0.
+        match &self.selection {
+            Some(m) if m.iter().any(|&b| b) => {}
+            _ => return 0,
+        }
+        let Some(mask) = self.selection.take() else {
+            return 0; // unreachable — the match above proved Some
+        };
+        self.snap(if cut {
+            "Selection to Layer (Cut)"
+        } else {
+            "Selection to Layer"
+        });
+        let src_idx = self.active;
+
+        // Bulk-copy the whole source layer, then keep only the selection.
+        // A temp Vec sidesteps holding &mut to two layers at once.
+        let mut new_data = self.layers[src_idx].buf.data.clone();
+        crate::simd::color::mask_clear_rgba(&mut new_data, &mask, false);
+
+        if cut {
+            crate::simd::color::mask_clear_rgba(&mut self.layers[src_idx].buf.data, &mask, true);
+        }
+
+        let id = self.insert_layer_above_active("");
+        self.layers[self.active].buf.data = new_data;
+        self.recomposite();
+        id
+    }
+
     /// Remove Object (PatchMatch, feature `patchmatch`): reconstructs the
     /// selected region from the surrounding image and writes the result into
     /// the active layer, then deselects. Snaps history like every other

@@ -285,8 +285,10 @@ export function TextSettings({
               </>
             )}
 
-            {/* Drop shadow — soft, Rust-rendered. Works with or without a
-                background: "Box" casts from the bubble, "Text" from the glyphs. */}
+            {/* Drop shadow — soft, Rust-rendered. With a background, "Box" casts
+                from the box/bubble and "Text" from the glyphs. With Background =
+                None there's no box, so any shadow (Box/Text/Both) casts from the
+                text silhouette — "Box" still produces a visible shadow. */}
             <ToolButtonGroup
               label="Drop Shadow"
               options={SHADOW_MODE_OPTIONS}

@@ -1,7 +1,15 @@
 // ===== FILE: app/src/features/canvas/CanvasArea.tsx =====
 // Item 2: Spacebar pan (Photoshop-style hand tool)
 // Item 3: Alt+Scroll zoom fix (zoom transform now uses panOffset)
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTools";
 import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
@@ -402,6 +410,29 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       gridReady,
     ]);
 
+    // ── Canvas-rect refresh ────────────────────────────────────────────────
+    // The canvas-space overlays below (rulers/grid + draggable H/V guides)
+    // project from `canvasRef.current.getBoundingClientRect()`, read inline
+    // during render. That's correct as long as SOMETHING re-renders whenever
+    // the canvas moves/resizes — zoom and pan do (they're state). But switching
+    // to/from the Batch Image Editor re-parents the canvas from the full-size
+    // host to a small grid cell (or back) WITHOUT any state change here, so no
+    // re-render fires and the overlay keeps drawing against the stale rect:
+    //   • entering batch  → a guide flashes across the FULL canvas, then a
+    //     later unrelated render finally moves it (looks like flash-then-vanish);
+    //   • leaving batch   → the guide takes "a while" to snap back to the right
+    //     place (until some other render happens).
+    // Fix: force a re-render right after the layout settles so the overlay
+    // re-reads a fresh rect. The `useLayoutEffect` runs post-DOM-commit,
+    // pre-paint, so the STALE rect is never painted (kills the flash); the
+    // ResizeObserver below covers any animated/async settling.
+    const [, refreshCanvasRect] = useReducer((n: number) => n + 1, 0);
+    useLayoutEffect(() => {
+      // state.width/height are the WASM image dims — the same values imgW/imgH
+      // derive from further down — so they already cover a dimension change.
+      refreshCanvasRect();
+    }, [activeTool, state.width, state.height]);
+
     // ── Redraw bridge ──────────────────────────────────────────────────────
     // The <canvas> DOM element gets re-created whenever the surrounding tool
     // wrapper changes (e.g. switching activeTool between Batch Image Editor's
@@ -423,9 +454,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       flushToCanvas();
 
       // Re-blit whenever the container resizes. flushToCanvas is a no-op when
-      // canvas dimensions already match WASM state, so this is cheap.
+      // canvas dimensions already match WASM state, so this is cheap. Also
+      // refresh the overlay rect so guides track the canvas as it resizes.
       const ro = new ResizeObserver(() => {
         flushToCanvas();
+        refreshCanvasRect();
       });
       ro.observe(container);
       return () => ro.disconnect();

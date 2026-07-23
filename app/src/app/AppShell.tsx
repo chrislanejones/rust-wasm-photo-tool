@@ -1044,6 +1044,8 @@ export function AppShell() {
     handleSelectAll,
     handleDeselect,
     handleDeleteSelection,
+    handleNewLayerCopy,
+    handleNewLayerCut,
     handleRemoveObject,
     handleToggleMove,
     handleToggleSelectionMode,
@@ -1227,6 +1229,7 @@ export function AppShell() {
     editState: drawingTools.editState,
     selectionMask,
     copyFullCanvas: handleCopyToClipboard,
+    exportCanvasBackground,
   });
 
   const textTool = useTextTool({
@@ -2191,6 +2194,8 @@ export function AppShell() {
     onSelectAll: handleSelectAll,
     onDeselect: handleDeselect,
     hasSelection: selectionMask !== null,
+    onNewLayerCopy: handleNewLayerCopy,
+    onNewLayerCut: handleNewLayerCut,
     onToggleMove: handleToggleMove,
     onApplyCrop: drawingTools.applyCrop,
     hasCropSelection: drawingTools.cropSelection !== null,
@@ -2689,6 +2694,8 @@ export function AppShell() {
               onSelectAll: handleSelectAll,
               onDeselect: handleDeselect,
               onDelete: handleDeleteSelection,
+              onNewLayerCopy: handleNewLayerCopy,
+              onNewLayerCut: handleNewLayerCut,
               onRemoveObject: handleRemoveObject,
               active: selectionMask !== null,
               kind: selectionKind,
@@ -2912,8 +2919,8 @@ export function AppShell() {
                       selectionMask={activeTool === "crop" ? selectionMask : null}
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
-                      // Magnetic lasso (behind ih_smart_edge). Same routing gate
-                      // as click-to-select — plus the kind, since the lasso is a
+                      // Magnetic lasso (always available). Same routing gate as
+                      // click-to-select — plus the kind, since the lasso is a
                       // session and the other three kinds are click-once.
                       lassoActive={
                         activeTool === "crop" &&

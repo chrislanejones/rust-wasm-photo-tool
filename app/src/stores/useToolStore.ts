@@ -50,8 +50,9 @@ export type AdjustMode = "adjust" | "select";
  *  - `lasso`      — magnetic lasso: click anchors, the wire path-finds along the
  *                   edges between them, double-click closes. Unlike the other
  *                   three this is NOT click-once — it's a session (begin →
- *                   commit* → close). Only reachable behind the `ih_smart_edge`
- *                   switch; see lib/smartEdge.ts. */
+ *                   commit* → close). Shipped by default since the
+ *                   selection-tool overhaul (`ih_smart_edge` now gates only
+ *                   the Paint Smart Brush; see lib/smartEdge.ts). */
 export type SelectionKind = "wand" | "edge" | "colorRange" | "lasso";
 
 interface ToolState {

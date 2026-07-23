@@ -4,7 +4,8 @@
 //! `#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]`.
 //!
 //! - [`blur`]   — separable Gaussian blur passes (`filters::gaussian_blur_region`).
-//! - [`color`]  — brightness, contrast, pixelate cell-sums, mask invert.
+//! - [`color`]  — brightness, contrast, pixelate cell-sums, mask invert,
+//!   selection-masked clear.
 //! - [`resize`] — bilinear + the separable filtered-resize passes (lanczos/catmull).
 
 pub mod blur;

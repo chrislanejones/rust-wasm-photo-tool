@@ -430,8 +430,13 @@ pub(crate) fn build_annotation_tile(
         let tx = sh_margin as i32;
         let ty = sh_margin as i32;
         let mut tile = vec![0u8; (tile_w * tile_h * 4) as usize];
-        // Only the text can cast a shadow when there's no background box.
-        if any_shadow && shadow_text {
+        // No background box exists, so there is nothing for `shadow_box` to cast
+        // from — the only silhouette available is the text. Fall back to casting
+        // ANY enabled shadow (Box, Text, or Both) from the glyphs, so picking
+        // "Box" with Background = None still produces a visible shadow instead of
+        // silently doing nothing. (With a box present, Box vs Text stay distinct
+        // — see the background path below.)
+        if any_shadow {
             composite_drop_shadow(
                 &mut tile,
                 tile_w,
@@ -670,6 +675,29 @@ pub(crate) fn annotation_ink_offset(
 /// keeps a resize from collapsing the box to nothing.
 const PASTE_MIN_SIZE: u32 = 10;
 
+impl ImageHorseTool {
+    /// The snap-free core of [`add_layer`]: mint an id, insert a transparent
+    /// `Content` layer directly above the active one, make it active. Split
+    /// out so `selection_to_new_layer` (selection.rs) can reuse the exact
+    /// insert-above-active semantics inside its OWN single history step — the
+    /// one caller-visible difference from `add_layer` is that no "Add Layer"
+    /// snapshot is pushed here.
+    pub(crate) fn insert_layer_above_active(&mut self, name: &str) -> u32 {
+        let id = self.next_layer_id;
+        self.next_layer_id = self.next_layer_id.wrapping_add(1).max(1);
+        let display = if name.is_empty() {
+            format!("Layer {}", id)
+        } else {
+            name.to_string()
+        };
+        let layer = Layer::new(id, display, self.width, self.height);
+        let insert_at = self.active + 1;
+        self.layers.insert(insert_at, layer);
+        self.active = insert_at;
+        id
+    }
+}
+
 #[wasm_bindgen]
 impl ImageHorseTool {
     // ── Layers ───────────────────────────────────────────────────────────
@@ -719,18 +747,7 @@ impl ImageHorseTool {
     /// the active layer. Returns its id. Pushes "Add Layer".
     pub fn add_layer(&mut self, name: &str) -> u32 {
         self.snap("Add Layer");
-        let id = self.next_layer_id;
-        self.next_layer_id = self.next_layer_id.wrapping_add(1).max(1);
-        let display = if name.is_empty() {
-            format!("Layer {}", id)
-        } else {
-            name.to_string()
-        };
-        let layer = Layer::new(id, display, self.width, self.height);
-        let insert_at = self.active + 1;
-        self.layers.insert(insert_at, layer);
-        self.active = insert_at;
-        id
+        self.insert_layer_above_active(name)
     }
 
     /// Duplicate the layer with `id` (pixels + annotations), inserting the copy

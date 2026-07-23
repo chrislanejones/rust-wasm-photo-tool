@@ -12,12 +12,24 @@
 //      the Rust selection-overlay mask (alpha > 0 scan; the mask is the
 //      canvas-sized RGBA overlay already held in useToolStore).
 //
-// DECISIONS (see SESSION_LOG.md): copies are ACTIVE-LAYER pixels via the
-// engine's `copy_region` — bounding-rect only (no mask-shaped extraction) and
-// non-mutating (no auto-commit/flatten), because live text/shape annotations
-// are composite-time renders and masked extraction would need a new engine
-// API. Text boxes copy as text natively (real <textarea>). The paste-placement
-// box is deliberately excluded — its content already IS the clipboard image.
+// DECISIONS (see SESSION_LOG.md): bounding-rect only (no mask-shaped
+// extraction) and non-mutating (no auto-commit/flatten). Text boxes copy as
+// text natively (real <textarea>). The paste-placement box is deliberately
+// excluded — its content already IS the clipboard image.
+//
+// REVERSED 2026-07-22: copies were ACTIVE-LAYER pixels via `copy_region`,
+// justified above by "live text/shape annotations are composite-time renders
+// and masked extraction would need a new engine API". That API now exists, so
+// the justification is gone. Two things were wrong with the old behaviour:
+// selecting over a caption and copying pasted a BLANK rectangle (text is an
+// overlay, never layer pixels — pinned in tests/copy_region_composited.rs),
+// and this was the only export/share/copy path ignoring the "Canvas background
+// on export" preference. Now uses `copy_region_composited`, which samples the
+// visible composite and honours that preference.
+//
+// Still bounding-rect, NOT mask-shaped — that part of the original decision
+// stands. Only WHAT is sampled changed (composite vs active layer), not the
+// SHAPE of the copy.
 import { useCallback } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import type { CropSelection, DrawEditState } from "@/hooks/useDrawingTools";
@@ -32,6 +44,7 @@ export function useCopyRegionAction({
   editState,
   selectionMask,
   copyFullCanvas,
+  exportCanvasBackground,
 }: {
   stamp: ReturnType<typeof useCloneStamp>;
   activeTool: ToolType;
@@ -40,6 +53,9 @@ export function useCopyRegionAction({
   selectionMask: Uint8Array | null;
   /** Whole-canvas copy — the Ctrl+C fallback when no region is active. */
   copyFullCanvas: () => Promise<void> | void;
+  /** Settings → Layers & Canvas → "Canvas background on export and copy".
+   *  Same flag the download/share/whole-canvas-copy paths read. */
+  exportCanvasBackground: boolean;
 }) {
   /** True when Ctrl+C would copy a region (drives the menu item's enabled
    *  state). Mask-bounds scanning is deferred to the actual copy. */
@@ -107,14 +123,14 @@ export function useCopyRegionAction({
       return;
     }
     try {
-      // `copy_region` reads the active layer and zero-fills outside image
-      // bounds, so the rect needs no clamping. PNG encoding stays in the
-      // engine too (encodeRgba → encode_png_pixels).
-      const pixels = tool.copy_region(
+      // Zero-fills outside image bounds, so the rect needs no clamping. PNG
+      // encoding stays in the engine too (encodeRgba → encode_png_pixels).
+      const pixels = tool.copy_region_composited(
         region.x,
         region.y,
         region.width,
         region.height,
+        exportCanvasBackground,
       );
       const blob = await encodeRgba(
         pixels,
@@ -132,7 +148,7 @@ export function useCopyRegionAction({
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast.error(`Couldn't copy selection: ${msg}`);
     }
-  }, [stamp, resolveRegion, copyFullCanvas]);
+  }, [stamp, resolveRegion, copyFullCanvas, exportCanvasBackground]);
 
   return { hasActiveRegion, handleCopyRegion };
 }
