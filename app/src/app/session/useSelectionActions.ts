@@ -7,6 +7,10 @@ import type { RefObject, MouseEvent as ReactMouseEvent } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useToolStore } from "@/stores/useToolStore";
 import { tryRemoveObject } from "@/lib/patchmatch";
+import {
+  selectionCombineMode,
+  type SelectionCombineMode,
+} from "@/lib/selectionBool";
 import { toast } from "@/components/ui/sonner";
 
 export function useSelectionActions(
@@ -32,6 +36,17 @@ export function useSelectionActions(
   const [lassoCommitted, setLassoCommitted] = useState<Int32Array | null>(null);
   const [lassoPreview, setLassoPreview] = useState<Int32Array | null>(null);
 
+  // ── Additive / subtractive selection (`ih_selection_bool`, default OFF) ─────
+  // The intent behind the NEXT (or in-flight lasso) selection: 0 replace,
+  // 1 union (Shift), 2 subtract (Alt). The engine is the source of truth for
+  // the actual op (we push this to `set_selection_combine` before each
+  // producer); this mirror only exists so the on-canvas preview can tint the
+  // marching-ants add vs. subtract while the gesture is live.
+  // TODO(chris): additive/subtractive preview overlay styling — Chris is
+  // designing this by eye. `combineHint` is the hook/prop it should read;
+  // nothing renders off it yet.
+  const [combineHint, setCombineHint] = useState<SelectionCombineMode>(0);
+
   const getCoords = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
     const c = canvasRef.current;
     if (!c) return { x: 0, y: 0 };
@@ -54,9 +69,18 @@ export function useSelectionActions(
       if (!tool) return;
       const { x, y } = getCoords(e);
 
+      // Shift = add (union), Alt = subtract; flag-gated, else always 0/replace.
+      const mode = selectionCombineMode(e);
+
       if (selectionKind === "lasso") {
-        // First click opens the session; every click after drops another anchor.
+        // The lasso is a multi-click SESSION, not click-once — so the add/
+        // subtract intent is fixed when the loop OPENS (first anchor) and the
+        // engine consumes it at `lasso_close`. Mid-session clicks are anchors,
+        // never producers, so re-reading the modifier per anchor would be a
+        // lie; we set combine mode once here and leave it.
         if (!tool.lasso_active()) {
+          tool.set_selection_combine(mode);
+          setCombineHint(mode);
           if (!tool.lasso_begin(x, y)) return;
         } else {
           tool.lasso_commit(x, y);
@@ -66,6 +90,11 @@ export function useSelectionActions(
         return;
       }
 
+      // Click-once kinds (wand / edge / color-range) resolve the intent at
+      // click time. The engine routes the produced mask through union/subtract
+      // when mode != 0; mode 0 is the old replace path, byte-for-byte.
+      tool.set_selection_combine(mode);
+      setCombineHint(mode);
       const mask =
         selectionKind === "edge"
           ? tool.magic_wand_select_edges(x, y, selectionTolerance, edgeThreshold)
@@ -134,6 +163,7 @@ export function useSelectionActions(
     stamp.toolRef.current?.clear_selection();
     setLassoCommitted(null);
     setLassoPreview(null);
+    setCombineHint(0);
     setSelectionMask(null);
   }, [stamp]);
   const handleDeleteSelection = useCallback(() => {
@@ -230,5 +260,9 @@ export function useSelectionActions(
     handleLassoCancel,
     lassoCommitted,
     lassoPreview,
+    // Additive/subtractive intent for the live gesture (`ih_selection_bool`):
+    // 0 replace, 1 union, 2 subtract. The preview overlay Chris is designing
+    // reads this — see the TODO by its useState.
+    combineHint,
   };
 }

@@ -184,6 +184,80 @@ impl ImageHorseTool {
         }
         Some(fy as usize * w + fx as usize)
     }
+
+    // ── Boolean-selection combine core (private; not wasm-exported) ─────────
+    // One implementation over real `&[bool]` slices; the wasm exports
+    // (`selection_union`/`selection_subtract`) convert their `&[u8]` argument
+    // and call these, and `apply_produced_selection` calls them directly with
+    // the bool mask a producer already built.
+
+    /// Collapse an all-false selection to `None` (the canonical "no
+    /// selection"); a non-empty selection is left untouched.
+    fn normalize_selection(&mut self) {
+        if self
+            .selection
+            .as_ref()
+            .is_some_and(|m| !m.iter().any(|&b| b))
+        {
+            self.selection = None;
+        }
+    }
+
+    /// OR `mask` into the current selection. No selection → the mask becomes
+    /// it. No-ops on a length mismatch. Returns whether anything is selected.
+    fn union_bools(&mut self, mask: &[bool]) -> bool {
+        if mask.len() != (self.width * self.height) as usize {
+            return self.has_selection();
+        }
+        match &mut self.selection {
+            Some(cur) => {
+                for (c, &m) in cur.iter_mut().zip(mask) {
+                    *c |= m;
+                }
+            }
+            None => self.selection = Some(mask.to_vec()),
+        }
+        self.normalize_selection();
+        self.has_selection()
+    }
+
+    /// Clear every selected pixel `mask` covers; normalise an empty result to
+    /// `None`. No-ops on a length mismatch. Returns whether anything remains.
+    fn subtract_bools(&mut self, mask: &[bool]) -> bool {
+        if mask.len() != (self.width * self.height) as usize {
+            return self.has_selection();
+        }
+        if let Some(cur) = &mut self.selection {
+            for (c, &m) in cur.iter_mut().zip(mask) {
+                if m {
+                    *c = false;
+                }
+            }
+        }
+        self.normalize_selection();
+        self.has_selection()
+    }
+
+    /// Store a freshly-produced tool mask per the current combine mode and
+    /// return the resulting selection overlay RGBA (the SAME shape every
+    /// producer returns). Replace (0) is the historical behaviour; add (1) /
+    /// subtract (2) route through the union/subtract core so the Shift/Alt
+    /// modifiers compose. `mask` is already canvas-sized.
+    fn apply_produced_selection(&mut self, mask: Vec<bool>) -> Vec<u8> {
+        match self.selection_combine {
+            1 => {
+                self.union_bools(&mask);
+            }
+            2 => {
+                self.subtract_bools(&mask);
+            }
+            _ => {
+                self.selection = Some(mask);
+                self.normalize_selection();
+            }
+        }
+        self.selection_overlay()
+    }
 }
 
 #[wasm_bindgen]
@@ -198,9 +272,7 @@ impl ImageHorseTool {
             return Vec::new();
         };
         let mask = flood_select(&self.composite_cache, w, h, start, tolerance as i32, None);
-        let overlay = selection_overlay_rgba(&mask, w, h);
-        self.selection = Some(mask);
-        overlay
+        self.apply_produced_selection(mask)
     }
 
     /// Edge-aware magic wand. Same 4-connected flood fill as `magic_wand_select`,
@@ -235,9 +307,7 @@ impl ImageHorseTool {
             tolerance as i32,
             Some((&edges, edge_threshold.min(255) as u8)),
         );
-        let overlay = selection_overlay_rgba(&mask, w, h);
-        self.selection = Some(mask);
-        overlay
+        self.apply_produced_selection(mask)
     }
 
     /// Color-range select (Photoshop's Select → Color Range). Takes EVERY pixel
@@ -266,9 +336,7 @@ impl ImageHorseTool {
                 && (c[2] as i32 - t[2]).abs() <= tol
                 && (c[3] as i32 - t[3]).abs() <= tol;
         }
-        let overlay = selection_overlay_rgba(&mask, w, h);
-        self.selection = Some(mask);
-        overlay
+        self.apply_produced_selection(mask)
     }
 
     /// Select the whole canvas (Alt+A). Returns the overlay RGBA.
@@ -298,6 +366,40 @@ impl ImageHorseTool {
     /// Deselect (Alt+D). No history.
     pub fn clear_selection(&mut self) {
         self.selection = None;
+    }
+
+    /// Set how the NEXT tool-produced selection combines with the current one:
+    /// 0 = replace (default), 1 = add (union), 2 = subtract. Clamped to 0..=2.
+    /// JS sets this from the Shift/Alt modifier when the `ih_selection_bool`
+    /// flag is on; it stays 0 otherwise, so behaviour is unchanged.
+    pub fn set_selection_combine(&mut self, mode: u8) {
+        self.selection_combine = mode.min(2);
+    }
+
+    /// OR `mask` into the current selection (boolean add). With no current
+    /// selection, the mask BECOMES the selection. An all-false result is
+    /// normalised to `None` ("no selection"). No-ops (returns the current
+    /// state, no panic across the wasm boundary) when `mask` isn't
+    /// canvas-sized. Returns whether anything is selected afterwards.
+    ///
+    /// The mask is `&[u8]` (non-zero = selected), not `&[bool]` — wasm-bindgen
+    /// has no ABI for a `bool` slice, and JS passes a `Uint8Array` anyway.
+    pub fn selection_union(&mut self, mask: &[u8]) -> bool {
+        let bools: Vec<bool> = mask.iter().map(|&m| m != 0).collect();
+        self.union_bools(&bools)
+    }
+
+    /// Clear (deselect) every pixel of the current selection that `mask`
+    /// covers. When nothing remains selected the selection becomes `None` —
+    /// so it reads as "no selection" (what `delete_selection`,
+    /// `remove_object`, `selection_to_new_layer` and `has_selection` all
+    /// expect), NOT a `Some(all-false)` zero-area selection. No-ops on a
+    /// length mismatch. Returns whether anything remains selected.
+    ///
+    /// `mask` is `&[u8]` (non-zero = covered) — see `selection_union`.
+    pub fn selection_subtract(&mut self, mask: &[u8]) -> bool {
+        let bools: Vec<bool> = mask.iter().map(|&m| m != 0).collect();
+        self.subtract_bools(&bools)
     }
 
     /// Delete the selected pixels (make them transparent) on the active layer,
@@ -533,9 +635,7 @@ impl ImageHorseTool {
         }
 
         let mask = crate::livewire::mask_from_loop(&loop_px, w, h);
-        let overlay = selection_overlay_rgba(&mask, w, h);
-        self.selection = Some(mask);
-        overlay
+        self.apply_produced_selection(mask)
     }
 
     /// Abandon the lasso session (Esc). Drops the cost map; leaves any existing

@@ -923,6 +923,20 @@ declare module "stamp_tool" {
      *  deselects after. Returns the new layer id, or 0 when nothing is
      *  selected (no history, no mutation). */
     selection_to_new_layer(cut: boolean): number;
+    /** Boolean selection ops (`ih_selection_bool`). `mask` is `&[u8]`
+     *  (non-zero = covered); a length mismatch is a safe no-op. Returns
+     *  whether anything is still selected afterwards.
+     *  Union: OR `mask` into the current selection (no selection → the mask
+     *  becomes it). Subtract: clear covered pixels; an all-false result reads
+     *  back as NO selection (None), not a zero-area Some. */
+    selection_union(mask: Uint8Array): boolean;
+    selection_subtract(mask: Uint8Array): boolean;
+    /** Combine mode for the NEXT producer call: 0 = replace, 1 = union,
+     *  2 = subtract (clamped). The producers (wand / edge / color-range /
+     *  lasso-close) route their mask through this so Shift/Alt-drag adds or
+     *  subtracts instead of replacing. Reset to 0 after each use is the
+     *  caller's job. */
+    set_selection_combine(mode: number): void;
 
     // ── Magnetic lasso (live-wire) — always available ──
     // Path-finds along the SAME edge core the edge-aware wand uses, turned into

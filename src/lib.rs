@@ -447,6 +447,13 @@ pub struct ImageHorseTool {
     /// nothing is selected. Built by the Selection Marker tool's flood-fill /
     /// select-all; `delete_selection` clears the masked pixels.
     selection: Option<Vec<bool>>,
+    /// How the NEXT tool-produced selection mask combines with the current
+    /// selection: 0 = replace (default / historical behaviour), 1 = add
+    /// (union), 2 = subtract. Set by JS from the Shift/Alt modifier when the
+    /// `ih_selection_bool` flag is on; the producers (wand/edge/color-range and
+    /// the lasso at close) route through `apply_produced_selection`. Stays 0
+    /// when the flag is off, so nothing about the shipped behaviour changes.
+    selection_combine: u8,
     /// Monotonic counter feeding `patchmatch::compute_nnf`'s seed, one
     /// `remove_object` call at a time (post-increment). Keeps the kernel's own
     /// RNG seeded and deterministic (never reads system time/entropy) while
@@ -809,6 +816,7 @@ impl ImageHorseTool {
             editing_shape_id: None,
             editing_text_id: None,
             selection: None,
+            selection_combine: 0,
             #[cfg(feature = "patchmatch")]
             patchmatch_seed_counter: 0,
             lasso: None,
