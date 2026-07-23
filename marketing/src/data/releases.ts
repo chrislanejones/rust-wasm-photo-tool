@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.86",
+    date: "2026-07-23",
+    headline: "The Selection tool grows up — magnetic lasso and layers",
+    entries: [
+      { tag: "feature", text: "The magnetic lasso is live. Click your way around an object and the line snaps to the edge between each click, so you stop tracing outlines by hand. It sits alongside the wand, the edge-aware wand, and color-range select in one panel that now looks like the Paint tool — four tiles, each with its own explanation behind the lightbulb." },
+      { tag: "feature", text: "You can now lift a selection onto its own layer: Copy it to a new one with Ctrl+J, or Cut it out onto one with Ctrl+Shift+J — the move Photoshop has had forever. The pixel work runs in the Rust engine on a new SIMD path, so it stays instant even on a large photo." },
+      { tag: "fix", text: "Copying a selection now copies what you actually see. It used to grab only the active layer, so a selection over a caption pasted a blank rectangle; it now takes the whole visible image — text, shapes, every layer." },
+      { tag: "fix", text: "Guides and rulers no longer flash across the whole screen when you open the Batch editor, and a text drop-shadow set to “Box” with nothing behind it now casts from the letters instead of doing nothing." },
+    ],
+  },
+  {
     version: "v0.9.85",
     date: "2026-07-22",
     headline: "A check that was never running, now runs",

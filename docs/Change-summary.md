@@ -2033,3 +2033,40 @@ ESLint is the first checker to read them; 3 of the 26 errors were there.
 
 **Verified**: `pnpm lint` reports 0 errors / 62 warnings, `tsc --noEmit`
 clean, 184/184 vitest passing, app and marketing production builds succeed.
+
+## v7.43 — 2026-07-23
+
+**The Selection tool overhaul — magnetic lasso, "place on a new layer", and a
+panel that matches Paint.** The magnetic lasso (live-wire, shortest-path over
+the Sobel edge map — the same edges the edge-aware wand uses) is enabled by
+default. It was fully built and wired for weeks behind the `ih_smart_edge`
+flag; the only thing left was a human confirming the feel, which is now done.
+Its flag was decoupled from the Paint "Smart Brush", which stays gated on its
+own.
+
+The four selection kinds (Wand, Edge-aware, Color Range, Magnetic) moved onto
+the shared multi-mode panel template the Paint tool uses — icon tiles on top,
+the active kind's description in a lightbulb tooltip, no permanent paragraph.
+The old "Coming soon" stub is gone.
+
+New: **Selection → new layer**, Copy (`Ctrl+J`) or Cut (`Ctrl+Shift+J`),
+Photoshop's Layer-via-Copy / Layer-via-Cut. The masked pixel copy runs through
+a new WebAssembly SIMD128 kernel (`mask_clear_rgba`) with a bit-identical
+scalar fallback.
+
+| #   | Change                                                                    | Status                                                                    |
+| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | Magnetic lasso enabled by default; decoupled from `ih_smart_edge` (Paint Smart Brush stays gated) | Complete — always-present 4th selection kind |
+| 2   | Selection sub-modes migrated to the shared `ToolModeToggle` (Paint's pattern); per-kind lightbulb; "Coming soon" stub removed; All/None/Delete restyled as tiles | Complete |
+| 3   | `selection_to_new_layer(cut)` engine method + `simd::color::mask_clear_rgba` (wasm128 + scalar fallback) | Complete — Copy `Ctrl+J` / Cut `Ctrl+Shift+J`, 4 engine tests + 3 kernel tests |
+| 4   | `copy_region_composited` — selection copy samples the VISIBLE composite (text/shapes/all layers), honors the canvas-background-on-export pref | Complete — Ctrl+C over a caption no longer pastes a blank rect |
+| 5   | Rulers & draggable H/V guides no longer flash full-canvas entering the Batch editor, nor lag leaving it (overlay re-reads the canvas rect post-layout) | Complete |
+| 6   | Text drop shadow: "Box" with Background = None casts from the text silhouette instead of nothing | Complete — engine-side, regression-tested |
+| 7   | Settings copy: "Canvas on import" → "Importing: …"; "Canvas background on export and copy to clipboard" → "Exporting: …" | Complete |
+| 8   | React Compiler lint rules adopted (`static-components` + `purity`, at zero violations); 6 render-phase fixes; ADR-020 | Complete — see ADR-020 |
+
+**Verified**: `cargo fmt --check` clean, clippy `-D warnings` clean on default /
+tiles / patchmatch, engine tests pass; `tsc --noEmit` clean, eslint 0 errors /
+62 warnings, 195/195 vitest, app + marketing production builds succeed. Shipped
+WASM 735,865 B (+1,192 over the v7.42 baseline — the new `selection_to_new_layer`
+export, the mask-clear SIMD kernel, and the text-shadow fallback branch).

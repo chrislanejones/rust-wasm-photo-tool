@@ -70,13 +70,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.42 — 2026-07-22
+### v7.43 — 2026-07-23
 
-**The lint gate was fiction. Now it runs.** The project's own checklist has required `npx eslint app/src --max-warnings 0` for months. There was no ESLint config anywhere in the repo, and ESLint wasn't a dependency either — so every "run" downloaded ESLint fresh and exited on config-not-found. A gate nobody can run is worse than no gate, because everyone assumes it ran.
+**The Selection tool grew up.** The magnetic lasso is live: click around an object and the line snaps to the edge between your clicks, so you don't have to trace it by hand. It joins the wand, the edge-aware wand, and color-range select in a single panel that finally looks like the Paint tool — four tiles, each with its own explanation behind the lightbulb, no more "coming soon" placeholder.
 
-There's a real flat config now: TypeScript, React hooks, and Vite fast-refresh rules. Correctness only, no formatting opinions. The first honest run over 207 files found 26 errors and 64 warnings, with 182 files completely clean. The 26 errors are fixed — mostly dead stores, where a variable is initialized and then overwritten on every path before anything reads it, plus three `any` casts that now name the type they always meant and two silent `catch {}` blocks that now say why they swallow.
+**Put a selection on its own layer.** Select something, then Copy it to a new layer (Ctrl+J) or Cut it out onto one (Ctrl+Shift+J) — the same move Photoshop's had for twenty years. The pixel work runs in the Rust engine on a new SIMD path, so it stays instant on a large photo.
 
-Two things only turned up once the linter actually ran. The source contained `eslint-disable` comments written for a linter that had never run. And the 13 test files had never been statically analysed at all — `tsconfig.json` excludes them from the type pass, so until now nothing checked them. The 57 remaining `react-hooks/exhaustive-deps` warnings are left visible on purpose: errors block the gate, warnings are a backlog to work down deliberately. Rewriting a dependency array can change behaviour, so each one gets a human.
+**Copying a selection copies what you see.** Copy-to-clipboard used to grab only the active layer, which meant a selection over a caption pasted a blank rectangle. It now samples the visible image — text, shapes, every layer — and honors your "canvas background on export" setting.
+
+**Two fixes worth calling out.** Guides and rulers no longer flash across the whole screen when you open the Batch editor, or lag on the way back. And a text drop-shadow set to "Box" with no background behind it now casts from the letters instead of doing nothing.
 
 ## License
 
