@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.87",
+    date: "2026-07-23",
+    headline: "Select gets its own button — and stops lying about its size",
+    entries: [
+      { tag: "feature", text: "Select is a real tool now, with its own button (press S). It used to hide inside Adjust & Select behind a Click-to-select toggle you had to arm first; now you pick the tool and the canvas just works — click to select, drag to sweep a rectangle or ellipse marquee. Hold Shift to add to a selection, Alt to cut away, and the cursor shows a little + or − so you know which one you're about to do." },
+      { tag: "fix", text: "On photos bigger than the window, the marching-ants outline drew two to three times larger than the actual selection — the overlay was sized to the image's raw pixels while the canvas was scaled to fit. The selection underneath was always right; only the outline was wrong. Fixed, along with the magnetic lasso's wire, which had the same bug." },
+      { tag: "feature", text: "Every selection is now a step in History: each select, add, subtract, Select All and Deselect shows up by name and undoes with Ctrl+Z. Undoing a Delete Selection or a Cut-to-layer brings back what you had selected, not just the pixels. A click that changes nothing records nothing." },
+      { tag: "ui", text: "The Select panel got tidier: one Selection header with the explanations behind its lightbulb, five actions in two neat rows (All, Deselect, Delete, then Copy and Cut), and the drag shape — rectangle or ellipse — is a two-button choice. Old links to the combined tool still land in the right place." },
+      { tag: "rust", text: "The rectangle and ellipse marquees are new engine producers riding the same combine pipeline as every other selection kind, and undo snapshots now carry the selection mask — selection-only steps never touch the op log, pinned by tests." },
+    ],
+  },
+  {
     version: "v0.9.86",
     date: "2026-07-23",
     headline: "The Selection tool grows up — magnetic lasso and layers",

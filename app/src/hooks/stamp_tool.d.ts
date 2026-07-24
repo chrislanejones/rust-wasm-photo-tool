@@ -908,6 +908,17 @@ declare module "stamp_tool" {
      *  `tolerance` of the clicked colour, anywhere in the image — not just the
      *  connected blob the wand reaches. */
     color_range_select(x: number, y: number, tolerance: number): Uint8Array;
+    /** Rectangular marquee over the drag rect (any corner order, canvas px).
+     *  Normalised, snapped outward (floor/ceil), clamped to the canvas; rides
+     *  the same combine pipeline as every producer. A degenerate or fully
+     *  off-canvas drag replaces with NO selection (Photoshop's empty-marquee
+     *  deselect); under combine 1/2 it no-ops. Returns the overlay RGBA. */
+    rect_select(x0: number, y0: number, x1: number, y1: number): Uint8Array;
+    /** Elliptical marquee: the ellipse inscribed in the same drag rect. A
+     *  pixel is in when its centre satisfies (dx/rx)² + (dy/ry)² <= 1; a drag
+     *  past the canvas edge keeps its shape and is cropped, not squashed.
+     *  Same normalise/clamp/combine behaviour as `rect_select`. */
+    ellipse_select(x0: number, y0: number, x1: number, y1: number): Uint8Array;
     /** Select the whole canvas; returns the overlay RGBA. */
     select_all(): Uint8Array;
     /** Current selection as an RGBA overlay (empty if nothing selected). */

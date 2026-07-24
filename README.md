@@ -70,15 +70,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.43 — 2026-07-23
+### v7.44 — 2026-07-23
 
-**The Selection tool grew up.** The magnetic lasso is live: click around an object and the line snaps to the edge between your clicks, so you don't have to trace it by hand. It joins the wand, the edge-aware wand, and color-range select in a single panel that finally looks like the Paint tool — four tiles, each with its own explanation behind the lightbulb, no more "coming soon" placeholder.
+**Select is a real tool now.** It used to hide inside "Adjust & Select" behind a Click-to-select toggle you had to arm before the canvas would respond. It has its own button now — press `S` — and the canvas just works: click to select with the wand, edge-aware wand, color range, or magnetic lasso; drag to sweep a rectangle or ellipse marquee. Hold Shift to add to a selection, Alt to cut away from it — the cursor shows a little + or − so you know what you're about to do. Adjust went back to being just crop and transform.
 
-**Put a selection on its own layer.** Select something, then Copy it to a new layer (Ctrl+J) or Cut it out onto one (Ctrl+Shift+J) — the same move Photoshop's had for twenty years. The pixel work runs in the Rust engine on a new SIMD path, so it stays instant on a large photo.
+**The marching ants were lying to you.** On any photo bigger than the window, the selection outline drew two to three times larger than the actual selection — the overlay was sized to the image's raw pixels while the canvas was scaled to fit. The selection underneath was always correct; only the outline was wrong. Fixed, along with the lasso wire, which had the same bug.
 
-**Copying a selection copies what you see.** Copy-to-clipboard used to grab only the active layer, which meant a selection over a caption pasted a blank rectangle. It now samples the visible image — text, shapes, every layer — and honors your "canvas background on export" setting.
-
-**Two fixes worth calling out.** Guides and rulers no longer flash across the whole screen when you open the Batch editor, or lag on the way back. And a text drop-shadow set to "Box" with no background behind it now casts from the letters instead of doing nothing.
+**Every selection is now a step in History.** Each select, add, subtract, Select All, and Deselect shows up named in the History panel and undoes with Ctrl+Z like anything else. Undoing a Delete Selection or a Cut-to-layer brings back what you had selected, not just the pixels. Clicking the same thing twice doesn't clutter your history — a click that changes nothing records nothing.
 
 ## License
 

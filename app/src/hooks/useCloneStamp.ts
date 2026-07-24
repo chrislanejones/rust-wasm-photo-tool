@@ -11,6 +11,7 @@ import {
 } from "@/lib/resourceMonitor";
 import { syncOplog, tryTilesFlush } from "@/lib/tilesFlush";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { useToolStore } from "@/stores/useToolStore";
 
 /** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
 async function decodePngToRgba(
@@ -677,21 +678,32 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     useAnnotationStore.getState().bumpAnnotations();
   }, []);
 
+  /** Selection changes are undo steps now (each select / add / subtract /
+   *  deselect), and pixel-step undo restores the mask that was live at that
+   *  moment — so every history move re-pulls the overlay from the engine.
+   *  Store action, read straight off the store (no new prop threading). */
+  const refreshSelectionMask = useCallback(() => {
+    const ov = toolRef.current?.selection_overlay();
+    useToolStore.getState().setSelectionMask(ov && ov.length ? ov : null);
+  }, []);
+
   const undo = useCallback(() => {
     if (toolRef.current?.undo()) {
       flushToCanvas();
       syncState();
       broadcastAnnotationsChanged();
+      refreshSelectionMask();
     }
-  }, [flushToCanvas, syncState, broadcastAnnotationsChanged]);
+  }, [flushToCanvas, syncState, broadcastAnnotationsChanged, refreshSelectionMask]);
 
   const redo = useCallback(() => {
     if (toolRef.current?.redo()) {
       flushToCanvas();
       syncState();
       broadcastAnnotationsChanged();
+      refreshSelectionMask();
     }
-  }, [flushToCanvas, syncState, broadcastAnnotationsChanged]);
+  }, [flushToCanvas, syncState, broadcastAnnotationsChanged, refreshSelectionMask]);
 
   const jumpToHistory = useCallback(
     (index: number) => {
@@ -699,9 +711,10 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
         flushToCanvas();
         syncState();
         broadcastAnnotationsChanged();
+        refreshSelectionMask();
       }
     },
-    [flushToCanvas, syncState, broadcastAnnotationsChanged],
+    [flushToCanvas, syncState, broadcastAnnotationsChanged, refreshSelectionMask],
   );
 
   const deleteHistoryEntry = useCallback(

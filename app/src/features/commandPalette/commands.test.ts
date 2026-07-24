@@ -16,7 +16,6 @@ beforeEach(() => {
   useToolStore.setState({
     activeTool: "compress",
     brushMode: "paint",
-    adjustMode: "adjust",
     selectionKind: "wand",
     shapesMode: "shapes",
   });
@@ -67,17 +66,22 @@ describe("the registry navigates via routes", () => {
 describe("sub-mode entries come from the shared table", () => {
   it("covers the registry tools and the not-yet-migrated ones alike", () => {
     const ids = build().map((c) => c.id);
-    // Registry modules (Paint / Resize / Adjust & Select)…
+    // Registry modules (Paint / Resize / Select)…
     expect(ids).toContain("mode.brush.pen");
     expect(ids).toContain("mode.compress.resize");
-    expect(ids).toContain("mode.crop.select");
+    expect(ids).toContain("mode.select.wand");
     // …and the legacy lists (Stamps / Shapes).
     expect(ids).toContain("mode.stamp.emojis");
     expect(ids).toContain("mode.shapes.arrows");
   });
 
+  it("emits no mode.crop.* entries — Adjust is single-mode since the Select split", () => {
+    const ids = build().map((c) => c.id);
+    expect(ids.some((id) => id.startsWith("mode.crop."))).toBe(false);
+  });
+
   it("labels a sub-mode with the tool's DISPLAY name, not its legacy id", () => {
-    expect(byId(build(), "mode.crop.select")!.label).toBe("Adjust & Select › Select");
+    expect(byId(build(), "mode.select.edge")!.label).toBe("Select › Edge-aware");
     expect(byId(build(), "mode.brush.blur")!.label).toBe("Paint › Blur");
   });
 
@@ -124,13 +128,15 @@ describe("Text's sub-modes are not palette-searchable (known gap, not a regressi
 });
 
 describe("tool-arc entries since v7.20", () => {
-  it("offers the three selection kinds (2.6b)", () => {
-    const cmd = byId(build(), "select.edge")!;
-    expect(cmd.label).toBe("Adjust & Select › Edge-aware");
+  it("offers the selection kinds as real routes (Select is its own tool)", () => {
+    // Was a hand-rolled `select.edge` entry that navigated to the old
+    // `#/tool/adjust/select` and set the kind imperatively; the kinds are the
+    // Select TOOL's registry sub-modes now, so the generic mode.* loop emits
+    // them and the kind rides in the route itself.
+    const cmd = byId(build(), "mode.select.edge")!;
+    expect(cmd.label).toBe("Select › Edge-aware");
     cmd.run();
-    // Navigates to the Select sub-mode AND sets the kind — the navigation half
-    // still goes through the router.
-    expect(currentHash()).toBe("#/tool/adjust/select");
+    expect(currentHash()).toBe("#/tool/select/edge");
     expect(useToolStore.getState().selectionKind).toBe("edge");
   });
 

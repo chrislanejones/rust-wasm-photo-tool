@@ -1,11 +1,15 @@
-// The Select sub-mode of "Adjust & Select" (tool-arc session 2.6).
+// The Select TOOL's panel. Was the Select sub-mode of "Adjust & Select"
+// (tool-arc 2.6) until the split: two tools were wearing one id, and the
+// "Click-to-select" arming toggle was the visible seam. Now picking the tool
+// IS the arming — a canvas click fires the active kind immediately, and a
+// canvas DRAG sweeps a marquee (rect or ellipse, the shape control below).
 //
 // Everything that decides WHAT is selected lives here. The magic wand moved in
 // from Layer Settings — it was always a selection tool, it just happened to be
-// parked next to Move/Resize-Layer. All four kinds end in the same place: an
-// engine call returning a canvas-sized overlay, stored as the one selection
-// mask. Downstream (Delete, Deselect, New Layer, the overlay blit) never
-// learns which kind produced it.
+// parked next to Move/Resize-Layer. All kinds and both marquee shapes end in
+// the same place: an engine call returning a canvas-sized overlay, stored as
+// the one selection mask. Downstream (Delete, Deselect, New Layer, the
+// overlay blit) never learns which kind produced it.
 //
 //   Wand        — 4-connected flood fill within tolerance. Leaks through soft
 //                 gradients, which is exactly what the next one fixes.
@@ -25,9 +29,9 @@
 // template): stacked icon tiles on top, the active kind's title + lightbulb
 // info below, then the kind's settings — do not fork the layout.
 import {
-  MousePointerClick,
   BoxSelect,
   SquareDashed,
+  CircleDashed,
   Trash2,
   Wand2,
   Blend,
@@ -37,20 +41,21 @@ import {
   Scissors,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SizeSlider } from "@/components/SizeSlider";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
-import type { SelectionKind } from "@/stores/useToolStore";
+import type { SelectionKind, SelectionShape } from "@/stores/useToolStore";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
 export interface SelectionControls {
   tolerance: number;
   onToleranceChange: (v: number) => void;
-  /** Whether click-to-select mode is on (canvas clicks select). */
-  mode: boolean;
-  onToggleMode: () => void;
+  /** Marquee shape a canvas DRAG sweeps out (clicks fire `kind` instead). */
+  shape: SelectionShape;
+  onShapeChange: (s: SelectionShape) => void;
   onSelectAll: () => void;
   onDeselect: () => void;
   onDelete: () => void;
@@ -115,12 +120,18 @@ const PANEL_MODES: readonly ToolMode<SelectionKind>[] = SELECT_MODES.map(
     ...m,
     info: (
       <>
-        {m.info} Turn on click-to-select, then click the canvas.{" "}
+        {m.info} Click the canvas to select; drag for a marquee.{" "}
         <kbd>Alt+A</kbd> selects all, <kbd>Alt+D</kbd> deselects.
       </>
     ),
   }),
 );
+
+/** Marquee shapes for the drag gesture, in ToolButtonGroup shape. */
+const SHAPE_OPTIONS: { id: SelectionShape; label: string; icon: typeof SquareDashed }[] = [
+  { id: "rect", label: "Rect", icon: SquareDashed },
+  { id: "ellipse", label: "Ellipse", icon: CircleDashed },
+];
 
 export function SelectSettings({
   disabled,
@@ -145,15 +156,13 @@ export function SelectSettings({
       >
         {(kind) => (
           <>
-            <ToolButton
-              active={selection.mode}
-              disabled={disabled}
-              onClick={selection.onToggleMode}
-              className="w-full"
-            >
-              <MousePointerClick />{" "}
-              {selection.mode ? "Click-to-select: on" : "Click-to-select"}
-            </ToolButton>
+            <ToolButtonGroup
+              label="Drag shape"
+              options={SHAPE_OPTIONS}
+              value={selection.shape}
+              onChange={selection.onShapeChange}
+              columns={2}
+            />
 
             <SizeSlider
               label="Tolerance"
@@ -178,50 +187,50 @@ export function SelectSettings({
         )}
       </ToolModeToggle>
 
-      {/* ── Act on the selection ────────────────────────────────────────
-          Stacked tiles, same shape as the kind toggle above (Paint's tile
-          look). Outside the ToolModeToggle body: these actions are
-          kind-independent and shouldn't re-animate on every kind switch. */}
-      <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr] border-t border-theme-sidebar-border pt-3">
-        <ToolButton
-          stacked
-          disabled={disabled}
-          onClick={selection.onSelectAll}
-          title="Select all (Alt+A)"
-        >
-          <BoxSelect /> All
-        </ToolButton>
-        <ToolButton
-          stacked
-          disabled={disabled || !selection.active}
-          onClick={selection.onDeselect}
-          title="Deselect (Alt+D)"
-        >
-          <SquareDashed /> None
-        </ToolButton>
-        <ToolButton
-          stacked
-          disabled={disabled || !selection.active}
-          onClick={selection.onDelete}
-          title="Delete selection"
-        >
-          <Trash2 /> Delete
-        </ToolButton>
-      </div>
-
-      {/* ── New Layer (Layer Via Copy / Layer Via Cut) ──────────────────── */}
+      {/* ── Act on the selection: one title + bulb over all five actions ──
+          Two 3-column rows out of a single 5-item grid (All/Deselect/Delete,
+          then Copy/Cut/—). The old "New Layer" sub-header is gone — its copy
+          lives in this bulb now, per the no-permanent-paragraphs rule.
+          Outside the ToolModeToggle body: these actions are kind-independent
+          and shouldn't re-animate on every kind switch. */}
       <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
         <SectionHeader
-          title="New Layer"
+          title="Selection"
           info={
             <>
-              Places the current selection onto a new layer above. Copy leaves
-              the original (<kbd>Ctrl+J</kbd>); Cut removes it from this layer
-              (<kbd>Ctrl+Shift+J</kbd>).
+              All selects the whole canvas (<kbd>Alt+A</kbd>); Deselect drops
+              the selection (<kbd>Alt+D</kbd>); Delete clears the selected
+              pixels. Copy (<kbd>Ctrl+J</kbd>) and Cut (
+              <kbd>Ctrl+Shift+J</kbd>) place the selection on a new layer
+              above — Cut also removes it from this one.
             </>
           }
         />
-        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
+        <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
+          <ToolButton
+            stacked
+            disabled={disabled}
+            onClick={selection.onSelectAll}
+            title="Select all (Alt+A)"
+          >
+            <BoxSelect /> All
+          </ToolButton>
+          <ToolButton
+            stacked
+            disabled={disabled || !selection.active}
+            onClick={selection.onDeselect}
+            title="Deselect (Alt+D)"
+          >
+            <SquareDashed /> Deselect
+          </ToolButton>
+          <ToolButton
+            stacked
+            disabled={disabled || !selection.active}
+            onClick={selection.onDelete}
+            title="Delete selection"
+          >
+            <Trash2 /> Delete
+          </ToolButton>
           <ToolButton
             stacked
             disabled={disabled || !selection.active}
@@ -238,6 +247,7 @@ export function SelectSettings({
           >
             <Scissors /> Cut
           </ToolButton>
+          {/* third cell of row two intentionally empty */}
         </div>
       </div>
 

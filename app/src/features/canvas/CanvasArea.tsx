@@ -30,8 +30,14 @@ import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
+import { selectionCombineMode } from "@/lib/selectionBool";
 
 const EMPTY_SEGMENTS = new Float32Array(0);
+
+/** Screen-px movement below which a Select-tool press is a CLICK (fires the
+ *  active kind), at or above which it's a marquee DRAG. Screen px, not canvas
+ *  px, so the feel is zoom-independent. Matches the crop tool's 5px spirit. */
+const MARQUEE_THRESHOLD_PX = 4;
 
 // Data-URI SVG cursor for the rotate handle — there's no standard CSS
 // rotation cursor, so we draw a small curved-arrow glyph. Falls back to
@@ -48,6 +54,38 @@ const ROTATE_CURSOR =
     </svg>`,
   ) +
   "\") 12 12, grab";
+
+// Crosshair-with-plus / crosshair-with-minus for the Select tool while a
+// Shift (add) / Alt (subtract) modifier is held — no standard CSS cursor
+// carries the intent badge, so we draw it (same data-URI approach as the
+// rotate cursor above; black-under-white double stroke for contrast on any
+// background). Falls back to plain `crosshair`.
+const combineCursor = (badge: "plus" | "minus"): string => {
+  const bar =
+    "<line x1='16' y1='20' x2='22' y2='20' stroke='black' stroke-width='3.5'/>" +
+    "<line x1='16' y1='20' x2='22' y2='20' stroke='white' stroke-width='2'/>";
+  const cross =
+    badge === "plus"
+      ? bar +
+        "<line x1='19' y1='17' x2='19' y2='23' stroke='black' stroke-width='3.5'/>" +
+        "<line x1='19' y1='17' x2='19' y2='23' stroke='white' stroke-width='2'/>"
+      : bar;
+  return (
+    "url(\"data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round'>
+        <line x1='10' y1='2' x2='10' y2='18' stroke='black' stroke-width='3'/>
+        <line x1='2' y1='10' x2='18' y2='10' stroke='black' stroke-width='3'/>
+        <line x1='10' y1='2' x2='10' y2='18' stroke='white' stroke-width='1.5'/>
+        <line x1='2' y1='10' x2='18' y2='10' stroke='white' stroke-width='1.5'/>
+        ${cross}
+      </svg>`,
+    ) +
+    "\") 10 10, crosshair"
+  );
+};
+const SELECT_ADD_CURSOR = combineCursor("plus");
+const SELECT_SUBTRACT_CURSOR = combineCursor("minus");
 
 interface TextInputState {
   screenX: number;
@@ -99,17 +137,33 @@ interface Props {
     bgTail?: number;
   };
   colorPickerActive?: boolean;
-  /** Selection Marker (magic-wand): when active, a canvas click flood-selects. */
+  /** Select tool: canvas clicks fire the active selection kind. */
   selectionActive?: boolean;
-  /** Layer Settings → Move toggle on — drives the canvas cursor (move vs select). */
+  /** Layer Settings → Move toggle on — drives the canvas cursor. */
   layerMoveActive?: boolean;
   onSelectionClick?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
+  /** Select tool, click-once kinds: a DRAG sweeps a marquee instead of
+   *  clicking — preview here, engine commit on release. Off for the lasso
+   *  kind (its clicks are session anchors; a drag must not fight it). */
+  marqueeActive?: boolean;
+  /** Rect, or the ellipse inscribed in the drag rect — mirrors
+   *  `useToolStore.selectionShape` for the preview outline. */
+  marqueeShape?: "rect" | "ellipse";
+  /** Commit the marquee: canvas-space corners + the release modifiers
+   *  (Shift add / Alt subtract, flag-gated in the handler). */
+  onMarqueeCommit?: (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    mods: { shiftKey: boolean; altKey: boolean },
+  ) => void;
   /** Canvas-sized RGBA selection overlay (from Rust), drawn over the image. */
   selectionMask?: Uint8Array | null;
   selectionWidth?: number;
   selectionHeight?: number;
-  /** Magnetic lasso (behind `ih_smart_edge`): a session is open, so mouse-moves
-   *  drive the live wire and a double-click closes the loop. */
+  /** Magnetic lasso kind: a session may be open, so mouse-moves drive the
+   *  live wire and a double-click closes the loop. */
   lassoActive?: boolean;
   onLassoMove?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   onLassoClose?: () => void;
@@ -287,8 +341,8 @@ function getCursorForTool(
   tool?: string,
   isPanning?: boolean,
   colorPickerActive?: boolean,
-  selectionActive?: boolean,
   moveActive?: boolean,
+  combineIntent?: 0 | 1 | 2,
 ): string | undefined {
   if (isPanning) return "grab";
   if (colorPickerActive && tool === "crop") return "crosshair";
@@ -296,11 +350,16 @@ function getCursorForTool(
     case "text":
       return "text";
     case "arrow":
-      // Layer Settings: cursor follows the active sub-mode (neither on → default,
-      // so it never looks stuck in Move while you're trying to select).
-      if (selectionActive) return "crosshair";
+      // Layer Settings: Move toggle on → move cursor, otherwise default.
       if (moveActive) return "move";
       return undefined;
+    case "select":
+      // The gesture's intent is visible before it lands: Shift (add) and Alt
+      // (subtract) badge the crosshair while held (`ih_selection_bool`; with
+      // the flag off combineIntent is always 0).
+      if (combineIntent === 1) return SELECT_ADD_CURSOR;
+      if (combineIntent === 2) return SELECT_SUBTRACT_CURSOR;
+      return "crosshair";
     case "crop":
     case "shapes":
       return "crosshair";
@@ -341,6 +400,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       selectionActive,
       layerMoveActive,
       onSelectionClick,
+      marqueeActive,
+      marqueeShape,
+      onMarqueeCommit,
       selectionMask,
       selectionWidth,
       selectionHeight,
@@ -468,6 +530,58 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
     const [isDraggingPan, setIsDraggingPan] = useState(false);
+
+    // ── The main canvas's LAYOUT size (CSS px, pre-transform) ────────────────
+    // `.main-canvas` is CSS-fit-scaled (max-width/max-height), so its layout
+    // box is NOT the image's natural size on any photo bigger than the
+    // viewport. Overlays that ride the same pan/zoom transform (Selection
+    // marker, lasso wire) must base their CSS size on THIS box — hard-coding
+    // the natural size drew the marching ants 2-3× too large on big photos
+    // (the "selection is twice the size of the object" bug). A ResizeObserver
+    // tracks it through window resizes, sidebar toggles, and image swaps.
+    const [canvasCss, setCanvasCss] = useState<{ w: number; h: number } | null>(
+      null,
+    );
+    useEffect(() => {
+      const c = canvasRef.current;
+      if (!c) return;
+      const measure = () =>
+        setCanvasCss((prev) => {
+          const w = c.clientWidth;
+          const h = c.clientHeight;
+          return prev && prev.w === w && prev.h === h ? prev : { w, h };
+        });
+      const ro = new ResizeObserver(measure);
+      ro.observe(c);
+      measure();
+      return () => ro.disconnect();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ── Select tool: marquee drag (rect/ellipse) ─────────────────────────────
+    // The drag start in canvas coords (x,y) + screen coords (sx,sy — for the
+    // click-vs-drag threshold, which must be zoom-independent). The preview
+    // rect is canvas-space; the engine commit happens in useSelectionActions.
+    const marqueeStartRef = useRef<{
+      x: number;
+      y: number;
+      sx: number;
+      sy: number;
+    } | null>(null);
+    const [marqueeRect, setMarqueeRect] = useState<{
+      x0: number;
+      y0: number;
+      x1: number;
+      y1: number;
+    } | null>(null);
+    // A drag past the threshold must swallow the click the browser fires
+    // after its mouseup, or the marquee would immediately be replaced by a
+    // wand selection at the release point.
+    const suppressSelectionClickRef = useRef(false);
+    // Live Shift/Alt intent while the Select tool hovers — drives the +/−
+    // cursor badge. Always 0 when the `ih_selection_bool` kill switch is set
+    // (selectionCombineMode reads the switch itself).
+    const [combineIntent, setCombineIntent] = useState<0 | 1 | 2>(0);
 
     const handlePanMouseDown = useCallback(
       (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -833,13 +947,44 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       activeTool,
       isPanning,
       colorPickerActive,
-      selectionActive,
       layerMoveActive,
+      selectionActive ? combineIntent : 0,
     );
     const panCursor = isDraggingPan ? "grabbing" : cursor;
 
+    // The one canvas-coords conversion this component does (same math as the
+    // session hook's getCoords — a screen point in the element's box mapped
+    // through the canvas's intrinsic size, so zoom/fit scaling cancels out).
+    const toCanvasPoint = (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const c = canvasRef.current;
+      if (!c) return null;
+      const r = c.getBoundingClientRect();
+      return {
+        x: ((e.clientX - r.left) * c.width) / r.width,
+        y: ((e.clientY - r.top) * c.height) / r.height,
+      };
+    };
+
     // Combined mouse handlers — pan takes priority when spacebar is held
-    const wrappedMouseDown = isPanning ? handlePanMouseDown : onMouseDown;
+    const baseMouseDown = isPanning ? handlePanMouseDown : onMouseDown;
+    // Marquee arm: remember where a Select-tool drag might start. Not yet a
+    // drag — the threshold check on mousemove decides — so the click path
+    // stays live for sub-threshold presses.
+    const wrappedMouseDown =
+      marqueeActive && !isPanning
+        ? (e: React.MouseEvent<HTMLCanvasElement>) => {
+            if (e.button === 0) {
+              const p = toCanvasPoint(e);
+              if (p)
+                marqueeStartRef.current = {
+                  ...p,
+                  sx: e.clientX,
+                  sy: e.clientY,
+                };
+            }
+            baseMouseDown?.(e);
+          }
+        : baseMouseDown;
     const baseMouseMove = isPanning ? handlePanMouseMove : onMouseMove;
     // Text-tool hover highlight runs alongside the regular mousemove.
     const hoverMouseMove = isTextTool
@@ -851,14 +996,63 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // Magnetic lasso: while a session is open the wire chases the cursor, so it
     // rides alongside whatever mousemove is already in play (and never while
     // panning — spacebar still wins).
-    const wrappedMouseMove =
+    const lassoMouseMove =
       lassoActive && !isPanning
         ? (e: React.MouseEvent<HTMLCanvasElement>) => {
             hoverMouseMove?.(e);
             onLassoMove?.(e);
           }
         : hoverMouseMove;
-    const wrappedMouseUp = isPanning ? handlePanMouseUp : onMouseUp;
+    // Select tool: track the live Shift/Alt intent for the cursor badge, and
+    // grow the marquee preview once the drag clears the threshold (screen px,
+    // so it means the same thing at every zoom).
+    const wrappedMouseMove =
+      selectionActive && !isPanning
+        ? (e: React.MouseEvent<HTMLCanvasElement>) => {
+            lassoMouseMove?.(e);
+            const intent = selectionCombineMode(e);
+            if (intent !== combineIntent) setCombineIntent(intent);
+            const start = marqueeStartRef.current;
+            if (start && marqueeActive) {
+              const moved = Math.hypot(e.clientX - start.sx, e.clientY - start.sy);
+              if (marqueeRect || moved > MARQUEE_THRESHOLD_PX) {
+                const p = toCanvasPoint(e);
+                if (p)
+                  setMarqueeRect({ x0: start.x, y0: start.y, x1: p.x, y1: p.y });
+              }
+            }
+          }
+        : lassoMouseMove;
+    const baseMouseUp = isPanning ? handlePanMouseUp : onMouseUp;
+    // Marquee commit on release; the click that follows is swallowed (see the
+    // suppress ref). A sub-threshold press never set marqueeRect, so it falls
+    // through to the click path untouched.
+    const wrappedMouseUp =
+      marqueeActive && !isPanning
+        ? (e: React.MouseEvent<HTMLCanvasElement>) => {
+            const started = marqueeStartRef.current !== null;
+            marqueeStartRef.current = null;
+            if (started && marqueeRect) {
+              suppressSelectionClickRef.current = true;
+              onMarqueeCommit?.(
+                marqueeRect.x0,
+                marqueeRect.y0,
+                marqueeRect.x1,
+                marqueeRect.y1,
+                { shiftKey: e.shiftKey, altKey: e.altKey },
+              );
+              setMarqueeRect(null);
+            }
+            baseMouseUp?.();
+          }
+        : baseMouseUp;
+    // Leaving the canvas mid-drag cancels the marquee (no commit) — matching
+    // how a crop drag dies at the edge rather than committing a guess.
+    const wrappedMouseLeave = () => {
+      marqueeStartRef.current = null;
+      if (marqueeRect) setMarqueeRect(null);
+      baseMouseUp?.();
+    };
 
     const { width: imgW, height: imgH } = hookResult.state;
 
@@ -898,12 +1092,21 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           onMouseDown={wrappedMouseDown}
           onMouseMove={wrappedMouseMove}
           onMouseUp={wrappedMouseUp}
-          onMouseLeave={isPanning ? handlePanMouseUp : onMouseUp}
+          onMouseLeave={wrappedMouseLeave}
           onClick={
             isTextTool
               ? onCanvasClick
               : selectionActive
-                ? onSelectionClick
+                ? (e) => {
+                    // A completed marquee drag fires a click on release —
+                    // swallow exactly that one so it can't wand-select over
+                    // the fresh marquee.
+                    if (suppressSelectionClickRef.current) {
+                      suppressSelectionClickRef.current = false;
+                      return;
+                    }
+                    onSelectionClick?.(e);
+                  }
                 : undefined
           }
           // Double-click closes the lasso loop. Only bound while a session is
@@ -924,6 +1127,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             preview={lassoPreview ?? null}
             width={imgW}
             height={imgH}
+            cssWidth={canvasCss?.w}
+            cssHeight={canvasCss?.h}
             panOffset={panOffset}
             zoom={zoom}
           />
@@ -938,6 +1143,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               mask={selectionMask}
               width={selectionWidth}
               height={selectionHeight}
+              cssWidth={canvasCss?.w}
+              cssHeight={canvasCss?.h}
               panOffset={panOffset}
               zoom={zoom}
             />
@@ -1078,6 +1285,53 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   onPointerDown={(e) => handleCropPointerDown(e, h.id)}
                 />
               ))}
+            </svg>
+          );
+        })()}
+
+        {/* ── Marquee drag preview (Select tool) ───────────────────────────
+            The live outline of the drag before it commits — same fixed-SVG
+            idiom as the crop overlay above, minus mask/thirds/handles (this
+            is a gesture echo, not an editable region; the committed result is
+            the engine's marching-ants overlay). Dashed white-over-black
+            double stroke so it reads on any image. */}
+        {marqueeRect && canvasRef.current && (() => {
+          const canvas = canvasRef.current!;
+          const r = canvas.getBoundingClientRect();
+          const sx = r.width / canvas.width;
+          const sy = r.height / canvas.height;
+          const vx = r.left + Math.min(marqueeRect.x0, marqueeRect.x1) * sx;
+          const vy = r.top + Math.min(marqueeRect.y0, marqueeRect.y1) * sy;
+          const vw = Math.abs(marqueeRect.x1 - marqueeRect.x0) * sx;
+          const vh = Math.abs(marqueeRect.y1 - marqueeRect.y0) * sy;
+
+          return (
+            <svg
+              style={{
+                position: "fixed",
+                inset: 0,
+                width: "100vw",
+                height: "100vh",
+                pointerEvents: "none",
+                zIndex: 40,
+                overflow: "hidden",
+              }}
+            >
+              {marqueeShape === "ellipse" ? (
+                <>
+                  <ellipse cx={vx + vw / 2} cy={vy + vh / 2} rx={vw / 2} ry={vh / 2}
+                    fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={2.5} strokeDasharray="5 5" />
+                  <ellipse cx={vx + vw / 2} cy={vy + vh / 2} rx={vw / 2} ry={vh / 2}
+                    fill="none" stroke="white" strokeWidth={1} strokeDasharray="5 5" />
+                </>
+              ) : (
+                <>
+                  <rect x={vx} y={vy} width={vw} height={vh}
+                    fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth={2.5} strokeDasharray="5 5" />
+                  <rect x={vx} y={vy} width={vw} height={vh}
+                    fill="none" stroke="white" strokeWidth={1} strokeDasharray="5 5" />
+                </>
+              )}
             </svg>
           );
         })()}

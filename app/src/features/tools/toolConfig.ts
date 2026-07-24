@@ -3,6 +3,7 @@ import type { ToolType } from "@/lib/types";
 import {
   Shrink,
   VectorSquare,
+  SquareDashedMousePointer,
   Paintbrush,
   Type,
   Layers,
@@ -22,8 +23,9 @@ export interface ToolDefinition {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   gradient: string;
-  /** Digit-key shortcut that switches to this tool (mirrors TOOL_BY_DIGIT in
-   *  useKeyboardShortcuts.ts — keys 1-9, then 0 for the 10th tool). */
+  /** Key that switches to this tool (mirrors TOOL_BY_KEY in
+   *  useKeyboardShortcuts.ts — keys 1-9, 0, then letters once the digit row
+   *  filled: S = Select). */
   shortcutKey: string;
 }
 
@@ -39,14 +41,25 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     // Display label only — the id stays `crop` (load-bearing: shortcuts,
-    // persistence, the tool registry). Renamed in the tool-arc 2.6 session
-    // when the Select sub-mode moved in alongside Adjust.
+    // persistence, the tool registry). "Adjust & Select" until the Select
+    // sub-mode split into its own tool; now just the crop/transform half.
     id: "crop",
-    label: "Adjust & Select",
-    description: "Crop, transform & select",
+    label: "Adjust",
+    description: "Crop & transform",
     icon: VectorSquare,
     gradient: "from-cyan-500 to-blue-500",
     shortcutKey: "2",
+  },
+  {
+    // Selection, split out of "Adjust & Select" — the first tool whose id
+    // matches its label from birth. Click = the active SelectionKind
+    // (wand/edge/color/lasso); drag = rect/ellipse marquee.
+    id: "select",
+    label: "Select",
+    description: "Select by click or marquee",
+    icon: SquareDashedMousePointer,
+    gradient: "from-teal-500 to-cyan-500",
+    shortcutKey: "S",
   },
   {
     id: "brush",

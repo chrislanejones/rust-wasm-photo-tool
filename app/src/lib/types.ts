@@ -12,6 +12,7 @@ export type ToolType =
   | "stamp"
   | "compress"
   | "crop"
+  | "select"    // Selection split out of "Adjust & Select" — born matching its label
   | "brush"
   | "text"
   | "arrow"

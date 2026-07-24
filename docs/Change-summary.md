@@ -2070,3 +2070,38 @@ tiles / patchmatch, engine tests pass; `tsc --noEmit` clean, eslint 0 errors /
 62 warnings, 195/195 vitest, app + marketing production builds succeed. Shipped
 WASM 735,865 B (+1,192 over the v7.42 baseline — the new `selection_to_new_layer`
 export, the mask-clear SIMD kernel, and the text-shadow fallback branch).
+
+## v7.44 — 2026-07-23
+
+**Select becomes a real tool — its own button, canvas-first, every step
+undoable.** Selection had lived inside "Adjust & Select" behind a
+Click-to-select toggle: three flags deep before a canvas click did anything,
+and every selection drag spawned the crop box, because the only rectangle
+gesture in the app belonged to crop. Select is now tool #11 (press `S` — the
+first letter shortcut; the digit row filled up at ten). Pick it and the canvas
+just works: click fires the active kind, drag sweeps a marquee. Adjust is
+just Adjust again.
+
+The marching-ants display bug: the selection overlay hard-coded its CSS size
+to the image's natural pixels while the canvas is fit-scaled to the window —
+on any photo larger than the viewport the ants drew 2–3× bigger than the
+selection they described. All four kinds looked broken; the engine mask was
+right the whole time. Both overlays (ants + lasso wire) now render into the
+canvas's measured layout box.
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | Select split out of `crop` as tool id `select` (first id born matching its label); Adjust/Select sub-mode, `selectionMode` flag and the Click-to-select toggle deleted | Complete — one gate: being on the tool IS the arming |
+| 2   | Drag = marquee: `rect_select` / `ellipse_select` engine producers riding the shared combine pipeline; Rect/Ellipse shape control; 4px click-vs-drag threshold; dashed preview | Complete — 13 engine tests |
+| 3   | Overlay fit-scale fix: SelectionOverlay + LassoOverlay take the canvas's ResizeObserver-measured CSS box instead of the natural size | Complete — pre-existing on master, first seen on large photos |
+| 4   | Shift = add / Alt = subtract ON by default; `ih_selection_bool` becomes a `"0"` kill switch; Select-tool cursor badges the intent (+/−) | Complete |
+| 5   | Every selection change is one undo step with a History name (Magic Wand, Edge Select, Color Range, Magnetic Lasso, Marquee, Add/Subtract Selection, Select All, Deselect); no-op clicks push nothing | Complete — 8 engine tests |
+| 6   | Selection-only steps are transparent to the op log (never seek or break it); undoing Delete Selection / Layer-via-Cut restores the mask along with the pixels | Complete — lockstep pinned by test |
+| 7   | Select panel: one "Selection" header + lightbulb over five actions (All / Deselect / Delete / Copy / Cut in two 3-column rows); "New Layer" sub-header gone; "None" renamed Deselect | Complete |
+| 8   | Legacy links (`#/tool/adjust/select`, `?tool=adjust&mode=select`) land on the Select tool; palette kinds are real routes (`#/tool/select/wand`) | Complete |
+
+**Verified**: `cargo fmt --check` clean, clippy `-D warnings` clean, engine
+tests pass (incl. 13 marquee + 8 history); `tsc --noEmit` clean, eslint 0
+errors / 61 warnings, 198/198 vitest, production build succeeds. Shipped WASM
+743,834 B (+7,969 over v7.43 — marquee producers, selection-carrying
+snapshots, history labels).

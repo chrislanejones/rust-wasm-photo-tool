@@ -38,10 +38,11 @@ export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
 export type ResizeMode = "compress" | "resize";
-/** "Adjust & Select" (legacy id `crop`) sub-modes: Adjust = the crop /
- *  transform controls; Select = the selection tools. */
-export type AdjustMode = "adjust" | "select";
-/** How a canvas click selects, in Select mode.
+/** Marquee shape a Select-tool DRAG sweeps out (clicks fire the
+ *  `SelectionKind` instead): the rect, or the ellipse inscribed in it.
+ *  Transient like the rest of selection state — not persisted. */
+export type SelectionShape = "rect" | "ellipse";
+/** How a canvas click selects, in the Select tool.
  *  - `wand`       — 4-connected flood fill within tolerance (the original).
  *  - `edge`       — same fill, but walled in by the Sobel edge map so it stops
  *                   at the object outline instead of leaking through gradients.
@@ -59,8 +60,8 @@ interface ToolState {
   activeTool: ToolType;
   brushMode: BrushMode;
   resizeMode: ResizeMode;
-  adjustMode: AdjustMode;
   selectionKind: SelectionKind;
+  selectionShape: SelectionShape;
   /** Edge-wall strength for `selectionKind: "edge"` (0..=255). Lower = more
    *  walls = tighter selection. */
   edgeThreshold: number;
@@ -84,7 +85,6 @@ interface ToolState {
   /** Active Crop aspect ratio; `null` ≡ "Free" (no constraint). */
   cropRatio: [number, number] | null;
   selectionTolerance: number;
-  selectionMode: boolean;
   selectionMask: Uint8Array | null;
   stampSettings: StampSettings;
   toolSettings: ToolSettings;
@@ -92,8 +92,8 @@ interface ToolState {
   setActiveTool: (v: SetArg<ToolType>) => void;
   setBrushMode: (v: SetArg<BrushMode>) => void;
   setResizeMode: (v: SetArg<ResizeMode>) => void;
-  setAdjustMode: (v: SetArg<AdjustMode>) => void;
   setSelectionKind: (v: SetArg<SelectionKind>) => void;
+  setSelectionShape: (v: SetArg<SelectionShape>) => void;
   setEdgeThreshold: (v: SetArg<number>) => void;
   setSmartBrush: (v: SetArg<boolean>) => void;
   setSmartBrushStrength: (v: SetArg<number>) => void;
@@ -106,7 +106,6 @@ interface ToolState {
   setEraserMode: (v: SetArg<EraserMode>) => void;
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
-  setSelectionMode: (v: SetArg<boolean>) => void;
   setSelectionMask: (v: SetArg<Uint8Array | null>) => void;
   setStampSettings: (v: SetArg<StampSettings>) => void;
   setToolSettings: (v: SetArg<ToolSettings>) => void;
@@ -118,8 +117,8 @@ export const useToolStore = create<ToolState>()(
       activeTool: "compress",
       brushMode: "paint",
       resizeMode: "compress",
-      adjustMode: "adjust",
       selectionKind: "wand",
+      selectionShape: "rect",
       // 90/255: walls off hard outlines while ignoring film grain / JPEG noise.
       edgeThreshold: 90,
       smartBrush: false,
@@ -133,7 +132,6 @@ export const useToolStore = create<ToolState>()(
       eraserMode: "brush",
       cropRatio: null,
       selectionTolerance: 24,
-      selectionMode: false,
       selectionMask: null,
       stampSettings: { brushSize: 20, hardness: 0.8, opacity: 1.0 },
       toolSettings: defaultToolSettings,
@@ -142,10 +140,10 @@ export const useToolStore = create<ToolState>()(
       setBrushMode: (v) => set((s) => ({ brushMode: resolveSet(v, s.brushMode) })),
       setResizeMode: (v) =>
         set((s) => ({ resizeMode: resolveSet(v, s.resizeMode) })),
-      setAdjustMode: (v) =>
-        set((s) => ({ adjustMode: resolveSet(v, s.adjustMode) })),
       setSelectionKind: (v) =>
         set((s) => ({ selectionKind: resolveSet(v, s.selectionKind) })),
+      setSelectionShape: (v) =>
+        set((s) => ({ selectionShape: resolveSet(v, s.selectionShape) })),
       setEdgeThreshold: (v) =>
         set((s) => ({ edgeThreshold: resolveSet(v, s.edgeThreshold) })),
       setSmartBrush: (v) => set((s) => ({ smartBrush: resolveSet(v, s.smartBrush) })),
@@ -164,8 +162,6 @@ export const useToolStore = create<ToolState>()(
       setCropRatio: (v) => set((s) => ({ cropRatio: resolveSet(v, s.cropRatio) })),
       setSelectionTolerance: (v) =>
         set((s) => ({ selectionTolerance: resolveSet(v, s.selectionTolerance) })),
-      setSelectionMode: (v) =>
-        set((s) => ({ selectionMode: resolveSet(v, s.selectionMode) })),
       setSelectionMask: (v) =>
         set((s) => ({ selectionMask: resolveSet(v, s.selectionMask) })),
       setStampSettings: (v) =>

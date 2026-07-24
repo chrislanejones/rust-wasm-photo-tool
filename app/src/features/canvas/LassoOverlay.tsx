@@ -19,9 +19,15 @@ interface Props {
   committed: Int32Array | null;
   /** The live wire from the last anchor to the cursor. Flat [x,y,…] pairs. */
   preview: Int32Array | null;
-  /** Image (document) dimensions — the SVG's coordinate space. */
+  /** Image (document) dimensions — the SVG's coordinate space (viewBox). */
   width: number;
   height: number;
+  /** The main canvas's fit-scaled LAYOUT size in CSS px (see
+   *  SelectionOverlay — the natural size drew the wire 2-3× too large on
+   *  photos bigger than the viewport). The viewBox stays image-space, so the
+   *  points need no rescaling. Optional only for the pre-measure frame. */
+  cssWidth?: number;
+  cssHeight?: number;
   panOffset: { x: number; y: number };
   zoom: number;
 }
@@ -41,6 +47,8 @@ export function LassoOverlay({
   preview,
   width,
   height,
+  cssWidth,
+  cssHeight,
   panOffset,
   zoom,
 }: Props) {
@@ -55,8 +63,10 @@ export function LassoOverlay({
       viewBox={`0 0 ${width} ${height}`}
       style={{
         position: "absolute",
-        width,
-        height,
+        // Fit-scaled layout box, not the natural size — the viewBox maps the
+        // image-space points into whatever box CSS gives us.
+        width: cssWidth ?? width,
+        height: cssHeight ?? height,
         transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
         transformOrigin: "center center",
         pointerEvents: "none",

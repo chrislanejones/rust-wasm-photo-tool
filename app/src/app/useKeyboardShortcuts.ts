@@ -4,13 +4,16 @@ import { useUIStore } from "@/stores/useUIStore";
 import { setPaletteActions } from "@/features/commandPalette";
 import { navigateTo } from "@/features/routing";
 
-/** All ten tools in toolbar order — keys 1-9, 0. Exported (test-only use) so
- *  it can be cross-checked against toolConfig.ts's ToolDefinition.shortcutKey
- *  — the two are meant to be the same contract stated twice and must not
- *  drift (see useKeyboardShortcuts.test.ts). */
-export const TOOL_BY_DIGIT: Record<string, ToolType> = {
+/** All eleven tools in toolbar order — keys 1-9, 0, then letters (the digit
+ *  row filled up when Select split out of Adjust & Select; S is the first
+ *  letter key, Photoshop-style). Keyed on `e.code`. Exported (test-only use)
+ *  so it can be cross-checked against toolConfig.ts's
+ *  ToolDefinition.shortcutKey — the two are meant to be the same contract
+ *  stated twice and must not drift (see useKeyboardShortcuts.test.ts). */
+export const TOOL_BY_KEY: Record<string, ToolType> = {
   Digit1: "compress",
   Digit2: "crop",
+  KeyS: "select",
   Digit3: "brush",
   Digit4: "text",
   Digit5: "arrow",
@@ -335,10 +338,10 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // ─── Bare number keys → tool switching ──────────────
-      if (onToolChange && e.code in TOOL_BY_DIGIT) {
+      // ─── Bare tool keys (digits + S) → tool switching ──────────────
+      if (onToolChange && e.code in TOOL_BY_KEY) {
         e.preventDefault();
-        onToolChange(TOOL_BY_DIGIT[e.code]);
+        onToolChange(TOOL_BY_KEY[e.code]);
       }
     };
 

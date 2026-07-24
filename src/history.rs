@@ -22,14 +22,26 @@ pub struct Snapshot {
     pub active: usize,
     pub width: u32,
     pub height: u32,
+    /// The selection mask at the time of the snapshot — selection changes are
+    /// undo steps (each select / add / subtract / deselect), and pixel-step
+    /// undo also restores the mask that was live at that moment.
+    pub selection: Option<Vec<bool>>,
+    /// True when this snapshot was pushed by a selection-only action. Such
+    /// steps recorded NO op, so undo/redo must treat them as transparent to
+    /// the op log: restore just the mask, never seek the log cursor (see
+    /// `ImageHorseTool::undo`). The layer stack in a selection-only snapshot
+    /// is identical to the state below it by construction.
+    pub selection_only: bool,
 }
 
 impl Snapshot {
     /// Approximate heap bytes this snapshot holds. The dominant cost is each
     /// layer's pixel buffer (width·height·4); the annotation vecs are negligible
-    /// by comparison, so they're omitted.
+    /// by comparison, so they're omitted. The selection adds 1 byte/px when
+    /// present.
     pub fn bytes(&self) -> usize {
-        self.layers.iter().map(|l| l.buf.data.len()).sum()
+        self.layers.iter().map(|l| l.buf.data.len()).sum::<usize>()
+            + self.selection.as_ref().map_or(0, |s| s.len())
     }
 }
 
@@ -106,6 +118,10 @@ impl History {
         if let Some(snap) = self.undo_stack.pop_back() {
             let mut cur = current;
             cur.label = snap.label.clone();
+            // The redo entry stands in for the step being undone, so it keeps
+            // the step's kind too — a selection-only step must redo through
+            // the selection-only (log-transparent) path.
+            cur.selection_only = snap.selection_only;
             self.redo_stack.push(cur);
             Some(snap)
         } else {
@@ -119,6 +135,8 @@ impl History {
         if let Some(snap) = self.redo_stack.pop() {
             let mut cur = current;
             cur.label = snap.label.clone();
+            // Mirror of `undo` — the undo entry keeps the redone step's kind.
+            cur.selection_only = snap.selection_only;
             self.undo_stack.push_back(cur);
             Some(snap)
         } else {

@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { useKeyboardShortcuts, TOOL_BY_DIGIT } from "./useKeyboardShortcuts";
+import { useKeyboardShortcuts, TOOL_BY_KEY } from "./useKeyboardShortcuts";
 import { TOOLS } from "@/features/tools/toolConfig";
 
 // React 19 warns ("not configured to support act(...)") unless this flag is
@@ -117,24 +117,25 @@ afterEach(() => {
   container.remove();
 });
 
-describe("TOOL_BY_DIGIT agrees with toolConfig.ts (one contract, stated twice)", () => {
+describe("TOOL_BY_KEY agrees with toolConfig.ts (one contract, stated twice)", () => {
   // toolConfig.ts's ToolDefinition.shortcutKey doc-comment claims it "mirrors
-  // TOOL_BY_DIGIT in useKeyboardShortcuts.ts" — this is the only place that
+  // TOOL_BY_KEY in useKeyboardShortcuts.ts" — this is the only place that
   // claim is actually checked. If someone adds/reorders a tool in one table
-  // without the other, digit keys and the sidebar/palette shortcut hints
+  // without the other, tool keys and the sidebar/palette shortcut hints
   // silently disagree about which key does what.
-  it("every tool's shortcutKey resolves through TOOL_BY_DIGIT to that same tool", () => {
+  /** shortcutKey → e.code: digits are DigitN, letters are KeyX (S arrived
+   *  when Select split out and the digit row was already full). */
+  const toCode = (k: string) => (/^\d$/.test(k) ? `Digit${k}` : `Key${k}`);
+
+  it("every tool's shortcutKey resolves through TOOL_BY_KEY to that same tool", () => {
     for (const tool of TOOLS) {
-      const code = tool.shortcutKey === "0" ? "Digit0" : `Digit${tool.shortcutKey}`;
-      expect(TOOL_BY_DIGIT[code]).toBe(tool.id);
+      expect(TOOL_BY_KEY[toCode(tool.shortcutKey)]).toBe(tool.id);
     }
   });
 
-  it("has no digit entries beyond what toolConfig.ts's ten tools define", () => {
-    const expectedCodes = new Set(
-      TOOLS.map((t) => (t.shortcutKey === "0" ? "Digit0" : `Digit${t.shortcutKey}`)),
-    );
-    expect(new Set(Object.keys(TOOL_BY_DIGIT))).toEqual(expectedCodes);
+  it("has no entries beyond what toolConfig.ts's eleven tools define", () => {
+    const expectedCodes = new Set(TOOLS.map((t) => toCode(t.shortcutKey)));
+    expect(new Set(Object.keys(TOOL_BY_KEY))).toEqual(expectedCodes);
   });
 });
 

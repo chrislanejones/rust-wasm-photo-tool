@@ -9,37 +9,13 @@ import {
   Square,
   RectangleHorizontal,
   RectangleVertical,
-  SlidersHorizontal,
-  MousePointerSquareDashed,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
-import { ToolModeToggle, type ToolMode } from "@/components/ui/tool-mode-toggle";
 import { cn } from "@/lib/utils";
 import type { CropSelection } from "@/hooks/useDrawingTools";
-import type { AdjustMode } from "@/stores/useToolStore";
-import { SelectSettings, type SelectionControls } from "./SelectSettings";
-
-/** The two sub-modes of "Adjust & Select" (tool id `crop`). Exported so the
- *  registry module and the command palette derive their entries from one list. */
-export const ADJUST_MODES: ToolMode<AdjustMode>[] = [
-  {
-    id: "adjust",
-    label: "Adjust",
-    icon: SlidersHorizontal,
-    title: "Adjust",
-    info: "Crop, straighten, flip and rotate — everything that changes the frame.",
-  },
-  {
-    id: "select",
-    label: "Select",
-    icon: MousePointerSquareDashed,
-    title: "Select",
-    info: "Choose what you're working on: wand, edge-aware, or colour range.",
-  },
-];
 
 /* ── Aspect-ratio presets ─────────────────────────────────────────────
  * "free" leaves the user dragging without constraint; everything else
@@ -104,11 +80,6 @@ interface TransformCropSettingsProps {
   /** Currently-selected color to preview in the swatch (falls back to a
    *  neutral color if the caller hasn't picked one yet). */
   pickedColor?: string;
-  /** Sub-mode: Adjust (crop/transform) vs Select (the selection tools). */
-  activeMode: AdjustMode;
-  onModeChange: (m: AdjustMode) => void;
-  /** Selection tools — moved here from Layer Settings in tool-arc 2.6. */
-  selection: SelectionControls;
 }
 
 export function TransformCropSettings({
@@ -125,9 +96,6 @@ export function TransformCropSettings({
   colorPickerActive = false,
   onSetColorPickerActive,
   pickedColor,
-  activeMode,
-  onModeChange,
-  selection,
 }: TransformCropSettingsProps) {
   const ratio = ratioIdFromLock(cropRatio);
   const displayColor = pickedColor ?? "#000000";
@@ -151,27 +119,10 @@ export function TransformCropSettings({
     onSetCropSelection({ x, y, width: w, height: h });
   };
 
+  // Single-mode again: the Select half split into its own tool, so the
+  // ToolModeToggle wrapper (and its AdjustBody closure) went with it — this
+  // is the tool's original Adjust content, returned directly.
   return (
-    <ToolModeToggle
-      modes={ADJUST_MODES}
-      activeMode={activeMode}
-      onModeChange={onModeChange}
-    >
-      {(mode) =>
-        mode === "select" ? (
-          <SelectSettings disabled={disabled} selection={selection} />
-        ) : (
-          <AdjustBody />
-        )
-      }
-    </ToolModeToggle>
-  );
-
-  /* The Adjust body — the tool's original contents, verbatim. Declared as a
-     closure so the (already long) JSX below didn't have to be threaded through
-     another prop drill just to reach the toggle's body slot. */
-  function AdjustBody() {
-    return (
     <div className="space-y-6">
       {/* ── Crop (first; no verbiage — just the ratio + apply) ───────────── */}
       {onApplyCrop && (
@@ -302,6 +253,5 @@ export function TransformCropSettings({
         </div>
       )}
     </div>
-    );
-  }
+  );
 }

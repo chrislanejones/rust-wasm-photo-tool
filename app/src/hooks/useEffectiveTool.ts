@@ -70,6 +70,13 @@ export function useEffectiveTool({
   if (activeTool === "effects") {
     return idle;
   }
+  // Select tool: the click (kind) and drag (marquee) gestures are wired a
+  // level up — CanvasArea's wrappers → useSelectionActions — so the
+  // underlying stamp handlers must idle or a drag would clone-stamp
+  // (the unmatched-tool fallthrough below returns the raw stamp handlers).
+  if (activeTool === "select") {
+    return idle;
+  }
   // Layer Settings tool: Move drags the layer (when its toggle is on);
   // otherwise idle so canvas clicks fall through to the Selection marker.
   if (activeTool === "arrow") {

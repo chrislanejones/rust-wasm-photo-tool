@@ -7,6 +7,13 @@ interface Props {
   mask: Uint8Array;
   width: number;
   height: number;
+  /** The main canvas's LAYOUT size in CSS px (its fit-scaled box, measured by
+   *  CanvasArea's ResizeObserver). `.main-canvas` is max-width/max-height
+   *  fit-scaled, so on any photo bigger than the viewport this is SMALLER
+   *  than the natural size — using the natural size here drew the ants 2-3×
+   *  too large. Optional only for the first pre-measure frame. */
+  cssWidth?: number;
+  cssHeight?: number;
   /** The image canvas's live pan offset (px) and zoom — we apply the SAME CSS
    *  transform as the main canvas so the marker tracks it exactly. */
   panOffset: { x: number; y: number };
@@ -29,6 +36,8 @@ export function SelectionOverlay({
   mask,
   width,
   height,
+  cssWidth,
+  cssHeight,
   panOffset,
   zoom,
 }: Props) {
@@ -57,8 +66,11 @@ export function SelectionOverlay({
       height={height}
       style={{
         position: "absolute",
-        width,
-        height,
+        // The fit-scaled layout box, NOT the natural size — the backing store
+        // stays image-resolution (width/height attrs above) and CSS scales it,
+        // exactly like the main canvas itself.
+        width: cssWidth ?? width,
+        height: cssHeight ?? height,
         transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
         transformOrigin: "center center",
         pointerEvents: "none",
