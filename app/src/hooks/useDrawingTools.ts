@@ -155,12 +155,21 @@ export function useDrawingTools({
       ) => Uint32Array | undefined)
     | null
   >(null);
-  if (!constrainRef.current) {
-    void import("stamp_tool").then(async (mod) => {
-      await mod.default();
-      constrainRef.current = mod.constrain_crop_to_ratio;
-    }).catch(() => {});
-  }
+  // Warm the cache from an effect, not from the render body. The import is
+  // async either way, so `constrainRef.current` is null immediately after the
+  // first render in both versions, and the only reader (`constrainDrag`) runs
+  // from pointer handlers long after mount — with a JS fallback if the cache is
+  // still cold. Starting it during render was a side effect in the render
+  // phase, which a discarded/replayed render would fire spuriously.
+  useEffect(() => {
+    if (constrainRef.current) return;
+    void import("stamp_tool")
+      .then(async (mod) => {
+        await mod.default();
+        constrainRef.current = mod.constrain_crop_to_ratio;
+      })
+      .catch(() => {});
+  }, []);
 
   /** Apply the locked-ratio constraint to a raw drag rect. Returns null
    *  when no ratio is locked so callers fall back to the free path. */
@@ -185,9 +194,9 @@ export function useDrawingTools({
       const dx = end.x - start.x;
       const dy = end.y - start.y;
       const r = ratio[0] / ratio[1];
-      let w = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
+      const w = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
         ? Math.abs(dx) : Math.abs(dy) * r;
-      let h = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
+      const h = Math.abs(dy) === 0 || Math.abs(dx) / Math.max(Math.abs(dy), 1e-9) > r
         ? Math.abs(dx) / r : Math.abs(dy);
       let x = start.x;
       let y = start.y;
@@ -365,7 +374,7 @@ export function useDrawingTools({
       const tool = toolRef.current;
       if (!tool) return;
       if (editStateRef.current) commitEdit();
-      let list: ShapeMeta[] = [];
+      let list: ShapeMeta[];
       try {
         list = JSON.parse(tool.get_shape_annotations()) as ShapeMeta[];
       } catch {
@@ -506,7 +515,7 @@ export function useDrawingTools({
     const editId = editStateRef.current?.editId;
     if (editId == null) return;
     const tool = toolRef.current;
-    let stillThere = false;
+    let stillThere: boolean;
     try {
       stillThere = (JSON.parse(tool?.get_shape_annotations() ?? "[]") as ShapeMeta[])
         .some((s) => s.id === editId);

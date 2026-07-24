@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { useKeyboardShortcuts, TOOL_BY_DIGIT } from "./useKeyboardShortcuts";
+import { useKeyboardShortcuts, TOOL_BY_KEY } from "./useKeyboardShortcuts";
 import { TOOLS } from "@/features/tools/toolConfig";
 
 // React 19 warns ("not configured to support act(...)") unless this flag is
@@ -75,6 +75,35 @@ function pressEnter(target: EventTarget = window) {
   });
 }
 
+/** Ctrl+C, dispatched from `target` so the input/textarea guard is exercised. */
+function pressCtrlC(target: EventTarget = window) {
+  const evt = new KeyboardEvent("keydown", {
+    key: "c",
+    code: "KeyC",
+    ctrlKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => {
+    target.dispatchEvent(evt);
+  });
+}
+
+/** Ctrl+J (optionally +Shift), same dispatch shape as pressCtrlC. */
+function pressCtrlJ(target: EventTarget = window, shift = false) {
+  const evt = new KeyboardEvent("keydown", {
+    key: shift ? "J" : "j",
+    code: "KeyJ",
+    ctrlKey: true,
+    shiftKey: shift,
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => {
+    target.dispatchEvent(evt);
+  });
+}
+
 beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -88,24 +117,25 @@ afterEach(() => {
   container.remove();
 });
 
-describe("TOOL_BY_DIGIT agrees with toolConfig.ts (one contract, stated twice)", () => {
+describe("TOOL_BY_KEY agrees with toolConfig.ts (one contract, stated twice)", () => {
   // toolConfig.ts's ToolDefinition.shortcutKey doc-comment claims it "mirrors
-  // TOOL_BY_DIGIT in useKeyboardShortcuts.ts" — this is the only place that
+  // TOOL_BY_KEY in useKeyboardShortcuts.ts" — this is the only place that
   // claim is actually checked. If someone adds/reorders a tool in one table
-  // without the other, digit keys and the sidebar/palette shortcut hints
+  // without the other, tool keys and the sidebar/palette shortcut hints
   // silently disagree about which key does what.
-  it("every tool's shortcutKey resolves through TOOL_BY_DIGIT to that same tool", () => {
+  /** shortcutKey → e.code: digits are DigitN, letters are KeyX (S arrived
+   *  when Select split out and the digit row was already full). */
+  const toCode = (k: string) => (/^\d$/.test(k) ? `Digit${k}` : `Key${k}`);
+
+  it("every tool's shortcutKey resolves through TOOL_BY_KEY to that same tool", () => {
     for (const tool of TOOLS) {
-      const code = tool.shortcutKey === "0" ? "Digit0" : `Digit${tool.shortcutKey}`;
-      expect(TOOL_BY_DIGIT[code]).toBe(tool.id);
+      expect(TOOL_BY_KEY[toCode(tool.shortcutKey)]).toBe(tool.id);
     }
   });
 
-  it("has no digit entries beyond what toolConfig.ts's ten tools define", () => {
-    const expectedCodes = new Set(
-      TOOLS.map((t) => (t.shortcutKey === "0" ? "Digit0" : `Digit${t.shortcutKey}`)),
-    );
-    expect(new Set(Object.keys(TOOL_BY_DIGIT))).toEqual(expectedCodes);
+  it("has no entries beyond what toolConfig.ts's eleven tools define", () => {
+    const expectedCodes = new Set(TOOLS.map((t) => toCode(t.shortcutKey)));
+    expect(new Set(Object.keys(TOOL_BY_KEY))).toEqual(expectedCodes);
   });
 });
 
@@ -213,5 +243,114 @@ describe("sanity: the harness actually reaches the real handler", () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit6", bubbles: true }));
     });
     expect(onToolChange).toHaveBeenCalledWith("ai");
+  });
+});
+
+describe("Ctrl+J / Ctrl+Shift+J -> selection to a new layer", () => {
+  // The handler is gated on `hasSelection` BEFORE preventDefault, so with
+  // nothing selected the browser keeps its own Ctrl+J; and it sits behind the
+  // same input/textarea/contentEditable guard as every other combo, so it
+  // can never fire while the user is typing a "j" into a caption.
+  it("fires copy-to-new-layer on the canvas when something is selected", () => {
+    const onNewLayerCopy = vi.fn();
+    const onNewLayerCut = vi.fn();
+    mount(baseProps({ onNewLayerCopy, onNewLayerCut, hasSelection: true }));
+    pressCtrlJ(window);
+    expect(onNewLayerCopy).toHaveBeenCalledTimes(1);
+    expect(onNewLayerCut).not.toHaveBeenCalled();
+  });
+
+  it("fires cut-to-new-layer with Shift held", () => {
+    const onNewLayerCopy = vi.fn();
+    const onNewLayerCut = vi.fn();
+    mount(baseProps({ onNewLayerCopy, onNewLayerCut, hasSelection: true }));
+    pressCtrlJ(window, true);
+    expect(onNewLayerCut).toHaveBeenCalledTimes(1);
+    expect(onNewLayerCopy).not.toHaveBeenCalled();
+  });
+
+  it("does NOT fire when nothing is selected (browser keeps Ctrl+J)", () => {
+    const onNewLayerCopy = vi.fn();
+    const onNewLayerCut = vi.fn();
+    mount(baseProps({ onNewLayerCopy, onNewLayerCut, hasSelection: false }));
+    pressCtrlJ(window);
+    pressCtrlJ(window, true);
+    expect(onNewLayerCopy).not.toHaveBeenCalled();
+    expect(onNewLayerCut).not.toHaveBeenCalled();
+  });
+
+  it("does NOT fire from inside a <textarea> (typing guard)", () => {
+    const onNewLayerCopy = vi.fn();
+    const onNewLayerCut = vi.fn();
+    mount(baseProps({ onNewLayerCopy, onNewLayerCut, hasSelection: true }));
+    const ta = document.createElement("textarea");
+    document.body.appendChild(ta);
+    pressCtrlJ(ta);
+    pressCtrlJ(ta, true);
+    expect(onNewLayerCopy).not.toHaveBeenCalled();
+    expect(onNewLayerCut).not.toHaveBeenCalled();
+    ta.remove();
+  });
+
+  it("does nothing (and does not throw) when the callbacks were never provided", () => {
+    expect(() => {
+      mount(baseProps({ hasSelection: true }));
+      pressCtrlJ(window);
+      pressCtrlJ(window, true);
+    }).not.toThrow();
+  });
+});
+
+describe("Ctrl+C never steals a text box's native copy", () => {
+  // useCopyRegionAction's header states "Text boxes copy as text natively
+  // (real <textarea>)". That promise rests entirely on the input/textarea/
+  // contentEditable guard at the top of the keydown handler — nothing else
+  // enforces it. Since region copy now samples the VISIBLE COMPOSITE
+  // (copy_region_composited) rather than the active layer, a regression here
+  // would mean selecting text in a caption and getting a PNG of the canvas
+  // on the clipboard instead of the characters.
+  it("fires region copy when the canvas has focus", () => {
+    const onCopyRegion = vi.fn();
+    mount(baseProps({ onCopyRegion }));
+    pressCtrlC(window);
+    expect(onCopyRegion).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT fire region copy from inside a <textarea>", () => {
+    const onCopyRegion = vi.fn();
+    mount(baseProps({ onCopyRegion }));
+    const ta = document.createElement("textarea");
+    document.body.appendChild(ta);
+    pressCtrlC(ta);
+    expect(onCopyRegion).not.toHaveBeenCalled();
+    ta.remove();
+  });
+
+  it("does NOT fire region copy from inside an <input>", () => {
+    const onCopyRegion = vi.fn();
+    mount(baseProps({ onCopyRegion }));
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    pressCtrlC(input);
+    expect(onCopyRegion).not.toHaveBeenCalled();
+    input.remove();
+  });
+
+  it("does NOT fire region copy from a contentEditable element", () => {
+    const onCopyRegion = vi.fn();
+    mount(baseProps({ onCopyRegion }));
+    const div = document.createElement("div");
+    // jsdom does NOT implement `isContentEditable` — setting the
+    // `contentEditable` attribute leaves it false, so without this the test
+    // would fail against a jsdom gap rather than against our guard. Define it
+    // so the handler's real `e.target.isContentEditable` branch is exercised.
+    Object.defineProperty(div, "isContentEditable", {
+      value: true,
+      configurable: true,
+    });
+    document.body.appendChild(div);
+    pressCtrlC(div);
+    expect(onCopyRegion).not.toHaveBeenCalled();
+    div.remove();
   });
 });

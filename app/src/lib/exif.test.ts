@@ -28,22 +28,13 @@ interface RawEntry {
   tag: number;
   type: TiffType;
   count: number;
-  data: Uint8Array; // pre-encoded element bytes, length === typeSize*count
-}
-
-function typeSize(t: TiffType): number {
-  return t === 2 ? 1 : t === 3 ? 2 : t === 4 ? 4 : 8; // ASCII/ SHORT/ LONG/ RATIONAL
+  data: Uint8Array; // pre-encoded element bytes, length === element size * count
 }
 
 function asciiEntry(tag: number, s: string): RawEntry {
   const bytes = new Uint8Array(s.length + 1); // trailing NUL
   for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
   return { tag, type: 2, count: bytes.length, data: bytes };
-}
-function shortEntry(tag: number, v: number): RawEntry {
-  const b = new Uint8Array(2);
-  new DataView(b.buffer).setUint16(0, v, true);
-  return { tag, type: 3, count: 1, data: b };
 }
 function longEntry(tag: number, v: number): RawEntry {
   const b = new Uint8Array(4);

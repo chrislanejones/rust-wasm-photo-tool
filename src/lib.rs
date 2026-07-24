@@ -447,6 +447,13 @@ pub struct ImageHorseTool {
     /// nothing is selected. Built by the Selection Marker tool's flood-fill /
     /// select-all; `delete_selection` clears the masked pixels.
     selection: Option<Vec<bool>>,
+    /// How the NEXT tool-produced selection mask combines with the current
+    /// selection: 0 = replace (default / historical behaviour), 1 = add
+    /// (union), 2 = subtract. Set by JS from the Shift/Alt modifier when the
+    /// `ih_selection_bool` flag is on; the producers (wand/edge/color-range and
+    /// the lasso at close) route through `apply_produced_selection`. Stays 0
+    /// when the flag is off, so nothing about the shipped behaviour changes.
+    selection_combine: u8,
     /// Monotonic counter feeding `patchmatch::compute_nnf`'s seed, one
     /// `remove_object` call at a time (post-increment). Keeps the kernel's own
     /// RNG seeded and deterministic (never reads system time/entropy) while
@@ -628,6 +635,8 @@ impl ImageHorseTool {
             active: self.active,
             width: self.width,
             height: self.height,
+            selection: self.selection.clone(),
+            selection_only: false,
         }
     }
 
@@ -642,6 +651,18 @@ impl ImageHorseTool {
         #[cfg(feature = "tiles")]
         self.oplog_maybe_start();
         let s = self.make_snapshot(label);
+        self.hist.push(s);
+    }
+
+    /// Push a SELECTION-ONLY history step (each select / add / subtract /
+    /// deselect is undoable, Photoshop-style). Unlike `snap` this records no
+    /// op and deliberately does NOT start the op log — the step is
+    /// transparent to it: `undo`/`redo` restore just the mask for these
+    /// snapshots and never move the log cursor, so the "one recorded op ↔
+    /// one snapshot" lockstep the op-log undo path relies on still holds.
+    fn snap_selection(&mut self, label: &str) {
+        let mut s = self.make_snapshot(label);
+        s.selection_only = true;
         self.hist.push(s);
     }
 
@@ -660,6 +681,9 @@ impl ImageHorseTool {
         self.active = snap.active.min(self.layers.len().saturating_sub(1));
         self.width = snap.width;
         self.height = snap.height;
+        // The mask that was live at that moment comes back too — undoing a
+        // Delete Selection / Layer Via Cut restores what was selected.
+        self.selection = snap.selection;
         // Source point may now reference out-of-bounds pixels.
         self.stamp.source_x = None;
         self.stamp.source_y = None;
@@ -820,6 +844,7 @@ impl ImageHorseTool {
             editing_shape_id: None,
             editing_text_id: None,
             selection: None,
+            selection_combine: 0,
             #[cfg(feature = "patchmatch")]
             patchmatch_seed_counter: 0,
             lasso: None,
@@ -2044,7 +2069,28 @@ impl ImageHorseTool {
     // ── History ─────────────────────────────────────────────────────────
 
     pub fn undo(&mut self) -> bool {
-        // Op-log replay path first (tiles feature + runtime switch + log
+        // Selection-only steps first: they recorded no op, so they are
+        // TRANSPARENT to the op log — restore just the mask through the
+        // snapshot stack and leave the log cursor alone. The op-log path
+        // below therefore only ever sees op-backed snapshots on top, which
+        // is what keeps its one-op-one-snapshot lockstep true. Restoring
+        // only the mask (layers are identical by construction) also means
+        // this must NOT go through `restore_snapshot`, whose full restore
+        // would needlessly mark a live op log broken.
+        if self
+            .hist
+            .undo_stack
+            .back()
+            .is_some_and(|s| s.selection_only)
+        {
+            let current = self.make_snapshot("Current State");
+            if let Some(snap) = self.hist.undo(current) {
+                self.selection = snap.selection;
+                return true;
+            }
+            return false;
+        }
+        // Op-log replay path (tiles feature + runtime switch + log
         // consistent) — falls through to snapshot undo on ANY doubt.
         #[cfg(feature = "tiles")]
         if self.oplog_use_for_undo && self.try_oplog_undo() {
@@ -2060,6 +2106,20 @@ impl ImageHorseTool {
     }
 
     pub fn redo(&mut self) -> bool {
+        // Mirror of `undo`'s selection-only interception (see there).
+        if self
+            .hist
+            .redo_stack
+            .last()
+            .is_some_and(|s| s.selection_only)
+        {
+            let current = self.make_snapshot("Current State");
+            if let Some(snap) = self.hist.redo(current) {
+                self.selection = snap.selection;
+                return true;
+            }
+            return false;
+        }
         #[cfg(feature = "tiles")]
         if self.oplog_use_for_undo && self.try_oplog_redo() {
             return true;
@@ -2240,6 +2300,8 @@ impl ImageHorseTool {
             active: 0,
             width: w,
             height: h,
+            selection: None,
+            selection_only: false,
         });
     }
 
@@ -2266,6 +2328,8 @@ impl ImageHorseTool {
             active: 0,
             width: w,
             height: h,
+            selection: None,
+            selection_only: false,
         });
     }
 
@@ -2580,6 +2644,42 @@ impl ImageHorseTool {
             w,
             h,
         )
+    }
+
+    /// Copy a region out of the VISIBLE COMPOSITE instead of the active layer.
+    ///
+    /// `copy_region` above reads `layers[active]` only, so copying a selection
+    /// on a multi-layer document yielded that one layer's pixels rather than
+    /// what the user could see — and it ignored the "Canvas background on
+    /// export" preference that every other export/share/copy path honours.
+    ///
+    /// `include_background` mirrors that preference: `true` bakes the Canvas
+    /// fill in, `false` composites every layer except it. Unlike
+    /// `composite_excluding_background`, the result is NOT tight-cropped —
+    /// the caller's rect is in full-document coordinates, so cropping first
+    /// would shift the region out from under it.
+    pub fn copy_region_composited(
+        &self,
+        x: i32,
+        y: i32,
+        w: u32,
+        h: u32,
+        include_background: bool,
+    ) -> Vec<u8> {
+        let (iw, ih) = (self.width, self.height);
+        // Same Canvas selection rule as `composite_excluding_background`: by
+        // `kind` via `canvas_idx()`, never by layer name — `load_image` names
+        // the photo "Background" too (ADR-016).
+        let layers: &[Layer] = if include_background {
+            &self.layers[..]
+        } else if self.canvas_idx() == Some(0) && self.layers.len() > 1 {
+            &self.layers[1..]
+        } else {
+            &self.layers[..]
+        };
+        let composite =
+            composite_layers(layers, iw, ih, self.editing_shape_id, self.editing_text_id);
+        transform::copy_region(&composite, iw as i32, ih as i32, x, y, w, h)
     }
 
     pub fn paste_region(

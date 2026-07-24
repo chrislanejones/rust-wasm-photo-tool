@@ -200,6 +200,16 @@ declare module "stamp_tool" {
     thumbnail_height(max_px: number): number;
     thumbnail_data(max_px: number): Uint8Array;
     copy_region(x: number, y: number, w: number, h: number): Uint8Array;
+    /** Copy a region out of the VISIBLE COMPOSITE rather than the active
+     *  layer. `include_background` mirrors the `exportCanvasBackground`
+     *  preference. Not tight-cropped — the rect is in document coordinates. */
+    copy_region_composited(
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      include_background: boolean,
+    ): Uint8Array;
     paste_region(
       pixels: Uint8Array,
       src_w: number,
@@ -898,6 +908,31 @@ declare module "stamp_tool" {
      *  `tolerance` of the clicked colour, anywhere in the image — not just the
      *  connected blob the wand reaches. */
     color_range_select(x: number, y: number, tolerance: number): Uint8Array;
+    /** Non-committing hover preview: the tinted FILLED overlay of the region a
+     *  click-once kind WOULD grab from (x,y), computed with the same mask core
+     *  as the committing producer so the two can't drift. Touches neither the
+     *  stored selection nor history. `kind`: 0 wand, 1 edge-aware, 2 color
+     *  range. `tint`: 1 add (green), 2 subtract (red), else neutral (blue).
+     *  Empty when out of bounds or the region is empty. */
+    selection_preview(
+      x: number,
+      y: number,
+      kind: number,
+      tolerance: number,
+      edge_threshold: number,
+      tint: number,
+    ): Uint8Array;
+    /** Rectangular marquee over the drag rect (any corner order, canvas px).
+     *  Normalised, snapped outward (floor/ceil), clamped to the canvas; rides
+     *  the same combine pipeline as every producer. A degenerate or fully
+     *  off-canvas drag replaces with NO selection (Photoshop's empty-marquee
+     *  deselect); under combine 1/2 it no-ops. Returns the overlay RGBA. */
+    rect_select(x0: number, y0: number, x1: number, y1: number): Uint8Array;
+    /** Elliptical marquee: the ellipse inscribed in the same drag rect. A
+     *  pixel is in when its centre satisfies (dx/rx)² + (dy/ry)² <= 1; a drag
+     *  past the canvas edge keeps its shape and is cropped, not squashed.
+     *  Same normalise/clamp/combine behaviour as `rect_select`. */
+    ellipse_select(x0: number, y0: number, x1: number, y1: number): Uint8Array;
     /** Select the whole canvas; returns the overlay RGBA. */
     select_all(): Uint8Array;
     /** Current selection as an RGBA overlay (empty if nothing selected). */
@@ -907,8 +942,28 @@ declare module "stamp_tool" {
     clear_selection(): void;
     /** Delete selected pixels (transparent) on the active layer; deselects. */
     delete_selection(): boolean;
+    /** Place the selected pixels of the ACTIVE layer on a new layer directly
+     *  above it (Layer Via Copy / Layer Via Cut — Ctrl+J / Ctrl+Shift+J).
+     *  `cut` additionally clears them from the source layer. One history step;
+     *  deselects after. Returns the new layer id, or 0 when nothing is
+     *  selected (no history, no mutation). */
+    selection_to_new_layer(cut: boolean): number;
+    /** Boolean selection ops (`ih_selection_bool`). `mask` is `&[u8]`
+     *  (non-zero = covered); a length mismatch is a safe no-op. Returns
+     *  whether anything is still selected afterwards.
+     *  Union: OR `mask` into the current selection (no selection → the mask
+     *  becomes it). Subtract: clear covered pixels; an all-false result reads
+     *  back as NO selection (None), not a zero-area Some. */
+    selection_union(mask: Uint8Array): boolean;
+    selection_subtract(mask: Uint8Array): boolean;
+    /** Combine mode for the NEXT producer call: 0 = replace, 1 = union,
+     *  2 = subtract (clamped). The producers (wand / edge / color-range /
+     *  lasso-close) route their mask through this so Shift/Alt-drag adds or
+     *  subtracts instead of replacing. Reset to 0 after each use is the
+     *  caller's job. */
+    set_selection_combine(mode: number): void;
 
-    // ── Magnetic lasso (live-wire) — behind the `ih_smart_edge` switch ──
+    // ── Magnetic lasso (live-wire) — always available ──
     // Path-finds along the SAME edge core the edge-aware wand uses, turned into
     // a cost map (strong edge = cheap to travel). Ends where every other
     // selection tool ends: one mask, one overlay RGBA.

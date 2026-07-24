@@ -23,7 +23,8 @@ import {
 const MODES: Partial<Record<ToolType, string[]>> = {
   brush: ["paint", "blur", "pen", "erase"],
   compress: ["compress", "resize"],
-  crop: ["adjust", "select"],
+  // crop is single-mode since the Select split; the kinds are Select's modes.
+  select: ["wand", "edge", "colorRange", "lasso"],
   shapes: ["shapes", "pens", "arrows"],
   stamp: ["clone", "red", "emojis"],
 };
@@ -76,7 +77,9 @@ describe("parseRoute — hash to state", () => {
       tool: "brush",
       mode: "blur",
     });
-    expect(parse("#/tool/crop/select")).toMatchObject({ tool: "crop", mode: "select" });
+    // `crop` (the legacy id for Adjust) still resolves; its old `select`
+    // sub-mode is covered by the legacy-redirect tests below.
+    expect(parse("#/tool/crop")).toMatchObject({ tool: "crop" });
     // "#/tool/ai" pre-dates the Eraser rename and must keep resolving — same
     // legacy-id-alias mechanism as #/tool/brush for Paint.
     expect(parse("#/tool/ai")).toMatchObject({ tool: "ai" });
@@ -175,7 +178,8 @@ describe("round-trip stability", () => {
     { kind: "tool", tool: "brush", mode: "blur" },
     { kind: "tool", tool: "brush", mode: "erase" },
     { kind: "tool", tool: "compress", mode: "resize" },
-    { kind: "tool", tool: "crop", mode: "select" },
+    { kind: "tool", tool: "crop" },
+    { kind: "tool", tool: "select", mode: "wand" },
     { kind: "tool", tool: "shapes", mode: "arrows" },
     { kind: "tool", tool: "stamp", mode: "emojis" },
     { kind: "tool", tool: "text" },
@@ -209,6 +213,18 @@ describe("round-trip stability", () => {
     expect(formatRoute(parse("#/tool/shapes/arrow") as Route)).toBe(
       "#/tool/shapes/arrows",
     );
+  });
+
+  it("legacy Adjust-&-Select links land on the Select TOOL", () => {
+    // Select lived inside Adjust & Select until the split; the old links are
+    // in bookmarks and shared URLs, so they must keep meaning "selection" —
+    // not "Adjust with an unknown mode silently dropped".
+    expect(parse("#/tool/adjust/select")).toEqual({ kind: "tool", tool: "select" });
+    expect(parse("#/tool/crop/select")).toEqual({ kind: "tool", tool: "select" });
+    expect(fromSearch("?tool=adjust&mode=select")).toEqual({
+      kind: "tool",
+      tool: "select",
+    });
   });
 
   it("every tool has a slug and it survives the trip", () => {

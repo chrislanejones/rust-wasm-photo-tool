@@ -139,10 +139,11 @@ import {
   Pipette,
 } from "lucide-react";
 
-/** Digit-key shortcut + label per tool (mirrors TOOL_BY_DIGIT in useKeyboardShortcuts). */
+/** Tool-key shortcut + label per tool (mirrors TOOL_BY_KEY in useKeyboardShortcuts). */
 const TOOL_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {
   compress: { keys: "1", label: "compress" },
-  crop: { keys: "2", label: "crop" },
+  crop: { keys: "2", label: "adjust" },
+  select: { keys: "S", label: "select" },
   brush: { keys: "3", label: "brush" },
   text: { keys: "4", label: "text" },
   arrow: { keys: "5", label: "arrow" },
@@ -1053,9 +1054,11 @@ export function AppShell() {
     handleSelectAll,
     handleDeselect,
     handleDeleteSelection,
+    handleNewLayerCopy,
+    handleNewLayerCut,
     handleRemoveObject,
     handleToggleMove,
-    handleToggleSelectionMode,
+    handleMarqueeCommit,
     handleLassoMove,
     handleLassoClose,
     // (Esc-to-cancel is bound inside the hook, only while a session is open.)
@@ -1063,32 +1066,27 @@ export function AppShell() {
     lassoPreview,
   } = useSelectionActions(stamp, canvasRef);
 
-  // ── Selection Marker (magic-wand) — Edit & Move → Selection (above Align) ──
+  // ── The Select tool's panel/canvas state ──────────────────────────────────
   // All masking math is Rust; JS just stores the returned overlay + routes ops.
-  // (The click/toggle handlers now live in useSelectionActions; these selectors
-  // remain because the panel + canvas JSX and the leave-tool effect read them.)
+  // (The click/marquee handlers live in useSelectionActions; these selectors
+  // remain because the panel + canvas JSX read them.)
   const selectionTolerance = useToolStore((s) => s.selectionTolerance);
   const setSelectionTolerance = useToolStore((s) => s.setSelectionTolerance);
-  const selectionMode = useToolStore((s) => s.selectionMode);
-  const setSelectionMode = useToolStore((s) => s.setSelectionMode);
   const selectionMask = useToolStore((s) => s.selectionMask);
-  // Adjust & Select (tool id `crop`): sub-mode + which engine call a canvas
-  // click makes (wand / edge-aware / colour range) — tool-arc 2.6.
-  const adjustMode = useToolStore((s) => s.adjustMode);
-  const setAdjustMode = useToolStore((s) => s.setAdjustMode);
+  // Which engine call a canvas click makes (wand / edge-aware / colour range /
+  // lasso), and which shape a drag sweeps (rect / ellipse).
   const selectionKind = useToolStore((s) => s.selectionKind);
   const setSelectionKind = useToolStore((s) => s.setSelectionKind);
+  const selectionShape = useToolStore((s) => s.selectionShape);
+  const setSelectionShape = useToolStore((s) => s.setSelectionShape);
   const edgeThreshold = useToolStore((s) => s.edgeThreshold);
   const setEdgeThreshold = useToolStore((s) => s.setEdgeThreshold);
 
-  // Move lives on Layer Settings ("arrow"); the selection tools moved to
-  // Adjust & Select ("crop") in tool-arc 2.6. Each toggle clears when you leave
-  // ITS OWN tool — clearing selection on leaving `arrow` (as this did when they
-  // shared a home) would now switch it off the moment you opened the tool that
-  // owns it.
+  // Move lives on Layer Settings ("arrow") and clears when you leave that
+  // tool. Selection needs no such reset since the split: being ON the Select
+  // tool IS the armed state, so leaving the tool disarms by construction.
   useEffect(() => {
     if (activeTool !== "arrow") setMoveActive(false);
-    if (activeTool !== "crop") setSelectionMode(false);
   }, [activeTool]);
 
   const blurDown = useCallback(
@@ -1250,6 +1248,7 @@ export function AppShell() {
     editState: drawingTools.editState,
     selectionMask,
     copyFullCanvas: handleCopyToClipboard,
+    exportCanvasBackground,
   });
 
   const textTool = useTextTool({
@@ -2223,6 +2222,8 @@ export function AppShell() {
     onSelectAll: handleSelectAll,
     onDeselect: handleDeselect,
     hasSelection: selectionMask !== null,
+    onNewLayerCopy: handleNewLayerCopy,
+    onNewLayerCut: handleNewLayerCut,
     onToggleMove: handleToggleMove,
     onApplyCrop: drawingTools.applyCrop,
     hasCropSelection: drawingTools.cropSelection !== null,
@@ -2716,11 +2717,13 @@ export function AppShell() {
             selection={{
               tolerance: selectionTolerance,
               onToleranceChange: setSelectionTolerance,
-              mode: selectionMode,
-              onToggleMode: handleToggleSelectionMode,
+              shape: selectionShape,
+              onShapeChange: setSelectionShape,
               onSelectAll: handleSelectAll,
               onDeselect: handleDeselect,
               onDelete: handleDeleteSelection,
+              onNewLayerCopy: handleNewLayerCopy,
+              onNewLayerCut: handleNewLayerCut,
               onRemoveObject: handleRemoveObject,
               active: selectionMask !== null,
               kind: selectionKind,
@@ -2728,8 +2731,6 @@ export function AppShell() {
               edgeThreshold: edgeThreshold,
               onEdgeThresholdChange: setEdgeThreshold,
             }}
-            adjustMode={adjustMode}
-            onAdjustModeChange={setAdjustMode}
             moveActive={moveActive}
             onToggleMove={handleToggleMove}
             toolSettings={toolSettings}
@@ -2930,40 +2931,39 @@ export function AppShell() {
                       textInput={textTool.textInput}
                       textareaRef={textTool.textareaRef}
                       onCanvasClick={textTool.onCanvasClick}
-                      // Selection moved from Layer Settings (`arrow`) to Adjust
-                      // & Select (`crop`) in tool-arc 2.6; the canvas routing has
-                      // to follow the panel or click-to-select silently no-ops.
-                      // Move-layer stays on `arrow`.
-                      selectionActive={
-                        activeTool === "crop" &&
-                        adjustMode === "select" &&
-                        selectionMode
-                      }
+                      // Select is its own tool: being on it IS the armed
+                      // state — one gate, no sub-mode, no toggle. Move-layer
+                      // stays on `arrow`.
+                      selectionActive={activeTool === "select"}
                       layerMoveActive={activeTool === "arrow" && moveActive}
                       onSelectionClick={handleSelectionClick}
                       // Gated to the tool(s) that can actually populate this
-                      // mask: Adjust & Select's wand/lasso, or the Magic
-                      // Eraser sub-mode of the Eraser tool (its brush paints
-                      // the same store field — see useMagicEraserTool).
+                      // mask: the Select tool (selection's home since the
+                      // v7.44 split — was Adjust & Select), or the Magic
+                      // Eraser sub-mode of the Eraser tool, whose brush
+                      // paints the same store field (see useMagicEraserTool).
                       // Without the second clause the mask is still written
                       // during a Magic Eraser stroke, but this prop zeroes
                       // it back out before <SelectionOverlay> ever sees it.
                       selectionMask={
-                        activeTool === "crop" ||
+                        activeTool === "select" ||
                         (activeTool === "ai" && eraserMode === "magic")
                           ? selectionMask
                           : null
                       }
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
-                      // Magnetic lasso (behind ih_smart_edge). Same routing gate
-                      // as click-to-select — plus the kind, since the lasso is a
-                      // session and the other three kinds are click-once.
+                      // Drag = marquee for the click-once kinds; the lasso kind
+                      // keeps drags to itself (its clicks are session anchors).
+                      marqueeActive={
+                        activeTool === "select" && selectionKind !== "lasso"
+                      }
+                      marqueeShape={selectionShape}
+                      onMarqueeCommit={handleMarqueeCommit}
+                      // Magnetic lasso: a session-based kind, so it gets the
+                      // kind-specific gate the click-once kinds don't need.
                       lassoActive={
-                        activeTool === "crop" &&
-                        adjustMode === "select" &&
-                        selectionMode &&
-                        selectionKind === "lasso"
+                        activeTool === "select" && selectionKind === "lasso"
                       }
                       onLassoMove={handleLassoMove}
                       onLassoClose={handleLassoClose}

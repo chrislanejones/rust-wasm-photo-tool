@@ -17,6 +17,8 @@ interface Props<T extends string> {
   label?: string;
   /** Icon-on-top, text-below tiles (vs the default icon-left row). */
   stacked?: boolean;
+  /** Disable every tile (e.g. no image loaded). Default false. */
+  disabled?: boolean;
   className?: string;
 }
 
@@ -39,6 +41,7 @@ export function ToolButtonGroup<T extends string>({
   columns = 2,
   label,
   stacked = false,
+  disabled = false,
   className,
 }: Props<T>) {
   return (
@@ -59,6 +62,7 @@ export function ToolButtonGroup<T extends string>({
               key={opt.id}
               active={value === opt.id}
               stacked={stacked}
+              disabled={disabled}
               onClick={() => onChange(opt.id)}
             >
               {Icon && <Icon />}

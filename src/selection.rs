@@ -50,6 +50,46 @@ pub(crate) fn selection_overlay_rgba(mask: &[bool], w: usize, h: usize) -> Vec<u
     }
     out
 }
+
+/// Tinted "possible future region" overlay for the hover preview — a filled
+/// translucent zone (NOT marching ants), so it reads as a soft highlight of
+/// where a click would land rather than a committed selection. `tint`:
+/// 1 = add (green), 2 = subtract (red), anything else = neutral (blue).
+/// Boundary pixels get a stronger alpha so the zone keeps a legible edge over
+/// any image. Same boundary rule as `selection_overlay_rgba`.
+pub(crate) fn preview_overlay_rgba(mask: &[bool], w: usize, h: usize, tint: u8) -> Vec<u8> {
+    let [r, g, b] = match tint {
+        1 => [34u8, 197, 94], // green — add
+        2 => [239, 68, 68],   // red — subtract
+        _ => [64, 140, 255],  // blue — neutral (plain replace)
+    };
+    const FILL_A: u8 = 70;
+    const EDGE_A: u8 = 210;
+    let mut out = vec![0u8; w * h * 4];
+    if w == 0 || h == 0 {
+        return out;
+    }
+    let sel = |x: usize, y: usize| mask[y * w + x];
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if !mask[i] {
+                continue;
+            }
+            let boundary = x == 0
+                || y == 0
+                || x + 1 == w
+                || y + 1 == h
+                || !sel(x - 1, y)
+                || !sel(x + 1, y)
+                || !sel(x, y - 1)
+                || !sel(x, y + 1);
+            let a = if boundary { EDGE_A } else { FILL_A };
+            out[i * 4..i * 4 + 4].copy_from_slice(&[r, g, b, a]);
+        }
+    }
+    out
+}
 /// 4-connected flood fill from `start` over `buf`, taking every pixel within
 /// `tol` (per channel) of the seed colour. When `edges` is `Some((map, wall))`
 /// the fill also refuses to cross a pixel whose edge strength exceeds `wall` —
@@ -168,6 +208,28 @@ pub(crate) fn flood_barrier_into(
     }
 }
 
+/// Normalise a marquee drag rect (any corner order, f64 canvas px) into
+/// pixel bounds `[x0,x1) × [y0,y1)` snapped outward (floor/ceil) and clamped
+/// to the canvas. A degenerate or fully off-canvas drag comes back as an
+/// empty range — safe to iterate, selects nothing.
+fn clamp_drag_rect(
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    w: usize,
+    h: usize,
+) -> (usize, usize, usize, usize) {
+    let clamp = |lo: f64, hi: f64, max: usize| {
+        let a = lo.min(hi).floor().max(0.0) as usize;
+        let b = (lo.max(hi).ceil().max(0.0) as usize).min(max);
+        (a.min(max), b)
+    };
+    let (rx0, rx1) = clamp(x0, x1, w);
+    let (ry0, ry1) = clamp(y0, y1, h);
+    (rx0, ry0, rx1, ry1)
+}
+
 impl ImageHorseTool {
     /// Validate a canvas click and turn it into a composite-buffer pixel index.
     /// `None` when the image is empty, the click is out of bounds, or the
@@ -184,6 +246,109 @@ impl ImageHorseTool {
         }
         Some(fy as usize * w + fx as usize)
     }
+
+    /// The raw boolean mask a click-once selection KIND would produce from the
+    /// pixel at `(x, y)` — the shared core behind both the committing
+    /// producers (`magic_wand_select` &c.) and the non-committing hover
+    /// preview (`selection_preview`), so the two can never disagree about what
+    /// a click would grab. `kind`: 0 = wand (flood within tolerance),
+    /// 1 = edge-aware (same flood, walled by the Sobel map at `edge_threshold`),
+    /// 2 = color range (every pixel within tolerance, anywhere). `None` when
+    /// the click is out of bounds / the image is empty — callers preserve
+    /// their no-op-on-OOB behaviour by short-circuiting on it.
+    fn selection_mask_for(
+        &self,
+        kind: u8,
+        x: f64,
+        y: f64,
+        tolerance: u32,
+        edge_threshold: u32,
+    ) -> Option<Vec<bool>> {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let start = self.seed_index(x, y)?;
+        let tol = tolerance as i32;
+        Some(match kind {
+            1 => {
+                let edges = crate::edges::sobel_magnitude(&self.composite_cache, w, h);
+                flood_select(
+                    &self.composite_cache,
+                    w,
+                    h,
+                    start,
+                    tol,
+                    Some((&edges, edge_threshold.min(255) as u8)),
+                )
+            }
+            2 => {
+                let buf = &self.composite_cache;
+                let t = [
+                    buf[start * 4] as i32,
+                    buf[start * 4 + 1] as i32,
+                    buf[start * 4 + 2] as i32,
+                    buf[start * 4 + 3] as i32,
+                ];
+                let mut mask = vec![false; w * h];
+                for (i, m) in mask.iter_mut().enumerate() {
+                    let c = &buf[i * 4..i * 4 + 4];
+                    *m = (c[0] as i32 - t[0]).abs() <= tol
+                        && (c[1] as i32 - t[1]).abs() <= tol
+                        && (c[2] as i32 - t[2]).abs() <= tol
+                        && (c[3] as i32 - t[3]).abs() <= tol;
+                }
+                mask
+            }
+            _ => flood_select(&self.composite_cache, w, h, start, tol, None),
+        })
+    }
+
+    // ── Boolean-selection combine core (private; not wasm-exported) ─────────
+    // One PURE implementation over `&[bool]` slices; the wasm exports
+    // (`selection_union`/`selection_subtract`) convert their `&[u8]` argument
+    // and route through it, and `apply_produced_selection` calls it with the
+    // bool mask a producer already built. Pure so callers can compare the
+    // would-be result against the current selection FIRST — a no-op change
+    // must not push a history step.
+
+    /// The selection that results from combining `cur` with `mask` under
+    /// `mode` (0 replace, 1 union, 2 subtract). An all-false result collapses
+    /// to `None` (the canonical "no selection"). `mask` must be canvas-sized.
+    fn combined_selection(cur: Option<&Vec<bool>>, mask: &[bool], mode: u8) -> Option<Vec<bool>> {
+        let next: Vec<bool> = match (mode, cur) {
+            (1, Some(c)) => c.iter().zip(mask).map(|(&a, &b)| a || b).collect(),
+            (2, Some(c)) => c.iter().zip(mask).map(|(&a, &b)| a && !b).collect(),
+            // Subtracting from nothing is nothing.
+            (2, None) => return None,
+            // Replace — or union onto an empty selection, which is the mask.
+            _ => mask.to_vec(),
+        };
+        if next.iter().any(|&b| b) {
+            Some(next)
+        } else {
+            None
+        }
+    }
+
+    /// Store a freshly-produced tool mask per the current combine mode and
+    /// return the resulting selection overlay RGBA (the SAME shape every
+    /// producer returns). Replace (0) is the historical behaviour; add (1) /
+    /// subtract (2) compose, and the combine mode also picks the history
+    /// label over the producer's `label`. Every ACTUAL change is one undo
+    /// step (`snap_selection`); a click that reproduces the current selection
+    /// exactly pushes nothing. `mask` is already canvas-sized.
+    fn apply_produced_selection(&mut self, mask: Vec<bool>, label: &str) -> Vec<u8> {
+        let mode = self.selection_combine;
+        let next = Self::combined_selection(self.selection.as_ref(), &mask, mode);
+        if next != self.selection {
+            let label = match mode {
+                1 => "Add Selection",
+                2 => "Subtract Selection",
+                _ => label,
+            };
+            self.snap_selection(label);
+            self.selection = next;
+        }
+        self.selection_overlay()
+    }
 }
 
 #[wasm_bindgen]
@@ -193,14 +358,10 @@ impl ImageHorseTool {
     /// clicked pixel. Stores the mask; returns a canvas-sized RGBA overlay for the
     /// JS selection layer to draw. Empty Vec if the click is out of bounds.
     pub fn magic_wand_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
-        let (w, h) = (self.width as usize, self.height as usize);
-        let Some(start) = self.seed_index(x, y) else {
+        let Some(mask) = self.selection_mask_for(0, x, y, tolerance, 0) else {
             return Vec::new();
         };
-        let mask = flood_select(&self.composite_cache, w, h, start, tolerance as i32, None);
-        let overlay = selection_overlay_rgba(&mask, w, h);
-        self.selection = Some(mask);
-        overlay
+        self.apply_produced_selection(mask, "Magic Wand")
     }
 
     /// Edge-aware magic wand. Same 4-connected flood fill as `magic_wand_select`,
@@ -222,22 +383,10 @@ impl ImageHorseTool {
         tolerance: u32,
         edge_threshold: u32,
     ) -> Vec<u8> {
-        let (w, h) = (self.width as usize, self.height as usize);
-        let Some(start) = self.seed_index(x, y) else {
+        let Some(mask) = self.selection_mask_for(1, x, y, tolerance, edge_threshold) else {
             return Vec::new();
         };
-        let edges = crate::edges::sobel_magnitude(&self.composite_cache, w, h);
-        let mask = flood_select(
-            &self.composite_cache,
-            w,
-            h,
-            start,
-            tolerance as i32,
-            Some((&edges, edge_threshold.min(255) as u8)),
-        );
-        let overlay = selection_overlay_rgba(&mask, w, h);
-        self.selection = Some(mask);
-        overlay
+        self.apply_produced_selection(mask, "Edge Select")
     }
 
     /// Color-range select (Photoshop's Select → Color Range). Takes EVERY pixel
@@ -246,29 +395,80 @@ impl ImageHorseTool {
     /// one click grabs all the sky, or every instance of a logo colour, without
     /// shift-clicking each island.
     pub fn color_range_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
-        let (w, h) = (self.width as usize, self.height as usize);
-        let Some(start) = self.seed_index(x, y) else {
+        let Some(mask) = self.selection_mask_for(2, x, y, tolerance, 0) else {
             return Vec::new();
         };
-        let buf = &self.composite_cache;
-        let t = [
-            buf[start * 4] as i32,
-            buf[start * 4 + 1] as i32,
-            buf[start * 4 + 2] as i32,
-            buf[start * 4 + 3] as i32,
-        ];
-        let tol = tolerance as i32;
-        let mut mask = vec![false; w * h];
-        for (i, m) in mask.iter_mut().enumerate() {
-            let c = &buf[i * 4..i * 4 + 4];
-            *m = (c[0] as i32 - t[0]).abs() <= tol
-                && (c[1] as i32 - t[1]).abs() <= tol
-                && (c[2] as i32 - t[2]).abs() <= tol
-                && (c[3] as i32 - t[3]).abs() <= tol;
+        self.apply_produced_selection(mask, "Color Range")
+    }
+
+    /// Non-committing preview of the region a click-once selection would grab
+    /// from `(x, y)` — the hover "possible future region". Computes the SAME
+    /// mask the committing producer would (`selection_mask_for`), then returns
+    /// a tinted FILLED overlay (`tint`: 1 = add/green, 2 = subtract/red, else
+    /// neutral/blue). Takes `&self` and touches neither the stored selection
+    /// nor history — it is purely a perception aid. Empty Vec when out of
+    /// bounds or the region is empty (nothing to preview). `kind`: 0 = wand,
+    /// 1 = edge-aware, 2 = color range (the lasso is anchor-based — no hover
+    /// preview — and the marquee is a drag, previewed JS-side).
+    pub fn selection_preview(
+        &self,
+        x: f64,
+        y: f64,
+        kind: u8,
+        tolerance: u32,
+        edge_threshold: u32,
+        tint: u8,
+    ) -> Vec<u8> {
+        let Some(mask) = self.selection_mask_for(kind, x, y, tolerance, edge_threshold) else {
+            return Vec::new();
+        };
+        if !mask.iter().any(|&b| b) {
+            return Vec::new();
         }
-        let overlay = selection_overlay_rgba(&mask, w, h);
-        self.selection = Some(mask);
-        overlay
+        preview_overlay_rgba(&mask, self.width as usize, self.height as usize, tint)
+    }
+
+    /// Rectangular marquee select over the drag rect `(x0,y0)-(x1,y1)` in
+    /// canvas px (any corner order). The rect is normalised, snapped outward
+    /// (floor/ceil — a sub-pixel drag still lands one full pixel), and clamped
+    /// to the canvas. Rides the same combine pipeline as every producer, so
+    /// Shift/Alt add/subtract compose. A degenerate or fully off-canvas rect
+    /// produces an all-false mask: replace mode then reads as "deselect"
+    /// (Photoshop's empty-marquee behaviour); add/subtract no-op.
+    pub fn rect_select(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<u8> {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let (rx0, ry0, rx1, ry1) = clamp_drag_rect(x0, y0, x1, y1, w, h);
+        let mut mask = vec![false; w * h];
+        for y in ry0..ry1 {
+            mask[y * w + rx0..y * w + rx1].fill(true);
+        }
+        self.apply_produced_selection(mask, "Marquee")
+    }
+
+    /// Elliptical marquee: the ellipse inscribed in the drag rect
+    /// `(x0,y0)-(x1,y1)` — same gesture as `rect_select`, same normalise/
+    /// clamp/combine behaviour. A pixel is in when its CENTRE satisfies
+    /// `(dx/rx)² + (dy/ry)² <= 1`, so a full-canvas drag touches the edge
+    /// pixels and a 1×1 drag still selects its pixel.
+    pub fn ellipse_select(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<u8> {
+        let (w, h) = (self.width as usize, self.height as usize);
+        // Radii come from the UNCLAMPED drag so an ellipse dragged past the
+        // canvas edge keeps its shape and gets cropped, not squashed.
+        let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+        let (rx, ry) = ((x1 - x0).abs() / 2.0, (y1 - y0).abs() / 2.0);
+        let (bx0, by0, bx1, by1) = clamp_drag_rect(x0, y0, x1, y1, w, h);
+        let mut mask = vec![false; w * h];
+        if rx > 0.0 && ry > 0.0 {
+            for y in by0..by1 {
+                let dy = (y as f64 + 0.5 - cy) / ry;
+                let row = y * w;
+                for (x, m) in mask[row + bx0..row + bx1].iter_mut().enumerate() {
+                    let dx = ((bx0 + x) as f64 + 0.5 - cx) / rx;
+                    *m = dx * dx + dy * dy <= 1.0;
+                }
+            }
+        }
+        self.apply_produced_selection(mask, "Ellipse Marquee")
     }
 
     /// Select the whole canvas (Alt+A). Returns the overlay RGBA.
@@ -276,7 +476,11 @@ impl ImageHorseTool {
         let (w, h) = (self.width as usize, self.height as usize);
         let mask = vec![true; w * h];
         let overlay = selection_overlay_rgba(&mask, w, h);
-        self.selection = Some(mask);
+        // One undo step — unless everything is already selected (no-op).
+        if self.selection.as_ref() != Some(&mask) {
+            self.snap_selection("Select All");
+            self.selection = Some(mask);
+        }
         overlay
     }
 
@@ -295,21 +499,80 @@ impl ImageHorseTool {
             .is_some_and(|m| m.iter().any(|&b| b))
     }
 
-    /// Deselect (Alt+D). No history.
+    /// Deselect (Alt+D). One undo step when something was selected.
     pub fn clear_selection(&mut self) {
-        self.selection = None;
+        // One undo step (Photoshop's Deselect is undoable); no-op when
+        // nothing is selected.
+        if self.selection.is_some() {
+            self.snap_selection("Deselect");
+            self.selection = None;
+        }
+    }
+
+    /// Set how the NEXT tool-produced selection combines with the current one:
+    /// 0 = replace (default), 1 = add (union), 2 = subtract. Clamped to 0..=2.
+    /// JS sets this from the Shift/Alt modifier when the `ih_selection_bool`
+    /// flag is on; it stays 0 otherwise, so behaviour is unchanged.
+    pub fn set_selection_combine(&mut self, mode: u8) {
+        self.selection_combine = mode.min(2);
+    }
+
+    /// OR `mask` into the current selection (boolean add). With no current
+    /// selection, the mask BECOMES the selection. An all-false result is
+    /// normalised to `None` ("no selection"). No-ops (returns the current
+    /// state, no panic across the wasm boundary) when `mask` isn't
+    /// canvas-sized. Returns whether anything is selected afterwards.
+    ///
+    /// The mask is `&[u8]` (non-zero = selected), not `&[bool]` — wasm-bindgen
+    /// has no ABI for a `bool` slice, and JS passes a `Uint8Array` anyway.
+    pub fn selection_union(&mut self, mask: &[u8]) -> bool {
+        if mask.len() != (self.width * self.height) as usize {
+            return self.has_selection();
+        }
+        let bools: Vec<bool> = mask.iter().map(|&m| m != 0).collect();
+        let next = Self::combined_selection(self.selection.as_ref(), &bools, 1);
+        if next != self.selection {
+            self.snap_selection("Add Selection");
+            self.selection = next;
+        }
+        self.has_selection()
+    }
+
+    /// Clear (deselect) every pixel of the current selection that `mask`
+    /// covers. When nothing remains selected the selection becomes `None` —
+    /// so it reads as "no selection" (what `delete_selection`,
+    /// `remove_object`, `selection_to_new_layer` and `has_selection` all
+    /// expect), NOT a `Some(all-false)` zero-area selection. No-ops on a
+    /// length mismatch. Returns whether anything remains selected.
+    ///
+    /// `mask` is `&[u8]` (non-zero = covered) — see `selection_union`.
+    pub fn selection_subtract(&mut self, mask: &[u8]) -> bool {
+        if mask.len() != (self.width * self.height) as usize {
+            return self.has_selection();
+        }
+        let bools: Vec<bool> = mask.iter().map(|&m| m != 0).collect();
+        let next = Self::combined_selection(self.selection.as_ref(), &bools, 2);
+        if next != self.selection {
+            self.snap_selection("Subtract Selection");
+            self.selection = next;
+        }
+        self.has_selection()
     }
 
     /// Delete the selected pixels (make them transparent) on the active layer,
     /// then deselect. Snaps history. Returns true if something was selected.
     pub fn delete_selection(&mut self) -> bool {
-        let Some(mask) = self.selection.take() else {
-            return false;
-        };
-        if !mask.iter().any(|&b| b) {
-            return false;
+        // Guard, then snap, THEN take — the snapshot carries the selection
+        // now, so it must be captured while the mask is still in place or
+        // undo would bring the pixels back without what was selected.
+        match &self.selection {
+            Some(m) if m.iter().any(|&b| b) => {}
+            _ => return false,
         }
         self.snap("Delete Selection");
+        let Some(mask) = self.selection.take() else {
+            return false; // unreachable — the match above proved Some
+        };
         let data = &mut self.layers[self.active].buf.data;
         for (i, &sel) in mask.iter().enumerate() {
             let p = i * 4;
@@ -322,6 +585,56 @@ impl ImageHorseTool {
         }
         self.recomposite();
         true
+    }
+
+    /// Place the selected pixels on a NEW layer directly above the active one
+    /// (Photoshop's Layer Via Copy / Layer Via Cut — Ctrl+J / Ctrl+Shift+J).
+    /// Source pixels come from the ACTIVE layer only, matching the "edits
+    /// always land on the active layer" rule `delete_selection` follows.
+    ///
+    /// `cut = false`: the source layer is left intact. `cut = true`: the
+    /// selected pixels are additionally cleared (made transparent) on the
+    /// source layer, exactly as `delete_selection` would clear them.
+    ///
+    /// One history step for the whole operation — the layer insertion reuses
+    /// `add_layer`'s id/insert-above-active core via the snap-free
+    /// `insert_layer_above_active`, so there is no second "Add Layer" entry.
+    /// Deselects after (like `delete_selection`) so no stale mask hangs over
+    /// the moved pixels. Returns the new layer id, or 0 when nothing is
+    /// selected / the mask is all-false (no history, no mutation).
+    pub fn selection_to_new_layer(&mut self, cut: bool) -> u32 {
+        // Guard without mutating: `delete_selection`'s take-first shape would
+        // drop an all-false selection on the way out; this must be a pure
+        // no-op when it returns 0.
+        match &self.selection {
+            Some(m) if m.iter().any(|&b| b) => {}
+            _ => return 0,
+        }
+        // Snap BEFORE taking — the snapshot carries the selection (undo of a
+        // Cut restores the mask along with the pixels).
+        self.snap(if cut {
+            "Selection to Layer (Cut)"
+        } else {
+            "Selection to Layer"
+        });
+        let Some(mask) = self.selection.take() else {
+            return 0; // unreachable — the match above proved Some
+        };
+        let src_idx = self.active;
+
+        // Bulk-copy the whole source layer, then keep only the selection.
+        // A temp Vec sidesteps holding &mut to two layers at once.
+        let mut new_data = self.layers[src_idx].buf.data.clone();
+        crate::simd::color::mask_clear_rgba(&mut new_data, &mask, false);
+
+        if cut {
+            crate::simd::color::mask_clear_rgba(&mut self.layers[src_idx].buf.data, &mask, true);
+        }
+
+        let id = self.insert_layer_above_active("");
+        self.layers[self.active].buf.data = new_data;
+        self.recomposite();
+        id
     }
 
     /// Remove Object (PatchMatch, feature `patchmatch`): reconstructs the
@@ -356,11 +669,11 @@ impl ImageHorseTool {
     /// diagnostic session. The cache is derived state; rebuild it and continue.
     #[cfg(feature = "patchmatch")]
     pub fn remove_object(&mut self) -> bool {
-        let Some(mask) = self.selection.take() else {
-            return false;
-        };
-        if !mask.iter().any(|&b| b) {
-            return false;
+        // Guard WITHOUT mutating (a refused call must leave the selection
+        // in place), then snap while the mask is still live, then take.
+        match &self.selection {
+            Some(m) if m.iter().any(|&b| b) => {}
+            _ => return false,
         }
         let (w, h) = (self.width as usize, self.height as usize);
         if w == 0 || h == 0 {
@@ -376,6 +689,9 @@ impl ImageHorseTool {
             return false;
         }
         self.snap("Remove Object");
+        let Some(mask) = self.selection.take() else {
+            return false; // unreachable — the match above proved Some
+        };
         let seed = self.patchmatch_seed_counter;
         self.patchmatch_seed_counter = self.patchmatch_seed_counter.wrapping_add(1);
         let filled = crate::patchmatch::inpaint(&self.composite_cache, w, h, &mask, seed);
@@ -502,9 +818,7 @@ impl ImageHorseTool {
         }
 
         let mask = crate::livewire::mask_from_loop(&loop_px, w, h);
-        let overlay = selection_overlay_rgba(&mask, w, h);
-        self.selection = Some(mask);
-        overlay
+        self.apply_produced_selection(mask, "Magnetic Lasso")
     }
 
     /// Abandon the lasso session (Esc). Drops the cost map; leaves any existing

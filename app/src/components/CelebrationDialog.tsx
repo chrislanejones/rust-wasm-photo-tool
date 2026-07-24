@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   PartyPopper,
@@ -22,24 +22,30 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-/** Live shipping stats (June 2026, through v0.9.31 · Jun 12–27). */
+/** Live shipping stats (July 2026, through v0.9.85 · Jul 2–22).
+ *
+ *  Counted from `marketing/src/data/releases.ts`, the hand-written trail log,
+ *  NOT typed in by hand — 42 July releases, 109 entries, against 400 all-time.
+ *  Tag split for July: fix 34, rust 21, feature 20, ui 17, infra 16, perf 1.
+ *  Re-derive rather than guess when this is next refreshed. */
 const STATS = {
-  monthFeatures: 67, // features shipped in June (65 → 67 with v0.9.31)
-  releases: 24,
-  allTime: 90, // crossed 90 lifetime features with this push
-  monthPct: 74, // June = 74% of all-time features
+  monthShipped: 109, // entries logged in July across 42 releases
+  releases: 42,
+  allTime: 400, // all-time trail-log entries
+  monthPct: 27, // July = 27% of everything ever shipped
 };
 
-/** This week's headline features — icon + label, shown as chips. */
+/** July's headline work — icon + label, shown as chips. Drawn from real
+ *  release headlines, newest first. */
 const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: string }[] = [
-  { icon: Eraser, label: "Eraser tool" },
-  { icon: Paintbrush, label: "Brush hardness" },
-  { icon: Aperture, label: "Layer masks" },
-  { icon: Layers, label: "Layer Settings + Ctrl+M" },
-  { icon: BoxSelect, label: "Rust selection marker" },
-  { icon: Grid3x3, label: "Transparency checkerboard" },
-  { icon: ImageDown, label: "Drag & paste import" },
-  { icon: ChartArea, label: "Histogram drop anim" },
+  { icon: Eraser, label: "Object removal (local)" },
+  { icon: Paintbrush, label: "AI tool → Eraser tool" },
+  { icon: Aperture, label: "Magnetic lasso" },
+  { icon: Layers, label: "Undo that survives reload" },
+  { icon: BoxSelect, label: "Command palette" },
+  { icon: Grid3x3, label: "Open + save .ora projects" },
+  { icon: ImageDown, label: "Strip photo location" },
+  { icon: ChartArea, label: "Offline app shell" },
 ];
 
 const CONFETTI_COLORS = [
@@ -64,10 +70,20 @@ interface Particle {
   left: number;
 }
 
-/** A one-shot center-burst confetti popper, generated once per mount. */
+/** A one-shot center-burst confetti popper, generated once per mount.
+ *
+ *  Geometry is random, and `useMemo`'s callback runs in the RENDER phase, so
+ *  the old version called `Math.random()` nine times during render — impure
+ *  (ADR-020). Generating on mount instead costs exactly one frame before the
+ *  burst, which is invisible against the 0-120ms stagger the particles already
+ *  carry, and every span still animates from `initial` to `animate` when it
+ *  mounts. Confetti itself only mounts while the dialog is open. */
 function Confetti() {
-  const particles = useMemo<Particle[]>(() => {
-    return Array.from({ length: 48 }, () => {
+  const [particles, setParticles] = useState<Particle[]>([]);
+
+  useEffect(() => {
+    setParticles(
+      Array.from({ length: 48 }, () => {
       const angle = Math.random() * Math.PI * 2;
       const dist = 120 + Math.random() * 220;
       return {
@@ -81,8 +97,9 @@ function Confetti() {
         delay: Math.random() * 0.12,
         duration: 0.9 + Math.random() * 0.7,
         left: 50 + (Math.random() - 0.5) * 12,
-      };
-    });
+        };
+      }),
+    );
   }, []);
 
   return (
@@ -135,7 +152,7 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PartyPopper className="h-5 w-5 text-theme-accent" />
-            June feature spree
+            July shipping spree
           </DialogTitle>
         </DialogHeader>
 
@@ -148,16 +165,16 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
           >
             <div className="flex items-baseline gap-2">
               <span className="text-6xl font-extrabold tabular-nums text-theme-accent">
-                {STATS.monthFeatures}
+                {STATS.monthShipped}
               </span>
               <Sparkles className="h-6 w-6 text-theme-accent" />
             </div>
             <span className="text-sm font-semibold text-text-secondary">
-              features shipped in June&nbsp;🐎
+              features and fixes shipped in July&nbsp;🐎
             </span>
             {/* Milestone */}
             <span className="mt-1 rounded-full border border-theme-sidebar-border bg-bg-elevated px-3 py-1 text-2xs font-semibold text-theme-accent">
-              Just crossed {STATS.allTime} lifetime features!
+              20 features and 34 fixes, across {STATS.releases} releases
             </span>
           </motion.div>
 

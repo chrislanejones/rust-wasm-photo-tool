@@ -78,6 +78,7 @@ export function ImageGuidesOverlay({
 
   return (
     <svg
+      data-testid="image-guides-overlay"
       style={{
         position: "fixed",
         inset: 0,

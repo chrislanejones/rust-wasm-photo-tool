@@ -13,7 +13,7 @@ beforeEach(() => {
     activeTool: "compress",
     brushMode: "paint",
     resizeMode: "compress",
-    adjustMode: "adjust",
+    selectionKind: "wand",
     shapesMode: "shapes",
     stampSubMode: "clone",
   });
@@ -122,7 +122,7 @@ describe("round-trip", () => {
     "#/tool/paint/blur",
     "#/tool/paint/pen",
     "#/tool/resize/resize",
-    "#/tool/adjust/select",
+    "#/tool/select/wand",
     "#/tool/shapes/arrows",
     "#/tool/stamps/emojis",
     "#/tool/text",
@@ -165,9 +165,10 @@ describe("describeRoute", () => {
     expect(describeRoute({ kind: "tool", tool: "brush", mode: "blur" })).toBe(
       "Paint › Blur",
     );
-    expect(describeRoute({ kind: "tool", tool: "crop", mode: "select" })).toBe(
-      "Adjust & Select › Select",
+    expect(describeRoute({ kind: "tool", tool: "select", mode: "edge" })).toBe(
+      "Select › Edge-aware",
     );
+    expect(describeRoute({ kind: "tool", tool: "crop" })).toBe("Adjust");
     expect(describeRoute({ kind: "settings", tab: "security" })).toBe(
       "Settings › Security",
     );

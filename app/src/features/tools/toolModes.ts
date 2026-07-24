@@ -21,9 +21,9 @@ import type { ToolType } from "@/lib/types";
 import { TOOL_MODULES } from "./toolModules";
 import { useToolStore } from "@/stores/useToolStore";
 import type {
-  AdjustMode,
   BrushMode,
   ResizeMode,
+  SelectionKind,
   ShapesMode,
   StampSubMode,
 } from "@/stores/useToolStore";
@@ -66,9 +66,10 @@ const MODE_ACCESS: Partial<Record<ToolType, ModeAccess>> = {
     get: () => useToolStore.getState().resizeMode,
     set: (m) => useToolStore.getState().setResizeMode(m as ResizeMode),
   },
-  crop: {
-    get: () => useToolStore.getState().adjustMode,
-    set: (m) => useToolStore.getState().setAdjustMode(m as AdjustMode),
+  // crop has no MODE_ACCESS row: single-mode again since Select split out.
+  select: {
+    get: () => useToolStore.getState().selectionKind,
+    set: (m) => useToolStore.getState().setSelectionKind(m as SelectionKind),
   },
   stamp: {
     get: () => useToolStore.getState().stampSubMode,
@@ -88,7 +89,10 @@ export function modesFor(tool: ToolType): ToolModeInfo[] {
     return registered.map((m) => ({
       id: m.id,
       label: m.label,
-      keywords: [m.label],
+      // A mode's plain-string info doubles as palette search terms (SELECT_MODES
+      // keeps `info` a string for exactly this); ReactNode infos are display-only.
+      keywords:
+        typeof m.info === "string" ? [m.label, m.info] : [m.label],
     }));
   }
   return LEGACY_SUBMODES[tool] ?? [];

@@ -26,6 +26,7 @@ export type Route =
 const TOOL_SLUG: Record<ToolType, string> = {
   compress: "resize",
   crop: "adjust",
+  select: "select",
   brush: "paint",
   text: "text",
   arrow: "layers",
@@ -130,6 +131,21 @@ function settingsTabFromSlug(slug: string): SettingsTab | undefined {
   return SETTINGS_TABS.find((t) => t.toLowerCase() === raw);
 }
 
+/** Legacy inbound redirect: Select lived inside Adjust & Select until it
+ *  became its own tool, so `#/tool/adjust/select` (and
+ *  `?tool=adjust&mode=select`) exist in old links and bookmarks. They land on
+ *  the Select TOOL — not on Adjust with the mode silently dropped, which
+ *  would strand the user on the wrong half of the old pairing. */
+function legacySelectRedirect(
+  tool: ToolType,
+  rawMode: string | undefined,
+): Route | null {
+  if (tool === "crop" && rawMode?.toLowerCase() === "select") {
+    return { kind: "tool", tool: "select" };
+  }
+  return null;
+}
+
 /**
  * Parse a fragment into a Route. `null` = "this hash says nothing about the
  * view" — an empty hash, a garbage hash, or an unknown root. Callers treat
@@ -156,6 +172,8 @@ export function parseRoute(
   if (root === "tool" || root === "tools") {
     const tool = rest[0] ? toolFromSlug(rest[0]) : undefined;
     if (!tool) return null; // unknown tool -> not a route we can honour
+    const legacy = legacySelectRedirect(tool, rest[1]);
+    if (legacy) return legacy;
     const mode = rest[1] ? modeFromSlug(tool, rest[1], modesOf(tool)) : undefined;
     return { kind: "tool", tool, mode };
   }
@@ -200,6 +218,8 @@ export function routeFromSearch(
   if (!tool) return null;
 
   const modeParam = params.get("mode");
+  const legacy = legacySelectRedirect(tool, modeParam ?? undefined);
+  if (legacy) return legacy;
   const mode = modeParam
     ? modeFromSlug(tool, modeParam, modesOf(tool))
     : undefined;

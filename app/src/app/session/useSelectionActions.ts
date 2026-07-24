@@ -1,12 +1,22 @@
-// Selection-marker (magic-wand) + Move/Selection toggle handlers, extracted
-// verbatim from AppShell (stage 2). All masking math is Rust; JS just stores the
-// returned overlay + routes ops. Tool state is read straight from useToolStore;
-// the WASM `stamp` handle and the canvas ref are passed in.
+// The Select tool's session handlers (extracted from AppShell in stage 2,
+// promoted from sub-mode to tool in the split). All masking math is Rust; JS
+// just stores the returned overlay + routes ops. Tool state is read straight
+// from useToolStore; the WASM `stamp` handle and the canvas ref are passed in.
+//
+// Gesture model: a canvas CLICK fires the active SelectionKind; a canvas DRAG
+// sweeps a marquee (rect/ellipse per selectionShape) committed on release via
+// handleMarqueeCommit. There is no arming toggle — picking the tool is the
+// arming.
 import { useCallback, useEffect, useState } from "react";
 import type { RefObject, MouseEvent as ReactMouseEvent } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useToolStore } from "@/stores/useToolStore";
 import { tryRemoveObject } from "@/lib/patchmatch";
+import {
+  selectionCombineMode,
+  type SelectionCombineMode,
+} from "@/lib/selectionBool";
+import { toast } from "@/components/ui/sonner";
 
 export function useSelectionActions(
   stamp: ReturnType<typeof useCloneStamp>,
@@ -16,8 +26,6 @@ export function useSelectionActions(
   const selectionKind = useToolStore((s) => s.selectionKind);
   const edgeThreshold = useToolStore((s) => s.edgeThreshold);
   const setSelectionMask = useToolStore((s) => s.setSelectionMask);
-  const setSelectionMode = useToolStore((s) => s.setSelectionMode);
-  const setAdjustMode = useToolStore((s) => s.setAdjustMode);
   const setMoveActive = useToolStore((s) => s.setMoveActive);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
 
@@ -30,6 +38,17 @@ export function useSelectionActions(
   // whether a session is running (`lasso_active()`).
   const [lassoCommitted, setLassoCommitted] = useState<Int32Array | null>(null);
   const [lassoPreview, setLassoPreview] = useState<Int32Array | null>(null);
+
+  // ── Additive / subtractive selection (ON by default; "0" kill switch) ──────
+  // The intent behind the NEXT (or in-flight lasso) selection: 0 replace,
+  // 1 union (Shift), 2 subtract (Alt). The engine is the source of truth for
+  // the actual op (we push this to `set_selection_combine` before each
+  // producer); this mirror only exists so the on-canvas preview can tint the
+  // marching-ants add vs. subtract while the gesture is live.
+  // TODO(chris): additive/subtractive preview overlay styling — Chris is
+  // designing this by eye. `combineHint` is the hook/prop it should read;
+  // nothing renders off it yet.
+  const [combineHint, setCombineHint] = useState<SelectionCombineMode>(0);
 
   const getCoords = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
     const c = canvasRef.current;
@@ -53,9 +72,18 @@ export function useSelectionActions(
       if (!tool) return;
       const { x, y } = getCoords(e);
 
+      // Shift = add (union), Alt = subtract; flag-gated, else always 0/replace.
+      const mode = selectionCombineMode(e);
+
       if (selectionKind === "lasso") {
-        // First click opens the session; every click after drops another anchor.
+        // The lasso is a multi-click SESSION, not click-once — so the add/
+        // subtract intent is fixed when the loop OPENS (first anchor) and the
+        // engine consumes it at `lasso_close`. Mid-session clicks are anchors,
+        // never producers, so re-reading the modifier per anchor would be a
+        // lie; we set combine mode once here and leave it.
         if (!tool.lasso_active()) {
+          tool.set_selection_combine(mode);
+          setCombineHint(mode);
           if (!tool.lasso_begin(x, y)) return;
         } else {
           tool.lasso_commit(x, y);
@@ -65,6 +93,11 @@ export function useSelectionActions(
         return;
       }
 
+      // Click-once kinds (wand / edge / color-range) resolve the intent at
+      // click time. The engine routes the produced mask through union/subtract
+      // when mode != 0; mode 0 is the old replace path, byte-for-byte.
+      tool.set_selection_combine(mode);
+      setCombineHint(mode);
       const mask =
         selectionKind === "edge"
           ? tool.magic_wand_select_edges(x, y, selectionTolerance, edgeThreshold)
@@ -111,7 +144,7 @@ export function useSelectionActions(
   // Bound here rather than in useKeyboardShortcuts: the listener only exists
   // while a lasso session is actually open, so Escape keeps its existing
   // meaning everywhere else in the app and the shared shortcut hook doesn't
-  // grow a case for a flagged-off feature.
+  // grow a session-scoped case.
   useEffect(() => {
     if (!lassoCommitted) return;
     const onKey = (e: KeyboardEvent) => {
@@ -133,6 +166,7 @@ export function useSelectionActions(
     stamp.toolRef.current?.clear_selection();
     setLassoCommitted(null);
     setLassoPreview(null);
+    setCombineHint(0);
     setSelectionMask(null);
   }, [stamp]);
   const handleDeleteSelection = useCallback(() => {
@@ -143,6 +177,34 @@ export function useSelectionActions(
     }
     setSelectionMask(null);
   }, [stamp]);
+  // "New Layer" — place the selection on a new layer above the active one
+  // (Layer Via Copy / Layer Via Cut; Ctrl+J / Ctrl+Shift+J). Same publish
+  // shape as handleDeleteSelection: the engine snaps + deselects + returns
+  // 0-on-nothing, JS flushes, syncs (so the Layers panel sees the new layer)
+  // and drops the overlay mask.
+  const handleNewLayerFromSelection = useCallback(
+    (cut: boolean) => {
+      const tool = stamp.toolRef.current;
+      if (!tool) return;
+      if (tool.selection_to_new_layer(cut)) {
+        stamp.flushToCanvas();
+        stamp.syncState();
+        toast.success(
+          cut ? "Selection cut to a new layer" : "Selection copied to a new layer",
+        );
+      }
+      setSelectionMask(null);
+    },
+    [stamp, setSelectionMask],
+  );
+  const handleNewLayerCopy = useCallback(
+    () => handleNewLayerFromSelection(false),
+    [handleNewLayerFromSelection],
+  );
+  const handleNewLayerCut = useCallback(
+    () => handleNewLayerFromSelection(true),
+    [handleNewLayerFromSelection],
+  );
   // Remove Object (PatchMatch, `ih_patchmatch` flag — see lib/patchmatch.ts).
   // Same shape as handleDeleteSelection above: `tryRemoveObject` is already
   // the flag+export guard, so a flag-off or default (non-`patchmatch`) build
@@ -159,25 +221,42 @@ export function useSelectionActions(
     }
     setSelectionMask(null);
   }, [stamp]);
-  // Move-layer toggle (Layer Settings + Ctrl+M). Switches to the Layer Settings
-  // tool. Still clears selection-click mode: the two interpret a canvas click
-  // differently, so they stay mutually exclusive even though they now live on
-  // different tools.
+  // Marquee drag commit: CanvasArea owns the ephemeral drag preview and calls
+  // this on release with the drag's canvas-space corners + the live modifiers.
+  // Same intent-resolution as a click (Shift/Alt behind `ih_selection_bool`),
+  // same publish shape as every producer. The engine treats a degenerate or
+  // off-canvas rect as Photoshop's empty-marquee deselect in replace mode —
+  // CanvasArea's click-vs-drag threshold keeps accidental sub-pixel drags
+  // from reaching here at all.
+  const handleMarqueeCommit = useCallback(
+    (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      mods: { shiftKey: boolean; altKey: boolean },
+    ) => {
+      const tool = stamp.toolRef.current;
+      if (!tool) return;
+      const mode = selectionCombineMode(mods);
+      tool.set_selection_combine(mode);
+      setCombineHint(mode);
+      // Read at commit time, not subscribed — the shape can't change mid-drag.
+      const shape = useToolStore.getState().selectionShape;
+      const mask =
+        shape === "ellipse"
+          ? tool.ellipse_select(x0, y0, x1, y1)
+          : tool.rect_select(x0, y0, x1, y1);
+      setSelectionMask(mask.length ? mask : null);
+    },
+    [stamp, setSelectionMask],
+  );
+  // Move-layer toggle (Layer Settings + Ctrl+M). Switches to the Layer
+  // Settings tool; Select-vs-Move exclusivity now falls out of them being
+  // different tools, so there is no selection flag left to clear.
   const handleToggleMove = useCallback(() => {
     setActiveTool("arrow");
-    setSelectionMode(false);
     setMoveActive((m) => !m);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // Selection click-to-select toggle. Switches to Adjust & Select (its home
-  // since tool-arc 2.6) and puts it in the Select sub-mode — without that the
-  // toggle turns on but the canvas still shows the Adjust body, and the click
-  // routing (gated on adjustMode === "select") never fires.
-  const handleToggleSelectionMode = useCallback(() => {
-    setActiveTool("crop");
-    setAdjustMode("select");
-    setMoveActive(false);
-    setSelectionMode((m) => !m);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -187,15 +266,24 @@ export function useSelectionActions(
     handleSelectAll,
     handleDeselect,
     handleDeleteSelection,
+    // Selection → new layer (Copy = Ctrl+J, Cut = Ctrl+Shift+J).
+    handleNewLayerCopy,
+    handleNewLayerCut,
     // Remove Object (behind ih_patchmatch; see lib/patchmatch.ts).
     handleRemoveObject,
     handleToggleMove,
-    handleToggleSelectionMode,
-    // Magnetic lasso (behind ih_smart_edge; see lib/smartEdge.ts).
+    // Marquee drag (rect/ellipse per selectionShape) — commit on release.
+    handleMarqueeCommit,
+    // Magnetic lasso — shipped by default since the selection-tool overhaul
+    // (`ih_smart_edge` now gates only the Paint Smart Brush).
     handleLassoMove,
     handleLassoClose,
     handleLassoCancel,
     lassoCommitted,
     lassoPreview,
+    // Additive/subtractive intent for the live gesture (`ih_selection_bool`):
+    // 0 replace, 1 union, 2 subtract. The preview overlay Chris is designing
+    // reads this — see the TODO by its useState.
+    combineHint,
   };
 }

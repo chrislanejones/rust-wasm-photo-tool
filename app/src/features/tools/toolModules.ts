@@ -11,15 +11,18 @@
 // add AppShell wiring here or anywhere else.
 import type { ToolType } from "@/lib/types";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
-import { Paintbrush, Shrink, VectorSquare } from "lucide-react";
+import {
+  Paintbrush,
+  Shrink,
+  VectorSquare,
+  SquareDashedMousePointer,
+} from "lucide-react";
 import { PaintSettings, PAINT_MODES } from "./settings/PaintSettings";
 import type { PaintMode } from "./settings/PaintSettings";
 import { ResizeSettings, RESIZE_MODES } from "./settings/ResizeSettings";
-import {
-  TransformCropSettings,
-  ADJUST_MODES,
-} from "./settings/TransformCropSettings";
-import type { ResizeMode, AdjustMode } from "@/stores/useToolStore";
+import { TransformCropSettings } from "./settings/TransformCropSettings";
+import { SelectSettings, SELECT_MODES } from "./settings/SelectSettings";
+import type { ResizeMode, SelectionKind } from "@/stores/useToolStore";
 
 /**
  * Minimal registry entry for one tool. Kept deliberately small — fields are
@@ -66,16 +69,29 @@ const resizeModule: ToolModule<ResizeMode> = {
   Settings: ResizeSettings,
 };
 
-/** Adjust & Select — third registered module (tool-UI arc Session 2.6).
- *  Registered under its legacy id `crop` (shortcut `2` + persistence depend on
- *  it); the DISPLAY label became "Adjust & Select" when the Select sub-mode
- *  moved in from Layer Settings. Sub-mode state: `useToolStore.adjustMode`. */
-const adjustModule: ToolModule<AdjustMode> = {
+/** Adjust — third registered module (tool-UI arc Session 2.6). Registered
+ *  under its legacy id `crop` (shortcut `2` + persistence depend on it).
+ *  Single-mode again since the Select half split into its own tool — the
+ *  Adjust/Select ToolModeToggle and `useToolStore.adjustMode` went with it. */
+const adjustModule: ToolModule = {
   id: "crop", // legacy id — see ToolModule.id
-  label: "Adjust & Select",
+  label: "Adjust",
   icon: VectorSquare,
-  modes: ADJUST_MODES,
+  modes: [],
   Settings: TransformCropSettings,
+};
+
+/** Select — fourth registered module, and the first tool whose registry id
+ *  matches its label from birth (it split OUT of Adjust & Select, so there is
+ *  no legacy id to honour). Its `modes` are the selection kinds — what a
+ *  canvas CLICK does; the marquee drag (rect/ellipse) is a separate axis in
+ *  `useToolStore.selectionShape`. */
+const selectModule: ToolModule<SelectionKind> = {
+  id: "select",
+  label: "Select",
+  icon: SquareDashedMousePointer,
+  modes: SELECT_MODES,
+  Settings: SelectSettings,
 };
 
 /**
@@ -86,4 +102,5 @@ export const TOOL_MODULES: Partial<Record<ToolType, ToolModule>> = {
   brush: paintModule,
   compress: resizeModule,
   crop: adjustModule,
+  select: selectModule,
 };

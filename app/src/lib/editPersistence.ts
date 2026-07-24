@@ -175,7 +175,7 @@ interface LayerMeta {
  * bottom → top. Used by both the IDB and Convex save paths.
  */
 export function collectLayers(t: ImageHorseTool): PersistedLayer[] {
-  let metas: LayerMeta[] = [];
+  let metas: LayerMeta[];
   try {
     metas = JSON.parse(t.get_layers()) as LayerMeta[];
   } catch {
@@ -296,7 +296,7 @@ export async function savePhotoEdit(
   }
 
   // Live (non-destructive) text annotations.
-  let annotations: PersistedAnnotation[] = [];
+  let annotations: PersistedAnnotation[];
   try {
     const raw = t.get_text_annotations();
     const parsed = JSON.parse(raw) as Array<

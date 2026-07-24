@@ -24,6 +24,48 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.88",
+    date: "2026-07-24",
+    headline: "See a selection before you make it",
+    entries: [
+      { tag: "feature", text: "With the Select tool, hover over the image and hold a modifier: the region a click would select lights up as a filled zone — green while you hold Shift (what you'd add), red while you hold Alt (what you'd subtract). It re-floods live from the pixel under your cursor. Click and it commits; the zone becomes the real selection. Purely there to help you aim — it changes nothing on its own." },
+      { tag: "feature", text: "Works for the wand, the edge-aware wand, and color range (the magnetic lasso is anchor-based, so it has no hover preview). The preview runs the exact same flood the real click runs, so what you see is what you get." },
+      { tag: "rust", text: "The preview is a new read-only engine call that shares one mask core with the committing selection, so the two can never disagree about what a click grabs. It touches neither your selection nor your undo history, and the recompute is throttled to one flood per frame." },
+    ],
+  },
+  {
+    version: "v0.9.87",
+    date: "2026-07-23",
+    headline: "Select gets its own button — and stops lying about its size",
+    entries: [
+      { tag: "feature", text: "Select is a real tool now, with its own button (press S). It used to hide inside Adjust & Select behind a Click-to-select toggle you had to arm first; now you pick the tool and the canvas just works — click to select, drag to sweep a rectangle or ellipse marquee. Hold Shift to add to a selection, Alt to cut away, and the cursor shows a little + or − so you know which one you're about to do." },
+      { tag: "fix", text: "On photos bigger than the window, the marching-ants outline drew two to three times larger than the actual selection — the overlay was sized to the image's raw pixels while the canvas was scaled to fit. The selection underneath was always right; only the outline was wrong. Fixed, along with the magnetic lasso's wire, which had the same bug." },
+      { tag: "feature", text: "Every selection is now a step in History: each select, add, subtract, Select All and Deselect shows up by name and undoes with Ctrl+Z. Undoing a Delete Selection or a Cut-to-layer brings back what you had selected, not just the pixels. A click that changes nothing records nothing." },
+      { tag: "ui", text: "The Select panel got tidier: one Selection header with the explanations behind its lightbulb, five actions in two neat rows (All, Deselect, Delete, then Copy and Cut), and the drag shape — rectangle or ellipse — is a two-button choice. Old links to the combined tool still land in the right place." },
+      { tag: "rust", text: "The rectangle and ellipse marquees are new engine producers riding the same combine pipeline as every other selection kind, and undo snapshots now carry the selection mask — selection-only steps never touch the op log, pinned by tests." },
+    ],
+  },
+  {
+    version: "v0.9.86",
+    date: "2026-07-23",
+    headline: "The Selection tool grows up — magnetic lasso and layers",
+    entries: [
+      { tag: "feature", text: "The magnetic lasso is live. Click your way around an object and the line snaps to the edge between each click, so you stop tracing outlines by hand. It sits alongside the wand, the edge-aware wand, and color-range select in one panel that now looks like the Paint tool — four tiles, each with its own explanation behind the lightbulb." },
+      { tag: "feature", text: "You can now lift a selection onto its own layer: Copy it to a new one with Ctrl+J, or Cut it out onto one with Ctrl+Shift+J — the move Photoshop has had forever. The pixel work runs in the Rust engine on a new SIMD path, so it stays instant even on a large photo." },
+      { tag: "fix", text: "Copying a selection now copies what you actually see. It used to grab only the active layer, so a selection over a caption pasted a blank rectangle; it now takes the whole visible image — text, shapes, every layer." },
+      { tag: "fix", text: "Guides and rulers no longer flash across the whole screen when you open the Batch editor, and a text drop-shadow set to “Box” with nothing behind it now casts from the letters instead of doing nothing." },
+    ],
+  },
+  {
+    version: "v0.9.85",
+    date: "2026-07-22",
+    headline: "A check that was never running, now runs",
+    entries: [
+      { tag: "infra", text: "Nothing you can see changed in this one. The project's checklist has required a code linter to pass before anything ships, and it turned out the linter had never actually run — it was never installed, and there was no configuration for it to read, so every attempt quietly failed and got treated as a pass. That is worse than not having the check at all, because everyone assumed it was working." },
+      { tag: "fix", text: "It runs now, and the first real pass over 207 files found 26 things worth fixing — all of them fixed here. Mostly harmless leftovers: values computed and then thrown away before anything read them, a few places where the code had stopped describing what type it was really handling. The test files turned out to have had no automated checking of any kind until now." },
+    ],
+  },
+  {
     version: "v0.9.84",
     date: "2026-07-19",
     headline: "The app learns to cache itself — switch still off",

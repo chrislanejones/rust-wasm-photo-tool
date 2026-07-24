@@ -1976,3 +1976,160 @@ eliminated. Decision recorded in
 `sw.js`, no workbox chunk, no `version.json`, and zero occurrences of
 `serviceWorker` in the emitted bundle. `tsc --noEmit` clean, 184/184 vitest
 passing, production build succeeds.
+
+## v7.42 — 2026-07-22
+
+**The lint gate becomes real.** The definition of done in `CLAUDE.md` has
+listed `npx eslint app/src --max-warnings 0` for months. There was no
+`eslint.config.*` anywhere in the repo — master or any worktree — and ESLint
+was not a dependency in either `package.json`, so every invocation had `npx`
+fetch ESLint from the registry and then exit on config-not-found. The gate
+had never once run. It was worse than having no gate, because the checklist
+implied it had.
+
+A flat config now lives at the workspace root: `@eslint/js` recommended,
+`typescript-eslint` recommended, and the two classic React hook rules, plus
+`react-refresh/only-export-components` for Vite HMR. Correctness only — no
+formatting or style rules. The gate is **errors-only**: `pnpm lint` exits
+non-zero on any error, and warnings stay visible as a tracked backlog rather
+than being silenced.
+
+First honest run over 207 files: **90 problems, 26 errors and 64 warnings,
+with 182 files completely clean.** All 26 errors are fixed in this release.
+
+| #   | Change                                                                    | Status                                                                    |
+| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | `eslint.config.mjs` at the workspace root — flat config, ESLint 10 (`.mjs` because the root `package.json` is CJS) | Complete — `pnpm lint` and `npx eslint app/src` both work |
+| 2   | ESLint 10.7 + `typescript-eslint` 8.65 + `eslint-plugin-react-hooks` 7.1 + `eslint-plugin-react-refresh` 0.5 added as root devDependencies | Complete — none of them were installed before |
+| 3   | 11 `no-useless-assignment` dead stores removed — initializers overwritten on every path before any read | Complete — `tsc` definite-assignment verified each one |
+| 4   | 3 `no-explicit-any` casts replaced — two `storageId as any` become `Id<"_storage">`, one Convex row field gets a narrow inline type | Complete |
+| 5   | 2 `no-unused-expressions` — `cond ? a() : b()` used as a statement became `if/else` | Complete — behaviour identical |
+| 6   | 3 empty `catch {}` blocks documented; 2 dead test helpers deleted; 2 `prefer-const` | Complete |
+| 7   | 2 stale `eslint-disable` comments removed — written for a linter that had never run | Complete |
+| 8   | `no-unused-vars` configured to honour the existing `^_` convention (`_settings`, `_onChange`, `_dropped`) | Complete — the code already marked intent; the rule now reads it |
+| 9   | `CLAUDE.md` definition of done corrected — `--max-warnings 0` replaced with `pnpm lint`, with a note on why it must not come back | Complete |
+
+**Deliberately deferred**, each its own decision rather than a side effect of
+wiring a linter:
+
+- **`max-lines` and the entropy/drift rules.** The tripwire that would catch
+  the next AppShell, but enabling it the same day as the config buries the
+  signal under the current one. Needs a ratchet baseline first.
+- **The React Compiler rule set.** `eslint-plugin-react-hooks` v7's
+  `recommended` is no longer the two classic rules — it now carries 17,
+  14 of them `error`. Measured against this codebase it reports **123
+  react-hooks problems (66 errors)** versus 57 warnings for the classic
+  pair: `refs` 35, `set-state-in-effect` 18, `purity` 10,
+  `static-components` 2, `preserve-manual-memoization` 1. Real correctness
+  rules and worth a session of their own; enabling them here would have made
+  the gate red on day one.
+- **Type-aware linting** (`recommendedTypeChecked`) — needs a TS program per
+  run and produces a much larger initial wave.
+
+**Test files had no static analysis before this.** `app/tsconfig.json`
+excludes `src/**/*.test.ts(x)` from the `noEmit` pass, so `tsc` — including
+`noUnusedLocals` and `noUnusedParameters` — has never seen the 13 spec files.
+ESLint is the first checker to read them; 3 of the 26 errors were there.
+
+**Verified**: `pnpm lint` reports 0 errors / 62 warnings, `tsc --noEmit`
+clean, 184/184 vitest passing, app and marketing production builds succeed.
+
+## v7.43 — 2026-07-23
+
+**The Selection tool overhaul — magnetic lasso, "place on a new layer", and a
+panel that matches Paint.** The magnetic lasso (live-wire, shortest-path over
+the Sobel edge map — the same edges the edge-aware wand uses) is enabled by
+default. It was fully built and wired for weeks behind the `ih_smart_edge`
+flag; the only thing left was a human confirming the feel, which is now done.
+Its flag was decoupled from the Paint "Smart Brush", which stays gated on its
+own.
+
+The four selection kinds (Wand, Edge-aware, Color Range, Magnetic) moved onto
+the shared multi-mode panel template the Paint tool uses — icon tiles on top,
+the active kind's description in a lightbulb tooltip, no permanent paragraph.
+The old "Coming soon" stub is gone.
+
+New: **Selection → new layer**, Copy (`Ctrl+J`) or Cut (`Ctrl+Shift+J`),
+Photoshop's Layer-via-Copy / Layer-via-Cut. The masked pixel copy runs through
+a new WebAssembly SIMD128 kernel (`mask_clear_rgba`) with a bit-identical
+scalar fallback.
+
+| #   | Change                                                                    | Status                                                                    |
+| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | Magnetic lasso enabled by default; decoupled from `ih_smart_edge` (Paint Smart Brush stays gated) | Complete — always-present 4th selection kind |
+| 2   | Selection sub-modes migrated to the shared `ToolModeToggle` (Paint's pattern); per-kind lightbulb; "Coming soon" stub removed; All/None/Delete restyled as tiles | Complete |
+| 3   | `selection_to_new_layer(cut)` engine method + `simd::color::mask_clear_rgba` (wasm128 + scalar fallback) | Complete — Copy `Ctrl+J` / Cut `Ctrl+Shift+J`, 4 engine tests + 3 kernel tests |
+| 4   | `copy_region_composited` — selection copy samples the VISIBLE composite (text/shapes/all layers), honors the canvas-background-on-export pref | Complete — Ctrl+C over a caption no longer pastes a blank rect |
+| 5   | Rulers & draggable H/V guides no longer flash full-canvas entering the Batch editor, nor lag leaving it (overlay re-reads the canvas rect post-layout) | Complete |
+| 6   | Text drop shadow: "Box" with Background = None casts from the text silhouette instead of nothing | Complete — engine-side, regression-tested |
+| 7   | Settings copy: "Canvas on import" → "Importing: …"; "Canvas background on export and copy to clipboard" → "Exporting: …" | Complete |
+| 8   | React Compiler lint rules adopted (`static-components` + `purity`, at zero violations); 6 render-phase fixes; ADR-020 | Complete — see ADR-020 |
+
+**Verified**: `cargo fmt --check` clean, clippy `-D warnings` clean on default /
+tiles / patchmatch, engine tests pass; `tsc --noEmit` clean, eslint 0 errors /
+62 warnings, 195/195 vitest, app + marketing production builds succeed. Shipped
+WASM 735,865 B (+1,192 over the v7.42 baseline — the new `selection_to_new_layer`
+export, the mask-clear SIMD kernel, and the text-shadow fallback branch).
+
+## v7.44 — 2026-07-23
+
+**Select becomes a real tool — its own button, canvas-first, every step
+undoable.** Selection had lived inside "Adjust & Select" behind a
+Click-to-select toggle: three flags deep before a canvas click did anything,
+and every selection drag spawned the crop box, because the only rectangle
+gesture in the app belonged to crop. Select is now tool #11 (press `S` — the
+first letter shortcut; the digit row filled up at ten). Pick it and the canvas
+just works: click fires the active kind, drag sweeps a marquee. Adjust is
+just Adjust again.
+
+The marching-ants display bug: the selection overlay hard-coded its CSS size
+to the image's natural pixels while the canvas is fit-scaled to the window —
+on any photo larger than the viewport the ants drew 2–3× bigger than the
+selection they described. All four kinds looked broken; the engine mask was
+right the whole time. Both overlays (ants + lasso wire) now render into the
+canvas's measured layout box.
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | Select split out of `crop` as tool id `select` (first id born matching its label); Adjust/Select sub-mode, `selectionMode` flag and the Click-to-select toggle deleted | Complete — one gate: being on the tool IS the arming |
+| 2   | Drag = marquee: `rect_select` / `ellipse_select` engine producers riding the shared combine pipeline; Rect/Ellipse shape control; 4px click-vs-drag threshold; dashed preview | Complete — 13 engine tests |
+| 3   | Overlay fit-scale fix: SelectionOverlay + LassoOverlay take the canvas's ResizeObserver-measured CSS box instead of the natural size | Complete — pre-existing on master, first seen on large photos |
+| 4   | Shift = add / Alt = subtract ON by default; `ih_selection_bool` becomes a `"0"` kill switch; Select-tool cursor badges the intent (+/−) | Complete |
+| 5   | Every selection change is one undo step with a History name (Magic Wand, Edge Select, Color Range, Magnetic Lasso, Marquee, Add/Subtract Selection, Select All, Deselect); no-op clicks push nothing | Complete — 8 engine tests |
+| 6   | Selection-only steps are transparent to the op log (never seek or break it); undoing Delete Selection / Layer-via-Cut restores the mask along with the pixels | Complete — lockstep pinned by test |
+| 7   | Select panel: one "Selection" header + lightbulb over five actions (All / Deselect / Delete / Copy / Cut in two 3-column rows); "New Layer" sub-header gone; "None" renamed Deselect | Complete |
+| 8   | Legacy links (`#/tool/adjust/select`, `?tool=adjust&mode=select`) land on the Select tool; palette kinds are real routes (`#/tool/select/wand`) | Complete |
+
+**Verified**: `cargo fmt --check` clean, clippy `-D warnings` clean, engine
+tests pass (incl. 13 marquee + 8 history); `tsc --noEmit` clean, eslint 0
+errors / 61 warnings, 198/198 vitest, production build succeeds. Shipped WASM
+743,834 B (+7,969 over v7.43 — marquee producers, selection-carrying
+snapshots, history labels).
+
+## v7.45 — 2026-07-24
+
+**See what a selection will grab before you commit to it.** Pick the Select
+tool, hover over the image, and hold a modifier: the region a click *would*
+select lights up as a filled zone — green while you hold Shift (what you'd
+add), red while you hold Alt (what you'd subtract). It re-floods live from
+the pixel under the cursor as you move. Click and it commits; the zone
+becomes the real marching ants. Let go of the key or move off the image and
+it clears. It changes nothing on its own — it's there so you can aim.
+
+Works for the Wand, Edge-aware, and Color Range kinds (the magnetic lasso is
+anchor-based, so it has no hover preview). The preview runs the *same* flood
+the actual click runs — computed in the engine, read-only, so it can't drift
+from what you'll get and never touches your selection or your undo history.
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | Hover "possible future region" preview — green (Shift/add) / red (Alt/subtract) filled zone of what a click would select, live under the cursor | Complete — Wand / Edge / Color Range |
+| 2   | New engine `selection_preview` (read-only, non-committing) on a shared `selection_mask_for` core the committing producers now share — preview and click can't diverge | Complete — 6 engine tests |
+| 3   | Recompute throttled to one flood per frame, gated on a held modifier, skipped when the cursor hasn't crossed into a new pixel | Complete |
+| 4   | Enforcement: the trail-log commit squares (`marketing/src/data/commits.ts`) are now a required, gated part of the release routine so they can't go stale | Complete — tooling |
+
+**Verified**: `cargo fmt --check` clean, clippy `-D warnings` clean, engine
+tests pass (incl. 6 preview); `tsc --noEmit` clean, eslint 0 errors / 61
+warnings, 198/198 vitest, app + marketing production builds succeed. Shipped
+WASM 745,691 B (+1,857 over v7.44 — the preview export and its shared mask
+core).

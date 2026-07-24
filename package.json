@@ -10,11 +10,19 @@
     "build:marketing": "pnpm --filter photo-horse-marketing build",
     "build:wasm": "wasm-pack build --target web --out-dir pkg -- --features tiles",
     "build:all": "pnpm run build:wasm && pnpm run build",
+    "lint": "eslint app/src eslint.config.mjs",
+    "lint:fix": "eslint app/src eslint.config.mjs --fix",
     "test:e2e": "playwright test",
     "test:e2e:sw": "playwright test --config playwright.sw.config.ts"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
-    "convex": "catalog:"
+    "convex": "catalog:",
+    "eslint": "^10.7.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
+    "typescript-eslint": "^8.65.0"
   }
 }

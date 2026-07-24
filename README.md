@@ -70,11 +70,11 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.41 — 2026-07-19
+### v7.45 — 2026-07-24
 
-**The app can cache itself for offline use now — and the switch is off.** Every visit re-downloads about 3.6 MB of app shell, the 734 KB Rust engine included, and a network drop mid-session means the next boot fails outright. That's a strange way for an editor to behave when all of your originals and edits already live in the browser. A service worker fixes both. The one that landed is precache-only: it stores the build's own hashed files and nothing else. Sign-in, cloud sync and share links always go to the network, so nothing about your account or your documents can ever be served stale.
+**See what a selection will grab before you commit.** With the Select tool, hover over the image and hold a modifier: the region a click *would* select lights up as a filled zone — green while you hold Shift (what you'd add), red while you hold Alt (what you'd subtract). It re-floods live from the pixel under your cursor as you move. Click and it commits; the zone turns into the real marching ants. Let go of the key, or move off the image, and it clears. It's purely there to help you aim — nothing about it changes the picture or your selection.
 
-It ships off. A default build contains no service worker at all — nothing registered, nothing emitted, no bytes. Turning it on is a separate, deliberate decision, because a bad service worker is the worst thing this app could ship: it strands people on an old version without ever saying so. When it is on, a new build waits for an explicit Reload instead of swapping code out from under an open edit, and a per-build hash check raises the prompt again if a stale cache is still serving old files.
+It works for the wand, the edge-aware wand, and color range (the magnetic lasso is anchor-based, so it has no hover preview). The preview runs the exact same flood the real click runs — computed in the engine, read-only — so what you see is what you'll get, and it never touches your undo history.
 
 ## License
 

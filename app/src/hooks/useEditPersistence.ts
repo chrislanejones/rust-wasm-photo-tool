@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useConvexAuth, useConvex, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import type { RefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import {
@@ -340,7 +341,7 @@ export function useEditPersistence() {
             body: archive.buffer as ArrayBuffer,
           });
           const { storageId } = await resp.json() as { storageId: string };
-          await saveEdit({ photoKey: photoId, storageId: storageId as any, canvasW, canvasH });
+          await saveEdit({ photoKey: photoId, storageId: storageId as Id<"_storage">, canvasW, canvasH });
           // The local copy is already on disk (written before this block).
           return;
         } catch (err) {
@@ -379,7 +380,9 @@ export function useEditPersistence() {
               return { canvasW: edit.canvasW, canvasH: edit.canvasH, canvasPng: data, undoStack: [], redoStack: [], annotations: [] };
             }
           }
-        } catch {}
+        } catch {
+          // Cloud read failed entirely — fall through to the IDB copy below.
+        }
       }
       return null;
     },
@@ -389,7 +392,12 @@ export function useEditPersistence() {
   const deletePhotoEdit = useCallback(
     async (photoId: string) => {
       if (isAuthenticated) {
-        try { await removeEdit({ photoKey: photoId }); } catch {}
+        try {
+          await removeEdit({ photoKey: photoId });
+        } catch {
+          // Best-effort cloud delete; the local IDB delete below is the one
+          // that must happen, and it is not conditional on this succeeding.
+        }
       }
       await idbDelete(photoId);
     },
@@ -398,7 +406,11 @@ export function useEditPersistence() {
 
   const clearAllEdits = useCallback(async () => {
     if (isAuthenticated) {
-      try { await clearAllConvex(); } catch {}
+      try {
+        await clearAllConvex();
+      } catch {
+        // Best-effort cloud clear; the local IDB clear below always runs.
+      }
     }
     await idbClear();
   }, [isAuthenticated, clearAllConvex]);
