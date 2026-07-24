@@ -2133,3 +2133,36 @@ tests pass (incl. 6 preview); `tsc --noEmit` clean, eslint 0 errors / 61
 warnings, 198/198 vitest, app + marketing production builds succeed. Shipped
 WASM 745,691 B (+1,857 over v7.44 — the preview export and its shared mask
 core).
+
+## v7.46 — 2026-07-24
+
+**The Magic Eraser launches — and so, it turns out, does the engine.** Brush
+over an unwanted object with the Eraser tool's Magic mode (or select it and
+hit Remove Object in the Select panel) and it's erased and rebuilt from the
+surrounding image, entirely on your device. Single-resolution kernel, so big
+holes come out soft — the honest state of it — but full-coverage strokes on a
+real object work, and undo brings everything back. Coverage is the whole
+game: brush all of the object, not an X through it.
+
+The launch surfaced a production bug worth recording plainly: Netlify's build
+command ran `wasm-pack build` with no feature flags, overwriting the
+committed engine with a featureless one. Production has been serving a wasm
+without the tiles/op-log machinery since v7.36 — every "shipped ON" op-log
+flag was silently disabled in prod by the runtime feature-detects (which is
+also why nothing ever crashed). Fixed: the deploy now builds
+`--features tiles,patchmatch`, so the op-log actually reaches users for the
+first time, alongside the eraser.
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | Magic Eraser brush (Eraser → Magic): brush-to-mask, size ring, Ctrl+[/] sizing, one-per-frame overlay, remove-on-release | Complete — merged from the eraser line, caught up to v7.45 first |
+| 2   | Remove Object in the Select panel — same engine call, selection-driven | Complete |
+| 3   | `ih_patchmatch` flips from opt-in to a `"0"` kill switch; panel copy de-caveated; wasm-export feature-detect stays as the skew guard | Complete |
+| 4   | Netlify deploy bug: featureless `wasm-pack build` overwrote the committed pkg — prod never had tiles/op-log. Build now passes `tiles,patchmatch` (netlify.toml + `build:wasm`) | Fixed — prod wasm goes 679,875 → ~753,713 B |
+| 5   | `remove_object` hardened in the merge: guard-without-mutating + snap-before-take (undo restores the mask) + warm-a-cold-cache-and-continue | Complete — pinned by both test suites |
+
+**Verified**: fmt/clippy `-D warnings` clean on `tiles,patchmatch` combined,
+cargo tests green on tiles, patchmatch, and combined; tsc clean, eslint 0
+errors / 61 warnings, 201/201 vitest; app + marketing production builds
+succeed. Shipped WASM 753,713 B (+7,995 over v7.45 — the PatchMatch kernel,
+in the binary users download for the first time).

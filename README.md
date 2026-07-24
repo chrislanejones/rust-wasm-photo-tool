@@ -70,11 +70,11 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.45 — 2026-07-24
+### v7.46 — 2026-07-24
 
-**See what a selection will grab before you commit.** With the Select tool, hover over the image and hold a modifier: the region a click *would* select lights up as a filled zone — green while you hold Shift (what you'd add), red while you hold Alt (what you'd subtract). It re-floods live from the pixel under your cursor as you move. Click and it commits; the zone turns into the real marching ants. Let go of the key, or move off the image, and it clears. It's purely there to help you aim — nothing about it changes the picture or your selection.
+**The Magic Eraser is live.** Pick the Eraser tool, switch to Magic, and brush over something you want gone — release, and it's removed and filled in from the surrounding image, entirely on your device. No upload, no sign-in. You can also select the object with any Select-tool kind and hit Remove Object. One rule matters: cover the whole object. A partial stroke leaves the fill free to rebuild the object from its own leftovers. Large areas can come out soft — that's the current kernel being honest, not broken — and undo brings everything back, selection included.
 
-It works for the wand, the edge-aware wand, and color range (the magnetic lasso is anchor-based, so it has no hover preview). The preview runs the exact same flood the real click runs — computed in the engine, read-only — so what you see is what you'll get, and it never touches your undo history.
+**A deploy bug meant some engine features never actually reached the live site.** The production build was compiling the image engine without its newer machinery, and the app's own safety checks quietly worked around the gap instead of crashing. Fixed — the full engine now ships, so the editing history that survives a reload works on the live site the way it always did in development.
 
 ## License
 

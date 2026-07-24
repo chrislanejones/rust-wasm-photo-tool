@@ -252,19 +252,16 @@ export function SelectSettings({
       </div>
 
       {/* ── Remove Object (PatchMatch) ──────────────────────────────────────
-          Behind `ih_patchmatch` — a verification switch, not a shipped
-          preference (see lib/patchmatch.ts). Its own section rather than a
-          4th slot in the "Act on the selection" grid: it's a materially
-          different, much heavier operation than Delete, and it's
-          flagged-off-by-default WIP — giving it equal visual weight to the
-          settled actions above would overstate how done it is. Day 1 (scalar,
-          single-resolution): fill quality is coarse on a real photo until the
-          pyramid lands. */}
+          SHIPPED ON since v7.46 (`ih_patchmatch` is a "0" kill switch now —
+          see lib/patchmatch.ts). Its own section rather than a 4th slot in
+          the "Act on the selection" grid: it's a materially different, much
+          heavier operation than Delete. Still the single-resolution kernel —
+          large holes show soft smearing until the pyramid lands (ADR-018). */}
       {patchmatch && (
         <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
           <SectionHeader
             title="Remove Object"
-            info="Erases the selection and reconstructs it from the rest of the image (PatchMatch). Verification switch — day 1, single-resolution, so fill quality is still coarse on a full photo."
+            info="Erases the selection and rebuilds it from the rest of the image, on your device. Cover the whole object — a partial selection lets it rebuild the object from its own leftovers. Big areas can come out soft."
           />
           <ToolButton
             disabled={disabled || !selection.active}

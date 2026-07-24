@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.89",
+    date: "2026-07-24",
+    headline: "The Magic Eraser is live",
+    entries: [
+      { tag: "feature", text: "Brush over something you want gone and release — it's removed and filled in from the surrounding image, entirely on your device. No upload, no sign-in. You can also select the object first and hit Remove Object. One rule: cover the whole object — a partial stroke lets the fill rebuild it from its own leftovers. Large areas can come out soft for now; undo brings everything back, selection included." },
+      { tag: "fix", text: "A deploy bug meant some of the engine's newer machinery never actually reached the live site — the app's own safety checks quietly worked around the gap instead of crashing, which is why nobody noticed. Fixed: the full engine now ships, so features like the editing history that survives a reload finally work on the live site the way they always did in development." },
+      { tag: "rust", text: "The removal runs a PatchMatch kernel compiled into the WebAssembly engine. Undoing a removal restores the pixels and what you had selected, and the whole path is pinned by tests from two directions." },
+    ],
+  },
+  {
     version: "v0.9.88",
     date: "2026-07-24",
     headline: "See a selection before you make it",

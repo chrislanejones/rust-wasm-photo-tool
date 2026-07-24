@@ -102,15 +102,15 @@ export function AISettings({
   const mode = useToolStore((s) => s.eraserMode);
   const setMode = useToolStore((s) => s.setEraserMode);
   const activeModeInfo = ERASER_MODES.find((m) => m.id === mode)!;
-  // Magic Eraser — behind `ih_patchmatch` (see lib/patchmatch.ts), same
-  // verification-switch status as SelectSettings.tsx's Remove Object button,
-  // which this mode calls on release. Flag off: ERASER_MODES' static
-  // "Coming soon" text (below), unchanged from before this landed. Flag on:
-  // a real, still-caveated description — not "coming soon" once it's live.
+  // Magic Eraser — SHIPPED ON since v7.46; `ih_patchmatch` is a "0" kill
+  // switch (see lib/patchmatch.ts), and this mode calls the same
+  // remove_object that SelectSettings' Remove Object button does, on
+  // release. With the switch killed (or on a wasm build without the export)
+  // the tile falls back to ERASER_MODES' static "Coming soon" text below.
   const patchmatchEnabled = isPatchmatchEnabled();
   const headerInfo =
     mode === "magic" && patchmatchEnabled
-      ? "Drag over an unwanted object and release — it's selected and removed in one stroke (local PatchMatch, runs on your device, no sign-in). Verification switch — day 1, single-resolution, so fill quality is still coarse on a full photo."
+      ? "Brush over the whole unwanted object and release — it's selected and removed in one stroke, on your device, no sign-in. Cover all of it: a partial stroke lets the fill rebuild the object from its own leftovers. Big areas can come out soft."
       : activeModeInfo.info;
 
   const canRun = aiEnabled && !!activePhotoId && !!stampToolRef.current;
