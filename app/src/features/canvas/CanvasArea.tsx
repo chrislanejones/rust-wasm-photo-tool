@@ -28,6 +28,7 @@ import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useUIStore } from "@/stores/useUIStore";
+import { useToolStore } from "@/stores/useToolStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
 import { selectionCombineMode } from "@/lib/selectionBool";
@@ -582,6 +583,138 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // cursor badge. Always 0 when the `ih_selection_bool` kill switch is set
     // (selectionCombineMode reads the switch itself).
     const [combineIntent, setCombineIntent] = useState<0 | 1 | 2>(0);
+    // Ref mirror so the rAF preview closure (below) and the keyboard effect
+    // read the LIVE intent, not a stale render's. `setIntent` keeps both in
+    // step — the state drives the cursor re-render, the ref the async reads.
+    const combineIntentRef = useRef<0 | 1 | 2>(0);
+    const setIntent = useCallback((next: 0 | 1 | 2) => {
+      combineIntentRef.current = next;
+      setCombineIntent((cur) => (cur === next ? cur : next));
+    }, []);
+
+    // ── Hover preview: the "possible future region" a click WOULD grab ────────
+    // While the Select tool hovers with a modifier held (Shift=add/green,
+    // Alt=subtract/red), the region the current kind would select from the
+    // pixel under the cursor is previewed live — computed in the engine
+    // (`selection_preview`, non-committing) and blitted through a second
+    // overlay. rAF-coalesced so at most one flood runs per frame, and skipped
+    // when the cursor hasn't crossed into a new pixel. Perception only; a
+    // click commits and the real ants replace it.
+    const [previewMask, setPreviewMask] = useState<Uint8Array | null>(null);
+    const previewRafRef = useRef<number | null>(null);
+    const previewPixelRef = useRef<number>(-1);
+    const lastHoverRef = useRef<{ x: number; y: number } | null>(null);
+    const selectionKind = useToolStore((s) => s.selectionKind);
+    const selectionTolerance = useToolStore((s) => s.selectionTolerance);
+    const edgeThreshold = useToolStore((s) => s.edgeThreshold);
+    // Kind → engine code. Only the click-once kinds preview on hover; the
+    // lasso is anchor-based and the marquee is a drag (previewed separately).
+    const PREVIEW_KIND: Record<string, number> = {
+      wand: 0,
+      edge: 1,
+      colorRange: 2,
+    };
+    const previewKindCode =
+      selectionKind in PREVIEW_KIND ? PREVIEW_KIND[selectionKind] : null;
+
+    const clearPreview = useCallback(() => {
+      if (previewRafRef.current != null) {
+        cancelAnimationFrame(previewRafRef.current);
+        previewRafRef.current = null;
+      }
+      previewPixelRef.current = -1;
+      setPreviewMask((m) => (m === null ? m : null));
+    }, []);
+
+    // Compute the preview for the last-hovered pixel, coalesced to one per
+    // frame. Reads intent/kind/params at fire time so a mid-flight modifier
+    // change is honoured. Bails when there's nothing to show (no modifier, no
+    // kind, off-canvas, or mid-drag) — leaving any previous preview cleared.
+    const schedulePreview = useCallback(() => {
+      if (previewRafRef.current != null) return;
+      previewRafRef.current = requestAnimationFrame(() => {
+        previewRafRef.current = null;
+        const pt = lastHoverRef.current;
+        const tool = hookResult.toolRef.current;
+        const canvas = canvasRef.current;
+        const intent = combineIntentRef.current;
+        if (
+          !pt ||
+          !tool ||
+          !canvas ||
+          intent === 0 ||
+          previewKindCode == null ||
+          marqueeStartRef.current !== null
+        ) {
+          return;
+        }
+        const px = Math.round(pt.x);
+        const py = Math.round(pt.y);
+        if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) {
+          clearPreview();
+          return;
+        }
+        const pixel = py * canvas.width + px;
+        if (pixel === previewPixelRef.current) return; // same pixel — no rework
+        previewPixelRef.current = pixel;
+        const ov = tool.selection_preview(
+          pt.x,
+          pt.y,
+          previewKindCode,
+          selectionTolerance,
+          edgeThreshold,
+          intent,
+        );
+        setPreviewMask(ov && ov.length ? ov : null);
+      });
+    }, [hookResult, canvasRef, previewKindCode, selectionTolerance, edgeThreshold, clearPreview]);
+
+    // Modifier pressed/released WITHOUT moving the mouse: keep the intent,
+    // cursor badge and hover preview live off keydown/keyup while the Select
+    // tool is active (a hold-Shift over a stationary cursor should light the
+    // zone; a release should clear it).
+    useEffect(() => {
+      if (!selectionActive) return;
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key !== "Shift" && e.key !== "Alt") return;
+        const intent = selectionCombineMode({
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+        });
+        setIntent(intent);
+        if (intent !== 0 && previewKindCode != null && lastHoverRef.current) {
+          schedulePreview();
+        } else {
+          clearPreview();
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("keyup", onKey);
+      return () => {
+        window.removeEventListener("keydown", onKey);
+        window.removeEventListener("keyup", onKey);
+      };
+    }, [selectionActive, previewKindCode, setIntent, schedulePreview, clearPreview]);
+
+    // Leaving the Select tool, or switching to a kind with no hover preview
+    // (the lasso), drops any live zone and resets the intent so a stale
+    // green/red highlight can't linger.
+    useEffect(() => {
+      if (!selectionActive || previewKindCode == null) {
+        clearPreview();
+        setIntent(0);
+      }
+    }, [selectionActive, previewKindCode, clearPreview, setIntent]);
+
+    // Drop any pending frame on unmount.
+    useEffect(
+      () => () => {
+        if (previewRafRef.current != null) {
+          cancelAnimationFrame(previewRafRef.current);
+        }
+      },
+      [],
+    );
 
     const handlePanMouseDown = useCallback(
       (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1011,7 +1144,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         ? (e: React.MouseEvent<HTMLCanvasElement>) => {
             lassoMouseMove?.(e);
             const intent = selectionCombineMode(e);
-            if (intent !== combineIntent) setCombineIntent(intent);
+            setIntent(intent);
             const start = marqueeStartRef.current;
             if (start && marqueeActive) {
               const moved = Math.hypot(e.clientX - start.sx, e.clientY - start.sy);
@@ -1019,6 +1152,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 const p = toCanvasPoint(e);
                 if (p)
                   setMarqueeRect({ x0: start.x, y0: start.y, x1: p.x, y1: p.y });
+              }
+            } else {
+              // Not dragging: track the hover point and preview the future
+              // region under the cursor (only while a modifier is held and the
+              // kind is a click-once one — schedulePreview bails otherwise).
+              const p = toCanvasPoint(e);
+              lastHoverRef.current = p;
+              if (intent !== 0 && previewKindCode != null && p) {
+                schedulePreview();
+              } else {
+                clearPreview();
               }
             }
           }
@@ -1043,14 +1187,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               );
               setMarqueeRect(null);
             }
+            clearPreview(); // the commit becomes the real ants
             baseMouseUp?.();
           }
         : baseMouseUp;
     // Leaving the canvas mid-drag cancels the marquee (no commit) — matching
-    // how a crop drag dies at the edge rather than committing a guess.
+    // how a crop drag dies at the edge rather than committing a guess — and
+    // drops any hover preview so the zone doesn't hang off-canvas.
     const wrappedMouseLeave = () => {
       marqueeStartRef.current = null;
       if (marqueeRect) setMarqueeRect(null);
+      clearPreview();
       baseMouseUp?.();
     };
 
@@ -1105,6 +1252,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                       suppressSelectionClickRef.current = false;
                       return;
                     }
+                    clearPreview(); // the click's result becomes the real ants
                     onSelectionClick?.(e);
                   }
                 : undefined
@@ -1125,6 +1273,22 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           <LassoOverlay
             committed={lassoCommitted ?? null}
             preview={lassoPreview ?? null}
+            width={imgW}
+            height={imgH}
+            cssWidth={canvasCss?.w}
+            cssHeight={canvasCss?.h}
+            panOffset={panOffset}
+            zoom={zoom}
+          />
+        )}
+
+        {/* ── Hover preview: the "possible future region" (tinted, from Rust) ──
+            Rendered BEFORE the committed ants so the real selection paints on
+            top of the green/red zone. Same blit path as the ants; the engine
+            already tinted it. Perception only — cleared on click/leave. */}
+        {previewMask && previewMask.length > 0 && selectionActive && (
+          <SelectionOverlay
+            mask={previewMask}
             width={imgW}
             height={imgH}
             cssWidth={canvasCss?.w}

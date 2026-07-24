@@ -50,6 +50,46 @@ pub(crate) fn selection_overlay_rgba(mask: &[bool], w: usize, h: usize) -> Vec<u
     }
     out
 }
+
+/// Tinted "possible future region" overlay for the hover preview — a filled
+/// translucent zone (NOT marching ants), so it reads as a soft highlight of
+/// where a click would land rather than a committed selection. `tint`:
+/// 1 = add (green), 2 = subtract (red), anything else = neutral (blue).
+/// Boundary pixels get a stronger alpha so the zone keeps a legible edge over
+/// any image. Same boundary rule as `selection_overlay_rgba`.
+pub(crate) fn preview_overlay_rgba(mask: &[bool], w: usize, h: usize, tint: u8) -> Vec<u8> {
+    let [r, g, b] = match tint {
+        1 => [34u8, 197, 94], // green — add
+        2 => [239, 68, 68],   // red — subtract
+        _ => [64, 140, 255],  // blue — neutral (plain replace)
+    };
+    const FILL_A: u8 = 70;
+    const EDGE_A: u8 = 210;
+    let mut out = vec![0u8; w * h * 4];
+    if w == 0 || h == 0 {
+        return out;
+    }
+    let sel = |x: usize, y: usize| mask[y * w + x];
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            if !mask[i] {
+                continue;
+            }
+            let boundary = x == 0
+                || y == 0
+                || x + 1 == w
+                || y + 1 == h
+                || !sel(x - 1, y)
+                || !sel(x + 1, y)
+                || !sel(x, y - 1)
+                || !sel(x, y + 1);
+            let a = if boundary { EDGE_A } else { FILL_A };
+            out[i * 4..i * 4 + 4].copy_from_slice(&[r, g, b, a]);
+        }
+    }
+    out
+}
 /// 4-connected flood fill from `start` over `buf`, taking every pixel within
 /// `tol` (per channel) of the seed colour. When `edges` is `Some((map, wall))`
 /// the fill also refuses to cross a pixel whose edge strength exceeds `wall` —
@@ -207,6 +247,60 @@ impl ImageHorseTool {
         Some(fy as usize * w + fx as usize)
     }
 
+    /// The raw boolean mask a click-once selection KIND would produce from the
+    /// pixel at `(x, y)` — the shared core behind both the committing
+    /// producers (`magic_wand_select` &c.) and the non-committing hover
+    /// preview (`selection_preview`), so the two can never disagree about what
+    /// a click would grab. `kind`: 0 = wand (flood within tolerance),
+    /// 1 = edge-aware (same flood, walled by the Sobel map at `edge_threshold`),
+    /// 2 = color range (every pixel within tolerance, anywhere). `None` when
+    /// the click is out of bounds / the image is empty — callers preserve
+    /// their no-op-on-OOB behaviour by short-circuiting on it.
+    fn selection_mask_for(
+        &self,
+        kind: u8,
+        x: f64,
+        y: f64,
+        tolerance: u32,
+        edge_threshold: u32,
+    ) -> Option<Vec<bool>> {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let start = self.seed_index(x, y)?;
+        let tol = tolerance as i32;
+        Some(match kind {
+            1 => {
+                let edges = crate::edges::sobel_magnitude(&self.composite_cache, w, h);
+                flood_select(
+                    &self.composite_cache,
+                    w,
+                    h,
+                    start,
+                    tol,
+                    Some((&edges, edge_threshold.min(255) as u8)),
+                )
+            }
+            2 => {
+                let buf = &self.composite_cache;
+                let t = [
+                    buf[start * 4] as i32,
+                    buf[start * 4 + 1] as i32,
+                    buf[start * 4 + 2] as i32,
+                    buf[start * 4 + 3] as i32,
+                ];
+                let mut mask = vec![false; w * h];
+                for (i, m) in mask.iter_mut().enumerate() {
+                    let c = &buf[i * 4..i * 4 + 4];
+                    *m = (c[0] as i32 - t[0]).abs() <= tol
+                        && (c[1] as i32 - t[1]).abs() <= tol
+                        && (c[2] as i32 - t[2]).abs() <= tol
+                        && (c[3] as i32 - t[3]).abs() <= tol;
+                }
+                mask
+            }
+            _ => flood_select(&self.composite_cache, w, h, start, tol, None),
+        })
+    }
+
     // ── Boolean-selection combine core (private; not wasm-exported) ─────────
     // One PURE implementation over `&[bool]` slices; the wasm exports
     // (`selection_union`/`selection_subtract`) convert their `&[u8]` argument
@@ -264,11 +358,9 @@ impl ImageHorseTool {
     /// clicked pixel. Stores the mask; returns a canvas-sized RGBA overlay for the
     /// JS selection layer to draw. Empty Vec if the click is out of bounds.
     pub fn magic_wand_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
-        let (w, h) = (self.width as usize, self.height as usize);
-        let Some(start) = self.seed_index(x, y) else {
+        let Some(mask) = self.selection_mask_for(0, x, y, tolerance, 0) else {
             return Vec::new();
         };
-        let mask = flood_select(&self.composite_cache, w, h, start, tolerance as i32, None);
         self.apply_produced_selection(mask, "Magic Wand")
     }
 
@@ -291,19 +383,9 @@ impl ImageHorseTool {
         tolerance: u32,
         edge_threshold: u32,
     ) -> Vec<u8> {
-        let (w, h) = (self.width as usize, self.height as usize);
-        let Some(start) = self.seed_index(x, y) else {
+        let Some(mask) = self.selection_mask_for(1, x, y, tolerance, edge_threshold) else {
             return Vec::new();
         };
-        let edges = crate::edges::sobel_magnitude(&self.composite_cache, w, h);
-        let mask = flood_select(
-            &self.composite_cache,
-            w,
-            h,
-            start,
-            tolerance as i32,
-            Some((&edges, edge_threshold.min(255) as u8)),
-        );
         self.apply_produced_selection(mask, "Edge Select")
     }
 
@@ -313,27 +395,37 @@ impl ImageHorseTool {
     /// one click grabs all the sky, or every instance of a logo colour, without
     /// shift-clicking each island.
     pub fn color_range_select(&mut self, x: f64, y: f64, tolerance: u32) -> Vec<u8> {
-        let (w, h) = (self.width as usize, self.height as usize);
-        let Some(start) = self.seed_index(x, y) else {
+        let Some(mask) = self.selection_mask_for(2, x, y, tolerance, 0) else {
             return Vec::new();
         };
-        let buf = &self.composite_cache;
-        let t = [
-            buf[start * 4] as i32,
-            buf[start * 4 + 1] as i32,
-            buf[start * 4 + 2] as i32,
-            buf[start * 4 + 3] as i32,
-        ];
-        let tol = tolerance as i32;
-        let mut mask = vec![false; w * h];
-        for (i, m) in mask.iter_mut().enumerate() {
-            let c = &buf[i * 4..i * 4 + 4];
-            *m = (c[0] as i32 - t[0]).abs() <= tol
-                && (c[1] as i32 - t[1]).abs() <= tol
-                && (c[2] as i32 - t[2]).abs() <= tol
-                && (c[3] as i32 - t[3]).abs() <= tol;
-        }
         self.apply_produced_selection(mask, "Color Range")
+    }
+
+    /// Non-committing preview of the region a click-once selection would grab
+    /// from `(x, y)` — the hover "possible future region". Computes the SAME
+    /// mask the committing producer would (`selection_mask_for`), then returns
+    /// a tinted FILLED overlay (`tint`: 1 = add/green, 2 = subtract/red, else
+    /// neutral/blue). Takes `&self` and touches neither the stored selection
+    /// nor history — it is purely a perception aid. Empty Vec when out of
+    /// bounds or the region is empty (nothing to preview). `kind`: 0 = wand,
+    /// 1 = edge-aware, 2 = color range (the lasso is anchor-based — no hover
+    /// preview — and the marquee is a drag, previewed JS-side).
+    pub fn selection_preview(
+        &self,
+        x: f64,
+        y: f64,
+        kind: u8,
+        tolerance: u32,
+        edge_threshold: u32,
+        tint: u8,
+    ) -> Vec<u8> {
+        let Some(mask) = self.selection_mask_for(kind, x, y, tolerance, edge_threshold) else {
+            return Vec::new();
+        };
+        if !mask.iter().any(|&b| b) {
+            return Vec::new();
+        }
+        preview_overlay_rgba(&mask, self.width as usize, self.height as usize, tint)
     }
 
     /// Rectangular marquee select over the drag rect `(x0,y0)-(x1,y1)` in

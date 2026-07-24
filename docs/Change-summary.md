@@ -2105,3 +2105,31 @@ tests pass (incl. 13 marquee + 8 history); `tsc --noEmit` clean, eslint 0
 errors / 61 warnings, 198/198 vitest, production build succeeds. Shipped WASM
 743,834 B (+7,969 over v7.43 — marquee producers, selection-carrying
 snapshots, history labels).
+
+## v7.45 — 2026-07-24
+
+**See what a selection will grab before you commit to it.** Pick the Select
+tool, hover over the image, and hold a modifier: the region a click *would*
+select lights up as a filled zone — green while you hold Shift (what you'd
+add), red while you hold Alt (what you'd subtract). It re-floods live from
+the pixel under the cursor as you move. Click and it commits; the zone
+becomes the real marching ants. Let go of the key or move off the image and
+it clears. It changes nothing on its own — it's there so you can aim.
+
+Works for the Wand, Edge-aware, and Color Range kinds (the magnetic lasso is
+anchor-based, so it has no hover preview). The preview runs the *same* flood
+the actual click runs — computed in the engine, read-only, so it can't drift
+from what you'll get and never touches your selection or your undo history.
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | Hover "possible future region" preview — green (Shift/add) / red (Alt/subtract) filled zone of what a click would select, live under the cursor | Complete — Wand / Edge / Color Range |
+| 2   | New engine `selection_preview` (read-only, non-committing) on a shared `selection_mask_for` core the committing producers now share — preview and click can't diverge | Complete — 6 engine tests |
+| 3   | Recompute throttled to one flood per frame, gated on a held modifier, skipped when the cursor hasn't crossed into a new pixel | Complete |
+| 4   | Enforcement: the trail-log commit squares (`marketing/src/data/commits.ts`) are now a required, gated part of the release routine so they can't go stale | Complete — tooling |
+
+**Verified**: `cargo fmt --check` clean, clippy `-D warnings` clean, engine
+tests pass (incl. 6 preview); `tsc --noEmit` clean, eslint 0 errors / 61
+warnings, 198/198 vitest, app + marketing production builds succeed. Shipped
+WASM 745,691 B (+1,857 over v7.44 — the preview export and its shared mask
+core).

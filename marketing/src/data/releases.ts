@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.88",
+    date: "2026-07-24",
+    headline: "See a selection before you make it",
+    entries: [
+      { tag: "feature", text: "With the Select tool, hover over the image and hold a modifier: the region a click would select lights up as a filled zone — green while you hold Shift (what you'd add), red while you hold Alt (what you'd subtract). It re-floods live from the pixel under your cursor. Click and it commits; the zone becomes the real selection. Purely there to help you aim — it changes nothing on its own." },
+      { tag: "feature", text: "Works for the wand, the edge-aware wand, and color range (the magnetic lasso is anchor-based, so it has no hover preview). The preview runs the exact same flood the real click runs, so what you see is what you get." },
+      { tag: "rust", text: "The preview is a new read-only engine call that shares one mask core with the committing selection, so the two can never disagree about what a click grabs. It touches neither your selection nor your undo history, and the recompute is throttled to one flood per frame." },
+    ],
+  },
+  {
     version: "v0.9.87",
     date: "2026-07-23",
     headline: "Select gets its own button — and stops lying about its size",

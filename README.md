@@ -70,13 +70,11 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.44 — 2026-07-23
+### v7.45 — 2026-07-24
 
-**Select is a real tool now.** It used to hide inside "Adjust & Select" behind a Click-to-select toggle you had to arm before the canvas would respond. It has its own button now — press `S` — and the canvas just works: click to select with the wand, edge-aware wand, color range, or magnetic lasso; drag to sweep a rectangle or ellipse marquee. Hold Shift to add to a selection, Alt to cut away from it — the cursor shows a little + or − so you know what you're about to do. Adjust went back to being just crop and transform.
+**See what a selection will grab before you commit.** With the Select tool, hover over the image and hold a modifier: the region a click *would* select lights up as a filled zone — green while you hold Shift (what you'd add), red while you hold Alt (what you'd subtract). It re-floods live from the pixel under your cursor as you move. Click and it commits; the zone turns into the real marching ants. Let go of the key, or move off the image, and it clears. It's purely there to help you aim — nothing about it changes the picture or your selection.
 
-**The marching ants were lying to you.** On any photo bigger than the window, the selection outline drew two to three times larger than the actual selection — the overlay was sized to the image's raw pixels while the canvas was scaled to fit. The selection underneath was always correct; only the outline was wrong. Fixed, along with the lasso wire, which had the same bug.
-
-**Every selection is now a step in History.** Each select, add, subtract, Select All, and Deselect shows up named in the History panel and undoes with Ctrl+Z like anything else. Undoing a Delete Selection or a Cut-to-layer brings back what you had selected, not just the pixels. Clicking the same thing twice doesn't clutter your history — a click that changes nothing records nothing.
+It works for the wand, the edge-aware wand, and color range (the magnetic lasso is anchor-based, so it has no hover preview). The preview runs the exact same flood the real click runs — computed in the engine, read-only — so what you see is what you'll get, and it never touches your undo history.
 
 ## License
 

@@ -908,6 +908,20 @@ declare module "stamp_tool" {
      *  `tolerance` of the clicked colour, anywhere in the image — not just the
      *  connected blob the wand reaches. */
     color_range_select(x: number, y: number, tolerance: number): Uint8Array;
+    /** Non-committing hover preview: the tinted FILLED overlay of the region a
+     *  click-once kind WOULD grab from (x,y), computed with the same mask core
+     *  as the committing producer so the two can't drift. Touches neither the
+     *  stored selection nor history. `kind`: 0 wand, 1 edge-aware, 2 color
+     *  range. `tint`: 1 add (green), 2 subtract (red), else neutral (blue).
+     *  Empty when out of bounds or the region is empty. */
+    selection_preview(
+      x: number,
+      y: number,
+      kind: number,
+      tolerance: number,
+      edge_threshold: number,
+      tint: number,
+    ): Uint8Array;
     /** Rectangular marquee over the drag rect (any corner order, canvas px).
      *  Normalised, snapped outward (floor/ceil), clamped to the canvas; rides
      *  the same combine pipeline as every producer. A degenerate or fully
