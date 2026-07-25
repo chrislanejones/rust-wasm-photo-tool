@@ -31,7 +31,10 @@ async function decodePngToRgba(
   return { rgba, w, h };
 }
 
-export async function importOra(
+/** Internal — the parse+load half of `importOraAsNewPhoto`. Module-private on
+ *  purpose: nothing outside this file consumed it, and a narrower surface is
+ *  the point. Still very much alive; `importOraAsNewPhoto` calls it twice. */
+async function importOra(
   file: File | Blob,
   tool: ImageHorseTool,
 ): Promise<void> {
