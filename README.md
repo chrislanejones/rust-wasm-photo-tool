@@ -70,13 +70,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.48 — 2026-07-25
+### v7.49 — 2026-07-25
 
-**Nothing here changes what the app does. The point is that less can go wrong.**
+**Nothing user-visible changes. The engine's JavaScript side got taken apart and put back together where the names make sense.**
 
-Undo and redo can no longer take the editor down. Six places in the image engine assumed the edit history was present rather than checking; none of them could actually fire today, but they sat far enough from the check that one careless edit would have turned a dead assumption into a crash mid-edit. They check now, and fall back to the ordinary undo if the history isn't there.
+For most of this app's life, one 1,467-line hook owned everything the image engine does — because the app started as a clone stamp tool, and every feature since squatted in the hook that held the engine. It's now six files: the engine core (loading, state, the zero-copy paint path), history, layers, export, transforms — and the clone stamp itself, which is finally just the clone stamp, at 229 lines.
 
-**The build can no longer lie about what shipped.** For five weeks the live site served an image engine missing half its machinery, and nothing caught it — the app quietly worked around the gap instead of failing, so every build looked fine. There is now a check that fetches the *running* site's engine, looks inside it, and fails if it is the wrong one. The project's own code checks went from advisory to blocking in the same pass: they can fail the build now, rather than printing a complaint nobody reads.
+Nothing moved but code. Every edit path was verified against the built app from a fresh profile: paint, undo and redo byte-exact in both directions, layers, flips exact, export produced a real file on disk, and a reload restored the session pixel-for-pixel.
 
 ## License
 

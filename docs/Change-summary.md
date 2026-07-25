@@ -2227,3 +2227,34 @@ vitest (6 new); production build succeeds. Deploy sentinel and the guardrails
 ratchet were each tested in BOTH directions — passing at baseline and failing
 when they should. Engine **753,713 → 753,582 B (−131)**: the panic machinery the
 six unwraps were emitting.
+
+## v7.49 — 2026-07-25
+
+The clonestamp-split: `useCloneStamp.ts` (1,467 LOC, ~62 returned callbacks,
+17 importers, fallow's #3 refactoring target) decomposed into domain hooks.
+Behavior-preserving — no logic changes, no features, one domain per commit
+with all gates green between commits.
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | `useEngineCore` — engine lifecycle, refs, state mirror, zero-copy flush, all four load/restore paths, brush params. `loadFromSaved` moved VERBATIM (111 cyclomatic — its own session) | Complete |
+| 2   | `useHistory` — undo/redo/jump/delete/clear + the Ctrl+Z binding | Complete |
+| 3   | `useLayers` — full stack surface incl. non-destructive masks | Complete |
+| 4   | `useExport` — png/lossy exports + Rust-scaled thumbnails | Complete |
+| 5   | `useTransforms` — geometry, adjustments, cross-photo copy/paste | Complete |
+| 6   | `useCloneStamp` becomes a 229-line facade: composes the five, returns the identical 62-key surface — **zero importer churn** | Complete |
+
+**Proofs, not vibes**: fallow — useCloneStamp off the target list entirely
+(was #3), useEngineCore not in the top 10 (the debt is quarantined in
+loadFromSaved); dupes unchanged at 60 (verbatim moves relocate clones, they
+don't dissolve them). Artifact smoke from a fresh profile against the
+production build: 12-sample load, paint, undo/redo **byte-exact both
+directions** (checksums 1550871 ⇄ 1549238 ⇄ 1550203), layer add + visibility
+toggle exact, Flip-H involution exact, export produced a real 383,297-byte
+JPG on disk, reload + Resume restored **checksum-identical** pixels. Zero
+console errors. Gates on every commit: tsc, eslint 0 errors (61→59
+warnings), 211/211 vitest, build:all.
+
+**Deferred** (PARKING_LOT): step 2 — the zustand engine store + CanvasArea
+memoization with a render-count proof. Bigger than all five extractions
+combined and touches the files the toolbar arc is reshaping.

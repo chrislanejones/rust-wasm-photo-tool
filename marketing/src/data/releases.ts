@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.92",
+    date: "2026-07-25",
+    headline: "The clone stamp is finally just the clone stamp",
+    entries: [
+      { tag: "infra", text: "Nothing user-visible changes in this one. For most of this app's life, a single 1,467-line file owned everything the image engine does — because the app started as a clone stamp tool, and every feature since moved into the file that held the engine. It's now six files with honest names: the engine core, history, layers, export, transforms, and the clone stamp itself at 229 lines." },
+      { tag: "infra", text: "Nothing moved but code, and that claim was tested against the built app from a fresh profile: paint, undo and redo byte-exact in both directions, layer add and visibility toggles exact, flips exact, export produced a real file on disk, and a reload restored the session pixel-for-pixel." },
+    ],
+  },
+  {
     version: "v0.9.91",
     date: "2026-07-25",
     headline: "Nothing changes — less can go wrong",
