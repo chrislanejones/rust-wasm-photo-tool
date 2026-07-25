@@ -94,7 +94,7 @@ import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 import { makeThumbnail, makeThumbnailFromPixels } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
-import { useToolStore } from "@/stores/useToolStore";
+import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useGuidesStore } from "@/stores/useGuidesStore";
@@ -143,7 +143,8 @@ import {
 const TOOL_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {
   compress: { keys: "1", label: "compress" },
   crop: { keys: "2", label: "adjust" },
-  select: { keys: "S", label: "select" },
+  // `select` has no entry: the tool is keyless until the selection-tools UI
+  // rework, so the status bar must not advertise a key that does nothing.
   brush: { keys: "3", label: "brush" },
   text: { keys: "4", label: "text" },
   arrow: { keys: "5", label: "arrow" },
@@ -1074,11 +1075,9 @@ export function AppShell() {
   const setSelectionTolerance = useToolStore((s) => s.setSelectionTolerance);
   const selectionMask = useToolStore((s) => s.selectionMask);
   // Which engine call a canvas click makes (wand / edge-aware / colour range /
-  // lasso), and which shape a drag sweeps (rect / ellipse).
+  // lasso / rect / ellipse) — one exclusive mode, gesture included.
   const selectionKind = useToolStore((s) => s.selectionKind);
   const setSelectionKind = useToolStore((s) => s.setSelectionKind);
-  const selectionShape = useToolStore((s) => s.selectionShape);
-  const setSelectionShape = useToolStore((s) => s.setSelectionShape);
   const edgeThreshold = useToolStore((s) => s.edgeThreshold);
   const setEdgeThreshold = useToolStore((s) => s.setEdgeThreshold);
 
@@ -2717,8 +2716,6 @@ export function AppShell() {
             selection={{
               tolerance: selectionTolerance,
               onToleranceChange: setSelectionTolerance,
-              shape: selectionShape,
-              onShapeChange: setSelectionShape,
               onSelectAll: handleSelectAll,
               onDeselect: handleDeselect,
               onDelete: handleDeleteSelection,
@@ -2953,12 +2950,16 @@ export function AppShell() {
                       }
                       selectionWidth={stamp.state.width}
                       selectionHeight={stamp.state.height}
-                      // Drag = marquee for the click-once kinds; the lasso kind
-                      // keeps drags to itself (its clicks are session anchors).
+                      // Drag = marquee for the two marquee modes ONLY. The
+                      // click-once kinds and the lasso no longer sweep one:
+                      // since v7.47 the mode picks the gesture, so a stray drag
+                      // in Wand can't quietly produce a rectangle.
                       marqueeActive={
-                        activeTool === "select" && selectionKind !== "lasso"
+                        activeTool === "select" && isMarqueeKind(selectionKind)
                       }
-                      marqueeShape={selectionShape}
+                      marqueeShape={
+                        isMarqueeKind(selectionKind) ? selectionKind : "rect"
+                      }
                       onMarqueeCommit={handleMarqueeCommit}
                       // Magnetic lasso: a session-based kind, so it gets the
                       // kind-specific gate the click-once kinds don't need.

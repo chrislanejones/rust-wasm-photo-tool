@@ -1,33 +1,41 @@
 // The Select TOOL's panel. Was the Select sub-mode of "Adjust & Select"
 // (tool-arc 2.6) until the split: two tools were wearing one id, and the
 // "Click-to-select" arming toggle was the visible seam. Now picking the tool
-// IS the arming — a canvas click fires the active kind immediately, and a
-// canvas DRAG sweeps a marquee (rect or ellipse, the shape control below).
+// IS the arming, and picking a MODE decides the gesture.
+//
+// Six modes, ONE exclusive set (v7.47, ADR-022 superseding ADR-021). It used
+// to be two axes — a 4-way kind for clicks and a 2-way shape for drags, both
+// live at once — which is strictly more capable and read as two unrelated
+// groups nobody could tell apart. Exclusivity costs a mode switch before a
+// marquee and buys a panel you can understand at a glance.
 //
 // Everything that decides WHAT is selected lives here. The magic wand moved in
 // from Layer Settings — it was always a selection tool, it just happened to be
-// parked next to Move/Resize-Layer. All kinds and both marquee shapes end in
-// the same place: an engine call returning a canvas-sized overlay, stored as
-// the one selection mask. Downstream (Delete, Deselect, New Layer, the
-// overlay blit) never learns which kind produced it.
+// parked next to Move/Resize-Layer. All six modes end in the same place: an
+// engine call returning a canvas-sized overlay, stored as the one selection
+// mask. Downstream (Delete, Deselect, New Layer, the overlay blit) never
+// learns which mode produced it.
 //
-//   Wand        — 4-connected flood fill within tolerance. Leaks through soft
-//                 gradients, which is exactly what the next one fixes.
-//   Edge-aware  — the same fill, walled in by the Sobel edge map (src/edges.rs).
-//                 The shared core: the magnetic lasso and Smart Brush walk these
-//                 same edges, so "what is an edge" stays one definition.
-//   Color Range — every pixel within tolerance of the clicked colour, anywhere
-//                 in the image (Photoshop's Select → Color Range). One click
-//                 takes all the sky, not just the connected patch of it.
-//   Magnetic    — the lasso (src/livewire.rs): click anchors, the wire
-//                 path-finds along the edges between them, double-click closes.
-//                 Shipped by default since the selection-tool overhaul — the
-//                 `ih_smart_edge` switch now gates ONLY the Paint Smart Brush
-//                 (see lib/smartEdge.ts).
+//   Wand           — 4-connected flood fill within tolerance. Leaks through
+//                    soft gradients, which is exactly what the next one fixes.
+//   Edge-aware     — the same fill, walled in by the Sobel edge map
+//                    (src/edges.rs). The shared core: the magnetic lasso and
+//                    Smart Brush walk these same edges, so "what is an edge"
+//                    stays one definition.
+//   Magnetic Lasso — src/livewire.rs: click anchors, the wire path-finds along
+//                    the edges between them, double-click closes. Shipped by
+//                    default since the selection-tool overhaul — the
+//                    `ih_smart_edge` switch now gates ONLY the Paint Smart
+//                    Brush (see lib/smartEdge.ts).
+//   Color Range    — every pixel within tolerance of the clicked colour,
+//                    anywhere in the image (Photoshop's Select → Color Range).
+//                    One click takes all the sky, not just the connected patch.
+//   Rectangle      — drag-swept marquee rect. Ignores clicks.
+//   Ellipse        — the ellipse inscribed in that drag rect. Ignores clicks.
 //
-// The sub-mode selector is the shared ToolModeToggle (the Paint panel's
-// template): stacked icon tiles on top, the active kind's title + lightbulb
-// info below, then the kind's settings — do not fork the layout.
+// The mode selector is the shared ToolModeToggle (the Paint panel's template):
+// stacked icon tiles on top, the active mode's title + lightbulb info below,
+// then that mode's settings — do not fork the layout.
 import {
   BoxSelect,
   SquareDashed,
@@ -35,27 +43,24 @@ import {
   Trash2,
   Wand2,
   Blend,
-  Lasso,
+  Magnet,
   Eraser,
   CopyPlus,
   Scissors,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
-import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SizeSlider } from "@/components/SizeSlider";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
-import type { SelectionKind, SelectionShape } from "@/stores/useToolStore";
+import type { SelectionKind } from "@/stores/useToolStore";
+import { isMarqueeKind } from "@/stores/useToolStore";
 
 /** Controls for the selection tools. Shared with the parent tool panel. */
 export interface SelectionControls {
   tolerance: number;
   onToleranceChange: (v: number) => void;
-  /** Marquee shape a canvas DRAG sweeps out (clicks fire `kind` instead). */
-  shape: SelectionShape;
-  onShapeChange: (s: SelectionShape) => void;
   onSelectAll: () => void;
   onDeselect: () => void;
   onDelete: () => void;
@@ -78,7 +83,7 @@ export interface SelectionControls {
   onEdgeThresholdChange: (v: number) => void;
 }
 
-/** The four selection kinds, in ToolModeToggle shape. Exported because the
+/** All six selection modes, in ToolModeToggle shape. Exported because the
  *  command palette offers each one as a jump-to entry — one list, so the panel
  *  and the palette can't end up describing them differently. `info` stays a
  *  plain string (narrowed below) because the palette indexes it as a search
@@ -99,16 +104,28 @@ export const SELECT_MODES: readonly (ToolMode<SelectionKind> & {
     info: "The wand, but it stops at object outlines instead of leaking through soft gradients.",
   },
   {
+    id: "lasso",
+    label: "Magnetic Lasso",
+    icon: Magnet,
+    info: "Click anchors around an object; the wire snaps to the edge between them. Double-click to close, Esc to cancel.",
+  },
+  {
     id: "colorRange",
     label: "Color Range",
     icon: BoxSelect,
     info: "Takes every pixel of that colour anywhere in the image — not just the patch you clicked.",
   },
   {
-    id: "lasso",
-    label: "Magnetic",
-    icon: Lasso,
-    info: "Click anchors around an object; the wire snaps to the edge between them. Double-click to close, Esc to cancel.",
+    id: "rect",
+    label: "Rectangle",
+    icon: SquareDashed,
+    info: "Drag a rectangle. This one ignores clicks — press, drag, release.",
+  },
+  {
+    id: "ellipse",
+    label: "Ellipse",
+    icon: CircleDashed,
+    info: "Drag the ellipse inscribed in the box you sweep. Ignores clicks — press, drag, release.",
   },
 ];
 
@@ -120,18 +137,16 @@ const PANEL_MODES: readonly ToolMode<SelectionKind>[] = SELECT_MODES.map(
     ...m,
     info: (
       <>
-        {m.info} Click the canvas to select; drag for a marquee.{" "}
+        {m.info}{" "}
+        {isMarqueeKind(m.id)
+          ? "Press, drag and release on the canvas."
+          : "Click the canvas to select."}{" "}
         <kbd>Alt+A</kbd> selects all, <kbd>Alt+D</kbd> deselects.
       </>
     ),
   }),
 );
 
-/** Marquee shapes for the drag gesture, in ToolButtonGroup shape. */
-const SHAPE_OPTIONS: { id: SelectionShape; label: string; icon: typeof SquareDashed }[] = [
-  { id: "rect", label: "Rect", icon: SquareDashed },
-  { id: "ellipse", label: "Ellipse", icon: CircleDashed },
-];
 
 export function SelectSettings({
   disabled,
@@ -144,33 +159,32 @@ export function SelectSettings({
 
   return (
     <div className="space-y-4">
-      {/* ── How a click selects: the 2×2 kind toggle ─────────────────────
-          Each kind's description lives in its lightbulb (ToolModeToggle's
+      {/* ── The mode: one exclusive 3×2 grid of all six ──────────────────
+          Three columns to match the Selection grid below, so the panel reads
+          as two grids of the same shape rather than four unrelated clusters.
+          Each mode's description lives in its lightbulb (ToolModeToggle's
           SectionHeader), never a permanent paragraph. */}
       <ToolModeToggle
         modes={PANEL_MODES}
-        columns={2}
+        columns={3}
         activeMode={selection.kind}
         onModeChange={selection.onKindChange}
         disabled={disabled}
       >
         {(kind) => (
           <>
-            <ToolButtonGroup
-              label="Drag shape"
-              options={SHAPE_OPTIONS}
-              value={selection.shape}
-              onChange={selection.onShapeChange}
-              columns={2}
-            />
-
-            <SizeSlider
-              label="Tolerance"
-              value={selection.tolerance}
-              min={0}
-              max={120}
-              onChange={selection.onToleranceChange}
-            />
+            {/* Tolerance drives the flood/colour-match kinds only. The marquee
+                kinds sweep pure geometry, so it is hidden for them rather than
+                shown disabled — same rule as Edge sensitivity below. */}
+            {!isMarqueeKind(kind) && (
+              <SizeSlider
+                label="Tolerance"
+                value={selection.tolerance}
+                min={0}
+                max={120}
+                onChange={selection.onToleranceChange}
+              />
+            )}
             {/* Only meaningful for the edge-aware wand — hidden otherwise
                 rather than shown disabled, so the panel doesn't grow dead
                 controls. */}

@@ -123,18 +123,27 @@ describe("TOOL_BY_KEY agrees with toolConfig.ts (one contract, stated twice)", (
   // claim is actually checked. If someone adds/reorders a tool in one table
   // without the other, tool keys and the sidebar/palette shortcut hints
   // silently disagree about which key does what.
-  /** shortcutKey → e.code: digits are DigitN, letters are KeyX (S arrived
-   *  when Select split out and the digit row was already full). */
+  /** shortcutKey → e.code: digits are DigitN, letters are KeyX. */
   const toCode = (k: string) => (/^\d$/.test(k) ? `Digit${k}` : `Key${k}`);
 
-  it("every tool's shortcutKey resolves through TOOL_BY_KEY to that same tool", () => {
-    for (const tool of TOOLS) {
+  /** `shortcutKey` is optional — a tool may ship keyless (Select currently is,
+   *  pending the selection-tools UI rework). Keyless tools are held to the
+   *  opposite contract: they must be ABSENT from TOOL_BY_KEY, which the
+   *  set-equality test below enforces. */
+  const keyed = TOOLS.filter(
+    (t): t is typeof t & { shortcutKey: string } => !!t.shortcutKey,
+  );
+
+  it("every keyed tool's shortcutKey resolves through TOOL_BY_KEY to that same tool", () => {
+    for (const tool of keyed) {
       expect(TOOL_BY_KEY[toCode(tool.shortcutKey)]).toBe(tool.id);
     }
   });
 
-  it("has no entries beyond what toolConfig.ts's eleven tools define", () => {
-    const expectedCodes = new Set(TOOLS.map((t) => toCode(t.shortcutKey)));
+  it("has no entries beyond what toolConfig.ts's keyed tools define", () => {
+    // Doubles as the keyless guard: a tool with no shortcutKey contributes no
+    // expected code, so binding it in TOOL_BY_KEY fails here as an extra entry.
+    const expectedCodes = new Set(keyed.map((t) => toCode(t.shortcutKey)));
     expect(new Set(Object.keys(TOOL_BY_KEY))).toEqual(expectedCodes);
   });
 });

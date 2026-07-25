@@ -38,30 +38,51 @@ export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
 export type ResizeMode = "compress" | "resize";
-/** Marquee shape a Select-tool DRAG sweeps out (clicks fire the
- *  `SelectionKind` instead): the rect, or the ellipse inscribed in it.
- *  Transient like the rest of selection state — not persisted. */
+/** Marquee shape a `rect`/`ellipse` drag sweeps out. Derived from the active
+ *  `SelectionKind` now rather than stored beside it — see the note there. */
 export type SelectionShape = "rect" | "ellipse";
-/** How a canvas click selects, in the Select tool.
+/** The Select tool's mode — ONE mutually-exclusive set of six.
+ *
+ *  Until v7.47 this was two orthogonal axes (a 4-way "kind" for clicks, a
+ *  2-way "shape" for drags), so a wand click and a rect drag were both live at
+ *  once. That was deliberate (ADR-021 rejected marquee-as-a-tile to avoid
+ *  mode-switching for the commonest gesture) but it read as two unrelated
+ *  groups in the panel and nobody could tell the axes apart. Collapsed here
+ *  into one exclusive list; ADR-022 supersedes 021 with the reasoning.
+ *
+ *  Click-once — a canvas click resolves the whole selection:
  *  - `wand`       — 4-connected flood fill within tolerance (the original).
  *  - `edge`       — same fill, but walled in by the Sobel edge map so it stops
  *                   at the object outline instead of leaking through gradients.
  *  - `colorRange` — every pixel within tolerance of the clicked colour anywhere
  *                   in the image (Photoshop's Select → Color Range).
+ *  Session — many clicks, then a close:
  *  - `lasso`      — magnetic lasso: click anchors, the wire path-finds along the
- *                   edges between them, double-click closes. Unlike the other
- *                   three this is NOT click-once — it's a session (begin →
- *                   commit* → close). Shipped by default since the
- *                   selection-tool overhaul (`ih_smart_edge` now gates only
- *                   the Paint Smart Brush; see lib/smartEdge.ts). */
-export type SelectionKind = "wand" | "edge" | "colorRange" | "lasso";
+ *                   edges between them, double-click closes (begin → commit* →
+ *                   close). `ih_smart_edge` now gates only the Paint Smart
+ *                   Brush; see lib/smartEdge.ts.
+ *  Drag — a press-drag-release sweeps the marquee, and a click does nothing:
+ *  - `rect`       — the drag rectangle.
+ *  - `ellipse`    — the ellipse inscribed in that rectangle. */
+export type SelectionKind =
+  | "wand"
+  | "edge"
+  | "colorRange"
+  | "lasso"
+  | "rect"
+  | "ellipse";
+/** The two drag kinds — the marquee runs for these and only these. */
+export const MARQUEE_KINDS = ["rect", "ellipse"] as const;
+/** True when the kind sweeps a marquee on drag (and ignores plain clicks). */
+export function isMarqueeKind(k: SelectionKind): k is SelectionShape {
+  return k === "rect" || k === "ellipse";
+}
 
 interface ToolState {
   activeTool: ToolType;
   brushMode: BrushMode;
   resizeMode: ResizeMode;
   selectionKind: SelectionKind;
-  selectionShape: SelectionShape;
   /** Edge-wall strength for `selectionKind: "edge"` (0..=255). Lower = more
    *  walls = tighter selection. */
   edgeThreshold: number;
@@ -93,7 +114,6 @@ interface ToolState {
   setBrushMode: (v: SetArg<BrushMode>) => void;
   setResizeMode: (v: SetArg<ResizeMode>) => void;
   setSelectionKind: (v: SetArg<SelectionKind>) => void;
-  setSelectionShape: (v: SetArg<SelectionShape>) => void;
   setEdgeThreshold: (v: SetArg<number>) => void;
   setSmartBrush: (v: SetArg<boolean>) => void;
   setSmartBrushStrength: (v: SetArg<number>) => void;
@@ -118,7 +138,6 @@ export const useToolStore = create<ToolState>()(
       brushMode: "paint",
       resizeMode: "compress",
       selectionKind: "wand",
-      selectionShape: "rect",
       // 90/255: walls off hard outlines while ignoring film grain / JPEG noise.
       edgeThreshold: 90,
       smartBrush: false,
@@ -142,8 +161,6 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ resizeMode: resolveSet(v, s.resizeMode) })),
       setSelectionKind: (v) =>
         set((s) => ({ selectionKind: resolveSet(v, s.selectionKind) })),
-      setSelectionShape: (v) =>
-        set((s) => ({ selectionShape: resolveSet(v, s.selectionShape) })),
       setEdgeThreshold: (v) =>
         set((s) => ({ edgeThreshold: resolveSet(v, s.edgeThreshold) })),
       setSmartBrush: (v) => set((s) => ({ smartBrush: resolveSet(v, s.smartBrush) })),

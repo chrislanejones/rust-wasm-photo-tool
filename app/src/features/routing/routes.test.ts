@@ -23,8 +23,9 @@ import {
 const MODES: Partial<Record<ToolType, string[]>> = {
   brush: ["paint", "blur", "pen", "erase"],
   compress: ["compress", "resize"],
-  // crop is single-mode since the Select split; the kinds are Select's modes.
-  select: ["wand", "edge", "colorRange", "lasso"],
+  // crop is single-mode since the Select split; the six exclusive selection
+  // modes are Select's modes (rect/ellipse joined the kinds in v7.47).
+  select: ["wand", "edge", "colorRange", "lasso", "rect", "ellipse"],
   shapes: ["shapes", "pens", "arrows"],
   stamp: ["clone", "red", "emojis"],
 };

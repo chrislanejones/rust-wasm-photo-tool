@@ -25,8 +25,10 @@ export interface ToolDefinition {
   gradient: string;
   /** Key that switches to this tool (mirrors TOOL_BY_KEY in
    *  useKeyboardShortcuts.ts — keys 1-9, 0, then letters once the digit row
-   *  filled: S = Select). */
-  shortcutKey: string;
+   *  filled). Optional: a tool may ship with no key at all, in which case it
+   *  must not appear in TOOL_BY_KEY, the sidebar tooltip, or ShortcutModal.
+   *  Select is currently keyless pending the selection-tools UI rework. */
+  shortcutKey?: string;
 }
 
 export const TOOLS: ToolDefinition[] = [
@@ -59,7 +61,10 @@ export const TOOLS: ToolDefinition[] = [
     description: "Select by click or marquee",
     icon: SquareDashedMousePointer,
     gradient: "from-teal-500 to-cyan-500",
-    shortcutKey: "S",
+    // Deliberately keyless — do NOT give this a letter key. `S` was removed
+    // pending the selection-tools UI rework that splits the kinds into their
+    // own tools + routes; Select gets a DIGIT there as part of the renumbering,
+    // not a revived `S`.
   },
   {
     id: "brush",

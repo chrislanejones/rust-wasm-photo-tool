@@ -3,14 +3,19 @@
 // just stores the returned overlay + routes ops. Tool state is read straight
 // from useToolStore; the WASM `stamp` handle and the canvas ref are passed in.
 //
-// Gesture model: a canvas CLICK fires the active SelectionKind; a canvas DRAG
-// sweeps a marquee (rect/ellipse per selectionShape) committed on release via
-// handleMarqueeCommit. There is no arming toggle — picking the tool is the
-// arming.
+// Gesture model (v7.47): the active SelectionKind picks the gesture, one mode
+// at a time —
+//   wand / edge / colorRange  CLICK, resolved immediately;
+//   lasso                     a click SESSION (begin → commit* → close);
+//   rect / ellipse            DRAG-only, committed on release through
+//                             handleMarqueeCommit; clicks are inert.
+// Before v7.47 a drag swept a marquee in EVERY non-lasso kind, so wand-click
+// and rect-drag were both live at once. There is no arming toggle — picking
+// the tool is the arming, and picking the mode is the gesture.
 import { useCallback, useEffect, useState } from "react";
 import type { RefObject, MouseEvent as ReactMouseEvent } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
-import { useToolStore } from "@/stores/useToolStore";
+import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
 import { tryRemoveObject } from "@/lib/patchmatch";
 import {
   selectionCombineMode,
@@ -70,6 +75,13 @@ export function useSelectionActions(
     (e: ReactMouseEvent<HTMLCanvasElement>) => {
       const tool = stamp.toolRef.current;
       if (!tool) return;
+
+      // Rectangle / Ellipse are drag-only: their selection comes from
+      // `onMarqueeCommit` on release, never from a click. Bail before touching
+      // combine mode so a stray click in a marquee mode is inert rather than
+      // silently flood-filling from whatever pixel it landed on.
+      if (isMarqueeKind(selectionKind)) return;
+
       const { x, y } = getCoords(e);
 
       // Shift = add (union), Alt = subtract; flag-gated, else always 0/replace.
@@ -241,10 +253,13 @@ export function useSelectionActions(
       const mode = selectionCombineMode(mods);
       tool.set_selection_combine(mode);
       setCombineHint(mode);
-      // Read at commit time, not subscribed — the shape can't change mid-drag.
-      const shape = useToolStore.getState().selectionShape;
+      // Read at commit time, not subscribed — the mode can't change mid-drag.
+      // Only the two marquee modes arm a drag at all, so anything else here
+      // would mean the gate upstream leaked; fall back to rect rather than
+      // inventing a selection.
+      const kind = useToolStore.getState().selectionKind;
       const mask =
-        shape === "ellipse"
+        kind === "ellipse"
           ? tool.ellipse_select(x0, y0, x1, y1)
           : tool.rect_select(x0, y0, x1, y1);
       setSelectionMask(mask.length ? mask : null);
