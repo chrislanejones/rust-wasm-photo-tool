@@ -369,6 +369,10 @@ function getCursorForTool(
   }
 }
 
+// TEMPORARY render-count instrumentation (removed before commit) — the step-2
+// proof requires a before/after number, not an assertion.
+declare global { interface Window { __canvasAreaRenders?: number } }
+
 export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
   (
     {
@@ -431,6 +435,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     },
     ref,
   ) => {
+    window.__canvasAreaRenders = (window.__canvasAreaRenders ?? 0) + 1;
     const { onMouseDown, onMouseMove, onMouseUp, state, flushToCanvas } = hookResult;
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
     const internalContainerRef = useRef<HTMLDivElement>(null);

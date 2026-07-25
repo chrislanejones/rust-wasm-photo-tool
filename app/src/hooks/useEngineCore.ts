@@ -16,7 +16,7 @@
 // context, even though the gestures that write them live in the residual hook.
 // That is the honest seam — the state shape is the contract, and the state
 // shape includes the source.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { RefObject, MouseEvent } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
@@ -29,6 +29,13 @@ import {
 } from "@/lib/resourceMonitor";
 import { syncOplog, tryTilesFlush } from "@/lib/tilesFlush";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import {
+  useEngineStore,
+  useEngineSnapshot,
+  type EngineSnapshot,
+  type HistoryEntry,
+  type LayerInfo,
+} from "@/stores/useEngineStore";
 
 /** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
 async function decodePngToRgba(
@@ -44,70 +51,21 @@ async function decodePngToRgba(
   return { rgba: ctx.getImageData(0, 0, w, h).data, w, h };
 }
 
-export interface HistoryEntry {
-  type: "undo" | "current" | "redo";
-  label: string;
-  index: number;
-}
-
-/** A single layer in the stack, as reported by the Rust `get_layers()` JSON. */
-export interface LayerInfo {
-  id: number;
-  name: string;
-  /** What this layer IS to the document (ADR-016). `"canvas"` is the artboard
-   *  fill — a layer the user sees and can toggle, but document METADATA to the
-   *  op log, which counts only `"content"` layers.
-   *
-   *  Always gate on this, never on `name`: "Background" means the FILL on an
-   *  artboard document and the PHOTO on a single-layer one, and the name is
-   *  user-editable besides. */
-  kind: "canvas" | "content";
-  visible: boolean;
-  opacity: number; // 0..1
-  active: boolean;
-  /** Whether this layer has a non-destructive mask (paint it in Edit-mask mode). */
-  hasMask: boolean;
-}
-
-export interface CloneStampState {
-  ready: boolean;
-  hasSource: boolean;
-  sourcePos: { x: number; y: number } | null;
-  undoCount: number;
-  redoCount: number;
-  history: HistoryEntry[];
-  zoom: number;
-  // Exposed so components can re-render when dimensions change (e.g. after rotate)
-  width: number;
-  height: number;
-  /** True if the loaded image contains any transparent pixels (from Rust alpha scan). */
-  hasTransparency: boolean;
-  /** Layer stack, bottom → top, mirrored from Rust. */
-  layers: LayerInfo[];
-  /** Id of the active layer (receives all tool edits). */
-  activeLayerId: number;
-}
-
-const INITIAL_STATE: CloneStampState = {
-  ready: false,
-  hasSource: false,
-  sourcePos: null,
-  undoCount: 0,
-  redoCount: 0,
-  history: [],
-  zoom: 1,
-  width: 0,
-  height: 0,
-  hasTransparency: false,
-  layers: [],
-  activeLayerId: 0,
-};
+// The snapshot type + its initial value moved to stores/useEngineStore.ts in
+// step 2. Re-exported here so the 17 importers that type against
+// `HistoryEntry` / `LayerInfo` / `CloneStampState` from the hook keep working.
+export type {
+  HistoryEntry,
+  LayerInfo,
+  EngineSnapshot,
+  CloneStampState,
+} from "@/stores/useEngineStore";
 
 /** The engine context + public core surface. Domain hooks (useHistory,
  *  useLayers, useExport, useTransforms) and the clone-stamp residual receive
  *  this whole object; the facade re-exposes the public members. */
 export interface EngineCore {
-  state: CloneStampState;
+  state: EngineSnapshot;
   toolRef: RefObject<ImageHorseTool | null>;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   /** Clone-source position mirror (drawn by CanvasArea, remapped on flip). */
@@ -122,8 +80,7 @@ export interface EngineCore {
     e: MouseEvent<HTMLCanvasElement> | globalThis.MouseEvent,
   ) => { x: number; y: number };
   /** Bump the annotation revision so consumers re-sync derived state after an
-   *  operation that may have swapped the overlay set (undo/redo/jump, layer
-   *  switch, merge, flatten, oplog restore). */
+   *  operation that may have swapped the overlay set. */
   broadcastAnnotationsChanged: () => void;
   reset: () => void;
   loadImage: (file: File) => Promise<void>;
@@ -168,7 +125,9 @@ export function useEngineCore(
   // deferred present and paints garbage. A private copy is immune.
   const backbufferRef = useRef<ImageData | null>(null);
 
-  const [state, setState] = useState<CloneStampState>(INITIAL_STATE);
+  // Read the snapshot back for the facade's `state` key. The WRITE path is
+  // the store action below — one write per engine sync.
+  const state = useEngineSnapshot();
 
   /**
    * Drop the loaded image entirely: blank the <canvas>, release the WASM tool
@@ -188,7 +147,7 @@ export function useEngineCore(
       canvas.width = 0;
       canvas.height = 0;
     }
-    setState(INITIAL_STATE);
+    useEngineStore.getState().resetSnapshot();
   }, [canvasRef]);
 
   const syncState = useCallback(() => {
@@ -213,7 +172,7 @@ export function useEngineCore(
     } catch {
       layers = [];
     }
-    setState({
+    useEngineStore.getState().setSnapshot({
       ready: true,
       hasSource: t.has_source() && !sourceDisarmedRef.current,
       sourcePos: sourcePosRef.current,
