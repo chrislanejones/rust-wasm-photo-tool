@@ -129,10 +129,27 @@ export function useEngineSnapshot(): EngineSnapshot {
   );
 }
 
-/** Just the document dimensions — what CanvasArea needs for layout math.
- *  Scalar-only, so it re-renders on a resize/rotate/crop and nothing else. */
-export function useEngineDimensions(): { width: number; height: number } {
+/** Exactly the slices CanvasArea reads — and NOTHING else.
+ *
+ *  This narrowness is the whole point, and it was measured: subscribing
+ *  CanvasArea to the FULL snapshot ADDED renders (20 -> 23 on the slider
+ *  scenario), because `setSnapshot` writes fresh `history` and `layers` ARRAYS
+ *  on every engine sync, so a shallow compare over the whole object fails even
+ *  when nothing CanvasArea cares about moved. These five are scalars plus
+ *  `sourcePos` (a ref object that only changes when the clone source moves), so
+ *  this subscription fires on resize/rotate/crop/zoom/source-move and nothing
+ *  else. Do not widen it to the full snapshot for convenience. */
+export function useCanvasEngineState(): Pick<
+  EngineSnapshot,
+  "ready" | "width" | "height" | "zoom" | "sourcePos"
+> {
   return useEngineStore(
-    useShallow((s) => ({ width: s.width, height: s.height })),
+    useShallow((s) => ({
+      ready: s.ready,
+      width: s.width,
+      height: s.height,
+      zoom: s.zoom,
+      sourcePos: s.sourcePos,
+    })),
   );
 }

@@ -42,6 +42,12 @@ interface UseEffectiveToolParams {
   redStampTool: ReturnType<typeof useRedStampTool>;
 }
 
+/** Stable no-op handlers for tools with no canvas interaction. Module scope so
+ *  their identity never changes — see the note at the `idle` object. */
+const NOOP_DOWN = () => {};
+const NOOP_MOVE = () => {};
+const NOOP_UP = () => {};
+
 export function useEffectiveTool({
   stamp,
   activeTool,
@@ -67,11 +73,16 @@ export function useEffectiveTool({
   // Idle handlers for tools that don't paint on the canvas. The clone stamp's
   // own onMouseDown/Move/Up ride along on `...stamp`; without overriding them
   // they "leak" — e.g. on the Effects tool the clone stamp would keep drawing.
+  // NOTE (step 2): the no-ops are MODULE-SCOPE constants, not inline arrows.
+  // Inline `(() => {})` minted three fresh function identities on every render,
+  // and the idle branch serves Compress/Effects/Select plus the fallthrough —
+  // so CanvasArea's handler props changed every render and React.memo could
+  // never hold. They are stateless no-ops; hoisting them is identity-only.
   const idle = {
     ...stamp,
-    onMouseDown: (() => {}) as typeof stamp.onMouseDown,
-    onMouseMove: (() => {}) as typeof stamp.onMouseMove,
-    onMouseUp: (() => {}) as typeof stamp.onMouseUp,
+    onMouseDown: NOOP_DOWN as typeof stamp.onMouseDown,
+    onMouseMove: NOOP_MOVE as typeof stamp.onMouseMove,
+    onMouseUp: NOOP_UP as typeof stamp.onMouseUp,
   };
   // Effects tool has no canvas interaction of its own — the Color Picker now
   // lives under Edit & Transform (see `activeTool === "crop"` below).

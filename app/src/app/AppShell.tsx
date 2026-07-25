@@ -1459,6 +1459,35 @@ export function AppShell() {
       setToolSettings((p) => (p.emoji ? { ...p, emoji: "" } : p)),
   });
 
+  // Memoized: this object literal was rebuilt inline in CanvasArea's props on
+  // every render, so it defeated memoization no matter what else was stable.
+  const memoTextSettings = useMemo(
+    () => ({
+      fontSize: toolSettings.fontSize,
+      fontFamily: toolSettings.fontFamily,
+      fontWeight: toolSettings.fontWeight,
+      textColor: toolSettings.textColor,
+      bgKind: toolSettings.bgKind,
+      bgColor: toolSettings.bgColor,
+      bgOpacity: toolSettings.bgOpacity,
+      bgPadding: toolSettings.bgPadding,
+      bgCornerRadius: toolSettings.bgCornerRadius,
+      bgTail: toolSettings.bgTail,
+    }),
+    [
+      toolSettings.fontSize,
+      toolSettings.fontFamily,
+      toolSettings.fontWeight,
+      toolSettings.textColor,
+      toolSettings.bgKind,
+      toolSettings.bgColor,
+      toolSettings.bgOpacity,
+      toolSettings.bgPadding,
+      toolSettings.bgCornerRadius,
+      toolSettings.bgTail,
+    ],
+  );
+
   const effectiveStamp = useEffectiveTool({
     stamp,
     activeTool,
@@ -2830,7 +2859,11 @@ export function AppShell() {
                       <div style={{ position: "absolute", inset: 0 }}>
                         <CanvasArea
                           ref={canvasRef}
-                          hookResult={effectiveStamp}
+                          toolRef={effectiveStamp.toolRef}
+                      onMouseDown={effectiveStamp.onMouseDown}
+                      onMouseMove={effectiveStamp.onMouseMove}
+                      onMouseUp={effectiveStamp.onMouseUp}
+                      flushToCanvas={effectiveStamp.flushToCanvas}
                           brushDiameter={diameter}
                           cursorPos={pos}
                           cursorVisible={visible}
@@ -2843,18 +2876,7 @@ export function AppShell() {
                           onTextKeyDown={textTool.onTextKeyDown}
                           onTextChange={textTool.onTextChange}
                           onTextBlur={textTool.onTextBlur}
-                          textSettings={{
-                            fontSize: toolSettings.fontSize,
-                            fontFamily: toolSettings.fontFamily,
-                            fontWeight: toolSettings.fontWeight,
-                            textColor: toolSettings.textColor,
-                            bgKind: toolSettings.bgKind,
-                            bgColor: toolSettings.bgColor,
-                            bgOpacity: toolSettings.bgOpacity,
-                            bgPadding: toolSettings.bgPadding,
-                            bgCornerRadius: toolSettings.bgCornerRadius,
-                            bgTail: toolSettings.bgTail,
-                          }}
+                          textSettings={memoTextSettings}
                           containerRef={containerRef}
                           onTextPositionChange={textTool.setTextPosition}
                           onTextFontSizeChange={handleTextFontSizeChange}
@@ -2918,7 +2940,11 @@ export function AppShell() {
                   <div className="canvas-fullsize-slot">
                     <CanvasArea
                       ref={canvasRef}
-                      hookResult={effectiveStamp}
+                      toolRef={effectiveStamp.toolRef}
+                      onMouseDown={effectiveStamp.onMouseDown}
+                      onMouseMove={effectiveStamp.onMouseMove}
+                      onMouseUp={effectiveStamp.onMouseUp}
+                      flushToCanvas={effectiveStamp.flushToCanvas}
                       brushDiameter={diameter}
                       cursorPos={pos}
                       cursorVisible={visible}
@@ -2974,18 +3000,7 @@ export function AppShell() {
                       onTextChange={textTool.onTextChange}
                       onTextBlur={textTool.onTextBlur}
                       guides={guidesConfig}
-                      textSettings={{
-                        fontSize: toolSettings.fontSize,
-                        fontFamily: toolSettings.fontFamily,
-                        fontWeight: toolSettings.fontWeight,
-                        textColor: toolSettings.textColor,
-                        bgKind: toolSettings.bgKind,
-                        bgColor: toolSettings.bgColor,
-                        bgOpacity: toolSettings.bgOpacity,
-                        bgPadding: toolSettings.bgPadding,
-                        bgCornerRadius: toolSettings.bgCornerRadius,
-                        bgTail: toolSettings.bgTail,
-                      }}
+                      textSettings={memoTextSettings}
                       containerRef={containerRef}
                       onTextPositionChange={textTool.setTextPosition}
                       onTextFontSizeChange={handleTextFontSizeChange}

@@ -32,6 +32,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
 import { selectionCombineMode } from "@/lib/selectionBool";
+import { useCanvasEngineState } from "@/stores/useEngineStore";
 
 const EMPTY_SEGMENTS = new Float32Array(0);
 
@@ -109,7 +110,17 @@ interface AnnotationBox {
 }
 
 interface Props {
-  hookResult: ReturnType<typeof useCloneStamp>;
+  /** Step 2: the whole 62-key hook result used to arrive as ONE prop, and
+   *  useEffectiveTool mints a fresh wrapper every render — so this component
+   *  re-rendered 1:1 with AppShell (measured: 20 slider changes -> 20 renders).
+   *  It now takes only what it uses, each an identity-stable member, and reads
+   *  the engine snapshot from the store. `toolRef` stays a prop on purpose: a
+   *  WASM handle is not store material. */
+  toolRef: ReturnType<typeof useCloneStamp>["toolRef"];
+  onMouseDown: ReturnType<typeof useCloneStamp>["onMouseDown"];
+  onMouseMove: ReturnType<typeof useCloneStamp>["onMouseMove"];
+  onMouseUp: ReturnType<typeof useCloneStamp>["onMouseUp"];
+  flushToCanvas: ReturnType<typeof useCloneStamp>["flushToCanvas"];
   brushDiameter: number;
   cursorPos: { x: number; y: number };
   cursorVisible: boolean;
@@ -369,14 +380,14 @@ function getCursorForTool(
   }
 }
 
-// TEMPORARY render-count instrumentation (removed before commit) — the step-2
-// proof requires a before/after number, not an assertion.
-declare global { interface Window { __canvasAreaRenders?: number } }
-
 export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
   (
     {
-      hookResult,
+      toolRef,
+      onMouseDown,
+      onMouseMove,
+      onMouseUp,
+      flushToCanvas,
       brushDiameter,
       cursorPos,
       cursorVisible,
@@ -435,8 +446,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     },
     ref,
   ) => {
-    window.__canvasAreaRenders = (window.__canvasAreaRenders ?? 0) + 1;
-    const { onMouseDown, onMouseMove, onMouseUp, state, flushToCanvas } = hookResult;
+    const state = useCanvasEngineState();
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
     const internalContainerRef = useRef<HTMLDivElement>(null);
     const containerRef = externalContainerRef ?? internalContainerRef;
@@ -647,7 +657,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       previewRafRef.current = requestAnimationFrame(() => {
         previewRafRef.current = null;
         const pt = lastHoverRef.current;
-        const tool = hookResult.toolRef.current;
+        const tool = toolRef.current;
         const canvas = canvasRef.current;
         const intent = combineIntentRef.current;
         if (
@@ -679,7 +689,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         );
         setPreviewMask(ov && ov.length ? ov : null);
       });
-    }, [hookResult, canvasRef, previewKindCode, selectionTolerance, edgeThreshold, clearPreview]);
+    }, [toolRef, canvasRef, previewKindCode, selectionTolerance, edgeThreshold, clearPreview]);
 
     // Modifier pressed/released WITHOUT moving the mouse: keep the intent,
     // cursor badge and hover preview live off keydown/keyup while the Select
@@ -1213,7 +1223,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       baseMouseUp?.();
     };
 
-    const { width: imgW, height: imgH } = hookResult.state;
+    const { width: imgW, height: imgH } = state;
 
     // Draggable image guides (read the store directly — non-destructive overlay,
     // independent of the rulers/grid pref).
@@ -1999,7 +2009,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // matches exactly; fall back to the JS-measured box centre.
           let pivotLocalX = boxW / 2;
           let pivotLocalY = boxH / 2;
-          const measured = hookResult.toolRef.current?.measure_text(
+          const measured = toolRef.current?.measure_text(
             textInput.text || " ",
             effFontSize,
             effFontWeight === "bold",
@@ -2166,7 +2176,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // (commitText stores (x,y) = overlay + cssPad − text_ink_offset_bg;
           // this is the same geometry projected back onto the preview).
           const inkBase = showBg
-            ? hookResult.toolRef.current?.text_ink_offset(
+            ? toolRef.current?.text_ink_offset(
                 textInput.text || " ",
                 effFontSize,
                 effFontWeight === "bold",
@@ -2474,3 +2484,16 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     );
   },
 );
+
+// Memoized: with the fat `hookResult` prop gone and the idle handlers hoisted
+// to module scope, every remaining prop is identity-stable across an unrelated
+// AppShell render — so this now actually holds instead of being decoration.
+CanvasArea.displayName = "CanvasArea";
+// NOT memoized — measured, not assumed. React.memo was tried here and blocked
+// ZERO renders: 14 OTHER props are rebuilt inline in AppShell's JSX every
+// render (onCanvasLeave, onSelectionClick, onMarqueeCommit, onLassoMove,
+// onLassoClose, onCropChange, the five onPen* handlers, and the guides /
+// annotations / drawSettings literals). With any one of those unstable, memo
+// is pure comparison overhead — it measured 20 -> 23 renders, i.e. worse.
+// Memoizing those 14 in AppShell is the prerequisite; see docs/PARKING_LOT.md.
+CanvasArea.displayName = "CanvasArea";
