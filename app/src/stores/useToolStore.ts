@@ -15,13 +15,13 @@ import { idbStorage } from "./storage/idbStorage";
 
 /** Paint sub-modes (Paint tool): freehand paint, blur brush, Bézier pen, or
  *  the eraser (scrubs the active layer's alpha). */
-const BRUSH_MODES = ["paint", "blur", "pen", "erase"] as const;
+export const BRUSH_MODES = ["paint", "blur", "pen", "erase"] as const;
 export type BrushMode = (typeof BRUSH_MODES)[number];
 /** Stamp tool sub-modes. */
-const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;
+export const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;
 export type StampSubMode = (typeof STAMP_SUB_MODES)[number];
 /** Shapes tool sub-modes. */
-const SHAPES_MODES = ["shapes", "pens", "arrows"] as const;
+export const SHAPES_MODES = ["shapes", "pens", "arrows"] as const;
 export type ShapesMode = (typeof SHAPES_MODES)[number];
 /** Eraser tool (id "ai") sub-modes: `brush` = drag-to-erase on the canvas;
  *  `magic` = local Magic Eraser (PatchMatch); `rembg` = Background Removal and
@@ -33,7 +33,7 @@ export type ShapesMode = (typeof SHAPES_MODES)[number];
  *  Named `ERASER_MODE_VALUES` (not `ERASER_MODES`) — AISettings.tsx already
  *  has a richer `ERASER_MODES` (icon/label/info per tile); this is just the
  *  bare value tuple for hydration validation. */
-const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
+export const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
 export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
