@@ -70,15 +70,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.47 — 2026-07-25
+### v7.48 — 2026-07-25
 
-**The Select tool is one list of six.** Wand, Edge-aware, Magnetic Lasso, Color Range, Rectangle and Ellipse now sit in a single group with one of them on at a time. Before, Rectangle and Ellipse were a separate "drag shape" setting that ran alongside whichever mode you had picked — so dragging swept a rectangle no matter what the panel said was selected, and there was no way to tell the two halves apart by looking at them. Now the mode decides both what gets selected and how you ask for it: click for the first four, drag for the last two. A click in Rectangle does nothing and a drag in Wand does nothing, so a slip of the hand can't hand you a selection you didn't ask for.
+**Nothing here changes what the app does. The point is that less can go wrong.**
 
-Rect is now Rectangle, and Magnetic is now Magnetic Lasso. Each mode has its own address, so a link can point at one.
+Undo and redo can no longer take the editor down. Six places in the image engine assumed the edit history was present rather than checking; none of them could actually fire today, but they sat far enough from the check that one careless edit would have turned a dead assumption into a crash mid-edit. They check now, and fall back to the ordinary undo if the history isn't there.
 
-The trade is a mode switch before you can drag a box, where before you could always just drag. That's the cost of being able to read the panel.
-
-**Select has no keyboard shortcut right now.** `S` is gone; it gets a number in a UI change that's coming.
+**The build can no longer lie about what shipped.** For five weeks the live site served an image engine missing half its machinery, and nothing caught it — the app quietly worked around the gap instead of failing, so every build looked fine. There is now a check that fetches the *running* site's engine, looks inside it, and fails if it is the wrong one. The project's own code checks went from advisory to blocking in the same pass: they can fail the build now, rather than printing a complaint nobody reads.
 
 ## License
 

@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.91",
+    date: "2026-07-25",
+    headline: "Nothing changes — less can go wrong",
+    entries: [
+      { tag: "fix", text: "Undo and redo can no longer take the editor down. Six places in the image engine assumed the edit history was present rather than checking. None of them could actually fire today, but they sat far enough from the check that one careless edit would have turned a dead assumption into a crash mid-edit. They check now, and fall back to ordinary undo if the history isn't there." },
+      { tag: "infra", text: "The build can no longer lie about what shipped. For five weeks the live site served an image engine missing half its machinery and nothing caught it — the app quietly worked around the gap instead of failing, so every build looked fine. There's now a check that fetches the running site's engine, looks inside it, and fails if it's the wrong one." },
+      { tag: "infra", text: "The project's own code checks went from advisory to blocking. They used to print complaints and pass anyway. They can fail the build now, and the count of existing problems can only go down — a new one stops the build immediately." },
+    ],
+  },
+  {
     version: "v0.9.90",
     date: "2026-07-25",
     headline: "The Select tool is one list of six",

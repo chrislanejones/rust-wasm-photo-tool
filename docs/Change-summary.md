@@ -2201,3 +2201,29 @@ is entirely app-side.
 **Also recorded**: imagehorse-qc for v7.44–7.46 completed (sections 1–5 pass;
 Export confirmed by hand). Three findings parked, of which one — `ShortcutModal`
 listing ten tools and omitting Select — is resolved by Select going keyless.
+
+## v7.48 — 2026-07-25
+
+A repair-only pass: no features, nothing user-visible changes. Two of the four
+items turned out to be different problems than the brief described, and both are
+recorded here rather than quietly "fixed".
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | Six `oplog.as_ref()/.as_mut().unwrap()` in `oplog_sync_annotations`, `oplog_sync_canvas`, `try_oplog_undo`, `try_oplog_redo` → guarded re-acquisition falling back to snapshot undo | Complete — **but they were never live crashes**: all six already sat behind a `None` guard in the same function. A borrow-checker artifact (the guard's borrow dies at the intervening `&mut self` calls), fixed as defence in depth |
+| 2   | Deploy sentinel — `scripts/deploy-sentinel.sh` + CI job fetching the LIVE site's glue and wasm; fails on a size outside 700–800 KB or a missing `oplog_` / `remove_object` / `rect_select` | New — the manual check that caught the five-week featureless-prod bug, automated. Kept a script so it stays runnable by hand |
+| 3a  | `ih_selection_bool` kill switch verified intact after the v7.47 six-mode rework; pinned by `selectionBool.test.ts` (6 tests) | Complete — every `set_selection_combine` write is fed by `selectionCombineMode`, which reads the flag itself |
+| 3b  | `importOra` made module-private instead of deleted | **Brief was wrong**: it is called twice inside `importOraAsNewPhoto`, which is live in `ExportPane.tsx`. Deleting it breaks `.ora` import, and the parser stays reachable regardless, so deletion shed zero attack surface |
+| 4   | `pnpm lint` + vitest now blocking in CI; guardrails converted from `continue-on-error` to a baseline ratchet (`scripts/guardrails.sh`) | Complete — only 1 of 6 checks is at zero (112 violations across the rest), so the build now fails when a count goes **up**. New violations blocked from today; existing ones payable-down only |
+
+**Reverted before merge:** an item-3(c) unexport of the four `useToolStore` mode
+constants. Correct against master as it stood, wrong against the in-flight
+toolbar work, which adds `TEXT_MODES`/`BATCH_MODES` as exported constants in the
+same block for `toolModes.ts` to consume.
+
+**Verified**: fmt clean; clippy `-D warnings` and cargo test green on tiles,
+patchmatch and combined; tsc clean; eslint 0 errors / 61 warnings; 211/211
+vitest (6 new); production build succeeds. Deploy sentinel and the guardrails
+ratchet were each tested in BOTH directions — passing at baseline and failing
+when they should. Engine **753,713 → 753,582 B (−131)**: the panic machinery the
+six unwraps were emitting.
