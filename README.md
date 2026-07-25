@@ -70,11 +70,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.46 — 2026-07-24
+### v7.47 — 2026-07-25
 
-**The Magic Eraser is live.** Pick the Eraser tool, switch to Magic, and brush over something you want gone — release, and it's removed and filled in from the surrounding image, entirely on your device. No upload, no sign-in. You can also select the object with any Select-tool kind and hit Remove Object. One rule matters: cover the whole object. A partial stroke leaves the fill free to rebuild the object from its own leftovers. Large areas can come out soft — that's the current kernel being honest, not broken — and undo brings everything back, selection included.
+**The Select tool is one list of six.** Wand, Edge-aware, Magnetic Lasso, Color Range, Rectangle and Ellipse now sit in a single group with one of them on at a time. Before, Rectangle and Ellipse were a separate "drag shape" setting that ran alongside whichever mode you had picked — so dragging swept a rectangle no matter what the panel said was selected, and there was no way to tell the two halves apart by looking at them. Now the mode decides both what gets selected and how you ask for it: click for the first four, drag for the last two. A click in Rectangle does nothing and a drag in Wand does nothing, so a slip of the hand can't hand you a selection you didn't ask for.
 
-**A deploy bug meant some engine features never actually reached the live site.** The production build was compiling the image engine without its newer machinery, and the app's own safety checks quietly worked around the gap instead of crashing. Fixed — the full engine now ships, so the editing history that survives a reload works on the live site the way it always did in development.
+Rect is now Rectangle, and Magnetic is now Magnetic Lasso. Each mode has its own address, so a link can point at one.
+
+The trade is a mode switch before you can drag a box, where before you could always just drag. That's the cost of being able to read the panel.
+
+**Select has no keyboard shortcut right now.** `S` is gone; it gets a number in a UI change that's coming.
 
 ## License
 

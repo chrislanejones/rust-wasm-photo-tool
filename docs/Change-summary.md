@@ -2166,3 +2166,38 @@ cargo tests green on tiles, patchmatch, and combined; tsc clean, eslint 0
 errors / 61 warnings, 201/201 vitest; app + marketing production builds
 succeed. Shipped WASM 753,713 B (+7,995 over v7.45 — the PatchMatch kernel,
 in the binary users download for the first time).
+
+## v7.47 — 2026-07-25
+
+The Select tool's six modes become one mutually-exclusive list. Rectangle and
+Ellipse used to be a separate "drag shape" setting living beside the four click
+modes, both live at once: a drag swept a marquee whatever mode was lit, and the
+panel drew the two axes as unrelated groups under a header carrying the *click*
+mode's name. It read as though Rectangle were a sub-option of the Wand. Now the
+mode picks the gesture as well as the algorithm — click for wand, edge-aware
+and color range, a click session for the magnetic lasso, drag for Rectangle and
+Ellipse. Clicks are inert in the two drag modes, and drags are inert everywhere
+else.
+
+This reverses ADR-021, which rejected exactly this arrangement to avoid a mode
+switch before the commonest gesture. The switch is a real cost and it is being
+paid on purpose: a panel nobody can read is worse than a click.
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | `SelectionKind` absorbs `rect`/`ellipse` — one exclusive union of six; `selectionShape` state and setter deleted (transient, never persisted, so no migration) | Complete |
+| 2   | `isMarqueeKind()` is the single predicate — gates the marquee, the click bail-out, and whether Tolerance is shown | Complete |
+| 3   | Per-mode routes: `#/tool/select/rect` and `/ellipse` join the four that existed. No routing change needed — `modesFor("select")` already derived panel, palette and routes from one list | Complete |
+| 4   | Rect → Rectangle, Magnetic → Magnetic Lasso (new icon); mode grid goes 2-up → 3-up to match the Selection grid beneath it | Complete |
+| 5   | Select is keyless — `S` removed from `TOOL_BY_KEY`; `shortcutKey` is now optional on `ToolDefinition`, and neither the sidebar tooltip nor the status bar advertises a key that does nothing | Complete — a digit arrives with the next UI pass |
+| 6   | `selectModes.test.ts` pins mode ids, order and `isMarqueeKind` agreement | New — the drift guard the two-list arrangement lacked |
+
+**Verified**: tsc clean, eslint 0 errors / 61 warnings, 205/205 vitest, app
+production build succeeds. Smoked on the production build with all six routes
+resolving: Rectangle and Ellipse drags commit a selection and their clicks are
+inert; wand clicks still select. Engine unchanged at 753,713 B — this release
+is entirely app-side.
+
+**Also recorded**: imagehorse-qc for v7.44–7.46 completed (sections 1–5 pass;
+Export confirmed by hand). Three findings parked, of which one — `ShortcutModal`
+listing ten tools and omitting Select — is resolved by Select going keyless.

@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.90",
+    date: "2026-07-25",
+    headline: "The Select tool is one list of six",
+    entries: [
+      { tag: "ui", text: "Wand, Edge-aware, Magnetic Lasso, Color Range, Rectangle and Ellipse now sit in a single group with one of them on at a time. Rectangle and Ellipse used to be a separate \"drag shape\" setting running alongside whichever mode you had picked, so dragging swept a rectangle no matter what the panel said was selected — and nothing on screen told you the two halves were different things. Now the mode decides both what gets selected and how you ask for it." },
+      { tag: "feature", text: "Click for the first four, drag for Rectangle and Ellipse. A click in Rectangle does nothing and a drag in Wand does nothing, so a slip of the hand can't hand you a selection you didn't ask for. The trade is a mode switch before you can drag a box, where before you could always just drag — that's the cost of being able to read the panel." },
+      { tag: "ui", text: "Rect is now Rectangle and Magnetic is now Magnetic Lasso. Each mode has its own address, so a link can point at one. Select has no keyboard shortcut for the moment — it gets a number in a UI change that's coming." },
+    ],
+  },
+  {
     version: "v0.9.89",
     date: "2026-07-24",
     headline: "The Magic Eraser is live",
