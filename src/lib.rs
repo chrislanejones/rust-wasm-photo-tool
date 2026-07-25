@@ -1355,7 +1355,11 @@ impl ImageHorseTool {
         };
         let mut pending: Vec<crate::ops::Op> = Vec::new();
         {
-            let log_doc = self.oplog.as_ref().unwrap().live_document();
+            // Guarded, not unwrapped — see oplog_sync_canvas for the rationale.
+            let Some(log_ref) = self.oplog.as_ref() else {
+                return;
+            };
+            let log_doc = log_ref.live_document();
             let layer = &self.layers[content];
             if layer.text_annotations.is_empty()
                 && layer.shape_annotations.is_empty()
@@ -1412,7 +1416,13 @@ impl ImageHorseTool {
             return;
         }
         let params = self.canvas_params();
-        let log = self.oplog.as_mut().unwrap();
+        // Guarded rather than unwrapped. The `is_none()` check above makes this
+        // unreachable today, but the two are far enough apart that an edit
+        // between them would turn a dead unwrap into a live panic — and a panic
+        // here aborts the whole WASM instance mid-edit.
+        let Some(log) = self.oplog.as_mut() else {
+            return;
+        };
         if log.canvas() != params {
             log.set_canvas(params);
         }
@@ -1474,8 +1484,16 @@ impl ImageHorseTool {
         // authoritative here. This keeps the history panel + fallback sane.
         let current = self.make_snapshot("Current State");
         let _ = self.hist.undo(current);
-        let n = self.oplog.as_ref().unwrap().cursor() - 1;
-        self.oplog.as_mut().unwrap().seek(n);
+        // Re-acquire: the `log` borrow from the guard above ended at the
+        // `&mut self` calls in between, which is the only reason this was ever
+        // an unwrap. Falling back to `false` routes the caller to snapshot
+        // undo — the graceful path that already exists — instead of panicking
+        // and taking the WASM instance down mid-edit.
+        let Some(log) = self.oplog.as_mut() else {
+            return false;
+        };
+        let n = log.cursor() - 1;
+        log.seek(n);
         self.oplog_restore_into_engine();
         true
     }
@@ -1505,8 +1523,12 @@ impl ImageHorseTool {
         }
         let current = self.make_snapshot("Current State");
         let _ = self.hist.redo(current);
-        let n = self.oplog.as_ref().unwrap().cursor() + 1;
-        self.oplog.as_mut().unwrap().seek(n);
+        // Re-acquire + graceful bail — mirror of try_oplog_undo.
+        let Some(log) = self.oplog.as_mut() else {
+            return false;
+        };
+        let n = log.cursor() + 1;
+        log.seek(n);
         self.oplog_restore_into_engine();
         true
     }
