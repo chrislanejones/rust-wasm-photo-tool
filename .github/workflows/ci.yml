@@ -9,6 +9,7 @@ on:
   pull_request:
   schedule:
     - cron: "0 9 * * 1" # Mondays 09:00 UTC
+  workflow_dispatch: # so the deploy sentinel can be run on demand
 
 permissions:
   contents: read
@@ -53,6 +54,25 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter stamp-tool exec tsc -b --noEmit
       - run: pnpm run build:all
+
+  # Asserts the LIVE site is serving a real engine — not that a build succeeded.
+  # From v7.36 to v7.45 netlify.toml ran a bare `wasm-pack build` with no
+  # --features, so prod shipped a WASM with no tiles/op-log for five weeks. It
+  # never crashed: the runtime feature-detects quietly took the fallback path,
+  # so every "shipped ON" flag was off for real users while every local build
+  # was green. HTTP 200 proved nothing; only fetching the live binary did.
+  #
+  # Deliberately NOT gated on the current commit: it validates whatever is live
+  # right now, so it catches a bad deploy on the weekly cron too, not only on
+  # the push that caused it. On push it runs against the PREVIOUS deploy (the
+  # new one is still building) — which is fine, the invariant is "prod is never
+  # featureless", not "prod matches this SHA".
+  deploy-sentinel:
+    name: Deploy sentinel (live prod engine)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/deploy-sentinel.sh
 
   marketing:
     name: Marketing build (mirrors Vercel /marketing root)
