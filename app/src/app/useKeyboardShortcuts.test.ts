@@ -14,8 +14,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { useKeyboardShortcuts, TOOL_BY_KEY } from "./useKeyboardShortcuts";
-import { TOOLS } from "@/features/tools/toolConfig";
+import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
+import { GROUP_BY_KEY, TOOL_GROUPS } from "@/features/tools/toolGroups";
 
 // React 19 warns ("not configured to support act(...)") unless this flag is
 // set before any act() call — harmless in real app code (never imported
@@ -117,37 +117,28 @@ afterEach(() => {
   container.remove();
 });
 
-describe("TOOL_BY_KEY agrees with toolConfig.ts (one contract, stated twice)", () => {
-  // toolConfig.ts's ToolDefinition.shortcutKey doc-comment claims it "mirrors
-  // TOOL_BY_KEY in useKeyboardShortcuts.ts" — this is the only place that
-  // claim is actually checked. If someone adds/reorders a tool in one table
-  // without the other, tool keys and the sidebar/palette shortcut hints
-  // silently disagree about which key does what.
-  /** shortcutKey → e.code: digits are DigitN, punctuation has its own name
-   *  (the rail runs past `0` onto `-`), letters are KeyX. */
-  const PUNCT_CODE: Record<string, string> = { "-": "Minus", "=": "Equal" };
-  const toCode = (k: string) =>
-    PUNCT_CODE[k] ?? (/^\d$/.test(k) ? `Digit${k}` : `Key${k}`);
+describe("GROUP_BY_KEY agrees with the group registry (one contract, stated twice)", () => {
+  // GROUP_BY_KEY is DERIVED from TOOL_GROUPS, so this can no longer drift the
+  // way the old hand-written TOOL_BY_KEY did (it silently omitted Select for
+  // three releases). The test stays anyway: it pins the derivation itself, and
+  // it is the thing that fails loudly if someone reintroduces a literal table.
+  const toCode = (k: string) => `Digit${k}`;
 
-  /** `shortcutKey` is optional — a tool MAY ship keyless, though none is
-   *  today (Select got its promised digit in the new-ui-toolbar renumbering).
-   *  Keyless tools are held to the opposite contract: they must be ABSENT
-   *  from TOOL_BY_KEY, which the set-equality test below enforces. */
-  const keyed = TOOLS.filter(
-    (t): t is typeof t & { shortcutKey: string } => !!t.shortcutKey,
-  );
-
-  it("every keyed tool's shortcutKey resolves through TOOL_BY_KEY to that same tool", () => {
-    for (const tool of keyed) {
-      expect(TOOL_BY_KEY[toCode(tool.shortcutKey)]).toBe(tool.id);
+  it("every group's shortcutKey resolves through GROUP_BY_KEY to that same group", () => {
+    for (const group of TOOL_GROUPS) {
+      expect(GROUP_BY_KEY[toCode(group.shortcutKey)]).toBe(group.id);
     }
   });
 
-  it("has no entries beyond what toolConfig.ts's keyed tools define", () => {
-    // Doubles as the keyless guard: a tool with no shortcutKey contributes no
-    // expected code, so binding it in TOOL_BY_KEY fails here as an extra entry.
-    const expectedCodes = new Set(keyed.map((t) => toCode(t.shortcutKey)));
-    expect(new Set(Object.keys(TOOL_BY_KEY))).toEqual(expectedCodes);
+  it("has no entries beyond what the five groups define", () => {
+    const expectedCodes = new Set(TOOL_GROUPS.map((g) => toCode(g.shortcutKey)));
+    expect(new Set(Object.keys(GROUP_BY_KEY))).toEqual(expectedCodes);
+  });
+
+  it("binds exactly the digits 1-5", () => {
+    expect(Object.keys(GROUP_BY_KEY).sort()).toEqual([
+      "Digit1", "Digit2", "Digit3", "Digit4", "Digit5",
+    ]);
   });
 });
 
@@ -239,55 +230,61 @@ describe("sanity: the harness actually reaches the real handler", () => {
     expect(onUndo).toHaveBeenCalledTimes(1);
   });
 
-  it("bare digit 4 switches to the Paint tool", () => {
-    const onToolChange = vi.fn();
-    mount(baseProps({ onToolChange }));
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit4", bubbles: true }));
-    });
-    expect(onToolChange).toHaveBeenCalledWith("brush");
-  });
-
-  it("bare digit 7 switches to the Eraser tool (id stays 'ai')", () => {
-    const onToolChange = vi.fn();
-    mount(baseProps({ onToolChange }));
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit7", bubbles: true }));
-    });
-    expect(onToolChange).toHaveBeenCalledWith("ai");
-  });
-
-  it("bare digit 3 switches to Select — the key it was promised in v7.44", () => {
-    const onToolChange = vi.fn();
-    mount(baseProps({ onToolChange }));
+  it("bare digit 3 selects the Create group", () => {
+    const onGroupChange = vi.fn();
+    mount(baseProps({ onGroupChange }));
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit3", bubbles: true }));
     });
-    expect(onToolChange).toHaveBeenCalledWith("select");
+    expect(onGroupChange).toHaveBeenCalledWith("create");
   });
 
-  it("bare Minus switches to Batch — the rail runs past 0 onto '-'", () => {
-    const onToolChange = vi.fn();
-    mount(baseProps({ onToolChange }));
+  it("bare digit 2 selects Select — no longer Adjust, the digits moved to groups", () => {
+    const onGroupChange = vi.fn();
+    mount(baseProps({ onGroupChange }));
     act(() => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Minus", bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit2", bubbles: true }));
     });
-    expect(onToolChange).toHaveBeenCalledWith("emoji");
+    expect(onGroupChange).toHaveBeenCalledWith("select");
   });
 
-  it("Alt+Minus still zooms out rather than switching tools", () => {
-    // The bare tool-key path must not steal the key from the Alt binding on
-    // the same physical key — the Alt branch returns before it is reached.
-    const onToolChange = vi.fn();
+  it("bare digit 5 selects the Batch group", () => {
+    const onGroupChange = vi.fn();
+    mount(baseProps({ onGroupChange }));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit5", bubbles: true }));
+    });
+    expect(onGroupChange).toHaveBeenCalledWith("batch");
+  });
+
+  it("digits 6-0 and Minus are now INERT — the rail is five wide", () => {
+    // The old eleven-tool rail ran 1-9, 0, then Minus. Those keys must no
+    // longer fire anything, or a muscle-memory `7` would silently activate
+    // whatever the fifth group's first sub-tool happens to be.
+    const onGroupChange = vi.fn();
+    mount(baseProps({ onGroupChange }));
+    for (const code of ["Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus"]) {
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent("keydown", { code, bubbles: true }));
+      });
+    }
+    expect(onGroupChange).not.toHaveBeenCalled();
+  });
+
+  it("Alt+Minus still zooms out rather than switching groups", () => {
+    // Minus is no longer a bare binding at all (the rail is five wide), but the
+    // Alt branch must keep working — and must keep returning before the bare
+    // digit path, which is the collision this has always guarded.
+    const onGroupChange = vi.fn();
     const onZoomOut = vi.fn();
-    mount(baseProps({ onToolChange, onZoomOut }));
+    mount(baseProps({ onGroupChange, onZoomOut }));
     act(() => {
       window.dispatchEvent(
         new KeyboardEvent("keydown", { code: "Minus", altKey: true, bubbles: true }),
       );
     });
     expect(onZoomOut).toHaveBeenCalledTimes(1);
-    expect(onToolChange).not.toHaveBeenCalled();
+    expect(onGroupChange).not.toHaveBeenCalled();
   });
 });
 

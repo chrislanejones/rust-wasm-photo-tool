@@ -1,35 +1,20 @@
 import { useEffect, useRef } from "react";
-import type { ToolType } from "@/lib/types";
 import { useUIStore } from "@/stores/useUIStore";
+import { GROUP_BY_KEY, type ToolGroupId } from "@/features/tools/toolGroups";
 import { setPaletteActions } from "@/features/commandPalette";
 import { navigateTo } from "@/features/routing";
 
-/** Tool keys in GRID READING ORDER across the 4-column rail — digits 1-9, then
- *  0 for the tenth, then `-` (Minus) for the eleventh, continuing along the
- *  number row rather than leaving one tool bare. Select is keyed again here
- *  (`3`): its `S` was dropped in v7.44 explicitly pending this renumbering.
- *
- *  `Minus` is safe as a BARE key — the zoom-out binding on the same physical
- *  key lives in the Alt branch below (Alt+`-`), which returns before the bare
- *  tool-key path is reached.
- *
- *  Keyed on `e.code`. Exported (test-only use) so it can be cross-checked
- *  against toolConfig.ts's ToolDefinition.shortcutKey — the two are meant to
- *  be the same contract stated twice and must not drift (see
- *  useKeyboardShortcuts.test.ts). */
-export const TOOL_BY_KEY: Record<string, ToolType> = {
-  Digit1: "compress",
-  Digit2: "crop",
-  Digit3: "select",
-  Digit4: "brush",
-  Digit5: "text",
-  Digit6: "arrow",
-  Digit7: "ai",
-  Digit8: "shapes",
-  Digit9: "effects",
-  Digit0: "stamp",
-  Minus: "emoji",
-};
+// Digits 1-5 select the five tool GROUPS, in rail order. The table is no
+// longer written here at all: it is `GROUP_BY_KEY`, derived from TOOL_GROUPS
+// in features/tools/toolGroups.ts, so the binding, the rail tooltip and the
+// ShortcutModal row cannot disagree about which digit does what.
+//
+// This replaces the old eleven-entry TOOL_BY_KEY (digits 1-9, then `0`, then
+// `-` for the eleventh tool). Sub-tools get NO bare-key bindings: 33 of them
+// would exhaust the number row and then some, and the brief is explicit that
+// they are palette- and click-reachable only unless a binding is obvious.
+// Freeing `0` and `-` also removes the bare-`Minus` collision hazard that the
+// old table had to reason about against Alt+`-` (zoom out).
 
 /**
  * True if `el` (the focused element) is a control that natively responds to
@@ -72,7 +57,7 @@ interface KeyboardShortcutOptions {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset?: () => void;
-  onToolChange?: (tool: ToolType) => void;
+  onGroupChange?: (group: ToolGroupId) => void;
   onFlipH?: () => void;
   onFlipV?: () => void;
   onRotateCw?: () => void;
@@ -127,7 +112,7 @@ export function useKeyboardShortcuts({
   onZoomIn,
   onZoomOut,
   onZoomReset,
-  onToolChange,
+  onGroupChange,
   onFlipH,
   onFlipV,
   onRotateCw,
@@ -345,10 +330,10 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // ─── Bare tool keys (digits + S) → tool switching ──────────────
-      if (onToolChange && e.code in TOOL_BY_KEY) {
+      // ─── Bare digits 1-5 → tool GROUP switching ────────────────────
+      if (onGroupChange && e.code in GROUP_BY_KEY) {
         e.preventDefault();
-        onToolChange(TOOL_BY_KEY[e.code]);
+        onGroupChange(GROUP_BY_KEY[e.code]);
       }
     };
 
@@ -374,7 +359,7 @@ export function useKeyboardShortcuts({
     onUndo, onRedo, onExport, onExportAll, onDeleteAll, onSelectAll, onDeselect, hasSelection, onApplyCrop, hasCropSelection, onAdjustBrushSize,
     setShowUpload, setShowTools, setShowGallery,
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
-    onZoomOut, onZoomReset, onToolChange, onFlipH, onFlipV, onRotateCw,
+    onZoomOut, onZoomReset, onGroupChange, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onCopyRegion, onNewLayerCopy, onNewLayerCut, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
   ]);
 }

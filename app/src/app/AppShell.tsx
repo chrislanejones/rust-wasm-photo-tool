@@ -49,6 +49,8 @@ import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
+import { groupById } from "@/features/tools/toolGroups";
+import { activateGroup } from "@/features/tools/activateSubTool";
 import type { PlacementCell } from "@/components/PlacementGrid";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
@@ -2246,11 +2248,12 @@ export function AppShell() {
     onZoomIn: handleZoomIn,
     onZoomOut: handleZoomOut,
     onZoomReset: handleZoomReset,
-    onToolChange: (t) => {
-      // Batch Image Editor requires 2+ photos; ignore the shortcut otherwise
-      // so the keyboard path matches the disabled sidebar icon.
-      if (t === "emoji" && photos.length <= 1) return;
-      setActiveTool(t);
+    onGroupChange: (g) => {
+      // Batch requires 2+ photos; ignore the digit otherwise so the keyboard
+      // path matches the disabled rail tile.
+      if (g === "batch" && photos.length <= 1) return;
+      const group = groupById(g);
+      if (group) activateGroup(group);
     },
     onFlipH: stamp.flipHorizontal,
     onFlipV: stamp.flipVertical,

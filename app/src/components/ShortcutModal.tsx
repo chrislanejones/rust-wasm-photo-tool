@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Keyboard } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
-import { TOOLS } from "@/features/tools/toolConfig";
+import { TOOL_GROUPS } from "@/features/tools/toolGroups";
 
 interface Props {
   open: boolean;
@@ -10,16 +10,18 @@ interface Props {
 
 const SHORTCUT_GROUPS = [
   {
-    title: "Tools (bare keys)",
-    // DERIVED from toolConfig.ts, not hand-written. This list used to be its
-    // own copy of the tool table and drifted: it silently omitted Select for
-    // three releases after `S` was removed. Generating it means a tool that
-    // gains, loses or changes a key updates here for free, and a keyless tool
-    // simply doesn't appear. Rail order is TOOLS order, which is also the
-    // order the keys are assigned in.
-    shortcuts: TOOLS.filter((t) => t.shortcutKey).map((t) => ({
-      keys: [t.shortcutKey!],
-      action: t.tooltipTitle ?? t.label,
+    title: "Tool groups (bare keys)",
+    // DERIVED from the five-group registry, not hand-written. This list used to
+    // be its own copy of the tool table and drifted: it silently omitted Select
+    // for three releases after `S` was removed. Generating it means a group
+    // that gains, loses or changes a key updates here for free.
+    //
+    // Sub-tools are deliberately absent: 33 of them have no bare-key bindings
+    // (palette and click only), so there is nothing here to list for them and
+    // no way for this table to fall behind one.
+    shortcuts: TOOL_GROUPS.map((g) => ({
+      keys: [g.shortcutKey],
+      action: g.label,
     })),
   },
   {
