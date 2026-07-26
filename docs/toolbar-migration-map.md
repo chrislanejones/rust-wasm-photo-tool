@@ -223,6 +223,35 @@ pair, which is the same information the toolbar restored before this job.
 
 ---
 
+## Verification — against artifacts, not tests
+
+Production build served on port 5199, served bundle hash confirmed against the
+build output (guards the stale-dist trap). Sample images loaded. **0 console
+errors** across the whole sweep.
+
+All 33 sub-tools were clicked in the running app:
+
+| Group | Live | Result |
+|-------|------|--------|
+| Enhance | 4/4 | correct panel each (Compress / Resize / Levels / Background Removal) |
+| Select | 6/6 | correct panel each (Wand … Ellipse) |
+| Create | 13/13 | correct panel each (Paint … Stamps) |
+| Edit | 6/7 | correct panel; Perspective renders disabled and is not clickable |
+| Batch | 3/3 | correct panel each (Logo / Text / Rename) |
+
+Every activation lit the right sub-tile AND the right group tile.
+
+**Line's preselect verified specifically** (the AMBIGUOUS-2 implementation):
+reset the Shapes panel to Rectangle, clicked the Line sub-tool, Line became the
+active kind. An earlier probe suggested it was a no-op; that probe was
+confounded — a prior sweep had already left the kind on `line`, so both
+snapshots matched. Re-tested from a clean state, it works.
+
+Known and expected at this stage: the three Edit sub-tools sharing `crop` all
+show the full `TransformCropSettings` panel (and all read `#/tool/adjust`), and
+the three sharing `arrow` all show the full `LayerSettings` panel. Panel
+scoping is phase 2; URL distinction is phase 3b.
+
 ## Stale premise in the brief
 
 > "ShortcutModal must derive from the registry — it's a hand-maintained fourth
