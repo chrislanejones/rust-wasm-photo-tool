@@ -6,6 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { HOVER_RING } from "@/lib/styles";
 
 /** One independently-toggleable button in a {@link ToggleButtonGroup}. */
 export interface ToggleGroupItem {
@@ -55,7 +56,11 @@ export function ToggleButtonGroup({
             title={tooltip ? undefined : label}
             aria-label={tooltip?.label ?? label}
             className={cn(
-              "flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold font-mono transition-all",
+              "flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold font-mono",
+              "transition-all duration-200 ease-out",
+              // Same warm-accent hover ring as the tool rail and the top bar's
+              // icon buttons — one hover vocabulary across every button group.
+              HOVER_RING,
               fill && "flex-1",
               // Active = raised elevated pill. In dark, --accent-ui and
               // --bg-elevated are both #2b2b2b (unchanged); in light, bg-elevated
@@ -66,16 +71,13 @@ export function ToggleButtonGroup({
                 : "text-text-muted hover:text-text-primary hover:bg-bg-elevated",
             )}
           >
-            {!noIcons && (
-              // Icon-only mode gets a BIGGER glyph: with the label hidden the
-              // icon is the button's entire content, and at 14px it read as a
-              // small mark floating in a wide tile — the Review panel's four
-              // section toggles are the case that shows it. 18px matches the
-              // top bar's IconButton glyph, so the two groups sit at the same
-              // visual weight. Labelled buttons keep 14px, where the icon is a
-              // supporting mark next to text and a bigger one would crowd it.
-              <Icon className={compact ? "h-[18px] w-[18px]" : "h-3.5 w-3.5"} />
-            )}
+            {/* ONE glyph size, labelled or not: 18px, matching the top bar's
+                IconButton. The top bar's New/Tools/Gallery/Review and the
+                Review panel's History/Layers/Reselect/Histogram are the same
+                component, and they now read at the same weight whether or not
+                the label is showing. (14px here made the labelled ones look
+                like a different, smaller control than their icon-only twins.) */}
+            {!noIcons && <Icon className="h-[18px] w-[18px]" />}
             {!compact && <span>{label}</span>}
           </button>
         );
