@@ -8,7 +8,6 @@ import { Scissors, Eraser, Wand2, Trash2, Lock } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { SizeSlider } from "@/components/SizeSlider";
 import { SectionHeader } from "@/components/ui/section-header";
-import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
@@ -26,8 +25,12 @@ type LiveType = "rembg" | "inpaint";
 // Deliberately NOT ToolModeToggle — that component mysteriously fails to
 // re-render its render-prop body in this file's sibling TextSettings.tsx
 // (root cause never pinned down after real investigation; see that file's
-// history). Plain ToolButtonGroup + a switch is the proven-working pattern
-// used there instead, so it's used here too rather than risk the same bug.
+// history). A plain SectionHeader + a switch on `mode` is the proven-working
+// pattern used there instead, so it's used here too rather than risk the bug.
+//
+// This array outlived the hoist: the TILES it fed now render in the header
+// (SubtoolRow, via toolModes.ts LEGACY_SUBMODES.ai), but the per-mode
+// title/info below is still resolved from here.
 const ERASER_MODES: {
   id: EraserMode;
   label: string;
@@ -100,7 +103,6 @@ export function AISettings({
   // (useEffectiveTool) can see which sub-mode is selected — the prerequisite
   // for Magic Eraser to receive paint strokes once that routing lands.
   const mode = useToolStore((s) => s.eraserMode);
-  const setMode = useToolStore((s) => s.setEraserMode);
   const activeModeInfo = ERASER_MODES.find((m) => m.id === mode)!;
   // Magic Eraser — SHIPPED ON since v7.46; `ih_patchmatch` is a "0" kill
   // switch (see lib/patchmatch.ts), and this mode calls the same
@@ -138,14 +140,10 @@ export function AISettings({
   };
 
   return (
-    <div className="space-y-4 -mt-2">
-      <ToolButtonGroup
-        stacked
-        columns={2}
-        options={ERASER_MODES}
-        value={mode}
-        onChange={setMode}
-      />
+    // The four mode tiles moved to the ToolsSidebar header (SubtoolRow), which
+    // reads/writes this same `eraserMode` via toolModes.ts. `-mt-2` went with
+    // them — it only existed to tuck that row under the panel's top padding.
+    <div className="space-y-4">
       <SectionHeader title={activeModeInfo.title} info={headerInfo} />
 
       {mode === "brush" && (

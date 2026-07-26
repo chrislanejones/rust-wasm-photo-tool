@@ -6,7 +6,7 @@
 //   All other existing functionality preserved
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
-import { useStoreUser } from "@/hooks/useStoreUser";
+import { useStoreUser, useRealTier } from "@/hooks/useStoreUser";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
@@ -68,7 +68,7 @@ import {
 } from "@/lib/galleryManifest";
 import { getPhotoLimit } from "@/lib/photoLimits";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
-import { hasReplicateAI, TIERS } from "@/lib/tiers";
+import { hasReplicateAI, TIERS, userModeForTier } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { useSelectionActions } from "./session/useSelectionActions";
@@ -208,11 +208,19 @@ function AuthModeWatcher({ onMode }: { onMode: (m: UserMode) => void }) {
   const { isLoaded, isSignedIn } = useUser();
   // Create/refresh the Convex users row on sign-in (tier lives there).
   useStoreUser();
+  // ...and then actually READ that tier. This line was missing: the watcher
+  // created the row the tier lives in and then reported `loggedIn` for every
+  // signed-in user, so a pro/team subscriber was gated to free limits —
+  // gallery 24 instead of 100, 100 MB instead of 5 GB, 3 layers instead of
+  // unlimited, and the Replicate AI tools OFF, which is the paid headline.
+  // The server was enforcing the real tier the whole time; only the UI lied.
+  // `useRealTier` was written and documented for exactly this and never wired.
+  const realTier = useRealTier();
 
   useEffect(() => {
     if (!isLoaded) return;
-    onMode(isSignedIn ? "loggedIn" : "demo");
-  }, [isLoaded, isSignedIn, onMode]);
+    onMode(isSignedIn ? userModeForTier(realTier) : "demo");
+  }, [isLoaded, isSignedIn, realTier, onMode]);
 
   return null;
 }

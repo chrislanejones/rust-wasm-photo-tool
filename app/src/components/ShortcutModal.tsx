@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Keyboard } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
+import { TOOLS } from "@/features/tools/toolConfig";
 
 interface Props {
   open: boolean;
@@ -10,18 +11,16 @@ interface Props {
 const SHORTCUT_GROUPS = [
   {
     title: "Tools (bare keys)",
-    shortcuts: [
-      { keys: ["1"], action: "Resize & Compress" },
-      { keys: ["2"], action: "Crop & Transform" },
-      { keys: ["3"], action: "Paint & Blur Brush" },
-      { keys: ["4"], action: "Text & Speech Bubbles" },
-      { keys: ["5"], action: "Move (active layer)" },
-      { keys: ["6"], action: "Eraser" },
-      { keys: ["7"], action: "Shapes & Arrows" },
-      { keys: ["8"], action: "Effects (Levels & Color Picker)" },
-      { keys: ["9"], action: "Stamps" },
-      { keys: ["0"], action: "Batch Image Editor" },
-    ],
+    // DERIVED from toolConfig.ts, not hand-written. This list used to be its
+    // own copy of the tool table and drifted: it silently omitted Select for
+    // three releases after `S` was removed. Generating it means a tool that
+    // gains, loses or changes a key updates here for free, and a keyless tool
+    // simply doesn't appear. Rail order is TOOLS order, which is also the
+    // order the keys are assigned in.
+    shortcuts: TOOLS.filter((t) => t.shortcutKey).map((t) => ({
+      keys: [t.shortcutKey!],
+      action: t.tooltipTitle ?? t.label,
+    })),
   },
   {
     title: "Navigation",

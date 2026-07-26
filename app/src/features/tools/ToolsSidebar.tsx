@@ -18,6 +18,7 @@ import type { ExportFormat } from "@/lib/exportImage";
 import type { StampMode } from "./settings/StampSettings";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { ToolGrid } from "./ToolGrid";
+import { SubtoolRow } from "./SubtoolRow";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import { LayerSettings } from "./settings/LayerSettings";
@@ -231,8 +232,10 @@ export function ToolsSidebar({
       }
       style={embedded ? { boxShadow: "var(--shadow-panel)" } : { boxShadow: "var(--shadow-panel)" }}
     >
-      {/* No title/close — the 10 tool icons are the only thing in the header. */}
-      <div className="px-4 pt-3 pb-4 border-b border-border">
+      {/* Tool rail + the active tool's sub-tool rail. `layout` is what makes
+          the body below slide rather than jump when the sub-row row-count
+          changes (0 -> 1 -> 2 rows). */}
+      <motion.div layout className="px-4 pt-3 pb-4 border-b border-border">
         <ToolGrid
           activeTool={activeTool}
           onToolChange={onToolChange}
@@ -243,9 +246,13 @@ export function ToolsSidebar({
                 : false,
           }}
         />
-      </div>
+        <SubtoolRow activeTool={activeTool} disabled={!imageReady} />
+      </motion.div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
+      <motion.div
+        layout
+        className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin"
+      >
         {activeTool === "compress" && (
           <ResizeSettings
             disabled={!imageReady}
@@ -391,7 +398,7 @@ export function ToolsSidebar({
             onChange={onToolSettingsChange}
           />
         )}
-      </div>
+      </motion.div>
 
       <div className="p-4 border-t border-border">
         {/* One Download button. With a single photo it downloads directly;

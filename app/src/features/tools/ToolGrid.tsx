@@ -14,7 +14,11 @@ interface Props {
 
 export function ToolGrid({ activeTool, onToolChange, disabledTools }: Props) {
   return (
-    <div className="grid grid-cols-5 gap-2" role="toolbar" aria-label="Select tool">
+    // 4 columns, not 5, and it must MATCH SubtoolRow's column count: the two
+    // grids then share a tile size, so the header grows in exact one-tile steps
+    // as the sub-tool row appears/disappears. (11 tools also sit better as
+    // 4/4/3 than as 5/5/1.)
+    <div className="grid grid-cols-4 gap-2" role="toolbar" aria-label="Select tool">
       {TOOLS.map((tool) => {
         const disabledEntry = disabledTools?.[tool.id];
         const isDisabled = Boolean(disabledEntry);

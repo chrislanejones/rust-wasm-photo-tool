@@ -18,10 +18,14 @@ import { useGalleryStore } from "./useGalleryStore";
 describe("useToolStore persistence", () => {
   const { partialize, merge } = useToolStore.persist.getOptions();
 
-  it("partializes exactly the four sub-mode prefs", () => {
+  it("partializes exactly the six sub-mode prefs", () => {
+    // Was four. `textMode` and `batchMode` joined in the new-ui-toolbar arc
+    // when Text's and Batch's sub-modes moved out of component `useState` and
+    // into the store — same "remember which sub-mode I was in" category as the
+    // other four, so they persist on the same terms.
     const persisted = partialize!(useToolStore.getState());
     expect(Object.keys(persisted).sort()).toEqual(
-      ["brushMode", "eraserMode", "shapesMode", "stampSubMode"].sort(),
+      ["batchMode", "brushMode", "eraserMode", "shapesMode", "stampSubMode", "textMode"].sort(),
     );
   });
 

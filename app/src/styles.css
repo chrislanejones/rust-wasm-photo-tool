@@ -273,9 +273,12 @@
      so it must be set ON the shadowed element — a var flip on `.dark` alone
      would never cascade down to it.
    • The black layers keep their `var(--tw-shadow-color, …)` wrapper so an
-     explicit `shadow-<color>` modifier (ToolButton's `shadow-black/25`) still
-     overrides them. The hairline stays literal so a color modifier can't
-     accidentally turn it black.
+     explicit `shadow-<color>` modifier still overrides them. The hairline
+     stays literal so a color modifier can't accidentally turn it black.
+     (The tool-rail tile used to be the example here, with `shadow-black/25`
+     over its accent gradient. Both are gone — the selected tile now takes a
+     plain `shadow-sm` and lets the `.dark` restatement above do the work,
+     which is the intended pattern.)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* The utility Tailwind never generated (see 1 above). */

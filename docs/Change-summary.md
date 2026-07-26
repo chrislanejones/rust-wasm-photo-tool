@@ -2258,3 +2258,21 @@ warnings), 211/211 vitest, build:all.
 **Deferred** (PARKING_LOT): step 2 — the zustand engine store + CanvasArea
 memoization with a render-count proof. Bigger than all five extractions
 combined and touches the files the toolbar arc is reshaping.
+
+## v7.50 — 2026-07-26
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | **Paid accounts were gated to the free tier.** `AuthModeWatcher` called `useStoreUser()` — creating the very Convex row the tier lives in — then reported `loggedIn` for every signed-in user. `useRealTier` existed, was documented as the fix, and was never called (found by the fallow dead-export pass). | **FIXED** — new `userModeForTier()` maps Convex `free\|pro\|team` → UI `demo\|loggedIn\|paid`; wired into the watcher and reactive, so a grant/upgrade flips live |
+| 2   | What a `$10/mo` subscriber was actually getting: gallery 24 (not 100), storage 100 MB (not 5 GB), 3 layers (not unlimited), and **Replicate AI off** — the paid headline. Server-side enforcement was always correct; only the client lied. | Quantified from `lib/tiers.ts` |
+| 3   | `tiers.test.ts` — 7 tests pinning the mapping, the fail-closed `null`/unknown cases, and that only `paid` unlocks AI | New — the bug shipped because nothing tested the seam between two vocabularies |
+| 4   | **CI was red for 12 hours and it was our own step order.** v7.48 added `pnpm -C app test` *before* `pnpm run build:all`; the suite transitively imports `lib/photoLimits.ts`, which does `await import("stamp_tool")` — a package that only exists once `build:wasm` has produced `pkg/`. | Fixed — test step moved after `build:all`. Reproduced locally by moving `pkg/` aside, then verified from that same clean state |
+| 5   | Toolbar: sub-tools hoisted out of the settings panels into a `SubtoolRow` under the tool rail, same tile shape/size, `grid-cols-4` on both so the header steps in whole tiles | Complete |
+| 6   | All eleven tools keyed in grid reading order — `1`–`9`, `0`, then `-` (Minus). Select gets `3`, the digit promised when `S` was dropped in v7.47. `TEXT_MODES`/`BATCH_MODES` lifted out of component state into `useToolStore` so the palette, routing and the new row share one definition | Complete |
+| 7   | Guardrail ratchet: raw-colors baseline lowered 27 → 26 (the toolbar work removed one) | Locked in |
+
+**Verified**: tsc clean; eslint 0 errors / 59 warnings; **224/224 vitest** (17
+files, 7 new); `build:all` succeeds; guardrails ratchet passes with no count
+above baseline. The CI fix was verified the honest way — `pkg/` moved aside to
+reproduce the red, then `build:all` → `test` from that same state: 217 → 224
+passing.

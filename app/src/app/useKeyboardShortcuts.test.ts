@@ -123,13 +123,16 @@ describe("TOOL_BY_KEY agrees with toolConfig.ts (one contract, stated twice)", (
   // claim is actually checked. If someone adds/reorders a tool in one table
   // without the other, tool keys and the sidebar/palette shortcut hints
   // silently disagree about which key does what.
-  /** shortcutKey → e.code: digits are DigitN, letters are KeyX. */
-  const toCode = (k: string) => (/^\d$/.test(k) ? `Digit${k}` : `Key${k}`);
+  /** shortcutKey → e.code: digits are DigitN, punctuation has its own name
+   *  (the rail runs past `0` onto `-`), letters are KeyX. */
+  const PUNCT_CODE: Record<string, string> = { "-": "Minus", "=": "Equal" };
+  const toCode = (k: string) =>
+    PUNCT_CODE[k] ?? (/^\d$/.test(k) ? `Digit${k}` : `Key${k}`);
 
-  /** `shortcutKey` is optional — a tool may ship keyless (Select currently is,
-   *  pending the selection-tools UI rework). Keyless tools are held to the
-   *  opposite contract: they must be ABSENT from TOOL_BY_KEY, which the
-   *  set-equality test below enforces. */
+  /** `shortcutKey` is optional — a tool MAY ship keyless, though none is
+   *  today (Select got its promised digit in the new-ui-toolbar renumbering).
+   *  Keyless tools are held to the opposite contract: they must be ABSENT
+   *  from TOOL_BY_KEY, which the set-equality test below enforces. */
   const keyed = TOOLS.filter(
     (t): t is typeof t & { shortcutKey: string } => !!t.shortcutKey,
   );
@@ -236,22 +239,55 @@ describe("sanity: the harness actually reaches the real handler", () => {
     expect(onUndo).toHaveBeenCalledTimes(1);
   });
 
-  it("bare digit 3 switches to the Paint tool", () => {
+  it("bare digit 4 switches to the Paint tool", () => {
+    const onToolChange = vi.fn();
+    mount(baseProps({ onToolChange }));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit4", bubbles: true }));
+    });
+    expect(onToolChange).toHaveBeenCalledWith("brush");
+  });
+
+  it("bare digit 7 switches to the Eraser tool (id stays 'ai')", () => {
+    const onToolChange = vi.fn();
+    mount(baseProps({ onToolChange }));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit7", bubbles: true }));
+    });
+    expect(onToolChange).toHaveBeenCalledWith("ai");
+  });
+
+  it("bare digit 3 switches to Select — the key it was promised in v7.44", () => {
     const onToolChange = vi.fn();
     mount(baseProps({ onToolChange }));
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit3", bubbles: true }));
     });
-    expect(onToolChange).toHaveBeenCalledWith("brush");
+    expect(onToolChange).toHaveBeenCalledWith("select");
   });
 
-  it("bare digit 6 switches to the Eraser tool (id stays 'ai')", () => {
+  it("bare Minus switches to Batch — the rail runs past 0 onto '-'", () => {
     const onToolChange = vi.fn();
     mount(baseProps({ onToolChange }));
     act(() => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit6", bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Minus", bubbles: true }));
     });
-    expect(onToolChange).toHaveBeenCalledWith("ai");
+    expect(onToolChange).toHaveBeenCalledWith("emoji");
+  });
+
+  it("Alt+Minus still zooms out rather than switching tools", () => {
+    // The bare tool-key path must not steal the key from the Alt binding on
+    // the same physical key — the Alt branch returns before it is reached.
+    const onToolChange = vi.fn();
+    const onZoomOut = vi.fn();
+    mount(baseProps({ onToolChange, onZoomOut }));
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { code: "Minus", altKey: true, bubbles: true }),
+      );
+    });
+    expect(onZoomOut).toHaveBeenCalledTimes(1);
+    expect(onToolChange).not.toHaveBeenCalled();
   });
 });
 

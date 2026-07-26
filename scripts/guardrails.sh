@@ -91,7 +91,7 @@ n_raw_color=$(rg -n '\b(bg|text|border|ring)-(zinc|neutral|gray|slate|stone)-[0-
     -g '!**/CanvasArea.tsx' -g '!**/PenOverlay.tsx' -g '!**/CompareSlider.tsx' \
     -g '!**/MagnifierOverlay.tsx' -g '!**/GalleryBar.tsx' -g '!**/colors.ts' -g '!**/toolConfig.ts' \
   | rg -v 'allow: raw-color' | wc -l)
-check "raw-colors" 27 "use design tokens (docs/ci-guardrails.md §2)" "$n_raw_color"
+check "raw-colors" 26 "use design tokens (docs/ci-guardrails.md §2)" "$n_raw_color"
 
 n_type=$(rg -n 'text-\[[0-9.]+px\]|font-medium|font-black' app/src -g '*.tsx' | wc -l)
 check "type-scale" 9 "off-scale type / faux weights (§4)" "$n_type"

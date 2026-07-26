@@ -20,6 +20,7 @@ import {
   makeThumbnail,
   makeThumbnailFromPixels,
 } from "@/lib/workingCopy";
+import { useToolStore } from "@/stores/useToolStore";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "@/components/ui/sonner";
@@ -531,15 +532,16 @@ export function BatchSettings({
     syncState,
   ]);
 
-  const [mode, setMode] = useState<"logo" | "text" | "rename">("logo");
+  // Store-backed, not local state: the hoisted SubtoolRow, the command palette
+  // and hash routing all read this mode through toolModes.ts. While it was a
+  // `useState` here none of the three could see it.
+  const mode = useToolStore((s) => s.batchMode);
+  const setMode = useToolStore((s) => s.setBatchMode);
 
   return (
-    <ToolModeToggle
-      modes={BATCH_TOOL_MODES}
-      columns={3}
-      activeMode={mode}
-      onModeChange={setMode}
-    >
+    // No `showModeRow` — the tiles live in the ToolsSidebar header now; this
+    // renders only the active mode's title + body.
+    <ToolModeToggle modes={BATCH_TOOL_MODES} activeMode={mode} onModeChange={setMode}>
       {(m) =>
         m === "text" ? (
         <TextBatchPanel

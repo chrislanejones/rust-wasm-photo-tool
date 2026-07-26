@@ -22,12 +22,13 @@ export interface ToolDefinition {
   tooltipTitle?: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
-  gradient: string;
   /** Key that switches to this tool (mirrors TOOL_BY_KEY in
-   *  useKeyboardShortcuts.ts — keys 1-9, 0, then letters once the digit row
-   *  filled). Optional: a tool may ship with no key at all, in which case it
-   *  must not appear in TOOL_BY_KEY, the sidebar tooltip, or ShortcutModal.
-   *  Select is currently keyless pending the selection-tools UI rework. */
+   *  useKeyboardShortcuts.ts). Keys run in GRID READING ORDER across the
+   *  4-column rail: 1-9, then 0 for the tenth, then `-` for the eleventh —
+   *  the number row continues past 0, so the eleventh tool keeps a key
+   *  instead of going bare. Optional: a tool may ship with no key at all, in
+   *  which case it must not appear in TOOL_BY_KEY, the sidebar tooltip, or
+   *  ShortcutModal. Every tool is keyed today. */
   shortcutKey?: string;
 }
 
@@ -36,9 +37,8 @@ export const TOOLS: ToolDefinition[] = [
     id: "compress",
     label: "Resize",
     tooltipTitle: "Compress & Resize",
-    description: "Compress & resize images",
+    description: "Shrink the file or change the pixel dimensions",
     icon: Shrink,
-    gradient: "from-orange-500 to-red-500",
     shortcutKey: "1",
   },
   {
@@ -47,9 +47,8 @@ export const TOOLS: ToolDefinition[] = [
     // sub-mode split into its own tool; now just the crop/transform half.
     id: "crop",
     label: "Adjust",
-    description: "Crop & transform",
+    description: "Crop, flip, rotate and pick a colour off the image",
     icon: VectorSquare,
-    gradient: "from-cyan-500 to-blue-500",
     shortcutKey: "2",
   },
   {
@@ -58,29 +57,26 @@ export const TOOLS: ToolDefinition[] = [
     // (wand/edge/color/lasso); drag = rect/ellipse marquee.
     id: "select",
     label: "Select",
-    description: "Select by click or marquee",
+    description: "Wand, edge-aware, lasso, colour range or marquee",
     icon: SquareDashedMousePointer,
-    gradient: "from-teal-500 to-cyan-500",
-    // Deliberately keyless — do NOT give this a letter key. `S` was removed
-    // pending the selection-tools UI rework that splits the kinds into their
-    // own tools + routes; Select gets a DIGIT there as part of the renumbering,
-    // not a revived `S`.
+    // The promised digit, delivered: `S` was removed in v7.44 pending this
+    // renumbering, and Select sits third in the rail, so it takes `3`. Do NOT
+    // revive `S` — the digit IS the key now.
+    shortcutKey: "3",
   },
   {
     id: "brush",
     label: "Paint",
-    description: "Paint, blur & pen",
+    description: "Brush, blur and pen strokes straight onto the canvas",
     icon: Paintbrush,
-    gradient: "from-blue-500 to-indigo-500",
-    shortcutKey: "3",
+    shortcutKey: "4",
   },
   {
     id: "text",
     label: "Text",
-    description: "Text & speech bubbles",
+    description: "Add a caption, put a plate behind it, or read text out",
     icon: Type,
-    gradient: "from-amber-400 to-orange-500",
-    shortcutKey: "4",
+    shortcutKey: "5",
   },
   {
     // NB: the `arrow` id is legacy — this slot is now the Layer Settings tool:
@@ -89,10 +85,9 @@ export const TOOLS: ToolDefinition[] = [
     id: "arrow",
     label: "Layer Settings",
     tooltipTitle: "Layer Settings",
-    description: "Move the active layer & select regions",
+    description: "Move the active layer and resize the canvas around it",
     icon: Layers,
-    gradient: "from-emerald-500 to-teal-500",
-    shortcutKey: "5",
+    shortcutKey: "6",
   },
   {
     // DISPLAY label only — id stays "ai" (shortcut 6, persistence, routing
@@ -102,26 +97,23 @@ export const TOOLS: ToolDefinition[] = [
     // Magic Eraser + Background Removal + Object Removal (AISettings.tsx).
     id: "ai",
     label: "Eraser",
-    description: "Remove objects & backgrounds",
+    description: "Rub out by hand, or lift an object or background away",
     icon: Eraser,
-    gradient: "from-violet-500 to-purple-600",
-    shortcutKey: "6",
+    shortcutKey: "7",
   },
   {
     id: "shapes",
     label: "Shapes",
-    description: "Shapes & arrows",
+    description: "Boxes, ellipses, pen paths and arrows",
     icon: Shapes,
-    gradient: "from-pink-500 to-rose-500",
-    shortcutKey: "7",
+    shortcutKey: "8",
   },
   {
     id: "effects",
     label: "Effects",
-    description: "Levels & color picker",
+    description: "Brightness, contrast, saturation, shadows and sharpen",
     icon: Sparkles,
-    gradient: "from-indigo-400 to-violet-600",
-    shortcutKey: "8",
+    shortcutKey: "9",
   },
   {
     id: "stamp",
@@ -129,17 +121,17 @@ export const TOOLS: ToolDefinition[] = [
     // The "stamp" id (shortcut, persistence, routing) is intentionally
     // untouched; ids are renamed during the registry migration only.
     label: "Stamps",
-    description: "Clone stamp, red stamps & emojis",
+    description: "Clone from a source point, or drop markers and emoji",
     icon: Stamp,
-    gradient: "from-rose-500 to-red-600",
-    shortcutKey: "9",
+    shortcutKey: "0",
   },
   {
     id: "emoji",
     label: "Batch Image Editor",
-    description: "Apply logo or text to all loaded images at once",
+    description: "Stamp a logo, add text or rename every loaded photo at once",
     icon: Images,
-    gradient: "from-yellow-400 to-orange-400",
-    shortcutKey: "0",
+    // Eleventh in the rail, so it continues past `0` onto `-`. Bare `-` is
+    // free: the zoom-out binding on the same key is Alt+`-`.
+    shortcutKey: "-",
   },
 ];

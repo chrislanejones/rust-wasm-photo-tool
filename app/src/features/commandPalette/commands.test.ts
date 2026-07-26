@@ -40,10 +40,12 @@ describe("the registry navigates via routes", () => {
     expect(currentHash()).toBe("#/settings/security");
   });
 
-  it("the Eraser (id 'ai') jump-to-tool entry lands on the renamed '#/tool/eraser' route", () => {
+  it("the Eraser (id 'ai') jump-to-tool entry lands on the renamed 'eraser' route", () => {
+    useToolStore.setState({ eraserMode: "brush" });
     byId(build(), "tool.ai")!.run();
     expect(useToolStore.getState().activeTool).toBe("ai");
-    expect(currentHash()).toBe("#/tool/eraser");
+    // Carries its sub-mode now that `eraserMode` is on the sub-mode axis.
+    expect(currentHash()).toBe("#/tool/eraser/brush");
   });
 
   it("every navigating entry produces a route the URL can express", () => {
@@ -100,30 +102,51 @@ describe("the Eraser tool (repurposed 'ai' slot)", () => {
   it("has exactly one jump-to-tool entry, labeled Eraser (not the old 'AI')", () => {
     const cmd = byId(build(), "tool.ai")!;
     expect(cmd.label).toBe("Eraser");
-    expect(cmd.shortcut).toBe("6");
+    // 7, not 6: the rail renumbered in reading order when Select took a digit.
+    expect(cmd.shortcut).toBe("7");
   });
 
-  it("has no jump-to-sub-mode entries — AISettings is flat buttons, not a ToolModeToggle", () => {
-    // Confirms the brief's suspicion directly: unlike Paint/Shapes/Stamps,
-    // the Eraser isn't in TOOL_MODULES and has no LEGACY_SUBMODES row, so
-    // allToolModes() never emits a "mode.ai.*" id — a user hunting for
-    // "Magic Eraser" or "Background Removal" in the palette will only ever
-    // find the one tool-level "Eraser" entry, not a sub-mode for each action.
+  it("offers all four of its sub-modes as jump-to entries", () => {
+    // Was the reverse assertion: the Eraser had no LEGACY_SUBMODES row, so
+    // allToolModes() emitted no "mode.ai.*" ids and a user hunting for "Magic
+    // Eraser" or "Background Removal" found only the one tool-level entry.
+    // The new-ui-toolbar arc gave `ai` a row (its tiles had to come from
+    // somewhere), and the palette picks it up off the same table.
     const ids = build().map((c) => c.id);
-    expect(ids.some((id) => id.startsWith("mode.ai."))).toBe(false);
+    for (const m of ["brush", "magic", "rembg", "inpaint"]) {
+      expect(ids).toContain(`mode.ai.${m}`);
+    }
+  });
+
+  it("a sub-mode entry both navigates and selects the mode", () => {
+    const cmd = byId(build(), "mode.ai.magic")!;
+    expect(cmd.label).toBe("Eraser › Magic Eraser");
+    cmd.run();
+    expect(useToolStore.getState().activeTool).toBe("ai");
+    expect(useToolStore.getState().eraserMode).toBe("magic");
+    expect(currentHash()).toBe("#/tool/eraser/magic");
   });
 });
 
-describe("Text's sub-modes are not palette-searchable (known gap, not a regression)", () => {
-  // TextSettings.tsx's mode (Text/Background/OCR) is local useState — it was
-  // never threaded through useToolStore the way Paint/Shapes/Stamps/Resize/
-  // Adjust are, so there's no store field for toolModes.ts's LEGACY_SUBMODES
-  // to read even though OCR (new tonight) would otherwise want an entry here.
-  // This predates tonight's OCR move (Text/Background already had it) —
-  // pinned as current behavior, not fixed, per this pass's scope.
-  it("emits no mode.text.* entries at all", () => {
+describe("Text's sub-modes are palette-searchable (the gap closed in new-ui-toolbar)", () => {
+  // TextSettings.tsx held its mode (Text/Background/OCR) in local useState, so
+  // there was no store field for toolModes.ts to read and the palette emitted
+  // no mode.text.* entries at all — OCR in particular was unreachable by
+  // search. The hoist moved it to `useToolStore.textMode`, which fixes it.
+  it("emits one entry per Text sub-mode", () => {
     const ids = build().map((c) => c.id);
-    expect(ids.some((id) => id.startsWith("mode.text."))).toBe(false);
+    for (const m of ["text", "background", "ocr"]) {
+      expect(ids).toContain(`mode.text.${m}`);
+    }
+  });
+
+  it("OCR is reachable and selects the mode", () => {
+    const cmd = byId(build(), "mode.text.ocr")!;
+    expect(cmd.label).toBe("Text › OCR");
+    cmd.run();
+    expect(useToolStore.getState().activeTool).toBe("text");
+    expect(useToolStore.getState().textMode).toBe("ocr");
+    expect(currentHash()).toBe("#/tool/text/ocr");
   });
 });
 

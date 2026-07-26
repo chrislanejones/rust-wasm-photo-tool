@@ -12,6 +12,8 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { Spinner } from "@/components/ui/spinner";
 import { useAIJob } from "@/hooks/useAIJob";
+import { useToolStore } from "@/stores/useToolStore";
+import type { TextMode } from "@/stores/useToolStore";
 
 const FONT_FAMILIES = [
   { label: "Sans Serif", value: "sans-serif" },
@@ -70,8 +72,10 @@ export interface TextMemory {
   textColor: string;
 }
 
-type TextMode = "text" | "background" | "ocr";
-
+/** The mode tiles the hoisted SubtoolRow renders for this tool. Kept here (not
+ *  moved to toolModes.ts) because the `info` strings are this panel's
+ *  lightbulb copy; toolModes.ts LEGACY_SUBMODES carries the palette's own
+ *  thin projection of the same three ids. */
 const MODE_OPTIONS: readonly ToolMode<TextMode>[] = [
   {
     id: "text",
@@ -117,7 +121,10 @@ export function TextSettings({
   activePhotoId,
   stampToolRef,
 }: TextSettingsProps) {
-  const [mode, setMode] = useState<TextMode>("text");
+  // Store-backed, not local state: the hoisted SubtoolRow, the command palette
+  // and hash routing all read this mode through toolModes.ts. While it was a
+  // `useState` here none of the three could see it.
+  const mode = useToolStore((s) => s.textMode);
 
   // OCR's own job instance — never runs an image model, so onImageResult is
   // genuinely a no-op here (useAIJob only calls it for rembg/upscale/inpaint;
@@ -148,14 +155,10 @@ export function TextSettings({
   const activeModeInfo = MODE_OPTIONS.find((opt) => opt.id === mode);
 
   return (
-    <div className="space-y-5 -mt-2" data-text-panel>
-    <ToolButtonGroup
-      stacked
-      columns={3}
-      options={MODE_OPTIONS}
-      value={mode}
-      onChange={setMode}
-    />
+    // The mode tiles moved to the ToolsSidebar header (SubtoolRow); `-mt-2`
+    // went with them — it only existed to tuck that row under the panel's top
+    // padding, and without it the title would ride too high.
+    <div className="space-y-5" data-text-panel>
     {activeModeInfo && (
       <SectionHeader title={activeModeInfo.label} info={activeModeInfo.info} />
     )}

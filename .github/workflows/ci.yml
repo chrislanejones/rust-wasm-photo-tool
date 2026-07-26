@@ -58,8 +58,16 @@ jobs:
       # it was in CLAUDE.md for months while no eslint config or dependency
       # existed, so the "gate" silently exited on config-not-found every run.
       - run: pnpm lint
-      - run: pnpm -C app test
+      # ORDER MATTERS: the suite must run AFTER build:all, not before it.
+      # `useKeyboardShortcuts.test.ts` transitively imports lib/photoLimits.ts,
+      # which does `await import("stamp_tool")` — the WASM package that only
+      # exists once `build:wasm` has produced pkg/. Running tests first fails
+      # with "Failed to resolve import stamp_tool", which looks like a broken
+      # test and is actually a missing build artifact. It passed locally only
+      # because pkg/ was already on disk; reproduced by moving pkg/ aside.
+      # (The `rust` job builds pkg/ too, but jobs don't share a filesystem.)
       - run: pnpm run build:all
+      - run: pnpm -C app test
 
   # Asserts the LIVE site is serving a real engine — not that a build succeeded.
   # From v7.36 to v7.45 netlify.toml ran a bare `wasm-pack build` with no

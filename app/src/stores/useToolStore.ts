@@ -35,6 +35,18 @@ export type ShapesMode = (typeof SHAPES_MODES)[number];
  *  bare value tuple for hydration validation. */
 export const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
 export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
+/** Text tool sub-modes: `text` = the type tool, `background` = the plate/bubble
+ *  behind it, `ocr` = read text out of the image. Lifted here out of
+ *  TextSettings.tsx local `useState` in the new-ui-toolbar arc — while it was
+ *  component state the mode was invisible to the command palette, hash routing
+ *  AND the hoisted SubtoolRow, all three of which read it via toolModes.ts. */
+export const TEXT_MODES = ["text", "background", "ocr"] as const;
+export type TextMode = (typeof TEXT_MODES)[number];
+/** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
+ *  rename. Lifted out of BatchSettings.tsx local state for the same reason as
+ *  `TEXT_MODES` above. */
+export const BATCH_MODES = ["logo", "text", "rename"] as const;
+export type BatchMode = (typeof BATCH_MODES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
 export type ResizeMode = "compress" | "resize";
@@ -78,7 +90,11 @@ export function isMarqueeKind(k: SelectionKind): k is SelectionShape {
   return k === "rect" || k === "ellipse";
 }
 
-interface ToolState {
+/** Exported because `features/tools/toolModes.ts` types its per-tool mode
+ *  SELECTORS against it — one selector definition serving both the imperative
+ *  `getState()` read (palette/router) and the reactive `useToolStore(...)` read
+ *  (SubtoolRow), so the two can't drift. That is the only outside consumer. */
+export interface ToolState {
   activeTool: ToolType;
   brushMode: BrushMode;
   resizeMode: ResizeMode;
@@ -103,6 +119,8 @@ interface ToolState {
   stampSubMode: StampSubMode;
   shapesMode: ShapesMode;
   eraserMode: EraserMode;
+  textMode: TextMode;
+  batchMode: BatchMode;
   /** Active Crop aspect ratio; `null` ≡ "Free" (no constraint). */
   cropRatio: [number, number] | null;
   selectionTolerance: number;
@@ -124,6 +142,8 @@ interface ToolState {
   setStampSubMode: (v: SetArg<StampSubMode>) => void;
   setShapesMode: (v: SetArg<ShapesMode>) => void;
   setEraserMode: (v: SetArg<EraserMode>) => void;
+  setTextMode: (v: SetArg<TextMode>) => void;
+  setBatchMode: (v: SetArg<BatchMode>) => void;
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
   setSelectionMask: (v: SetArg<Uint8Array | null>) => void;
@@ -149,6 +169,8 @@ export const useToolStore = create<ToolState>()(
       stampSubMode: "clone",
       shapesMode: "shapes",
       eraserMode: "brush",
+      textMode: "text",
+      batchMode: "logo",
       cropRatio: null,
       selectionTolerance: 24,
       selectionMask: null,
@@ -176,6 +198,8 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ stampSubMode: resolveSet(v, s.stampSubMode) })),
       setShapesMode: (v) => set((s) => ({ shapesMode: resolveSet(v, s.shapesMode) })),
       setEraserMode: (v) => set((s) => ({ eraserMode: resolveSet(v, s.eraserMode) })),
+      setTextMode: (v) => set((s) => ({ textMode: resolveSet(v, s.textMode) })),
+      setBatchMode: (v) => set((s) => ({ batchMode: resolveSet(v, s.batchMode) })),
       setCropRatio: (v) => set((s) => ({ cropRatio: resolveSet(v, s.cropRatio) })),
       setSelectionTolerance: (v) =>
         set((s) => ({ selectionTolerance: resolveSet(v, s.selectionTolerance) })),
@@ -203,6 +227,8 @@ export const useToolStore = create<ToolState>()(
         stampSubMode: s.stampSubMode,
         shapesMode: s.shapesMode,
         eraserMode: s.eraserMode,
+        textMode: s.textMode,
+        batchMode: s.batchMode,
       }),
       // Runs on every rehydrate (unlike `migrate`, which only fires on a
       // version bump) — the persisted blob is same-origin-writable IndexedDB,
@@ -219,6 +245,8 @@ export const useToolStore = create<ToolState>()(
           stampSubMode: validated(p.stampSubMode, STAMP_SUB_MODES, current.stampSubMode),
           shapesMode: validated(p.shapesMode, SHAPES_MODES, current.shapesMode),
           eraserMode: validated(p.eraserMode, ERASER_MODE_VALUES, current.eraserMode),
+          textMode: validated(p.textMode, TEXT_MODES, current.textMode),
+          batchMode: validated(p.batchMode, BATCH_MODES, current.batchMode),
         };
       },
     },

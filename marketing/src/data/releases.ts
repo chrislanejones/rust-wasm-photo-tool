@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v0.9.93",
+    date: "2026-07-26",
+    headline: "Paid accounts were getting free limits",
+    entries: [
+      { tag: "fix", text: "If you pay for Image Horse, the app was giving you the free tier. Signing in resolved every account to free, so a paid subscription got a 24-photo gallery instead of 100, 100 MB of storage instead of 5 GB, three layers per image instead of unlimited — and the AI tools, the thing you're actually paying for, stayed switched off. The server knew your real tier the whole time; only the interface was wrong. It now reads that tier and unlocks live, with no reload." },
+      { tag: "ui", text: "The toolbar has a second row. Sub-tools used to live inside each tool's settings panel as wide word-tiles, below a column of square icon tiles — two shapes of button in one narrow strip, and the row scrolled away with the panel. They now sit directly under the tool rail in tiles of the same shape, so the header grows by exactly one row when a tool has sub-tools." },
+      { tag: "ui", text: "Every tool is on the number row now: 1 through 9, then 0 for the tenth and - for the eleventh, running in reading order across the rail. Select takes 3 — it lost its S key two releases ago, and this is the renumbering that was promised." },
+    ],
+  },
+  {
     version: "v0.9.92",
     date: "2026-07-25",
     headline: "The clone stamp is finally just the clone stamp",

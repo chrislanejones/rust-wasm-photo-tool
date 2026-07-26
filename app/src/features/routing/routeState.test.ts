@@ -16,6 +16,13 @@ beforeEach(() => {
     selectionKind: "wand",
     shapesMode: "shapes",
     stampSubMode: "clone",
+    // Eraser / Text / Batch joined the sub-mode axis in the new-ui-toolbar arc
+    // (their modes moved out of component state into the store). They must be
+    // reset here too or a mode one test selects leaks into the next one's
+    // round-trip — the tool's hash now carries its mode.
+    eraserMode: "brush",
+    textMode: "text",
+    batchMode: "logo",
   });
   useUIStore.setState({ settingsOpen: false, settingsTab: "general" });
 });
@@ -64,14 +71,21 @@ describe("hash -> state", () => {
     expect(useToolStore.getState().brushMode).toBe("blur"); // unchanged
   });
 
-  it("the Eraser tool (id 'ai') has no sub-mode route — it's flat buttons, not a ToolModeToggle", () => {
-    applyRoute(parseHash("#/tool/eraser")!);
+  it("the Eraser tool (id 'ai') routes its four sub-modes", () => {
+    // Was a known gap: `eraserMode` lived in the store but had no MODE_ACCESS
+    // row, so the router could neither read nor write it and every Eraser hash
+    // collapsed to the bare tool. The new-ui-toolbar hoist wired it up.
+    applyRoute(parseHash("#/tool/eraser/rembg")!);
     expect(useToolStore.getState().activeTool).toBe("ai");
-    // A mode segment on the Eraser's URL isn't validated against anything
-    // (no registry/legacy sub-mode list exists for "ai") — it's just dropped.
-    applyRoute(parseHash("#/tool/eraser/brush")!);
+    expect(useToolStore.getState().eraserMode).toBe("rembg");
+    expect(currentHash()).toBe("#/tool/eraser/rembg");
+  });
+
+  it("never writes an Eraser sub-mode that isn't one of its own", () => {
+    useToolStore.setState({ eraserMode: "magic" });
+    applyRoute(parseHash("#/tool/eraser/blur")!); // Paint's mode
     expect(useToolStore.getState().activeTool).toBe("ai");
-    expect(currentHash()).toBe("#/tool/eraser");
+    expect(useToolStore.getState().eraserMode).toBe("magic"); // untouched
   });
 
   it("the legacy '#/tool/ai' link still resolves to the same tool as '#/tool/eraser'", () => {
@@ -82,16 +96,15 @@ describe("hash -> state", () => {
     expect(useToolStore.getState().activeTool).toBe("ai");
   });
 
-  it("OCR is not (yet) part of the routing system — Text has no sub-mode table entry", () => {
-    // TextSettings.tsx's mode (Text/Background/OCR) is local useState, never
-    // synced through useToolStore the way Paint/Shapes/Stamps/Resize/Adjust
-    // are — so there is no store field for the router to read or write, and
-    // an OCR-shaped hash can't select anything. This pins CURRENT behavior,
-    // not the ideal: a hand-typed "#/tool/text/ocr" silently drops the mode
-    // segment and just lands on bare Text.
+  it("OCR is deep-linkable now that Text's mode lives in the store", () => {
+    // Was the counterpart gap to the Eraser one above: TextSettings.tsx held
+    // Text/Background/OCR in local useState, so no store field existed for the
+    // router to read or write and "#/tool/text/ocr" dropped its mode segment.
+    // The hoist moved it to `useToolStore.textMode`, which closes it.
     applyRoute(parseHash("#/tool/text/ocr")!);
     expect(useToolStore.getState().activeTool).toBe("text");
-    expect(currentHash()).toBe("#/tool/text");
+    expect(useToolStore.getState().textMode).toBe("ocr");
+    expect(currentHash()).toBe("#/tool/text/ocr");
   });
 });
 
@@ -111,8 +124,8 @@ describe("state -> hash", () => {
   });
 
   it("writes the renamed 'eraser' slug for the ai tool, never the old 'ai' slug", () => {
-    useToolStore.setState({ activeTool: "ai" });
-    expect(currentHash()).toBe("#/tool/eraser");
+    useToolStore.setState({ activeTool: "ai", eraserMode: "inpaint" });
+    expect(currentHash()).toBe("#/tool/eraser/inpaint");
   });
 });
 
@@ -125,8 +138,10 @@ describe("round-trip", () => {
     "#/tool/select/wand",
     "#/tool/shapes/arrows",
     "#/tool/stamps/emojis",
-    "#/tool/text",
-    "#/tool/eraser",
+    // Text and Eraser carry a mode segment now — see the two "was a known gap"
+    // tests above. Effects stays bare: it genuinely has no sub-modes.
+    "#/tool/text/background",
+    "#/tool/eraser/magic",
     "#/tool/effects",
     "#/settings/security",
     "#/settings/superuser",

@@ -78,3 +78,20 @@ export const TIERS: Record<UserMode, TierConfig> = {
 
 /** Replicate AI is a Paid-only feature. */
 export const hasReplicateAI = (mode: UserMode): boolean => TIERS[mode].replicateAI;
+
+/** Convex `users.tier` → the UI's `UserMode`.
+ *
+ *  Two vocabularies exist for one concept: the server stores
+ *  `"free" | "pro" | "team"` (convex/schema.ts) and the client gates on
+ *  `"demo" | "loggedIn" | "paid"`. Nothing translated between them, which is
+ *  how paid accounts ended up capped at free limits — see the fix at
+ *  `AuthModeWatcher` in AppShell.
+ *
+ *  `null` means "signed in, tier not resolved yet" (the Convex query is in
+ *  flight) and deliberately maps to `loggedIn`, NOT `paid`: erring toward the
+ *  lower tier means a free user never sees a flash of paid features, and a paid
+ *  user upgrades a tick later when the query lands. The query is reactive, so a
+ *  tier grant or upgrade flips the UI live with no reload. */
+export function userModeForTier(tier: string | null | undefined): UserMode {
+  return tier === "pro" || tier === "team" ? "paid" : "loggedIn";
+}

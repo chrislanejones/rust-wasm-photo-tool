@@ -70,13 +70,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.49 — 2026-07-25
+### v7.50 — 2026-07-26
 
-**Nothing user-visible changes. The engine's JavaScript side got taken apart and put back together where the names make sense.**
+**If you pay for Image Horse, you were being given the free limits.** Signing in resolved everyone to the free tier, so a paid account got a 24-photo gallery instead of 100, 100 MB of storage instead of 5 GB, three layers per image instead of unlimited — and the AI tools, which are the thing you're paying for, stayed switched off. The server knew your real tier the whole time; only the app's own interface was wrong. It now reads the tier it already had and unlocks live, with no reload.
 
-For most of this app's life, one 1,467-line hook owned everything the image engine does — because the app started as a clone stamp tool, and every feature since squatted in the hook that held the engine. It's now six files: the engine core (loading, state, the zero-copy paint path), history, layers, export, transforms — and the clone stamp itself, which is finally just the clone stamp, at 229 lines.
+**The toolbar got its second row, and every tool got a key.** Sub-tools used to sit inside each tool's settings panel as wide word-tiles, in a column that already had square icon tiles at the top — two shapes of button in one narrow strip, and the row scrolled away with the panel. They now sit directly under the tool rail in tiles the same shape, so the header grows by exactly one row when a tool has sub-tools.
 
-Nothing moved but code. Every edit path was verified against the built app from a fresh profile: paint, undo and redo byte-exact in both directions, layers, flips exact, export produced a real file on disk, and a reload restored the session pixel-for-pixel.
+All eleven tools are on the number row: `1`–`9`, then `0` for the tenth, then `-` for the eleventh, running in reading order across the four-column rail. Select takes `3` — it lost its `S` in v7.47, and this is the renumbering that was promised.
 
 ## License
 
