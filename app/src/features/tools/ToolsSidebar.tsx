@@ -39,7 +39,6 @@ import type { AIResultPixels } from "@/hooks/useAIJob";
 interface ToolsSidebarProps {
   onClose: () => void;
   activeTool: ToolType;
-  onToolChange: (t: ToolType) => void;
   stampSettings: StampSettingsType;
   onStampSettingsChange: (s: StampSettingsType) => void;
   hasSource: boolean;
@@ -143,7 +142,6 @@ interface ToolsSidebarProps {
 
 export function ToolsSidebar({
   activeTool,
-  onToolChange,
   stampSettings,
   onStampSettingsChange,
   hasSource,
@@ -237,16 +235,14 @@ export function ToolsSidebar({
           changes (0 -> 1 -> 2 rows). */}
       <motion.div layout className="px-4 pt-3 pb-4 border-b border-border">
         <ToolGrid
-          activeTool={activeTool}
-          onToolChange={onToolChange}
-          disabledTools={{
-            emoji:
+          disabledGroups={{
+            batch:
               photos.length <= 1
                 ? "Upload another image to run a batch edit"
                 : false,
           }}
         />
-        <SubtoolRow activeTool={activeTool} disabled={!imageReady} />
+        <SubtoolRow disabled={!imageReady} />
       </motion.div>
 
       <motion.div

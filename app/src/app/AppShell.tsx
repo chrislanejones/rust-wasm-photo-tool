@@ -2676,7 +2676,6 @@ export function AppShell() {
             embedded={bp.dock}
             onClose={() => setShowTools(false)}
             activeTool={activeTool}
-            onToolChange={(t) => { setActiveTool(t); }}
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
             hasSource={stamp.state.hasSource}

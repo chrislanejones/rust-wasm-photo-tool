@@ -1,36 +1,39 @@
-import type { ToolDefinition } from "./toolConfig";
 import { HOVER_RING, TILE_DISABLED, TILE_IDLE, TILE_SELECTED } from "@/lib/styles";
 
 interface Props {
-  tool: ToolDefinition;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
   active: boolean;
   disabled?: boolean;
   onClick: () => void;
 }
 
 /**
- * One tool tile. Sizing is fully spatial — `aspect-square w-full` fills its
- * grid cell, and the icon is a percentage of the tile — so the toolbar reflows
- * cleanly at any panel width.
+ * One top-level rail tile — a tool GROUP since the five-group restructure.
+ * Sizing is fully spatial — `aspect-square w-full` fills its grid cell, and the
+ * icon is a percentage of the tile — so the toolbar reflows cleanly at any
+ * panel width.
  *
- * The whole rail is monochrome. The active tool is marked by an INK BORDER
- * plus a surface lift, not a fill: per-tool accent gradients are gone, and the
- * accent colour now belongs exclusively to the transient hover ring and the
- * `:focus-visible` outline. TILE_SELECTED / TILE_IDLE / TILE_DISABLED are the
- * single definition (lib/styles.ts) — that header carries the full reasoning
- * for why selection lives on `border-color` and not on a ring.
+ * Takes `icon` + `label` rather than a whole definition object: the rail draws
+ * groups now, the sub-tool row draws sub-tools, and both are the same
+ * silhouette. Keeping the props primitive means neither row owns the other's
+ * data shape.
+ *
+ * The whole rail is monochrome. The active group is marked by a BORDER plus a
+ * surface lift, not a fill: per-tool accent gradients are gone. TILE_SELECTED /
+ * TILE_IDLE / TILE_DISABLED are the single definition (lib/styles.ts) — that
+ * header carries the full reasoning for why selection lives on `border-color`
+ * and not on a ring.
  */
-export function ToolButton({ tool, active, disabled = false, onClick }: Props) {
-  const Icon = tool.icon;
-
+export function ToolButton({ icon: Icon, label, active, disabled = false, onClick }: Props) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       aria-disabled={disabled}
-      aria-label={tool.label}
+      aria-label={label}
       aria-pressed={active}
-      title={tool.label}
+      title={label}
       className={[
         "group flex aspect-square w-full items-center justify-center rounded-2xl",
         "transition-all duration-200 ease-out",

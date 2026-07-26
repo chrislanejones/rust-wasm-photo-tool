@@ -96,6 +96,23 @@ export function isMarqueeKind(k: SelectionKind): k is SelectionShape {
  *  (SubtoolRow), so the two can't drift. That is the only outside consumer. */
 export interface ToolState {
   activeTool: ToolType;
+  /** Which of the five-group registry's 33 sub-tools is lit — the composite
+   *  `"<group>/<subTool>"` key from `features/tools/toolGroups.ts`.
+   *
+   *  WHY THIS EXISTS AT ALL. For 27 of the 33 sub-tools the active one is
+   *  implied by `(activeTool, mode)`. The other six are not: Crop / Transform /
+   *  Color Picker all resolve to `crop` with no mode, and Resize Layer /
+   *  Canvas Size / Guides all resolve to `arrow` with no mode, because those
+   *  are single-mode tools whose panels hold several features each. Derive the
+   *  lit tile from `(tool, mode)` and those six light three-at-a-time.
+   *
+   *  DELIBERATELY NOT PERSISTED. `partialize` below is an explicit allowlist
+   *  and this field is kept out of it — so no IndexedDB schema change, no
+   *  version bump, and the `dexie-migration` skill is not triggered. On reload
+   *  it is re-derived from the persisted `(activeTool, mode)` pair via
+   *  `subToolForToolMode`, which is exactly the information the toolbar
+   *  restored from before this field existed. */
+  activeSubTool: string;
   brushMode: BrushMode;
   resizeMode: ResizeMode;
   selectionKind: SelectionKind;
@@ -129,6 +146,7 @@ export interface ToolState {
   toolSettings: ToolSettings;
 
   setActiveTool: (v: SetArg<ToolType>) => void;
+  setActiveSubTool: (v: SetArg<string>) => void;
   setBrushMode: (v: SetArg<BrushMode>) => void;
   setResizeMode: (v: SetArg<ResizeMode>) => void;
   setSelectionKind: (v: SetArg<SelectionKind>) => void;
@@ -155,6 +173,10 @@ export const useToolStore = create<ToolState>()(
   persist(
     (set) => ({
       activeTool: "compress",
+      // Matches `activeTool: "compress"` + `resizeMode: "compress"` below —
+      // Enhance › Compress. Kept as a literal rather than computed from the
+      // registry so the store keeps no import edge onto features/tools.
+      activeSubTool: "enhance/compress",
       brushMode: "paint",
       resizeMode: "compress",
       selectionKind: "wand",
@@ -178,6 +200,8 @@ export const useToolStore = create<ToolState>()(
       toolSettings: defaultToolSettings,
 
       setActiveTool: (v) => set((s) => ({ activeTool: resolveSet(v, s.activeTool) })),
+      setActiveSubTool: (v) =>
+        set((s) => ({ activeSubTool: resolveSet(v, s.activeSubTool) })),
       setBrushMode: (v) => set((s) => ({ brushMode: resolveSet(v, s.brushMode) })),
       setResizeMode: (v) =>
         set((s) => ({ resizeMode: resolveSet(v, s.resizeMode) })),
