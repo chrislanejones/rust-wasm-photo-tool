@@ -133,6 +133,15 @@ export interface ToolState {
   /** Mask paint value (0 = hide/black, 255 = reveal/white). */
   maskPaintValue: number;
   colorPickerActive: boolean;
+  /** Recently eyedroppered colours, newest first, de-duplicated, capped.
+   *
+   *  NOT PERSISTED — same reasoning as `activeSubTool`: `partialize` below is
+   *  an explicit allowlist and this is kept out of it, so adding the feature
+   *  needs no IndexedDB schema change and does not trip the `dexie-migration`
+   *  gate. The cost is that history is per-session. Making it survive a reload
+   *  is a one-line partialize change PLUS that migration procedure — a
+   *  deliberate follow-up, not something to slip in. */
+  pickedColorHistory: string[];
   stampSubMode: StampSubMode;
   shapesMode: ShapesMode;
   eraserMode: EraserMode;
@@ -147,6 +156,10 @@ export interface ToolState {
 
   setActiveTool: (v: SetArg<ToolType>) => void;
   setActiveSubTool: (v: SetArg<string>) => void;
+  /** Record a picked colour at the head of the history. */
+  pushPickedColor: (hex: string) => void;
+  removePickedColor: (hex: string) => void;
+  clearPickedColors: () => void;
   setBrushMode: (v: SetArg<BrushMode>) => void;
   setResizeMode: (v: SetArg<ResizeMode>) => void;
   setSelectionKind: (v: SetArg<SelectionKind>) => void;
@@ -188,6 +201,7 @@ export const useToolStore = create<ToolState>()(
       maskEditing: false,
       maskPaintValue: 0,
       colorPickerActive: false,
+      pickedColorHistory: [],
       stampSubMode: "clone",
       shapesMode: "shapes",
       eraserMode: "brush",
@@ -202,6 +216,25 @@ export const useToolStore = create<ToolState>()(
       setActiveTool: (v) => set((s) => ({ activeTool: resolveSet(v, s.activeTool) })),
       setActiveSubTool: (v) =>
         set((s) => ({ activeSubTool: resolveSet(v, s.activeSubTool) })),
+      // Newest first, case-insensitively de-duplicated (the engine hands back
+      // uppercase hex, hand-typed swatches are lowercase — without this the
+      // same colour lands twice and looks like a bug). Capped at 12: it is a
+      // recall list, not a log, and the panel column is 252px.
+      pushPickedColor: (hex) =>
+        set((s) => {
+          const norm = hex.toUpperCase();
+          const rest = s.pickedColorHistory.filter(
+            (c) => c.toUpperCase() !== norm,
+          );
+          return { pickedColorHistory: [norm, ...rest].slice(0, 12) };
+        }),
+      removePickedColor: (hex) =>
+        set((s) => ({
+          pickedColorHistory: s.pickedColorHistory.filter(
+            (c) => c.toUpperCase() !== hex.toUpperCase(),
+          ),
+        })),
+      clearPickedColors: () => set({ pickedColorHistory: [] }),
       setBrushMode: (v) => set((s) => ({ brushMode: resolveSet(v, s.brushMode) })),
       setResizeMode: (v) =>
         set((s) => ({ resizeMode: resolveSet(v, s.resizeMode) })),

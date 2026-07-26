@@ -13,6 +13,7 @@ import { ReselectBar } from "@/components/ui/reselect-bar";
 import { SectionHeader } from "@/components/ui/section-header";
 import { CanvasResize } from "@/components/CanvasResize";
 import { useGuidesStore } from "@/stores/useGuidesStore";
+import { cn } from "@/lib/utils";
 
 interface LayerSettingsProps {
   disabled: boolean;
@@ -34,6 +35,12 @@ interface LayerSettingsProps {
   /** Deletes the artboard's Background layer outright. */
   onRemoveCanvas: () => void;
   canRemoveCanvas: boolean;
+  /** Which section to render. Edit gives Resize Layer, Guides and Canvas Size
+   *  each their own sub-tool tile, so each shows ONLY its own section rather
+   *  than the whole panel three times over. Omitted renders all three with
+   *  separators — the pre-restructure behaviour. Mirrors the same prop on
+   *  TransformCropSettings. */
+  section?: "layer" | "guides" | "canvas";
 }
 
 /**
@@ -56,6 +63,7 @@ export function LayerSettings({
   onResizeCanvas,
   onRemoveCanvas,
   canRemoveCanvas,
+  section,
 }: LayerSettingsProps) {
   // Guide state lives in the dedicated Zustand slice (shared with the canvas
   // overlay), so we read it directly rather than prop-drilling.
@@ -90,9 +98,15 @@ export function LayerSettings({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [removeGuide]);
 
+  const show = (v: NonNullable<LayerSettingsProps["section"]>) =>
+    section === undefined || section === v;
+  /** The separator rule only earns its keep when sections are stacked. */
+  const sep = section === undefined ? "pt-3 border-t border-theme-sidebar-border" : "";
+
   return (
     <div className="space-y-6 -mt-2">
       {/* ── Move or Resize the active layer ──────────────────────────────── */}
+      {show("layer") && (
       <div className="space-y-2">
         <SectionHeader
           title="Move or Resize Layer"
@@ -128,13 +142,15 @@ export function LayerSettings({
           />
         </div>
       </div>
+      )}
 
       {/* The Selection Marker used to live here. It moved to Adjust & Select →
           Select in the tool-arc 2.6 session — it was always a selection tool,
           just parked next to Move/Resize-Layer. */}
 
       {/* ── Guides (non-destructive draggable overlay lines) ─────────────── */}
-      <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
+      {show("guides") && (
+      <div className={cn("space-y-2", sep)}>
         <SectionHeader
           title="Horizontal and Vertical Guides"
           info={
@@ -199,9 +215,11 @@ export function LayerSettings({
           </>
         )}
       </div>
+      )}
 
       {/* ── Canvas size (the checkerboard backdrop is the canvas) ─────────── */}
-      <div className="space-y-3 pt-3 border-t border-theme-sidebar-border">
+      {show("canvas") && (
+      <div className={cn("space-y-3", sep)}>
         <SectionHeader
           title="Background Canvas Size"
           info="Resizes the backing canvas, not the photo — content keeps its native resolution, centred; new area uses the backing color."
@@ -215,6 +233,7 @@ export function LayerSettings({
           canRemove={canRemoveCanvas}
         />
       </div>
+      )}
     </div>
   );
 }

@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { SectionHeader } from "@/components/ui/section-header";
+import { ReselectBar } from "@/components/ui/reselect-bar";
+import { useToolStore } from "@/stores/useToolStore";
 import { cn } from "@/lib/utils";
 import type { CropSelection } from "@/hooks/useDrawingTools";
 
@@ -87,6 +89,9 @@ interface TransformCropSettingsProps {
    *  Omitted renders all three, stacked with separators — the pre-restructure
    *  behaviour, kept so any other caller is unaffected. */
   section?: "crop" | "transform" | "colorPicker";
+  /** Re-apply a colour from the picker history (sets brush + text colour, the
+   *  same two fields a fresh pick writes). */
+  onPickColor?: (hex: string) => void;
 }
 
 export function TransformCropSettings({
@@ -104,7 +109,11 @@ export function TransformCropSettings({
   onSetColorPickerActive,
   pickedColor,
   section,
+  onPickColor,
 }: TransformCropSettingsProps) {
+  const pickedColorHistory = useToolStore((s) => s.pickedColorHistory);
+  const removePickedColor = useToolStore((s) => s.removePickedColor);
+  const clearPickedColors = useToolStore((s) => s.clearPickedColors);
   /** Render this section? All of them when unscoped. */
   const show = (s: NonNullable<TransformCropSettingsProps["section"]>) =>
     section === undefined || section === s;
@@ -265,6 +274,57 @@ export function TransformCropSettings({
               A pixel magnifier follows your cursor over the canvas. Hover to
               preview, click to pick.
             </div>
+          )}
+
+          {/* ── Picked-colour history ──────────────────────────────────────
+              Same UI vocabulary as the Guides list in LayerSettings: a
+              `.history-list` of ReselectBar rows, click to re-apply, ✕ to
+              forget. Reusing ReselectBar rather than rolling a swatch list
+              means the two histories stay visually identical for free — its
+              `label` takes a ReactNode, so the swatch rides along with the
+              hex.
+
+              SESSION-ONLY: `pickedColorHistory` is deliberately outside the
+              store's persist allowlist, so this list empties on reload.
+              Surviving a reload needs the dexie-migration procedure, not a
+              one-line change. */}
+          {pickedColorHistory.length > 0 && (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-2xs font-semibold font-mono text-theme-muted-foreground">
+                  Recent Colors
+                </span>
+                <button
+                  type="button"
+                  className="text-2xs text-theme-muted-foreground hover:text-theme-foreground underline underline-offset-2"
+                  onClick={clearPickedColors}
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="history-list max-h-40">
+                {pickedColorHistory.map((hex) => (
+                  <ReselectBar
+                    key={hex}
+                    label={
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="h-3.5 w-3.5 rounded border border-theme-muted shrink-0"
+                          style={{ backgroundColor: hex }}
+                        />
+                        <span className="font-mono uppercase">{hex}</span>
+                      </span>
+                    }
+                    selected={hex.toUpperCase() === displayColor.toUpperCase()}
+                    disabled={disabled}
+                    onSelect={() => onPickColor?.(hex)}
+                    onDelete={() => removePickedColor(hex)}
+                    title="Re-apply this color"
+                    deleteLabel="Forget this color"
+                  />
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}

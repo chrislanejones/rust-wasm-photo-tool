@@ -118,6 +118,8 @@ interface ToolsSidebarProps {
   colorPickerActive?: boolean;
   onSetColorPickerActive?: (active: boolean) => void;
   pickedColor?: string;
+  /** Re-apply a colour from the Color Picker history. */
+  onPickColor?: (hex: string) => void;
   onGlobalBlur?: (intensity: number) => void;
   // Shapes sub-mode
   shapesMode?: ShapesMode;
@@ -197,6 +199,7 @@ export function ToolsSidebar({
   colorPickerActive,
   onSetColorPickerActive,
   pickedColor,
+  onPickColor,
   onGlobalBlur,
   shapesMode,
   onShapesModeChange,
@@ -229,6 +232,14 @@ export function ToolsSidebar({
       : subToolId === "color-picker"
         ? ("colorPicker" as const)
         : ("crop" as const);
+
+  /** Same, for LayerSettings' three sections. */
+  const layerSection =
+    subToolId === "guides"
+      ? ("guides" as const)
+      : subToolId === "canvas-size"
+        ? ("canvas" as const)
+        : ("layer" as const);
 
   return (
     <motion.div
@@ -304,6 +315,7 @@ export function ToolsSidebar({
             colorPickerActive={colorPickerActive}
             onSetColorPickerActive={onSetColorPickerActive}
             pickedColor={pickedColor}
+            onPickColor={onPickColor}
             section={cropSection}
           />
         )}
@@ -356,6 +368,7 @@ export function ToolsSidebar({
             onResizeCanvas={onResizeCanvas}
             onRemoveCanvas={onRemoveCanvas}
             canRemoveCanvas={canRemoveCanvas}
+            section={layerSection}
           />
         )}
 

@@ -159,8 +159,11 @@ export function useEffectiveTool({
           };
         case "transform":
         case "canvas-size":
-          // Button-driven: flips/rotations and the W×H resizer. (Guides is
-          // Coming Soon and never reaches here — the early return catches it.)
+        case "guides":
+          // Button-driven: flips/rotations, the W×H resizer, and guide
+          // add/remove. Guides ARE draggable, but on their own overlay
+          // (ImageGuidesOverlay), not through the stamp handlers — so this
+          // must idle or a guide drag would reach the clone stamp.
           return idle;
         default:
           return idle;

@@ -45,6 +45,7 @@ import {
   FileEdit,
   FlipHorizontal,
   Frame,
+  Grid2x2,
   ImagePlus,
   Lasso,
   Move,
@@ -53,7 +54,6 @@ import {
   PenTool,
   Pin,
   Pipette,
-  Ruler,
   Scaling,
   Scan,
   ScanText,
@@ -506,16 +506,16 @@ const editGroup: ToolGroupDefinition = {
       keywords: ["canvas size", "background", "artboard", "extend", "pad"],
     },
     {
-      // Coming Soon, same as Perspective — carries no `tool`, so it is
-      // unreachable by route and palette by TYPE, not by a runtime check.
-      // (The guides overlay itself still exists and still works; what is not
-      // ready is a Guides sub-tool that owns it from the rail.)
+      // Live, not Coming Soon: the guides overlay is built and works. The
+      // earlier Ruler ICON was the problem — it read as a measurement tool
+      // that doesn't exist. Grid2x2 says "alignment lines" without promising
+      // a ruler. No canvas gesture of its own (guides are added from the
+      // panel, then dragged on the existing overlay), so no cursor.
       id: "guides",
       label: "Guides",
       description: "Draggable horizontal and vertical alignment lines",
-      icon: Ruler,
-      comingSoon: true,
-      note: "Guides aren't wired to the rail yet",
+      icon: Grid2x2,
+      tool: "arrow",
       keywords: ["guides", "horizontal", "vertical", "snap", "alignment"],
     },
   ],

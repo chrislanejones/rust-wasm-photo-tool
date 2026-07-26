@@ -1037,6 +1037,8 @@ export function AppShell() {
 
   const handlePickColor = useCallback((hex: string) => {
     setToolSettings((prev) => ({ ...prev, brushColor: hex, textColor: hex }));
+    // Record it before disarming, so the Color Picker panel can offer it back.
+    useToolStore.getState().pushPickedColor(hex);
     setColorPickerActive(false);
   }, []);
 
@@ -2752,6 +2754,7 @@ export function AppShell() {
             colorPickerActive={colorPickerActive}
             onSetColorPickerActive={setColorPickerActive}
             pickedColor={toolSettings.brushColor}
+            onPickColor={handlePickColor}
             stampSubMode={stampSubMode}
             onStampSubModeChange={setStampSubMode}
             stampEmoji={toolSettings.emoji}
