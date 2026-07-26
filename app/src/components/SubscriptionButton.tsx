@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { IconButton } from "@/components/ui/icon-button";
 import { SuperUserPane, type SuperUserControls } from "@/components/SuperUserPane";
 import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
 import { LayersCanvasPane } from "@/components/LayersCanvasPane";
@@ -244,15 +245,12 @@ export function SubscriptionButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => openSettings(tab)}
-        className="btn-icon"
+      <IconButton
+        icon={Settings}
+        label="Settings"
         title="Settings"
-        aria-label="Settings"
-      >
-        <Settings className="h-4 w-4" />
-      </button>
+        onClick={() => openSettings(tab)}
+      />
 
       <Dialog open={open} onOpenChange={(o) => !o && closeSettings()}>
         <DialogContent

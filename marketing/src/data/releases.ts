@@ -24,6 +24,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.51",
+    date: "2026-07-26",
+    headline: "Eleven tools became five groups",
+    entries: [
+      { tag: "ui", text: "The toolbar is now five groups — Enhance, Select, Create, Edit, Batch — with everything you had one level down as a sub-tool. Nothing dropped, no tool id renamed, so old links still resolve." },
+      { tag: "fix", text: "The sub-tool decides what the canvas does. Anything without its own case used to inherit the clone stamp's handlers, which is how a selection drag could nearly clone-stamp the image." },
+      { tag: "ui", text: "Crop, Transform and the Eyedropper each get their own panel instead of sharing one. Same for Resize Layer, Canvas Size and Guides." },
+      { tag: "feature", text: "The eyedropper remembers: picked colours land in a Recent Colors list you can click to re-apply." },
+      { tag: "ui", text: "OCR moved out of the Text panel and onto the rail; Text's background and bubble controls moved up beside the colour swatch." },
+      { tag: "ui", text: "Digits 1-5 select the five groups, derived from the registry so the keys, the tooltips and the shortcut sheet can't disagree." },
+    ],
+  },
+  {
     version: "v0.9.93",
     date: "2026-07-26",
     headline: "Paid accounts were getting free limits",

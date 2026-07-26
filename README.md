@@ -70,13 +70,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.50 — 2026-07-26
+### v7.51 — 2026-07-26
 
-**If you pay for Image Horse, you were being given the free limits.** Signing in resolved everyone to the free tier, so a paid account got a 24-photo gallery instead of 100, 100 MB of storage instead of 5 GB, three layers per image instead of unlimited — and the AI tools, which are the thing you're paying for, stayed switched off. The server knew your real tier the whole time; only the app's own interface was wrong. It now reads the tier it already had and unlocks live, with no reload.
+**Eleven tools became five.** The top row is Enhance, Select, Create, Edit and Batch; everything you had is still there, one level down as a sub-tool. Eleven tiles wrapping 5/5/1 asked you to remember which of eleven things you wanted before you could start. Five named groups don't. The cost is honest and worth stating: reaching a sub-tool is one more click than it was.
 
-**The toolbar got its second row, and every tool got a key.** Sub-tools used to sit inside each tool's settings panel as wide word-tiles, in a column that already had square icon tiles at the top — two shapes of button in one narrow strip, and the row scrolled away with the panel. They now sit directly under the tool rail in tiles the same shape, so the header grows by exactly one row when a tool has sub-tools.
+Nothing was dropped and no tool id changed, so old links and bookmarks still resolve.
 
-All eleven tools are on the number row: `1`–`9`, then `0` for the tenth, then `-` for the eleventh, running in reading order across the four-column rail. Select takes `3` — it lost its `S` in v7.47, and this is the renumbering that was promised.
+**The sub-tool now decides what the canvas does.** Picking Brush, Clone Stamp or Magic Eraser sets the cursor and the drag behaviour for that sub-tool specifically, instead of the whole parent tool sharing one. Previously anything without its own case inherited the clone stamp's handlers — which is how a selection drag could very nearly clone-stamp the image. Sub-tools with nothing to do on canvas now do nothing, deliberately.
+
+**Crop, Transform and the Eyedropper each get their own panel.** They used to share one, so all three showed the same wall of controls. Same for Resize Layer, Canvas Size and Guides. Each now shows only its own section.
+
+**The eyedropper remembers.** Colours you pick land in a Recent Colors list — click one to put it back on the brush and text, ✕ to forget it. It clears when you reload.
+
+**OCR moved out of hiding.** Reading text out of an image was buried inside the Text panel; it's a Create sub-tool now. Text's background and bubble controls moved the other way, up next to the colour swatch where you're already working.
+
+Digits `1`–`5` select the five groups. `6`–`0` and `-` no longer do anything.
 
 ## License
 

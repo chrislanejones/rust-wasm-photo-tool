@@ -2276,3 +2276,42 @@ files, 7 new); `build:all` succeeds; guardrails ratchet passes with no count
 above baseline. The CI fix was verified the honest way — `pkg/` moved aside to
 reproduce the red, then `build:all` → `test` from that same state: 217 → 224
 passing.
+
+## v7.51 Change Summary — 2026-07-26
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | **Toolbar restructured: 11 tools → 5 groups** (Enhance / Select / Create / Edit / Batch) owning **33 sub-tools**. New `features/tools/toolGroups.ts` is the single definition site; the rail, sub-tool row, shortcuts and dispatch all derive from it | Complete |
+| 2   | **No legacy tool id renamed.** `compress`, `crop`, `arrow`, `ai`, `stamp`, `emoji` stay exactly what persistence and the inbound route aliases expect — a sub-tool is a *view* onto an existing `(ToolType, mode)` pair | Held |
+| 3   | Sub-tool identity is a store field (`activeSubTool`), not derived. 27 of 33 are unique by `(tool, mode)`; the six Edit ones are not — Crop/Transform/Color Picker are all `crop`, Resize Layer/Canvas Size/Guides all `arrow` — so derivation lit three tiles at once | Complete |
+| 4   | `activeSubTool` and `pickedColorHistory` are **deliberately outside `partialize`** — no IndexedDB schema change, so the `dexie-migration` gate is not tripped. Both re-derive or reset on reload | By design |
+| 5   | **Canvas dispatch switches on sub-tool.** `useEffectiveTool`'s unmatched-tool fallthrough returned the raw clone-stamp handlers — the near-miss where a marquee drag almost clone-stamped. Default is now `idle`, every group has an explicit case, every Create/Edit sub-tool is named | **FIXED** |
+| 6   | Cursor declared per sub-tool in the registry, on the same row as dispatch — a sub-tool with no gesture carries no cursor *and* idles, so the two can't drift. Select's Shift/Alt badge and Resize Layer's `move` stay dynamic | Complete |
+| 7   | Edit panels split: `TransformCropSettings` and `LayerSettings` each gained a `section` prop. All six live Edit sub-tools render their own section alone | Complete |
+| 8   | Colour-picker history — newest-first, case-insensitively de-duplicated, capped at 12. Built from `ReselectBar` in a `.history-list`, the same primitives as the Guides list, so the two can't drift apart visually | New |
+| 9   | Digits `1`–`5` select groups. Hand-written `TOOL_BY_KEY` (11 entries) deleted for `GROUP_BY_KEY`, derived from the registry. `6`–`0`/`-` now inert — test-pinned, so muscle memory does nothing rather than something | Complete |
+| 10  | `ShortcutModal` re-pointed at the group registry. Worth recording: it already derived from `toolConfig.ts` — the "fourth hand-maintained copy" that lost Select for three releases was fixed before this arc, not by it | Corrected |
+| 11  | Registry edits from review: **Line removed** (`line` stays a shape kind in the Shapes panel), **OCR promoted** to a Create sub-tool, **Guides** kept live but re-iconed off `Ruler` (it read as a measurement tool that doesn't exist), **Perspective** Coming Soon | Complete |
+| 12  | Coming Soon is a discriminated-union member carrying no `tool`, so it is unreachable by route and palette **by type** rather than by a runtime check somebody can forget | Complete |
+| 13  | Text panel: background/bubble/shadow controls now render in the Text mode too, directly after the colour swatch | Complete |
+| 14  | Sub-tile border width matched to the rail (`border-2`); hover ring no longer clipped by the height-animating wrapper's `overflow-hidden`; toolbar icons 50% → 55%, scoped to the tile components rather than the global `h-1/2` utilities | Complete |
+| 15  | All 33 sub-tools gained a tooltip description — Create is 13 tiles and was a wall of icons | Complete |
+
+**Verified** against the served production build (bundle hash checked against
+the build output, not just HTTP 200), fresh profile, zero console errors: all
+five groups render; every one of the 33 sub-tools activates, lights its own
+tile and its group's, and shows the right panel; Perspective renders disabled
+and is not clickable; per-sub-tool cursors confirmed (Brush → crosshair, Text →
+text, Compress → default, where the whole Paint tool previously shared one);
+Edit's six sections each render alone; three real eyedropper clicks produced
+`#2D2319` / `#565547` / `#A1B1C0` in the history, newest first.
+
+Gates on every commit: `tsc --noEmit` clean, eslint **0 errors / 59 warnings**,
+**225/225 vitest** (17 files), production build succeeds.
+
+**Deferred**: routes are still the old `#/tool/<tool>/<mode>` grammar — the new
+`#/tool/<group>/<subtool>` form and its legacy redirects are not built yet, so
+the three Edit sub-tools sharing `crop` still share one URL. The registry ↔
+routes ↔ palette ↔ dispatch contract test is likewise unwritten. Both are the
+next session's work, and both are logged in `docs/toolbar-migration-map.md`
+alongside the ORPHAN/AMBIGUOUS list.

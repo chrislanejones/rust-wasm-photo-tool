@@ -21,6 +21,7 @@ import {
   Undo2,
   Redo2,
 } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
 import { UserMenu } from "@/components/UserMenu";
 import { SubscriptionButton } from "@/components/SubscriptionButton";
 import type { SuperUserControls } from "@/components/SuperUserPane";
@@ -155,13 +156,12 @@ export function TopBar({
                 <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
+                      <IconButton
+                        icon={Undo2}
+                        label="Undo"
                         onClick={onUndo}
                         disabled={!canUndo}
-                        className="btn-icon"
-                      >
-                        <Undo2 className="h-4 w-4" />
-                      </button>
+                      />
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
                       <p className="font-semibold">Undo</p>
@@ -170,13 +170,12 @@ export function TopBar({
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
+                      <IconButton
+                        icon={Redo2}
+                        label="Redo"
                         onClick={onRedo}
                         disabled={!canRedo}
-                        className="btn-icon"
-                      >
-                        <Redo2 className="h-4 w-4" />
-                      </button>
+                      />
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
                       <p className="font-semibold">Redo</p>
@@ -193,13 +192,12 @@ export function TopBar({
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
-                  <button
+                  <IconButton
+                    icon={ZoomOut}
+                    label="Zoom out"
                     onClick={onZoomOut}
                     disabled={zoom <= 0.25}
-                    className="btn-icon"
-                  >
-                    <ZoomOut className="h-4 w-4" />
-                  </button>
+                  />
                   {/* Show the % whenever there's room: wide, or narrow (where
                       Undo/Redo dropped out and freed space). Hidden only in the
                       cramped BP_TIGHT case (both side panels open, 1000–1200). */}
@@ -208,13 +206,12 @@ export function TopBar({
                       {Math.round(zoom * 100)}%
                     </span>
                   )}
-                  <button
+                  <IconButton
+                    icon={ZoomIn}
+                    label="Zoom in"
                     onClick={onZoomIn}
                     disabled={zoom >= 4}
-                    className="btn-icon"
-                  >
-                    <ZoomIn className="h-4 w-4" />
-                  </button>
+                  />
                 </div>
               </TooltipTrigger>
               <TooltipContent side="bottom">
