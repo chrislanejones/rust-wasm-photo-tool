@@ -15,7 +15,7 @@
 // shared with the command palette and URL routing. Adding a sub-tool means
 // editing toolModes.ts (or the tool's registry module) — never this file.
 //
-// LAYOUT CONTRACT: both this grid and ToolGrid are `grid-cols-4` with `gap-2`,
+// LAYOUT CONTRACT: both this grid and ToolGrid are `grid-cols-5` with `gap-2`,
 // and the tiles are `aspect-square w-full`. That is deliberate — it makes the
 // header height move in exact one-tile increments (0 rows / 1 row / 2 rows), so
 // the body "step" is always the same distance and never a ragged half-tile.
@@ -49,7 +49,7 @@ interface Props {
  *  THE TIE TO THE RAIL. This used to be colour: the active sub-tile wore the
  *  PARENT tool's gradient, so you matched the two lit tiles by hue. With the
  *  gradients gone the tie is structural instead — the rail and this row each
- *  light exactly one tile, in the SAME ink vocabulary, stacked 12px apart
+ *  light exactly one tile, in the SAME accent vocabulary, stacked 12px apart
  *  under one hairline. The grading (2px + `shadow-sm` up top, a finer 1px line
  *  here, on top of the existing radius step) is what says parent-then-child
  *  rather than two peer rows. Deliberately NOT a pointer/connector under the
@@ -137,7 +137,7 @@ export function SubtoolRow({ activeTool, disabled = false }: Props) {
               it collapses with the row instead of leaving a stray line. */}
           <div className="mt-3 mb-3 h-px bg-border/60" />
           <div
-            className="grid grid-cols-4 gap-2"
+            className="grid grid-cols-5 gap-2"
             role="toolbar"
             aria-label={`${tool?.label ?? "Tool"} sub-tools`}
           >

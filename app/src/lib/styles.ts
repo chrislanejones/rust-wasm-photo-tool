@@ -32,10 +32,21 @@ export const HOVER_RING =
    `ring-offset-2` extends 4px, so a PERMANENT accent halo would also eat half
    the gutter and butt straight into a hovered neighbour's halo.
 
-   Why ink and not the accent: persistent state is neutral (`border-foreground`
-   — #2a2622 on light, #eeeeee on dark, ≥11:1 against either tile fill), and
-   the warm accent is reserved for the transient pointer/keyboard states. That
-   way "selected" can never be mistaken for "hovered".
+   Colour: BOTH selected and hover are the warm accent (`theme-primary` —
+   #c98f3f on light, #fcdfc2 on dark). An earlier pass made selected a neutral
+   ink instead, on the theory that a separate hue keeps it from being mistaken
+   for hover; Chris asked for the accent in both, and the states stay legible
+   without the hue split because they were never relying on it — they differ by
+   CHANNEL and SHAPE: selected is a solid border hugging the tile edge at 0px
+   outward, hover is a 60%-opacity halo sitting 2–4px OUTSIDE it. Solid-and-
+   inside vs soft-and-outside reads even in one colour.
+
+   KNOWN, ACCEPTED: at #c98f3f on the light sidebar this is 2.67:1, under the
+   3:1 WCAG 1.4.11 asks of a non-text indicator. The hover ring and the global
+   focus outline already had exactly this shortfall — it comes from `--accent`
+   itself, so fixing it means recolouring the light theme, not patching here.
+   Selected now shares it. If it needs solving, the fix is a darker light-mode
+   accent token, applied once at the source.
 
    Both branches carry the same border WIDTH (transparent when idle) so the
    border box never changes size — the header's exact one-tile height step as
@@ -50,7 +61,7 @@ export const HOVER_RING =
 
 /** Tool-rail tile — the active tool. */
 export const TILE_SELECTED =
-  "border-2 border-foreground bg-bg-elevated text-text-primary shadow-sm";
+  "border-2 border-theme-primary bg-bg-elevated text-text-primary shadow-sm";
 
 /** Tool-rail tile — every other tool. */
 export const TILE_IDLE =
@@ -58,7 +69,7 @@ export const TILE_IDLE =
 
 /** Sub-tool tile — the active sub-mode. One step lighter than TILE_SELECTED. */
 export const SUBTILE_SELECTED =
-  "border border-foreground bg-bg-elevated text-text-primary";
+  "border border-theme-primary bg-bg-elevated text-text-primary";
 
 /** Sub-tool tile — every other sub-mode. */
 export const SUBTILE_IDLE =

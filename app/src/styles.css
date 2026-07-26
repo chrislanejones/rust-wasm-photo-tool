@@ -1249,12 +1249,19 @@ kbd {
    SHARED BUTTON STYLES
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* 24px, down from 28px. The icon deliberately stays 14px rather than scaling
+   with the box: the padding tightens from 7px to 5px, which is what makes the
+   button read smaller, while the glyph stays legible (a 12px gear at
+   stroke-width 2 turns to mush). 24px is also the floor — WCAG 2.2 §2.5.8
+   Target Size (Minimum) is 24×24 CSS px, so anything smaller drops under it.
+   `TinyNumberBox` (ui/tiny-number-box.tsx) sits inline with these in the zoom
+   and gallery-count rows and carries the same height — change both or neither. */
 .btn-icon {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   color: var(--text-secondary);
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius);
   display: flex;
   align-items: center;
