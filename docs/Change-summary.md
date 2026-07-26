@@ -2315,3 +2315,32 @@ the three Edit sub-tools sharing `crop` still share one URL. The registry ↔
 routes ↔ palette ↔ dispatch contract test is likewise unwritten. Both are the
 next session's work, and both are logged in `docs/toolbar-migration-map.md`
 alongside the ORPHAN/AMBIGUOUS list.
+
+## v7.52 Change Summary — 2026-07-26
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | **Route grammar is now `#/<group>/<subtool>`** — `#/create/brush`, `#/edit/color-picker`. The old `#/tool/<tool>/<mode>` described the pre-v7.51 structure, so the three Edit sub-tools sharing the `crop` id collapsed onto ONE url and a link couldn't say which it meant | Complete |
+| 2   | **35 legacy URL shapes redirected**, one assertion each — tool slugs (`#/tool/paint/blur`), raw `ToolType` ids (`#/tool/brush/blur`), the v7.44 Adjust-&-Select link, singular mode aliases, the `?tool=`/`?mode=` query form, and `#/tool/<group>/<sub>` for anyone who guesses it | Complete |
+| 3   | **Ambiguity fixed while writing the redirect table**: `select` is BOTH a group id and a legacy tool slug, so `#/tool/select/edge` was resolving as a group, failing to match `edge` as a sub-tool *id*, and silently dropping onto the group default (Magic Wand) — the wrong selection mode with nothing to say so. Under the `tool/` prefix the legacy reading now wins | **FIXED** |
+| 4   | Coming Soon sub-tools are unreachable by URL: a route naming one collapses to the group default. They carry no `tool`, so `applyRoute` would have nothing to activate | Complete |
+| 5   | `applyRoute` now goes through `activateSubTool` — the same call the rail and the palette make — so a link and a click leave the app in identical state, including preselects (the Color Picker toggle arms and disarms) | Complete |
+| 6   | **Command palette rebuilt on the group registry.** It emitted "Paint › Paint": the old loop walked `TOOLS` + the sub-mode table, so it spoke legacy tool names and doubled the label whenever a tool's first mode shared its name. Now one entry per group + one per live sub-tool, labelled "Create › Brush" | **FIXED** |
+| 7   | Palette Batch gating matches the rail and the router (2+ photos), pinned in all three places | Complete |
+| 8   | **Ruler** added to Edit beside Guides as a disabled placeholder, like Perspective — slot held, measuring unbuilt. 34 sub-tools, 32 live | New |
+| 9   | Three test suites rewritten against the new contract: `routes.test.ts` (74 tests incl. the redirect table), `commands.test.ts`, `routeState.test.ts` — round-trip identity is asserted over **every live sub-tool**, not a sample | Complete |
+
+**Verified** against the served production build (bundle hash checked), fresh
+profile: every group and sub-tool writes its own URL — `#/create/brush`,
+`#/create/clone-stamp`, `#/edit/transform`, `#/edit/color-picker`,
+`#/enhance/adjustments`, `#/select/ellipse`, `#/batch/rename`. Palette shows
+`Enhance › Compress` … `Create › Brush`, 37 tool rows (5 groups + 32 live
+sub-tools), and **zero** doubled `X › X` labels. Ruler and Perspective render
+disabled. The only console errors are Clerk's third-party telemetry endpoint
+failing CORS — not app code.
+
+Gates: `tsc --noEmit` clean, eslint **0 errors / 59 warnings**, **233/233
+vitest** (17 files, +8), production build succeeds.
+
+**Deferred**: ADR-023, and the approved `Ctrl+K`-then-letter chord for
+sub-tools (letter scoped to the active group).

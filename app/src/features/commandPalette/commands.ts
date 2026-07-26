@@ -39,11 +39,13 @@ import {
   Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { ToolType } from "@/lib/types";
 import type { ThemeChoice } from "@/lib/preferences";
+import type { ToolGroupId } from "@/features/tools/toolGroups";
 import type { SettingsTab } from "@/components/SubscriptionButton";
-import { TOOLS, TOOL_MODULES } from "@/features/tools";
-import { allToolModes } from "@/features/tools/toolModes";
+import {
+  TOOL_GROUPS,
+  LIVE_SUB_TOOLS,
+} from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
 import { navigateTo, currentRouteUrl, currentRouteLabel } from "@/features/routing";
 
@@ -111,10 +113,8 @@ async function copyRouteLink(): Promise<void> {
 // arrive by the same road and the address bar never lies about where you are.
 // The palette does NOT call setActiveTool / setBrushMode / openSettings itself:
 // a second navigation path is precisely how the URL and the app desync.
-const jumpToTool = (tool: ToolType) => navigateTo({ kind: "tool", tool });
-
-const jumpToSubMode = (tool: ToolType, mode: string) =>
-  navigateTo({ kind: "tool", tool, mode });
+const jumpToSubTool = (group: ToolGroupId, subTool: string) =>
+  navigateTo({ kind: "tool", group, subTool });
 
 /** Settings panes are routes too (`#/settings/security`). */
 const openSettingsTab = (tab: SettingsTab) => navigateTo({ kind: "settings", tab });
@@ -123,48 +123,45 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
   const ui = () => useUIStore.getState();
   const commands: PaletteCommand[] = [];
 
-  // ── Tools: jump-to-tool ──────────────────────────────────────────────────
-  for (const tool of TOOLS) {
-    // Registry module wins as the metadata source once a tool has migrated.
-    const module = TOOL_MODULES[tool.id];
+  // ── Tools: one entry per GROUP ───────────────────────────────────────────
+  // Jumping to a group lands on its first live sub-tool, same as clicking its
+  // rail tile — the palette and the rail share `activateSubTool` underneath.
+  for (const group of TOOL_GROUPS) {
+    const first = group.subTools.find((sub) => !sub.comingSoon);
+    if (!first) continue;
     commands.push({
-      id: `tool.${tool.id}`,
-      label: module?.label ?? tool.label,
+      id: `group.${group.id}`,
+      label: group.label,
       group: "tools",
-      keywords: [tool.description],
-      icon: module?.icon ?? tool.icon,
-      shortcut: tool.shortcutKey,
-      // Batch Image Editor needs 2+ photos — mirrors AppShell's onToolChange
-      // guard so the palette matches the sidebar gating exactly.
-      disabled: tool.id === "emoji" && ctx.photoCount <= 1,
-      run: () => jumpToTool(tool.id),
+      keywords: [group.description],
+      icon: group.icon,
+      shortcut: group.shortcutKey,
+      // Batch needs 2+ photos — mirrors the rail's disabled tile and the
+      // router's own guard, so all three agree.
+      disabled: group.id === "batch" && ctx.photoCount <= 1,
+      run: () => jumpToSubTool(group.id, first.id),
     });
   }
 
-  // ── Tools: jump-to-sub-mode ──────────────────────────────────────────────
-  // One source: features/tools/toolModes (registry modules first, hand-written
-  // lists for the not-yet-migrated tools). The palette used to keep its own
-  // copy of both, which the router would then have had to copy again.
-  for (const { tool, mode } of allToolModes()) {
-    const module = TOOL_MODULES[tool];
-    const toolDef = TOOLS.find((t) => t.id === tool);
-    const toolLabel = module?.label ?? toolDef?.label ?? tool;
+  // ── Tools: one entry per SUB-TOOL ────────────────────────────────────────
+  // Labelled "Create › Brush", not "Paint › Paint". The old loop walked TOOLS
+  // and the sub-mode table, so it spoke in legacy tool names and printed the
+  // tool's label twice for any tool whose first mode shared its name. One
+  // source now: the group registry.
+  //
+  // Coming Soon sub-tools are absent by construction — LIVE_SUB_TOOLS filters
+  // them — so Perspective and Ruler can't be reached from here.
+  for (const { group, subTool } of LIVE_SUB_TOOLS) {
     commands.push({
-      id: `mode.${tool}.${mode.id}`,
-      label: `${toolLabel} › ${mode.label}`,
+      id: `sub.${group.id}.${subTool.id}`,
+      label: `${group.label} › ${subTool.label}`,
       group: "tools",
-      keywords: [...mode.keywords, toolLabel],
-      icon: module?.modes.find((m) => m.id === mode.id)?.icon ?? toolDef?.icon,
-      run: () => jumpToSubMode(tool, mode.id),
+      keywords: [...subTool.keywords, group.label, subTool.description],
+      icon: subTool.icon,
+      disabled: group.id === "batch" && ctx.photoCount <= 1,
+      run: () => jumpToSubTool(group.id, subTool.id),
     });
   }
-
-  // (The old hand-rolled "Adjust & Select › <kind>" block is gone: Select is
-  // its own tool now, its kinds ARE its registry sub-modes, so the generic
-  // loop above already emits `mode.select.wand` … `mode.select.lasso` with
-  // real routes (`#/tool/select/wand`). Persisted recents pointing at the old
-  // `select.<kind>` ids simply stop matching, which the palette drops
-  // gracefully.)
 
   // ── Settings ─────────────────────────────────────────────────────────────
   commands.push(

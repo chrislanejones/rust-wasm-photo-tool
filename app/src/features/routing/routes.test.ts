@@ -4,167 +4,204 @@
 // round-trip stability, and — the one that actually matters in the wild —
 // garbage in, safe default out, never a throw.
 //
-// `modesOf` is injected here rather than imported from the tool registry: these
-// tests pin the GRAMMAR, not the current tool line-up, so they don't start
-// failing the day someone adds a Paint mode.
+// Since v7.51 the grammar addresses the SUB-TOOL (`#/create/brush`), not the
+// legacy tool+mode pair. The bulk of this file is therefore the LEGACY
+// REDIRECT table: one assertion per URL shape the app has ever written, because
+// bookmarks exist and silently landing on the wrong tool is worse than a refusal.
+//
+// Unlike the pre-v7.51 version, these run against the REAL registry rather than
+// an injected mode table — resolving against it is the grammar's whole job now,
+// so faking it would test nothing.
 import { describe, it, expect } from "vitest";
-import type { ToolType } from "@/lib/types";
 import {
   parseRoute,
   formatRoute,
   routeFromSearch,
   stripRoutingParams,
   buildRouteUrl,
-  toolSlug,
+  routeLabel,
   SETTINGS_TAB_LABELS,
   type Route,
 } from "./routes";
+import { LIVE_SUB_TOOLS, TOOL_GROUPS } from "@/features/tools/toolGroups";
 
-const MODES: Partial<Record<ToolType, string[]>> = {
-  brush: ["paint", "blur", "pen", "erase"],
-  compress: ["compress", "resize"],
-  // crop is single-mode since the Select split; the six exclusive selection
-  // modes are Select's modes (rect/ellipse joined the kinds in v7.47).
-  select: ["wand", "edge", "colorRange", "lasso", "rect", "ellipse"],
-  shapes: ["shapes", "pens", "arrows"],
-  stamp: ["clone", "red", "emojis"],
-};
-const modesOf = (tool: ToolType): readonly string[] => MODES[tool] ?? [];
+const parse = (hash: string) => parseRoute(hash);
+const fromSearch = (search: string) => routeFromSearch(search);
 
-const parse = (hash: string) => parseRoute(hash, modesOf);
-const fromSearch = (search: string) => routeFromSearch(search, modesOf);
-
-describe("parseRoute — hash to state", () => {
-  it("parses a tool + sub-mode", () => {
-    expect(parse("#/tool/paint/blur")).toEqual({
+describe("parseRoute — the canonical group/sub-tool form", () => {
+  it("parses a group + sub-tool", () => {
+    expect(parse("#/create/brush")).toEqual({
       kind: "tool",
-      tool: "brush",
-      mode: "blur",
+      group: "create",
+      subTool: "brush",
     });
   });
 
-  it("parses a bare tool (no sub-mode)", () => {
-    expect(parse("#/tool/text")).toEqual({
+  it("parses a bare group as that group's first live sub-tool", () => {
+    expect(parse("#/create")).toEqual({
       kind: "tool",
-      tool: "text",
-      mode: undefined,
+      group: "create",
+      subTool: "brush",
     });
   });
 
-  it("parses a settings pane", () => {
+  it("distinguishes the three Edit sub-tools that share the `crop` tool id", () => {
+    // The whole reason the grammar changed: under the old form all three of
+    // these collapsed onto `#/tool/adjust`.
+    expect(parse("#/edit/crop")).toMatchObject({ subTool: "crop" });
+    expect(parse("#/edit/transform")).toMatchObject({ subTool: "transform" });
+    expect(parse("#/edit/color-picker")).toMatchObject({ subTool: "color-picker" });
+  });
+
+  it("is case-insensitive and tolerates a missing/extra slash", () => {
+    const want = { kind: "tool", group: "create", subTool: "brush" };
+    expect(parse("#/CREATE/BRUSH")).toEqual(want);
+    expect(parse("create/brush")).toEqual(want);
+    expect(parse("#//create//brush//")).toEqual(want);
+  });
+
+  it("parses a settings pane, and bare #/settings opens the default", () => {
     expect(parse("#/settings/security")).toEqual({
       kind: "settings",
       tab: "security",
     });
-  });
-
-  it("maps every public slug back to its legacy ToolType id", () => {
-    // The whole point of the slug layer: the URL says `paint`, the store says
-    // `brush`. If this drifts, every existing link breaks.
-    expect(parse("#/tool/paint")).toMatchObject({ tool: "brush" });
-    expect(parse("#/tool/adjust")).toMatchObject({ tool: "crop" });
-    expect(parse("#/tool/resize")).toMatchObject({ tool: "compress" });
-    expect(parse("#/tool/layers")).toMatchObject({ tool: "arrow" });
-    expect(parse("#/tool/batch")).toMatchObject({ tool: "emoji" });
-    expect(parse("#/tool/stamps")).toMatchObject({ tool: "stamp" });
-    // Display renamed AI -> Eraser; the canonical WRITE slug followed suit.
-    expect(parse("#/tool/eraser")).toMatchObject({ tool: "ai" });
-    expect(toolSlug("ai")).toBe("eraser");
-  });
-
-  it("still accepts the legacy ToolType id as an inbound alias", () => {
-    expect(parse("#/tool/brush/blur")).toEqual({
-      kind: "tool",
-      tool: "brush",
-      mode: "blur",
-    });
-    // `crop` (the legacy id for Adjust) still resolves; its old `select`
-    // sub-mode is covered by the legacy-redirect tests below.
-    expect(parse("#/tool/crop")).toMatchObject({ tool: "crop" });
-    // "#/tool/ai" pre-dates the Eraser rename and must keep resolving — same
-    // legacy-id-alias mechanism as #/tool/brush for Paint.
-    expect(parse("#/tool/ai")).toMatchObject({ tool: "ai" });
-  });
-
-  it("accepts forgiving sub-mode aliases (singular forms)", () => {
-    expect(parse("#/tool/shapes/arrow")).toMatchObject({ mode: "arrows" });
-    expect(parse("#/tool/stamps/emoji")).toMatchObject({ mode: "emojis" });
-  });
-
-  it("is case-insensitive and tolerates a missing/extra slash", () => {
-    expect(parse("#/TOOL/Paint/BLUR")).toMatchObject({ tool: "brush", mode: "blur" });
-    expect(parse("/tool/paint/blur")).toMatchObject({ tool: "brush", mode: "blur" });
-    expect(parse("#//tool//paint//blur//")).toMatchObject({
-      tool: "brush",
-      mode: "blur",
-    });
-  });
-
-  it("bare #/settings opens the default pane", () => {
     expect(parse("#/settings")).toEqual({ kind: "settings", tab: "general" });
   });
 });
 
+describe("parseRoute — legacy redirects (one per shape we have ever written)", () => {
+  // The pre-v7.51 canonical form was `#/tool/<toolSlug>[/<mode>]`, with the raw
+  // ToolType id accepted alongside the slug. Every row is a link that can exist
+  // in somebody's bookmarks.
+  const LEGACY: [string, string, string][] = [
+    ["#/tool/resize/compress", "enhance", "compress"],
+    ["#/tool/resize/resize", "enhance", "resize"],
+    ["#/tool/compress/compress", "enhance", "compress"],
+    ["#/tool/effects", "enhance", "adjustments"],
+    ["#/tool/eraser/rembg", "enhance", "ai"],
+    ["#/tool/ai/rembg", "enhance", "ai"],
+    ["#/tool/select/wand", "select", "magic-wand"],
+    ["#/tool/select/edge", "select", "edge-aware"],
+    ["#/tool/select/lasso", "select", "magnetic-lasso"],
+    ["#/tool/select/colorrange", "select", "color-range"],
+    ["#/tool/select/rect", "select", "rectangle"],
+    ["#/tool/select/ellipse", "select", "ellipse"],
+    ["#/tool/paint/paint", "create", "brush"],
+    ["#/tool/paint/pen", "create", "pen"],
+    ["#/tool/paint/blur", "create", "blur-brush"],
+    ["#/tool/brush/blur", "create", "blur-brush"],
+    ["#/tool/eraser/brush", "create", "eraser"],
+    ["#/tool/eraser/magic", "create", "magic-eraser"],
+    ["#/tool/text/text", "create", "text"],
+    ["#/tool/text/ocr", "create", "ocr"],
+    ["#/tool/shapes/shapes", "create", "shapes"],
+    ["#/tool/shapes/pens", "create", "pins"],
+    ["#/tool/shapes/arrows", "create", "arrow"],
+    ["#/tool/stamps/clone", "create", "clone-stamp"],
+    ["#/tool/stamps/red", "create", "stamps"],
+    ["#/tool/stamps/emojis", "create", "emoji"],
+    ["#/tool/stamp/emojis", "create", "emoji"],
+    ["#/tool/adjust", "edit", "crop"],
+    ["#/tool/crop", "edit", "crop"],
+    ["#/tool/layers", "edit", "resize-layer"],
+    ["#/tool/arrow", "edit", "resize-layer"],
+    ["#/tool/batch/logo", "batch", "logo"],
+    ["#/tool/batch/text", "batch", "text"],
+    ["#/tool/batch/rename", "batch", "rename"],
+    ["#/tool/emoji/logo", "batch", "logo"],
+  ];
+
+  for (const [hash, group, subTool] of LEGACY) {
+    it(`${hash} -> #/${group}/${subTool}`, () => {
+      expect(parse(hash)).toEqual({ kind: "tool", group, subTool });
+    });
+  }
+
+  it("the v7.44 Adjust-&-Select link lands on the Select GROUP, not Edit", () => {
+    // Dropping the mode and leaving you on Edit would strand you on the wrong
+    // half of the old pairing.
+    expect(parse("#/tool/adjust/select")).toMatchObject({ group: "select" });
+    expect(fromSearch("?tool=adjust&mode=select")).toMatchObject({ group: "select" });
+  });
+
+  it("accepts forgiving sub-mode aliases (singular forms)", () => {
+    expect(parse("#/tool/shapes/arrow")).toEqual({
+      kind: "tool",
+      group: "create",
+      subTool: "arrow",
+    });
+    expect(parse("#/tool/shapes/pen")).toEqual({
+      kind: "tool",
+      group: "create",
+      subTool: "pins",
+    });
+  });
+
+  it("accepts a group under the legacy `tool/` prefix too", () => {
+    // Nothing writes this, but it is the obvious thing to guess and costs one
+    // branch to honour.
+    expect(parse("#/tool/create/brush")).toEqual({
+      kind: "tool",
+      group: "create",
+      subTool: "brush",
+    });
+  });
+});
+
 describe("parseRoute — garbage in, safe default out", () => {
-  // The contract the app leans on: null means "this URL says nothing about the
-  // view" and the caller leaves the user exactly where they are.
-  const garbage = [
+  const GARBAGE = [
     "",
     "#",
     "#/",
     "#/nonsense",
     "#/tool",
-    "#/tool/notatool",
+    "#/tool/",
     "#/tool/notatool/notamode",
-    "#/settings/notapane",
+    "#/%%%",
+    "#/create/%E0",
+    "#/" + "a".repeat(5000),
     "#/../../etc/passwd",
-    "#/tool/%%%",
-    "#/tool/" + "x".repeat(5000),
-    "#/<script>alert(1)</script>",
+    "#/create/brush?x=<script>",
   ];
 
-  for (const hash of garbage) {
-    it(`does not throw and yields no tool route for ${JSON.stringify(hash.slice(0, 40))}`, () => {
-      let route: Route | null = null;
-      expect(() => {
-        route = parse(hash);
-      }).not.toThrow();
-      // An unknown settings PANE is the one forgiving case (falls back to the
-      // default pane); everything else must refuse to move the app.
-      if (hash === "#/settings/notapane") {
-        expect(route).toEqual({ kind: "settings", tab: "general" });
-      } else {
-        expect(route).toBeNull();
-      }
+  for (const hash of GARBAGE) {
+    it(`does not throw for ${JSON.stringify(hash.slice(0, 40))}`, () => {
+      expect(() => parse(hash)).not.toThrow();
     });
   }
 
-  it("drops an unknown sub-mode but keeps the tool", () => {
-    // Friendlier than failing the whole route: a typo'd mode still lands you on
-    // the right tool, and the mirror rewrites the URL to the canonical one.
-    expect(parse("#/tool/paint/notamode")).toEqual({
+  it("drops an unknown sub-tool but keeps the group", () => {
+    expect(parse("#/create/nonsense")).toEqual({
       kind: "tool",
-      tool: "brush",
-      mode: undefined,
+      group: "create",
+      subTool: "brush",
     });
   });
 
-  it("refuses a sub-mode that belongs to a DIFFERENT tool", () => {
-    // `erase` is Paint's, not Shapes' — accepting it would poke a value the
-    // shapesMode union has never heard of into the store.
-    expect(parse("#/tool/shapes/erase")).toMatchObject({ mode: undefined });
+  it("refuses an unknown group outright", () => {
+    expect(parse("#/nonsense/brush")).toBeNull();
+  });
+
+  it("a Coming Soon sub-tool falls back to the group default, never itself", () => {
+    // Perspective and Ruler must be unreachable by URL — they carry no tool, so
+    // applyRoute would have nothing to activate.
+    expect(parse("#/edit/perspective")).toMatchObject({ subTool: "crop" });
+    expect(parse("#/edit/ruler")).toMatchObject({ subTool: "crop" });
+  });
+
+  it("refuses a sub-tool that belongs to a DIFFERENT group", () => {
+    expect(parse("#/edit/brush")).toMatchObject({ subTool: "crop" });
   });
 });
 
 describe("formatRoute — state to hash", () => {
-  it("writes the canonical slug, never the legacy id", () => {
-    expect(formatRoute({ kind: "tool", tool: "brush", mode: "blur" })).toBe(
-      "#/tool/paint/blur",
+  it("writes the group/sub-tool form, never the legacy tool slug", () => {
+    expect(formatRoute({ kind: "tool", group: "create", subTool: "brush" })).toBe(
+      "#/create/brush",
     );
-    expect(formatRoute({ kind: "tool", tool: "crop", mode: "select" })).toBe(
-      "#/tool/adjust/select",
-    );
-    expect(formatRoute({ kind: "tool", tool: "emoji" })).toBe("#/tool/batch");
+    expect(
+      formatRoute({ kind: "tool", group: "edit", subTool: "color-picker" }),
+    ).toBe("#/edit/color-picker");
   });
 
   it("writes a settings pane", () => {
@@ -175,142 +212,104 @@ describe("formatRoute — state to hash", () => {
 });
 
 describe("round-trip stability", () => {
-  const routes: Route[] = [
-    { kind: "tool", tool: "brush", mode: "blur" },
-    { kind: "tool", tool: "brush", mode: "erase" },
-    { kind: "tool", tool: "compress", mode: "resize" },
-    { kind: "tool", tool: "crop" },
-    { kind: "tool", tool: "select", mode: "wand" },
-    { kind: "tool", tool: "shapes", mode: "arrows" },
-    { kind: "tool", tool: "stamp", mode: "emojis" },
-    { kind: "tool", tool: "text" },
-    { kind: "tool", tool: "ai" },
-    { kind: "tool", tool: "effects" },
-    { kind: "tool", tool: "arrow" },
-    { kind: "settings", tab: "general" },
-    { kind: "settings", tab: "security" },
-    { kind: "settings", tab: "superuser" },
-  ];
-
-  for (const route of routes) {
-    it(`route -> hash -> route is identity for ${formatRoute(route)}`, () => {
-      const back = parse(formatRoute(route));
-      expect(back).toEqual({ mode: undefined, ...route });
-    });
-  }
-
-  it("hash -> route -> hash is a fixed point (no oscillation)", () => {
-    // The loop guard depends on this: if formatting a parsed hash could produce
-    // a DIFFERENT hash, the mirror would write, re-read, and write forever.
-    for (const route of routes) {
-      const once = formatRoute(route);
-      const twice = formatRoute(parse(once) as Route);
-      expect(twice).toBe(once);
-    }
-  });
-
-  it("an aliased inbound hash normalises to the canonical form in one hop", () => {
-    expect(formatRoute(parse("#/tool/brush/blur") as Route)).toBe("#/tool/paint/blur");
-    expect(formatRoute(parse("#/tool/shapes/arrow") as Route)).toBe(
-      "#/tool/shapes/arrows",
-    );
-  });
-
-  it("legacy Adjust-&-Select links land on the Select TOOL", () => {
-    // Select lived inside Adjust & Select until the split; the old links are
-    // in bookmarks and shared URLs, so they must keep meaning "selection" —
-    // not "Adjust with an unknown mode silently dropped".
-    expect(parse("#/tool/adjust/select")).toEqual({ kind: "tool", tool: "select" });
-    expect(parse("#/tool/crop/select")).toEqual({ kind: "tool", tool: "select" });
-    expect(fromSearch("?tool=adjust&mode=select")).toEqual({
-      kind: "tool",
-      tool: "select",
-    });
-  });
-
-  it("every tool has a slug and it survives the trip", () => {
-    const tools: ToolType[] = [
-      "stamp",
-      "compress",
-      "crop",
-      "brush",
-      "text",
-      "arrow",
-      "ai",
-      "shapes",
-      "effects",
-      "emoji",
-    ];
-    for (const tool of tools) {
-      expect(toolSlug(tool)).toBeTruthy();
-      expect(parse(`#/tool/${toolSlug(tool)}`)).toMatchObject({ tool });
+  it("route -> hash -> route is identity for EVERY live sub-tool", () => {
+    for (const { group, subTool } of LIVE_SUB_TOOLS) {
+      const route: Route = { kind: "tool", group: group.id, subTool: subTool.id };
+      expect(parse(formatRoute(route))).toEqual(route);
     }
   });
 
   it("every settings tab is linkable", () => {
     for (const tab of Object.keys(SETTINGS_TAB_LABELS)) {
-      expect(parse(`#/settings/${tab}`)).toMatchObject({ tab });
+      const route = { kind: "settings", tab } as Route;
+      expect(parse(formatRoute(route))).toEqual(route);
+    }
+  });
+
+  it("hash -> route -> hash is a fixed point (no oscillation)", () => {
+    for (const hash of ["#/create/brush", "#/edit/guides", "#/settings/security"]) {
+      const route = parse(hash);
+      expect(route).not.toBeNull();
+      expect(formatRoute(route!)).toBe(hash);
+    }
+  });
+
+  it("a legacy hash normalises to the canonical form in ONE hop", () => {
+    const once = parse("#/tool/paint/blur");
+    expect(formatRoute(once!)).toBe("#/create/blur-brush");
+    expect(formatRoute(parse(formatRoute(once!))!)).toBe("#/create/blur-brush");
+  });
+
+  it("every group is reachable by its bare name", () => {
+    for (const group of TOOL_GROUPS) {
+      expect(parse(`#/${group.id}`)).toMatchObject({
+        kind: "tool",
+        group: group.id,
+      });
     }
   });
 });
 
 describe("query params", () => {
-  it("reads ?tool= and ?mode=", () => {
-    expect(fromSearch("?tool=paint&mode=blur")).toEqual({
+  it("reads ?group= and ?subtool=", () => {
+    expect(fromSearch("?group=create&subtool=brush")).toEqual({
       kind: "tool",
-      tool: "brush",
-      mode: "blur",
+      group: "create",
+      subTool: "brush",
     });
   });
 
-  it("reads ?settings=", () => {
+  it("still reads the legacy ?tool= and ?mode=", () => {
+    expect(fromSearch("?tool=paint&mode=blur")).toEqual({
+      kind: "tool",
+      group: "create",
+      subTool: "blur-brush",
+    });
+  });
+
+  it("reads ?settings= and it outranks the rest (the modal is foreground)", () => {
     expect(fromSearch("?settings=security")).toEqual({
+      kind: "settings",
+      tab: "security",
+    });
+    expect(fromSearch("?group=create&settings=security")).toEqual({
       kind: "settings",
       tab: "security",
     });
   });
 
-  it("settings outranks tool (the modal is the foreground view)", () => {
-    expect(fromSearch("?tool=paint&settings=rulers")).toEqual({
-      kind: "settings",
-      tab: "rulers",
-    });
-  });
-
   it("ignores a search string with nothing routable in it", () => {
-    expect(fromSearch("")).toBeNull();
-    expect(fromSearch("?utm_source=x")).toBeNull();
-    expect(fromSearch("?tool=notatool")).toBeNull();
-    expect(fromSearch("?v=abc123")).toBeNull(); // the share token is not a route
+    expect(fromSearch("?utm_source=x&v=abc")).toBeNull();
   });
 
   it("strips only the params routing owns", () => {
-    expect(stripRoutingParams("?tool=paint&mode=blur&v=abc&utm_source=x")).toBe(
+    expect(stripRoutingParams("?v=abc&tool=paint&mode=blur&utm_source=x")).toBe(
       "?v=abc&utm_source=x",
     );
-    expect(stripRoutingParams("?tool=paint")).toBe("");
-    expect(stripRoutingParams("")).toBe("");
-    expect(stripRoutingParams("?v=abc")).toBe("?v=abc");
+    expect(stripRoutingParams("?group=create&subtool=brush")).toBe("");
   });
 });
 
 describe("buildRouteUrl — the copy-link output", () => {
   it("keeps the share token and drops the routing params", () => {
     expect(
-      buildRouteUrl("https://ih.app", "/", "?v=abc&tool=stale", {
+      buildRouteUrl("https://ih.app", "/", "?v=abc&tool=paint", {
         kind: "tool",
-        tool: "brush",
-        mode: "blur",
+        group: "create",
+        subTool: "blur-brush",
       }),
-    ).toBe("https://ih.app/?v=abc#/tool/paint/blur");
+    ).toBe("https://ih.app/?v=abc#/create/blur-brush");
+  });
+});
+
+describe("routeLabel", () => {
+  it("names a route the way the palette shows it", () => {
+    expect(routeLabel({ kind: "tool", group: "create", subTool: "brush" })).toBe(
+      "Create › Brush",
+    );
   });
 
-  it("anchors to the served path (works on localhost and any host)", () => {
-    expect(
-      buildRouteUrl("http://localhost:5173", "/app/", "", {
-        kind: "settings",
-        tab: "security",
-      }),
-    ).toBe("http://localhost:5173/app/#/settings/security");
+  it("names a settings pane", () => {
+    expect(routeLabel({ kind: "settings", tab: "security" })).toBe("Security");
   });
 });

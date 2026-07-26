@@ -54,6 +54,7 @@ import {
   PenTool,
   Pin,
   Pipette,
+  Ruler,
   Scaling,
   Scan,
   ScanText,
@@ -517,6 +518,18 @@ const editGroup: ToolGroupDefinition = {
       icon: Grid2x2,
       tool: "arrow",
       keywords: ["guides", "horizontal", "vertical", "snap", "alignment"],
+    },
+    {
+      // Parked next to Guides on purpose — a ruler is the measurement half of
+      // the same job, and Chris wants the slot held. Coming Soon carries no
+      // `tool`, so it is unreachable by route and palette by TYPE.
+      id: "ruler",
+      label: "Ruler",
+      description: "Measure distances and angles on the image",
+      icon: Ruler,
+      comingSoon: true,
+      note: "Measuring isn't built yet",
+      keywords: ["ruler", "measure", "distance", "angle", "dimension"],
     },
   ],
 };

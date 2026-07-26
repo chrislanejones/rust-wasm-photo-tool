@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.52",
+    date: "2026-07-26",
+    headline: "Links name the tool you're actually looking at",
+    entries: [
+      { tag: "feature", text: "Routes are now #/create/brush and #/edit/color-picker. Crop, Transform and the Eyedropper are one tool underneath, so they used to share a single URL that couldn't say which it meant." },
+      { tag: "fix", text: "Thirty-five legacy URL shapes redirect to the sub-tool they meant, each pinned by its own test. Old bookmarks keep working." },
+      { tag: "fix", text: "#/tool/select/edge was landing on Magic Wand — 'select' is both a group and a legacy tool slug, and the group reading won. The legacy reading now wins under that prefix." },
+      { tag: "fix", text: "The command palette listed rows like 'Paint > Paint'. Entries now read 'Create > Brush', built from the same registry as the toolbar and the keyboard." },
+      { tag: "ui", text: "Ruler sits on the rail beside Guides as a disabled placeholder, like Perspective — the slot is held, the measuring isn't built." },
+    ],
+  },
+  {
     version: "v7.51",
     date: "2026-07-26",
     headline: "Eleven tools became five groups",

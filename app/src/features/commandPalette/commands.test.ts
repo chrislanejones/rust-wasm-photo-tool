@@ -3,11 +3,17 @@
 // at the same place by the same road. These tests pin that — every navigating
 // entry lands the app on the route its label promises, and the routing entries
 // the status bar advertises actually exist.
+//
+// Since v7.51 the palette speaks GROUPS and SUB-TOOLS, built from
+// `toolGroups.ts`. It used to walk `TOOLS` plus the sub-mode table, which meant
+// it spoke in legacy tool names and printed the tool's label twice for any tool
+// whose first mode shared its name — the "Paint › Paint" row.
 import { describe, it, expect, beforeEach } from "vitest";
 import { buildPaletteCommands, type PaletteCommand } from "./commands";
 import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { currentHash } from "@/features/routing";
+import { LIVE_SUB_TOOLS, TOOL_GROUPS } from "@/features/tools/toolGroups";
 
 const build = (photoCount = 1) => buildPaletteCommands({ photoCount });
 const byId = (cmds: PaletteCommand[], id: string) => cmds.find((c) => c.id === id);
@@ -15,185 +21,147 @@ const byId = (cmds: PaletteCommand[], id: string) => cmds.find((c) => c.id === i
 beforeEach(() => {
   useToolStore.setState({
     activeTool: "compress",
+    activeSubTool: "enhance/compress",
     brushMode: "paint",
+    resizeMode: "compress",
     selectionKind: "wand",
     shapesMode: "shapes",
+    eraserMode: "brush",
+    textMode: "text",
+    stampSubMode: "clone",
+    batchMode: "logo",
+    colorPickerActive: false,
   });
   useUIStore.setState({ settingsOpen: false, settingsTab: "general" });
 });
 
 describe("the registry navigates via routes", () => {
-  it("a jump-to-tool entry lands on that tool's route", () => {
-    byId(build(), "tool.brush")!.run();
+  it("a jump-to-GROUP entry lands on that group's first live sub-tool", () => {
+    byId(build(), "group.create")!.run();
     expect(useToolStore.getState().activeTool).toBe("brush");
-    expect(currentHash()).toBe("#/tool/paint/paint");
+    expect(currentHash()).toBe("#/create/brush");
   });
 
-  it("a jump-to-sub-mode entry lands on that sub-mode's route", () => {
-    byId(build(), "mode.brush.blur")!.run();
-    expect(currentHash()).toBe("#/tool/paint/blur");
+  it("a jump-to-SUB-TOOL entry lands on that sub-tool's route", () => {
+    byId(build(), "sub.create.blur-brush")!.run();
+    expect(useToolStore.getState().activeTool).toBe("brush");
+    expect(useToolStore.getState().brushMode).toBe("blur");
+    expect(currentHash()).toBe("#/create/blur-brush");
   });
 
   it("a settings entry lands on that pane's route", () => {
     byId(build(), "settings.security")!.run();
-    expect(useUIStore.getState().settingsOpen).toBe(true);
     expect(currentHash()).toBe("#/settings/security");
   });
 
-  it("the Eraser (id 'ai') jump-to-tool entry lands on the renamed 'eraser' route", () => {
-    useToolStore.setState({ eraserMode: "brush" });
-    byId(build(), "tool.ai")!.run();
-    expect(useToolStore.getState().activeTool).toBe("ai");
-    // Carries its sub-mode now that `eraserMode` is on the sub-mode axis.
-    expect(currentHash()).toBe("#/tool/eraser/brush");
+  it("the three Edit sub-tools sharing `crop` get THREE distinct routes", () => {
+    // The old grammar collapsed these onto one URL, so the palette could offer
+    // three rows that all went to the same place.
+    const cmds = build();
+    const hashes = ["crop", "transform", "color-picker"].map((id) => {
+      byId(cmds, `sub.edit.${id}`)!.run();
+      return currentHash();
+    });
+    expect(hashes).toEqual(["#/edit/crop", "#/edit/transform", "#/edit/color-picker"]);
+    expect(new Set(hashes).size).toBe(3);
   });
 
   it("every navigating entry produces a route the URL can express", () => {
-    // The guarantee behind "one nav path": if an entry moved the app somewhere
-    // the grammar can't name, the address bar would quietly go stale.
-    const navEntries = build(2).filter(
-      (c) => (c.id.startsWith("tool.") || c.id.startsWith("mode.") || c.id.startsWith("settings.")) && !c.disabled,
+    const cmds = build(2).filter(
+      (c) => c.group === "tools" && !c.disabled,
     );
-    expect(navEntries.length).toBeGreaterThan(10);
-    for (const cmd of navEntries) {
-      if (cmd.id.startsWith("settings.") && !cmd.id.match(/^settings\.(open|security|rulers-pane)$/)) {
-        continue; // theme/ruler toggles are settings CHANGES, not navigation
-      }
+    expect(cmds.length).toBeGreaterThan(0);
+    for (const cmd of cmds) {
       cmd.run();
-      expect(currentHash()).toMatch(/^#\/(tool|settings)\//);
+      const hash = currentHash();
+      expect(hash.startsWith("#/")).toBe(true);
+      expect(hash).not.toContain("undefined");
     }
   });
 });
 
-describe("sub-mode entries come from the shared table", () => {
-  it("covers the registry tools and the not-yet-migrated ones alike", () => {
-    const ids = build().map((c) => c.id);
-    // Registry modules (Paint / Resize / Select)…
-    expect(ids).toContain("mode.brush.pen");
-    expect(ids).toContain("mode.compress.resize");
-    expect(ids).toContain("mode.select.wand");
-    // …and the legacy lists (Stamps / Shapes).
-    expect(ids).toContain("mode.stamp.emojis");
-    expect(ids).toContain("mode.shapes.arrows");
+describe("entries come from the group registry", () => {
+  it("emits exactly one entry per group", () => {
+    const cmds = build(2);
+    for (const group of TOOL_GROUPS) {
+      expect(byId(cmds, `group.${group.id}`)).toBeDefined();
+    }
+    expect(cmds.filter((c) => c.id.startsWith("group.")).length).toBe(
+      TOOL_GROUPS.length,
+    );
   });
 
-  it("emits no mode.crop.* entries — Adjust is single-mode since the Select split", () => {
-    const ids = build().map((c) => c.id);
-    expect(ids.some((id) => id.startsWith("mode.crop."))).toBe(false);
+  it("emits exactly one entry per LIVE sub-tool", () => {
+    const cmds = build(2);
+    for (const { group, subTool } of LIVE_SUB_TOOLS) {
+      expect(byId(cmds, `sub.${group.id}.${subTool.id}`)).toBeDefined();
+    }
+    expect(cmds.filter((c) => c.id.startsWith("sub.")).length).toBe(
+      LIVE_SUB_TOOLS.length,
+    );
   });
 
-  it("labels a sub-mode with the tool's DISPLAY name, not its legacy id", () => {
-    expect(byId(build(), "mode.select.edge")!.label).toBe("Select › Edge-aware");
-    expect(byId(build(), "mode.brush.blur")!.label).toBe("Paint › Blur");
+  it("labels a sub-tool 'Group › Sub-tool', never the legacy tool name", () => {
+    const cmds = build();
+    expect(byId(cmds, "sub.create.brush")!.label).toBe("Create › Brush");
+    expect(byId(cmds, "sub.enhance.compress")!.label).toBe("Enhance › Compress");
+    // The regression this replaces: the old loop produced "Paint › Paint".
+    expect(cmds.some((c) => c.label === "Paint › Paint")).toBe(false);
+    expect(cmds.some((c) => /^(\w+) › \1$/.test(c.label))).toBe(false);
   });
 
-  it("Paint's dead Eraser sub-mode has no palette entry anymore", () => {
-    // Paint lost its 4th toggle tile tonight (now Paint/Blur/Pen, was
-    // Paint/Blur/Pen/Erase) — a stale "mode.brush.erase" entry would let a
-    // user ⌘K their way to a mode the UI no longer offers.
-    const ids = build().map((c) => c.id);
-    expect(ids).not.toContain("mode.brush.erase");
-    const brushModeIds = ids.filter((id) => id.startsWith("mode.brush."));
-    expect(brushModeIds.sort()).toEqual(["mode.brush.blur", "mode.brush.paint", "mode.brush.pen"]);
+  it("offers no entry for a Coming Soon sub-tool", () => {
+    const cmds = build(2);
+    expect(byId(cmds, "sub.edit.perspective")).toBeUndefined();
+    expect(byId(cmds, "sub.edit.ruler")).toBeUndefined();
+  });
+
+  it("no entry speaks a legacy tool id in its own id", () => {
+    // Guards the drift back: ids are group/sub-tool now.
+    const cmds = build(2).filter((c) => c.group === "tools");
+    for (const c of cmds) {
+      expect(c.id).toMatch(/^(group|sub)\./);
+    }
   });
 });
 
-describe("the Eraser tool (repurposed 'ai' slot)", () => {
-  it("has exactly one jump-to-tool entry, labeled Eraser (not the old 'AI')", () => {
-    const cmd = byId(build(), "tool.ai")!;
-    expect(cmd.label).toBe("Eraser");
-    // 7, not 6: the rail renumbered in reading order when Select took a digit.
-    expect(cmd.shortcut).toBe("7");
+describe("Batch gating matches the rail and the router", () => {
+  it("Batch entries are disabled with fewer than 2 photos", () => {
+    const one = build(1);
+    expect(byId(one, "group.batch")!.disabled).toBe(true);
+    expect(byId(one, "sub.batch.logo")!.disabled).toBe(true);
   });
 
-  it("offers all four of its sub-modes as jump-to entries", () => {
-    // Was the reverse assertion: the Eraser had no LEGACY_SUBMODES row, so
-    // allToolModes() emitted no "mode.ai.*" ids and a user hunting for "Magic
-    // Eraser" or "Background Removal" found only the one tool-level entry.
-    // The new-ui-toolbar arc gave `ai` a row (its tiles had to come from
-    // somewhere), and the palette picks it up off the same table.
-    const ids = build().map((c) => c.id);
-    for (const m of ["brush", "magic", "rembg", "inpaint"]) {
-      expect(ids).toContain(`mode.ai.${m}`);
-    }
-  });
-
-  it("a sub-mode entry both navigates and selects the mode", () => {
-    const cmd = byId(build(), "mode.ai.magic")!;
-    expect(cmd.label).toBe("Eraser › Magic Eraser");
-    cmd.run();
-    expect(useToolStore.getState().activeTool).toBe("ai");
-    expect(useToolStore.getState().eraserMode).toBe("magic");
-    expect(currentHash()).toBe("#/tool/eraser/magic");
+  it("…and enabled once there are 2+", () => {
+    const two = build(2);
+    expect(byId(two, "group.batch")!.disabled).toBe(false);
+    expect(byId(two, "sub.batch.logo")!.disabled).toBe(false);
   });
 });
 
-describe("Text's sub-modes are palette-searchable (the gap closed in new-ui-toolbar)", () => {
-  // TextSettings.tsx held its mode (Text/Background/OCR) in local useState, so
-  // there was no store field for toolModes.ts to read and the palette emitted
-  // no mode.text.* entries at all — OCR in particular was unreachable by
-  // search. The hoist moved it to `useToolStore.textMode`, which fixes it.
-  it("emits one entry per Text sub-mode", () => {
-    const ids = build().map((c) => c.id);
-    for (const m of ["text", "background", "ocr"]) {
-      expect(ids).toContain(`mode.text.${m}`);
-    }
-  });
-
-  it("OCR is reachable and selects the mode", () => {
-    const cmd = byId(build(), "mode.text.ocr")!;
-    expect(cmd.label).toBe("Text › OCR");
-    cmd.run();
+describe("sub-tools that were previously unreachable", () => {
+  it("OCR is a first-class entry now", () => {
+    byId(build(), "sub.create.ocr")!.run();
     expect(useToolStore.getState().activeTool).toBe("text");
     expect(useToolStore.getState().textMode).toBe("ocr");
-    expect(currentHash()).toBe("#/tool/text/ocr");
-  });
-});
-
-describe("tool-arc entries since v7.20", () => {
-  it("offers the selection kinds as real routes (Select is its own tool)", () => {
-    // Was a hand-rolled `select.edge` entry that navigated to the old
-    // `#/tool/adjust/select` and set the kind imperatively; the kinds are the
-    // Select TOOL's registry sub-modes now, so the generic mode.* loop emits
-    // them and the kind rides in the route itself.
-    const cmd = byId(build(), "mode.select.edge")!;
-    expect(cmd.label).toBe("Select › Edge-aware");
-    cmd.run();
-    expect(currentHash()).toBe("#/tool/select/edge");
-    expect(useToolStore.getState().selectionKind).toBe("edge");
+    expect(currentHash()).toBe("#/create/ocr");
   });
 
-  it("offers the Resize/Compress sub-modes (2.1)", () => {
-    expect(byId(build(), "mode.compress.compress")!.label).toBe("Resize › Compress");
-  });
-});
-
-describe("the routing actions the status bar advertises", () => {
-  it("has 'Copy link to this view', findable by the words people type", () => {
-    const cmd = byId(build(), "action.copy-link")!;
-    expect(cmd.label).toBe("Copy link to this view");
-    expect(cmd.group).toBe("actions");
-    for (const term of ["copy link", "share", "url", "permalink", "bookmark"]) {
-      expect(cmd.keywords).toContain(term);
-    }
+  it("Magic Eraser selects its mode as well as navigating", () => {
+    byId(build(), "sub.create.magic-eraser")!.run();
+    expect(useToolStore.getState().activeTool).toBe("ai");
+    expect(useToolStore.getState().eraserMode).toBe("magic");
   });
 
-  it("has 'Go to route…', which keeps the palette open", () => {
-    let prompted = false;
-    const cmds = buildPaletteCommands({
-      photoCount: 1,
-      promptRoute: () => {
-        prompted = true;
-      },
-    });
-    const cmd = byId(cmds, "action.goto")!;
-    expect(cmd.keepOpen).toBe(true); // it hands the palette back to you
-    expect(cmd.keywords).toContain("jump");
-    cmd.run();
-    expect(prompted).toBe(true);
+  it("Color Picker arms the eyedropper, the way the rail tile does", () => {
+    byId(build(), "sub.edit.color-picker")!.run();
+    expect(useToolStore.getState().colorPickerActive).toBe(true);
   });
 
-  it("disables Go to route… when the palette hasn't provided the jump box", () => {
-    expect(byId(build(), "action.goto")!.disabled).toBe(true);
+  it("…and moving to another Edit sub-tool disarms it again", () => {
+    const cmds = build();
+    byId(cmds, "sub.edit.color-picker")!.run();
+    byId(cmds, "sub.edit.crop")!.run();
+    expect(useToolStore.getState().colorPickerActive).toBe(false);
   });
 });

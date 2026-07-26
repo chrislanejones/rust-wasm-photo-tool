@@ -70,21 +70,28 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.51 — 2026-07-26
+### v7.52 — 2026-07-26
 
-**Eleven tools became five.** The top row is Enhance, Select, Create, Edit and Batch; everything you had is still there, one level down as a sub-tool. Eleven tiles wrapping 5/5/1 asked you to remember which of eleven things you wanted before you could start. Five named groups don't. The cost is honest and worth stating: reaching a sub-tool is one more click than it was.
+**Links now name the tool you are actually looking at.** The URL was
+`#/tool/<tool>/<mode>`, which described the old eleven-tool structure — so Crop,
+Transform and the Eyedropper, which are one tool underneath, all shared
+`#/tool/adjust`. A link could not tell you which of the three it meant. Routes
+are now `#/create/brush`, `#/edit/color-picker`, `#/select/ellipse`: the thing
+the toolbar shows you is the thing the address bar says.
 
-Nothing was dropped and no tool id changed, so old links and bookmarks still resolve.
+Every old link still works. Thirty-five legacy URL shapes are redirected to the
+sub-tool they meant, each one pinned by its own test, because bookmarks exist
+and landing quietly on the wrong tool is worse than refusing.
 
-**The sub-tool now decides what the canvas does.** Picking Brush, Clone Stamp or Magic Eraser sets the cursor and the drag behaviour for that sub-tool specifically, instead of the whole parent tool sharing one. Previously anything without its own case inherited the clone stamp's handlers — which is how a selection drag could very nearly clone-stamp the image. Sub-tools with nothing to do on canvas now do nothing, deliberately.
+**The command palette speaks the same language.** It listed rows like
+"Paint › Paint" — the old loop walked the legacy tool table and printed the
+tool's name twice whenever its first mode shared that name. Entries are now
+"Create › Brush", one per group and one per sub-tool, from the same registry the
+toolbar and the keyboard use.
 
-**Crop, Transform and the Eyedropper each get their own panel.** They used to share one, so all three showed the same wall of controls. Same for Resize Layer, Canvas Size and Guides. Each now shows only its own section.
-
-**The eyedropper remembers.** Colours you pick land in a Recent Colors list — click one to put it back on the brush and text, ✕ to forget it. It clears when you reload.
-
-**OCR moved out of hiding.** Reading text out of an image was buried inside the Text panel; it's a Create sub-tool now. Text's background and bubble controls moved the other way, up next to the colour swatch where you're already working.
-
-Digits `1`–`5` select the five groups. `6`–`0` and `-` no longer do anything.
+**Ruler is on the rail as a placeholder**, next to Guides, disabled — the slot is
+held, the measuring isn't built. Like Perspective, it carries no route and no
+palette entry, so it can't be reached by guessing a URL.
 
 ## License
 
