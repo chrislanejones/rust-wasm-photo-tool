@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HOVER_RING } from "@/lib/styles";
 
 /**
  * A single square icon button — the top bar's Undo / Redo / Zoom controls.
@@ -19,10 +20,21 @@ import { cn } from "@/lib/utils";
  * TopBar — this only replaces what goes inside it, so the grouped look is
  * untouched.
  *
- * Sizing matches the tool rail's rule: the icon is a PERCENTAGE of the button
- * (55%), not a fixed `h-4 w-4`, so the glyph keeps its proportion if the button
- * size ever changes. Idle/hover/active colours mirror ToggleButtonGroup so the
- * whole bar reads as one system.
+ * VOCABULARY: the tool rail's, deliberately — border for state, HOVER_RING for
+ * hover, icon sized as a PERCENTAGE (55%) rather than a fixed `h-4 w-4` so the
+ * glyph keeps its proportion. That makes the top bar and the tool rail read as
+ * one system instead of two.
+ *
+ * Two departures from ToolButton, both forced by where these sit:
+ *  - IDLE IS TRANSPARENT, not `bg-bg-tertiary`. These live INSIDE the group
+ *    pills, which are themselves `bg-bg-tertiary` — a tile with the same fill
+ *    as its container is invisible. Hover still lifts to `bg-bg-elevated`, so
+ *    the affordance survives and the pill background is preserved.
+ *  - `rounded-lg`, not `rounded-2xl`. The rail's radius is proportionate at
+ *    39px; at 28px it reads as a circle.
+ *
+ * Height is 28px to match the panel toggles and the user avatar already in the
+ * bar, so nothing reflows.
  */
 export interface IconButtonProps
   extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
@@ -41,17 +53,21 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       aria-label={label}
       aria-pressed={active || undefined}
       className={cn(
-        "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-        "transition-all duration-150",
+        "group flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+        "transition-all duration-200 ease-out",
+        // Same border-carries-state rule as the rail: the width is on BOTH
+        // branches so the content box never changes size between them.
         active
-          ? "bg-bg-elevated text-text-primary shadow-md"
-          : "text-text-muted hover:text-text-primary hover:bg-bg-elevated",
+          ? "border-2 border-theme-primary bg-bg-elevated text-text-primary shadow-sm"
+          : "border-2 border-transparent text-text-muted hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]",
+        !active && HOVER_RING,
         "disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent",
+        "disabled:hover:ring-0 disabled:active:scale-100",
         className,
       )}
       {...props}
     >
-      <Icon className="h-[55%] w-[55%]" />
+      <Icon className="h-[55%] w-[55%] transition-transform duration-200 ease-out group-hover:scale-110" />
     </button>
   ),
 );
