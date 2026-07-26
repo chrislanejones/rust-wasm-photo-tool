@@ -115,6 +115,19 @@ export function AISettings({
       ? "Brush over the whole unwanted object and release — it's selected and removed in one stroke, on your device, no sign-in. Cover all of it: a partial stroke lets the fill rebuild the object from its own leftovers. Big areas can come out soft."
       : activeModeInfo.info;
 
+  /** The two Replicate-backed actions. They are ONE sub-tool (Enhance › AI)
+   *  and both render together.
+   *
+   *  They used to be two exclusive modes picked from this panel's own tile row
+   *  — but that row moved into the sub-tool header, and the five-group
+   *  restructure then gave the header the GROUP's sub-tools instead of this
+   *  tool's modes. Enhance › AI pins `eraserMode` to "rembg", and nothing was
+   *  left that could set "inpaint", so Object Removal became unreachable.
+   *  Rendering both buttons removes the dependence on a mode picker that no
+   *  longer exists — and they were never really exclusive: they are two
+   *  buttons, not two states. */
+  const isReplicate = mode === "rembg" || mode === "inpaint";
+
   const canRun = aiEnabled && !!activePhotoId && !!stampToolRef.current;
 
   const runModel = (type: "rembg") => {
@@ -144,7 +157,17 @@ export function AISettings({
     // reads/writes this same `eraserMode` via toolModes.ts. `-mt-2` went with
     // them — it only existed to tuck that row under the panel's top padding.
     <div className="space-y-4">
-      <SectionHeader title={activeModeInfo.title} info={headerInfo} />
+      {/* The AI sub-tool owns BOTH Replicate actions, so its header names the
+          sub-tool rather than whichever mode happens to be set. Brush and
+          Magic Eraser are their own Create sub-tools and keep their own. */}
+      {isReplicate ? (
+        <SectionHeader
+          title="AI"
+          info="Runs on Replicate, so it needs sign-in and a Paid plan. Background Removal cuts the subject out; Object Removal opens a mask editor, you paint what should go, and the model fills it back in."
+        />
+      ) : (
+        <SectionHeader title={activeModeInfo.title} info={headerInfo} />
+      )}
 
       {mode === "brush" && (
         <>
@@ -213,7 +236,7 @@ export function AISettings({
           </div>
         ))}
 
-      {(mode === "rembg" || mode === "inpaint") && (
+      {isReplicate && (
         <>
           {!aiEnabled && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
@@ -224,8 +247,7 @@ export function AISettings({
             </div>
           )}
 
-          {mode === "rembg" && (
-            <button
+          <button
               type="button"
               onClick={() => runModel("rembg")}
               disabled={!canRun || busy}
@@ -238,19 +260,17 @@ export function AISettings({
                 : lastType === "rembg" && phase === "running"
                   ? "Removing background..."
                   : "Remove Background"}
-            </button>
-          )}
-          {mode === "rembg" && lastType === "rembg" && error && (
+          </button>
+          {lastType === "rembg" && error && (
             <p className="text-2xs text-destructive leading-relaxed">{error}</p>
           )}
-          {mode === "rembg" && lastType === "rembg" && phase === "done" && !error && (
+          {lastType === "rembg" && phase === "done" && !error && (
             <p className="text-2xs text-success">
               Background removed - applied to canvas.
             </p>
           )}
 
-          {mode === "inpaint" && (
-            <button
+          <button
               type="button"
               onClick={openObjModal}
               disabled={!canRun || busy}
@@ -263,12 +283,11 @@ export function AISettings({
                 : lastType === "inpaint" && phase === "running"
                   ? "Removing object..."
                   : "Remove Object"}
-            </button>
-          )}
-          {mode === "inpaint" && lastType === "inpaint" && error && (
+          </button>
+          {lastType === "inpaint" && error && (
             <p className="text-2xs text-destructive leading-relaxed">{error}</p>
           )}
-          {mode === "inpaint" && lastType === "inpaint" && phase === "done" && !error && (
+          {lastType === "inpaint" && phase === "done" && !error && (
             <p className="text-2xs text-success">
               Object removed - applied to canvas.
             </p>
