@@ -66,7 +66,16 @@ export function ToggleButtonGroup({
                 : "text-text-muted hover:text-text-primary hover:bg-bg-elevated",
             )}
           >
-            {!noIcons && <Icon className="h-3.5 w-3.5" />}
+            {!noIcons && (
+              // Icon-only mode gets a BIGGER glyph: with the label hidden the
+              // icon is the button's entire content, and at 14px it read as a
+              // small mark floating in a wide tile — the Review panel's four
+              // section toggles are the case that shows it. 18px matches the
+              // top bar's IconButton glyph, so the two groups sit at the same
+              // visual weight. Labelled buttons keep 14px, where the icon is a
+              // supporting mark next to text and a bigger one would crowd it.
+              <Icon className={compact ? "h-[18px] w-[18px]" : "h-3.5 w-3.5"} />
+            )}
             {!compact && <span>{label}</span>}
           </button>
         );
