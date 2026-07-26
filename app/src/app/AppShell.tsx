@@ -50,7 +50,7 @@ import { IdleScreen } from "@/components/IdleScreen";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
 import { groupById } from "@/features/tools/toolGroups";
-import { activateGroup } from "@/features/tools/activateSubTool";
+import { activateGroup, useActiveSubTool } from "@/features/tools/activateSubTool";
 import type { PlacementCell } from "@/components/PlacementGrid";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
@@ -320,6 +320,10 @@ export function AppShell() {
   // (useEffectiveTool) and the selection-overlay prop below can see it. The
   // panel itself (AISettings.tsx) reads/writes the same store field.
   const eraserMode = useToolStore((s) => s.eraserMode);
+  /** The lit sub-tool — drives canvas dispatch (useEffectiveTool) and the
+   *  canvas cursor. Re-derives from (activeTool, mode) when the stored key is
+   *  stale, so a legacy route or a panel's own mode toggle still lands right. */
+  const activeSubTool = useActiveSubTool();
   /** Active Crop-tool aspect ratio. `null` ≡ "Free" (no constraint).
    *  Drags in useDrawingTools snap to this ratio via Rust when set. */
   const cropRatio = useToolStore((s) => s.cropRatio);
@@ -1471,23 +1475,22 @@ export function AppShell() {
 
   const effectiveStamp = useEffectiveTool({
     stamp,
-    activeTool,
+    // Dispatch keys off the lit SUB-TOOL now, not the legacy tool id — see the
+    // hook header for why the old unmatched-tool fallthrough was a hazard.
+    subTool: activeSubTool,
     colorPickerActive,
     colorPicker,
     moveActive,
     moveLayerTool,
     eraserTool,
     magicEraserTool,
-    eraserMode,
     drawingTools,
     maskEditing,
     maskTool,
-    brushMode,
     blurDown,
     blurMove,
     blurUp,
     paintTool,
-    stampSubMode,
     emojiTool,
     redStampTool,
   });

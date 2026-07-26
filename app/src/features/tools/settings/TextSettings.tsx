@@ -221,7 +221,13 @@ export function TextSettings({
           </div>
         )}
 
-        {m === "background" && (
+        {/* Background / bubble / shadow controls.
+            Rendered for the TEXT mode too, immediately after the Color swatch
+            above — the plate behind a caption is part of styling that caption,
+            and hiding it behind a second mode meant you had to leave the text
+            you were editing to reach it. `background` keeps its own mode so the
+            existing toggle, route and palette entry all still land somewhere. */}
+        {(m === "text" || m === "background") && (
           <div className="space-y-5">
             {/* Style toggle */}
             <ToolButtonGroup

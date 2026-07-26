@@ -48,7 +48,7 @@ export function ToolButton({ icon: Icon, label, active, disabled = false, onClic
             ].join(" "),
       ].join(" ")}
     >
-      <Icon className="h-1/2 w-1/2 transition-transform duration-200 ease-out group-hover:scale-110" />
+      <Icon className="h-[55%] w-[55%] transition-transform duration-200 ease-out group-hover:scale-110" />
     </button>
   );
 }

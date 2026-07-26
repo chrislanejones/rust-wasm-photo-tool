@@ -57,15 +57,18 @@ function SubtoolButton({
   label,
   active,
   disabled,
-  tooltip,
+  description,
+  note,
   onClick,
 }: {
   icon?: React.ComponentType<{ className?: string }>;
   label: string;
   active: boolean;
   disabled: boolean;
-  /** Second tooltip line — the Coming Soon note, when there is one. */
-  tooltip?: string;
+  /** Second tooltip line — what the sub-tool does. */
+  description: string;
+  /** Replaces `description` for a Coming Soon tile. */
+  note?: string;
   onClick: () => void;
 }) {
   return (
@@ -90,7 +93,7 @@ function SubtoolButton({
           ].join(" ")}
         >
           {Icon ? (
-            <Icon className="h-1/2 w-1/2 transition-transform duration-200 ease-out group-hover:scale-110" />
+            <Icon className="h-[55%] w-[55%] transition-transform duration-200 ease-out group-hover:scale-110" />
           ) : (
             <span className="text-2xs font-semibold">{label.slice(0, 2)}</span>
           )}
@@ -98,9 +101,7 @@ function SubtoolButton({
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={8}>
         <p className="text-xs font-semibold">{label}</p>
-        {tooltip && (
-          <p className="text-muted-foreground text-2xs">{tooltip}</p>
-        )}
+        <p className="text-muted-foreground text-2xs">{note ?? description}</p>
       </TooltipContent>
     </Tooltip>
   );
@@ -129,7 +130,18 @@ export function SubtoolRow({ disabled = false }: Props) {
           animate={{ height: "auto", opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
           transition={panelSpacingTransition}
-          className="overflow-hidden"
+          // `overflow-hidden` is what makes the height animation clip cleanly —
+          // but it also clipped the hover ring off the tiles in the outer
+          // columns and the bottom row. HOVER_RING is `ring-2` at
+          // `ring-offset-2`, i.e. it extends 4px OUTSIDE the tile, and the grid
+          // fills this box exactly, so on an edge tile that 4px fell outside
+          // the clip box and the halo came out flat-sided.
+          //
+          // The negative margin + equal padding widens the CLIP box by 8px a
+          // side while leaving the grid's own position and width untouched, so
+          // the ring has somewhere to land. It borrows from the header's `px-4`
+          // / `pb-4`, which has 16px to give, so nothing shifts.
+          className="overflow-hidden -mx-2 px-2 -mb-2 pb-2"
         >
           {/* Hairline separating rail from sub-rail. Inside the animated box so
               it collapses with the row instead of leaving a stray line. */}
@@ -156,7 +168,8 @@ export function SubtoolRow({ disabled = false }: Props) {
                   label={subTool.label}
                   active={!comingSoon && resolved.key === activeSubTool?.key}
                   disabled={disabled || comingSoon}
-                  tooltip={comingSoon ? subTool.note : undefined}
+                  description={subTool.description}
+                  note={comingSoon ? subTool.note : undefined}
                   onClick={() => {
                     if (disabled || comingSoon) return;
                     activateSubTool(resolved);

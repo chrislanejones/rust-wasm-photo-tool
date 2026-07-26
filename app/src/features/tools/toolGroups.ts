@@ -47,7 +47,6 @@ import {
   Frame,
   ImagePlus,
   Lasso,
-  Minus,
   Move,
   PackageOpen,
   Palette,
@@ -57,6 +56,7 @@ import {
   Ruler,
   Scaling,
   Scan,
+  ScanText,
   Shapes,
   Smile,
   SquareDashed,
@@ -81,12 +81,6 @@ export type ToolGroupId = "enhance" | "select" | "create" | "edit" | "batch";
 export interface SubToolPreselect {
   /** Edit › Color Picker. Exactly what the panel's existing toggle sets. */
   colorPicker?: boolean;
-  /** Create › Line. `line` is a shape KIND inside the Shapes panel (sibling of
-   *  Rectangle / Circle / Hand-drawn), one level below the sub-mode axis — so
-   *  Line is the Shapes sub-tool with that kind preselected. Flagged
-   *  AMBIGUOUS-2 in the migration map; this is the conservative reading, not a
-   *  decision. */
-  shapeKind?: string;
 }
 
 interface SubToolBase {
@@ -94,6 +88,11 @@ interface SubToolBase {
    *  `#/tool/create/clone-stamp`. Never rename — links and bookmarks. */
   id: string;
   label: string;
+  /** Second tooltip line — what this sub-tool actually does. The rail tiles
+   *  have carried a description since before the restructure; the sub-tool
+   *  tiles showed only their label, which made the widest group (Create, 13
+   *  tiles) a wall of icons you had to click to identify. */
+  description: string;
   icon: React.ComponentType<{ className?: string }>;
   /** Fuzzy-search terms for the command palette, beyond the label. */
   keywords: string[];
@@ -108,6 +107,17 @@ export interface LiveSubTool extends SubToolBase {
    *  (`effects`, `crop`, `arrow`). */
   mode?: string;
   preselect?: SubToolPreselect;
+  /** CSS cursor while this sub-tool is active over the canvas. Omitted means
+   *  the default arrow — correct for every sub-tool with NO canvas gesture
+   *  (all of Enhance and Batch, plus Transform / Canvas Size / Guides), which
+   *  is exactly the set that must also idle in dispatch. The cursor and the
+   *  handlers are two views of the same fact, so they live on the same row.
+   *
+   *  Two cursors stay DYNAMIC and are resolved at the canvas rather than here,
+   *  because they depend on live state a static table can't see: Select's
+   *  add/subtract badge (Shift/Alt held) and Resize Layer's `move` (only while
+   *  the Move toggle is on). */
+  cursor?: string;
 }
 
 /** A sub-tool that is announced but not built. Renders disabled with a
@@ -150,6 +160,7 @@ const enhanceGroup: ToolGroupDefinition = {
     {
       id: "compress",
       label: "Compress",
+      description: "Shrink the file size — method, format and quality",
       icon: FileArchive,
       tool: "compress",
       mode: "compress",
@@ -158,6 +169,7 @@ const enhanceGroup: ToolGroupDefinition = {
     {
       id: "resize",
       label: "Resize",
+      description: "Set new pixel dimensions, with or without the aspect lock",
       icon: Scaling,
       tool: "compress",
       mode: "resize",
@@ -166,6 +178,7 @@ const enhanceGroup: ToolGroupDefinition = {
     {
       id: "adjustments",
       label: "Adjustments",
+      description: "Brightness, contrast, saturation, shadows and sharpen",
       icon: SunDim,
       tool: "effects",
       keywords: [
@@ -179,6 +192,7 @@ const enhanceGroup: ToolGroupDefinition = {
       // brief is what confirms this is one tile and not three.
       id: "ai",
       label: "AI",
+      description: "Background removal and object removal, run on a model",
       icon: Bot,
       tool: "ai",
       mode: "rembg",
@@ -204,56 +218,68 @@ const selectGroup: ToolGroupDefinition = {
     {
       id: "magic-wand",
       label: "Magic Wand",
+      description: "Flood-fill a region within a colour tolerance",
       icon: Wand2,
       tool: "select",
       mode: "wand",
+      cursor: "crosshair",
       keywords: ["wand", "flood fill", "tolerance", "magic"],
     },
     {
       id: "edge-aware",
       label: "Edge-aware",
+      description: "Same fill, walled in by the edge map so it stops at the outline",
       icon: Scan,
       tool: "select",
       mode: "edge",
+      cursor: "crosshair",
       keywords: ["edge", "sobel", "outline", "boundary"],
     },
     {
       id: "magnetic-lasso",
       label: "Magnetic Lasso",
+      description: "Click anchors and the wire path-finds along the edges",
       icon: Lasso,
       tool: "select",
       mode: "lasso",
+      cursor: "crosshair",
       keywords: ["lasso", "magnetic", "anchors", "path", "trace"],
     },
     {
       id: "color-range",
       label: "Color Range",
+      description: "Every pixel near the clicked colour, anywhere in the image",
       icon: SwatchBook,
       tool: "select",
       mode: "colorRange",
+      cursor: "crosshair",
       keywords: ["colour range", "color range", "similar", "hue", "sample"],
     },
     {
       id: "rectangle",
       label: "Rectangle",
+      description: "Drag out a rectangular marquee",
       icon: SquareDashed,
       tool: "select",
       mode: "rect",
+      cursor: "crosshair",
       keywords: ["rectangle", "marquee", "box", "drag"],
     },
     {
       id: "ellipse",
       label: "Ellipse",
+      description: "Drag out the ellipse inscribed in that rectangle",
       icon: CircleDashed,
       tool: "select",
       mode: "ellipse",
+      cursor: "crosshair",
       keywords: ["ellipse", "circle", "oval", "marquee"],
     },
   ],
 };
 
 // ── Create ───────────────────────────────────────────────────────────────────
-// The widest group at 13. Absorbs Paint, Stamps, Shapes, the hand Eraser and
+// The widest group at 12. Absorbs Paint, Stamps, Shapes, the hand Eraser and
 // Text, so the panel switch here MUST route on sub-tool rather than on legacy
 // tool id — five different `ToolType`s feed this one group.
 const createGroup: ToolGroupDefinition = {
@@ -266,33 +292,41 @@ const createGroup: ToolGroupDefinition = {
     {
       id: "brush",
       label: "Brush",
+      description: "Freehand paint straight onto the canvas",
       icon: Brush,
       tool: "brush",
       mode: "paint",
+      cursor: "crosshair",
       keywords: ["brush", "paint", "freehand", "draw"],
     },
     {
       id: "pen",
       label: "Pen",
+      description: "Bézier paths — click anchors, drag to curve",
       icon: PenTool,
       tool: "brush",
       mode: "pen",
+      cursor: "crosshair",
       keywords: ["pen", "bezier", "path", "vector", "curve"],
     },
     {
       id: "clone-stamp",
       label: "Clone Stamp",
+      description: "Alt+click a source point, then paint pixels from it",
       icon: Copy,
       tool: "stamp",
       mode: "clone",
+      cursor: "crosshair",
       keywords: ["clone", "heal", "duplicate", "source point"],
     },
     {
       id: "blur-brush",
       label: "Blur Brush",
+      description: "Soften whatever you drag across",
       icon: Droplets,
       tool: "brush",
       mode: "blur",
+      cursor: "crosshair",
       keywords: ["blur", "soften", "smudge", "brush"],
     },
     {
@@ -304,17 +338,21 @@ const createGroup: ToolGroupDefinition = {
       // refuses it. Left exactly as found: not deleted, not revived.
       id: "eraser",
       label: "Eraser",
+      description: "Rub pixels out by hand",
       icon: Eraser,
       tool: "ai",
       mode: "brush",
+      cursor: "crosshair",
       keywords: ["eraser", "erase", "rub out", "delete pixels"],
     },
     {
       id: "magic-eraser",
       label: "Magic Eraser",
+      description: "Paint over something and let PatchMatch fill it in",
       icon: Wand2,
       tool: "ai",
       mode: "magic",
+      cursor: "crosshair",
       keywords: ["magic eraser", "patchmatch", "inpaint", "content aware"],
     },
     {
@@ -322,17 +360,33 @@ const createGroup: ToolGroupDefinition = {
       // own toggle — ORPHAN O-2/O-3, no sub-tool tile in the brief.
       id: "text",
       label: "Text",
+      description: "Add a caption, with an optional plate or bubble behind it",
       icon: Type,
       tool: "text",
       mode: "text",
+      cursor: "text",
       keywords: ["text", "type", "caption", "label", "words"],
+    },
+    {
+      // Text's third mode, promoted to a sub-tool of its own so it is reachable
+      // from the rail rather than only from inside the Text panel. Reads text
+      // out of the image; no canvas gesture, so no cursor and it idles.
+      id: "ocr",
+      label: "OCR",
+      description: "Read the text out of the image",
+      icon: ScanText,
+      tool: "text",
+      mode: "ocr",
+      keywords: ["ocr", "read text", "extract", "scan", "recognise"],
     },
     {
       id: "shapes",
       label: "Shapes",
+      description: "Rectangles, circles, hand-drawn outlines and lines",
       icon: Shapes,
       tool: "shapes",
       mode: "shapes",
+      cursor: "crosshair",
       keywords: ["shape", "rectangle", "circle", "box", "hand-drawn"],
     },
     {
@@ -342,43 +396,41 @@ const createGroup: ToolGroupDefinition = {
       // correctly; the stale label is what made them look like one thing.
       id: "pins",
       label: "Pins",
+      description: "Drop numbered or lettered markers for callouts",
       icon: Pin,
       tool: "shapes",
       mode: "pens",
+      cursor: "crosshair",
       keywords: ["pin", "marker", "numbers", "letters", "annotate", "callout"],
     },
     {
       id: "arrow",
       label: "Arrow",
+      description: "Single- or double-headed arrows",
       icon: ArrowUpRight,
       tool: "shapes",
       mode: "arrows",
+      cursor: "crosshair",
       keywords: ["arrow", "pointer", "annotate", "single", "double"],
-    },
-    {
-      // AMBIGUOUS-2 — see SubToolPreselect.shapeKind.
-      id: "line",
-      label: "Line",
-      icon: Minus,
-      tool: "shapes",
-      mode: "shapes",
-      preselect: { shapeKind: "line" },
-      keywords: ["line", "straight", "rule", "stroke"],
     },
     {
       id: "emoji",
       label: "Emoji",
+      description: "Drop an emoji sticker anywhere on the image",
       icon: Smile,
       tool: "stamp",
       mode: "emojis",
+      cursor: "crosshair",
       keywords: ["emoji", "sticker", "reaction", "face"],
     },
     {
       id: "stamps",
       label: "Stamps",
+      description: "Red marker stamps — approved, rejected, and the rest",
       icon: Stamp,
       tool: "stamp",
       mode: "red",
+      cursor: "crosshair",
       keywords: ["stamp", "red", "marker", "batch stamp", "numbered"],
     },
   ],
@@ -401,13 +453,16 @@ const editGroup: ToolGroupDefinition = {
     {
       id: "crop",
       label: "Crop",
+      description: "Pick a ratio, drag the box, then apply",
       icon: Crop,
       tool: "crop",
+      cursor: "crosshair",
       keywords: ["crop", "trim", "ratio", "aspect"],
     },
     {
       id: "transform",
       label: "Transform",
+      description: "Flip or rotate the active layer in place",
       icon: FlipHorizontal,
       tool: "crop",
       keywords: ["transform", "flip", "rotate", "mirror"],
@@ -415,6 +470,7 @@ const editGroup: ToolGroupDefinition = {
     {
       id: "perspective",
       label: "Perspective",
+      description: "Correct a keystoned or skewed photo",
       icon: Scan,
       comingSoon: true,
       note: "Perspective correction is not built yet",
@@ -426,14 +482,17 @@ const editGroup: ToolGroupDefinition = {
       // an existing state rather than a new activation path.
       id: "color-picker",
       label: "Color Picker",
+      description: "Eyedropper — sample a pixel into the brush and text colour",
       icon: Pipette,
       tool: "crop",
       preselect: { colorPicker: true },
+      cursor: "crosshair",
       keywords: ["colour picker", "color picker", "eyedropper", "sample", "pick"],
     },
     {
       id: "resize-layer",
       label: "Resize Layer",
+      description: "Move and scale the active layer",
       icon: Move,
       tool: "arrow",
       keywords: ["resize layer", "move layer", "scale layer", "reposition"],
@@ -441,15 +500,22 @@ const editGroup: ToolGroupDefinition = {
     {
       id: "canvas-size",
       label: "Canvas Size",
+      description: "Grow or shrink the background canvas without resampling",
       icon: Frame,
       tool: "arrow",
       keywords: ["canvas size", "background", "artboard", "extend", "pad"],
     },
     {
+      // Coming Soon, same as Perspective — carries no `tool`, so it is
+      // unreachable by route and palette by TYPE, not by a runtime check.
+      // (The guides overlay itself still exists and still works; what is not
+      // ready is a Guides sub-tool that owns it from the rail.)
       id: "guides",
       label: "Guides",
+      description: "Draggable horizontal and vertical alignment lines",
       icon: Ruler,
-      tool: "arrow",
+      comingSoon: true,
+      note: "Guides aren't wired to the rail yet",
       keywords: ["guides", "horizontal", "vertical", "snap", "alignment"],
     },
   ],
@@ -468,6 +534,7 @@ const batchGroup: ToolGroupDefinition = {
     {
       id: "logo",
       label: "Logo",
+      description: "Stamp a logo onto every loaded photo at once",
       icon: ImagePlus,
       tool: "emoji",
       mode: "logo",
@@ -476,6 +543,7 @@ const batchGroup: ToolGroupDefinition = {
     {
       id: "text",
       label: "Text",
+      description: "Add the same caption to every loaded photo",
       icon: Type,
       tool: "emoji",
       mode: "text",
@@ -484,6 +552,7 @@ const batchGroup: ToolGroupDefinition = {
     {
       id: "rename",
       label: "Rename",
+      description: "Rename the whole gallery from a pattern",
       icon: FileEdit,
       tool: "emoji",
       mode: "rename",

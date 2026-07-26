@@ -19,6 +19,7 @@ import type { StampMode } from "./settings/StampSettings";
 import type { ShapesMode } from "@/stores/useToolStore";
 import { ToolGrid } from "./ToolGrid";
 import { SubtoolRow } from "./SubtoolRow";
+import { useActiveSubTool } from "./activateSubTool";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import { LayerSettings } from "./settings/LayerSettings";
@@ -213,6 +214,22 @@ export function ToolsSidebar({
   aiEnabled = false,
   onAIResult,
 }: ToolsSidebarProps) {
+  // PHASE 2: the panel switch routes on SUB-TOOL, not on legacy tool id, for
+  // the groups that absorbed several old tools. Edit is the case that needs it
+  // most — Crop, Transform and Color Picker are all `crop`, so switching on the
+  // tool id would render the whole panel three times over and the three tiles
+  // would be indistinguishable.
+  const activeSubTool = useActiveSubTool();
+  const subToolId = activeSubTool?.subTool.id;
+
+  /** Which section of TransformCropSettings the lit Edit sub-tool wants. */
+  const cropSection =
+    subToolId === "transform"
+      ? ("transform" as const)
+      : subToolId === "color-picker"
+        ? ("colorPicker" as const)
+        : ("crop" as const);
+
   return (
     <motion.div
       variants={embedded ? undefined : slideFromLeft}
@@ -287,6 +304,7 @@ export function ToolsSidebar({
             colorPickerActive={colorPickerActive}
             onSetColorPickerActive={onSetColorPickerActive}
             pickedColor={pickedColor}
+            section={cropSection}
           />
         )}
 

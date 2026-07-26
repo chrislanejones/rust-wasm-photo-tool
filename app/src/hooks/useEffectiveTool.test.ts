@@ -1,7 +1,7 @@
 // ===== FILE: app/src/hooks/useEffectiveTool.test.ts =====
 // useEffectiveTool is pure decision logic (no hooks of its own, no DOM) — it
 // just picks which set of onMouseDown/Move/Up handlers the canvas should get
-// for the currently active tool/sub-mode. Pinning the routing table directly,
+// for the currently active SUB-TOOL. Pinning the routing table directly,
 // with special attention to the "ai" (Eraser) branch, which is load-bearing
 // two ways: if the base branch regresses, dragging on the Eraser tool
 // silently does nothing; if the eraserMode === "magic" branch regresses, a
@@ -17,7 +17,7 @@ import type { usePaintTool } from "./usePaintTool";
 import type { useMagicEraserTool } from "./useMagicEraserTool";
 import type { useEmojiTool } from "./useEmojiTool";
 import type { useRedStampTool } from "./useRedStampTool";
-import type { ToolType } from "@/lib/types";
+import { resolveSubTool } from "@/features/tools/toolGroups";
 
 type Stamp = ReturnType<typeof useCloneStamp>;
 type ColorPicker = ReturnType<typeof useColorPicker>;
@@ -83,33 +83,40 @@ function makeRedStampTool(hasPending = false): RedStampTool {
 function baseParams(overrides: Partial<Parameters<typeof useEffectiveTool>[0]> = {}) {
   return {
     stamp: makeStamp(),
-    activeTool: "effects" as ToolType,
+    // Default: a sub-tool with no canvas gesture at all.
+    subTool: sub("enhance", "adjustments"),
     colorPickerActive: false,
     colorPicker: makeColorPicker(),
     moveActive: false,
     moveLayerTool: makeMoveLayerTool(),
     eraserTool: makePaintTool(),
     magicEraserTool: makeMagicEraserTool(),
-    eraserMode: "brush" as const,
     drawingTools: makeDrawingTools(),
     maskEditing: false,
     maskTool: makePaintTool(),
-    brushMode: "paint" as const,
     blurDown: vi.fn(),
     blurMove: vi.fn(),
     blurUp: vi.fn(),
     paintTool: makePaintTool(),
-    stampSubMode: "clone" as const,
     emojiTool: makeEmojiTool(),
     redStampTool: makeRedStampTool(),
     ...overrides,
   };
 }
 
+/** Resolve a real registry sub-tool. Deliberately NOT a hand-built literal:
+ *  routing is pinned against the SHIPPING registry, so a sub-tool that is
+ *  renamed or dropped fails here instead of silently losing its dispatch. */
+function sub(group: string, id: string) {
+  const r = resolveSubTool(group, id);
+  if (!r) throw new Error(`no such sub-tool: ${group}/${id}`);
+  return r;
+}
+
 describe("useEffectiveTool — the Eraser (ai) branch", () => {
   it("routes canvas mouse events to eraserTool, not idle", () => {
     const eraserTool = makePaintTool();
-    const result = useEffectiveTool(baseParams({ activeTool: "ai", eraserTool }));
+    const result = useEffectiveTool(baseParams({ subTool: sub("create", "eraser"), eraserTool }));
     expect(result.onMouseDown).toBe(eraserTool.onMouseDown);
     expect(result.onMouseMove).toBe(eraserTool.onMouseMove);
     expect(result.onMouseUp).toBe(eraserTool.onMouseUp);
@@ -119,7 +126,7 @@ describe("useEffectiveTool — the Eraser (ai) branch", () => {
     const eraserTool = makePaintTool();
     const paintTool = makePaintTool();
     const result = useEffectiveTool(
-      baseParams({ activeTool: "ai", eraserTool, paintTool }),
+      baseParams({ subTool: sub("create", "eraser"), eraserTool, paintTool }),
     );
     expect(result.onMouseDown).not.toBe(paintTool.onMouseDown);
     expect(result.onMouseMove).not.toBe(paintTool.onMouseMove);
@@ -131,30 +138,29 @@ describe("useEffectiveTool — the Eraser (ai) branch", () => {
     // reference but a stale/wrong function was passed in by the caller — this
     // proves the routed handler really does the eraser's work when driven.
     const eraserTool = makePaintTool();
-    const result = useEffectiveTool(baseParams({ activeTool: "ai", eraserTool }));
+    const result = useEffectiveTool(baseParams({ subTool: sub("create", "eraser"), eraserTool }));
     const fakeEvent = {} as Parameters<Stamp["onMouseDown"]>[0];
     result.onMouseDown(fakeEvent);
     expect(eraserTool.onMouseDown).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores stampSubMode/brushMode/moveActive — OTHER tools' sub-mode state never leaks in", () => {
-    // AISettings is flat buttons, not a ToolModeToggle: the Eraser's routing
-    // only ever branches on its own eraserMode (see the Magic Eraser
-    // describe block below), never another tool's sub-mode/toggle state.
+  it("ignores other sub-tools' state — moveActive never leaks into the Eraser", () => {
+    // Dispatch keys off the sub-tool identity alone, so unrelated live state
+    // (here: the Layer-Settings Move toggle) can't redirect the Eraser.
     const eraserTool = makePaintTool();
     const a = useEffectiveTool(
-      baseParams({ activeTool: "ai", eraserTool, brushMode: "blur", moveActive: true, stampSubMode: "emojis" }),
+      baseParams({ subTool: sub("create", "eraser"), eraserTool, moveActive: true }),
     );
     expect(a.onMouseDown).toBe(eraserTool.onMouseDown);
   });
 });
 
-describe("useEffectiveTool — the Magic Eraser sub-mode (ai + eraserMode)", () => {
+describe("useEffectiveTool — the Magic Eraser sub-tool", () => {
   it("brush mode (the default) still routes to eraserTool, not magicEraserTool", () => {
     const eraserTool = makePaintTool();
     const magicEraserTool = makeMagicEraserTool();
     const result = useEffectiveTool(
-      baseParams({ activeTool: "ai", eraserMode: "brush", eraserTool, magicEraserTool }),
+      baseParams({ subTool: sub("create", "eraser"), eraserTool, magicEraserTool }),
     );
     expect(result.onMouseDown).toBe(eraserTool.onMouseDown);
     expect(result.onMouseDown).not.toBe(magicEraserTool.onMouseDown);
@@ -164,7 +170,7 @@ describe("useEffectiveTool — the Magic Eraser sub-mode (ai + eraserMode)", () 
     const eraserTool = makePaintTool();
     const magicEraserTool = makeMagicEraserTool();
     const result = useEffectiveTool(
-      baseParams({ activeTool: "ai", eraserMode: "magic", eraserTool, magicEraserTool }),
+      baseParams({ subTool: sub("create", "magic-eraser"), eraserTool, magicEraserTool }),
     );
     expect(result.onMouseDown).toBe(magicEraserTool.onMouseDown);
     expect(result.onMouseMove).toBe(magicEraserTool.onMouseMove);
@@ -175,7 +181,7 @@ describe("useEffectiveTool — the Magic Eraser sub-mode (ai + eraserMode)", () 
   it("actually invokes magicEraserTool.onMouseDown when the returned handler is called", () => {
     const magicEraserTool = makeMagicEraserTool();
     const result = useEffectiveTool(
-      baseParams({ activeTool: "ai", eraserMode: "magic", magicEraserTool }),
+      baseParams({ subTool: sub("create", "magic-eraser"), magicEraserTool }),
     );
     const fakeEvent = {} as Parameters<Stamp["onMouseDown"]>[0];
     result.onMouseDown(fakeEvent);
@@ -184,9 +190,9 @@ describe("useEffectiveTool — the Magic Eraser sub-mode (ai + eraserMode)", () 
 });
 
 describe("useEffectiveTool — no cross-tool leakage (regression net)", () => {
-  it("Effects has no canvas interaction of its own (idle)", () => {
+  it("Adjustments has no canvas interaction of its own (idle)", () => {
     const stamp = makeStamp();
-    const result = useEffectiveTool(baseParams({ activeTool: "effects", stamp }));
+    const result = useEffectiveTool(baseParams({ subTool: sub("enhance", "adjustments"), stamp }));
     result.onMouseDown({} as Parameters<Stamp["onMouseDown"]>[0]);
     result.onMouseMove({} as Parameters<Stamp["onMouseMove"]>[0]);
     result.onMouseUp();
@@ -195,36 +201,36 @@ describe("useEffectiveTool — no cross-tool leakage (regression net)", () => {
     expect(stamp.onMouseUp).not.toHaveBeenCalled();
   });
 
-  it("Layer Settings (arrow) is idle unless moveActive is on", () => {
+  it("Resize Layer is idle unless moveActive is on", () => {
     const moveLayerTool = makeMoveLayerTool();
-    const idleResult = useEffectiveTool(baseParams({ activeTool: "arrow", moveActive: false, moveLayerTool }));
+    const idleResult = useEffectiveTool(baseParams({ subTool: sub("edit", "resize-layer"), moveActive: false, moveLayerTool }));
     expect(idleResult.onMouseDown).not.toBe(moveLayerTool.onMouseDown);
 
-    const movingResult = useEffectiveTool(baseParams({ activeTool: "arrow", moveActive: true, moveLayerTool }));
+    const movingResult = useEffectiveTool(baseParams({ subTool: sub("edit", "resize-layer"), moveActive: true, moveLayerTool }));
     expect(movingResult.onMouseDown).toBe(moveLayerTool.onMouseDown);
   });
 
-  it("Adjust & Select (crop) routes to the color picker only while it's active", () => {
+  it("Crop routes to the color picker only while it is active", () => {
     const colorPicker = makeColorPicker();
     const drawingTools = makeDrawingTools();
     const cropDefault = useEffectiveTool(
-      baseParams({ activeTool: "crop", colorPickerActive: false, colorPicker, drawingTools }),
+      baseParams({ subTool: sub("edit", "crop"), colorPickerActive: false, colorPicker, drawingTools }),
     );
     expect(cropDefault.onMouseDown).toBe(drawingTools.onMouseDown);
 
     const cropPicking = useEffectiveTool(
-      baseParams({ activeTool: "crop", colorPickerActive: true, colorPicker, drawingTools }),
+      baseParams({ subTool: sub("edit", "crop"), colorPickerActive: true, colorPicker, drawingTools }),
     );
     expect(cropPicking.onMouseDown).toBe(colorPicker.onMouseDown);
   });
 
-  it("Paint routes blur/erase/pen sub-modes to distinct handler sets", () => {
+  it("Blur Brush / Eraser / Pen route to distinct handler sets", () => {
     const eraserTool = makePaintTool();
     const paintTool = makePaintTool();
     const blurDown = vi.fn();
 
     const blur = useEffectiveTool(
-      baseParams({ activeTool: "brush", brushMode: "blur", blurDown, eraserTool, paintTool }),
+      baseParams({ subTool: sub("create", "blur-brush"), blurDown, eraserTool, paintTool }),
     );
     expect(blur.onMouseDown).toBe(blurDown);
 
@@ -232,47 +238,47 @@ describe("useEffectiveTool — no cross-tool leakage (regression net)", () => {
     // switch branch itself is intentionally still live) — still resolves to
     // the Eraser's own handlers, never Paint's.
     const erase = useEffectiveTool(
-      baseParams({ activeTool: "brush", brushMode: "erase", eraserTool, paintTool }),
+      baseParams({ subTool: sub("create", "eraser"), eraserTool, paintTool }),
     );
     expect(erase.onMouseDown).toBe(eraserTool.onMouseDown);
 
     const pen = useEffectiveTool(
-      baseParams({ activeTool: "brush", brushMode: "pen", eraserTool, paintTool }),
+      baseParams({ subTool: sub("create", "pen"), eraserTool, paintTool }),
     );
     expect(pen.onMouseDown).toBe(paintTool.onMouseDown);
   });
 
-  it("Paint's mask-editing branch outranks brushMode entirely", () => {
+  it("Brush's mask-editing branch outranks the paint tool", () => {
     const maskTool = makePaintTool();
     const result = useEffectiveTool(
-      baseParams({ activeTool: "brush", maskEditing: true, brushMode: "blur", maskTool }),
+      baseParams({ subTool: sub("create", "brush"), maskEditing: true, maskTool }),
     );
     expect(result.onMouseDown).toBe(maskTool.onMouseDown);
   });
 
-  it("Stamp routes to the emoji tool only in the emojis sub-mode", () => {
+  it("Emoji routes to the emoji tool; Clone Stamp does not", () => {
     const emojiTool = makeEmojiTool();
-    const emojis = useEffectiveTool(baseParams({ activeTool: "stamp", stampSubMode: "emojis", emojiTool }));
+    const emojis = useEffectiveTool(baseParams({ subTool: sub("create", "emoji"), emojiTool }));
     expect(emojis.onMouseDown).toBe(emojiTool.onMouseDown);
 
-    const clone = useEffectiveTool(baseParams({ activeTool: "stamp", stampSubMode: "clone", emojiTool }));
+    const clone = useEffectiveTool(baseParams({ subTool: sub("create", "clone-stamp"), emojiTool }));
     expect(clone.onMouseDown).not.toBe(emojiTool.onMouseDown);
   });
 
-  it("Stamp's clone-mode combinedDown defers to the red-stamp tool only when one is pending", () => {
+  it("Clone Stamp's combinedDown defers to the red-stamp tool only when one is pending", () => {
     const stamp = makeStamp();
     const redStampTool = makeRedStampTool(true);
     const result = useEffectiveTool(
-      baseParams({ activeTool: "stamp", stampSubMode: "clone", stamp, redStampTool }),
+      baseParams({ subTool: sub("create", "clone-stamp"), stamp, redStampTool }),
     );
     result.onMouseDown({} as Parameters<Stamp["onMouseDown"]>[0]);
     expect(redStampTool.onMouseDown).toHaveBeenCalledTimes(1);
     expect(stamp.onMouseDown).not.toHaveBeenCalled();
   });
 
-  it("a tool with no branch of its own (e.g. text) falls through to idle", () => {
+  it("Text has no canvas gesture of its own and idles", () => {
     const stamp = makeStamp();
-    const result = useEffectiveTool(baseParams({ activeTool: "text", stamp }));
+    const result = useEffectiveTool(baseParams({ subTool: sub("create", "text"), stamp }));
     result.onMouseDown({} as Parameters<Stamp["onMouseDown"]>[0]);
     expect(stamp.onMouseDown).not.toHaveBeenCalled();
   });

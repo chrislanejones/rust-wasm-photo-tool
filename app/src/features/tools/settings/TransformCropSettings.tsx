@@ -80,6 +80,13 @@ interface TransformCropSettingsProps {
   /** Currently-selected color to preview in the swatch (falls back to a
    *  neutral color if the caller hasn't picked one yet). */
   pickedColor?: string;
+  /** Which section to render. The Edit group gives Crop, Transform and Color
+   *  Picker each their own sub-tool tile, so each shows ONLY its own section
+   *  rather than the whole panel three times over.
+   *
+   *  Omitted renders all three, stacked with separators — the pre-restructure
+   *  behaviour, kept so any other caller is unaffected. */
+  section?: "crop" | "transform" | "colorPicker";
 }
 
 export function TransformCropSettings({
@@ -96,7 +103,14 @@ export function TransformCropSettings({
   colorPickerActive = false,
   onSetColorPickerActive,
   pickedColor,
+  section,
 }: TransformCropSettingsProps) {
+  /** Render this section? All of them when unscoped. */
+  const show = (s: NonNullable<TransformCropSettingsProps["section"]>) =>
+    section === undefined || section === s;
+  /** The separator rule only earns its keep when sections are stacked; scoped
+   *  to one section it would be a hairline above nothing. */
+  const sep = section === undefined ? "pt-3 border-t border-theme-sidebar-border" : "";
   const ratio = ratioIdFromLock(cropRatio);
   const displayColor = pickedColor ?? "#000000";
 
@@ -125,7 +139,7 @@ export function TransformCropSettings({
   return (
     <div className="space-y-6">
       {/* ── Crop (first; no verbiage — just the ratio + apply) ───────────── */}
-      {onApplyCrop && (
+      {show("crop") && onApplyCrop && (
         <div className="space-y-3 -mt-2">
           <SectionHeader
             title="Crop"
@@ -166,7 +180,8 @@ export function TransformCropSettings({
       )}
 
       {/* ── Transform ───────────────────────────────────────────────────── */}
-      <div className="space-y-2 pt-3 border-t border-theme-sidebar-border">
+      {show("transform") && (
+      <div className={cn("space-y-2", sep)}>
         <SectionHeader
           title="Transform"
           info={
@@ -207,10 +222,11 @@ export function TransformCropSettings({
           />
         </div>
       </div>
+      )}
 
       {/* ── Color Picker ────────────────────────────────────────────────── */}
-      {onSetColorPickerActive && (
-        <div className="space-y-3 pt-3 border-t border-theme-sidebar-border">
+      {show("colorPicker") && onSetColorPickerActive && (
+        <div className={cn("space-y-3", sep)}>
           <SectionHeader
             title="Color Picker"
             info="Click the eyedropper to activate, then hover over the image to magnify pixels. Click to pick a color — it will be set as your brush and text color."

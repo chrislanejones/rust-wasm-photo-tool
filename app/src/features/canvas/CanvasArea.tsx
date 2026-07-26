@@ -28,6 +28,8 @@ import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useToolStore } from "@/stores/useToolStore";
+import { useActiveSubTool } from "@/features/tools/activateSubTool";
+import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
@@ -338,35 +340,50 @@ function handCirclePath(
   return d.join(" ");
 }
 
-function getCursorForTool(
-  tool?: string,
+/** The canvas cursor for the lit SUB-TOOL.
+ *
+ *  The static answer comes from the registry (`LiveSubTool.cursor`), so a
+ *  sub-tool's cursor is declared on the same row as its dispatch — a sub-tool
+ *  with no canvas gesture carries no cursor AND idles in useEffectiveTool, and
+ *  the two can't drift apart. This function only layers on the states a static
+ *  table can't see.
+ *
+ *  Before the five-group restructure this switched on the legacy tool id, which
+ *  meant every sub-mode of a tool shared one cursor: the whole Paint tool got
+ *  the default arrow, and Crop / Transform / Color Picker were indistinguishable
+ *  because they are all `crop`. */
+function getCursorForSubTool(
+  subTool: ResolvedSubTool | undefined,
   isPanning?: boolean,
   colorPickerActive?: boolean,
   moveActive?: boolean,
   combineIntent?: 0 | 1 | 2,
 ): string | undefined {
   if (isPanning) return "grab";
-  if (colorPickerActive && tool === "crop") return "crosshair";
-  switch (tool) {
-    case "text":
-      return "text";
-    case "arrow":
-      // Layer Settings: Move toggle on → move cursor, otherwise default.
-      if (moveActive) return "move";
-      return undefined;
-    case "select":
-      // The gesture's intent is visible before it lands: Shift (add) and Alt
-      // (subtract) badge the crosshair while held (`ih_selection_bool`; with
-      // the flag off combineIntent is always 0).
-      if (combineIntent === 1) return SELECT_ADD_CURSOR;
-      if (combineIntent === 2) return SELECT_SUBTRACT_CURSOR;
-      return "crosshair";
-    case "crop":
-    case "shapes":
-      return "crosshair";
-    default:
-      return undefined;
+
+  const def = subTool && !subTool.subTool.comingSoon ? subTool.subTool : undefined;
+  const group = subTool?.group.id;
+
+  // The Color Picker toggle can be switched on from the Transform/Crop panel
+  // while a different Edit sub-tool is lit, so it wins inside that group —
+  // mirroring the identical precedence in useEffectiveTool.
+  if (colorPickerActive && group === "edit") return "crosshair";
+
+  // Select: the gesture's intent is visible before it lands — Shift (add) and
+  // Alt (subtract) badge the crosshair while held (`ih_selection_bool`; with
+  // the flag off combineIntent is always 0).
+  if (group === "select") {
+    if (combineIntent === 1) return SELECT_ADD_CURSOR;
+    if (combineIntent === 2) return SELECT_SUBTRACT_CURSOR;
   }
+
+  // Resize Layer only drags while its Move toggle is on; idle otherwise, so the
+  // cursor must not promise a drag the canvas won't honour.
+  if (group === "edit" && def?.id === "resize-layer") {
+    return moveActive ? "move" : undefined;
+  }
+
+  return def?.cursor;
 }
 
 export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
@@ -446,6 +463,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // both CanvasArea call sites for one gate would be drilling for its own
     // sake.
     const eraserMode = useToolStore((s) => s.eraserMode);
+    // The lit sub-tool drives the canvas cursor (getCursorForSubTool). Read as
+    // a hook rather than threaded as a 16th prop — it changes only when the
+    // sub-tool does, which already re-renders this component anyway.
+    const activeSubTool = useActiveSubTool();
 
     // ── Rulers & Grids: grid geometry comes from Rust (gridLinesSync). Warm the
     // WASM fn once the grid is enabled, then recompute segments when the image
@@ -1083,8 +1104,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
     const zoom = state.zoom;
     const isTextTool = activeTool === "text";
-    const cursor = getCursorForTool(
-      activeTool,
+    const cursor = getCursorForSubTool(
+      activeSubTool,
       isPanning,
       colorPickerActive,
       layerMoveActive,

@@ -52,11 +52,12 @@ export const HOVER_RING =
    border box never changes size — the header's exact one-tile height step as
    the sub-row appears/disappears depends on it.
 
-   Rail vs sub-row: identical vocabulary, graded by weight — 2px + a lift
-   (`shadow-sm`) up top, a finer 1px line below, on top of the radius step
-   (`rounded-2xl` / `rounded-xl`) the two rows already had. Parent reads
-   heavier than child; the pair of lit ink tiles under one hairline is what
-   ties the sub-row to the rail now that the per-tool gradients are gone.
+   Rail vs sub-row: identical vocabulary AND identical border width (2px in
+   both rows — a 1px sub-row line read as an inconsistency rather than as a
+   grading, and barely registered at all). The parent/child step is carried by
+   the radius (`rounded-2xl` / `rounded-xl`) plus the rail's extra `shadow-sm`
+   lift; the pair of lit accent tiles under one hairline is what ties the
+   sub-row to the rail now that the per-tool gradients are gone.
    ───────────────────────────────────────────────────────────────────────────*/
 
 /** Tool-rail tile — the active tool. */
@@ -67,13 +68,22 @@ export const TILE_SELECTED =
 export const TILE_IDLE =
   "border-2 border-transparent bg-bg-tertiary text-text-muted hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]";
 
-/** Sub-tool tile — the active sub-mode. One step lighter than TILE_SELECTED. */
+/** Sub-tool tile — the active sub-tool.
+ *
+ *  Border WIDTH matches the rail exactly (`border-2`). It used to be a finer
+ *  1px line, on the theory that a lighter weight would read as child-to-parent;
+ *  in practice the two lit tiles just looked like a rendering inconsistency,
+ *  and at 1px the accent barely registered against the tile fill. The
+ *  parent/child grading now rides entirely on the radius step (`rounded-2xl`
+ *  vs `rounded-xl`) and the rail's extra `shadow-sm` lift, which are the two
+ *  channels that were doing the real work anyway. */
 export const SUBTILE_SELECTED =
-  "border border-theme-primary bg-bg-elevated text-text-primary";
+  "border-2 border-theme-primary bg-bg-elevated text-text-primary";
 
-/** Sub-tool tile — every other sub-mode. */
+/** Sub-tool tile — every other sub-tool. Carries the same 2px width in
+ *  transparent, so the content box never changes size between states. */
 export const SUBTILE_IDLE =
-  "border border-transparent bg-bg-tertiary/60 text-text-muted hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]";
+  "border-2 border-transparent bg-bg-tertiary/60 text-text-muted hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]";
 
 /* Disabled — no image to act on. Tier-specific only so each keeps its own
    border WIDTH: a disabled tile sits in the same grid as enabled ones, and a
@@ -84,7 +94,7 @@ export const SUBTILE_IDLE =
 export const TILE_DISABLED =
   "cursor-not-allowed border-2 border-transparent bg-bg-tertiary/40 opacity-40 grayscale";
 export const SUBTILE_DISABLED =
-  "cursor-not-allowed border border-transparent bg-bg-tertiary/40 opacity-40 grayscale";
+  "cursor-not-allowed border-2 border-transparent bg-bg-tertiary/40 opacity-40 grayscale";
 
 /**
  * Base class-string for every Skeleton placeholder — the ONE definition site

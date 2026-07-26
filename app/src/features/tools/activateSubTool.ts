@@ -84,18 +84,6 @@ export function activateSubTool(resolved: ResolvedSubTool): void {
     store.setColorPickerActive(wantsColorPicker);
   }
 
-  // Create › Line preselects a shape KIND (AMBIGUOUS-2 in the migration map).
-  // Not cleared for other sub-tools: unlike the color picker this is an
-  // ordinary panel setting the user is free to change afterwards, and resetting
-  // it on every activation would fight them.
-  const shapeKind = live.preselect?.shapeKind;
-  if (shapeKind && store.toolSettings.shape !== shapeKind) {
-    store.setToolSettings({
-      ...store.toolSettings,
-      shape: shapeKind as NonNullable<ToolState["toolSettings"]["shape"]>,
-    });
-  }
-
   void group;
 }
 

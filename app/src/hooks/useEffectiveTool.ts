@@ -1,7 +1,24 @@
 // Resolves which tool's mouse handlers the canvas should actually receive for
-// the currently active tool + sub-mode. Extracted verbatim from AppShell's
-// `effectiveStamp` IIFE — same logic, same "recompute every render" behavior
-// (no memoization added, so this stays a drop-in move, not a perf change).
+// the currently active SUB-TOOL.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// WHY THIS SWITCHES ON THE SUB-TOOL AND NOT THE TOOL ID.
+//
+// It used to switch on `activeTool`, with an unmatched-tool fallthrough that
+// returned the RAW clone-stamp handlers. That fallthrough is how a marquee drag
+// once nearly clone-stamped: any tool without its own branch inherited whatever
+// the stamp was doing. Two things fix that here.
+//
+//   1. The default is `idle`, not `stamp`. A sub-tool that reaches the bottom
+//      of this function does nothing to the canvas, which is the safe answer.
+//   2. Every group has an EXPLICIT case, and inside Create and Edit every
+//      sub-tool does too. There is no "whatever's left" bucket that can quietly
+//      acquire new members when the registry grows.
+//
+// The registry is the other half of the guarantee: a sub-tool with no canvas
+// gesture carries no `cursor`, and those are exactly the ones that idle here.
+// Cursor and handlers are two views of one fact, so they are declared together
+// (toolGroups.ts) and read together.
 import type { MouseEvent } from "react";
 import type { useCloneStamp } from "./useCloneStamp";
 import type { useColorPicker } from "./useColorPicker";
@@ -11,195 +28,193 @@ import type { usePaintTool } from "./usePaintTool";
 import type { useMagicEraserTool } from "./useMagicEraserTool";
 import type { useEmojiTool } from "./useEmojiTool";
 import type { useRedStampTool } from "./useRedStampTool";
-import type { ToolType } from "@/lib/types";
-import type { BrushMode, EraserMode, StampSubMode } from "@/stores/useToolStore";
+import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 
 type Stamp = ReturnType<typeof useCloneStamp>;
 
 interface UseEffectiveToolParams {
   stamp: Stamp;
-  activeTool: ToolType;
+  /** The lit sub-tool. `undefined` only in the moment before the store settles;
+   *  treated as "no canvas gesture", which is the safe default. */
+  subTool: ResolvedSubTool | undefined;
   colorPickerActive: boolean;
   colorPicker: ReturnType<typeof useColorPicker>;
   moveActive: boolean;
   moveLayerTool: ReturnType<typeof useMoveLayerTool>;
   eraserTool: ReturnType<typeof usePaintTool>;
-  /** Local Magic Eraser (PatchMatch) — routed instead of `eraserTool` when
-   *  `eraserMode === "magic"`. Behind `ih_patchmatch`; the hook itself is the
-   *  flag+export guard, so this branch is safe to route to unconditionally. */
+  /** Local Magic Eraser (PatchMatch). Behind `ih_patchmatch`; the hook itself is
+   *  the flag+export guard, so this branch is safe to route to unconditionally. */
   magicEraserTool: ReturnType<typeof useMagicEraserTool>;
-  eraserMode: EraserMode;
   drawingTools: ReturnType<typeof useDrawingTools>;
   maskEditing: boolean;
   maskTool: ReturnType<typeof usePaintTool>;
-  brushMode: BrushMode;
   blurDown: Stamp["onMouseDown"];
   blurMove: Stamp["onMouseMove"];
   blurUp: Stamp["onMouseUp"];
   paintTool: ReturnType<typeof usePaintTool>;
-  stampSubMode: StampSubMode;
   emojiTool: ReturnType<typeof useEmojiTool>;
   redStampTool: ReturnType<typeof useRedStampTool>;
 }
 
 export function useEffectiveTool({
   stamp,
-  activeTool,
+  subTool,
   colorPickerActive,
   colorPicker,
   moveActive,
   moveLayerTool,
   eraserTool,
   magicEraserTool,
-  eraserMode,
   drawingTools,
   maskEditing,
   maskTool,
-  brushMode,
   blurDown,
   blurMove,
   blurUp,
   paintTool,
-  stampSubMode,
   emojiTool,
   redStampTool,
 }: UseEffectiveToolParams): Stamp {
-  // Idle handlers for tools that don't paint on the canvas. The clone stamp's
-  // own onMouseDown/Move/Up ride along on `...stamp`; without overriding them
-  // they "leak" — e.g. on the Effects tool the clone stamp would keep drawing.
-  const idle = {
+  // Idle handlers for sub-tools that don't paint on the canvas. The clone
+  // stamp's own onMouseDown/Move/Up ride along on `...stamp`; without
+  // overriding them they "leak" — on Adjustments, say, the clone stamp would
+  // keep drawing.
+  const idle: Stamp = {
     ...stamp,
     onMouseDown: (() => {}) as typeof stamp.onMouseDown,
     onMouseMove: (() => {}) as typeof stamp.onMouseMove,
     onMouseUp: (() => {}) as typeof stamp.onMouseUp,
   };
-  // Effects tool has no canvas interaction of its own — the Color Picker now
-  // lives under Edit & Transform (see `activeTool === "crop"` below).
-  if (activeTool === "effects") {
-    return idle;
-  }
-  // Select tool: the click (kind) and drag (marquee) gestures are wired a
-  // level up — CanvasArea's wrappers → useSelectionActions — so the
-  // underlying stamp handlers must idle or a drag would clone-stamp
-  // (the unmatched-tool fallthrough below returns the raw stamp handlers).
-  if (activeTool === "select") {
-    return idle;
-  }
-  // Layer Settings tool: Move drags the layer (when its toggle is on);
-  // otherwise idle so canvas clicks fall through to the Selection marker.
-  if (activeTool === "arrow") {
-    if (moveActive)
-      return {
-        ...stamp,
-        onMouseDown: moveLayerTool.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: moveLayerTool.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: moveLayerTool.onMouseUp as typeof stamp.onMouseUp,
-      };
-    return idle;
-  }
-  // Edit & Transform: the Color Picker toggle takes over the canvas while on;
-  // otherwise the crop-rectangle drag (drawingTools).
-  if (activeTool === "crop") {
-    if (colorPickerActive) {
-      return {
-        ...stamp,
-        onMouseDown: colorPicker.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: colorPicker.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: stamp.onMouseUp,
-      };
-    }
-    return {
-      ...stamp,
-      onMouseDown: drawingTools.onMouseDown as typeof stamp.onMouseDown,
-      onMouseMove: drawingTools.onMouseMove as typeof stamp.onMouseMove,
-      onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
-    };
-  }
-  if (activeTool === "shapes")
-    return {
-      ...stamp,
-      onMouseDown: drawingTools.onMouseDown as typeof stamp.onMouseDown,
-      onMouseMove: drawingTools.onMouseMove as typeof stamp.onMouseMove,
-      onMouseUp: drawingTools.onMouseUp as typeof stamp.onMouseUp,
-    };
-  // Eraser tool (id "ai" — the old AI slot, repurposed): dragging on the
-  // canvas erases, EXCEPT in the Magic Eraser sub-mode, which paints a
-  // removal selection instead (magicEraserTool is its own flag+export
-  // guard — safe to route to even on a default build). Background
-  // Removal/Object Removal actions in that panel are click-triggered, not
-  // canvas-driven, so they don't need a branch here.
-  if (activeTool === "ai") {
-    if (eraserMode === "magic") {
-      return {
-        ...stamp,
-        onMouseDown: magicEraserTool.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: magicEraserTool.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: magicEraserTool.onMouseUp as typeof stamp.onMouseUp,
-      };
-    }
-    return {
-      ...stamp,
-      onMouseDown: eraserTool.onMouseDown as typeof stamp.onMouseDown,
-      onMouseMove: eraserTool.onMouseMove as typeof stamp.onMouseMove,
-      onMouseUp: eraserTool.onMouseUp as typeof stamp.onMouseUp,
-    };
-  }
-  if (activeTool === "brush") {
-    if (maskEditing) {
-      return {
-        ...stamp,
-        onMouseDown: maskTool.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: maskTool.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: maskTool.onMouseUp as typeof stamp.onMouseUp,
-      };
-    }
-    if (brushMode === "blur") {
-      return {
-        ...stamp,
-        onMouseDown: blurDown,
-        onMouseMove: blurMove,
-        onMouseUp: blurUp,
-      };
-    }
-    if (brushMode === "erase") {
-      return {
-        ...stamp,
-        onMouseDown: eraserTool.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: eraserTool.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: eraserTool.onMouseUp as typeof stamp.onMouseUp,
-      };
-    }
-    // "pen" mode draws via the PenOverlay; the canvas itself uses the paint
-    // handlers (harmless when the overlay is capturing).
-    return {
-      ...stamp,
-      onMouseDown: paintTool.onMouseDown as typeof stamp.onMouseDown,
-      onMouseMove: paintTool.onMouseMove as typeof stamp.onMouseMove,
-      onMouseUp: paintTool.onMouseUp as typeof stamp.onMouseUp,
-    };
-  }
-  if (activeTool === "stamp") {
-    if (stampSubMode === "emojis") {
-      return {
-        ...stamp,
-        onMouseDown: emojiTool.onMouseDown as typeof stamp.onMouseDown,
-        onMouseMove: emojiTool.onMouseMove as typeof stamp.onMouseMove,
-        onMouseUp: emojiTool.onMouseUp as typeof stamp.onMouseUp,
-      };
-    }
-    const combinedDown: typeof stamp.onMouseDown = (e) => {
-      if (redStampTool.hasPendingStamp()) {
-        redStampTool.onMouseDown(e as MouseEvent<HTMLCanvasElement>);
-      } else {
-        stamp.onMouseDown(e);
+
+  /** Swap in one tool's three handlers, keeping the rest of the stamp surface
+   *  (state, refs, helpers) that CanvasArea reads off the same object. */
+  const use = (t: {
+    onMouseDown: unknown;
+    onMouseMove: unknown;
+    onMouseUp: unknown;
+  }): Stamp => ({
+    ...stamp,
+    onMouseDown: t.onMouseDown as typeof stamp.onMouseDown,
+    onMouseMove: t.onMouseMove as typeof stamp.onMouseMove,
+    onMouseUp: t.onMouseUp as typeof stamp.onMouseUp,
+  });
+
+  if (!subTool || subTool.subTool.comingSoon) return idle;
+  const id = subTool.subTool.id;
+
+  switch (subTool.group.id) {
+    // ── Enhance ──────────────────────────────────────────────────────────────
+    // Compress, Resize and Adjustments are panel-only. AI's Background/Object
+    // Removal are click-triggered inside AISettings, not canvas-driven. All
+    // four idle — and none of them declares a cursor, which is the same fact.
+    case "enhance":
+      return idle;
+
+    // ── Select ───────────────────────────────────────────────────────────────
+    // All six gestures are wired a level up (CanvasArea's wrappers →
+    // useSelectionActions), so the underlying stamp handlers MUST idle. This is
+    // the specific case the old fallthrough got wrong: a marquee drag reaching
+    // raw stamp handlers is the near-miss that motivated this rewrite.
+    case "select":
+      return idle;
+
+    // ── Batch ────────────────────────────────────────────────────────────────
+    // Logo / Text / Rename act on the whole gallery from the panel.
+    case "batch":
+      return idle;
+
+    // ── Edit ─────────────────────────────────────────────────────────────────
+    case "edit": {
+      // The Color Picker toggle still lives in TransformCropSettings, so it can
+      // be switched on while a different Edit sub-tool is lit. Honour it first,
+      // exactly as before, or the panel toggle would become a no-op.
+      if (colorPickerActive) {
+        return {
+          ...stamp,
+          onMouseDown: colorPicker.onMouseDown as typeof stamp.onMouseDown,
+          onMouseMove: colorPicker.onMouseMove as typeof stamp.onMouseMove,
+          // Deliberately the stamp's own mouse-up — the picker commits on
+          // down/move and has no release behaviour of its own.
+          onMouseUp: stamp.onMouseUp,
+        };
       }
-    };
-    return {
-      ...stamp,
-      onMouseDown: combinedDown,
-    };
+      switch (id) {
+        case "crop":
+          // The crop-rectangle drag.
+          return use(drawingTools);
+        case "resize-layer":
+          // Move drags the layer only while its toggle is on; otherwise idle so
+          // canvas clicks fall through to the Selection marker.
+          return moveActive ? use(moveLayerTool) : idle;
+        case "color-picker":
+          // Reached when the sub-tool is lit but the toggle hasn't been set —
+          // activateSubTool sets it, so this is the belt to that braces. Same
+          // shape as the toggle branch above: the picker has no mouse-up of its
+          // own (it commits on down/move), so the stamp's is kept.
+          return {
+            ...stamp,
+            onMouseDown: colorPicker.onMouseDown as typeof stamp.onMouseDown,
+            onMouseMove: colorPicker.onMouseMove as typeof stamp.onMouseMove,
+            onMouseUp: stamp.onMouseUp,
+          };
+        case "transform":
+        case "canvas-size":
+          // Button-driven: flips/rotations and the W×H resizer. (Guides is
+          // Coming Soon and never reaches here — the early return catches it.)
+          return idle;
+        default:
+          return idle;
+      }
+    }
+
+    // ── Create ───────────────────────────────────────────────────────────────
+    case "create": {
+      switch (id) {
+        case "brush":
+          // Mask editing borrows the paint gesture to scrub a mask instead.
+          return maskEditing ? use(maskTool) : use(paintTool);
+        case "pen":
+          // Drawn via the PenOverlay; the canvas keeps the paint handlers,
+          // harmless while the overlay is capturing.
+          return use(paintTool);
+        case "blur-brush":
+          return { ...stamp, onMouseDown: blurDown, onMouseMove: blurMove, onMouseUp: blurUp };
+        case "eraser":
+          return use(eraserTool);
+        case "magic-eraser":
+          return use(magicEraserTool);
+        case "emoji":
+          return use(emojiTool);
+        case "clone-stamp":
+        case "stamps": {
+          // Both keep the clone stamp's full surface (source point, preview),
+          // with the red/batch stamp taking the press when one is pending —
+          // preserved exactly as it behaved under the old `stamp` branch.
+          const combinedDown: typeof stamp.onMouseDown = (e) => {
+            if (redStampTool.hasPendingStamp()) {
+              redStampTool.onMouseDown(e as MouseEvent<HTMLCanvasElement>);
+            } else {
+              stamp.onMouseDown(e);
+            }
+          };
+          return { ...stamp, onMouseDown: combinedDown };
+        }
+        case "shapes":
+        case "pins":
+        case "arrow":
+          return use(drawingTools);
+        case "text":
+        case "ocr":
+          // Text placement is handled a level up (useTextTool via CanvasArea)
+          // and OCR reads the whole image from the panel — both idle here, as
+          // `text` did before this rewrite.
+          return idle;
+        default:
+          return idle;
+      }
+    }
+
+    default:
+      return idle;
   }
-  // No painting tool selected → idle handlers, so the clone stamp only acts
-  // when the Stamp tool itself is active (it used to leak onto other tools).
-  return idle;
 }
