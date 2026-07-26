@@ -249,6 +249,7 @@ export function SubscriptionButton({
         icon={Settings}
         label="Settings"
         title="Settings"
+        standalone
         onClick={() => openSettings(tab)}
       />
 

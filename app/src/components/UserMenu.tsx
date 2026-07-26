@@ -39,6 +39,7 @@ export function UserMenu({ large = false }: { large?: boolean }) {
               icon={User}
               label="Sign in"
               title="Sign in to save your work"
+              standalone
             />
           )}
         </SignInButton>

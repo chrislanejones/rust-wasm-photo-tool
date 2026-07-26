@@ -25,16 +25,18 @@ import { HOVER_RING } from "@/lib/styles";
  * glyph keeps its proportion. That makes the top bar and the tool rail read as
  * one system instead of two.
  *
- * Two departures from ToolButton, both forced by where these sit:
- *  - IDLE IS TRANSPARENT, not `bg-bg-tertiary`. These live INSIDE the group
- *    pills, which are themselves `bg-bg-tertiary` — a tile with the same fill
- *    as its container is invisible. Hover still lifts to `bg-bg-elevated`, so
- *    the affordance survives and the pill background is preserved.
- *  - `rounded-lg`, not `rounded-2xl`. The rail's radius is proportionate at
- *    39px; at 28px it reads as a circle.
+ * Two departures from ToolButton:
+ *  - `rounded-xl`, not `rounded-2xl` — one step down, the same relationship the
+ *    sub-tool tiles have to the rail tiles.
+ *  - The idle FILL depends on `standalone` — see below. This is the one thing
+ *    about these buttons that isn't uniform, and it has to be: a tile whose
+ *    fill matches its container is invisible.
  *
- * Height is 28px to match the panel toggles and the user avatar already in the
- * bar, so nothing reflows.
+ * SIZE: 36px, so the GLYPH lands at ~20px — within a pixel of the tool rail's
+ * (55% of its ~39px tile). Matching the icon was the point; matching the tile
+ * exactly would have cost more bar height for no extra legibility. At 28px the
+ * same 55% rule produced a 13px glyph, which read as a different, smaller
+ * control sitting next to the rail.
  */
 export interface IconButtonProps
   extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
@@ -43,23 +45,39 @@ export interface IconButtonProps
   label: string;
   /** Persistent-on state (e.g. a toggle). Omit for plain actions. */
   active?: boolean;
+  /** Set when the button does NOT sit inside a group pill.
+   *
+   *  Grouped buttons (Undo/Redo, the two Zooms) are transparent at rest and let
+   *  the pill's own `bg-bg-tertiary` show through — giving them the same fill as
+   *  their container would erase them. Standalone buttons (the Settings cog, the
+   *  signed-out user icon) have no container, so transparent leaves them looking
+   *  like a bare glyph with no button around it until you hover. They carry the
+   *  fill themselves. */
+  standalone?: boolean;
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({ icon: Icon, label, active = false, className, ...props }, ref) => (
+  ({ icon: Icon, label, active = false, standalone = false, className, ...props }, ref) => (
     <button
       ref={ref}
       type="button"
       aria-label={label}
       aria-pressed={active || undefined}
       className={cn(
-        "group flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+        "group flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
         "transition-all duration-200 ease-out",
         // Same border-carries-state rule as the rail: the width is on BOTH
         // branches so the content box never changes size between them.
         active
           ? "border-2 border-theme-primary bg-bg-elevated text-text-primary shadow-sm"
-          : "border-2 border-transparent text-text-muted hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]",
+          : [
+              "border-2 border-transparent text-text-muted",
+              // The rail's own idle fill when there is no pill to supply one.
+              standalone && "bg-bg-tertiary",
+              "hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]",
+            ]
+              .filter(Boolean)
+              .join(" "),
         !active && HOVER_RING,
         "disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent",
         "disabled:hover:ring-0 disabled:active:scale-100",
