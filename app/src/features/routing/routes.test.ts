@@ -26,7 +26,8 @@ const MODES: Partial<Record<ToolType, string[]>> = {
   // crop is single-mode since the Select split; the six exclusive selection
   // modes are Select's modes (rect/ellipse joined the kinds in v7.47).
   select: ["wand", "edge", "colorRange", "lasso", "rect", "ellipse"],
-  shapes: ["shapes", "pens", "arrows"],
+  // Shapes stopped being a tool in v7.51 — these are Vector's modes now.
+  text: ["text", "ocr", "shapes", "pens", "arrow", "line"],
   stamp: ["clone", "red", "emojis"],
 };
 const modesOf = (tool: ToolType): readonly string[] => MODES[tool] ?? [];
@@ -87,7 +88,6 @@ describe("parseRoute — hash to state", () => {
   });
 
   it("accepts forgiving sub-mode aliases (singular forms)", () => {
-    expect(parse("#/tool/shapes/arrow")).toMatchObject({ mode: "arrows" });
     expect(parse("#/tool/stamps/emoji")).toMatchObject({ mode: "emojis" });
   });
 
@@ -150,9 +150,9 @@ describe("parseRoute — garbage in, safe default out", () => {
   });
 
   it("refuses a sub-mode that belongs to a DIFFERENT tool", () => {
-    // `erase` is Paint's, not Shapes' — accepting it would poke a value the
-    // shapesMode union has never heard of into the store.
-    expect(parse("#/tool/shapes/erase")).toMatchObject({ mode: undefined });
+    // `erase` is Paint's, not Vector's — accepting it would poke a value the
+    // textMode union has never heard of into the store.
+    expect(parse("#/tool/text/erase")).toMatchObject({ mode: undefined });
   });
 });
 
@@ -181,9 +181,9 @@ describe("round-trip stability", () => {
     { kind: "tool", tool: "compress", mode: "resize" },
     { kind: "tool", tool: "crop" },
     { kind: "tool", tool: "select", mode: "wand" },
-    { kind: "tool", tool: "shapes", mode: "arrows" },
     { kind: "tool", tool: "stamp", mode: "emojis" },
     { kind: "tool", tool: "text" },
+    { kind: "tool", tool: "text", mode: "arrow" },
     { kind: "tool", tool: "ai" },
     { kind: "tool", tool: "effects" },
     { kind: "tool", tool: "arrow" },
@@ -211,9 +211,37 @@ describe("round-trip stability", () => {
 
   it("an aliased inbound hash normalises to the canonical form in one hop", () => {
     expect(formatRoute(parse("#/tool/brush/blur") as Route)).toBe("#/tool/paint/blur");
-    expect(formatRoute(parse("#/tool/shapes/arrow") as Route)).toBe(
-      "#/tool/shapes/arrows",
+    expect(formatRoute(parse("#/tool/stamps/emoji") as Route)).toBe(
+      "#/tool/stamps/emojis",
     );
+  });
+
+  it("legacy Shapes links land on the Vector tool at the matching sub-mode", () => {
+    // Shapes merged into Text as "Vector" in v7.51. Old links are the one part
+    // of the UI we can't go back and edit, so each one has to land on the
+    // surface that now draws that thing — not on a dead tool, and not on
+    // Vector's default mode with the user's actual intent dropped.
+    expect(parse("#/tool/shapes/arrows")).toEqual({
+      kind: "tool",
+      tool: "text",
+      mode: "arrow",
+    });
+    expect(parse("#/tool/shapes/pens")).toMatchObject({ tool: "text", mode: "pens" });
+    // Bare tool: no mode to preserve, so land on what that tile drew.
+    expect(parse("#/tool/shapes")).toMatchObject({ tool: "text", mode: "shapes" });
+    // Line was a shape KIND in the picker; in Vector it is a mode of its own.
+    expect(parse("#/tool/shapes/line")).toMatchObject({ tool: "text", mode: "line" });
+    // And the redirect settles in one hop — no oscillation.
+    expect(formatRoute(parse("#/tool/shapes/arrows") as Route)).toBe("#/tool/text/arrow");
+  });
+
+  it("Text's retired Background sub-mode falls back to Text", () => {
+    // Background became a section of the Text panel rather than a mode, so the
+    // old link still opens the panel that owns those controls.
+    expect(parse("#/tool/text/background")).toMatchObject({
+      tool: "text",
+      mode: "text",
+    });
   });
 
   it("legacy Adjust-&-Select links land on the Select TOOL", () => {
@@ -237,7 +265,6 @@ describe("round-trip stability", () => {
       "text",
       "arrow",
       "ai",
-      "shapes",
       "effects",
       "emoji",
     ];

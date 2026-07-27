@@ -17,6 +17,12 @@ export type ToolType =
   | "text"
   | "arrow"
   | "ai"
+  // GESTURE-ONLY since v7.51. Shapes stopped being a rail tool when it folded
+  // into Vector, but the canvas layer still needs a name for "the shape-drag
+  // gesture", so the id survives here. The store never holds it and the rail
+  // never shows it — it is produced by gestureToolFor() and consumed by
+  // useDrawingTools / useEffectiveTool / CanvasArea. Old `#/tool/shapes` links
+  // still parse, then redirect (features/routing/routes.ts).
   | "shapes"
   | "effects"   // was "blur" — now includes brightness, contrast, blur
   | "emoji";

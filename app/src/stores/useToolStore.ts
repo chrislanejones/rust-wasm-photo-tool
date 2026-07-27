@@ -21,8 +21,10 @@ export type BrushMode = (typeof BRUSH_MODES)[number];
 export const STAMP_SUB_MODES = ["clone", "red", "emojis"] as const;
 export type StampSubMode = (typeof STAMP_SUB_MODES)[number];
 /** Shapes tool sub-modes. */
-export const SHAPES_MODES = ["shapes", "pens", "arrows"] as const;
-export type ShapesMode = (typeof SHAPES_MODES)[number];
+// Retained as a TYPE only: ShapeSettings still switches its panel body on
+// which draw mode is active, and it is now fed the Vector mode. The standalone
+// Shapes tool (and its own `shapesMode` store field) went away in v7.51.
+export type ShapesMode = "shapes" | "pens" | "arrow" | "line";
 /** Eraser tool (id "ai") sub-modes: `brush` = drag-to-erase on the canvas;
  *  `magic` = local Magic Eraser (PatchMatch); `rembg` = Background Removal and
  *  `inpaint` = Object Removal (both Replicate-backed). Lifted out of
@@ -40,8 +42,40 @@ export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
  *  TextSettings.tsx local `useState` in the new-ui-toolbar arc — while it was
  *  component state the mode was invisible to the command palette, hash routing
  *  AND the hoisted SubtoolRow, all three of which read it via toolModes.ts. */
-export const TEXT_MODES = ["text", "background", "ocr"] as const;
+// The VECTOR tool's sub-modes (tool id stays `text` — ids are only renamed
+// during a registry migration, same rule as crop="Adjust" and ai="Eraser").
+// v7.51 absorbed the Shapes tool: its `shapes`/`pens`/`arrows` sub-modes moved
+// in here, `arrows` lost its plural to match the others, and `line` was
+// PROMOTED from a shape kind (it was one of four options inside the Shapes
+// sub-mode) to a sub-mode of its own, because reaching for a line is a
+// different intent from reaching for a box.
+//
+// `background` is NOT here any more and was not deleted: the plate/bubble
+// behind a caption is a text STYLE, not a separate tool, so its controls moved
+// inside the Text panel. OCR stays a sub-mode — it is a distinct job (read text
+// OUT of the image) rather than a way of drawing.
+export const TEXT_MODES = [
+  "text",
+  "ocr",
+  "shapes",
+  "pens",
+  "arrow",
+  "line",
+] as const;
+/** The Vector sub-modes that DRAW on the canvas — i.e. the ones that must route
+ *  pointer gestures the way the old standalone Shapes tool did. Text and OCR
+ *  are excluded: they have their own interaction (a click places a caption; OCR
+ *  runs a job and touches no pixels). */
+export const VECTOR_DRAW_MODES = ["shapes", "pens", "arrow", "line"] as const;
 export type TextMode = (typeof TEXT_MODES)[number];
+
+/** Narrows a Vector sub-mode to the drawing ones. The guard exists so the
+ *  panel router and the gesture layer agree on one definition of "draws" —
+ *  two hand-written `mode === "shapes" || mode === "pens" || ...` lists would
+ *  drift the first time a seventh mode arrives. */
+export function isVectorDrawMode(mode: TextMode): mode is ShapesMode {
+  return (VECTOR_DRAW_MODES as readonly string[]).includes(mode);
+}
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
  *  rename. Lifted out of BatchSettings.tsx local state for the same reason as
  *  `TEXT_MODES` above. */
@@ -117,7 +151,6 @@ export interface ToolState {
   maskPaintValue: number;
   colorPickerActive: boolean;
   stampSubMode: StampSubMode;
-  shapesMode: ShapesMode;
   eraserMode: EraserMode;
   textMode: TextMode;
   batchMode: BatchMode;
@@ -140,7 +173,6 @@ export interface ToolState {
   setMaskPaintValue: (v: SetArg<number>) => void;
   setColorPickerActive: (v: SetArg<boolean>) => void;
   setStampSubMode: (v: SetArg<StampSubMode>) => void;
-  setShapesMode: (v: SetArg<ShapesMode>) => void;
   setEraserMode: (v: SetArg<EraserMode>) => void;
   setTextMode: (v: SetArg<TextMode>) => void;
   setBatchMode: (v: SetArg<BatchMode>) => void;
@@ -167,7 +199,6 @@ export const useToolStore = create<ToolState>()(
       maskPaintValue: 0,
       colorPickerActive: false,
       stampSubMode: "clone",
-      shapesMode: "shapes",
       eraserMode: "brush",
       textMode: "text",
       batchMode: "logo",
@@ -196,7 +227,6 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ colorPickerActive: resolveSet(v, s.colorPickerActive) })),
       setStampSubMode: (v) =>
         set((s) => ({ stampSubMode: resolveSet(v, s.stampSubMode) })),
-      setShapesMode: (v) => set((s) => ({ shapesMode: resolveSet(v, s.shapesMode) })),
       setEraserMode: (v) => set((s) => ({ eraserMode: resolveSet(v, s.eraserMode) })),
       setTextMode: (v) => set((s) => ({ textMode: resolveSet(v, s.textMode) })),
       setBatchMode: (v) => set((s) => ({ batchMode: resolveSet(v, s.batchMode) })),
@@ -225,7 +255,6 @@ export const useToolStore = create<ToolState>()(
       partialize: (s): Partial<ToolState> => ({
         brushMode: s.brushMode,
         stampSubMode: s.stampSubMode,
-        shapesMode: s.shapesMode,
         eraserMode: s.eraserMode,
         textMode: s.textMode,
         batchMode: s.batchMode,
@@ -243,7 +272,6 @@ export const useToolStore = create<ToolState>()(
           ...current,
           brushMode: validated(p.brushMode, BRUSH_MODES, current.brushMode),
           stampSubMode: validated(p.stampSubMode, STAMP_SUB_MODES, current.stampSubMode),
-          shapesMode: validated(p.shapesMode, SHAPES_MODES, current.shapesMode),
           eraserMode: validated(p.eraserMode, ERASER_MODE_VALUES, current.eraserMode),
           textMode: validated(p.textMode, TEXT_MODES, current.textMode),
           batchMode: validated(p.batchMode, BATCH_MODES, current.batchMode),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import {
   Square,
   Circle,
@@ -13,7 +13,8 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
-import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
+import { SectionHeader } from "@/components/ui/section-header";
+import { forcedShapeFor } from "../vectorGesture";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { SizeSlider } from "@/components/SizeSlider";
@@ -26,7 +27,6 @@ const SHAPES = [
   { id: "rect",       label: "Rectangle", icon: Square  },
   { id: "circle",     label: "Circle",    icon: Circle  },
   { id: "handCircle", label: "Hand-drawn", icon: PenLine },
-  { id: "line",       label: "Line",      icon: Minus   },
 ] as const;
 
 const PIN_LABELS = [
@@ -78,7 +78,13 @@ const SHAPES_TOOL_MODES: readonly ToolMode<ShapesMode>[] = [
     info: "Click the canvas to drop an auto-sequenced callout pin — Numbers or Letters, in the order you place them.",
   },
   {
-    id: "arrows",
+    id: "line",
+    label: "Line",
+    icon: Minus,
+    info: "Drag a straight segment. Hold Shift while dragging an endpoint to snap the angle to 0/90/180/270°.",
+  },
+  {
+    id: "arrow",
     label: "Arrows",
     title: "Arrow",
     icon: ArrowUpRight,
@@ -97,25 +103,36 @@ interface ShapesSettingsProps {
   canPlace?: boolean;
 }
 
-export function ShapesSettings({ settings, onChange, activeMode, onModeChange, onPlace, canPlace = false }: ShapesSettingsProps) {
-  const [internalMode, setInternalMode] = useState<ShapesMode>("shapes");
-  const mode = activeMode ?? internalMode;
+export function ShapesSettings({ settings, onChange, activeMode, onPlace, canPlace = false }: ShapesSettingsProps) {
+  const mode: ShapesMode = activeMode ?? "shapes";
   const currentShape = (settings.shape ?? "rect") as ShapeType;
+
+  // Mode selection moved to the hoisted SubtoolRow in the new-ui-toolbar arc,
+  // and v7.51 folded this panel under the Vector tool — so this component no
+  // longer owns a ToolModeToggle. It renders the active mode's header and body
+  // only, matching TextSettings. `activeModeInfo` drives the same
+  // title + lightbulb the other panels use.
+  const activeModeInfo = SHAPES_TOOL_MODES.find((opt) => opt.id === mode);
+
+  // Line is a MODE now, not a kind inside the Shapes picker, so nothing else
+  // sets `settings.shape` while it's active — the commit path would otherwise
+  // draw whatever rect/ellipse the user last picked. Pinned here rather than in
+  // the gesture layer because `settings` is this panel's to own.
+  const forcedShape = forcedShapeFor(mode);
+  useEffect(() => {
+    if (forcedShape && settings.shape !== forcedShape) {
+      onChange({ ...settings, shape: forcedShape });
+    }
+  }, [forcedShape, settings, onChange]);
 
   return (
     // data-draw-panel: clicking inside this panel must NOT commit a pending
     // shape edit, so stroke/colour/shape tweaks live-update the overlay.
     <div className="space-y-3 -mt-2" data-draw-panel>
-      <ToolModeToggle
-        modes={SHAPES_TOOL_MODES}
-        columns={3}
-        activeMode={mode}
-        onModeChange={(m) => {
-          setInternalMode(m);
-          onModeChange?.(m);
-        }}
-      >
-        {(m) => {
+      {activeModeInfo && (
+        <SectionHeader title={activeModeInfo.title ?? activeModeInfo.label} info={activeModeInfo.info} />
+      )}
+      {((m: ShapesMode) => {
           switch (m) {
             // ── Shapes ──
             case "shapes":
@@ -267,8 +284,36 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 </>
               );
 
+            // ── Line ── promoted out of the shape-kind picker in v7.51: the
+            // mode IS the kind, so there is no shape selector here, just the
+            // stroke controls — `settings.shape` is pinned by the effect above.
+            case "line":
+              return (
+                <>
+                  <SizeSlider
+                    label="Stroke Width"
+                    value={settings.strokeWidth}
+                    min={1}
+                    max={10}
+                    onChange={(v) => onChange({ ...settings, strokeWidth: v })}
+                    presets={STROKE_WIDTH_PRESETS}
+                    renderPreset={(preset) => (
+                      <span
+                        className="rounded-full bg-theme-foreground"
+                        style={{ width: preset * 2, height: preset * 2 }}
+                      />
+                    )}
+                  />
+                  <ColorSwatchGrid
+                    colors={TEXT_COLORS}
+                    value={settings.strokeColor}
+                    onChange={(color) => onChange({ ...settings, strokeColor: color })}
+                  />
+                </>
+              );
+
             // ── Arrows ── mirrors Pins: style toggle → size → colour.
-            case "arrows":
+            case "arrow":
               return (
                 <>
                   {/* Arrow style: Single / Double — first, above the size. */}
@@ -306,8 +351,7 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                 </>
               );
           }
-        }}
-      </ToolModeToggle>
+        })(mode)}
 
       {onPlace && (
         <div className="space-y-2 border-t border-theme-sidebar-border pt-3">

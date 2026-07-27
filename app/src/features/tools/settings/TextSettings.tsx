@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { MutableRefObject } from "react";
-import { ChevronDown, Type, PaintBucket, ScanText, Lock, Copy } from "lucide-react";
+import { ChevronDown, Type, ScanText, Lock, Copy } from "lucide-react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { TEXT_COLORS } from "@/lib/colors";
@@ -82,12 +82,6 @@ const MODE_OPTIONS: readonly ToolMode<TextMode>[] = [
     label: "Text",
     icon: Type,
     info: "Font, weight and colour for the text itself.",
-  },
-  {
-    id: "background",
-    label: "Background",
-    icon: PaintBucket,
-    info: "A fill behind the text — plain box or speech bubble, with padding, corners and a drop shadow.",
   },
   {
     id: "ocr",
@@ -221,7 +215,11 @@ export function TextSettings({
           </div>
         )}
 
-        {m === "background" && (
+        {/* Background — folded in from its own sub-mode in v7.51. A plate or
+            bubble behind the caption is a STYLE of the text, not a different
+            tool, so it lives under the text controls behind a divider rather
+            than costing a tile in the Vector sub-tool row. */}
+        {m === "text" && (
           <div className="space-y-5">
             {/* Style toggle */}
             <ToolButtonGroup

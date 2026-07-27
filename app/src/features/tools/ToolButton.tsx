@@ -1,5 +1,5 @@
 import type { ToolDefinition } from "./toolConfig";
-import { HOVER_RING, TILE_DISABLED, TILE_IDLE, TILE_SELECTED } from "@/lib/styles";
+import { TILE_DISABLED, TILE_IDLE, TILE_SELECTED } from "@/lib/styles";
 
 interface Props {
   tool: ToolDefinition;
@@ -33,15 +33,27 @@ export function ToolButton({ tool, active, disabled = false, onClick }: Props) {
       title={tool.label}
       className={[
         "group flex aspect-square w-full items-center justify-center rounded-2xl",
-        "transition-all duration-200 ease-out",
+            // Transition the HOVER channels only — NOT `transition-all`.
+            //
+            // Selection is discrete: a tile either is the active tool or is
+            // not. Easing it means the tile you just left keeps its accent
+            // border and fades through grey for 200ms while the new one lights
+            // up, so clicking along the rail leaves a trail of half-lit tiles
+            // glowing and dying behind you. Chris: "looks like people at a
+            // stadium doing the wave". Caught by stretching the transition to
+            // 2s and screenshotting: at 570ms BOTH tiles were still bordered.
+            //
+            // So `border-color` and `box-shadow` — the two channels selection
+            // owns — snap, and only what hover changes is animated. Tailwind v4
+            // puts `scale-*` on the `scale` property, not `transform`, hence
+            // the name in this list.
+        "transition-[background-color,color,scale] duration-200 ease-out",
         disabled
           ? TILE_DISABLED
           : [
+              // Hover is a SURFACE change, not a ring — see the note in
+              // lib/styles.ts. TILE_IDLE carries it.
               active ? TILE_SELECTED : TILE_IDLE,
-              // Warm-accent ("brown") ring on hover — shared HOVER_RING. Kept
-              // on the ACTIVE tile too: selection is on `border-color`, so the
-              // hover ring still has a free channel to land in.
-              HOVER_RING,
             ].join(" "),
       ].join(" ")}
     >

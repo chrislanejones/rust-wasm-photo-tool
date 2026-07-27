@@ -17,7 +17,7 @@ beforeEach(() => {
     activeTool: "compress",
     brushMode: "paint",
     selectionKind: "wand",
-    shapesMode: "shapes",
+    textMode: "text",
   });
   useUIStore.setState({ settingsOpen: false, settingsTab: "general" });
 });
@@ -72,9 +72,10 @@ describe("sub-mode entries come from the shared table", () => {
     expect(ids).toContain("mode.brush.pen");
     expect(ids).toContain("mode.compress.resize");
     expect(ids).toContain("mode.select.wand");
-    // …and the legacy lists (Stamps / Shapes).
+    // …and the legacy lists (Stamps). Shapes stopped being a tool in v7.51 —
+    // its modes are Vector's now, asserted in the Vector block below.
     expect(ids).toContain("mode.stamp.emojis");
-    expect(ids).toContain("mode.shapes.arrows");
+    expect(ids).not.toContain("mode.shapes.arrows");
   });
 
   it("emits no mode.crop.* entries — Adjust is single-mode since the Select split", () => {
@@ -128,21 +129,37 @@ describe("the Eraser tool (repurposed 'ai' slot)", () => {
   });
 });
 
-describe("Text's sub-modes are palette-searchable (the gap closed in new-ui-toolbar)", () => {
+describe("Vector's sub-modes are palette-searchable (the gap closed in new-ui-toolbar)", () => {
   // TextSettings.tsx held its mode (Text/Background/OCR) in local useState, so
   // there was no store field for toolModes.ts to read and the palette emitted
   // no mode.text.* entries at all — OCR in particular was unreachable by
   // search. The hoist moved it to `useToolStore.textMode`, which fixes it.
-  it("emits one entry per Text sub-mode", () => {
+  // v7.51 folded Shapes into this tool and renamed the pair "Vector", so the
+  // palette is now the only place some of these are reachable by name — the
+  // rail lost four tiles' worth of labels when Shapes went away.
+  it("emits one entry per Vector sub-mode", () => {
     const ids = build().map((c) => c.id);
-    for (const m of ["text", "background", "ocr"]) {
+    for (const m of ["text", "ocr", "shapes", "pens", "arrow", "line"]) {
       expect(ids).toContain(`mode.text.${m}`);
     }
   });
 
+  // Background stopped being a mode and became a section of the Text panel.
+  it("no longer offers Background as a mode", () => {
+    expect(build().map((c) => c.id)).not.toContain("mode.text.background");
+  });
+
+  it("a drawing sub-mode lands on the Vector tool, not the retired Shapes one", () => {
+    const cmd = byId(build(), "mode.text.arrow")!;
+    cmd.run();
+    expect(useToolStore.getState().activeTool).toBe("text");
+    expect(useToolStore.getState().textMode).toBe("arrow");
+    expect(currentHash()).toBe("#/tool/text/arrow");
+  });
+
   it("OCR is reachable and selects the mode", () => {
     const cmd = byId(build(), "mode.text.ocr")!;
-    expect(cmd.label).toBe("Text › OCR");
+    expect(cmd.label).toBe("Vector › OCR");
     cmd.run();
     expect(useToolStore.getState().activeTool).toBe("text");
     expect(useToolStore.getState().textMode).toBe("ocr");

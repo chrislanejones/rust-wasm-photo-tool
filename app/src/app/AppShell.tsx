@@ -49,6 +49,7 @@ import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
+import { cursorToolFor, gestureToolFor, penModeFor } from "@/features/tools/vectorGesture";
 import type { PlacementCell } from "@/components/PlacementGrid";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
@@ -143,15 +144,15 @@ import {
 const TOOL_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {
   compress: { keys: "1", label: "compress" },
   crop: { keys: "2", label: "adjust" },
-  // `select` has no entry: the tool is keyless until the selection-tools UI
-  // rework, so the status bar must not advertise a key that does nothing.
-  brush: { keys: "3", label: "brush" },
-  text: { keys: "4", label: "text" },
-  arrow: { keys: "5", label: "arrow" },
-  ai: { keys: "6", label: "Eraser" },
-  shapes: { keys: "7", label: "shapes" },
+  select: { keys: "3", label: "select" },
+  brush: { keys: "4", label: "brush" },
+  text: { keys: "5", label: "vector" },
+  arrow: { keys: "6", label: "layers" },
+  ai: { keys: "7", label: "Eraser" },
   effects: { keys: "8", label: "effects" },
   stamp: { keys: "9", label: "stamp" },
+  // Retiring Shapes freed a slot, so the ten tools land on 1..0 and the old
+  // "-" overflow key is gone.
   emoji: { keys: "0", label: "batch" },
 };
 
@@ -312,8 +313,9 @@ export function AppShell() {
   const setColorPickerActive = useToolStore((s) => s.setColorPickerActive);
   const stampSubMode = useToolStore((s) => s.stampSubMode);
   const setStampSubMode = useToolStore((s) => s.setStampSubMode);
-  const shapesMode = useToolStore((s) => s.shapesMode);
-  const setShapesMode = useToolStore((s) => s.setShapesMode);
+  // Vector sub-mode (Text / OCR / Shapes / Pens / Arrow / Line). Read here
+  // because the canvas gesture layer keys off it, not just the panel.
+  const textMode = useToolStore((s) => s.textMode);
   // Eraser tool (id "ai") sub-mode — read here so canvas routing
   // (useEffectiveTool) and the selection-overlay prop below can see it. The
   // panel itself (AISettings.tsx) reads/writes the same store field.
@@ -1144,20 +1146,22 @@ export function AppShell() {
     stamp.syncState();
   }, [stamp]);
 
-  const effectiveDrawingTool =
-    activeTool === "shapes" && shapesMode === "arrows"
-      ? ("arrow" as const)
-      : activeTool;
+  // What the CANVAS is doing, which since v7.51 is not the same thing as what
+  // the rail has selected: the Vector tile maps to five different gestures
+  // depending on its sub-mode. See features/tools/vectorGesture.ts.
+  const gestureTool = gestureToolFor(activeTool, textMode);
+  // The canvas needs the cursor question answered, not the gesture question —
+  // they differ on Vector's Arrow mode. See cursorToolFor.
+  const cursorTool = cursorToolFor(activeTool, textMode);
 
   const drawingTools = useDrawingTools({
     toolRef: stamp.toolRef,
     canvasRef,
-    activeTool: effectiveDrawingTool,
+    activeTool: gestureTool,
     settings: toolSettings,
     flushToCanvas: flushAndSync,
     syncState: stamp.syncState,
-    penMode:
-      activeTool === "shapes" && shapesMode === "pens" ? "pins" : null,
+    penMode: penModeFor(activeTool, textMode),
     cropRatio,
     imageWidth: stamp.state.width,
     imageHeight: stamp.state.height,
@@ -1250,7 +1254,7 @@ export function AppShell() {
   // Pasting a region copy re-enters via the paste flow → pastePlacement.
   const { hasActiveRegion, handleCopyRegion } = useCopyRegionAction({
     stamp,
-    activeTool,
+    activeTool: gestureTool,
     cropSelection: drawingTools.cropSelection,
     editState: drawingTools.editState,
     selectionMask,
@@ -1265,7 +1269,10 @@ export function AppShell() {
     settings: toolSettings,
     flushToCanvas: stamp.flushToCanvas,
     syncState: stamp.syncState,
-    active: activeTool === "text",
+    // Vector's TEXT mode specifically — not the whole Vector tool. Since v7.51
+    // four of its six sub-modes draw shapes, and arming the text tool there
+    // would put a caret on the canvas and swallow the drag.
+    active: gestureTool === "text",
   });
 
   /**
@@ -1469,7 +1476,7 @@ export function AppShell() {
 
   const effectiveStamp = useEffectiveTool({
     stamp,
-    activeTool,
+    activeTool: gestureTool,
     colorPickerActive,
     colorPicker,
     moveActive,
@@ -2740,8 +2747,7 @@ export function AppShell() {
             onToggleMove={handleToggleMove}
             toolSettings={toolSettings}
             onToolSettingsChange={handleToolSettingsChange}
-            shapesMode={shapesMode}
-            onShapesModeChange={setShapesMode}
+            textMode={textMode}
             brushMode={brushMode}
             onBrushModeChange={setBrushMode}
             colorPickerActive={colorPickerActive}
@@ -2844,7 +2850,7 @@ export function AppShell() {
                           cursorVisible={visible}
                           onCanvasEnter={onCanvasEnter}
                           onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
-                          activeTool={activeTool}
+                          activeTool={cursorTool}
                           textInput={textTool.textInput}
                           textareaRef={textTool.textareaRef}
                           onCanvasClick={textTool.onCanvasClick}
@@ -2932,7 +2938,7 @@ export function AppShell() {
                       cursorVisible={visible}
                       onCanvasEnter={onCanvasEnter}
                       onCanvasLeave={() => { onCanvasLeave(); colorPicker.onMouseLeave(); }}
-                      activeTool={activeTool}
+                      activeTool={cursorTool}
                       textInput={textTool.textInput}
                       textareaRef={textTool.textareaRef}
                       onCanvasClick={textTool.onCanvasClick}

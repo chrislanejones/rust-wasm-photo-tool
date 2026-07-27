@@ -248,6 +248,17 @@ describe("sanity: the harness actually reaches the real handler", () => {
     expect(onToolChange).toHaveBeenCalledWith("brush");
   });
 
+  it("bare digit 5 switches to Vector (id stays 'text')", () => {
+    // v7.51 folded Shapes into Text and renamed the pair. One tile fewer means
+    // every key from 5 up shifted down one.
+    const onToolChange = vi.fn();
+    mount(baseProps({ onToolChange }));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit5", bubbles: true }));
+    });
+    expect(onToolChange).toHaveBeenCalledWith("text");
+  });
+
   it("bare digit 7 switches to the Eraser tool (id stays 'ai')", () => {
     const onToolChange = vi.fn();
     mount(baseProps({ onToolChange }));
@@ -266,13 +277,24 @@ describe("sanity: the harness actually reaches the real handler", () => {
     expect(onToolChange).toHaveBeenCalledWith("select");
   });
 
-  it("bare Minus switches to Batch — the rail runs past 0 onto '-'", () => {
+  it("bare digit 0 switches to Batch — ten tools now fit 1..0 exactly", () => {
+    // Was `Minus`: an eleventh tool overflowed the digit row, so the rail ran
+    // past 0 onto '-'. Retiring Shapes gave the slot back.
+    const onToolChange = vi.fn();
+    mount(baseProps({ onToolChange }));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Digit0", bubbles: true }));
+    });
+    expect(onToolChange).toHaveBeenCalledWith("emoji");
+  });
+
+  it("bare Minus no longer switches tools — it belongs to zoom now", () => {
     const onToolChange = vi.fn();
     mount(baseProps({ onToolChange }));
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { code: "Minus", bubbles: true }));
     });
-    expect(onToolChange).toHaveBeenCalledWith("emoji");
+    expect(onToolChange).not.toHaveBeenCalled();
   });
 
   it("Alt+Minus still zooms out rather than switching tools", () => {

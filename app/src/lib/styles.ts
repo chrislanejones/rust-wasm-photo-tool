@@ -9,7 +9,7 @@
  * matches both the side panels and the dialogs.)
  */
 export const HOVER_RING =
-  "hover:ring-2 hover:ring-theme-primary/60 hover:ring-offset-2 hover:ring-offset-theme-sidebar";
+  "hover:ring-2 hover:ring-theme-primary/60 hover:ring-offset-1 hover:ring-offset-theme-sidebar";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    TOOL-TILE SELECTION — the ToolGrid rail tile and the SubtoolRow tile.
@@ -17,10 +17,11 @@ export const HOVER_RING =
    THREE affordances land on these same two elements, so each one gets its own
    CSS channel and they never fight:
 
-     · SELECTED → `border-color`  — ink, hugs the tile edge, 0px outward
-     · HOVER    → `box-shadow`    — HOVER_RING above, accent, 2–4px outward
-     · FOCUS    → `outline`       — accent, 2–4px outward (styles.css
-                                    `button:focus-visible`, unlayered)
+     · SELECTED → `border-color`     — accent, hugs the tile edge, 0px outward
+     · HOVER    → `background` + ink — the tile lifts and the icon brightens;
+                                       NO outline of any kind
+     · FOCUS    → `outline`          — accent, 2–4px outward (styles.css
+                                       `button:focus-visible`, unlayered)
 
    Why selection is NOT a ring, despite being the obvious reach: every Tailwind
    `ring-*` utility writes into the SAME single box-shadow, so `hover:ring-*`
@@ -32,10 +33,43 @@ export const HOVER_RING =
    `ring-offset-2` extends 4px, so a PERMANENT accent halo would also eat half
    the gutter and butt straight into a hovered neighbour's halo.
 
-   Why ink and not the accent: persistent state is neutral (`border-foreground`
-   — #2a2622 on light, #eeeeee on dark, ≥11:1 against either tile fill), and
-   the warm accent is reserved for the transient pointer/keyboard states. That
-   way "selected" can never be mistaken for "hovered".
+   OFFSET IS 1, NOT 2, since the rail went back to 5-up: the halo was tuned
+   against 51px tiles, and at 39px a 4px halo is over a tenth of the tile and
+   still claims half the 8px gutter. This now only affects the remaining
+   HOVER_RING consumers, the tiles having dropped the ring entirely.
+
+   WHY HOVER IS NOT AN OUTLINE (2026-07-26). It was HOVER_RING — an accent halo
+   sitting 2-4px outside the tile — and that survived selection changing from
+   neutral ink to the accent. The result: a hovered tile and a selected tile
+   were both "an orange outline around a tile", one detached and one attached,
+   sitting side by side in a 5-wide grid. Chris flagged it twice from
+   screenshots before it was diagnosed. Suppressing the ring on the ACTIVE tile
+   only was not enough, because the two still collided across neighbours.
+
+   The tile already had a perfectly good hover signal and did not need a
+   second: idle `bg-bg-tertiary` -> hover `bg-bg-elevated` is #e9e3d8 -> #fff
+   on light, the text goes `text-muted` -> `text-primary` (#8a8175 -> #2a2622),
+   and the icon scales 110%. Three simultaneous changes, none of them an
+   outline. So the accent outline now means exactly ONE thing anywhere on the
+   rail: this is the active tool.
+
+   HOVER_RING itself stays for the surfaces that have no competing selected
+   border and no surface lift of their own — RadioCards, ActionTile. Do not
+   reintroduce it on the tiles.
+
+   Colour: selected is the warm accent (`theme-primary` —
+   #c98f3f on light, #fcdfc2 on dark). An earlier pass made selected a neutral
+   ink instead, on the theory that a separate hue keeps it from being mistaken
+   for hover; Chris asked for the accent in both, and the states stay legible
+   without the hue split because they no longer share a channel at all:
+   selected is a border, hover is a surface.
+
+   KNOWN, ACCEPTED: at #c98f3f on the light sidebar this is 2.67:1, under the
+   3:1 WCAG 1.4.11 asks of a non-text indicator. The hover ring and the global
+   focus outline already had exactly this shortfall — it comes from `--accent`
+   itself, so fixing it means recolouring the light theme, not patching here.
+   Selected now shares it. If it needs solving, the fix is a darker light-mode
+   accent token, applied once at the source.
 
    Both branches carry the same border WIDTH (transparent when idle) so the
    border box never changes size — the header's exact one-tile height step as
@@ -50,7 +84,7 @@ export const HOVER_RING =
 
 /** Tool-rail tile — the active tool. */
 export const TILE_SELECTED =
-  "border-2 border-foreground bg-bg-elevated text-text-primary shadow-sm";
+  "border-2 border-theme-primary bg-bg-elevated text-text-primary shadow-sm";
 
 /** Tool-rail tile — every other tool. */
 export const TILE_IDLE =
@@ -58,7 +92,7 @@ export const TILE_IDLE =
 
 /** Sub-tool tile — the active sub-mode. One step lighter than TILE_SELECTED. */
 export const SUBTILE_SELECTED =
-  "border border-foreground bg-bg-elevated text-text-primary";
+  "border border-theme-primary bg-bg-elevated text-text-primary";
 
 /** Sub-tool tile — every other sub-mode. */
 export const SUBTILE_IDLE =

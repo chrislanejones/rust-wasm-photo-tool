@@ -16,6 +16,22 @@ export const panelSpacingTransition: Transition = {
   mass: 0.8,
 };
 
+// Height/size changes that MOVE OTHER CONTENT — the sub-tool row growing from
+// three tiles to six, and the panel body it pushes down.
+//
+// A tween, not the spring above, and that is the whole point. Springs here are
+// underdamped (stiffness 400 / damping 30), so they overshoot the target and
+// settle back: a row animating 111px -> 64px lands near 63 and creeps back to
+// 64. On a bouncing ball that reads as life; on a horizontal edge with a whole
+// panel of controls sitting on it, it reads as the layout wobbling. A tween
+// approaches its target from one side and stops, so the edge cannot overshoot
+// by construction rather than by tuning a damping number.
+export const sizeTween: Transition = {
+  type: "tween",
+  duration: 0.2,
+  ease: "easeOut",
+};
+
 // Instant (no-motion) transition — swap in for the spring/tween transitions
 // above when the user has Reduce Motion on. Framer-motion animates layout props
 // (margin, width, …) through inline styles, NOT CSS, so the global

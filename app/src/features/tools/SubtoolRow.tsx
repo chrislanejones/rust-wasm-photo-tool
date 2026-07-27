@@ -15,7 +15,7 @@
 // shared with the command palette and URL routing. Adding a sub-tool means
 // editing toolModes.ts (or the tool's registry module) — never this file.
 //
-// LAYOUT CONTRACT: both this grid and ToolGrid are `grid-cols-4` with `gap-2`,
+// LAYOUT CONTRACT: both this grid and ToolGrid are `grid-cols-5` with `gap-2`,
 // and the tiles are `aspect-square w-full`. That is deliberate — it makes the
 // header height move in exact one-tile increments (0 rows / 1 row / 2 rows), so
 // the body "step" is always the same distance and never a ragged half-tile.
@@ -25,9 +25,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { panelSpacingTransition } from "@/lib/animations";
+import { sizeTween } from "@/lib/animations";
 import {
-  HOVER_RING,
   SUBTILE_DISABLED,
   SUBTILE_IDLE,
   SUBTILE_SELECTED,
@@ -49,7 +48,7 @@ interface Props {
  *  THE TIE TO THE RAIL. This used to be colour: the active sub-tile wore the
  *  PARENT tool's gradient, so you matched the two lit tiles by hue. With the
  *  gradients gone the tie is structural instead — the rail and this row each
- *  light exactly one tile, in the SAME ink vocabulary, stacked 12px apart
+ *  light exactly one tile, in the SAME accent vocabulary, stacked 12px apart
  *  under one hairline. The grading (2px + `shadow-sm` up top, a finer 1px line
  *  here, on top of the existing radius step) is what says parent-then-child
  *  rather than two peer rows. Deliberately NOT a pointer/connector under the
@@ -80,12 +79,13 @@ function SubtoolButton({
           aria-pressed={active}
           className={[
             "group flex aspect-square w-full items-center justify-center rounded-xl",
-            "transition-all duration-200 ease-out",
+            // Hover channels only — selection snaps. See ToolButton.tsx.
+            "transition-[background-color,color,scale] duration-200 ease-out",
             disabled
               ? SUBTILE_DISABLED
               : [
+                  // Hover is a surface change here too — see lib/styles.ts.
                   active ? SUBTILE_SELECTED : SUBTILE_IDLE,
-                  HOVER_RING,
                 ].join(" "),
           ].join(" ")}
         >
@@ -125,19 +125,45 @@ export function SubtoolRow({ activeTool, disabled = false }: Props) {
     <AnimatePresence initial={false}>
       {show && (
         <motion.div
-          key={activeTool}
-          layout
+          // STABLE key, deliberately NOT `activeTool`.
+          //
+          // Keying on the tool made every tool switch an unmount + remount, so
+          // AnimatePresence ran the exit animation on the outgoing row and then
+          // mounted the incoming one. Measured on a Vector -> Paint switch: the
+          // row collapsed 111px -> 0 over ~7 frames, sat at 0 for ~14 more, then
+          // POPPED to 64px with no enter animation (AnimatePresence's
+          // `initial={false}` suppresses it), with both rows briefly in the DOM.
+          // The panel body below rode all of it up and back down. That is the
+          // flicker.
+          //
+          // With one stable key the container never leaves: switching tools just
+          // swaps the tiles inside it (they carry their own `key={m.id}`), and
+          // the height animation covers the difference — 6 modes to 3 is one
+          // smooth 111 -> 64. AnimatePresence still does its real job, which is
+          // the genuine appear/disappear when a tool has fewer than two
+          // sub-modes.
+          key="subtool-row"
+          // NO `layout` prop, deliberately. It and the explicit height
+          // animation below are two different mechanisms for the same job and
+          // they fight: `layout` animates a box change by applying a SCALE
+          // transform, while `height: auto` animates the real box. Measured
+          // mid-switch in Chrome, the row carried
+          // `transform: matrix(1, 0, 0, 0.728, ...)` — squashed to 73% of its
+          // height and stretching back — while its height was independently
+          // growing 64 -> 111. The compound effect squashes the icons inside
+          // and shoves the rail above by ~21px. Chris: "see the bunny hop".
+          // The height animation alone is smooth and moves nothing else.
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: "auto", opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          transition={panelSpacingTransition}
+          transition={sizeTween}
           className="overflow-hidden"
         >
           {/* Hairline separating rail from sub-rail. Inside the animated box so
               it collapses with the row instead of leaving a stray line. */}
           <div className="mt-3 mb-3 h-px bg-border/60" />
           <div
-            className="grid grid-cols-4 gap-2"
+            className="grid grid-cols-5 gap-2"
             role="toolbar"
             aria-label={`${tool?.label ?? "Tool"} sub-tools`}
           >

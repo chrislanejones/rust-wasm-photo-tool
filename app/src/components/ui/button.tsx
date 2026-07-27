@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  *   border-highlight hover ring; disabled renders as a dark muted surface.
  * - `default` — same surface family at standard padding (for in-flow actions
  *   that don't need the large footprint).
- * - `tiny` — the 28×28 icon button matching the zoom controls (`.btn-icon`):
+ * - `tiny` — the 24×24 icon button matching the zoom controls (`.btn-icon`):
  *   panel close, undo/redo, user menu. Icon passed as children.
  * - `xs` — the 20×20 dense-row variant (`.btn-icon-xs`), e.g. the Layers list.
  *

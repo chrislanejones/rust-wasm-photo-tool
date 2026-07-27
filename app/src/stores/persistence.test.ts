@@ -18,14 +18,17 @@ import { useGalleryStore } from "./useGalleryStore";
 describe("useToolStore persistence", () => {
   const { partialize, merge } = useToolStore.persist.getOptions();
 
-  it("partializes exactly the six sub-mode prefs", () => {
-    // Was four. `textMode` and `batchMode` joined in the new-ui-toolbar arc
-    // when Text's and Batch's sub-modes moved out of component `useState` and
-    // into the store — same "remember which sub-mode I was in" category as the
-    // other four, so they persist on the same terms.
+  it("partializes exactly the five sub-mode prefs", () => {
+    // Was four, then six. `textMode` and `batchMode` joined in the
+    // new-ui-toolbar arc when Text's and Batch's sub-modes moved out of
+    // component `useState` and into the store — same "remember which sub-mode
+    // I was in" category, so they persist on the same terms. `shapesMode` then
+    // LEFT in v7.51: Shapes folded into Vector, and its four modes are values
+    // of `textMode` now, so a separate field would be a second source of truth
+    // for the same preference.
     const persisted = partialize!(useToolStore.getState());
     expect(Object.keys(persisted).sort()).toEqual(
-      ["batchMode", "brushMode", "eraserMode", "shapesMode", "stampSubMode", "textMode"].sort(),
+      ["batchMode", "brushMode", "eraserMode", "stampSubMode", "textMode"].sort(),
     );
   });
 
@@ -45,7 +48,8 @@ describe("useToolStore persistence", () => {
       {
         brushMode: "deleted-mode",
         stampSubMode: "clone",
-        shapesMode: "shapes",
+        // A v7.50 blob still says "background"; that mode is gone.
+        textMode: "background",
         eraserMode: "magic",
       },
       current,
@@ -53,6 +57,7 @@ describe("useToolStore persistence", () => {
     expect(merged.brushMode).toBe(current.brushMode); // stale value, fell back
     expect(merged.stampSubMode).toBe("clone"); // valid, passed through
     expect(merged.eraserMode).toBe("magic"); // valid, passed through
+    expect(merged.textMode).toBe(current.textMode); // retired mode, fell back
   });
 
   it("merge treats a missing/corrupted persisted blob as no-op, not a crash", () => {

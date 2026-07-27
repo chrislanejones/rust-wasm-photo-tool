@@ -17,11 +17,11 @@
 - **Fast integer compositing** — all alpha blending (`blend_pixel`, `blend_over`) uses integer source-over math instead of per-pixel float `÷255.0`, verified identical to the old result within ±1
 - **Color Picker** — Eyedropper activates on Effects → Color Picker tab; hovering the canvas shows a floating 11×11 magnifier (sourced from Rust `get_pixel_region`); clicking picks the pixel color and sets it as both brush and text color
 - **Blur Brush** — Box-blur with stroke-based region masking; configurable radius and intensity; now lives in the Brush tool's "Blur Brush" tab
-- **Arrows** — Anti-aliased arrows with arrowhead (single or double), drawn directly on the pixel buffer; accessible from the Arrows sub-tab inside the Shapes tool
-- **Shapes** — Rectangles, circles, hand-drawn circles, and lines rendered in WASM; Shapes tool has a Shapes/Arrows tab switcher at the top
+- **Arrows** — Anti-aliased arrows with arrowhead (single or double), drawn directly on the pixel buffer; Vector → Arrow
+- **Shapes** — Rectangles, circles and hand-drawn circles rendered in WASM; Vector → Shapes. Lines used to be a fourth shape in this picker and are now their own sub-tool, Vector → Line
 - **Paint / Brush** — Freehand painting via WASM `paint_dab` + `paint_stroke_to`; configurable brush size, color, and opacity; tab-switched with Blur Brush and Pen in the same panel
 - **Pen (Vector Paths)** — Photoshop-style Bézier pen (Paint → Pen tab): click to drop corner anchors, click-drag to pull smooth curve handles, and grab any anchor or handle to reshape the path. Enter closes it, Esc finishes it open. An optional solid **background** fills the closed interior (Rust scanline polygon fill, under the stroke). Committed paths stay **re-editable** — click one to re-open its anchors/handles — and round-trip through history, photo-switch, reload, and cloud sync as a kind-7 `ShapeAnnotation` (cubic control sequence flattened with de Casteljau)
-- **Text** — Click-to-place text with configurable font family (12 browser-safe options), size, weight, and color; up to 8 recent texts that re-open the canvas text box at the last used position, restoring all text settings
+- **Text** — Vector → Text. Click-to-place text with configurable font family (12 browser-safe options), size, weight, and color; up to 8 recent texts that re-open the canvas text box at the last used position, restoring all text settings
 - **Emoji Stamp** — Browser renders emoji to `OffscreenCanvas`, pixels sent to WASM `stamp_pixels()` for alpha compositing; emoji picker lives in the Stamp tool's Emojis tab
 - **Export** — Lossless PNG via Rust encoder, JPEG/WebP/AVIF via browser
 - **Blank Canvas** — start a new document from the upload dialog: dimensions + a page-size preset (FHD / Square / Story / 4×6 / 5×7 / 8×10) and a White / Black / hex / **Transparent** background; the fill is generated in Rust (`blank_png` → `codec::export_png`) with no canvas round-trip
@@ -33,8 +33,8 @@
 ### UI (React)
 
 - **Animated Panels** — Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)
-- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), **Batch Image Editor** (bulk logo stamp + grid mosaic view), Eraser (relabeled from AI)
-- **Tab Switchers** — Stamp (Clone / Stamps / Emojis), Shapes (Shapes / Arrows), Paint (Paint / Blur Brush / Pen), Effects (Levels / Color Picker) via shared `TabGroup` component
+- **Tool Grid** — 10 tools on bare keys 1–0: Resize, Adjust, Select, Paint, **Vector**, Layer Settings, Eraser, Effects, Stamps, Batch Image Editor. Vector is Text and Shapes merged into one tile (v7.51); the ten fit the digit row exactly, so there is no overflow key
+- **Sub-tool Row** — the tool's modes sit under the rail: Vector (Text / OCR / Shapes / Pens / Arrow / Line), Stamp (Clone / Stamps / Emojis), Paint (Paint / Blur Brush / Pen), Select (Wand / Edge / Colour Range / Lasso / Rectangle / Ellipse). Each has its own URL, e.g. `#/tool/text/line`
 - **Spacebar Pan** — Hold Space for grab-to-pan; all tool handlers bypassed during pan
 - **A/B Compare Slider** — Squoosh-style draggable divider; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned
 - **Multi-photo Gallery** — Bottom strip with thumbnails, add/remove/switch/**duplicate** (content-addressed, zero-copy; carries edits); PgUp/PgDn cycling; multi-select with Export / Delete / Duplicate / Unselect; header count + per-tier limit `(i)` tooltip; originals preserved in IndexedDB at full resolution regardless of working-copy downscale

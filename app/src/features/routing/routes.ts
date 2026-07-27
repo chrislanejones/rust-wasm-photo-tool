@@ -34,6 +34,8 @@ const TOOL_SLUG: Record<ToolType, string> = {
   // slug follows the display name. "#/tool/ai" keeps resolving via the
   // legacy-id alias below, so old links/bookmarks don't break.
   ai: "eraser",
+  // Retired from the rail in v7.51 (folded into Vector). The slug stays so
+  // old links still parse and reach legacyToolRedirect below.
   shapes: "shapes",
   effects: "effects",
   stamp: "stamps",
@@ -54,7 +56,6 @@ const TOOL_BY_SLUG: Record<string, ToolType> = (() => {
 /** Forgiving inbound mode aliases, per tool. Someone hand-typing a link will
  *  write the singular; the canonical id is what we write back. */
 const MODE_ALIASES: Partial<Record<ToolType, Record<string, string>>> = {
-  shapes: { arrow: "arrows", pen: "pens", shape: "shapes" },
   stamp: { emoji: "emojis", stamps: "clone" },
 };
 
@@ -131,17 +132,53 @@ function settingsTabFromSlug(slug: string): SettingsTab | undefined {
   return SETTINGS_TABS.find((t) => t.toLowerCase() === raw);
 }
 
-/** Legacy inbound redirect: Select lived inside Adjust & Select until it
- *  became its own tool, so `#/tool/adjust/select` (and
- *  `?tool=adjust&mode=select`) exist in old links and bookmarks. They land on
- *  the Select TOOL — not on Adjust with the mode silently dropped, which
- *  would strand the user on the wrong half of the old pairing. */
-function legacySelectRedirect(
+/** Where an old `#/tool/shapes[/mode]` link lands now that Shapes is a set of
+ *  Vector sub-modes rather than its own tool. The bare tool (no mode) goes to
+ *  Shapes, which is what that tile drew. */
+const LEGACY_SHAPES_MODE: Record<string, string> = {
+  arrows: "arrow",
+  arrow: "arrow",
+  pens: "pens",
+  pen: "pens",
+  // Retired from the rail in v7.51 (folded into Vector). The slug stays so
+  // old links still parse and reach legacyToolRedirect below.
+  shapes: "shapes",
+  shape: "shapes",
+  // Line was a shape KIND inside the picker, not a mode; in Vector it is a
+  // mode of its own, so an old deep link lands somewhere better than before.
+  line: "line",
+};
+
+/** Legacy inbound redirects for tools that moved. Old links and bookmarks are
+ *  the one part of the UI we can't go back and edit, so every rail change that
+ *  retires a slug leaves a rule here.
+ *
+ *  1. Select lived inside Adjust & Select until it became its own tool, so
+ *     `#/tool/adjust/select` (and `?tool=adjust&mode=select`) exist out there.
+ *     They land on the Select TOOL — not on Adjust with the mode silently
+ *     dropped, which would strand the user on the wrong half of the old
+ *     pairing.
+ *  2. Shapes merged into Text as "Vector" in v7.51. `#/tool/shapes/arrows`
+ *     becomes `#/tool/text/arrow` — same drawing surface, new address.
+ *  3. Text's Background sub-mode became a section of the Text panel in the
+ *     same change, so its old link resolves to Text rather than to nothing. */
+function legacyToolRedirect(
   tool: ToolType,
   rawMode: string | undefined,
 ): Route | null {
-  if (tool === "crop" && rawMode?.toLowerCase() === "select") {
+  const mode = rawMode?.toLowerCase();
+  if (tool === "crop" && mode === "select") {
     return { kind: "tool", tool: "select" };
+  }
+  if (tool === "shapes") {
+    return {
+      kind: "tool",
+      tool: "text",
+      mode: (mode && LEGACY_SHAPES_MODE[mode]) || "shapes",
+    };
+  }
+  if (tool === "text" && mode === "background") {
+    return { kind: "tool", tool: "text", mode: "text" };
   }
   return null;
 }
@@ -172,7 +209,7 @@ export function parseRoute(
   if (root === "tool" || root === "tools") {
     const tool = rest[0] ? toolFromSlug(rest[0]) : undefined;
     if (!tool) return null; // unknown tool -> not a route we can honour
-    const legacy = legacySelectRedirect(tool, rest[1]);
+    const legacy = legacyToolRedirect(tool, rest[1]);
     if (legacy) return legacy;
     const mode = rest[1] ? modeFromSlug(tool, rest[1], modesOf(tool)) : undefined;
     return { kind: "tool", tool, mode };
@@ -218,7 +255,7 @@ export function routeFromSearch(
   if (!tool) return null;
 
   const modeParam = params.get("mode");
-  const legacy = legacySelectRedirect(tool, modeParam ?? undefined);
+  const legacy = legacyToolRedirect(tool, modeParam ?? undefined);
   if (legacy) return legacy;
   const mode = modeParam
     ? modeFromSlug(tool, modeParam, modesOf(tool))

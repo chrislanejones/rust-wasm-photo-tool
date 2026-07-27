@@ -34,7 +34,7 @@ import {
   FileEdit,
   ImagePlus,
   MapPin,
-  PaintBucket,
+  Minus,
   ScanText,
   Scissors,
   Shapes as ShapesIcon,
@@ -53,7 +53,6 @@ import type {
   EraserMode,
   ResizeMode,
   SelectionKind,
-  ShapesMode,
   StampSubMode,
   TextMode,
   ToolState,
@@ -81,15 +80,18 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
     { id: "red", label: "Red Stamps", icon: StampIcon, keywords: ["red", "batch stamp", "marker"] },
     { id: "emojis", label: "Emojis", icon: Smile, keywords: ["emoji", "sticker"] },
   ],
-  shapes: [
-    { id: "shapes", label: "Shapes", icon: ShapesIcon, keywords: ["rectangle", "ellipse", "box"] },
-    { id: "pens", label: "Pens", icon: MapPin, keywords: ["pen", "bezier", "path", "vector"] },
-    { id: "arrows", label: "Arrows", icon: ArrowUpRight, keywords: ["arrow", "pointer", "annotate"] },
-  ],
+  // The VECTOR tool (id `text`). v7.51 absorbed the standalone Shapes tool, so
+  // shapes/pens/arrow live here now and `line` was promoted out of the shape-
+  // kind picker into a mode of its own. `background` is gone as a MODE, not as
+  // a feature: the plate behind a caption is a text style, so its controls sit
+  // inside the Text panel.
   text: [
-    { id: "text", label: "Text", icon: Type, keywords: ["text", "type", "caption", "label"] },
-    { id: "background", label: "Background", icon: PaintBucket, keywords: ["background", "fill", "bubble", "plate"] },
+    { id: "text", label: "Text", icon: Type, keywords: ["text", "type", "caption", "label", "background", "bubble", "plate"] },
     { id: "ocr", label: "OCR", icon: ScanText, keywords: ["ocr", "read", "extract", "scan text"] },
+    { id: "shapes", label: "Shapes", icon: ShapesIcon, keywords: ["rectangle", "ellipse", "box", "circle"] },
+    { id: "pens", label: "Pens", icon: MapPin, keywords: ["pen", "bezier", "path", "vector", "pin"] },
+    { id: "arrow", label: "Arrow", icon: ArrowUpRight, keywords: ["arrow", "pointer", "annotate"] },
+    { id: "line", label: "Line", icon: Minus, keywords: ["line", "rule", "straight", "segment"] },
   ],
   ai: [
     { id: "brush", label: "Eraser", icon: Eraser, keywords: ["erase", "brush", "rub out"] },
@@ -130,10 +132,6 @@ const MODE_ACCESS: Partial<Record<ToolType, ModeAccess>> = {
   stamp: {
     select: (s) => s.stampSubMode,
     set: (m) => useToolStore.getState().setStampSubMode(m as StampSubMode),
-  },
-  shapes: {
-    select: (s) => s.shapesMode,
-    set: (m) => useToolStore.getState().setShapesMode(m as ShapesMode),
   },
   // NEW in the new-ui-toolbar arc. `eraserMode` already existed in the store
   // and was simply never wired here — that was a latent palette/router gap,

@@ -4,14 +4,10 @@ import { useUIStore } from "@/stores/useUIStore";
 import { setPaletteActions } from "@/features/commandPalette";
 import { navigateTo } from "@/features/routing";
 
-/** Tool keys in GRID READING ORDER across the 4-column rail — digits 1-9, then
- *  0 for the tenth, then `-` (Minus) for the eleventh, continuing along the
- *  number row rather than leaving one tool bare. Select is keyed again here
- *  (`3`): its `S` was dropped in v7.44 explicitly pending this renumbering.
- *
- *  `Minus` is safe as a BARE key — the zoom-out binding on the same physical
- *  key lives in the Alt branch below (Alt+`-`), which returns before the bare
- *  tool-key path is reached.
+/** Tool keys in GRID READING ORDER across the rail — digits 1-9, then 0 for the
+ *  tenth. `Minus` was only needed while an eleventh tool existed; v7.51 folded
+ *  Shapes into Vector, so the rail is ten again and the number row covers it
+ *  exactly. Select keeps `3` (its `S` was dropped in v7.44 pending this).
  *
  *  Keyed on `e.code`. Exported (test-only use) so it can be cross-checked
  *  against toolConfig.ts's ToolDefinition.shortcutKey — the two are meant to
@@ -25,10 +21,9 @@ export const TOOL_BY_KEY: Record<string, ToolType> = {
   Digit5: "text",
   Digit6: "arrow",
   Digit7: "ai",
-  Digit8: "shapes",
-  Digit9: "effects",
-  Digit0: "stamp",
-  Minus: "emoji",
+  Digit8: "effects",
+  Digit9: "stamp",
+  Digit0: "emoji",
 };
 
 /**

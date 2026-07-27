@@ -5,10 +5,9 @@ import {
   VectorSquare,
   SquareDashedMousePointer,
   Paintbrush,
-  Type,
+  Spline,
   Layers,
   Eraser,
-  Shapes,
   Sparkles,
   Stamp,
   Images,
@@ -23,12 +22,12 @@ export interface ToolDefinition {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   /** Key that switches to this tool (mirrors TOOL_BY_KEY in
-   *  useKeyboardShortcuts.ts). Keys run in GRID READING ORDER across the
-   *  4-column rail: 1-9, then 0 for the tenth, then `-` for the eleventh —
-   *  the number row continues past 0, so the eleventh tool keeps a key
-   *  instead of going bare. Optional: a tool may ship with no key at all, in
-   *  which case it must not appear in TOOL_BY_KEY, the sidebar tooltip, or
-   *  ShortcutModal. Every tool is keyed today. */
+   *  useKeyboardShortcuts.ts). Keys run in GRID READING ORDER across the rail:
+   *  1-9, then 0 for the tenth. The `-` (Minus) key was needed only while an
+   *  eleventh tool existed; v7.51 folded Shapes into Vector and the rail is
+   *  back to ten, so the number row covers it exactly. Optional: a tool may
+   *  ship with no key at all, in which case it must not appear in
+   *  TOOL_BY_KEY, the sidebar tooltip, or ShortcutModal. */
   shortcutKey?: string;
 }
 
@@ -72,10 +71,15 @@ export const TOOLS: ToolDefinition[] = [
     shortcutKey: "4",
   },
   {
+    // DISPLAY label only — the id stays `text` (shortcuts, persistence and the
+    // canvas gesture routing key off it; ids are renamed during the registry
+    // migration only, same as crop="Adjust" and ai="Eraser"). v7.51 absorbed
+    // the standalone Shapes tool, so this slot now owns everything vector:
+    // captions, OCR, shapes, pen paths, arrows and lines.
     id: "text",
-    label: "Text",
-    description: "Add a caption, put a plate behind it, or read text out",
-    icon: Type,
+    label: "Vector",
+    description: "Text, shapes, pens, arrows and lines — plus reading text out",
+    icon: Spline,
     shortcutKey: "5",
   },
   {
@@ -102,18 +106,11 @@ export const TOOLS: ToolDefinition[] = [
     shortcutKey: "7",
   },
   {
-    id: "shapes",
-    label: "Shapes",
-    description: "Boxes, ellipses, pen paths and arrows",
-    icon: Shapes,
-    shortcutKey: "8",
-  },
-  {
     id: "effects",
     label: "Effects",
     description: "Brightness, contrast, saturation, shadows and sharpen",
     icon: Sparkles,
-    shortcutKey: "9",
+    shortcutKey: "8",
   },
   {
     id: "stamp",
@@ -123,7 +120,7 @@ export const TOOLS: ToolDefinition[] = [
     label: "Stamps",
     description: "Clone from a source point, or drop markers and emoji",
     icon: Stamp,
-    shortcutKey: "0",
+    shortcutKey: "9",
   },
   {
     id: "emoji",
@@ -132,6 +129,6 @@ export const TOOLS: ToolDefinition[] = [
     icon: Images,
     // Eleventh in the rail, so it continues past `0` onto `-`. Bare `-` is
     // free: the zoom-out binding on the same key is Alt+`-`.
-    shortcutKey: "-",
+    shortcutKey: "0",
   },
 ];

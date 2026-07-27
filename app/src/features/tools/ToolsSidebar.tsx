@@ -16,7 +16,7 @@ import type {
 } from "@/lib/types";
 import type { ExportFormat } from "@/lib/exportImage";
 import type { StampMode } from "./settings/StampSettings";
-import type { ShapesMode } from "@/stores/useToolStore";
+import { isVectorDrawMode, type TextMode } from "@/stores/useToolStore";
 import { ToolGrid } from "./ToolGrid";
 import { SubtoolRow } from "./SubtoolRow";
 import { StampSettingsPanel } from "./settings/StampSettings";
@@ -119,9 +119,8 @@ interface ToolsSidebarProps {
   onSetColorPickerActive?: (active: boolean) => void;
   pickedColor?: string;
   onGlobalBlur?: (intensity: number) => void;
-  // Shapes sub-mode
-  shapesMode?: ShapesMode;
-  onShapesModeChange?: (mode: ShapesMode) => void;
+  // Vector sub-mode — decides which panel the one Vector tile shows.
+  textMode?: TextMode;
   // Stamp sub-mode + emoji
   stampSubMode?: StampMode;
   onStampSubModeChange?: (mode: StampMode) => void;
@@ -199,8 +198,7 @@ export function ToolsSidebar({
   onSetColorPickerActive,
   pickedColor,
   onGlobalBlur,
-  shapesMode,
-  onShapesModeChange,
+  textMode = "text",
   stampSubMode,
   onStampSubModeChange,
   stampEmoji,
@@ -232,10 +230,19 @@ export function ToolsSidebar({
       }
       style={embedded ? { boxShadow: "var(--shadow-panel)" } : { boxShadow: "var(--shadow-panel)" }}
     >
-      {/* Tool rail + the active tool's sub-tool rail. `layout` is what makes
-          the body below slide rather than jump when the sub-row row-count
-          changes (0 -> 1 -> 2 rows). */}
-      <motion.div layout className="px-4 pt-3 pb-4 border-b border-border">
+      {/* Tool rail + the active tool's sub-tool rail.
+          NO `layout` HERE. It used to carry one, to make the body below slide
+          rather than jump as the sub-row grows 0 -> 1 -> 2 rows. But framer
+          implements `layout` by SCALING the box and letting children ride the
+          scale — so every tool switch put `transform: matrix(1,0,0,0.79,..)`
+          on this div and squashed the rail, the sub-row and every icon inside
+          them to 79% height, springing back over the animation. Measured live:
+          rail tiles breathing 30.7px -> 38.8px, icons 14.6 -> 18.4. Chris:
+          "jelly dance of icons", "see the bunny hop".
+          SubtoolRow animates its OWN height (see the note there), which
+          reflows this column naturally, so the slide still happens — without
+          anything being scaled. */}
+      <motion.div className="px-4 pt-3 pb-4 border-b border-border">
         <ToolGrid
           activeTool={activeTool}
           onToolChange={onToolChange}
@@ -249,10 +256,10 @@ export function ToolsSidebar({
         <SubtoolRow activeTool={activeTool} disabled={!imageReady} />
       </motion.div>
 
-      <motion.div
-        layout
-        className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin"
-      >
+      {/* Same reasoning as the header above: `layout` here scaled the whole
+          settings body on every sub-row size change, distorting its contents.
+          It is a `flex-1` child, so it already resizes correctly on its own. */}
+      <motion.div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
         {activeTool === "compress" && (
           <ResizeSettings
             disabled={!imageReady}
@@ -345,17 +352,6 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "shapes" && (
-          <ShapesSettings
-            settings={toolSettings}
-            onChange={onToolSettingsChange}
-            activeMode={shapesMode}
-            onModeChange={onShapesModeChange}
-            onPlace={onPlace}
-            canPlace={selectedKind === "shape"}
-          />
-        )}
-
         {activeTool === "emoji" && (
           <BatchSettings
             photos={photos}
@@ -376,17 +372,30 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "text" && (
-          <TextSettings
-            settings={toolSettings}
-            onChange={onToolSettingsChange}
-            onPlace={onPlace}
-            canPlace={selectedKind === "text"}
-            aiEnabled={aiEnabled}
-            activePhotoId={activePhotoId}
-            stampToolRef={stampToolRef}
-          />
-        )}
+        {/* Vector (v7.51): Shapes folded into Text under one rail tile, so the
+            sub-mode picks the panel. The tiles themselves live in the header
+            SubtoolRow — both panels read `textMode` from the store, this prop
+            only routes between them. */}
+        {activeTool === "text" &&
+          (isVectorDrawMode(textMode) ? (
+            <ShapesSettings
+              settings={toolSettings}
+              onChange={onToolSettingsChange}
+              activeMode={textMode}
+              onPlace={onPlace}
+              canPlace={selectedKind === "shape"}
+            />
+          ) : (
+            <TextSettings
+              settings={toolSettings}
+              onChange={onToolSettingsChange}
+              onPlace={onPlace}
+              canPlace={selectedKind === "text"}
+              aiEnabled={aiEnabled}
+              activePhotoId={activePhotoId}
+              stampToolRef={stampToolRef}
+            />
+          ))}
 
         {activeTool === "ai" && (
           <AISettings

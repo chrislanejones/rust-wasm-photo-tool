@@ -14,7 +14,6 @@ beforeEach(() => {
     brushMode: "paint",
     resizeMode: "compress",
     selectionKind: "wand",
-    shapesMode: "shapes",
     stampSubMode: "clone",
     // Eraser / Text / Batch joined the sub-mode axis in the new-ui-toolbar arc
     // (their modes moved out of component state into the store). They must be
@@ -55,9 +54,9 @@ describe("hash -> state", () => {
   });
 
   it("never writes a sub-mode that isn't one of the tool's own", () => {
-    applyRoute({ kind: "tool", tool: "shapes", mode: "erase" }); // Paint's mode
-    expect(useToolStore.getState().activeTool).toBe("shapes");
-    expect(useToolStore.getState().shapesMode).toBe("shapes"); // untouched
+    applyRoute({ kind: "tool", tool: "text", mode: "erase" }); // Paint's mode
+    expect(useToolStore.getState().activeTool).toBe("text");
+    expect(useToolStore.getState().textMode).toBe("text"); // untouched
   });
 
   it("Paint's dead erase route lands on Paint but leaves brushMode untouched", () => {
@@ -136,11 +135,11 @@ describe("round-trip", () => {
     "#/tool/paint/pen",
     "#/tool/resize/resize",
     "#/tool/select/wand",
-    "#/tool/shapes/arrows",
+    "#/tool/text/arrow",
     "#/tool/stamps/emojis",
     // Text and Eraser carry a mode segment now — see the two "was a known gap"
     // tests above. Effects stays bare: it genuinely has no sub-modes.
-    "#/tool/text/background",
+    "#/tool/text/shapes",
     "#/tool/eraser/magic",
     "#/tool/effects",
     "#/settings/security",
@@ -187,7 +186,7 @@ describe("describeRoute", () => {
     expect(describeRoute({ kind: "settings", tab: "security" })).toBe(
       "Settings › Security",
     );
-    expect(describeRoute({ kind: "tool", tool: "text" })).toBe("Text");
+    expect(describeRoute({ kind: "tool", tool: "text" })).toBe("Vector");
     // Display renamed AI -> Eraser; describeRoute reads toolConfig.ts's
     // current label, so it must say "Eraser", never the old "AI".
     expect(describeRoute({ kind: "tool", tool: "ai" })).toBe("Eraser");
