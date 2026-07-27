@@ -70,28 +70,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.52 — 2026-07-26
+### v7.53 — 2026-07-26
 
-**Links now name the tool you are actually looking at.** The URL was
-`#/tool/<tool>/<mode>`, which described the old eleven-tool structure — so Crop,
-Transform and the Eyedropper, which are one tool underneath, all shared
-`#/tool/adjust`. A link could not tell you which of the three it meant. Routes
-are now `#/create/brush`, `#/edit/color-picker`, `#/select/ellipse`: the thing
-the toolbar shows you is the thing the address bar says.
+**The site says what it is in the tab, not just on the page.** The browser title
+was "local-first image editing in the browser" — accurate and forgettable. It
+now leads with the line the homepage already opens on.
 
-Every old link still works. Thirty-five legacy URL shapes are redirected to the
-sub-tool they meant, each one pinned by its own test, because bookmarks exist
-and landing quietly on the wrong tool is worse than refusing.
+**⌘K searches the features, not just the pages.** All 45 entries from the
+Features page are in the palette, each one jumping to its own anchor rather than
+the top of a long page. They come from the same generated list the page renders,
+so a feature can't be in one and missing from the other.
 
-**The command palette speaks the same language.** It listed rows like
-"Paint › Paint" — the old loop walked the legacy tool table and printed the
-tool's name twice whenever its first mode shared that name. Entries are now
-"Create › Brush", one per group and one per sub-tool, from the same registry the
-toolbar and the keyboard use.
+**The feature list caught up with the toolbar.** Eight entries still described
+the eleven-tool layout — "Effects → Color Picker tab", "the Arrows sub-tab
+inside the Shapes tool" — none of which exist since the five groups landed.
+They now name the sub-tool you'd actually click, and five new entries cover the
+group toolbar, sub-tool routing and dispatch, the colour history, and OCR.
 
-**Ruler is on the rail as a placeholder**, next to Guides, disabled — the slot is
-held, the measuring isn't built. Like Perspective, it carries no route and no
-palette entry, so it can't be reached by guessing a URL.
+**Also in the editor:** Object Removal was unreachable. The AI panel used to
+pick between its modes with its own tile row; that row moved into the sub-tool
+header, and the restructure then filled the header with the group's sub-tools —
+leaving nothing that could reach Object Removal. Background Removal and Object
+Removal now sit together under one AI panel.
+
+The top bar's buttons match the tool rail: same border, same hover ring, same
+icon proportion. The panel toggles and the Review panel's section toggles are
+one component and now look it.
 
 ## License
 

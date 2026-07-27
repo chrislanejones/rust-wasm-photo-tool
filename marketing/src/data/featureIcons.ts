@@ -107,3 +107,18 @@ export function getFeatureIcon(name: string): ElementType {
 export function getGroupIcon(name: string): ElementType {
   return GROUP_ICONS[name] ?? AppWindow;
 }
+
+/** The anchor id a feature renders under on /features.
+ *
+ *  Lives HERE, not in features.ts — that file is regenerated from
+ *  docs/Features.md and anything added to it is wiped on the next run. It sits
+ *  beside the icon map because both are the hand-written half of the feature
+ *  data.
+ *
+ *  Shared with the command palette, which deep-links to these ids: two copies
+ *  of this rule is exactly how a palette result quietly becomes a dead anchor. */
+export const featureSlug = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");

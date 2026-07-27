@@ -1,16 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import Footer from "../components/Footer";
 import { FEATURES } from "../data/features";
-import { getFeatureIcon, getGroupIcon } from "../data/featureIcons";
+import { getFeatureIcon, getGroupIcon, featureSlug } from "../data/featureIcons";
 
 // Same breakpoint Nav.tsx uses for its own desktop/mobile split.
 const DESKTOP_QUERY = "(min-width: 60.0625rem)";
 
-const slug = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+const slug = featureSlug;
 
 const TOTAL = FEATURES.reduce((n, g) => n + g.items.length, 0);
 

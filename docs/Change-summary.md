@@ -2344,3 +2344,31 @@ vitest** (17 files, +8), production build succeeds.
 
 **Deferred**: ADR-023, and the approved `Ctrl+K`-then-letter chord for
 sub-tools (letter scoped to the active group).
+
+## v7.53 Change Summary — 2026-07-26
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | **Object Removal was unreachable.** `AISettings` used to pick between its four modes with its own tile row; that row moved into the sub-tool header in the new-ui-toolbar arc, and the five-group restructure then filled that header with the GROUP's sub-tools. Enhance › AI pins `eraserMode` to `rembg`, Create owns `brush`/`magic`, and nothing was left that could set `inpaint` | **FIXED** — both Replicate actions render together under one "AI" header; they were never exclusive, they are two buttons |
+| 2   | Correction to my own migration map: it claimed "AISettings' own toggle reaches inpaint" (AMBIGUOUS-3). It doesn't — that picker had already been removed before this arc began | Recorded |
+| 3   | Marketing `<title>` now leads with the hero line instead of "local-first image editing in the browser" | Complete |
+| 4   | **⌘K indexes all 45 features**, each deep-linked to its own `/features#<slug>` anchor. DERIVED from `features.ts` — the same generated data the page renders — so the palette and the page cannot disagree. The full body text stays searchable while only the first clause is shown | New |
+| 5   | `featureSlug` moved into `featureIcons.ts` (hand-written) and shared by the page and the palette. It was inline in `Features.tsx`; a second copy in the palette would have been how a deep link silently rots. NOT in `features.ts` — that file is regenerated and would wipe it | Complete |
+| 6   | **8 stale feature entries corrected.** They still described the eleven-tool layout: "Effects → Color Picker tab", "the Arrows sub-tab inside the Shapes tool", "tab-switched with Blur Brush and Pen", "the Stamp tool's Emojis tab", "Text → Background → Drop Shadow". None of those places exist now | Complete |
+| 7   | **5 new feature entries**: the five-group toolbar, sub-tool routing, sub-tool canvas dispatch, colour-picker history, OCR. Features 40 → 45 (UI 15 → 20) | Complete |
+| 8   | Top bar icon buttons (Undo / Redo / both Zooms / Settings / signed-out user) take the tool-rail vocabulary — border for state, hover ring, icon at 55% — at 36px so the glyph matches the rail's within a pixel. `standalone` variant carries its own fill for the two that sit outside a group pill | Complete |
+| 9   | Every `ToggleButtonGroup` button gets the hover ring and one 18px glyph, labelled or not. The top bar's four and the Review panel's four were already the same component; they now look it. Reaches the settings panes too, deliberately | Complete |
+
+**Verified**: marketing and app both build; the served marketing bundle carries
+the new title, the feature entries and the `/features#` deep links. App gates:
+`tsc --noEmit` clean, eslint **0 errors / 59 warnings**, **233/233 vitest**.
+
+**NOT done — the nav underline.** Chris reports the menu's hover/current-page
+rule is off kilter. The `.nav-pill__glide` span is the only underline in the nav
+(there is no `::after` rule fighting it) and the geometry reads correctly on
+paper — `offsetLeft`/`offsetWidth` against a `position: relative` list with no
+border or padding to offset them. Diagnosing it needs a measurement I couldn't
+take this session, and guessing at a CSS fix for something the reporter can see
+and I can't is how you ship a second bug. Carried to the next session.
+
+**Deferred**: ADR-023, and the approved `Ctrl+K`-then-letter chord for sub-tools.

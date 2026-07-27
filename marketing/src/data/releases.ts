@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.53",
+    date: "2026-07-26",
+    headline: "The tab, the search, and the feature list catch up",
+    entries: [
+      { tag: "fix", text: "Object Removal had become unreachable: the AI panel's mode picker moved into the sub-tool header, and the restructure then filled that header with the group's sub-tools. Background and Object Removal now sit together." },
+      { tag: "ui", text: "The browser title leads with the line the homepage opens on, instead of 'local-first image editing in the browser'." },
+      { tag: "feature", text: "Command-K searches all 45 features, each jumping to its own anchor. Derived from the same generated list the Features page renders, so the two can't disagree." },
+      { tag: "fix", text: "Eight feature entries still described the eleven-tool layout — 'Effects > Color Picker tab', 'the Arrows sub-tab inside the Shapes tool'. They now name the sub-tool you'd actually click." },
+      { tag: "ui", text: "Top bar buttons match the tool rail: same border, hover ring and icon proportion. The panel and Review toggles are one component and now look it." },
+    ],
+  },
+  {
     version: "v7.52",
     date: "2026-07-26",
     headline: "Links name the tool you're actually looking at",

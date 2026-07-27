@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EDITOR_URL, GITHUB_URL, CODEBERG_URL } from "../config";
+import { FEATURES } from "../data/features";
+import { featureSlug } from "../data/featureIcons";
 import { SearchIcon } from "./Icons";
 
 // Shipping the pill means shipping the keyboard model, so this is a real
@@ -8,8 +10,16 @@ import { SearchIcon } from "./Icons";
 // opens, focus goes into the input and comes back to the trigger, Tab is
 // trapped, and the page stops scrolling behind it.
 //
-// The index is written here rather than scraped, so a section that gets renamed
-// can't quietly become a dead result.
+// The hand-written half of the index is written here rather than scraped, so a
+// section that gets renamed can't quietly become a dead result.
+//
+// FEATURES ARE THE EXCEPTION, and for the same reason rather than against it:
+// they are DERIVED from `features.ts`, which is generated from
+// docs/Features.md — the repo's own canonical list, and the exact data
+// /features renders. Deriving from the source the page itself uses is the
+// opposite of scraping the page: a feature cannot appear here and not there,
+// and both use `featureSlug` so the deep link cannot rot either. Hand-typing
+// forty entries would have guaranteed drift the first time one was renamed.
 
 type Kind = "route" | "external" | "asset";
 
@@ -19,6 +29,8 @@ interface Item {
   hint: string;
   href: string;
   kind: Kind;
+  /** Full text to match against when the visible `hint` is truncated. */
+  search?: string;
 }
 
 const ITEMS: Item[] = [
@@ -36,6 +48,23 @@ const ITEMS: Item[] = [
   { group: "Open", label: "Open the demo", hint: "No account, no upload", href: EDITOR_URL, kind: "external" },
   { group: "Open", label: "Source on GitHub", hint: "chrislanejones/rust-wasm-photo-tool", href: GITHUB_URL, kind: "external" },
   { group: "Open", label: "Source on Codeberg", hint: "chrislanejones/rust-wasm-photo-tool", href: CODEBERG_URL, kind: "external" },
+
+  // Every feature on /features, deep-linked to its own anchor. Grouped by the
+  // same two headings the page uses, so a search for "clone stamp" or "pen"
+  // lands on the paragraph rather than the top of a long page.
+  ...FEATURES.flatMap((g): Item[] =>
+    g.items.map((f) => ({
+      group: g.name,
+      label: f.name,
+      // The body is the searchable hint, trimmed — these run long, and the
+      // filter reads `label + hint`, so the whole paragraph stays matchable
+      // while only the first clause is shown.
+      hint: f.body.length > 96 ? `${f.body.slice(0, 95).trimEnd()}…` : f.body,
+      href: `/features#${featureSlug(f.name)}`,
+      kind: "route" as const,
+      search: f.body,
+    })),
+  ),
 ];
 
 interface CommandPaletteProps {
@@ -53,7 +82,9 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return ITEMS;
-    return ITEMS.filter((i) => `${i.label} ${i.hint}`.toLowerCase().includes(needle));
+    return ITEMS.filter((i) =>
+      `${i.label} ${i.hint} ${i.search ?? ""}`.toLowerCase().includes(needle),
+    );
   }, [query]);
 
   // A fresh query means the old highlight is meaningless.
