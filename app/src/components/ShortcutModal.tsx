@@ -90,6 +90,10 @@ const SHORTCUT_GROUPS = [
     title: "Dev Tools",
     shortcuts: [
       { keys: ["Alt", "Delete"], action: "Toggle Diagnostics Window" },
+      // Bound in useKeyboardShortcuts as Ctrl/Cmd + Backslash. It was an
+      // undocumented easter egg; listing it costs the surprise once and stops
+      // it being a key combination nothing in the app admits exists.
+      { keys: ["Ctrl", "\\"], action: "Shipping celebration" },
     ],
   },
 ];

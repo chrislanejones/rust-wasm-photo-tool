@@ -66,14 +66,22 @@ export default function Home() {
   return (
     <>
       <main id="main">
-        {/* Rust and WASM are marked with a highlighter band rather than a
-            gradient or an italic — both are tired tells. The marker is also
-            this product's own vocabulary: it's an annotation tool. */}
+        {/* The price and the friction are marked with a highlighter band rather
+            than a gradient or an italic — both are tired tells. The marker is
+            also this product's own vocabulary: it's an annotation tool.
+            The headline sells price, place and friction, not the engine: Rust
+            and WASM mean nothing to anyone outside this trade, and "runs on your
+            machine" is a precision claim rather than a selling one — a reader
+            who has never heard of local-first doesn't know the alternative is
+            uploading their photos, so it reads as a shrug. That claim stays
+            below, beside the table that proves it row by row. Every word here
+            is copy this site already ships: the Demo tier is $0 / forever with
+            no signup, and the closing CTA says "No account, no upload." */}
         <header className="hero" id="hero" onPointerMove={spotlight}>
           <div className="hero__spotlight" aria-hidden="true" />
           <h1 className="hero__display hero__display--long">
-            Crop it, compress it, annotate it, gallop. That’s <mark className="mark">Rust</mark>,
-            compiled to <mark className="mark">WASM</mark>.
+            Crop it, compress it, annotate it, gallop. <mark className="mark">Free</mark> in your
+            browser. <mark className="mark">No account</mark>.
           </h1>
 
           {/* A real browser capture, not a redrawn frame — and it happens to show

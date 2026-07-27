@@ -70,32 +70,34 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.53 — 2026-07-26
+### v7.54 — 2026-07-27
 
-**The site says what it is in the tab, not just on the page.** The browser title
-was "local-first image editing in the browser" — accurate and forgettable. It
-now leads with the line the homepage already opens on.
+**The headline says what the thing is.** It used to lead with "That's Rust,
+compiled to WASM" — an engine note written for people who already know what
+those words mean. It now reads *"Crop it, compress it, annotate it, gallop.
+Free in your browser. No account."* Price, place and friction, which is what
+someone actually decides on.
 
-**⌘K searches the features, not just the pages.** All 45 entries from the
-Features page are in the palette, each one jumping to its own anchor rather than
-the top of a long page. They come from the same generated list the page renders,
-so a feature can't be in one and missing from the other.
+**Every page gets air at the top.** Home cleared the floating nav by 56px and
+the sub-pages by 66px; both are 80px now. Pricing turned out to have a third
+header style of its own and was the worst of the three at 18px. On a phone it
+was 18px everywhere, because the mobile rule assumed the bar shrinks on a small
+screen — it doesn't, it's 62px tall at 390px exactly as it is at 1440.
 
-**The feature list caught up with the toolbar.** Eight entries still described
-the eleven-tool layout — "Effects → Color Picker tab", "the Arrows sub-tab
-inside the Shapes tool" — none of which exist since the five groups landed.
-They now name the sub-tool you'd actually click, and five new entries cover the
-group toolbar, sub-tool routing and dispatch, the colour history, and OCR.
+**The bar says "Image Horse" on a phone again.** The wordmark had been pulled
+out because at 20px it shoved the menu button off the edge of a 375px screen.
+At 16px, beside a button that now reads "Demo" instead of "Open the demo", it
+fits with room to spare. The full phrase stays on the hero and Pricing buttons,
+where there's room for it to work.
 
-**Also in the editor:** Object Removal was unreachable. The AI panel used to
-pick between its modes with its own tile row; that row moved into the sub-tool
-header, and the restructure then filled the header with the group's sub-tools —
-leaving nothing that could reach Object Removal. Background Removal and Object
-Removal now sit together under one AI panel.
+**The underline under the current menu item is straight.** It was measured in
+whole pixels while the links sit on fractions — Pricing is 41.25px wide — so it
+landed up to a quarter-pixel off, by a different amount on every link.
 
-The top bar's buttons match the tool rail: same border, same hover ring, same
-icon proportion. The panel toggles and the Review panel's section toggles are
-one component and now look it.
+**Also in the editor:** the Ctrl+`\` shipping celebration was still counting
+July at the 22nd — 42 releases and 109 entries. July ran to 54 releases and 159
+entries, about a third of everything ever shipped. Ctrl+`\` is also listed in
+the keyboard shortcuts now; it was bound but undocumented.
 
 ## License
 

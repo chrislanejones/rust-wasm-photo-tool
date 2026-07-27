@@ -2372,3 +2372,34 @@ take this session, and guessing at a CSS fix for something the reporter can see
 and I can't is how you ship a second bug. Carried to the next session.
 
 **Deferred**: ADR-023, and the approved `Ctrl+K`-then-letter chord for sub-tools.
+
+## v7.54 Change Summary — 2026-07-27
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | **Hero headline rewritten.** It led with "That's `Rust`, compiled to `WASM`" — the implementation, sold to an audience that doesn't know the words. Now "Crop it, compress it, annotate it, gallop. **Free** in your browser. **No account**." Both highlighter bands moved with it | Complete |
+| 2   | The local-machine claim deliberately did NOT go in the headline. "Runs on your machine" is a precision statement, not a selling one: a reader who has never met local-first doesn't know the alternative is uploading, so it reads as a shrug. It stays below, beside the operations table that proves it row by row | Recorded |
+| 3   | Every word of the new headline is copy the site already shipped — Demo tier is `$0 / forever` with `No signup` (Pricing), and the closing CTA already said "No account, no upload" | Complete |
+| 4   | **Top-of-page spacing unified across all five pages.** `.hero` cleared the fixed nav by 56px, `.page-head` by 66px, and `.stat-hero` — a third header surface only Pricing uses — by 18px. All three now share `calc(var(--banner-height) + var(--space-2xl))`, so they clear by 80px and cannot drift apart | Complete |
+| 5   | **The mobile spacing rule rested on a false premise.** Its comment said "nav is shorter on a phone, so less top clearance is needed". Measured: the pill is **62px tall at 390px wide, identical to 1440px** — it drops its wordmark and source icons but keeps its height. Headings sat 18px under the bar; now 40px | **FIXED** |
+| 6   | **The wordmark is back in the phone pill.** It had been moved to the sheet because at 20px it made the mark 170px and shoved the burger to x=374 — off a 375px screen, so the menu could not be opened at all. At 16px, with a shorter CTA, the burger sits inside the pill with 9px of slack at 375px | Complete |
+| 7   | The nav CTA is **"Demo"** at every width, not "Open the demo". The short label was what paid for the wordmark on a phone, but it is not a mobile compromise — the button sits next to a horse and the words "Image Horse" on a page whose whole job is the demo. The long form stays on the hero CTA, the Pricing CTA and the ⌘K palette entry | Complete |
+| 8   | The scroll-morph no longer collapses the wordmark on a phone. Condensing exists to buy width for the link row, and the link row is already hidden there — on mobile the collapse cost the brand and bought nothing | Complete |
+| 9   | **The nav underline was measured in whole pixels.** `offsetLeft`/`offsetWidth` round to integers; the links sit on fractions (Pricing 41.25px wide, Trail Log 49.84px, Features at x=139.89). The glide landed up to 0.25px off — by a different amount and in a different direction on each link, which is what the eye reads as crooked. Home hid it entirely, being at offsetLeft 0. Now measured with `getBoundingClientRect()` against the list's own rect: **0.000px on both edges in every state** | **FIXED** |
+| 10  | Ruled out by measurement rather than by reading: no competing underline exists. Every link's `text-decoration`, `border-bottom`, `box-shadow`, `::before` and `::after` are empty — `.nav-pill__glide` is the only rule in the nav. Zoom is not a factor either (error held at ~0.2px from 100% to 150%) | Recorded |
+| 11  | Rect maths is safe here because `.nav-pill`'s only transform is a **translate**, not a scale, and the `<ul>` carries no padding or border — so `rect.left - listRect.left` is exactly what `offsetLeft` meant | Recorded |
+| 12  | **The Ctrl+`\` celebration was a month out of date** — counting July at the 22nd through v0.9.85: 42 releases, 109 entries, 400 all-time, 27%. Re-derived from `releases.ts` as its own comment instructs: **54 releases, 159 entries, 450 all-time, 35%**, and 31 features / 49 fixes | **FIXED** |
+| 13  | Its feature chips missed the entire five-group toolbar arc. Refreshed newest-first, and kept app-facing only — the site's ⌘K feature search is the obvious trap, since the editor's own palette is `Alt+,` and a chip pointing at ⌘K would name something the user cannot find | Complete |
+| 14  | **Ctrl+`\` added to the shortcut modal.** It was bound in `useKeyboardShortcuts` and listed nowhere — a key combination nothing in the app admitted existed | Complete |
+
+**Verified**: marketing `tsc -b` clean and build succeeds; app `tsc --noEmit`
+clean, eslint **0 errors / 59 warnings**, production build succeeds. Nav glide
+measured at 0.000px on both edges at rest, on hover of all five links, and
+condensed; page clearances measured at 80px desktop across all five pages and
+40px at 390px; the 375px pill measured with the burger inside it.
+
+**Parked**: `Ctrl/Cmd + M` (Move-layer) is bound at `useKeyboardShortcuts.ts:246`
+and also missing from the shortcut modal. Left out deliberately — worth auditing
+every `Ctrl`-chord at once rather than hand-adding rows one at a time.
+
+**Deferred**: ADR-023, and the approved `Ctrl+K`-then-letter chord for sub-tools.

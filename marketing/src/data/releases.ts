@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.54",
+    date: "2026-07-27",
+    headline: "The headline says what it is, and every page gets air at the top",
+    entries: [
+      { tag: "ui", text: "The homepage headline led with \"That's Rust, compiled to WASM\" — an engine note aimed at people who already know what those words mean. It now reads \"Crop it, compress it, annotate it, gallop. Free in your browser. No account.\" Price, place and friction, which is what someone decides on." },
+      { tag: "ui", text: "Every page starts lower. Home cleared the floating nav by 56px and the sub-pages by 66px; both are 80px now, and Pricing — which had its own third header style — was the worst at 18px." },
+      { tag: "fix", text: "On a phone the heading sat 18px under the nav bar, because the mobile rule assumed the bar shrinks on a small screen. It doesn't: it's 62px tall at 390px wide exactly as it is at 1440." },
+      { tag: "ui", text: "The bar says \"Image Horse\" on a phone again, instead of leaving the logo to do it alone. The wordmark had been pulled out because at 20px it shoved the menu button off the edge of a 375px screen; at 16px, next to a shorter button, it fits with room to spare." },
+      { tag: "ui", text: "The bar's button is \"Demo\" rather than \"Open the demo\". It sits beside a horse and the words Image Horse, on a page about the demo — the verb wasn't carrying anything. The full phrase stays on the hero and Pricing buttons, where there's room for it to work." },
+      { tag: "fix", text: "The underline under the current menu item was measured in whole pixels while the links sit on fractions — Pricing is 41.25px wide — so the rule landed up to a quarter-pixel off, by a different amount on each link. It now measures the real geometry and sits exactly under the word." },
+      { tag: "fix", text: "The Ctrl+\\ shipping celebration was still counting July at the 22nd: 42 releases and 109 entries. July actually ran to 53 releases and 151 entries, a third of everything ever shipped, and the popper's feature chips missed the whole five-group toolbar." },
+      { tag: "ui", text: "Ctrl+\\ is listed in the keyboard shortcuts now. It was bound but undocumented — a key combination nothing in the app admitted existed." },
+    ],
+  },
+  {
     version: "v7.53",
     date: "2026-07-26",
     headline: "The tab, the search, and the feature list catch up",

@@ -25,9 +25,18 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
       list.style.setProperty("--go", "0");
       return;
     }
-    // offsetLeft is relative to the list, which is the positioned ancestor
-    list.style.setProperty("--gx", `${el.offsetLeft}px`);
-    list.style.setProperty("--gw", String(el.offsetWidth));
+    // Rects, not offsetLeft/offsetWidth — those round to whole pixels and the
+    // links sit on fractions (Pricing measures 41.25px wide, Trail Log 49.84).
+    // Rounding left the rule up to a quarter-pixel off, by a different amount
+    // on every link, which is exactly the kind of inconsistency the eye reads
+    // as a crooked underline. The list is the positioned ancestor and carries
+    // no padding or border, so subtracting its left gives what offsetLeft
+    // meant — and the pill's only transform is a translate, so rect maths
+    // stays in CSS pixels.
+    const box = el.getBoundingClientRect();
+    const origin = list.getBoundingClientRect();
+    list.style.setProperty("--gx", `${box.left - origin.left}px`);
+    list.style.setProperty("--gw", String(box.width));
     list.style.setProperty("--go", "1");
   }, []);
 
@@ -157,8 +166,15 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
           <span className="nav-pill__glide" aria-hidden="true" />
         </ul>
 
+        {/* "Demo", not "Open the demo", at every width. The phone pill needed
+            the width — it has to seat the logo, the wordmark, this button and
+            the burger inside ~335px — but the short label is not a mobile
+            compromise: the button sits next to a horse and the word "Image
+            Horse" on a page whose whole job is explaining the demo, so the
+            verb was carrying nothing. The long form still lives where it has
+            room to work: the hero and Pricing CTAs, and the ⌘K palette. */}
         <a className="cta cta--fill nav-pill__cta" href={EDITOR_URL} {...external}>
-          Open the demo
+          Demo
         </a>
 
         {/* Condensing hides these, so they have to leave the tab order too. */}

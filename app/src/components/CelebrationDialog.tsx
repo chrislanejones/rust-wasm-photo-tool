@@ -4,13 +4,13 @@ import {
   PartyPopper,
   Sparkles,
   Eraser,
-  Paintbrush,
   Aperture,
-  ChartArea,
-  BoxSelect,
   Grid3x3,
-  ImageDown,
   Layers,
+  LayoutGrid,
+  Palette,
+  MousePointerClick,
+  RotateCcw,
 } from "lucide-react";
 import {
   Dialog,
@@ -22,30 +22,40 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-/** Live shipping stats (July 2026, through v0.9.85 · Jul 2–22).
+/** Live shipping stats (July 2026, through v7.54 · Jul 2–27).
  *
  *  Counted from `marketing/src/data/releases.ts`, the hand-written trail log,
- *  NOT typed in by hand — 42 July releases, 109 entries, against 400 all-time.
- *  Tag split for July: fix 34, rust 21, feature 20, ui 17, infra 16, perf 1.
- *  Re-derive rather than guess when this is next refreshed. */
+ *  NOT typed in by hand — 54 July releases, 159 entries, against 450 all-time
+ *  across 102 releases. Tag split for July: fix 49, ui 34, feature 31, rust 24,
+ *  infra 20, perf 1. Re-derive rather than guess when this is next refreshed:
+ *  parse each `version/date/headline/entries` block out of releases.ts, keep
+ *  the ones dated 2026-07, and count `tag:` occurrences. Note the order —
+ *  the release being cut has to be IN releases.ts before these are counted,
+ *  or the popper ships a release behind its own changelog. */
 const STATS = {
-  monthShipped: 109, // entries logged in July across 42 releases
-  releases: 42,
-  allTime: 400, // all-time trail-log entries
-  monthPct: 27, // July = 27% of everything ever shipped
+  monthShipped: 159, // entries logged in July across 54 releases
+  releases: 54,
+  allTime: 450, // all-time trail-log entries
+  monthPct: 35, // July = 35% of everything ever shipped
 };
 
 /** July's headline work — icon + label, shown as chips. Drawn from real
- *  release headlines, newest first. */
+ *  release headlines, newest first.
+ *
+ *  App-facing features only. The trail log this is counted from covers the
+ *  marketing site too, but a chip in the editor for something that only exists
+ *  on the website reads as a feature the user can't find — the site's ⌘K
+ *  feature search is the obvious trap, because the editor's own palette is
+ *  Alt+, and pointing at ⌘K here would just be wrong. */
 const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: string }[] = [
+  { icon: LayoutGrid, label: "Five-group toolbar" },
+  { icon: Palette, label: "Eyedropper remembers colours" },
   { icon: Eraser, label: "Object removal (local)" },
-  { icon: Paintbrush, label: "AI tool → Eraser tool" },
+  { icon: MousePointerClick, label: "Select is its own tool" },
   { icon: Aperture, label: "Magnetic lasso" },
-  { icon: Layers, label: "Undo that survives reload" },
-  { icon: BoxSelect, label: "Command palette" },
+  { icon: Layers, label: "Selection → its own layer" },
+  { icon: RotateCcw, label: "Undo that survives reload" },
   { icon: Grid3x3, label: "Open + save .ora projects" },
-  { icon: ImageDown, label: "Strip photo location" },
-  { icon: ChartArea, label: "Offline app shell" },
 ];
 
 const CONFETTI_COLORS = [
@@ -174,7 +184,7 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
             </span>
             {/* Milestone */}
             <span className="mt-1 rounded-full border border-theme-sidebar-border bg-bg-elevated px-3 py-1 text-2xs font-semibold text-theme-accent">
-              20 features and 34 fixes, across {STATS.releases} releases
+              31 features and 49 fixes, across {STATS.releases} releases
             </span>
           </motion.div>
 
