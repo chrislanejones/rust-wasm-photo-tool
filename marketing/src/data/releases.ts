@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.56",
+    date: "2026-07-27",
+    headline: "Signed in, and told to sign in",
+    entries: [
+      { tag: "fix", text: "Share links told signed-in people to sign in. The live site signs you in with one Clerk instance and asks a Convex backend that only trusted a different one, so the token was refused every time — while Clerk went on reporting you as signed in. Both instances are trusted now." },
+      { tag: "fix", text: "The button no longer guesses. \"Sign in to create share links\" was shown for three different situations, including to people already signed in; it now tells them apart — still connecting, actually signed out, or signed in but refused by the backend." },
+      { tag: "infra", text: "The same silence covered every account-backed feature, not just sharing: cloud edit persistence, preference sync, recent texts, and the user record the paid tier is read from. Whether paid accounts are being served free limits on the live site is written up as the first thing to check." },
+    ],
+  },
+  {
     version: "v7.55",
     date: "2026-07-27",
     headline: "A pen path stays put while you style it",

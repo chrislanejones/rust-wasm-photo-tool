@@ -28,13 +28,25 @@ export function ShareButton({
   disabled,
   onShared,
 }: Props) {
-  const { createShare, canShare } = useShare();
+  const { createShare, canShare, availability } = useShare();
   const [busy, setBusy] = useState(false);
 
   const handleClick = async () => {
     if (busy) return;
     if (!canShare) {
-      toast.info("Sign in to create share links.");
+      // Say which of the three it actually is. "Sign in to create share links"
+      // was shown for all of them, including to users who were signed in —
+      // sending them to look for a sign-in button they had already used.
+      if (availability === "connecting") {
+        toast.info("Still connecting to your account — try that again in a second.");
+      } else if (availability === "backend-rejected") {
+        toast.error("You're signed in, but the share service didn't accept the session.", {
+          description:
+            "This is a configuration mismatch, not something you did. Signing out and back in won't help.",
+        });
+      } else {
+        toast.info("Sign in to create share links.");
+      }
       return;
     }
     setBusy(true);
@@ -73,7 +85,15 @@ export function ShareButton({
       className="flex-1"
       onClick={handleClick}
       disabled={disabled || busy}
-      title={canShare ? "Create a public share link" : "Sign in to share"}
+      title={
+        canShare
+          ? "Create a public share link"
+          : availability === "connecting"
+            ? "Connecting to your account…"
+            : availability === "backend-rejected"
+              ? "Signed in, but the share service didn't accept the session"
+              : "Sign in to share"
+      }
     >
       {busy ? <Spinner size={24} /> : <Share2 />}
       <span>{busy ? "Creating…" : "Share link"}</span>

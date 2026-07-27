@@ -22,20 +22,20 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-/** Live shipping stats (July 2026, through v7.55 · Jul 2–27).
+/** Live shipping stats (July 2026, through v7.56 · Jul 2–27).
  *
  *  Counted from `marketing/src/data/releases.ts`, the hand-written trail log,
- *  NOT typed in by hand — 55 July releases, 164 entries, against 455 all-time
- *  across 103 releases. Tag split for July: fix 50, ui 37, feature 31, rust 24,
- *  infra 21, perf 1. Re-derive rather than guess when this is next refreshed:
+ *  NOT typed in by hand — 56 July releases, 167 entries, against 458 all-time
+ *  across 104 releases. Tag split for July: fix 52, ui 37, feature 31, rust 24,
+ *  infra 22, perf 1. Re-derive rather than guess when this is next refreshed:
  *  parse each `version/date/headline/entries` block out of releases.ts, keep
  *  the ones dated 2026-07, and count `tag:` occurrences. Note the order —
  *  the release being cut has to be IN releases.ts before these are counted,
  *  or the popper ships a release behind its own changelog. */
 const STATS = {
-  monthShipped: 164, // entries logged in July across 55 releases
-  releases: 55,
-  allTime: 455, // all-time trail-log entries
+  monthShipped: 167, // entries logged in July across 56 releases
+  releases: 56,
+  allTime: 458, // all-time trail-log entries
   monthPct: 36, // July = 36% of everything ever shipped
 };
 
@@ -184,7 +184,7 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
             </span>
             {/* Milestone */}
             <span className="mt-1 rounded-full border border-theme-sidebar-border bg-bg-elevated px-3 py-1 text-2xs font-semibold text-theme-accent">
-              31 features and 50 fixes, across {STATS.releases} releases
+              31 features and 52 fixes, across {STATS.releases} releases
             </span>
           </motion.div>
 

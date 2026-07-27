@@ -70,23 +70,34 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.56 — 2026-07-27
+
+**Signed in, and told to sign in.** Share links refused signed-in accounts with
+"Sign in to create share links." The live site signs you in with one Clerk
+instance and asks a Convex backend that only trusted a different one, so the
+token was rejected every time — while Clerk went on reporting you as signed in,
+which is why nothing looked broken. Both instances are trusted now.
+
+The button also stopped guessing: one message was covering three different
+situations, including people who were already signed in. It now tells them
+apart — still connecting, actually signed out, or signed in and refused by the
+backend.
+
+**The same silence covered every account-backed feature**, not just sharing:
+cloud edit persistence, preference sync, recent texts, and the user record the
+paid tier is read from. Whether paid accounts are currently being served free
+limits on the live site is the first thing to check —
+[docs/share-links-auth-mismatch.md](docs/share-links-auth-mismatch.md) has the
+measurements and the two open decisions.
+
 ### v7.55 — 2026-07-27
 
 **A pen path stays put while you style it.** Reaching for the Pen panel used to
-deselect the path you had just drawn: the "click away to finish" rule read raw
-coordinates, so every click on the panel counted as away — including the click
-on the colour swatch you opened it to reach. The path was gone before the
-picker appeared, which left the Reselect list as the only route to a path's
-colour. Finishing a path now leaves it selected, and Stroke and Background
-restyle the thing you just drew.
-
-**The first point tells you whether the ends are joined.** A ring: dashed while
-the path is open, solid blue when clicking there would connect them, solid once
-they are. An open path that happened to finish near its start used to look
-exactly like a closed one.
-
-**Esc is the way out** — it bakes the path and deselects. Undo steps back
-through the restyle first, then the path itself.
+deselect the path you had just drawn, which left the Reselect list as the only
+route to a path's colour. Finishing a path now leaves it selected, and Stroke
+and Background restyle the thing you just drew. The ring on the first point
+says whether the ends are joined: dashed while open, solid blue when a click
+there would connect them, solid once they are.
 
 ## License
 

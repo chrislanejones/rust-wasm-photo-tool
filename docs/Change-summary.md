@@ -2443,3 +2443,36 @@ since `S` was removed. Parked, not fixed: the label should derive from
 release per the project's definition of done — and it was already outstanding.
 
 **Deferred**: ADR-023, and the approved `Ctrl+K`-then-letter chord for sub-tools.
+
+## v7.56 Change Summary — 2026-07-27
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | **Share links told signed-in users to sign in.** The live site signs in with Clerk `amazed-akita-72`; `convex/auth.config.ts` trusted only `grateful-dingo-89`. Clerk minted a valid `convex` token, Convex rejected the issuer, and `useConvexAuth().isAuthenticated` never flipped — while Clerk's own `isSignedIn` stayed true, so nothing looked broken | **FIXED** (stopgap) — both instances are now trusted; a provider entry only declares an acceptable issuer, so adding one cannot invalidate working sessions |
+| 2   | Measured, not inferred: `window.Clerk.frontendApi` is `grateful-dingo-89` on localhost and `amazed-akita-72` on the live site; the deployed bundle points at `brave-ant-608.convex.cloud` — the **development** Convex deployment; `convex status` shows production `pastel-alligator-180` is not used by the deployed app at all. The prod console warns "Clerk has been loaded with development keys" of its own accord | Recorded |
+| 3   | Locally, signed in, the whole chain is healthy: `getToken({ template: "convex" })` issues a token with `iss: grateful-dingo-89` / `aud: convex` matching the config, and clicking Share produced a real link. **Share links were never broken in development** — only against the live environment | Recorded |
+| 4   | **The button was guessing.** "Sign in to create share links" was shown for three distinct states, one of which was a signed-in user. `useShare` now reports `connecting` / `signed-out` / `backend-rejected` and `ShareButton` says which | **FIXED** |
+| 5   | The Clerk check reads the global rather than `useAuth()` on purpose: `ShareButton` renders in demo mode, where `ConvexClerkProvider` mounts no `ClerkProvider` and Clerk's hooks throw. Demo mode is a project invariant | Recorded |
+| 6   | `useRecentTexts:23` had already documented this exact failure mode — "Clerk's `isSignedIn` stays true even when the Convex auth provider rejects the token (e.g. dev keys vs prod deployment)". The comment was right and nothing acted on it | Recorded |
+
+**Not just share links.** Every `useConvexAuth()` consumer fails the same silent
+way for a signed-in user on the live site: `useEditPersistence` (cloud
+persistence), `lib/preferences` (sync), `useRecentTexts`, and `useStoreUser` —
+which is where the **tier** is read from. That is the same shape as the v7.50
+paid-tier bug. **OPEN-1**: whether paid accounts are being served free-tier caps
+in production is unverified and needs a paid account on the live site.
+
+**OPEN-2 — not decided here.** The live site runs on a development Convex
+deployment and development Clerk keys while a production Convex deployment sits
+unused. Trusting both issuers stops the bleeding; it does not make that right.
+Options A (point the live site at production), B (consolidate on one dev
+instance), C (what shipped) are written up with tradeoffs in
+`docs/share-links-auth-mismatch.md`. A is the real fix.
+
+**Not live until deployed.** The auth config only takes effect once `npx convex
+deploy` pushes it to `brave-ant-608`. Deliberately not run here — it changes
+auth behaviour for the backend production depends on, which is a morning
+decision, not a 2am one.
+
+**Gates**: app `tsc --noEmit` clean, eslint **0 errors / 59 warnings**,
+**233/233 vitest** across 17 files; marketing `tsc -b` clean + build.
