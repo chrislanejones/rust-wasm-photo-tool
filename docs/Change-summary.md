@@ -2392,6 +2392,9 @@ and I can't is how you ship a second bug. Carried to the next session.
 | 13  | Its feature chips missed the entire five-group toolbar arc. Refreshed newest-first, and kept app-facing only — the site's ⌘K feature search is the obvious trap, since the editor's own palette is `Alt+,` and a chip pointing at ⌘K would name something the user cannot find | Complete |
 | 14  | **Ctrl+`\` added to the shortcut modal.** It was bound in `useKeyboardShortcuts` and listed nowhere — a key combination nothing in the app admitted existed | Complete |
 
+| 15  | **The contribution squares are generated after the release commit, not before it.** `gen-trail-data.mjs` reads `git log`, so running it during doc-prep always leaves the shipping day blank — normally invisible, but 2026-07-27 was a Monday opening a fresh week column (`Trail.tsx` starts each column on the Sunday on or before), so the whole column read as a dead week. Regenerated post-commit: 277 commits, 52 active days, through 2026-07-27 | **FIXED** |
+| 16  | Consequence worth knowing: the celebration counts are derived from `releases.ts`, so any entry added at release time shifts them. July closed at **160 entries / 451 all-time** once this row's own trail entry landed | Recorded |
+
 **Verified**: marketing `tsc -b` clean and build succeeds; app `tsc --noEmit`
 clean, eslint **0 errors / 59 warnings**, production build succeeds. Nav glide
 measured at 0.000px on both edges at rest, on hover of all five links, and

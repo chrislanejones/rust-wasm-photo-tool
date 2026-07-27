@@ -95,9 +95,14 @@ whole pixels while the links sit on fractions — Pricing is 41.25px wide — so
 landed up to a quarter-pixel off, by a different amount on every link.
 
 **Also in the editor:** the Ctrl+`\` shipping celebration was still counting
-July at the 22nd — 42 releases and 109 entries. July ran to 54 releases and 159
+July at the 22nd — 42 releases and 109 entries. July ran to 54 releases and 160
 entries, about a third of everything ever shipped. Ctrl+`\` is also listed in
 the keyboard shortcuts now; it was bound but undocumented.
+
+**And the contribution squares** are regenerated *after* the release commit
+instead of before it, so the day you shipped on isn't blank. Monday the 27th
+opened a fresh week column with nothing in it, because the generator reads
+`git log` and had run one commit too early.
 
 ## License
 

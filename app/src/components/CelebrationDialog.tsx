@@ -25,17 +25,17 @@ import { Button } from "@/components/ui/button";
 /** Live shipping stats (July 2026, through v7.54 · Jul 2–27).
  *
  *  Counted from `marketing/src/data/releases.ts`, the hand-written trail log,
- *  NOT typed in by hand — 54 July releases, 159 entries, against 450 all-time
+ *  NOT typed in by hand — 54 July releases, 160 entries, against 451 all-time
  *  across 102 releases. Tag split for July: fix 49, ui 34, feature 31, rust 24,
- *  infra 20, perf 1. Re-derive rather than guess when this is next refreshed:
+ *  infra 21, perf 1. Re-derive rather than guess when this is next refreshed:
  *  parse each `version/date/headline/entries` block out of releases.ts, keep
  *  the ones dated 2026-07, and count `tag:` occurrences. Note the order —
  *  the release being cut has to be IN releases.ts before these are counted,
  *  or the popper ships a release behind its own changelog. */
 const STATS = {
-  monthShipped: 159, // entries logged in July across 54 releases
+  monthShipped: 160, // entries logged in July across 54 releases
   releases: 54,
-  allTime: 450, // all-time trail-log entries
+  allTime: 451, // all-time trail-log entries
   monthPct: 35, // July = 35% of everything ever shipped
 };
 

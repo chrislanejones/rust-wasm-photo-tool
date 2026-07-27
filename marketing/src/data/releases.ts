@@ -36,6 +36,7 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "The underline under the current menu item was measured in whole pixels while the links sit on fractions — Pricing is 41.25px wide — so the rule landed up to a quarter-pixel off, by a different amount on each link. It now measures the real geometry and sits exactly under the word." },
       { tag: "fix", text: "The Ctrl+\\ shipping celebration was still counting July at the 22nd: 42 releases and 109 entries. July actually ran to 53 releases and 151 entries, a third of everything ever shipped, and the popper's feature chips missed the whole five-group toolbar." },
       { tag: "ui", text: "Ctrl+\\ is listed in the keyboard shortcuts now. It was bound but undocumented — a key combination nothing in the app admitted existed." },
+      { tag: "infra", text: "The contribution squares are regenerated after the release commit rather than before it, so the day you shipped on isn't blank. Monday the 27th started a fresh week column and had nothing in it, because the generator reads git log and had run a commit too early." },
     ],
   },
   {
