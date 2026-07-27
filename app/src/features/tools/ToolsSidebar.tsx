@@ -249,6 +249,11 @@ export function ToolsSidebar({
       exit={embedded ? undefined : "exit"}
       role="region"
       aria-label="Tool options"
+      // Clicking in here operates ON the current selection — the pen's colour
+      // and Background controls live in this panel — so it must not count as
+      // "clicked away" and end that selection. See PenOverlay's off-canvas
+      // finish, which reads raw coordinates and cannot tell panel from page.
+      data-pen-keep-selection=""
       className={
         embedded
           ? // Compact master-bar content box: flush below the chrome (top 56 =

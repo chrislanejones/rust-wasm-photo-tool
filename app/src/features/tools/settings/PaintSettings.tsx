@@ -74,9 +74,12 @@ export const PAINT_MODES: readonly ToolMode<PaintMode>[] = [
     icon: PenTool,
     info: (
       <>
-        Click to drop points, drag to pull Bézier handles.{" "}
-        <kbd>Enter</kbd> closes the path, <kbd>Esc</kbd> finishes it
-        open, <kbd>Backspace</kbd> undoes a point.
+        Click to drop points, drag to pull Bézier handles. The ring on your
+        first point shows the join: dashed while the path is open, solid blue
+        when a click there would connect the ends — or once they are.{" "}
+        <kbd>Enter</kbd> closes the path and keeps it selected, so Stroke and
+        Background restyle it. <kbd>Esc</kbd> finishes it open and deselects,{" "}
+        <kbd>Backspace</kbd> undoes a point.
       </>
     ),
   },

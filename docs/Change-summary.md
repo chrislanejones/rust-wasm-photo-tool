@@ -2406,3 +2406,40 @@ and also missing from the shortcut modal. Left out deliberately — worth auditi
 every `Ctrl`-chord at once rather than hand-adding rows one at a time.
 
 **Deferred**: ADR-023, and the approved `Ctrl+K`-then-letter chord for sub-tools.
+
+## v7.55 Change Summary — 2026-07-27
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | **A pen path deselected the moment you clicked the panel.** `PenOverlay`'s "click off the canvas → finish" listener works on raw coordinates, so every click on the tool panel counted as off-canvas — including the colour swatch you opened the panel to reach. The path was finished and deselected before the picker rendered, which is what made the Reselect list feel mandatory for something as ordinary as recolouring a path | **FIXED** — panels marked `data-pen-keep-selection` operate ON the selection and no longer end it; the workspace around the canvas still does |
+| 2   | **A finished path now stays selected.** `add_bezier_annotation` already returned the new id — nothing was reading it, so a committed path went straight back to nothing selected. The overlay keeps it, re-takes the engine's editing lock, and the panel's Stroke and Background then restyle the path you just drew | New |
+| 3   | Live preview needed no new plumbing: the overlay already drew with the panel's current `color`/`fillColor`, so a selected path recolours as you click swatches and bakes on finish | Recorded |
+| 4   | **Escape used to CANCEL whenever a path was selected** — correct when the only way to be selected was deliberately re-opening a committed path, but with (2) it threw away every restyle: pick a colour, press Escape, and the path snapped back to the colour it was drawn in. Escape now commits and deselects; `Ctrl+Z` is how you take back a reshape | **FIXED** (introduced by (2), caught in browser before it shipped) |
+| 5   | The close gesture that actually fires lives in `startDrag`, not `onCanvasDown`: the 8×8 first-anchor handle sits on top of the capture rect and stops propagation. Adding keep-selection to the `onCanvasDown` twin alone did nothing — clicking the first anchor still deselected | **FIXED** |
+| 6   | **Leaving the pen could have made a path vanish.** Because a finished path now holds `editing_shape_id`, unmounting the overlay would hide the baked path with nothing left drawing it. A teardown handler commits what's in flight (or releases the lock). Deliberately not `finish` — its `setState` calls have nothing to update during teardown | Complete |
+| 7   | **You could not tell whether the ends were joined.** An open path finishing near its start looked identical to a closed loop, and nothing hinted that clicking the first anchor would connect them. The first point now carries a ring: dashed (open), solid blue + filled (a click here joins them, or they already are). Static by choice — an animated dash would be one more moving thing over the photo and would need a reduced-motion escape | New |
+| 8   | The ring's radius **is** the click radius (`CLOSE_RADIUS`), shared by the hit test and the render. A ring promising a close the click doesn't perform is worse than no ring | Recorded |
+| 9   | The proximity listener sits on the SVG root, not the capture rect. On the rect the pointer went quiet at exactly the moment that matters — hovering the first anchor — because the anchor handles take `pointerEvents: all` and are siblings, not children, of the rect | **FIXED** |
+
+**Verified in-browser** (not inferred): draw → path stays selected → stroke
+`#ef4444` → `#22c55e` live → Background Solid fills → Esc bakes both onto the
+committed annotation → Ctrl+Z reverts the restyle, again removes the path.
+Switching tools mid-draw commits rather than losing it. All three ring states
+confirmed distinct, with the closed case checked by the path's `Z` terminator
+rather than by eye. Gates: `tsc --noEmit` clean, **233/233 vitest** across 17
+files, eslint **0 errors / 59 warnings**.
+
+**Checked, not changed — the status bar rotates correctly but mislabels
+sub-tools.** Slots 1–2 are tool-specific, slot 3 cycles the generic pool every
+3 minutes, `Alt+/` is pinned last on all ten routes sampled. The digit is right
+(it selects the GROUP) but the label names one sub-tool and keeps saying it for
+the rest: Resize and Adjustments both read "1 compress", Pen reads "3 brush",
+Crop reads "2 adjust". Select shows no tool hint at all — it is still keyless
+since `S` was removed. Parked, not fixed: the label should derive from
+`activeSubTool` rather than the group.
+
+**QC owed.** This release touched canvas and tool code (`PenOverlay`,
+`ToolsSidebar`, `AppShell`), so `imagehorse-qc` is required before the next
+release per the project's definition of done — and it was already outstanding.
+
+**Deferred**: ADR-023, and the approved `Ctrl+K`-then-letter chord for sub-tools.

@@ -762,7 +762,7 @@ export function AppShell() {
       // both fill. (Previously this was gated on an explicit `close`, so a curve
       // or circle finished without closing never filled.)
       const fillKind = toolSettings.fillMode !== "none" ? 1 : 0;
-      tool.add_bezier_annotation(
+      const id = tool.add_bezier_annotation(
         new Float64Array(flatPoints),
         toolSettings.strokeColor,
         toolSettings.strokeWidth,
@@ -771,6 +771,10 @@ export function AppShell() {
       );
       stamp.flushToCanvas();
       stamp.syncState();
+      // Hand the id back so the overlay can keep the path selected. Without it
+      // a finished path was immediately deselected, and the Reselect list was
+      // the only way back to its colour and Background.
+      return id;
     },
     [
       stamp,

@@ -70,39 +70,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.54 — 2026-07-27
+### v7.55 — 2026-07-27
 
-**The headline says what the thing is.** It used to lead with "That's Rust,
-compiled to WASM" — an engine note written for people who already know what
-those words mean. It now reads *"Crop it, compress it, annotate it, gallop.
-Free in your browser. No account."* Price, place and friction, which is what
-someone actually decides on.
+**A pen path stays put while you style it.** Reaching for the Pen panel used to
+deselect the path you had just drawn: the "click away to finish" rule read raw
+coordinates, so every click on the panel counted as away — including the click
+on the colour swatch you opened it to reach. The path was gone before the
+picker appeared, which left the Reselect list as the only route to a path's
+colour. Finishing a path now leaves it selected, and Stroke and Background
+restyle the thing you just drew.
 
-**Every page gets air at the top.** Home cleared the floating nav by 56px and
-the sub-pages by 66px; both are 80px now. Pricing turned out to have a third
-header style of its own and was the worst of the three at 18px. On a phone it
-was 18px everywhere, because the mobile rule assumed the bar shrinks on a small
-screen — it doesn't, it's 62px tall at 390px exactly as it is at 1440.
+**The first point tells you whether the ends are joined.** A ring: dashed while
+the path is open, solid blue when clicking there would connect them, solid once
+they are. An open path that happened to finish near its start used to look
+exactly like a closed one.
 
-**The bar says "Image Horse" on a phone again.** The wordmark had been pulled
-out because at 20px it shoved the menu button off the edge of a 375px screen.
-At 16px, beside a button that now reads "Demo" instead of "Open the demo", it
-fits with room to spare. The full phrase stays on the hero and Pricing buttons,
-where there's room for it to work.
-
-**The underline under the current menu item is straight.** It was measured in
-whole pixels while the links sit on fractions — Pricing is 41.25px wide — so it
-landed up to a quarter-pixel off, by a different amount on every link.
-
-**Also in the editor:** the Ctrl+`\` shipping celebration was still counting
-July at the 22nd — 42 releases and 109 entries. July ran to 54 releases and 160
-entries, about a third of everything ever shipped. Ctrl+`\` is also listed in
-the keyboard shortcuts now; it was bound but undocumented.
-
-**And the contribution squares** are regenerated *after* the release commit
-instead of before it, so the day you shipped on isn't blank. Monday the 27th
-opened a fresh week column with nothing in it, because the generator reads
-`git log` and had run one commit too early.
+**Esc is the way out** — it bakes the path and deselects. Undo steps back
+through the restyle first, then the path itself.
 
 ## License
 

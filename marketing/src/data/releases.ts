@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.55",
+    date: "2026-07-27",
+    headline: "A pen path stays put while you style it",
+    entries: [
+      { tag: "fix", text: "Reaching for the Pen panel deselected the path you had just drawn. The \"click away to finish\" rule read raw coordinates, so every click on the panel counted as away — including the click on the colour swatch you opened it to reach. The path was gone before the picker appeared." },
+      { tag: "ui", text: "Finishing a pen path now leaves it selected, so Stroke and Background restyle the thing you just drew. Changing a path's colour used to mean finding it in the Reselect list first, which is a lot to ask of anyone who hasn't found that list." },
+      { tag: "ui", text: "The ring on your first point says whether the ends are joined: dashed while the path is open, solid blue when clicking there would connect them, and solid once they are. An open path that happened to finish near its start used to look exactly like a closed one." },
+      { tag: "ui", text: "Esc is the way out — it bakes the path and deselects. Undo still steps back through the restyle and then the path itself, one at a time." },
+    ],
+  },
+  {
     version: "v7.54",
     date: "2026-07-27",
     headline: "The headline says what it is, and every page gets air at the top",
