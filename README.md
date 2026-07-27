@@ -70,34 +70,24 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.56 — 2026-07-27
+### v7.57 — 2026-07-27
 
-**Signed in, and told to sign in.** Share links refused signed-in accounts with
-"Sign in to create share links." The live site signs you in with one Clerk
-instance and asks a Convex backend that only trusted a different one, so the
-token was rejected every time — while Clerk went on reporting you as signed in,
-which is why nothing looked broken. Both instances are trusted now.
+**Changing photos could stop working entirely** — until you deleted the photo
+you were on. Saving an edited photo to the cloud waits on the server, and a
+Convex request that never answers (neither succeeding nor failing) left that
+wait running forever with the gallery stuck behind it. Every cloud step now
+gives up after eight seconds. Nothing was lost when it happened and nothing is
+lost now: your edit goes to the browser's own storage *before* the upload is
+attempted, so abandoning the upload costs freshness, not work.
 
-The button also stopped guessing: one message was covering three different
-situations, including people who were already signed in. It now tells them
-apart — still connecting, actually signed out, or signed in and refused by the
-backend.
+**Two tabs now ask which one you mean.** Image Horse open in more than one tab
+parks the others behind a "Use here" button, the way Google Messages does.
+Every tab shares one local database, so two at once could quietly overwrite
+each other's work.
 
-**The same silence covered every account-backed feature**, not just sharing:
-cloud edit persistence, preference sync, recent texts, and the user record the
-paid tier is read from. Whether paid accounts are currently being served free
-limits on the live site is the first thing to check —
-[docs/share-links-auth-mismatch.md](docs/share-links-auth-mismatch.md) has the
-measurements and the two open decisions.
-
-### v7.55 — 2026-07-27
-
-**A pen path stays put while you style it.** Reaching for the Pen panel used to
-deselect the path you had just drawn, which left the Reselect list as the only
-route to a path's colour. Finishing a path now leaves it selected, and Stroke
-and Background restyle the thing you just drew. The ring on the first point
-says whether the ends are joined: dashed while open, solid blue when a click
-there would connect them, solid once they are.
+**And clicking a photo says so immediately.** Saving an edited photo takes a
+few seconds; for that whole time nothing moved — no highlight, no progress —
+which reads as a broken gallery rather than a busy one.
 
 ## License
 

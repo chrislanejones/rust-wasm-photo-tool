@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.57",
+    date: "2026-07-27",
+    headline: "One tab at a time, and a save that can't wedge the gallery",
+    entries: [
+      { tag: "fix", text: "Changing photos could stop working entirely, until you deleted the photo you were on. Saving an edited photo to the cloud waits on the server, and a Convex request that never answers — neither succeeding nor failing — left that wait running forever with the gallery behind it. Every cloud step now gives up after eight seconds." },
+      { tag: "fix", text: "Nothing was lost when that happened, and nothing is lost now: your edit is written to the browser's own storage before the upload is even attempted. Giving up on the upload costs freshness, not work." },
+      { tag: "feature", text: "Image Horse open in two tabs now asks which one you mean, the way Google Messages does. The others park behind a \"Use here\" button instead of quietly writing over each other — every tab shares one local database, so two at once could overwrite work with no warning." },
+      { tag: "ui", text: "Clicking a photo says so immediately. Saving an edited photo can take a few seconds, and for that whole time nothing moved — no highlight, no progress — which read as a broken gallery rather than a busy one." },
+    ],
+  },
+  {
     version: "v7.56",
     date: "2026-07-27",
     headline: "Signed in, and told to sign in",

@@ -233,6 +233,33 @@ function decodeArchive(data: Uint8Array): SavedEdit {
 
 // ── Hook ───────────────────────────────────────────────────────────────────
 
+/** Ceiling on any single cloud round-trip during a save. Generous enough for a
+ *  large archive on a slow line, short enough that a wedged deployment costs a
+ *  pause rather than a dead gallery. */
+const CLOUD_STEP_TIMEOUT_MS = 8000;
+
+/** Bound a promise that might never settle.
+ *
+ *  A rejection reaches a `catch`; a HANG does not, and that is the failure this
+ *  guards. `generateUploadUrl()` is a Convex mutation that neither resolves nor
+ *  rejects when the deployment is unreachable, and every caller of
+ *  `savePhotoEdit` awaits it — so one hung mutation stopped the user changing
+ *  photos at all until they deleted the offending one. Racing does not cancel
+ *  the underlying request; it frees the caller, which is the part that matters.
+ *  The local IndexedDB copy is already on disk by the time any of this runs, so
+ *  giving up on the cloud leg loses nothing but freshness. */
+function withTimeout<T>(p: Promise<T>, what: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${what} did not settle within ${CLOUD_STEP_TIMEOUT_MS}ms`)),
+        CLOUD_STEP_TIMEOUT_MS,
+      ),
+    ),
+  ]);
+}
+
 export function useEditPersistence() {
   // isAuthenticated stays false until the JWT handshake with Convex succeeds,
   // so mismatched keys keep the app on the local IDB path rather than crashing.
@@ -334,14 +361,20 @@ export function useEditPersistence() {
           const layers = collectLayers(tool);
           const activeLayerId = tool.active_layer_id();
           const archive = encodeArchive(canvasW, canvasH, canvasPng, undoStack, redoStack, annotationsJson, shapesJson, layers, activeLayerId);
-          const uploadUrl = await generateUploadUrl();
-          const resp = await fetch(uploadUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/octet-stream" },
-            body: archive.buffer as ArrayBuffer,
-          });
+          const uploadUrl = await withTimeout(generateUploadUrl(), "generateUploadUrl");
+          const resp = await withTimeout(
+            fetch(uploadUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/octet-stream" },
+              body: archive.buffer as ArrayBuffer,
+            }),
+            "archive upload",
+          );
           const { storageId } = await resp.json() as { storageId: string };
-          await saveEdit({ photoKey: photoId, storageId: storageId as Id<"_storage">, canvasW, canvasH });
+          await withTimeout(
+            saveEdit({ photoKey: photoId, storageId: storageId as Id<"_storage">, canvasW, canvasH }),
+            "saveEdit",
+          );
           // The local copy is already on disk (written before this block).
           return;
         } catch (err) {

@@ -2476,3 +2476,36 @@ decision, not a 2am one.
 
 **Gates**: app `tsc --noEmit` clean, eslint **0 errors / 59 warnings**,
 **233/233 vitest** across 17 files; marketing `tsc -b` clean + build.
+
+## v7.57 Change Summary — 2026-07-27
+
+| #   | Change | Status |
+| --- | -------- | -------- |
+| 1   | **The gallery could wedge permanently.** Reported as "I wasn't able to change photos till I deleted the shared photo". `savePhotoEdit`'s cloud branch had three unbounded awaits — `generateUploadUrl()`, the archive `fetch`, and `saveEdit()`. `useImageSession` awaits the whole call before switching photos, so one hung Convex mutation stopped photo switching for good | **FIXED** — each cloud round-trip bounded at 8s (`withTimeout`), which fixes all three `savePhotoEdit` callers, not just the gallery |
+| 2   | The file's own comment already named the hazard: *"the cloud path can HANG — `generateUploadUrl()` is a Convex mutation that neither resolves nor rejects if the deployment is unreachable — and a hang never reaches a catch."* The **data-loss** half had been fixed (local IndexedDB write first); the **hang** half was still live, sitting inside a `try` a hang can never reach | Recorded |
+| 3   | **v7.56 is what exposed it.** The cloud branch is gated on `isAuthenticated`, which was false in production for as long as the Clerk issuer mismatch existed — so it had never run there. Fixing share links made signed-in production users execute it for the first time, straight into a latent hang | Recorded |
+| 4   | Racing does not cancel the request, it frees the caller — and the local IndexedDB copy is already on disk before any of it runs, so a timeout costs freshness and nothing else. Failures still land in the Diagnostics Window rather than vanishing | Recorded |
+| 5   | Verified against a deliberately wedged deployment (Convex HTTP routed to never respond): the gallery recovers at ~10s instead of never. Two 8s ceilings plus the local write, bounded either way | Verified |
+| 6   | **Single editing tab, Messages-style.** Every tab shares one set of IndexedDB databases and one engine document per photo, so two open at once silently overwrite each other with no warning. `useTabClaim` (BroadcastChannel) claims the session; other tabs park behind `MultiTabScreen` until "Use here". Last claim wins, and a newly-opened tab takes the session — handing control to the window the user isn't looking at would be the wrong default | New |
+| 7   | Reuses `IdleScreen`'s exact shape — chrome-less `Dialog`, card body, `--z-idle` — because both screens mean the same thing to the user (this tab is parked, press the button to resume) and shouldn't look like two features. Not dismissable: Esc and click-outside do nothing, so a parked tab cannot be edited into conflict | Complete |
+| 8   | BroadcastChannel deliberately, not a window CustomEvent (forbidden here) and not a store — neither crosses a tab boundary. Guarded with a `typeof` check so a browser without it gets no detection rather than a failed boot, and the tab id is minted once per tab so React StrictMode's double-mount can't make a tab park itself | Recorded |
+| 9   | **Clicking a photo now acknowledges the click.** `useImageSession` set its loading flag *after* two awaits, despite its own comment saying "flag loading synchronously, before any await" — so the indicator landed after the slow part it existed to cover. Moved above the save, and seeded `loadProgress` because the bar's width IS `loadProgress`: raising the flag alone renders a zero-width bar, present in the DOM and invisible on screen | **FIXED** |
+
+**Verified in-browser, not inferred**: one tab shows no dialog; opening a second
+parks the first; "Use here" in the first parks the second. Gallery recovery
+measured against a wedged Convex. Feedback measured from none-at-all to ~1.1s.
+
+**Parked, not fixed** (`docs/PARKING_LOT.md`): Dexie registers no `blocked` /
+`versionchange` handler, so the next schema bump can wedge a user with a stale
+tab open — `db.open()` never settles and every IndexedDB call hangs, including
+the local save this release deliberately does NOT time out (it is the only copy
+of the user's work). Two tabs on the same version were verified not to wedge, so
+it is latent until a version bump — which makes it work to land BEFORE the next
+Dexie migration. It belongs to the `dexie-migration` skill, not to this fix.
+
+**Still open**: "I don't see changes" after sharing was never reproduced and is
+not addressed here — it is unclear whether the shared link's image lacks the
+edits or the canvas stopped showing them.
+
+**Gates**: app `tsc --noEmit` clean, eslint **0 errors / 59 warnings**,
+**233/233 vitest** across 17 files; marketing `tsc -b` clean + build.

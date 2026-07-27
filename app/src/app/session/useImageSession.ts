@@ -344,6 +344,22 @@ export function useImageSession({
       const isCurrent = () => seq === selectSeqRef.current;
       activeIdRef.current = entry.id; // advance synchronously so cycling sees it
 
+      // Acknowledge the click NOW, before the save below. Saving a modified
+      // outgoing photo uploads its whole edit archive when signed in, which
+      // measured 2-4s on a 12-photo gallery — and for that entire window the
+      // thumbnail highlight didn't move, no spinner ran, and nothing else
+      // happened. Clicking a photo and watching the app ignore you for four
+      // seconds reads as "the gallery is broken", which is exactly how it was
+      // reported. The flag is idempotent and a superseded selection clears it
+      // on the way out, so setting it this early costs nothing.
+      //
+      // Both lines are needed. The bar's WIDTH is loadProgress, so raising the
+      // flag alone renders a zero-width bar — in the DOM, invisible on screen,
+      // which is indistinguishable from the bug. Seed a few percent so there is
+      // something to see while the save runs; the real steps (20 → 100) follow.
+      setIsImageLoading(true);
+      setLoadProgress(8);
+
       // Persist the OUTGOING photo only if it was actually modified. This used
       // to save on EVERY switch — and when signed in, savePhotoEdit uploads the
       // full edit archive to Convex, so just browsing the gallery re-uploaded
@@ -369,11 +385,12 @@ export function useImageSession({
       setHasBeenModified(false);
       setActivePhotoId(entry.id);
       setCompareActive(false);
-      // Flag loading synchronously, before any await: switching photos briefly
+      // Loading is already flagged above, ahead of the save's awaits — it has to
+      // be, or the flag lands after the slow part it exists to cover. It still
+      // matters here for the reason this comment always gave: switching briefly
       // leaves the *outgoing* photo's undo count > 0 while activePhotoId already
-      // points at the incoming one. The modified-dot effect gates on this so it
-      // doesn't falsely dot the newly-selected photo during the transition.
-      setIsImageLoading(true);
+      // points at the incoming one, and the modified-dot effect gates on this so
+      // it doesn't falsely dot the newly-selected photo mid-transition.
 
       // ── Op-log resume (ADR-006) ─────────────────────────────────────────
       // Preferred path when USE_OPLOG_PERSISTENCE / ih_oplog_persist is on:

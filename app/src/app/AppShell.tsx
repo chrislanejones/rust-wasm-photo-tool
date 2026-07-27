@@ -47,6 +47,8 @@ import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
 import { useTheme, useReduceMotion } from "@/lib/useTheme";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
+import { MultiTabScreen } from "@/components/MultiTabScreen";
+import { useTabClaim } from "@/hooks/useTabClaim";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
 import { groupById } from "@/features/tools/toolGroups";
@@ -419,6 +421,11 @@ export function AppShell() {
   // Idle screen — dims to "Continue with Image Horse" after the configured
   // timeout (0 = never) and lets the browser throttle the tab.
   const { idle, wake } = useIdleTimeout(prefs.idleTimeoutMin);
+
+  // Single editing tab. Every tab shares one set of IndexedDB databases, so two
+  // open at once silently overwrite each other; whichever tab claimed last wins
+  // and the others park behind MultiTabScreen until "Use here".
+  const { isStale: isStaleTab, claimHere: claimTabHere } = useTabClaim();
 
   // Gallery photo cap for the current tier. Resolved from Rust (`photo_limit`)
   // so the WASM layer is the single source of truth. Starts at the most
@@ -2403,6 +2410,10 @@ export function AppShell() {
       />
 
       <IdleScreen open={idle} onContinue={wake} />
+      {/* Another tab took the session. Sits beside IdleScreen because it is
+          the same idea — this tab is parked until you say otherwise — and
+          shares its z-layer so it covers every panel. */}
+      <MultiTabScreen open={isStaleTab} onUseHere={claimTabHere} />
 
       {/* Diagnostics Window (Alt+Delete) is always available. */}
       <DiagnosticLogOverlay
