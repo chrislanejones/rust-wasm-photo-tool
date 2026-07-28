@@ -70,24 +70,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.57 — 2026-07-27
+### v7.58 — 2026-07-28
 
-**Changing photos could stop working entirely** — until you deleted the photo
-you were on. Saving an edited photo to the cloud waits on the server, and a
-Convex request that never answers (neither succeeding nor failing) left that
-wait running forever with the gallery stuck behind it. Every cloud step now
-gives up after eight seconds. Nothing was lost when it happened and nothing is
-lost now: your edit goes to the browser's own storage *before* the upload is
-attempted, so abandoning the upload costs freshness, not work.
+**Two tiles claimed to be the current tool.** Click a tool with the mouse, then
+switch with a keyboard shortcut: the tool you left kept a ring, and the new one
+grew one too. The keyboard-focus ring was the same warm accent, at the same 2px,
+as "this is selected" — one colour doing two jobs. Focus is now neutral ink and
+dashed, so it reads as *the keyboard is here* instead of *this is the live tool*.
+In the gallery it had been worse: a focused thumbnail and a multi-selected one
+were painting byte-identical CSS, so there was no telling them apart at all.
 
-**Two tabs now ask which one you mean.** Image Horse open in more than one tab
-parks the others behind a "Use here" button, the way Google Messages does.
-Every tab shares one local database, so two at once could quietly overwrite
-each other's work.
-
-**And clicking a photo says so immediately.** Saving an edited photo takes a
-few seconds; for that whole time nothing moved — no highlight, no progress —
-which reads as a broken gallery rather than a busy one.
+The ring wasn't deleted, which was the tempting fix and the wrong one — it is
+what makes the app usable without a mouse. Contrast went up rather than down:
+2.67:1 to 14.3:1 on the light theme.
 
 ## License
 

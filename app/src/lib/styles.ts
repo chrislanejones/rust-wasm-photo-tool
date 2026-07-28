@@ -19,8 +19,17 @@ export const HOVER_RING =
 
      · SELECTED → `border-color`  — ink, hugs the tile edge, 0px outward
      · HOVER    → `box-shadow`    — HOVER_RING above, accent, 2–4px outward
-     · FOCUS    → `outline`       — accent, 2–4px outward (styles.css
-                                    `button:focus-visible`, unlayered)
+     · FOCUS    → `outline`       — NEUTRAL INK, DASHED, 2–4px outward
+                                    (styles.css `button:focus-visible`, unlayered)
+
+   FOCUS STOPPED BEING THE ACCENT on 2026-07-28. Three channels were never
+   enough on their own: selected and focus were both `--accent` at 2px, so a
+   tile clicked with the mouse and then abandoned by a keyboard shortcut kept an
+   accent ring while the newly-active tile grew one too — two tiles claiming to
+   be live. Channel-and-shape did not save it, because the stale ring was the
+   OUTSIDE one and sat on the tile that was no longer active. Colour is what
+   separates "the keyboard is here" from "this is the current tool"; the full
+   measurement is in the styles.css `:focus-visible` comment.
 
    Why selection is NOT a ring, despite being the obvious reach: every Tailwind
    `ring-*` utility writes into the SAME single box-shadow, so `hover:ring-*`

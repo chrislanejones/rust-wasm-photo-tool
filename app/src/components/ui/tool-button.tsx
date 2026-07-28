@@ -15,7 +15,16 @@ export interface ToolButtonProps
 const base =
   // transition (not just -colors) so the shared HOVER_RING fades. Applies to
   // every variant (toggle group, stacked tiles, action tiles).
-  `inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-2xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-ring focus-visible:ring-offset-1 focus-visible:ring-offset-theme-sidebar ${HOVER_RING} disabled:opacity-40 disabled:pointer-events-none disabled:hover:ring-0 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0`;
+  //
+  // No focus-visible ring of its own (removed 2026-07-28). It used to carry
+  // `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-ring`,
+  // which lost twice over: `--ring` IS the warm accent, so focus looked like the
+  // active state (`border-theme-primary` below) — and a `ring-*` focus ring
+  // writes the SAME box-shadow as the shared HOVER_RING, so on a hovered button
+  // the two silently replaced each other. Dropping it lets the global
+  // `:focus-visible` rule (styles.css) apply: neutral dashed ink on `outline`,
+  // a channel nothing else here uses. Focus is now identical across the app.
+  `inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-2xs font-semibold transition ${HOVER_RING} disabled:opacity-40 disabled:pointer-events-none disabled:hover:ring-0 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0`;
 
 // Stacked tile: icon on top, label below, larger icon, a bit more vertical pad.
 const stackedCls = "flex-col gap-1.5 py-3 [&_svg]:h-6 [&_svg]:w-6";
