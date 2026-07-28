@@ -143,21 +143,28 @@ import {
   Pipette,
 } from "lucide-react";
 
-/** Tool-key shortcut + label per tool (mirrors TOOL_BY_KEY in useKeyboardShortcuts). */
-const TOOL_SHORTCUT: Partial<Record<ToolType, ShortcutHint>> = {
-  compress: { keys: "1", label: "compress" },
-  crop: { keys: "2", label: "adjust" },
-  // `select` has no entry: the tool is keyless until the selection-tools UI
-  // rework, so the status bar must not advertise a key that does nothing.
-  brush: { keys: "3", label: "brush" },
-  text: { keys: "4", label: "text" },
-  arrow: { keys: "5", label: "arrow" },
-  ai: { keys: "6", label: "Eraser" },
-  shapes: { keys: "7", label: "shapes" },
-  effects: { keys: "8", label: "effects" },
-  stamp: { keys: "9", label: "stamp" },
-  emoji: { keys: "0", label: "batch" },
-};
+// TOOL_SHORTCUT is GONE (2026-07-28) — it was the pre-restructure eleven-tool
+// digit table, kept by hand, and it had gone stale in both columns. Slot 1 now
+// derives from the five-group registry via `subToolHint` below, the same
+// derived-or-nothing rule that fixed ShortcutModal's Select drift.
+//
+// What it was actually saying, measured across ten routes in a real browser:
+//   · #/enhance/adjustments → "8 effects"  — 8 is UNBOUND. Pressing it does
+//     nothing at all; verified, the route didn't change.
+//   · #/create/shapes → "7 shapes", #/batch/logo → "0 batch" — also unbound.
+//     The old table ran 1-9 then `0`; the restructure cut the digit axis to the
+//     five groups and freed 6-0, but this copy never heard about it.
+//   · #/edit/crop → "2 adjust" — WORSE than unbound: 2 is Select. Pressed it
+//     from Edit and landed on #/select/magic-wand. The bar was advertising a
+//     key that leaves the group you are in.
+//   · #/enhance/resize and #/create/pen → "1 compress" / "3 brush": right
+//     digit, wrong name, because one label was doing for a whole group.
+//   · #/select/* → no hint at all, on the theory that Select is keyless. That
+//     stopped being true at the restructure: Select is group 2 and the digit
+//     works (that is how the #/edit/crop test above landed there). Deriving
+//     from the registry gives Select its hint back for free.
+// So the parked note's "the digit is correct, only the label is wrong" was too
+// kind: five of ten routes named a digit that did nothing or jumped groups.
 
 /** The current tool's own distinctive action shortcut (not every tool has
  *  one) — mirrors the actual bindings in useKeyboardShortcuts.ts. Tools
@@ -326,6 +333,23 @@ export function AppShell() {
    *  canvas cursor. Re-derives from (activeTool, mode) when the stored key is
    *  stale, so a legacy route or a panel's own mode toggle still lands right. */
   const activeSubTool = useActiveSubTool();
+  /** Status-bar slot 1 — the digit that reaches here, and the name of where
+   *  "here" is. DERIVED from the registry (see the TOOL_SHORTCUT note at the
+   *  top of this file for what the hand-maintained version was claiming).
+   *
+   *  The digit is the GROUP's, because that is the only digit axis there is;
+   *  the label is the SUB-TOOL's, because that is what the user is looking at
+   *  and a group label would put "create" on thirteen different panels. Labels
+   *  come through verbatim in the registry's Title Case — they are tool names,
+   *  and lower-casing them would turn "OCR" into "ocr". */
+  const subToolHint = useMemo<ShortcutHint | undefined>(() => {
+    if (!activeSubTool) return undefined;
+    const { group, subTool } = activeSubTool;
+    // No key, no hint — never advertise a digit that does nothing. That rule is
+    // what the deleted table broke; keep it enforced here rather than trusted.
+    if (!group.shortcutKey) return undefined;
+    return { keys: group.shortcutKey, label: subTool.label };
+  }, [activeSubTool]);
   /** Active Crop-tool aspect ratio. `null` ≡ "Free" (no constraint).
    *  Drags in useDrawingTools snap to this ratio via Rust when set. */
   const cropRatio = useToolStore((s) => s.cropRatio);
@@ -3215,7 +3239,7 @@ export function AppShell() {
           activeToolHint={
             drawingTools.editState
               ? { keys: "Enter/Esc", label: "place / cancel" }
-              : TOOL_SHORTCUT[activeTool]
+              : subToolHint
           }
           activeToolHint2={
             drawingTools.editState ? undefined : TOOL_ACTION_SHORTCUT[activeTool]

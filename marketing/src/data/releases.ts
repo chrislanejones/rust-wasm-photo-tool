@@ -31,6 +31,8 @@ export const RELEASES: Release[] = [
       { tag: "ui", text: "Two tiles could claim to be the current tool. Click a tool with the mouse, then switch with a keyboard shortcut, and the one you left kept a ring while the new one grew one too — because the keyboard-focus ring was the same warm accent, at the same width, as \"this is selected\". Focus is now neutral ink and dashed: it reads as the keyboard being somewhere, not as the live tool." },
       { tag: "ui", text: "In the gallery the two states were painting identical CSS, so a keyboard-focused thumbnail and a multi-selected one could not be told apart at all. Selection now also marks its own edge, so it stays visible when the keyboard lands on it." },
       { tag: "fix", text: "The fix was not to remove the ring. That ring is what makes the app usable without a mouse, and it got easier to see rather than harder — the contrast of the focus outline went from 2.67:1 to 14.3:1 on the light theme." },
+      { tag: "fix", text: "The status bar was naming a key that did nothing. On Adjustments it said \"8\", on Shapes \"7\", on Batch \"0\" — digits left over from before the toolbar became five groups, bound to nothing. On Crop it said \"2\", which was worse: 2 is Select, so the hint meant to tell you where your tool lives took you out of it." },
+      { tag: "ui", text: "It also named the group instead of the tool, so Resize called itself \"compress\" and Pen called itself \"brush\". The bar now reads both the key and the name off the toolbar itself, which is how the Select tools got their hint back too." },
     ],
   },
   {

@@ -84,6 +84,14 @@ The ring wasn't deleted, which was the tempting fix and the wrong one — it is
 what makes the app usable without a mouse. Contrast went up rather than down:
 2.67:1 to 14.3:1 on the light theme.
 
+**The status bar was naming a key that did nothing.** On Adjustments it read
+"8", on Shapes "7", on Batch "0" — digits from before the toolbar became five
+groups, and none of them bound to anything any more. On Crop it read "2", which
+was worse than nothing: 2 is Select, so the one hint telling you how to get back
+to your tool took you out of it. And the label named a whole group, so Resize
+called itself "compress" and Pen called itself "brush". Both halves are now read
+off the toolbar itself, which is also how Select got its hint back.
+
 ## License
 
 MIT
