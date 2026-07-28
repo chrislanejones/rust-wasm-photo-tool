@@ -35,6 +35,7 @@ export const RELEASES: Release[] = [
       { tag: "ui", text: "It also named the group instead of the tool, so Resize called itself \"compress\" and Pen called itself \"brush\". The bar now reads both the key and the name off the toolbar itself, which is how the Select tools got their hint back too." },
       { tag: "feature", text: "A new version asks before it takes over: \"Update to the latest version?\" — Yes or No, in the same kind of dialog as \"Delete this image?\", instead of a toast in the corner with a Reload link. It says what Yes does, too: the tab reloads, and your photos and edits stay where they are. No means no, and the offer comes back later rather than never." },
       { tag: "ui", text: "The confirm buttons say what they are. \"Delete image\" was red text on a red tint, which measured 3.99:1 — under what small text needs to be readable. It is a white label on solid red now, and the update dialog's Yes is white on deep warm brown." },
+      { tag: "infra", text: "There is now a number for how much dead weight sits in browser storage. A read-only audit walks every local store and reports what a cleanup pass would find, deleting nothing: on a real twelve-photo gallery, nothing was stranded. It also confirmed two suspected leaks — Auto Compress, and deleting a photo — and found a worse one pointing the other way, where tidying up after a duplicated photo can remove bytes the original still needs. Written up rather than patched at three in the morning." },
     ],
   },
   {

@@ -104,6 +104,16 @@ tint, which measured 3.99:1 — under what small text needs. It's a white label 
 solid red now, at 4.83:1, and the update dialog's Yes is a white label on the
 deep warm ink at 12.7:1.
 
+**And there's now a number for how much dead weight is in browser storage.** A
+read-only audit walks every IndexedDB store and reports what a garbage collector
+*would* find, without deleting anything —
+**[the report](docs/content-addressed-gc-audit.md)**. On a real 12-photo gallery:
+nothing stranded. It also confirmed the two suspected leaks (Auto Compress, and
+deleting a photo) and turned up a worse one going the other way: originals are
+shared between duplicated photos, and the code that tidies them up doesn't check
+for that, so it can delete a photo's bytes out from under it. That one is written
+up, not fixed — it needs its own session.
+
 ## License
 
 MIT
