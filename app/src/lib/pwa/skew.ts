@@ -1,5 +1,5 @@
 import { evaluateBuildSkew } from "./skewVerdict";
-import { showUpdateToast } from "./updateToast";
+import { showUpdatePrompt } from "./updatePrompt";
 
 // Build-skew guard wiring (Night B brief, Task B). Two artifacts carry the
 // same per-build hash:
@@ -12,7 +12,7 @@ import { showUpdateToast } from "./updateToast";
 // If a stale service-worker cache serves an old bundle while the server has
 // moved on (or old WASM + new JS — same detection, the hash pair diverges),
 // the fetched hash disagrees with the embedded one: log ONE console.error
-// and raise the update banner immediately.
+// and raise the update dialog immediately.
 //
 // Called from swBoot (boot) and from the engine-init paths in useCloneStamp
 // (the brief's "the WASM loader checks" — the moment stale WASM would start
@@ -24,12 +24,12 @@ let skewReported = false;
 
 export async function checkBuildSkew(context: string): Promise<void> {
   if (__IH_SW_MODE__ !== "on") return; // statically removed in default builds
-  if (skewReported) return; // one error + one banner per session, not per init
+  if (skewReported) return; // one error + one prompt per session, not per init
 
   let manifestHash: string | null;
   try {
     const res = await fetch("/version.json", { cache: "no-store" });
-    if (!res.ok) return; // deploy target without a manifest — unknown, no banner
+    if (!res.ok) return; // deploy target without a manifest — unknown, no prompt
     const body = (await res.json()) as { buildHash?: unknown };
     manifestHash = typeof body.buildHash === "string" ? body.buildHash : null;
   } catch {
@@ -43,6 +43,6 @@ export async function checkBuildSkew(context: string): Promise<void> {
         `${__IH_BUILD_HASH__}, server has ${manifestHash}. A stale ` +
         `service-worker cache is serving an old build — reload to update.`,
     );
-    showUpdateToast(() => window.location.reload());
+    showUpdatePrompt(() => window.location.reload());
   }
 }

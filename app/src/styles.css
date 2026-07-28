@@ -113,6 +113,24 @@
   --input: #d8d0c2;
   --ring: #c98f3f;
 
+  /* Affirmative confirm button — a solid fill carrying a WHITE label, for the
+     "yes, do it" button in a confirm dialog. Deliberately ONE value for both
+     themes and deliberately not `--primary`: white on the warm accent measures
+     2.81:1 (light) and would be illegible, whereas white on this deep warm ink
+     is 12.7:1. It is the palette's existing on-accent ink (`--primary-
+     foreground`) promoted to a fill, so it introduces no new hue.
+     Not defined again under `.dark` — a single value is the point. */
+  --confirm: #3a3128;
+  --confirm-foreground: #ffffff;
+
+  /* Destructive confirm — same idea, red. NOT `--destructive`: that token is
+     #e55032 on the dark theme, and white on it measures 3.80:1 — MEASURED in
+     the browser, and actually WORSE than the 3.99:1 of the red-on-red-tint this
+     replaced. White needs a deeper red, so this pins the light theme's own
+     #dc2626 for both themes: white on it is 4.83:1, clearing 4.5:1 in both.
+     The button surface still reads at 3.68:1 against the dialog behind it. */
+  --confirm-danger: #dc2626;
+
   /* Keyboard-focus indicator — deliberately NOT --accent. See the
      `:focus-visible` rule below for the full reasoning; the short version is
      that the accent already means "this is the live/selected thing", and a
@@ -192,6 +210,9 @@
   --color-accent-foreground: var(--accent-ui-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-confirm: var(--confirm);
+  --color-confirm-foreground: var(--confirm-foreground);
+  --color-confirm-danger: var(--confirm-danger);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

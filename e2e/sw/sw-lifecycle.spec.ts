@@ -113,13 +113,13 @@ test.describe("build-skew guard (new build simulated via version.json)", () => {
     await page.goto("/");
 
     // Boot check runs BOOT_SETTLE_MS (2.5s) after load, post-Toaster-mount.
-    await expect(page.getByText("Update available")).toBeVisible({
+    await expect(page.getByText("Update to the latest version?")).toBeVisible({
       timeout: 20_000,
     });
     expect(skewErrors).toHaveLength(1);
 
-    // The banner offers Reload — the escape hatch exists and is clickable.
-    await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
+    // The dialog offers Yes — the escape hatch exists and is clickable.
+    await expect(page.getByRole("button", { name: "Yes" })).toBeVisible();
   });
 
   test("matching version.json stays silent — no false update banner", async ({
@@ -129,6 +129,6 @@ test.describe("build-skew guard (new build simulated via version.json)", () => {
     // whose hash matches the bundle by construction.
     await page.goto("/");
     await page.waitForTimeout(4500); // past the 2.5s boot check, with margin
-    await expect(page.getByText("Update available")).toHaveCount(0);
+    await expect(page.getByText("Update to the latest version?")).toHaveCount(0);
   });
 });

@@ -33,6 +33,8 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "The fix was not to remove the ring. That ring is what makes the app usable without a mouse, and it got easier to see rather than harder — the contrast of the focus outline went from 2.67:1 to 14.3:1 on the light theme." },
       { tag: "fix", text: "The status bar was naming a key that did nothing. On Adjustments it said \"8\", on Shapes \"7\", on Batch \"0\" — digits left over from before the toolbar became five groups, bound to nothing. On Crop it said \"2\", which was worse: 2 is Select, so the hint meant to tell you where your tool lives took you out of it." },
       { tag: "ui", text: "It also named the group instead of the tool, so Resize called itself \"compress\" and Pen called itself \"brush\". The bar now reads both the key and the name off the toolbar itself, which is how the Select tools got their hint back too." },
+      { tag: "feature", text: "A new version asks before it takes over: \"Update to the latest version?\" — Yes or No, in the same kind of dialog as \"Delete this image?\", instead of a toast in the corner with a Reload link. It says what Yes does, too: the tab reloads, and your photos and edits stay where they are. No means no, and the offer comes back later rather than never." },
+      { tag: "ui", text: "The confirm buttons say what they are. \"Delete image\" was red text on a red tint, which measured 3.99:1 — under what small text needs to be readable. It is a white label on solid red now, and the update dialog's Yes is white on deep warm brown." },
     ],
   },
   {

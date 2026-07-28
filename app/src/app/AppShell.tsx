@@ -48,6 +48,8 @@ import { useTheme, useReduceMotion } from "@/lib/useTheme";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 import { IdleScreen } from "@/components/IdleScreen";
 import { MultiTabScreen } from "@/components/MultiTabScreen";
+import { UpdatePrompt } from "@/components/UpdatePrompt";
+import { CONFIRM_DESTRUCTIVE } from "@/lib/styles";
 import { useTabClaim } from "@/hooks/useTabClaim";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { ToolsSidebar } from "@/features/tools";
@@ -2471,6 +2473,14 @@ export function AppShell() {
 
       <Toaster />
 
+      {/* "A new version is ready" — Yes / No. Mounted here beside Toaster,
+          IdleScreen and MultiTabScreen because it is the same kind of thing:
+          an app-level overlay with no place in the tool tree. Nothing else is
+          added to AppShell for it — the state lives in lib/pwa/updatePrompt.ts
+          (reachable from the non-React service-worker triggers) and the markup
+          in components/UpdatePrompt.tsx. */}
+      <UpdatePrompt />
+
       <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -2487,7 +2497,7 @@ export function AppShell() {
             </DialogClose>
             <Button size="large"
               onClick={confirmDeleteAll}
-              className="flex-1 border-destructive/40 bg-destructive/15 text-destructive hover:border-destructive hover:bg-destructive/25 hover:brightness-100"
+              className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
             >
               <Trash2 className="h-4 w-4" />
               Delete all
@@ -2520,7 +2530,7 @@ export function AppShell() {
                 setDeletePhotoId(null);
                 if (id) handleRemovePhoto(id);
               }}
-              className="flex-1 border-destructive/40 bg-destructive/15 text-destructive hover:border-destructive hover:bg-destructive/25 hover:brightness-100"
+              className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
             >
               <Trash2 className="h-4 w-4" />
               Delete image
@@ -2551,7 +2561,7 @@ export function AppShell() {
                 setDeleteSelectedOpen(false);
                 handleDeleteSelected();
               }}
-              className="flex-1 border-destructive/40 bg-destructive/15 text-destructive hover:border-destructive hover:bg-destructive/25 hover:brightness-100"
+              className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
             >
               <Trash2 className="h-4 w-4" />
               Delete selected

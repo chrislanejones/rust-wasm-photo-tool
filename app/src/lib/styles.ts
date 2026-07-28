@@ -105,6 +105,32 @@ export const TILE_DISABLED =
 export const SUBTILE_DISABLED =
   "cursor-not-allowed border-2 border-transparent bg-bg-tertiary/40 opacity-40 grayscale";
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   CONFIRM-DIALOG BUTTONS — the "yes, do it" button in a Dialog footer.
+
+   Both carry a WHITE label on a SOLID fill (Chris, 2026-07-28). White needs a
+   dark enough fill to be legible, which is why neither of these is a tint:
+   the delete button used to be `text-destructive` on `bg-destructive/15`, and
+   that measured 3.99:1 on the dark theme — under the 4.5:1 WCAG 1.4.3 asks of
+   body text. On the LIGHT theme the same tint blends to a pale pink (#fadede),
+   where a white label would have been 1.09:1 — invisible. A solid fill is what
+   makes "white text" a legible instruction rather than a broken one.
+   ───────────────────────────────────────────────────────────────────────────*/
+
+/** Destructive confirm — delete. Fill is `--confirm-danger`, NOT `--destructive`:
+ *  the first attempt used `bg-destructive`, and white on the dark theme's
+ *  #e55032 measured **3.80:1** in the browser — worse than the 3.99:1 of the
+ *  red-on-red-tint it replaced. Caught by measuring after the change rather
+ *  than shipping the tempting one-liner. `--confirm-danger` pins #dc2626 for
+ *  both themes, where white is 4.83:1. */
+export const CONFIRM_DESTRUCTIVE =
+  "border-confirm-danger bg-confirm-danger text-confirm-foreground hover:border-confirm-danger hover:brightness-110";
+
+/** Affirmative confirm — update, apply, proceed. White on `--confirm`, the deep
+ *  warm ink, at 12.7:1 in both themes. */
+export const CONFIRM_AFFIRMATIVE =
+  "border-confirm bg-confirm text-confirm-foreground hover:border-confirm hover:brightness-125";
+
 /**
  * Base class-string for every Skeleton placeholder — the ONE definition site
  * behind the `Skeleton` / `SkeletonText` / `SkeletonCircle` primitives

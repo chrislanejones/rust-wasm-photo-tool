@@ -92,6 +92,18 @@ to your tool took you out of it. And the label named a whole group, so Resize
 called itself "compress" and Pen called itself "brush". Both halves are now read
 off the toolbar itself, which is also how Select got its hint back.
 
+**"Update to the latest version?" — Yes or No.** A new build used to announce
+itself with a toast in the corner carrying a Reload link. It asks properly now,
+in the same kind of dialog as "Delete this image?", and says what updating does:
+it reloads the tab, and your photos and edits stay where they are. No still
+means no — declining leaves the session alone, and the offer comes back later
+rather than never.
+
+**The confirm buttons say what they are.** "Delete image" was red text on a red
+tint, which measured 3.99:1 — under what small text needs. It's a white label on
+solid red now, at 4.83:1, and the update dialog's Yes is a white label on the
+deep warm ink at 12.7:1.
+
 ## License
 
 MIT
