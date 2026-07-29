@@ -214,6 +214,64 @@ export interface SavedEdit {
   activeLayerId?: number;
 }
 
+/** THE one place live text annotations are prepared for persistence.
+ *
+ *  Drops `tile_*` (the pre-rendered, possibly pre-rotated tile cache — it is
+ *  re-rendered on restore, so persisting it bakes in something stale) and keeps
+ *  every field of `PersistedAnnotation`.
+ *
+ *  WHY IT IS SHARED (#22). This map existed TWICE — here for the local
+ *  IndexedDB save, and again inline in the cloud-archive path in
+ *  `hooks/useEditPersistence.ts` — and the copies had drifted: the cloud one
+ *  stopped at `bg_tail` and silently dropped all NINE `shadow_*` fields. Local
+ *  restore kept your drop shadows; cross-device restore lost them, with no
+ *  error either side. Two copies of an allowlist is the bug; one exported
+ *  function is the fix, and `editPersistence.stripDrift.test.ts` pins that the
+ *  set it emits is exactly the input minus `tile_*`.
+ *
+ *  Invisible until v7.56, because the cloud path never ran in production. */
+export function stripLiveAnnotations(raw: string): PersistedAnnotation[] {
+  try {
+    const parsed = JSON.parse(raw) as Array<
+      PersistedAnnotation & {
+        tile_w: number; tile_h: number;
+        tile_offset_x: number; tile_offset_y: number;
+      }
+    >;
+    return parsed.map((a) => ({
+      id: a.id,
+      text: a.text,
+      x: a.x,
+      y: a.y,
+      font_size: a.font_size,
+      r: a.r,
+      g: a.g,
+      b: a.b,
+      bold: a.bold,
+      rotation_deg: a.rotation_deg,
+      background_kind: a.background_kind,
+      bg_r: a.bg_r,
+      bg_g: a.bg_g,
+      bg_b: a.bg_b,
+      bg_a: a.bg_a,
+      bg_padding: a.bg_padding,
+      bg_corner_radius: a.bg_corner_radius,
+      bg_tail: a.bg_tail,
+      shadow_box: a.shadow_box,
+      shadow_text: a.shadow_text,
+      shadow_r: a.shadow_r,
+      shadow_g: a.shadow_g,
+      shadow_b: a.shadow_b,
+      shadow_a: a.shadow_a,
+      shadow_dx: a.shadow_dx,
+      shadow_dy: a.shadow_dy,
+      shadow_blur: a.shadow_blur,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** Parse the JSON emitted by `get_*_snapshot_annotations`. Drops tile_*
  *  fields since the tile is re-rendered on injection. */
 export function parseSnapshotAnnotations(raw: string): PersistedAnnotation[] {
@@ -295,45 +353,8 @@ export async function savePhotoEdit(
     });
   }
 
-  // Live (non-destructive) text annotations.
-  let annotations: PersistedAnnotation[];
-  try {
-    const raw = t.get_text_annotations();
-    const parsed = JSON.parse(raw) as Array<
-      PersistedAnnotation & { tile_w: number; tile_h: number; tile_offset_x: number; tile_offset_y: number }
-    >;
-    annotations = parsed.map((a) => ({
-      id: a.id,
-      text: a.text,
-      x: a.x,
-      y: a.y,
-      font_size: a.font_size,
-      r: a.r,
-      g: a.g,
-      b: a.b,
-      bold: a.bold,
-      rotation_deg: a.rotation_deg,
-      background_kind: a.background_kind,
-      bg_r: a.bg_r,
-      bg_g: a.bg_g,
-      bg_b: a.bg_b,
-      bg_a: a.bg_a,
-      bg_padding: a.bg_padding,
-      bg_corner_radius: a.bg_corner_radius,
-      bg_tail: a.bg_tail,
-      shadow_box: a.shadow_box,
-      shadow_text: a.shadow_text,
-      shadow_r: a.shadow_r,
-      shadow_g: a.shadow_g,
-      shadow_b: a.shadow_b,
-      shadow_a: a.shadow_a,
-      shadow_dx: a.shadow_dx,
-      shadow_dy: a.shadow_dy,
-      shadow_blur: a.shadow_blur,
-    }));
-  } catch {
-    annotations = [];
-  }
+  // Live (non-destructive) text annotations — shared stripper, see #22.
+  const annotations = stripLiveAnnotations(t.get_text_annotations());
 
   // Live (non-destructive) shape annotations.
   const shapes = parseShapes(t.get_shape_annotations());

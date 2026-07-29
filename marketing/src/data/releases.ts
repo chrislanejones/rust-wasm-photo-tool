@@ -31,6 +31,7 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "Your drawing is saved on a short delay, and if you switched photos while one of those saves was still writing, the next save was dropped instead of queued — silently, with nothing left to retry it. The strokes since the last completed save never reached disk. Saves now queue behind each other, so switching photos waits for the write instead of racing it." },
       { tag: "fix", text: "That was worse than it sounds: when reopening a photo the app trusts that record over its other copy, so it would hand back an older version that looked perfectly intact. Nothing about the saved format changed — only whether the save runs." },
       { tag: "infra", text: "Reproduced under test fixtures before being fixed: four tests that failed first, and the twenty-three existing save-and-restore tests still pass untouched." },
+      { tag: "fix", text: "Drop shadows on text vanished when a photo came back from the cloud. Saving locally and saving to the cloud each had their own copy of the same list of things to keep, and the cloud copy was missing all nine shadow settings — so the same photo kept its shadows on the machine you drew it on and came back flat anywhere else. There is one copy of that list now, and a test that fails if the two ever disagree again." },
     ],
   },
   {

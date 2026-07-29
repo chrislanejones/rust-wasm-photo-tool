@@ -13,6 +13,7 @@ import {
   parseSnapshotAnnotations,
   parseShapes,
   collectLayers,
+  stripLiveAnnotations,
 } from "@/lib/editPersistence";
 import type {
   SavedEdit,
@@ -315,40 +316,18 @@ export function useEditPersistence() {
             });
           }
 
-          // Live text annotations (re-editable overlay). Strip tile_* so
-          // we don't bake stale pre-rotated tile cache into the archive —
-          // tiles are re-rendered on load.
-          let annotationsJson = "[]";
-          try {
-            const raw = tool.get_text_annotations();
-            const parsed = JSON.parse(raw) as Array<
-              PersistedAnnotation & {
-                tile_w: number; tile_h: number;
-                tile_offset_x: number; tile_offset_y: number;
-              }
-            >;
-            const stripped: PersistedAnnotation[] = parsed.map((a) => ({
-              id: a.id,
-              text: a.text,
-              x: a.x,
-              y: a.y,
-              font_size: a.font_size,
-              r: a.r, g: a.g, b: a.b,
-              bold: a.bold,
-              rotation_deg: a.rotation_deg,
-              background_kind: a.background_kind,
-              bg_r: a.bg_r,
-              bg_g: a.bg_g,
-              bg_b: a.bg_b,
-              bg_a: a.bg_a,
-              bg_padding: a.bg_padding,
-              bg_corner_radius: a.bg_corner_radius,
-              bg_tail: a.bg_tail,
-            }));
-            annotationsJson = JSON.stringify(stripped);
-          } catch {
-            annotationsJson = "[]";
-          }
+          // Live text annotations (re-editable overlay). Strip tile_* so we
+          // don't bake a stale pre-rotated tile cache into the archive — tiles
+          // are re-rendered on load.
+          //
+          // This used to be its own inline copy of the map, and it had drifted:
+          // it stopped at `bg_tail` and silently dropped all nine `shadow_*`
+          // fields, so a cross-device restore lost drop shadows while a local
+          // restore kept them (#22). It shares `stripLiveAnnotations` with the
+          // local path now, so the two cannot disagree again.
+          const annotationsJson = JSON.stringify(
+            stripLiveAnnotations(tool.get_text_annotations()),
+          );
 
           // Live shape annotations (re-editable overlay) — current state only.
           let shapesJson = "[]";

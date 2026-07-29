@@ -84,6 +84,13 @@ for the write instead of racing it.
 The drop was reproduced under test fixtures first — four tests that failed
 before the fix and pass after.
 
+**Drop shadows on text vanished when a photo came back from the cloud.** Saving
+locally and saving to the cloud each had their own copy of the same list of
+things to keep, and the cloud copy was missing all nine shadow settings. Open
+the photo on the same machine and your shadows were there; open it on another
+device and the text came back flat, with no error either way. There is one copy
+of that list now, and a test that fails if the two ever disagree again.
+
 ## License
 
 MIT
