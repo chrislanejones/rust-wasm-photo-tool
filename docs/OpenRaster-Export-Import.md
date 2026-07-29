@@ -1,8 +1,17 @@
-# OpenRaster (.ora) Export / Import — Plan
+# OpenRaster (.ora) Export / Import
 
 > Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [File Map](File-Map.md).
 >
-> **Status: planning only — not implemented.** Today there is a disabled **"Export as .ora"** button in the Settings → Export tab (`app/src/components/ExportPane.tsx`); the serializer does not exist yet. This note is the actionable plan, grounded in the *real* Rust layer API.
+> **Status: SHIPPED.** Corrected 2026-07-30 — this said "planning only — not
+> implemented ... the serializer does not exist yet", which stopped being true
+> some releases ago. Both directions are live: `app/src/lib/openraster/`
+> (`export.ts`, `import.ts`, `stackXml.ts`, `types.ts`), wired into the
+> Settings → Export tab via `exportOra` / `importOraAsNewPhoto` in
+> `app/src/components/ExportPane.tsx`.
+>
+> What follows was written as the plan and is kept because the reasoning — the
+> format, and which Rust layer APIs it builds on — is still the design. Read it
+> as "why it works this way", not as "what to build".
 
 ## Why .ora
 

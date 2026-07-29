@@ -43,6 +43,16 @@ Plus two non-IDB persistence layers:
 - **`localStorage`** (`image-horse-prefs`, [`app/src/lib/preferences.ts`](../app/src/lib/preferences.ts)) — the Settings blob (theme, history depth, idle timeout, rulers/grid, reduce-motion, EXIF-keep, reopen-last-session). Tiny, read synchronously at boot, so `localStorage` is the right tool.
 - **Convex** (`users` row) — when signed in, the same preferences blob is mirrored server-side as JSON + its SHA-256, so settings follow the user across devices. Logged-out users stay `localStorage`-only. See [Architecture](Architecture.md).
 
+> ⚠️ **Measured 2026-07-28, and the table above is now out of date in one
+> place.** A read-only reachability audit found **no `image-horse-originals`
+> database at all** on a real profile — the originals live in
+> `image-horse-dexie/originals` (12 rows, 54.1 MB, all reachable), because
+> `USE_DEXIE_ORIGINALS` is on. So for ORIGINALS the Dexie layer is no longer
+> "new and parallel"; it is the live store. `photos` / `workingCopies` really
+> are still empty, and the gallery list really is still the hand-rolled
+> manifest, so the rest of this page holds. Numbers and method:
+> [content-addressed GC audit](content-addressed-gc-audit.md).
+
 **Design invariant:** the gallery *list* is React/Zustand state, but the *bytes it points at* live in `image-horse-originals` / `image-horse-edits`. The manifest (`image-horse-gallery`) is what lets an anonymous tab survive a close/reload — without it those bytes would be orphaned and the app would boot empty. This is exactly the "keep heavy data out of the JS heap, keep handles in state" pattern.
 
 ---

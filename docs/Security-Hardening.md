@@ -4,6 +4,11 @@
 >
 > No critical "hacked in 5 minutes" holes — React (auto-escaping), Clerk (auth), WASM (memory-safe pixel ops), and TypeScript already remove whole bug classes. This tracks the hardening worth doing before calling Image Horse production-ready, with what's **done now** vs. **next** vs. **supervised**.
 
+> Re-checked 2026-07-30: `validateUpload` and `sanitizeFilename` are both still
+> **unwired** (no call sites outside their own modules), so items 1 and the ZIP
+> entry-name item below remain open exactly as written. The EXIF and share-token
+> fixes are still in place.
+
 ## Done in this pass
 
 | Fix | Where | Note |
@@ -14,6 +19,19 @@
 | **Filename sanitizer (utility)** | `app/src/lib/security/sanitizeFilename.ts` | Strips `../`, separators, control chars, reserved names; bounded basename. For ZIP entries + download names. **Not yet wired.** |
 
 ## 🔴 High priority
+
+0. **⚠️ ROTATE THE CONVEX JWT SIGNING KEY — still outstanding.** Added to this
+   document 2026-07-30; it had been tracked only in session notes, which is
+   exactly the wrong place for the most urgent item on the list. The key was
+   printed to a terminal by `npx convex env list` on **2026-06-26**. Treat it as
+   compromised: it signs the tokens the backend trusts, so anyone holding it can
+   mint one. **Never run `convex env list` again — it dumps every secret in the
+   deployment**; use `convex env get <NAME>` for a single value.
+   Rotating it is a deploy-time action against a live backend and is deliberately
+   not automated here. Fold it into whichever option is taken for the Clerk /
+   Convex consolidation — see
+   [share-links auth mismatch](share-links-auth-mismatch.md), which is the other
+   half of the same decision.
 
 1. **Image upload validation** — the utility exists; **wire it**. Before decoding in `handleAddPhotos` / `decodeImageSource`, call `validateUpload(file)` and reject `{ ok: false }`. ⚠️ Confirm the full set of accepted input formats first (AVIF? HEIC? TIFF?) so the magic-byte allowlist doesn't false-reject valid uploads — that's why it's a **supervised wire-in**, not a blind overnight change. Extend `SIGNATURES` to match.
 2. **SVG** — handled by the firewall (rejected outright). If SVG support is ever wanted, **rasterize** it (don't render untrusted SVG); never inline it.

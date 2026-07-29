@@ -13,7 +13,7 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 - **[Architecture](docs/Architecture.md)** — system diagram, layers/compositing, the single-WASM-binary rationale, Rust ↔ Convex bridge.
 - **[File Map](docs/File-Map.md)** — Rust module map (`src/`) and the React frontend structure (`app/src/`).
 - **[Change Summary](docs/Change-summary.md)** — full dated release history (v2.1 → latest).
-- **[Keyboard Shortcuts](docs/Keyboard-Shortcuts.md)** — every shortcut (tools, panels, transforms, zoom, gallery).
+- **[Keyboard Shortcuts](docs/Keyboard-Shortcuts.md)** — every shortcut (tools, panels, transforms, zoom, gallery). The in-app modal (`Alt + /`) is the source of truth; this mirrors it.
 - **[Getting Started](docs/Getting-Started.md)** — install, run the app + marketing site, Convex setup, deploy notes.
 - **[Features](docs/Features.md)** — full feature list: Rust/WASM image processing + the React UI.
 - **[GitHub Actions (CI)](docs/GitHub-Actions.md)** — the CI workflow jobs (build, security, audits) and Dependabot.
@@ -22,9 +22,12 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 - **[State Management](docs/State-Management.md)** — the Zustand stores, the `SetArg` drop-in migration off AppShell's `useState`, and what stays local.
 - **[IndexedDB Investigation](docs/IndexedDB-Investigation.md)** — why IndexedDB, the live content databases, the Zustand persist adapter, and the Dexie content layer.
 - **[Service Workers & Caching](docs/Service-Workers-Caching.md)** — investigation: caching the WASM binary + app shell, the never-cache deny-list, and a phased PWA rollout.
-- **[OpenRaster (.ora) Export/Import](docs/OpenRaster-Export-Import.md)** — plan for layered `.ora` interchange, grounded in the existing Rust layer API.
+- **[OpenRaster (.ora) Export/Import](docs/OpenRaster-Export-Import.md)** — layered `.ora` interchange: how export/import work and why the format was chosen. **Shipped.**
 - **[Architecture Roadmap](docs/Architecture-Roadmap.md)** — the document-based-editor direction, prioritized and mapped onto the real repo (AppShell split, Zustand, workers, GPU).
-- **[Security Hardening](docs/Security-Hardening.md)** — audit + roadmap: share-token CSPRNG, the image-upload firewall, EXIF-by-default, and the supervised items (CSP, COEP, encryption).
+- **[Entropy Report](docs/entropy-2026-07-30.md)** — dated structural-drift measurement: where AppShell actually is, whether the decompositions paid off, and what the hotspot list says.
+- **[Content-Addressed GC Audit](docs/content-addressed-gc-audit.md)** — read-only reachability audit of everything in IndexedDB: what a collector would find, and the three orphan sources.
+- **[Share-Links Auth Mismatch](docs/share-links-auth-mismatch.md)** — the two-Clerk-instance investigation, the prod auth verification, and the Stripe-linkage verdict.
+- **[Security Hardening](docs/Security-Hardening.md)** — audit + roadmap: **the outstanding JWT key rotation**, share-token CSPRNG, the image-upload firewall, EXIF-by-default, and the supervised items (CSP, COEP, encryption).
 
 ## Tech Stack
 
@@ -99,6 +102,12 @@ after which every save failed. A failed upload was read as if it had succeeded,
 storing a pointer to nothing. And an unreadable cloud archive was treated as if
 it were an old-format image, which hid the real problem behind a confusing one.
 All four now recover or say what happened.
+
+**The docs got audited too** — all fifteen. Four were saying things that are no
+longer true (the shortcut table still listed the old tool keys, and the
+OpenRaster page still called a shipped feature a plan), and the security page
+was missing the most urgent item in the repo. Nothing was deleted; everything
+listed still earns its place.
 
 The **paid-tier question got a verdict**, too: nobody has ever subscribed, so
 there is no billing record attached to the wrong account and nothing to migrate.

@@ -14,7 +14,7 @@
 
 ## The real weak point
 
-`app/src/app/AppShell.tsx` (~3,245 lines) is the de-facto operating system for the app — dozens of `useState`s + callbacks for uploads, gallery, canvas, tools, history, export, AI, dialogs, zoom, layers, review, compression. **This is where the leverage is.** Everything below orbits shrinking it.
+`app/src/app/AppShell.tsx` (**3,314 lines** as of 2026-07-30 — it was ~3,245 when this was written and 3,220 at the last audit, i.e. it has GROWN while being dismantled; see the [entropy report](entropy-2026-07-30.md)) is the de-facto operating system for the app — dozens of `useState`s + callbacks for uploads, gallery, canvas, tools, history, export, AI, dialogs, zoom, layers, review, compression. **This is where the leverage is.** Everything below orbits shrinking it.
 
 ## Prioritized roadmap
 
