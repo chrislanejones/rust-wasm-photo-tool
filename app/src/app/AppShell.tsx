@@ -86,7 +86,8 @@ import { MagnifierOverlay } from "@/components/MagnifierOverlay";
 import { useAutoCompress } from "@/hooks/useAutoCompress";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
 import { useRecentTexts } from "@/hooks/useRecentTexts";
-import { putOriginal, getOriginal, getOriginalAsBlobUrl, deleteOriginal } from "@/lib/dexie/originalsAdapter";
+import { putOriginal, getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
+import { deleteReplacedOriginal } from "@/lib/originalRefs";
 import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 import { RadioCards } from "@/components/ui/radio-cards";
@@ -1800,9 +1801,19 @@ export function AppShell() {
         putOriginal(newFile, tw, th),
         makeThumbnailFromPixels(pixels, tw, th, mod.resize_pixels),
       ]);
-      if (oldKey && oldKey !== newKey && oldKey !== entry.uploadKey) {
-        deleteOriginal(oldKey).catch(() => {});
-      }
+      // Collect the blob this photo just stopped pointing at — but only if
+      // NOTHING else points at it. The old test here was
+      // `oldKey !== entry.uploadKey`, which knew about this photo's own
+      // baseline and nothing else, so it deleted blobs shared with a duplicate.
+      // See lib/originalRefs.ts for the four-step repro.
+      void deleteReplacedOriginal({
+        oldKey,
+        newKey,
+        photoId: entry.id,
+        // Read fresh, not from the render-time `photos`: this runs after two
+        // awaits and the gallery may have moved under it.
+        photos: useGalleryStore.getState().photos,
+      });
 
       setPhotos((prev) =>
         prev.map((p) =>
@@ -1992,6 +2003,7 @@ export function AppShell() {
         const photo = photos.find((p) => p.id === id);
         if (!photo) return;
         void (async () => {
+          const oldKey = photo.originalKey;
           const [newKey, newThumb] = await Promise.all([
             putOriginal(nf, photo.workingWidth, photo.workingHeight),
             makeThumbnail(nf),
@@ -2003,6 +2015,17 @@ export function AppShell() {
                 : { ...x, originalKey: newKey, thumbBlob: newThumb, byteSize: nf.size },
             ),
           );
+          // Auto Compress used to collect NOTHING — it was the one repoint path
+          // with no delete at all, so every run over an already-compressed photo
+          // stranded a blob (measured as the "pile" in the GC audit). Collect
+          // AFTER the state update so the fresh gallery read below already sees
+          // this photo on its new key.
+          void deleteReplacedOriginal({
+            oldKey,
+            newKey,
+            photoId: id,
+            photos: useGalleryStore.getState().photos,
+          });
         })();
       },
     );

@@ -113,7 +113,7 @@ usage is image bytes.
 
 ## The two named orphan sources, checked
 
-### 1. Auto Compress repoints `originalKey` without collecting — CONFIRMED, but narrower than parked
+### 1. Auto Compress repoints `originalKey` without collecting — CONFIRMED, narrower than parked, FIXED 2026-07-29
 
 The parked note says compression "repoints `originalKey` on every run without
 collecting the previous blob". Of the four repoint sites, **three do collect**:
@@ -125,6 +125,10 @@ collecting the previous blob". Of the four repoint sites, **three do collect**:
 | `BatchSettings` bulk-text | **yes** — same shape |
 | `AppShell.handleAutoCompress` per-photo callback | **NO** — `putOriginal(nf, …)` then repoints the entry, with no `deleteOriginal` anywhere in the path |
 
+**Fixed 2026-07-29**: `handleAutoCompress` now collects too, through the same
+guard as the other three. All four sites are one call —
+`deleteReplacedOriginal` — so none of them owns a delete decision any more.
+
 So the leak is real and it is specifically **Auto Compress** (`scope: "selected"
 | "all"`, the "make it web-ready" batch). Every run over a photo whose
 `originalKey` has already moved off its `uploadKey` strands one blob, and running
@@ -132,7 +136,7 @@ it repeatedly strands one per run — the "measurable pile" the note predicted,
 just from one site rather than all of them. The pile is 0 B on this profile only
 because Auto Compress has never run here (`photosRepointedByCompression: 0`).
 
-### 2. Deleted photos leave their originals behind — CONFIRMED
+### 2. Deleted photos leave their originals behind — CONFIRMED, still open (but now safe to fix)
 
 `useImageSession.handleRemovePhoto` calls `deletePhotoEdit(id)` and drops the
 entry from `photos`, and never touches the content store. Neither the
@@ -141,7 +145,13 @@ strands up to two originals — on this gallery, ~4.5 MB per photo on average.
 The edit archive *is* deleted, which is why the `edits` store shows 0 orphans
 even though photos have come and gone here.
 
-### 3. Not asked for, and more serious: `deleteOriginal` is not refcounted
+Deliberately NOT fixed alongside the refcount work: collecting on delete is the
+first step of the collector, and it needed the guard to exist first. It is safe
+to write now — `deleteReplacedOriginal` will refuse to take a blob a duplicate
+still points at — but it is its own change with its own decision (does deleting a
+photo also drop its `uploadKey` baseline?), not a rider on this one.
+
+### 3. Not asked for, and more serious: `deleteOriginal` was not refcounted — FIXED 2026-07-29
 
 The inverse failure, found while checking the above. `originalsAdapter.deleteOriginal`
 is an unconditional `db.originals.delete(key)` — compare `db.ts:285`, which
@@ -162,13 +172,44 @@ photo's own* baseline. It does not know about other photos. So:
 
 That is data loss, not garbage: P's bytes are gone and its entry still references
 them. Reached by reading the four paths, not by running it on a real gallery —
-deliberately, since reproducing it destroys an original. It needs its own session
-with fixtures.
+deliberately, since reproducing it destroys an original.
 
-**This is the reason a collector must not be bolted on next.** A mark-and-sweep
-over the manifest would be safe here, but the existing eager deletes are already
-unsafe for shared keys, and adding a sweep on top of them fixes the leak while
-leaving the sharp edge in place.
+**Fixed 2026-07-29** in `app/src/lib/originalRefs.ts`. The four repoint sites no
+longer call `deleteOriginal` at all; they call `deleteReplacedOriginal`, which
+derives the reachable set fresh and deletes only when nothing points at the blob.
+
+- **Reachable set, not a stored refcount.** A stored count needs retrofitting
+  onto every write site, needs a schema change (IndexedDB, no backup), and can
+  drift — at which point it needs a repair path of its own. The set is derived
+  per call from the gallery, stores nothing, and so cannot drift. It is the same
+  mark phase this audit already computes.
+- **The gallery is read fresh** (`useGalleryStore.getState().photos`) rather than
+  from a render-time snapshot. Batch passes repoint many photos in a loop, and a
+  stale array can miss a reference added part-way through — invisible to the
+  guard means deleted. Reading fresh also makes the batch case come out right:
+  when two duplicates share a blob, the first pass keeps it (the second photo
+  still points at it) and the second pass collects it.
+- **Roots that live outside the gallery must be declared.** `BatchSettings`
+  keeps a per-photo pre-logo/pre-text baseline in a React ref
+  (`logoBaselineRef` / `textBaselineRef`) so re-applying replaces rather than
+  stacks. That key appears in no manifest and no `PhotoEntry`, so those call
+  sites pass it as `extraRoots`. **Any future collector has the same obligation**
+  — a sweep that only reads the manifest would collect those baselines and break
+  re-apply.
+- **The bias is one-directional: when in doubt, keep.** Over-keeping leaves
+  garbage this audit can measure and a collector can sweep. Over-deleting
+  destroys a photo. A failing delete is swallowed for the same reason.
+
+Reproduced under fixtures rather than asserted: `app/src/lib/originalRefs.test.ts`
+runs the four steps against a real IndexedDB (fake-indexeddb, the adapter tests'
+harness) through the real adapter. One test deliberately performs the OLD
+unguarded delete and asserts P's bytes are destroyed — so the fixture is known to
+reproduce the bug — and the next asserts the guard keeps them. 14 tests.
+
+**A collector is now safe to build on top of this.** It was not before: a
+mark-and-sweep over the manifest would have fixed the leak while leaving the
+eager deletes' sharp edge in place, and would additionally have collected the
+ref-held batch baselines.
 
 ## What this makes decidable
 
@@ -177,11 +218,10 @@ leaving the sharp edge in place.
   be retrofitted onto four write sites and would need a repair path for counts
   that have already drifted; the reachable-set walk needs no stored state and
   cannot drift.
-- **Fix the eager deletes first.** Whatever the collector is, the four existing
-  `deleteOriginal` calls should stop deleting shared blobs — either refcount them
-  or drop them entirely and let the sweep do all collection. The second is
-  simpler and turns finding 3 from a data-loss bug into a bounded amount of
-  garbage.
+- **~~Fix the eager deletes first.~~ DONE 2026-07-29.** All four now go through
+  `deleteReplacedOriginal`, so they cannot delete a shared blob. A sweep can be
+  layered on top without inheriting a data-loss path — but see the `extraRoots`
+  note above: it must account for roots that are not in the manifest.
 - **Decide what `uploadKey` is worth.** It exists so A/B compare can show the
   untouched import, and it doubles the storage of every compressed photo. That is
   a product call, not a GC one, but a collector has to know whether it is a root.

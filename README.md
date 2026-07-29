@@ -70,49 +70,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.58 — 2026-07-28
+### v7.59 — 2026-07-29
 
-**Two tiles claimed to be the current tool.** Click a tool with the mouse, then
-switch with a keyboard shortcut: the tool you left kept a ring, and the new one
-grew one too. The keyboard-focus ring was the same warm accent, at the same 2px,
-as "this is selected" — one colour doing two jobs. Focus is now neutral ink and
-dashed, so it reads as *the keyboard is here* instead of *this is the live tool*.
-In the gallery it had been worse: a focused thumbnail and a multi-selected one
-were painting byte-identical CSS, so there was no telling them apart at all.
+**Compressing a photo could delete a different photo's original.** Originals are
+stored once and shared — that is what makes duplicating a photo instant, since
+the copy points at the same bytes. But the cleanup that runs after compressing
+only checked whether *that* photo still needed the old bytes, never whether
+anything else did. Compress a photo, duplicate it, compress the duplicate, and
+the first photo's original was deleted out from under it while it still pointed
+there. Nothing pointed at a backup, because there isn't one.
 
-The ring wasn't deleted, which was the tempting fix and the wrong one — it is
-what makes the app usable without a mouse. Contrast went up rather than down:
-2.67:1 to 14.3:1 on the light theme.
-
-**The status bar was naming a key that did nothing.** On Adjustments it read
-"8", on Shapes "7", on Batch "0" — digits from before the toolbar became five
-groups, and none of them bound to anything any more. On Crop it read "2", which
-was worse than nothing: 2 is Select, so the one hint telling you how to get back
-to your tool took you out of it. And the label named a whole group, so Resize
-called itself "compress" and Pen called itself "brush". Both halves are now read
-off the toolbar itself, which is also how Select got its hint back.
-
-**"Update to the latest version?" — Yes or No.** A new build used to announce
-itself with a toast in the corner carrying a Reload link. It asks properly now,
-in the same kind of dialog as "Delete this image?", and says what updating does:
-it reloads the tab, and your photos and edits stay where they are. No still
-means no — declining leaves the session alone, and the offer comes back later
-rather than never.
-
-**The confirm buttons say what they are.** "Delete image" was red text on a red
-tint, which measured 3.99:1 — under what small text needs. It's a white label on
-solid red now, at 4.83:1, and the update dialog's Yes is a white label on the
-deep warm ink at 12.7:1.
-
-**And there's now a number for how much dead weight is in browser storage.** A
-read-only audit walks every IndexedDB store and reports what a garbage collector
-*would* find, without deleting anything —
-**[the report](docs/content-addressed-gc-audit.md)**. On a real 12-photo gallery:
-nothing stranded. It also confirmed the two suspected leaks (Auto Compress, and
-deleting a photo) and turned up a worse one going the other way: originals are
-shared between duplicated photos, and the code that tidies them up doesn't check
-for that, so it can delete a photo's bytes out from under it. That one is written
-up, not fixed — it needs its own session.
+Cleanup now asks whether *anything* still needs the bytes, and keeps them if
+anything does. It was reproduced under test fixtures before it was fixed —
+including a test that performs the old delete on purpose, so we know the
+reproduction is real and not a story about the code.
 
 ## License
 

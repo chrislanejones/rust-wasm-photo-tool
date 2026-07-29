@@ -14,7 +14,9 @@ import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { TEXT_COLORS } from "@/lib/colors";
-import { getOriginal, putOriginal, deleteOriginal } from "@/lib/dexie/originalsAdapter";
+import { getOriginal, putOriginal } from "@/lib/dexie/originalsAdapter";
+import { deleteReplacedOriginal } from "@/lib/originalRefs";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 import {
   makeWorkingCopy,
   makeThumbnail,
@@ -202,6 +204,13 @@ export function BatchSettings({
   // onto that baseline instead of the already-logo'd result — so re-applying
   // *replaces* the logo rather than stacking a second one on top.
   const logoBaselineRef = useRef<Map<string, string>>(new Map());
+
+  /** The gallery AS OF NOW, for the delete guard. The `photos` prop is a
+   *  render-time snapshot and a batch pass repoints many photos in a loop, so a
+   *  reference added part-way through (a duplicate, say) would be invisible to
+   *  it — and invisible-to-the-guard means deleted. `getState()` is not a hook
+   *  call, so this is safe to call inside the loop. */
+  const latestPhotos = () => useGalleryStore.getState().photos;
 
   // Auto-dismiss the "Applied to N images" confirmation chip after 3s.
   useEffect(() => {
@@ -426,10 +435,18 @@ export function BatchSettings({
                   },
             ),
           );
-          // Prune the now-orphaned IDB blob (skip the baseline — re-apply needs it).
-          if (oldKey && oldKey !== newKey && oldKey !== baselineKey) {
-            deleteOriginal(oldKey).catch(() => {});
-          }
+          // Prune the blob this photo just left — unless something still
+          // points at it. `baselineKey` is passed as an extra root because
+          // re-apply needs it and it lives ONLY in logoBaselineRef, so no
+          // gallery entry mentions it. The old test compared against that key
+          // alone and could delete a blob shared with a duplicated photo.
+          void deleteReplacedOriginal({
+            oldKey,
+            newKey,
+            photoId: photo.id,
+            photos: latestPhotos(),
+            extraRoots: [baselineKey, ...logoBaselineRef.current.values()],
+          });
           succeeded++;
         } catch (err) {
           console.error("Bulk-logo: failed on photo", photo.id, err);
@@ -945,6 +962,10 @@ function TextBatchPanel({
   // stacking a second layer on top.
   const textBaselineRef = useRef<Map<string, string>>(new Map());
 
+  /** The gallery as of now — see the identical helper in BatchSettings. This
+   *  panel is its own component, so it needs its own. */
+  const latestPhotos = () => useGalleryStore.getState().photos;
+
   useEffect(() => {
     if (appliedCount === null) return;
     const t = window.setTimeout(() => setAppliedCount(null), 3000);
@@ -1089,9 +1110,14 @@ function TextBatchPanel({
                   },
             ),
           );
-          if (oldKey && oldKey !== newKey && oldKey !== baselineKey) {
-            deleteOriginal(oldKey).catch(() => {});
-          }
+          // Same guard as the logo pass; textBaselineRef holds the roots.
+          void deleteReplacedOriginal({
+            oldKey,
+            newKey,
+            photoId: photo.id,
+            photos: latestPhotos(),
+            extraRoots: [baselineKey, ...textBaselineRef.current.values()],
+          });
           succeeded++;
         } catch (err) {
           console.error("Bulk-text: failed on photo", photo.id, err);
