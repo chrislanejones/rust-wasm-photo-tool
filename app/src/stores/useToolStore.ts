@@ -10,7 +10,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { defaultToolSettings } from "@/lib/defaultToolSettings";
 import { SMART_BRUSH_DEFAULT_STRENGTH } from "@/lib/smartEdge";
-import { resolveSet, validated, type SetArg } from "./_shared";
+import { resolveSet, validated, validatedNumberInRange, type SetArg } from "./_shared";
+import { EXPORT_FORMATS, type ExportFormat } from "@/lib/exportImage";
 import { idbStorage } from "./storage/idbStorage";
 
 /** Paint sub-modes (Paint tool): freehand paint, blur brush, Bézier pen, or
@@ -147,6 +148,17 @@ export interface ToolState {
   eraserMode: EraserMode;
   textMode: TextMode;
   batchMode: BatchMode;
+  /** Export format + quality for Compress / Download / Apply Compression.
+   *
+   *  PERSISTED (#14). These were `useState` in AppShell, so every reload threw
+   *  away the choice and silently went back to JPEG at 75 — a preference the
+   *  user re-set on every visit. They join the existing allowlist rather than
+   *  getting a store of their own: same lifetime, same "remember what I picked"
+   *  contract as the sub-modes beside them, and no engine coupling, so there is
+   *  nothing to sync into WASM on rehydrate. */
+  exportFormat: ExportFormat;
+  /** JPEG/WebP/AVIF quality, 1..100. Ignored for PNG (lossless). */
+  quality: number;
   /** Active Crop aspect ratio; `null` ≡ "Free" (no constraint). */
   cropRatio: [number, number] | null;
   selectionTolerance: number;
@@ -178,6 +190,8 @@ export interface ToolState {
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
   setSelectionMask: (v: SetArg<Uint8Array | null>) => void;
+  setExportFormat: (v: SetArg<ExportFormat>) => void;
+  setQuality: (v: SetArg<number>) => void;
   setStampSettings: (v: SetArg<StampSettings>) => void;
   setToolSettings: (v: SetArg<ToolSettings>) => void;
 }
@@ -207,6 +221,10 @@ export const useToolStore = create<ToolState>()(
       eraserMode: "brush",
       textMode: "text",
       batchMode: "logo",
+      // Same defaults the AppShell useState pair had, so a user with no
+      // persisted blob (or one written before #14) sees no change at all.
+      exportFormat: "jpeg",
+      quality: 75,
       cropRatio: null,
       selectionTolerance: 24,
       selectionMask: null,
@@ -262,6 +280,9 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ selectionTolerance: resolveSet(v, s.selectionTolerance) })),
       setSelectionMask: (v) =>
         set((s) => ({ selectionMask: resolveSet(v, s.selectionMask) })),
+      setExportFormat: (v) =>
+        set((s) => ({ exportFormat: resolveSet(v, s.exportFormat) })),
+      setQuality: (v) => set((s) => ({ quality: resolveSet(v, s.quality) })),
       setStampSettings: (v) =>
         set((s) => ({ stampSettings: resolveSet(v, s.stampSettings) })),
       setToolSettings: (v) =>
@@ -286,6 +307,8 @@ export const useToolStore = create<ToolState>()(
         eraserMode: s.eraserMode,
         textMode: s.textMode,
         batchMode: s.batchMode,
+        exportFormat: s.exportFormat,
+        quality: s.quality,
       }),
       // Runs on every rehydrate (unlike `migrate`, which only fires on a
       // version bump) — the persisted blob is same-origin-writable IndexedDB,
@@ -304,6 +327,12 @@ export const useToolStore = create<ToolState>()(
           eraserMode: validated(p.eraserMode, ERASER_MODE_VALUES, current.eraserMode),
           textMode: validated(p.textMode, TEXT_MODES, current.textMode),
           batchMode: validated(p.batchMode, BATCH_MODES, current.batchMode),
+          // Both tolerate a blob written before these keys existed: `undefined`
+          // fails every check and falls back to the freshly-constructed default,
+          // which is exactly the pre-#14 behaviour. No version bump, no
+          // migration — the allowlist grew, the schema did not.
+          exportFormat: validated(p.exportFormat, EXPORT_FORMATS, current.exportFormat),
+          quality: validatedNumberInRange(p.quality, 1, 100, current.quality),
         };
       },
     },

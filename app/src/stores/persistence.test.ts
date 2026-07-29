@@ -18,15 +18,53 @@ import { useGalleryStore } from "./useGalleryStore";
 describe("useToolStore persistence", () => {
   const { partialize, merge } = useToolStore.persist.getOptions();
 
-  it("partializes exactly the six sub-mode prefs", () => {
-    // Was four. `textMode` and `batchMode` joined in the new-ui-toolbar arc
-    // when Text's and Batch's sub-modes moved out of component `useState` and
-    // into the store — same "remember which sub-mode I was in" category as the
-    // other four, so they persist on the same terms.
+  it("partializes exactly the six sub-mode prefs plus exportFormat + quality", () => {
+    // Was four, then six. `exportFormat` and `quality` joined in #14 when they
+    // moved out of AppShell `useState`, where every reload silently reset them
+    // to JPEG at 75. Same "remember what I picked" category as the sub-modes,
+    // and no engine coupling, so they persist on the same terms.
+    // This assertion is a DRIFT PIN: widening persistence has to break it on
+    // purpose rather than slip through, which is exactly what it did here.
     const persisted = partialize!(useToolStore.getState());
     expect(Object.keys(persisted).sort()).toEqual(
-      ["batchMode", "brushMode", "eraserMode", "shapesMode", "stampSubMode", "textMode"].sort(),
+      [
+        "batchMode",
+        "brushMode",
+        "eraserMode",
+        "exportFormat",
+        "quality",
+        "shapesMode",
+        "stampSubMode",
+        "textMode",
+      ].sort(),
     );
+  });
+
+  it("merge tolerates a blob written BEFORE exportFormat/quality existed", () => {
+    // The whole additive claim in one test: a persisted object from an older
+    // build has neither key, and both must land on the in-code default rather
+    // than `undefined` — no version bump, no migration, no crash.
+    const current = useToolStore.getState();
+    const merged = merge!({ brushMode: "blur" }, current) as typeof current;
+    expect(merged.exportFormat).toBe(current.exportFormat);
+    expect(merged.quality).toBe(current.quality);
+    expect(merged.brushMode).toBe("blur"); // the old key still applies
+  });
+
+  it("merge rejects an export format this build no longer has", () => {
+    const current = useToolStore.getState();
+    const merged = merge!({ exportFormat: "bmp" }, current) as typeof current;
+    expect(merged.exportFormat).toBe(current.exportFormat);
+  });
+
+  it("merge range-checks quality instead of trusting the blob", () => {
+    const current = useToolStore.getState();
+    for (const bad of [0, 101, -5, NaN, Infinity, "75", null]) {
+      const merged = merge!({ quality: bad }, current) as typeof current;
+      expect(merged.quality).toBe(current.quality);
+    }
+    // ...and a legal value still rehydrates.
+    expect((merge!({ quality: 42 }, current) as typeof current).quality).toBe(42);
   });
 
   it("does NOT partialize activeTool, selection*, or the settings blobs", () => {

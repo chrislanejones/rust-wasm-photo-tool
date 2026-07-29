@@ -73,3 +73,10 @@ install.log
 # Vercel CLI link (local only)
 .vercel
 .env*
+
+# TypeScript incremental build cache — a build artifact, not source. It was
+# tracked, so every `tsc` run showed up as a diff and every worktree ff-merge
+# hit a conflict on a file nobody edits (see PARKING_LOT / the clonestamp-split
+# notes). Untracked 2026-07-29; the local file stays put, it just stops being
+# git's business.
+*.tsbuildinfo

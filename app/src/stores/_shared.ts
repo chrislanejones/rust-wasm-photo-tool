@@ -34,6 +34,22 @@ export function validated<T>(value: unknown, allowed: readonly T[], fallback: T)
   return (allowed as readonly unknown[]).includes(value) ? (value as T) : fallback;
 }
 
+/** Narrows a rehydrated NUMBER to a range, falling back when it is missing,
+ *  not a number, NaN, or outside [min, max]. The union-based `validated` above
+ *  cannot do this job: a quality slider has 100 legal values, not a closed set
+ *  worth enumerating. Same contract otherwise — a blob written by another tab
+ *  or an older build never lands in state unchecked. */
+export function validatedNumberInRange(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max
+    ? value
+    : fallback;
+}
+
 /** Coerces a rehydrated value to an array of strings, dropping non-string
  *  entries and falling back to `[]` if the value itself isn't an array. */
 export function validatedStringArray(value: unknown): string[] {

@@ -11,7 +11,12 @@
 import type { SavedEdit } from "@/lib/editPersistence";
 import { encodeViaWorker } from "@/lib/codecWorkerClient";
 
-export type ExportFormat = "png" | "jpeg" | "webp" | "avif";
+/** Every export format, as a tuple so it can be range-checked at runtime —
+ *  the persisted `exportFormat` preference is rehydrated from same-origin-
+ *  writable IndexedDB and has to be validated against THIS build's list, the
+ *  same way the tool sub-modes are. Type is derived so the two cannot drift. */
+export const EXPORT_FORMATS = ["png", "jpeg", "webp", "avif"] as const;
+export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 const MIME: Record<ExportFormat, string> = {
   png: "image/png",

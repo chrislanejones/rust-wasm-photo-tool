@@ -85,6 +85,10 @@ anything does. It was reproduced under test fixtures before it was fixed —
 including a test that performs the old delete on purpose, so we know the
 reproduction is real and not a story about the code.
 
+**Your export format and quality stick now.** They were held in component
+state, so every reload quietly put them back to JPEG at 75 — a choice you had to
+re-make every visit. They live with the rest of the remembered preferences now.
+
 **Signing in on the live site works again — and the account tier still
 doesn't.** The backend now trusts both sign-in providers, which is what was
 breaking share links, so that half is verified fixed in production. But a paid

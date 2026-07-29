@@ -894,8 +894,14 @@ export function AppShell() {
   useEffect(() => {
     if (activeTool !== "crop") setColorPickerActive(false);
   }, [activeTool]);
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("jpeg");
-  const [quality, setQuality] = useState(75);
+  // Persisted prefs (#14), not local state: these used to be useState here, so
+  // every reload silently went back to JPEG at 75 and the user re-picked their
+  // format on every visit. Same setter signature (SetArg), so the call sites
+  // below — including `setQuality(q)` and the two panel props — are untouched.
+  const exportFormat = useToolStore((s) => s.exportFormat);
+  const setExportFormat = useToolStore((s) => s.setExportFormat);
+  const quality = useToolStore((s) => s.quality);
+  const setQuality = useToolStore((s) => s.setQuality);
 
   const effectiveBrushSize = (() => {
     switch (activeTool) {
