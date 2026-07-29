@@ -225,7 +225,28 @@ interface Binding {
 let activePhotoId: string | null = null;
 let bound: Binding | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-let saving = false;
+/** The save currently running, or the tail of the queue behind it. A save that
+ *  arrives while another is running CHAINS onto this instead of being dropped.
+ *
+ *  This used to be `let saving = false` plus an early `return` in
+ *  `saveOplogNow`, which was a silent no-op with no retry and no signal to the
+ *  caller — #21, and data loss rather than a leak: `restoreFromOplog` runs
+ *  first in `useImageSession` and a "restored" result short-circuits the
+ *  working-copy path, so a dropped tail hands the user a valid, internally
+ *  consistent, OLDER document on resume.
+ *
+ *  A promise chain rather than a `pendingRerun` boolean, deliberately: with a
+ *  flag, a caller that awaits `saveOplogNow` still gets control back before the
+ *  rerun has written anything, so `flushPendingOplogSave` would resolve with
+ *  the tail still in memory — and its whole job is to be awaited before a photo
+ *  switch. Chaining makes the await mean what the call site already assumes.
+ *
+ *  NOT collapsed into a single "one queued save is enough" slot: consecutive
+ *  calls can carry DIFFERENT photoIds (a flush-on-switch immediately followed
+ *  by the new photo's first save), and collapsing those would drop one — the
+ *  exact bug being fixed, in a new place. Volume is bounded by the debounce and
+ *  the handful of flush call sites, not by op count. */
+let inFlight: Promise<void> | null = null;
 /** Photos whose persisted log this session has already marked stale — keeps
  *  the invalidation to one manifest read + one write per photo, per session. */
 const invalidated = new Set<string>();
@@ -346,9 +367,25 @@ export function onOplogFlush(tool: object): void {
 /** Persist the photo's log now (also the test entry point). One readwrite
  *  transaction; all encoding happens before it opens. */
 export async function saveOplogNow(tool: object, photoId: string): Promise<void> {
-  if (!hasPersistExports(tool) || saving) return;
-  saving = true;
-  try {
+  if (!hasPersistExports(tool)) return;
+  // Queue behind whatever is already running. The predecessor's REJECTION must
+  // not cancel this save, so both settle paths continue to the same body.
+  const run = (inFlight ?? Promise.resolve()).then(
+    () => saveOplogInner(tool, photoId),
+    () => saveOplogInner(tool, photoId),
+  );
+  // The chain's tail must never reject, or an unhandled rejection escapes and
+  // every later save chains off a rejected promise. Callers still see `run`.
+  inFlight = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function saveOplogInner(tool: object, photoId: string): Promise<void> {
+  if (!hasPersistExports(tool)) return;
+  {
     // Re-checked at fire time, not just when the save was scheduled: a save
     // debounced BEFORE an unrecorded edit (or a new layer) would otherwise
     // land afterwards and persist a log that is missing it.
@@ -488,8 +525,6 @@ export async function saveOplogNow(tool: object, photoId: string): Promise<void>
       stale: false,
       at: Date.now(),
     });
-  } finally {
-    saving = false;
   }
 }
 
@@ -598,6 +633,6 @@ export function __resetOplogPersistenceForTests(): void {
   invalidated.clear();
   if (debounceTimer != null) clearTimeout(debounceTimer);
   debounceTimer = null;
-  saving = false;
+  inFlight = null;
   warnedRestoreFailure = false;
 }

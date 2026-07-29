@@ -70,47 +70,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.59 — 2026-07-29
+### v7.60 — 2026-07-30
 
-**Compressing a photo could delete a different photo's original.** Originals are
-stored once and shared — that is what makes duplicating a photo instant, since
-the copy points at the same bytes. But the cleanup that runs after compressing
-only checked whether *that* photo still needed the old bytes, never whether
-anything else did. Compress a photo, duplicate it, compress the duplicate, and
-the first photo's original was deleted out from under it while it still pointed
-there. Nothing pointed at a backup, because there isn't one.
+**Edits made in the last moments before switching photos could be lost.** Your
+drawing is saved on a short delay, and if you switched photos while one of those
+saves was still writing, the next save was dropped instead of queued — silently,
+with nothing left to retry it. The strokes since the last completed save never
+reached disk, and because the app trusts that record over its other copy when
+reopening a photo, it would hand you back an older version that looked
+perfectly intact. Saves now queue behind each other, so switching photos waits
+for the write instead of racing it.
 
-Cleanup now asks whether *anything* still needs the bytes, and keeps them if
-anything does. It was reproduced under test fixtures before it was fixed —
-including a test that performs the old delete on purpose, so we know the
-reproduction is real and not a story about the code.
-
-**The July shipping popper caught up with itself.** `Ctrl+\` celebrates the
-month's shipped work, and it was still counting through v7.57 — two releases
-behind its own changelog. Its numbers are counted from the trail log rather than
-typed in, and two of them had been hard-coded in the markup, which is how they
-drifted apart. They all read from one place now.
-
-**Your export format and quality stick now.** They were held in component
-state, so every reload quietly put them back to JPEG at 75 — a choice you had to
-re-make every visit. They live with the rest of the remembered preferences now.
-
-**Signing in on the live site works again — and the account tier still
-doesn't.** The backend now trusts both sign-in providers, which is what was
-breaking share links, so that half is verified fixed in production. But a paid
-account still reads as free there, and it turns out that was never an auth
-problem: signing in through two different providers creates two separate
-accounts on the backend, and the live site signs you into the one without the
-subscription. Written up in
-[docs/share-links-auth-mismatch.md](docs/share-links-auth-mismatch.md); the fix
-is a decision about which provider to keep, not a code change.
-
-**A future update can no longer wedge the app on an old tab.** Browsers refuse
-to upgrade a database while an older tab still has it open. Nothing was
-listening for that, so the next schema change would have left the new tab
-waiting forever — and every save waiting behind it. Old tabs now step aside when
-an upgrade arrives, and if something still holds on, it says so instead of
-hanging in silence.
+The drop was reproduced under test fixtures first — four tests that failed
+before the fix and pass after.
 
 ## License
 
