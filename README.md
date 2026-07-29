@@ -100,6 +100,10 @@ storing a pointer to nothing. And an unreadable cloud archive was treated as if
 it were an old-format image, which hid the real problem behind a confusing one.
 All four now recover or say what happened.
 
+The **paid-tier question got a verdict**, too: nobody has ever subscribed, so
+there is no billing record attached to the wrong account and nothing to migrate.
+Details in [docs/share-links-auth-mismatch.md](docs/share-links-auth-mismatch.md).
+
 An **[entropy report](docs/entropy-2026-07-30.md)** also went in — ten releases
 of structural drift, measured rather than guessed. Short version: the clone-stamp
 split held (that file is the same size it was ten releases ago), but the file it

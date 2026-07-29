@@ -238,3 +238,133 @@ curl -s -X POST https://<deployment>.convex.cloud/api/query \
 Still not verified, because it needs a real signed-in session on the live site:
 that a signed-in user now sees share links working end to end. The backend half
 is proven; the browser half needs Chris's credentials.
+
+---
+
+# 2026-07-30 — STRIPE LINKAGE: option B is safe, and the question is largely moot
+
+Diagnostic only. Nothing was written, no Stripe call was made, no user row was
+touched, `npx convex deploy` was not run. All four questions read off
+`brave-ant-608` — the deployment the live site actually uses — and the source.
+
+## Verdict
+
+**Option B is safe. No row migration is needed, because there is nothing to
+migrate: no subscription has ever existed.**
+
+## 1. Does a Stripe customer record exist? — **No. Zero.**
+
+The `subscriptions` table on `brave-ant-608` is **empty**. Not "one pointing at
+the wrong row" — none at all. Nobody has ever completed a checkout against the
+deployment the live site talks to.
+
+That alone makes the linkage question moot: there is no `stripeCustomerId`
+anywhere to be attached to the wrong identity.
+
+**It also answers the open question about how you subscribed: you didn't.** The
+`pro` tier on the dev-subject row is a **manual grant**, not a purchase. Two
+mechanisms can produce it and neither involves Stripe:
+
+- `users.devGrantTier` — an `internalMutation`, looks the user up **by email**
+  and patches `tier`.
+- `users.setMyTier` — the Super User pane's "Apply". Public, but gated on the
+  `ADMIN_EMAIL` Convex env var and throws for everyone else *and* when the env
+  var is unset. (Checked specifically, since a self-serve tier setter would be a
+  far more urgent finding than the one being investigated. It is properly
+  gated.)
+
+So the pro row is a grant made by email or by admin action, which is why it
+survived on the dev-subject row while the production-subject row stayed free.
+
+## 2. Which row holds the `stripeCustomerId`? — **Neither; it is not on the user row at all**
+
+Worth correcting the premise: `stripeCustomerId` is not a field on `users`. It
+lives on the separate `subscriptions` table, keyed by `userId: v.id("users")`:
+
+```
+subscriptions: { userId, stripeCustomerId, stripeSubId, plan, status, ... }
+  .index("by_userId") .index("by_stripeCustomerId") .index("by_stripeSubId")
+```
+
+So the linkage is a row reference, not a column on the identity — and with the
+table empty, there is no reference in either direction.
+
+## 3. What does the webhook resolve on? — **A Convex `Id<"users">` stamped at checkout**
+
+This was the crux, and the answer is the good one.
+
+`convex/http.ts` `/stripe-webhook` reads `obj.metadata.userId` and passes it
+straight to `subscriptions.fulfill`. It does **not** look up the user by
+`stripeCustomerId`, and it does **not** use a raw `identity.subject`.
+
+That `metadata.userId` is stamped in `convex/stripe.ts`:
+
+```
+const userId = await ctx.runMutation(api.users.upsert, {});   // from the LIVE session
+"metadata[userId]": String(userId),
+"subscription_data[metadata][userId]": String(userId),
+```
+
+`users.upsert` resolves the row from `ctx.auth.getUserIdentity()` at checkout
+time. So the subscription is bound to **whichever Convex row the person is
+signed in as when they click Upgrade**.
+
+**This is why option B fixes tomorrow as well as today.** After repointing
+prod's Clerk key at `grateful-dingo-89`, a prod session resolves to the
+dev-subject row — the one that already holds `pro` — so a future checkout stamps
+*that* row's id and the webhook writes there. The failure you were worried about
+(a later checkout re-orphaning the tier) requires prod to keep authenticating as
+the production subject, which is exactly what option B stops.
+
+The opposite design — resolving by `stripeCustomerId` → user — would have been
+the dangerous one, because an existing customer record would pin future payments
+to whichever row it was first attached to. That design is not in use.
+
+## 4. Does Plan & Billing read the row the webhook writes? — **Yes**
+
+No third instance of the pattern here. `subscriptions.fulfill` writes both
+sides:
+
+```
+await ctx.db.insert/patch("subscriptions", { userId, ... })
+const tier = sub.status === "active" ? sub.plan : "free";
+await ctx.db.patch(userId, { tier, updatedAt: Date.now() });   // ← the users row
+```
+
+and the UI reads exactly that:
+
+- `useRealTier` → `api.users.me` → `users.tier`
+- `SubscriptionButton` → `api.users.me` **and** `api.subscriptions.getByUser`
+
+Both resolve through the authenticated identity, so they read whatever row the
+session maps to — the same row `fulfill` patched. The tier the panel shows and
+the tier the server enforces come from one field.
+
+## What is still not verified, and by whom
+
+- **The unused production deployment (`pastel-alligator-180`) was not read.**
+  The Convex MCP marks it `readOnly`, which permits `tables`/`functionSpec` but
+  refuses `data`, so "no subscriptions" is established for `brave-ant-608` only.
+  Given the live site has never pointed at production and production trusts no
+  auth issuer at all (see the 2026-07-29 section), a subscription existing there
+  is close to impossible — but it is inference, not a reading.
+- **The Clerk user count in `amazed-akita-72`** — yours to check, thirty seconds
+  in the dashboard, and it is the one input this verdict does not cover.
+  Everything above says option B is safe *for billing*; it says nothing about
+  accounts. Switching instances does not migrate Clerk users, so if real people
+  have signed up against `amazed-akita-72`, they lose access on the day of the
+  switch regardless of the Stripe answer being clean.
+
+## Revised summary of the options
+
+- **B — consolidate on `grateful-dingo-89`.** Safe from the billing side, and it
+  is the only option that fixes the paid-tier symptom immediately (prod would
+  authenticate as the row that already holds `pro`). Gated solely on the Clerk
+  user-count question above.
+- **A — point the live site at production.** Unchanged, and still carries the
+  trap recorded on 2026-07-29: `pastel-alligator-180` has **no auth providers
+  configured**, so repointing without deploying `auth.config.ts` there first
+  goes from "wrong user row" to "not authenticated at all".
+- **Row migration** — **not needed**. There is no subscription to move, and the
+  `pro` tier is a manual grant that can simply be re-applied to whichever row
+  survives, by email, with `devGrantTier`.
