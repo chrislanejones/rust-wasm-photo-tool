@@ -85,6 +85,16 @@ anything does. It was reproduced under test fixtures before it was fixed —
 including a test that performs the old delete on purpose, so we know the
 reproduction is real and not a story about the code.
 
+**Signing in on the live site works again — and the account tier still
+doesn't.** The backend now trusts both sign-in providers, which is what was
+breaking share links, so that half is verified fixed in production. But a paid
+account still reads as free there, and it turns out that was never an auth
+problem: signing in through two different providers creates two separate
+accounts on the backend, and the live site signs you into the one without the
+subscription. Written up in
+[docs/share-links-auth-mismatch.md](docs/share-links-auth-mismatch.md); the fix
+is a decision about which provider to keep, not a code change.
+
 **A future update can no longer wedge the app on an old tab.** Browsers refuse
 to upgrade a database while an older tab still has it open. Nothing was
 listening for that, so the next schema change would have left the new tab
