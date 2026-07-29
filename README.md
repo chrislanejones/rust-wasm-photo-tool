@@ -85,6 +85,12 @@ anything does. It was reproduced under test fixtures before it was fixed —
 including a test that performs the old delete on purpose, so we know the
 reproduction is real and not a story about the code.
 
+**The July shipping popper caught up with itself.** `Ctrl+\` celebrates the
+month's shipped work, and it was still counting through v7.57 — two releases
+behind its own changelog. Its numbers are counted from the trail log rather than
+typed in, and two of them had been hard-coded in the markup, which is how they
+drifted apart. They all read from one place now.
+
 **Your export format and quality stick now.** They were held in component
 state, so every reload quietly put them back to JPEG at 75 — a choice you had to
 re-make every visit. They live with the rest of the remembered preferences now.

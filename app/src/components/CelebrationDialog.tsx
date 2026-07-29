@@ -22,21 +22,28 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-/** Live shipping stats (July 2026, through v7.57 · Jul 2–27).
+/** Live shipping stats (July 2026, through v7.59 · Jul 2–29).
  *
  *  Counted from `marketing/src/data/releases.ts`, the hand-written trail log,
- *  NOT typed in by hand — 57 July releases, 171 entries, against 462 all-time
- *  across 105 releases. Tag split for July: fix 54, ui 38, feature 32, rust 24,
- *  infra 22, perf 1. Re-derive rather than guess when this is next refreshed:
+ *  NOT typed in by hand — 59 July releases, 186 entries, against 477 all-time
+ *  across 107 releases. Tag split for July: fix 60, ui 43, feature 33, rust 24,
+ *  infra 25, perf 1. Re-derive rather than guess when this is next refreshed:
  *  parse each `version/date/headline/entries` block out of releases.ts, keep
  *  the ones dated 2026-07, and count `tag:` occurrences. Note the order —
  *  the release being cut has to be IN releases.ts before these are counted,
- *  or the popper ships a release behind its own changelog. */
+ *  or the popper ships a release behind its own changelog.
+ *
+ *  The two numbers in the milestone chip below are part of this set and were
+ *  hard-coded in the markup while the rest lived here, which is how they went
+ *  stale on their own — they read off STATS now, so one refresh moves all of
+ *  them together. */
 const STATS = {
-  monthShipped: 171, // entries logged in July across 57 releases
-  releases: 57,
-  allTime: 462, // all-time trail-log entries
-  monthPct: 37, // July = 37% of everything ever shipped
+  monthShipped: 186, // entries logged in July across 59 releases
+  releases: 59,
+  allTime: 477, // all-time trail-log entries
+  monthPct: 39, // July = 39% of everything ever shipped
+  features: 33, // July `tag: "feature"` entries
+  fixes: 60, // July `tag: "fix"` entries
 };
 
 /** July's headline work — icon + label, shown as chips. Drawn from real
@@ -184,7 +191,8 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
             </span>
             {/* Milestone */}
             <span className="mt-1 rounded-full border border-theme-sidebar-border bg-bg-elevated px-3 py-1 text-2xs font-semibold text-theme-accent">
-              32 features and 54 fixes, across {STATS.releases} releases
+              {STATS.features} features and {STATS.fixes} fixes, across{" "}
+              {STATS.releases} releases
             </span>
           </motion.div>
 
