@@ -27,6 +27,7 @@ import {
 const BAR_CLASS: Record<LogSource, string> = {
   WASM_ENGINE: "bg-warning",
   CONVEX_DB: "bg-blue-500",
+  INDEXEDDB: "bg-teal-500",
   REPLICATE_AI: "bg-violet-500",
   UI_THREAD: "bg-success",
   CONSOLE: "bg-bg-elevated",
@@ -35,6 +36,7 @@ const BAR_CLASS: Record<LogSource, string> = {
 const TEXT_CLASS: Record<LogSource, string> = {
   WASM_ENGINE: "text-warning",
   CONVEX_DB: "text-blue-400",
+  INDEXEDDB: "text-teal-400",
   REPLICATE_AI: "text-violet-400",
   UI_THREAD: "text-success",
   CONSOLE: "text-text-secondary",

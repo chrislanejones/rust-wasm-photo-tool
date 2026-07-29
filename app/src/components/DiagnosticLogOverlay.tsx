@@ -29,6 +29,8 @@ type Tab = "resources" | "telemetry" | "imagemeta";
 const SOURCE_CLASS: Record<LogSource, string> = {
   WASM_ENGINE: "bg-warning/10 text-warning border-warning/20",
   CONVEX_DB: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  // Local IndexedDB — teal to sit next to the cloud blue without being it.
+  INDEXEDDB: "bg-teal-500/10 text-teal-400 border-teal-500/20",
   REPLICATE_AI: "bg-violet-500/10 text-violet-400 border-violet-500/20",
   UI_THREAD: "bg-success/10 text-success border-success/20",
   CONSOLE: "bg-bg-elevated/40 text-text-secondary border-border/40",

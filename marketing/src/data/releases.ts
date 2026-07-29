@@ -31,6 +31,7 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "Originals are stored once and shared — that is what makes duplicating a photo instant, since the copy points at the same bytes. But the cleanup that ran after compressing only checked whether that photo still needed the old bytes, never whether anything else did. Compress a photo, duplicate it, compress the duplicate, and the first photo's original was deleted out from under it while it still pointed there. There is no backup to fall back on." },
       { tag: "fix", text: "Cleanup now asks whether anything at all still needs the bytes, and keeps them if anything does. It leans toward keeping: leftover bytes are something we can measure and clean up later, while a deleted photo is gone." },
       { tag: "infra", text: "Reproduced under test fixtures before it was fixed, including a test that performs the old delete on purpose — so the reproduction is known to be real rather than a story about the code." },
+      { tag: "fix", text: "A future update can no longer wedge the app on an old tab. Browsers refuse to upgrade a database while an older tab still has it open, and nothing was listening for that — so the next schema change would have left the new tab waiting forever, with every save waiting behind it. Old tabs now step aside when an upgrade arrives, and if something still holds on, it says so instead of hanging in silence." },
     ],
   },
   {

@@ -7,6 +7,9 @@
 export type LogSource =
   | "WASM_ENGINE"
   | "CONVEX_DB"
+  // Local IndexedDB, distinct from CONVEX_DB — that one is the cloud. Added for
+  // the Dexie upgrade-deadlock guard, whose whole value is being visible.
+  | "INDEXEDDB"
   | "REPLICATE_AI"
   | "UI_THREAD"
   | "CONSOLE";

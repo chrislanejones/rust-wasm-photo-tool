@@ -85,6 +85,13 @@ anything does. It was reproduced under test fixtures before it was fixed —
 including a test that performs the old delete on purpose, so we know the
 reproduction is real and not a story about the code.
 
+**A future update can no longer wedge the app on an old tab.** Browsers refuse
+to upgrade a database while an older tab still has it open. Nothing was
+listening for that, so the next schema change would have left the new tab
+waiting forever — and every save waiting behind it. Old tabs now step aside when
+an upgrade arrives, and if something still holds on, it says so instead of
+hanging in silence.
+
 ## License
 
 MIT

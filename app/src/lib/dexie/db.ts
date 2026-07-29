@@ -10,6 +10,7 @@
 // never-wired convenience mirror was removed in the 2026-07-17 fallow cleanup;
 // the op-log tables + helpers below are the live surface.)
 import Dexie, { type Table } from "dexie";
+import { logDiagnostic } from "@/lib/diagnosticsLog";
 
 // ── Records ────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,61 @@ class ImageHorseDB extends Dexie {
 /** The singleton database. Import for `useLiveQuery(() => db.photos.toArray())`
  *  and ad-hoc queries; prefer the helpers below for the common operations. */
 export const db = new ImageHorseDB();
+
+// ── Upgrade deadlock guard ──────────────────────────────────────────────────
+//
+// NOT a schema or storage change — no table, field, index, version or stored
+// byte is touched here, so this is outside the `dexie-migration` procedure.
+// It is connection lifecycle, and without it the NEXT migration can hang.
+//
+// The failure it prevents: a user has an old tab open when a release bumps the
+// schema. The new tab calls `db.open()`, IndexedDB refuses to upgrade while the
+// old connection is live, Dexie fires `blocked`, and with nobody listening the
+// open promise never settles. Every Dexie call then waits forever — including
+// the local save in `savePhotoEdit`, which deliberately has NO timeout because
+// it writes the only copy of the user's work. The whole app wedges, exactly the
+// way the gallery did when a Convex mutation hung (v7.57).
+//
+// `versionchange` is the half that actually fixes it. It fires in the OLD tab
+// when another tab wants to upgrade; closing the connection there lets the
+// upgrade proceed instead of deadlocking. The old tab's Dexie calls will then
+// fail rather than hang — the right trade, and it is already parked behind
+// MultiTabScreen, which claims a single editing tab.
+db.on("versionchange", () => {
+  logDiagnostic(
+    "INDEXEDDB",
+    "Another tab is upgrading the database; closing this connection so the upgrade is not blocked. Reload this tab to keep using it.",
+  );
+  db.close();
+});
+
+// `blocked` fires in the NEW tab when something still holds the old version
+// open — a tab that ignored `versionchange`, or another browser window. Nothing
+// can be done from here except make it visible instead of silent.
+//
+// DECIDED 2026-07-29 — a Diagnostics line, NOT a "close your other tabs" modal
+// (which is what PARKING_LOT originally specified; that entry now says this).
+// Three reasons, in order of weight:
+//   1. `MultiTabScreen` shipped in v7.57 and already claims a single editing
+//      tab with a visible screen. A modal here would be a second feature
+//      telling the user the same thing about the same situation.
+//   2. `blocked` is a WAIT, not a failure — it clears by itself the moment the
+//      other connection goes away. A modal that appears and then has to be
+//      dismissed for a condition that resolved itself is worse than a log.
+//   3. With `versionchange` above in place, every Image Horse tab drops its
+//      connection on demand, so `blocked` should only ever be reached by a tab
+//      from a build that predates this guard, or by another browser profile
+//      that BroadcastChannel cannot reach.
+// RESIDUAL GAP, deliberately accepted and parked: if a block does persist, the
+// app still waits with only a Diagnostics entry the user has no reason to open.
+// The fix for that is a timeout that raises MultiTabScreen's shape rather than
+// a new modal, and it is its own change.
+db.on("blocked", () => {
+  logDiagnostic(
+    "INDEXEDDB",
+    "Database upgrade is blocked by another open tab. Close other Image Horse tabs and reload.",
+  );
+});
 
 // ── Hashing (content address) ────────────────────────────────────────────────
 
