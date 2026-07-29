@@ -100,6 +100,12 @@ storing a pointer to nothing. And an unreadable cloud archive was treated as if
 it were an old-format image, which hid the real problem behind a confusing one.
 All four now recover or say what happened.
 
+An **[entropy report](docs/entropy-2026-07-30.md)** also went in — ten releases
+of structural drift, measured rather than guessed. Short version: the clone-stamp
+split held (that file is the same size it was ten releases ago), but the file it
+was split out of grew anyway, and a second oversized file has been quietly
+getting bigger. Nothing in it was acted on; the numbers are the deliverable.
+
 ## License
 
 MIT
