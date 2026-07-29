@@ -91,6 +91,15 @@ the photo on the same machine and your shadows were there; open it on another
 device and the text came back flat, with no error either way. There is one copy
 of that list now, and a test that fails if the two ever disagree again.
 
+**Four smaller ways storage could quietly stop working.** A single failed
+connection to browser storage used to be remembered for the rest of the
+session, so one bad moment wedged that store until you reloaded. Browsers also
+close idle connections on their own, and the app kept using the closed one —
+after which every save failed. A failed upload was read as if it had succeeded,
+storing a pointer to nothing. And an unreadable cloud archive was treated as if
+it were an old-format image, which hid the real problem behind a confusing one.
+All four now recover or say what happened.
+
 ## License
 
 MIT

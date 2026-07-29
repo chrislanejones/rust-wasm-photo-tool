@@ -22,7 +22,19 @@ function openDb(): Promise<IDBDatabase> {
       const db = (e.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     };
-    req.onsuccess = (e) => { _db = (e.target as IDBOpenDBRequest).result; resolve(_db!); };
+    req.onsuccess = (e) => {
+      _db = (e.target as IDBOpenDBRequest).result;
+      // Browsers close idle IndexedDB connections on their own, and a cached
+      // CLOSED connection throws InvalidStateError on every transaction after
+      // that — which here is every edit save for the rest of the session.
+      // Dropping the cache lets the next call reopen. (This store caches the
+      // CONNECTION rather than the promise, so unlike its three siblings a
+      // failed open was never cached; only the close case needed fixing.)
+      _db.onclose = () => {
+        _db = null;
+      };
+      resolve(_db);
+    };
     req.onerror = () => reject(req.error);
   });
 }

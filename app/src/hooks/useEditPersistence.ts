@@ -141,6 +141,14 @@ function encodeArchive(
   return u8;
 }
 
+/** The 8-byte PNG signature. The ONLY thing that makes a non-archive blob a
+ *  legitimate legacy single-PNG edit rather than corruption. */
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+function looksLikePng(data: Uint8Array): boolean {
+  return data.byteLength >= 8 && PNG_MAGIC.every((b, i) => data[i] === b);
+}
+
 function decodeArchive(data: Uint8Array): SavedEdit {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let pos = 0;
@@ -349,7 +357,21 @@ export function useEditPersistence() {
             }),
             "archive upload",
           );
-          const { storageId } = await resp.json() as { storageId: string };
+          // A non-2xx upload still parses as JSON — an error body, with no
+          // `storageId` in it. Unchecked, that handed `undefined` to saveEdit
+          // as an Id<"_storage">, persisting a pointer to nothing while the
+          // catch below logged a misleading "cloud save failed" for a request
+          // that had, as far as this code knew, succeeded.
+          if (!resp.ok) {
+            throw new Error(
+              `archive upload failed: HTTP ${resp.status} ${resp.statusText}`,
+            );
+          }
+          const body = (await resp.json()) as { storageId?: string };
+          if (!body.storageId) {
+            throw new Error("archive upload returned no storageId");
+          }
+          const { storageId } = body as { storageId: string };
           await withTimeout(
             saveEdit({ photoKey: photoId, storageId: storageId as Id<"_storage">, canvasW, canvasH }),
             "saveEdit",
@@ -387,9 +409,36 @@ export function useEditPersistence() {
             const data = new Uint8Array(await resp.arrayBuffer());
             try {
               return decodeArchive(data);
-            } catch {
-              // Legacy single-PNG blob — fall back gracefully
-              return { canvasW: edit.canvasW, canvasH: edit.canvasH, canvasPng: data, undoStack: [], redoStack: [], annotations: [] };
+            } catch (err) {
+              // A decode failure used to fall through to "it must be a legacy
+              // single-PNG blob", which is true for exactly one kind of failure
+              // and a lie for every other. Corrupt or truncated archive bytes
+              // were handed back AS pixels, so the real error surfaced later as
+              // an unrelated image-decode failure with the cause long gone.
+              //
+              // Only bytes that actually start with the PNG signature are a
+              // legacy blob. Anything else is corruption, and it says so.
+              if (looksLikePng(data)) {
+                return {
+                  canvasW: edit.canvasW,
+                  canvasH: edit.canvasH,
+                  canvasPng: data,
+                  undoStack: [],
+                  redoStack: [],
+                  annotations: [],
+                };
+              }
+              const detail = err instanceof Error ? err.message : String(err);
+              console.error(
+                `[edit-persist] cloud archive for ${photoId} is not decodable and is not a legacy PNG (${data.byteLength} bytes): ${detail}`,
+              );
+              logDiagnostic(
+                "CONVEX_DB",
+                `Cloud archive for this photo could not be read (${data.byteLength} bytes, ${detail}). Falling back to the copy stored in this browser.`,
+              );
+              // Returning null rather than the bad bytes: the caller falls
+              // through to the local IndexedDB copy, which is a real document.
+              return null;
             }
           }
         } catch {

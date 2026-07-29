@@ -17,17 +17,37 @@ const VERSION = 1;
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
+// A rejected open MUST NOT stay cached: `dbPromise` is returned to every later
+// caller, so one transient failure (private-mode quota refusal, a storage
+// eviction mid-open) wedged this store for the rest of the session with no way
+// back. Clearing it on rejection makes the next call retry.
+//
+// `db.onclose` matters for the same reason from the other direction: browsers
+// close idle IndexedDB connections on their own, and a cached CLOSED connection
+// throws InvalidStateError on every transaction afterwards. Dropping the cache
+// lets the next call reopen. Both guards compare identity before clearing, so a
+// late event from an old connection cannot discard a newer one.
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
+  const p = new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onclose = () => {
+        if (dbPromise === p) dbPromise = null;
+      };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
-  return dbPromise;
+  p.catch(() => {
+    if (dbPromise === p) dbPromise = null;
+  });
+  dbPromise = p;
+  return p;
 }
 
 async function idbGet(key: string): Promise<string | null> {
