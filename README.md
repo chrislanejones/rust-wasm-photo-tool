@@ -103,6 +103,11 @@ storing a pointer to nothing. And an unreadable cloud archive was treated as if
 it were an old-format image, which hid the real problem behind a confusing one.
 All four now recover or say what happened.
 
+Four **[architecture decision records](docs/adr/INDEX.md)** were written for
+calls already made — the five-group toolbar, the focus-ring vocabulary, how
+non-React code talks to the UI, and how shared image data is collected. They
+record; they don't decide.
+
 **The docs got audited too** — all fifteen. Four were saying things that are no
 longer true (the shortcut table still listed the old tool keys, and the
 OpenRaster page still called a shipped feature a plan), and the security page

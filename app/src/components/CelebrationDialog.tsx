@@ -22,12 +22,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-/** Live shipping stats (July 2026, through v7.59 · Jul 2–29).
+/** Live shipping stats (July 2026, through v7.60 · Jul 2–30).
  *
  *  Counted from `marketing/src/data/releases.ts`, the hand-written trail log,
- *  NOT typed in by hand — 59 July releases, 186 entries, against 477 all-time
- *  across 107 releases. Tag split for July: fix 60, ui 43, feature 33, rust 24,
- *  infra 25, perf 1. Re-derive rather than guess when this is next refreshed:
+ *  NOT typed in by hand — 60 July releases, 195 entries, against 486 all-time
+ *  across 108 releases. Tag split for July: fix 64, ui 43, feature 33, infra 30,
+ *  rust 24, perf 1. Re-derive rather than guess when this is next refreshed:
  *  parse each `version/date/headline/entries` block out of releases.ts, keep
  *  the ones dated 2026-07, and count `tag:` occurrences. Note the order —
  *  the release being cut has to be IN releases.ts before these are counted,
@@ -38,12 +38,12 @@ import { Button } from "@/components/ui/button";
  *  stale on their own — they read off STATS now, so one refresh moves all of
  *  them together. */
 const STATS = {
-  monthShipped: 186, // entries logged in July across 59 releases
-  releases: 59,
-  allTime: 477, // all-time trail-log entries
-  monthPct: 39, // July = 39% of everything ever shipped
+  monthShipped: 195, // entries logged in July across 60 releases
+  releases: 60,
+  allTime: 486, // all-time trail-log entries
+  monthPct: 40, // July = 40% of everything ever shipped
   features: 33, // July `tag: "feature"` entries
-  fixes: 60, // July `tag: "fix"` entries
+  fixes: 64, // July `tag: "fix"` entries
 };
 
 /** July's headline work — icon + label, shown as chips. Drawn from real
