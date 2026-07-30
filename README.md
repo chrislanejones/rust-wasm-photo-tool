@@ -124,6 +124,15 @@ split held (that file is the same size it was ten releases ago), but the file it
 was split out of grew anyway, and a second oversized file has been quietly
 getting bigger. Nothing in it was acted on; the numbers are the deliverable.
 
+**The keyboard shortcuts list is a real dialog now.** Escape closes it. Tab
+cycles inside it instead of wandering off into the page behind. When it closes,
+you land back on whatever you were on before you opened it, and screen readers
+are told it's a dialog. `Alt` + `/` still opens and closes it, and the × and
+clicking outside still work.
+
+Three tools were each carrying their own copy of the same canvas maths. There's
+one copy now, and the largest duplicate block in the codebase is gone.
+
 ## License
 
 MIT
