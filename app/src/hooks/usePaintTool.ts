@@ -3,6 +3,7 @@ import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { isSmartEdgeEnabled } from "@/lib/smartEdge";
 import { useToolStore } from "@/stores/useToolStore";
+import { useCanvasCoords } from "./useCanvasCoords";
 
 interface Opts {
   toolRef: React.RefObject<ImageHorseTool | null>;
@@ -50,18 +51,7 @@ export function usePaintTool({
   const smartBrush = useToolStore((s) => s.smartBrush);
   const smartBrushStrength = useToolStore((s) => s.smartBrushStrength);
 
-  const coords = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const c = canvasRef.current;
-      if (!c) return { x: 0, y: 0 };
-      const r = c.getBoundingClientRect();
-      return {
-        x: ((e.clientX - r.left) * c.width) / r.width,
-        y: ((e.clientY - r.top) * c.height) / r.height,
-      };
-    },
-    [canvasRef],
-  );
+  const coords = useCanvasCoords(canvasRef);
 
   const onMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {

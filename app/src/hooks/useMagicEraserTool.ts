@@ -3,6 +3,7 @@ import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { isPatchmatchEnabled, tryRemoveObject } from "@/lib/patchmatch";
 import { useToolStore } from "@/stores/useToolStore";
+import { useCanvasCoords } from "./useCanvasCoords";
 
 // Magic Eraser brush — verification-only, NOT a shipped preference.
 //
@@ -90,18 +91,7 @@ export function useMagicEraserTool({
   const rafPending = useRef(false);
   const rafTool = useRef<MagicEraserWasmExports | null>(null);
 
-  const coords = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const c = canvasRef.current;
-      if (!c) return { x: 0, y: 0 };
-      const r = c.getBoundingClientRect();
-      return {
-        x: ((e.clientX - r.left) * c.width) / r.width,
-        y: ((e.clientY - r.top) * c.height) / r.height,
-      };
-    },
-    [canvasRef],
-  );
+  const coords = useCanvasCoords(canvasRef);
 
   const pushOverlay = useCallback(
     (t: MagicEraserWasmExports) => {

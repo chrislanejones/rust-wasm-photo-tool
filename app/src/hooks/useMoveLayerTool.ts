@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { ImageHorseTool } from "stamp_tool";
+import { useCanvasCoords } from "./useCanvasCoords";
 
 interface Opts {
   toolRef: React.RefObject<ImageHorseTool | null>;
@@ -33,18 +34,7 @@ export function useMoveLayerTool({
   const start = useRef({ x: 0, y: 0 });
   const offset = useRef({ dx: 0, dy: 0 });
 
-  const coords = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const c = canvasRef.current;
-      if (!c) return { x: 0, y: 0 };
-      const r = c.getBoundingClientRect();
-      return {
-        x: ((e.clientX - r.left) * c.width) / r.width,
-        y: ((e.clientY - r.top) * c.height) / r.height,
-      };
-    },
-    [canvasRef],
-  );
+  const coords = useCanvasCoords(canvasRef);
 
   const onMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
