@@ -24,6 +24,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.61",
+    date: "2026-07-31",
+    headline: "Name a whole gallery from what's in the pictures",
+    entries: [
+      { tag: "feature", text: "Batch has a fourth tool: AI Rename. It reads every loaded photo and names it from what it sees — the dominant colour, whether it is bright or dark, whether it is a photograph, a graphic or a screenshot, and a rough read on the subject. Scan once, then edit the naming pattern and the whole list re-previews as you type. It runs on your own machine, so it works signed out and costs nothing per picture." },
+      { tag: "feature", text: "It describes a picture rather than recognising what is in it. You get dark-blue-portrait, not golden-retriever. That is a real limit, and the panel says so instead of pretending otherwise." },
+      { tag: "ui", text: "Drop or paste a stack of images and they go straight to the gallery. The three-way \"where should this go\" question only makes sense for a single picture, so now it only shows up for a single picture." },
+      { tag: "fix", text: "Dropping several images at once used to keep the first one and throw the rest away — no message, nothing to tell you they had gone. Pasting several did the same. Both now take every image you hand them, as many as your plan has room for, and say so when the batch had to be trimmed." },
+      { tag: "rust", text: "The reading is done in the engine rather than the browser. It samples a fixed grid whatever the picture's size, so a 24-megapixel photo costs the same to look at as a thumbnail." },
+      { tag: "fix", text: "Two colours came out wrong and the tests caught it before release: pure blue was being called \"sky\" and green foliage \"lime\", because the colour wheel was labelled one notch off." },
+      { tag: "infra", text: "Thirty-three new tests cover the naming, including the case that matters most — twenty photos that honestly describe the same still have to end up with twenty different filenames." },
+    ],
+  },
+  {
     version: "v7.60",
     date: "2026-07-30",
     headline: "Edits made just before switching photos could be lost",

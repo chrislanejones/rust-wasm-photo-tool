@@ -73,65 +73,37 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.60 — 2026-07-30
+### v7.61 — 2026-07-31
 
-**Edits made in the last moments before switching photos could be lost.** Your
-drawing is saved on a short delay, and if you switched photos while one of those
-saves was still writing, the next save was dropped instead of queued — silently,
-with nothing left to retry it. The strokes since the last completed save never
-reached disk, and because the app trusts that record over its other copy when
-reopening a photo, it would hand you back an older version that looked
-perfectly intact. Saves now queue behind each other, so switching photos waits
-for the write instead of racing it.
+**Name a whole gallery from what's in the pictures.** Batch has a fourth tool:
+AI Rename. It reads every loaded photo and names it from what it sees — the
+dominant colour, whether it's bright or dark, whether it's a photograph, a
+graphic or a screenshot, and a rough read on the subject. Scan once, then edit
+the naming pattern and the whole list re-previews as you type.
 
-The drop was reproduced under test fixtures first — four tests that failed
-before the fix and pass after.
+It runs on your own machine, so it works signed out and costs nothing per
+picture. And it describes a picture rather than recognising what's in it: you
+get `dark-blue-portrait`, not `golden-retriever`. That's a real limit, and the
+panel says so instead of pretending otherwise.
 
-**Drop shadows on text vanished when a photo came back from the cloud.** Saving
-locally and saving to the cloud each had their own copy of the same list of
-things to keep, and the cloud copy was missing all nine shadow settings. Open
-the photo on the same machine and your shadows were there; open it on another
-device and the text came back flat, with no error either way. There is one copy
-of that list now, and a test that fails if the two ever disagree again.
+The reading happens in the engine. It samples a fixed grid whatever the
+picture's size, so a 24-megapixel photo costs the same to look at as a
+thumbnail.
 
-**Four smaller ways storage could quietly stop working.** A single failed
-connection to browser storage used to be remembered for the rest of the
-session, so one bad moment wedged that store until you reloaded. Browsers also
-close idle connections on their own, and the app kept using the closed one —
-after which every save failed. A failed upload was read as if it had succeeded,
-storing a pointer to nothing. And an unreadable cloud archive was treated as if
-it were an old-format image, which hid the real problem behind a confusing one.
-All four now recover or say what happened.
+**Drop or paste a stack of images and they go straight to the gallery.** The
+three-way "where should this go" question only makes sense for a single
+picture, so now it only shows up for a single picture.
 
-Four **[architecture decision records](docs/adr/INDEX.md)** were written for
-calls already made — the five-group toolbar, the focus-ring vocabulary, how
-non-React code talks to the UI, and how shared image data is collected. They
-record; they don't decide.
+That closed something worse. Dropping several images at once used to keep the
+first one and throw the rest away — no message, nothing to say they'd gone.
+Pasting several did the same. Both now take every image you hand them, as many
+as your plan has room for, and say so when the batch had to be trimmed.
 
-**The docs got audited too** — all fifteen. Four were saying things that are no
-longer true (the shortcut table still listed the old tool keys, and the
-OpenRaster page still called a shipped feature a plan), and the security page
-was missing the most urgent item in the repo. Nothing was deleted; everything
-listed still earns its place.
-
-The **paid-tier question got a verdict**, too: nobody has ever subscribed, so
-there is no billing record attached to the wrong account and nothing to migrate.
-Details in [docs/share-links-auth-mismatch.md](docs/share-links-auth-mismatch.md).
-
-An **[entropy report](docs/entropy-2026-07-30.md)** also went in — ten releases
-of structural drift, measured rather than guessed. Short version: the clone-stamp
-split held (that file is the same size it was ten releases ago), but the file it
-was split out of grew anyway, and a second oversized file has been quietly
-getting bigger. Nothing in it was acted on; the numbers are the deliverable.
-
-**The keyboard shortcuts list is a real dialog now.** Escape closes it. Tab
-cycles inside it instead of wandering off into the page behind. When it closes,
-you land back on whatever you were on before you opened it, and screen readers
-are told it's a dialog. `Alt` + `/` still opens and closes it, and the × and
-clicking outside still work.
-
-Three tools were each carrying their own copy of the same canvas maths. There's
-one copy now, and the largest duplicate block in the codebase is gone.
+Two colours came out wrong and the tests caught it before release: pure blue
+was being called "sky" and green foliage "lime", because the colour wheel was
+labelled one notch off. Thirty-three new tests cover the naming, including the
+case that matters most — twenty photos that honestly describe the same still
+have to end up with twenty different filenames.
 
 ## License
 

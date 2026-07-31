@@ -5,12 +5,12 @@ import {
   Sparkles,
   Eraser,
   Aperture,
-  Grid3x3,
   Layers,
   LayoutGrid,
   Palette,
   MousePointerClick,
   RotateCcw,
+  ScanEye,
 } from "lucide-react";
 import {
   Dialog,
@@ -22,12 +22,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-/** Live shipping stats (July 2026, through v7.60 · Jul 2–30).
+/** Live shipping stats (July 2026, through v7.61 · Jul 2–31).
  *
  *  Counted from `marketing/src/data/releases.ts`, the hand-written trail log,
- *  NOT typed in by hand — 60 July releases, 195 entries, against 486 all-time
- *  across 108 releases. Tag split for July: fix 64, ui 43, feature 33, infra 30,
- *  rust 24, perf 1. Re-derive rather than guess when this is next refreshed:
+ *  NOT typed in by hand — 61 July releases, 205 entries, against 496 all-time
+ *  across 109 releases. Tag split for July: fix 66, ui 45, feature 35, infra 33,
+ *  rust 25, perf 1. Re-derive rather than guess when this is next refreshed:
  *  parse each `version/date/headline/entries` block out of releases.ts, keep
  *  the ones dated 2026-07, and count `tag:` occurrences. Note the order —
  *  the release being cut has to be IN releases.ts before these are counted,
@@ -38,12 +38,12 @@ import { Button } from "@/components/ui/button";
  *  stale on their own — they read off STATS now, so one refresh moves all of
  *  them together. */
 const STATS = {
-  monthShipped: 195, // entries logged in July across 60 releases
-  releases: 60,
-  allTime: 486, // all-time trail-log entries
-  monthPct: 40, // July = 40% of everything ever shipped
-  features: 33, // July `tag: "feature"` entries
-  fixes: 64, // July `tag: "fix"` entries
+  monthShipped: 205, // entries logged in July across 61 releases
+  releases: 61,
+  allTime: 496, // all-time trail-log entries
+  monthPct: 41, // July = 41% of everything ever shipped
+  features: 35, // July `tag: "feature"` entries
+  fixes: 66, // July `tag: "fix"` entries
 };
 
 /** July's headline work — icon + label, shown as chips. Drawn from real
@@ -55,6 +55,7 @@ const STATS = {
  *  feature search is the obvious trap, because the editor's own palette is
  *  Alt+, and pointing at ⌘K here would just be wrong. */
 const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: string }[] = [
+  { icon: ScanEye, label: "AI Rename a whole gallery" },
   { icon: LayoutGrid, label: "Five-group toolbar" },
   { icon: Palette, label: "Eyedropper remembers colours" },
   { icon: Eraser, label: "Object removal (local)" },
@@ -62,7 +63,6 @@ const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: stri
   { icon: Aperture, label: "Magnetic lasso" },
   { icon: Layers, label: "Selection → its own layer" },
   { icon: RotateCcw, label: "Undo that survives reload" },
-  { icon: Grid3x3, label: "Open + save .ora projects" },
 ];
 
 const CONFETTI_COLORS = [
