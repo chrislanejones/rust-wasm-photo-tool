@@ -21,6 +21,7 @@ use wasm_bindgen::prelude::*;
 mod annotations;
 mod codec;
 mod core;
+mod describe;
 mod drawing;
 mod edges;
 mod effects;
@@ -3390,6 +3391,18 @@ pub fn composite_pixels(
         transform::paste_region(&mut out, tw as i32, th as i32, &scaled, sw, sh, dx, dy);
     }
     out
+}
+
+/// Describe what an RGBA image looks like, as a JSON object — the engine behind
+/// Batch → AI Rename. Returns `kind`, `subject`, `tone`, `contrast`, `palette`,
+/// `color`, `orientation`, `detail`, `transparent` and a ready-made `slug`.
+///
+/// Stateless and offline: no account, no network, no per-image cost, so batch
+/// renaming works in demo mode. See `describe.rs` for what the tags mean — in
+/// particular, this describes an image, it does not recognise objects in it.
+#[wasm_bindgen]
+pub fn describe_image(pixels: &[u8], w: u32, h: u32) -> String {
+    describe::describe(pixels, w, h).to_json()
 }
 
 /// Stateless bilinear resize of an RGBA buffer. Used by the batch-logo feature

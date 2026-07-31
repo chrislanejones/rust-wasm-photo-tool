@@ -44,9 +44,14 @@ export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
 export const TEXT_MODES = ["text", "background", "ocr"] as const;
 export type TextMode = (typeof TEXT_MODES)[number];
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
- *  rename. Lifted out of BatchSettings.tsx local state for the same reason as
- *  `TEXT_MODES` above. */
-export const BATCH_MODES = ["logo", "text", "rename"] as const;
+ *  rename, and AI Rename (names every photo from what the engine sees in it).
+ *  Lifted out of BatchSettings.tsx local state for the same reason as
+ *  `TEXT_MODES` above.
+ *
+ *  Persistence reads this list through `validated()`, so an older persisted
+ *  state that predates `airename` falls back to the current default rather
+ *  than poking an unknown string into the union. */
+export const BATCH_MODES = ["logo", "text", "rename", "airename"] as const;
 export type BatchMode = (typeof BATCH_MODES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */

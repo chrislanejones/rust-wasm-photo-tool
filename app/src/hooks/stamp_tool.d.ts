@@ -53,6 +53,21 @@ declare module "stamp_tool" {
   ): Uint8Array;
 
   /**
+   * Stateless: describe what an RGBA image looks like, as a JSON object —
+   * the engine behind Batch → AI Rename. Parse with `parseDescription`
+   * (app/src/lib/describeImage.ts), which owns the matching TS shape.
+   *
+   * Offline and account-free: it measures the pixels (hue histogram, luma
+   * mean/variance, gradient energy, palette diversity, skin/foliage/sky
+   * ratios). It describes an image; it does not recognise objects in it.
+   */
+  export function describe_image(
+    pixels: Uint8Array,
+    w: number,
+    h: number,
+  ): string;
+
+  /**
    * Stateless bilinear resize of an RGBA buffer.
    * Used by the batch-logo feature to scale logos in Rust.
    */

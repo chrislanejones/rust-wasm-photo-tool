@@ -1594,15 +1594,26 @@ export function AppShell() {
       let source: Blob | null = null;
       let fileName = "pasted.png";
       if (items) {
-        for (const it of Array.from(items)) {
-          if (it.kind === "file" && it.type.startsWith("image/")) {
-            const f = it.getAsFile();
-            if (f) {
-              source = f;
-              if (f.name) fileName = f.name;
-            }
-            break;
-          }
+        // Collect EVERY image on the clipboard, not just the first. Pasting a
+        // multi-file selection out of a file manager hands over one item per
+        // file, and the "Add this image" choice dialog is single-image by
+        // construction — it used to keep item 0 and silently drop the rest.
+        // `getAsFile()` must run before any await (the item list is only valid
+        // during the event turn), which is why this maps eagerly.
+        const pasted = Array.from(items)
+          .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+          .map((it) => it.getAsFile())
+          .filter((f): f is File => f !== null);
+        if (pasted.length >= 2) {
+          // A stack never asks — straight to the gallery. handleAddPhotos
+          // trims to the tier cap and toasts when it had to.
+          await handleAddPhotos(pasted);
+          return;
+        }
+        const only = pasted[0];
+        if (only) {
+          source = only;
+          if (only.name) fileName = only.name;
         }
       }
       if (!source) {
@@ -1628,7 +1639,7 @@ export function AppShell() {
             });
       await openImportDialog(source, file);
     },
-    [openImportDialog],
+    [openImportDialog, handleAddPhotos],
   );
 
   // A "New"/start surface is up: the upload dialog, the boot splash, or the
@@ -1696,14 +1707,25 @@ export function AppShell() {
       depth = 0;
       setIsDraggingImage(false);
       // isSvgFile catches .svg drops whose source hands over an empty mime.
-      const file = Array.from(e.dataTransfer?.files ?? []).find(
+      const files = Array.from(e.dataTransfer?.files ?? []).filter(
         (f) => f.type.startsWith("image/") || isSvgFile(f),
       );
-      if (!file) {
+      if (files.length === 0) {
         toast.error("That doesn't look like an image");
         return;
       }
-      void openImportDialog(file, file);
+      // A STACK OF IMAGES NEVER ASKS. "Add this image" offers a single-image
+      // choice (stack as layer / merge into layer / new gallery image) and can
+      // only carry one file, so a multi-file drop used to keep files[0] and
+      // silently discard the rest. Two or more now go straight to the gallery
+      // regardless of whether the gallery is empty or already has photos —
+      // handleAddPhotos accepts as many as fit under the tier cap and toasts
+      // when the batch had to be trimmed.
+      if (files.length >= 2) {
+        void handleAddPhotos(files);
+        return;
+      }
+      void openImportDialog(files[0], files[0]);
     };
     window.addEventListener("dragenter", onEnter);
     window.addEventListener("dragover", onOver);
@@ -1716,7 +1738,7 @@ export function AppShell() {
       window.removeEventListener("drop", onDrop);
       setIsDraggingImage(false);
     };
-  }, [newSurfaceOpen, openImportDialog]);
+  }, [newSurfaceOpen, openImportDialog, handleAddPhotos]);
 
   // ── Import choice actions ──
   /** Center the imported image over the canvas. */

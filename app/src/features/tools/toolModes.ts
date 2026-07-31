@@ -35,6 +35,7 @@ import {
   ImagePlus,
   MapPin,
   PaintBucket,
+  ScanEye,
   ScanText,
   Scissors,
   Shapes as ShapesIcon,
@@ -101,6 +102,12 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
     { id: "logo", label: "Logo", icon: ImagePlus, keywords: ["logo", "watermark", "brand", "batch"] },
     { id: "text", label: "Text", icon: Type, keywords: ["text", "caption", "batch"] },
     { id: "rename", label: "Rename", icon: FileEdit, keywords: ["rename", "filename", "batch"] },
+    {
+      id: "airename",
+      label: "AI Rename",
+      icon: ScanEye,
+      keywords: ["ai rename", "smart rename", "describe", "content", "auto name", "batch"],
+    },
   ],
 };
 

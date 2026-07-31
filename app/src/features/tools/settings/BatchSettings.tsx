@@ -3,7 +3,7 @@
 // goes through the live WASM tool so it gets a normal undo entry; all other
 // photos are persisted to IDB irreversibly.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, Type, FileEdit, X } from "lucide-react";
+import { ImagePlus, Type, FileEdit, ScanEye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
@@ -23,6 +23,7 @@ import {
   makeThumbnailFromPixels,
 } from "@/lib/workingCopy";
 import { useToolStore } from "@/stores/useToolStore";
+import { AIRenamePanel } from "./AIRenamePanel";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "@/components/ui/sonner";
@@ -34,10 +35,11 @@ const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
  *  renders its own SectionHeader (Logo inline here, Text/Rename inside their
  *  own components), so ToolModeToggle only contributes the icon-row selector
  *  and stays silent on the header row rather than duplicating it. */
-const BATCH_TOOL_MODES: readonly ToolMode<"logo" | "text" | "rename">[] = [
+const BATCH_TOOL_MODES: readonly ToolMode<"logo" | "text" | "rename" | "airename">[] = [
   { id: "logo", label: "Logo", icon: ImagePlus },
   { id: "text", label: "Text", icon: Type },
   { id: "rename", label: "Rename", icon: FileEdit },
+  { id: "airename", label: "AI Rename", icon: ScanEye },
 ];
 
 // Batch positions now use the shared 9-cell placement grid.
@@ -571,6 +573,8 @@ export function BatchSettings({
         />
       ) : m === "rename" ? (
         <RenameBatchPanel photos={photos} setPhotos={setPhotos} />
+      ) : m === "airename" ? (
+        <AIRenamePanel photos={photos} setPhotos={setPhotos} />
       ) : (
       <>
       <div>
