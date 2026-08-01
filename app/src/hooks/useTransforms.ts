@@ -12,7 +12,32 @@ import { useCallback, useMemo } from "react";
 import type { EngineCore } from "./useEngineCore";
 
 export function useTransforms(engine: EngineCore) {
-  const { toolRef, sourcePosRef, syncState, flushToCanvas } = engine;
+  const {
+    toolRef,
+    sourcePosRef,
+    syncState,
+    flushToCanvas,
+    broadcastAnnotationsChanged,
+  } = engine;
+
+  /**
+   * Geometry transforms move live text/shape overlays in Rust (crop and
+   * resize_canvas translate them; resize_with_filter scales them), but
+   * `syncState` does NOT bump the annotation revision — it reports canvas
+   * dimensions and history, not overlay geometry. Without this the engine
+   * holds the corrected coordinates while React keeps drawing the overlay from
+   * the list it cached before the transform, so the fix is invisible until an
+   * undo or a tool switch happens to refresh it.
+   *
+   * Applied to every transform that moves annotations, not just resize: crop
+   * had exactly the same staleness and would show the same "annotations in the
+   * wrong place" symptom by a different route.
+   */
+  const commitGeometryChange = useCallback(() => {
+    flushToCanvas();
+    syncState();
+    broadcastAnnotationsChanged();
+  }, [flushToCanvas, syncState, broadcastAnnotationsChanged]);
 
   // ── Cross-photo copy / paste ──────────────────────────────────────────────
   /**
@@ -104,10 +129,9 @@ export function useTransforms(engine: EngineCore) {
       if (!t || w < 1 || h < 1) return;
       t.crop(x, y, w, h);
       sourcePosRef.current = null;
-      flushToCanvas();
-      syncState();
+      commitGeometryChange();
     },
-    [toolRef, sourcePosRef, flushToCanvas, syncState],
+    [toolRef, sourcePosRef, commitGeometryChange],
   );
 
   const resize = useCallback(
@@ -116,10 +140,9 @@ export function useTransforms(engine: EngineCore) {
       if (!t || newW < 1 || newH < 1) return;
       t.resize(newW, newH);
       sourcePosRef.current = null;
-      flushToCanvas();
-      syncState();
+      commitGeometryChange();
     },
-    [toolRef, sourcePosRef, flushToCanvas, syncState],
+    [toolRef, sourcePosRef, commitGeometryChange],
   );
 
   /** Resize with a selectable resampling filter (0=nearest, 1=bilinear, 2=catmull-rom, 3=lanczos3). */
@@ -129,10 +152,9 @@ export function useTransforms(engine: EngineCore) {
       if (!t || newW < 1 || newH < 1) return;
       t.resize_with_filter(newW, newH, filter);
       sourcePosRef.current = null;
-      flushToCanvas();
-      syncState();
+      commitGeometryChange();
     },
-    [toolRef, sourcePosRef, flushToCanvas, syncState],
+    [toolRef, sourcePosRef, commitGeometryChange],
   );
 
   /**
@@ -155,10 +177,9 @@ export function useTransforms(engine: EngineCore) {
       if (!t || newW < 1 || newH < 1) return;
       t.resize_canvas(newW, newH, anchor, r, g, b, a);
       sourcePosRef.current = null;
-      flushToCanvas();
-      syncState();
+      commitGeometryChange();
     },
-    [toolRef, sourcePosRef, flushToCanvas, syncState],
+    [toolRef, sourcePosRef, commitGeometryChange],
   );
 
   /**
@@ -175,10 +196,9 @@ export function useTransforms(engine: EngineCore) {
       if (!t) return;
       t.set_artboard_border(pad, r, g, b, a);
       sourcePosRef.current = null;
-      flushToCanvas();
-      syncState();
+      commitGeometryChange();
     },
-    [toolRef, sourcePosRef, flushToCanvas, syncState],
+    [toolRef, sourcePosRef, commitGeometryChange],
   );
 
   // ── Pixel adjustments ─────────────────────────────────────────────────────

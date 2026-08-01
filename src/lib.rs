@@ -2735,12 +2735,39 @@ impl ImageHorseTool {
     /// Resize with a selectable resampling filter.
     /// 0 = nearest, 1 = bilinear, 2 = catmull-rom, 3 = lanczos3.
     /// Unknown codes fall back to bilinear.
+    ///
+    /// **Everything canvas-sized is resized, not just the pixels.** A layer
+    /// owns three things measured in canvas coordinates — its buffer, its
+    /// optional mask, and its live text/shape overlays — and for years this
+    /// resampled only the first. The overlays kept their absolute coordinates
+    /// while the image shrank underneath them, so a shape centred on a 200px
+    /// canvas stayed at x=90 on a 100px one: 90% across a canvas it used to be
+    /// centred on. Reported as "the vector items move to the side instead of
+    /// anchoring in the same spot". Masks had the quieter version of the same
+    /// bug: `render_layer` skips a mask whose length no longer matches the
+    /// canvas, so a resize silently switched masking off altogether.
+    ///
+    /// `crop` and `resize_canvas` already translated overlays with their
+    /// layer; this is the sibling that never did.
+    ///
+    /// X and Y scale independently, because anchoring to the image content is
+    /// the whole point. Quantities with a single magnitude rather than an x and
+    /// a y — font size, stroke width, blur radius — scale by the geometric mean
+    /// of the two, which is exact for a uniform resize and preserves the area
+    /// ratio for a non-uniform one.
     pub fn resize_with_filter(&mut self, new_w: u32, new_h: u32, filter: u8) {
         if new_w == 0 || new_h == 0 {
             return;
         }
-        self.snap("Resize");
         let (ow, oh) = (self.width, self.height);
+        if ow == 0 || oh == 0 {
+            return;
+        }
+        self.snap("Resize");
+        let sx = new_w as f64 / ow as f64;
+        let sy = new_h as f64 / oh as f64;
+        let s_uniform = (sx * sy).sqrt();
+
         for layer in &mut self.layers {
             let resized = match filter {
                 0 => transform::resize_nearest(&layer.buf.data, ow, oh, new_w, new_h),
@@ -2751,6 +2778,69 @@ impl ImageHorseTool {
             layer.buf.data = resized;
             layer.buf.width = new_w;
             layer.buf.height = new_h;
+
+            // The mask is one grayscale byte per canvas pixel, so it has to
+            // follow. A mask that was ALREADY the wrong size is dropped rather
+            // than rescaled — it was inert before this call and rescaling it
+            // would silently switch masking back on with stale coverage.
+            if let Some(mask) = layer.mask.take() {
+                if mask.len() == (ow as usize) * (oh as usize) {
+                    layer.mask = Some(resize_mask(&mask, ow, oh, new_w, new_h, filter));
+                }
+            }
+
+            // Live overlays are stored in canvas coordinates and are NOT part
+            // of any layer buffer, so nothing above has touched them.
+            let scaled: Vec<_> = layer
+                .text_annotations
+                .iter()
+                .map(|a| {
+                    build_text_annotation(
+                        a.id,
+                        &a.text,
+                        // Never round a glyph out of existence.
+                        ((a.font_size as f64 * s_uniform) as f32).max(1.0),
+                        a.r,
+                        a.g,
+                        a.b,
+                        a.bold,
+                        (a.x as f64 * sx).round() as i32,
+                        (a.y as f64 * sy).round() as i32,
+                        a.rotation_deg,
+                        a.background_kind,
+                        a.bg_r,
+                        a.bg_g,
+                        a.bg_b,
+                        a.bg_a,
+                        (a.bg_padding as f64 * s_uniform).round() as u32,
+                        (a.bg_corner_radius as f64 * s_uniform).round() as u32,
+                        a.bg_tail,
+                        a.shadow_box,
+                        a.shadow_text,
+                        a.shadow_r,
+                        a.shadow_g,
+                        a.shadow_b,
+                        a.shadow_a,
+                        (a.shadow_dx as f64 * sx).round() as i32,
+                        (a.shadow_dy as f64 * sy).round() as i32,
+                        (a.shadow_blur as f64 * s_uniform).round() as u32,
+                    )
+                })
+                .collect();
+            layer.text_annotations = scaled;
+
+            for s in &mut layer.shape_annotations {
+                s.x0 *= sx;
+                s.y0 *= sy;
+                s.x1 *= sx;
+                s.y1 *= sy;
+                for p in &mut s.points {
+                    p.0 *= sx;
+                    p.1 *= sy;
+                }
+                // Keep a hairline visible rather than letting it round to zero.
+                s.stroke_width = (s.stroke_width * s_uniform).max(0.5);
+            }
         }
         self.width = new_w;
         self.height = new_h;
@@ -3391,6 +3481,28 @@ pub fn composite_pixels(
         transform::paste_region(&mut out, tw as i32, th as i32, &scaled, sw, sh, dx, dy);
     }
     out
+}
+
+/// Resample a single-channel layer mask with the same filter as its layer.
+///
+/// The transform kernels are all RGBA, and a mask is one byte per pixel, so it
+/// is widened to a gray RGBA buffer, run through the SAME tested kernel the
+/// layer used, and narrowed back. Deliberately not a bespoke single-channel
+/// sampler: a mask that resampled differently from the pixels it gates would
+/// creep out of alignment at the edges, and that is exactly the class of bug
+/// this whole change exists to remove.
+fn resize_mask(mask: &[u8], ow: u32, oh: u32, nw: u32, nh: u32, filter: u8) -> Vec<u8> {
+    let mut rgba = Vec::with_capacity(mask.len() * 4);
+    for &m in mask {
+        rgba.extend_from_slice(&[m, m, m, 255]);
+    }
+    let out = match filter {
+        0 => transform::resize_nearest(&rgba, ow, oh, nw, nh),
+        2 => transform::resize_catmull_rom(&rgba, ow, oh, nw, nh),
+        3 => transform::resize_lanczos3(&rgba, ow, oh, nw, nh),
+        _ => transform::resize_bilinear(&rgba, ow, oh, nw, nh),
+    };
+    out.chunks_exact(4).map(|p| p[0]).collect()
 }
 
 /// Describe what an RGBA image looks like, as a JSON object — the engine behind
@@ -4418,6 +4530,58 @@ mod layer_persistence_tests {
             "base layer should carry the shape: {s0}"
         );
         assert_eq!(s1, "[]", "top layer should have no shapes");
+    }
+
+    /// A layer mask is one byte per CANVAS pixel, so a resample has to carry it
+    /// too. `render_layer` skips a mask whose length no longer matches the
+    /// canvas, so before this was fixed a resize silently switched masking off
+    /// — no crash, no warning, the layer just stopped being masked.
+    #[test]
+    fn resize_resamples_the_layer_mask_to_the_new_canvas() {
+        let mut t = ImageHorseTool::new(20, 20);
+        t.load_image(&solid(20, 20, [255, 255, 255, 255]));
+        let id = t.layers[t.active].id;
+        assert!(t.add_layer_mask(id));
+        // Make the mask non-uniform so a real resample is observable.
+        if let Some(m) = t.layers[t.active].mask.as_mut() {
+            for (i, v) in m.iter_mut().enumerate() {
+                *v = if i % 20 < 10 { 0 } else { 255 };
+            }
+        }
+
+        t.resize_with_filter(10, 10, 1);
+
+        let mask = t.layers[t.active]
+            .mask
+            .as_ref()
+            .expect("mask must survive the resize");
+        assert_eq!(
+            mask.len(),
+            10 * 10,
+            "mask must match the new canvas or render_layer silently drops it"
+        );
+        // The left half was hidden and the right revealed; that must still hold.
+        assert!(mask[0] < 64, "left edge still hidden, got {}", mask[0]);
+        assert!(mask[9] > 192, "right edge still revealed, got {}", mask[9]);
+    }
+
+    /// Pen/polyline paths keep their vertices in `points`, which is a separate
+    /// list from the bbox — scaling only the bbox would leave the drawn path
+    /// behind.
+    #[test]
+    fn resize_scales_pen_path_points_not_just_the_bbox() {
+        let mut t = ImageHorseTool::new(200, 200);
+        t.load_image(&solid(200, 200, [255, 255, 255, 255]));
+        t.add_shape_annotation(
+            6, 20.0, 40.0, 60.0, 80.0, "#000000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        );
+        t.layers[t.active].shape_annotations[0].points = vec![(20.0, 40.0), (60.0, 80.0)];
+
+        t.resize_with_filter(100, 100, 1);
+
+        let pts = &t.layers[t.active].shape_annotations[0].points;
+        assert_eq!(pts[0], (10.0, 20.0), "first vertex");
+        assert_eq!(pts[1], (30.0, 40.0), "second vertex");
     }
 
     #[test]
