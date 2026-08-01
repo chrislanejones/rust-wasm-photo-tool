@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.62",
+    date: "2026-08-01",
+    headline: "Shapes and text stay where you put them when you resize",
+    entries: [
+      { tag: "fix", text: "Add a shape or some text, then resize the picture, and they used to slide off to one side. They were never moving — the picture was moving out from under them. Shapes, text, pen paths and their outlines now shrink and grow with the picture, so they stay exactly where you put them." },
+      { tag: "fix", text: "Text scales with the picture too, instead of staying the same size and swallowing a photo you have just made smaller." },
+      { tag: "fix", text: "A layer mask used to stop working altogether after a resize. The mask is stored at the picture's size, and resizing left it at the old one, at which point the app quietly ignored it and the layer went back to fully visible. Same cause as the first one, found while fixing it." },
+      { tag: "fix", text: "Cropping had the same blind spot in a different place. It moved things to the right position but never told the screen to redraw them, so they looked wrong until you undid something or switched tools. Crop, resize, canvas size and the canvas border all say so now." },
+      { tag: "infra", text: "Nine tests pin it down, including the exact case that was reported: a shape centred on a picture is still centred after the picture is halved." },
+    ],
+  },
+  {
     version: "v7.61",
     date: "2026-07-31",
     headline: "Name a whole gallery from what's in the pictures",

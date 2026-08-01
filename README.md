@@ -73,37 +73,28 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.61 — 2026-07-31
+### v7.62 — 2026-08-01
 
-**Name a whole gallery from what's in the pictures.** Batch has a fourth tool:
-AI Rename. It reads every loaded photo and names it from what it sees — the
-dominant colour, whether it's bright or dark, whether it's a photograph, a
-graphic or a screenshot, and a rough read on the subject. Scan once, then edit
-the naming pattern and the whole list re-previews as you type.
+**Shapes and text stay where you put them when you resize.** Add a shape or some
+text, then resize the picture, and they used to slide off to one side. They were
+never moving — the picture was moving out from under them. Shapes, text, pen
+paths and their outlines now shrink and grow with the picture, and text scales
+with it instead of staying the same size and swallowing a photo you have just
+made smaller.
 
-It runs on your own machine, so it works signed out and costs nothing per
-picture. And it describes a picture rather than recognising what's in it: you
-get `dark-blue-portrait`, not `golden-retriever`. That's a real limit, and the
-panel says so instead of pretending otherwise.
+**A layer mask used to stop working altogether after a resize.** The mask is
+stored at the picture's size, and resizing left it at the old one, at which
+point the app quietly ignored it and the layer went back to fully visible. No
+error, no warning — masking just switched itself off. Same cause as the first
+one, and found while fixing it.
 
-The reading happens in the engine. It samples a fixed grid whatever the
-picture's size, so a 24-megapixel photo costs the same to look at as a
-thumbnail.
+**Cropping had the same blind spot in a different place.** It moved things to
+the right position but never told the screen to redraw them, so they looked
+wrong until you undid something or switched tools. Crop, resize, canvas size and
+the canvas border all say so now.
 
-**Drop or paste a stack of images and they go straight to the gallery.** The
-three-way "where should this go" question only makes sense for a single
-picture, so now it only shows up for a single picture.
-
-That closed something worse. Dropping several images at once used to keep the
-first one and throw the rest away — no message, nothing to say they'd gone.
-Pasting several did the same. Both now take every image you hand them, as many
-as your plan has room for, and say so when the batch had to be trimmed.
-
-Two colours came out wrong and the tests caught it before release: pure blue
-was being called "sky" and green foliage "lime", because the colour wheel was
-labelled one notch off. Thirty-three new tests cover the naming, including the
-case that matters most — twenty photos that honestly describe the same still
-have to end up with twenty different filenames.
+Nine tests pin it down, including the exact case that was reported: a shape
+centred on a picture is still centred after the picture is halved.
 
 ## License
 
