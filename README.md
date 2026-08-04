@@ -10,24 +10,16 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 
 ## Documentation
 
-- **[Architecture](docs/Architecture.md)** — system diagram, layers/compositing, the single-WASM-binary rationale, Rust ↔ Convex bridge.
-- **[File Map](docs/File-Map.md)** — Rust module map (`src/`) and the React frontend structure (`app/src/`).
-- **[Change Summary](docs/Change-summary.md)** — full dated release history (v2.1 → latest).
-- **[Keyboard Shortcuts](docs/Keyboard-Shortcuts.md)** — every shortcut (tools, panels, transforms, zoom, gallery). The in-app modal (`Alt + /`) is the source of truth; this mirrors it.
-- **[Getting Started](docs/Getting-Started.md)** — install, run the app + marketing site, Convex setup, deploy notes.
-- **[Features](docs/Features.md)** — full feature list: Rust/WASM image processing + the React UI.
-- **[GitHub Actions (CI)](docs/GitHub-Actions.md)** — the CI workflow jobs (build, security, audits) and Dependabot.
-- **[CI Guardrails](docs/CI-Guardrails.md)** — the advisory `guardrails` job, flipping checks to blocking, and the local hook mirror.
-- **[Refactor Playbook](docs/Refactor-Playbook.md)** — single-source-of-truth conventions (color / type / z-index tokens, React + Rust health, target folder structures) and the reusable guardrail bundle.
-- **[State Management](docs/State-Management.md)** — the Zustand stores, the `SetArg` drop-in migration off AppShell's `useState`, and what stays local.
-- **[IndexedDB Investigation](docs/IndexedDB-Investigation.md)** — why IndexedDB, the live content databases, the Zustand persist adapter, and the Dexie content layer.
-- **[Service Workers & Caching](docs/Service-Workers-Caching.md)** — investigation: caching the WASM binary + app shell, the never-cache deny-list, and a phased PWA rollout.
-- **[OpenRaster (.ora) Export/Import](docs/OpenRaster-Export-Import.md)** — layered `.ora` interchange: how export/import work and why the format was chosen. **Shipped.**
-- **[Architecture Roadmap](docs/Architecture-Roadmap.md)** — the document-based-editor direction, prioritized and mapped onto the real repo (AppShell split, Zustand, workers, GPU).
-- **[Entropy Report](docs/entropy-2026-07-30.md)** — dated structural-drift measurement: where AppShell actually is, whether the decompositions paid off, and what the hotspot list says.
-- **[Content-Addressed GC Audit](docs/content-addressed-gc-audit.md)** — read-only reachability audit of everything in IndexedDB: what a collector would find, and the three orphan sources.
-- **[Share-Links Auth Mismatch](docs/share-links-auth-mismatch.md)** — the two-Clerk-instance investigation, the prod auth verification, and the Stripe-linkage verdict.
-- **[Security Hardening](docs/Security-Hardening.md)** — audit + roadmap: **the outstanding JWT key rotation**, share-token CSPRNG, the image-upload firewall, EXIF-by-default, and the supervised items (CSP, COEP, encryption).
+- **[Getting Started](docs/Getting-Started.md)** — install it, run the app and the marketing site, set up Convex, deploy.
+- **[Architecture](docs/Architecture.md)** — how it fits together: layers and compositing, why one WASM binary, the Rust ↔ Convex bridge.
+- **[File Map](docs/File-Map.md)** — where everything lives, in both the Rust crate (`src/`) and the React app (`app/src/`).
+- **[Features](docs/Features.md)** — what it can actually do, end to end.
+- **[Keyboard Shortcuts](docs/Keyboard-Shortcuts.md)** — every binding. The in-app modal (`Alt + /`) is authoritative for the tool digits; this mirrors it.
+- **[OpenRaster (.ora)](docs/OpenRaster-Export-Import.md)** — layered interchange with Krita, GIMP and friends: how import/export work, and why this format.
+- **[CI](docs/CI.md)** — the workflow jobs, the deploy sentinel, the static guardrails, and the local git hooks.
+- **[Change Summary](docs/Change-summary.md)** — the full dated release history.
+
+Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in `docs/archive/` rather than deleted.
 
 ## Tech Stack
 

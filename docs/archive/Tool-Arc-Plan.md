@@ -1,7 +1,10 @@
 # Tool-UI arc — migrating every multi-mode tool onto the shared toggle
 
-> Part of the [Image Horse](../README.md) docs. See also:
-> [Refactor Playbook](Refactor-Playbook.md) · [Engine Roadmap](Engine-Roadmap.md) ·
+> **ARCHIVED 2026-08-04.** Planning doc for the tool-registry arc. Historical.
+
+
+> Part of the [Image Horse](../../README.md) docs. See also:
+> [Refactor Playbook](Refactor-Playbook.md) · [Engine Roadmap](../Engine-Roadmap.md) ·
 > the `tool-module-migration` skill.
 
 Every multi-mode tool adopts one shared presentation — icon-row on top, tool
@@ -77,7 +80,7 @@ The biggest one. Split so a sprawling session doesn't eat the arc:
   image buffer — and both features fall out of it: the smart brush walks edges
   while painting, the magnetic lasso snaps to the same edges. The UI
   affordances land here; the edge core itself is engine work. Spec them
-  together — see the pairing note in [Engine Roadmap §3](Engine-Roadmap.md)
+  together — see the pairing note in [Engine Roadmap §3](../Engine-Roadmap.md)
   (§2 #1 Smart Brush, §2 #13 Magnetic Selection).
 
 ## Origin

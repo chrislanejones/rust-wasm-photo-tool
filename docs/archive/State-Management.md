@@ -1,6 +1,9 @@
 # State Management (Zustand)
 
-> Part of the [Image Horse](../README.md) docs. See also: [IndexedDB Investigation](IndexedDB-Investigation.md) · [File Map](File-Map.md) · [Architecture](Architecture.md).
+> **ARCHIVED 2026-08-04 — stale.** Written before AppShell was split into the session hooks (`useImageSession`, `useSelectionActions`, `useCanvasActions`, `useMaskActions`, `useCopyRegionAction`) and before the clone-stamp split; it mentions none of them. §5's "`/zustand` blueprint (planned hook extraction)" describes a plan that was carried out differently. The store list in §2 is still broadly right; everything about *where the extraction is going* is not. Kept for the `SetArg` migration pattern, which is still what the stores use.
+
+
+> Part of the [Image Horse](../../README.md) docs. See also: [IndexedDB Investigation](IndexedDB-Investigation.md) · [File Map](../File-Map.md) · [Architecture](../Architecture.md).
 >
 > **Status:** stores live under `app/src/stores/`; the `zustand-build` branch merged to `master` in v5.8 (9e614fc). AppShell's `useState`s that map to the three stores below have been fully swapped for selector bindings — verified 2026-06-30 via grep (all §2 "Replaces" entries are bound in `AppShell.tsx`; zero duplicate local `useState`s remain for them). What's still open is hook extraction and `useAnnotationStore` — see §8.
 
@@ -10,7 +13,7 @@
 
 `app/src/app/AppShell.tsx` had grown to **~3,245 lines** — a god-component holding dozens of `useState`s for UI chrome, tool modes, and the gallery, then prop-drilling them into the master bar, sidebars, status bar, canvas hooks, and dialogs. That makes the file hard to read, hard to test, and forces unrelated re-renders.
 
-[Zustand](https://github.com/pmndrs/zustand) lets any component subscribe **directly** to the slice of state it needs, with a stable selector, no provider, and no prop-drilling. The goal: lift cross-cutting state out of AppShell so the component shrinks toward orchestration-only, following the blueprint sketches in the repo's top-level [`/zustand`](../zustand) directory.
+[Zustand](https://github.com/pmndrs/zustand) lets any component subscribe **directly** to the slice of state it needs, with a stable selector, no provider, and no prop-drilling. The goal: lift cross-cutting state out of AppShell so the component shrinks toward orchestration-only, following the blueprint sketches in the repo's top-level ``/zustand`` (the blueprint directory, since deleted) directory.
 
 ---
 
@@ -73,7 +76,7 @@ Every store action is `setX: (v) => set((s) => ({ x: resolveSet(v, s.x) }))`. Se
 
 ## 5. The `/zustand` blueprint (planned hook extraction)
 
-The top-level [`/zustand`](../zustand) directory holds architectural **sketches** (typo-ridden, not compiled) for the end state: a ~75-line AppShell plus extracted hooks —
+The top-level ``/zustand`` (the blueprint directory, since deleted) directory holds architectural **sketches** (typo-ridden, not compiled) for the end state: a ~75-line AppShell plus extracted hooks —
 
 - `useTextTool`, `usePaintTool`, `useDrawingTools` — annotation/stroke tools
 - `useImageActions`, `usePhotoLoader`, `useUploadHandler` — gallery/image lifecycle

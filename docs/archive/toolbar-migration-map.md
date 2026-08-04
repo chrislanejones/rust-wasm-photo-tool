@@ -1,5 +1,8 @@
 # Toolbar migration map — 11 tools → 5 groups
 
+> **ARCHIVED 2026-08-04.** Working map for the five-group toolbar migration, which shipped across v7.51–v7.53. Historical.
+
+
 Written during the five-group toolbar restructure (night job, 2026-07-26).
 This is the mapping table the registry is built from, plus the two things the
 standing rules say I must not decide alone: **ORPHAN** (exists today, has no

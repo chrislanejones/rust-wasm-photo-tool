@@ -80,3 +80,12 @@ install.log
 # notes). Untracked 2026-07-29; the local file stays put, it just stops being
 # git's business.
 *.tsbuildinfo
+
+# Internal working docs — security roadmaps, auth-misconfiguration write-ups and
+# session audits. Untracked on purpose: they name deployments and walk through
+# how prod auth was wrong, which is a map for anyone probing the live site. The
+# identifiers themselves are already public in the client bundle (Convex URL,
+# Clerk issuer, publishable key), so this is about the narrative and the probing
+# recipe, not about secrets — no key material has ever been in these files.
+# Moving forward-only does NOT remove them from git history; see docs/PARKING_LOT.md.
+docs/internal/

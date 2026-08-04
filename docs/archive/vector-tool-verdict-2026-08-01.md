@@ -1,5 +1,8 @@
 # `feat/vector-tool` — merge or delete
 
+> **ARCHIVED 2026-08-04.** The merge-or-delete verdict on `feat/vector-tool`. The branch was deleted and preserved as the annotated tag `abandoned/vector-tool` on both remotes; see the Outcome section at the bottom.
+
+
 Measured 2026-08-01 (NIGHT JOB IV). The branch was not merged and was not
 modified; every number here comes from a throwaway copy (`test/vector-rebase`)
 so nothing published was rewritten.

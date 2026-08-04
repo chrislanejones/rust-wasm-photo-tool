@@ -1,6 +1,9 @@
 # IndexedDB for Larger Storage — Investigation
 
-> Part of the [Image Horse](../README.md) docs. See also: [State Management](State-Management.md) · [Service Workers & Caching](Service-Workers-Caching.md) · [Architecture](Architecture.md).
+> **ARCHIVED 2026-08-04.** An investigation write-up, not a reference — the decisions it argues for shipped long ago (Dexie content layer, the Zustand persist adapter, content-addressed originals). Any schema change goes through the `dexie-migration` procedure, not this file.
+
+
+> Part of the [Image Horse](../../README.md) docs. See also: [State Management](State-Management.md) · [Service Workers & Caching](Service-Workers-Caching.md) · [Architecture](../Architecture.md).
 >
 > **Status:** the three IndexedDB databases described in §2 are **live in production**. The Zustand ↔ IndexedDB persistence adapter (§3–§4) landed on the `zustand-build` branch (`app/src/stores/storage/idbStorage.ts`). Service-worker caching (referenced in §8) is still investigation-only.
 
@@ -34,14 +37,14 @@ We are **already IndexedDB-first for heavy data** — three hand-rolled database
 
 | DB name | File | Stores | Key |
 | --- | --- | --- | --- |
-| `image-horse-originals` | [`app/src/lib/originalsStore.ts`](../app/src/lib/originalsStore.ts) | Original photo bytes (`ArrayBuffer`) + mime/name/dims, content-addressed | **SHA-256 of the bytes** (dedupes identical uploads) |
-| `image-horse-edits` | [`app/src/lib/editPersistence.ts`](../app/src/lib/editPersistence.ts) | Per-photo current canvas + **full undo/redo history** as PNG blobs | photo id |
-| `image-horse-gallery` | [`app/src/lib/galleryManifest.ts`](../app/src/lib/galleryManifest.ts) | The lightweight gallery **manifest** — `PhotoEntry[]` (thumbnails + content keys + metadata) + active id | `"current"` (singleton) |
+| `image-horse-originals` | [`app/src/lib/originalsStore.ts`](../../app/src/lib/originalsStore.ts) | Original photo bytes (`ArrayBuffer`) + mime/name/dims, content-addressed | **SHA-256 of the bytes** (dedupes identical uploads) |
+| `image-horse-edits` | [`app/src/lib/editPersistence.ts`](../../app/src/lib/editPersistence.ts) | Per-photo current canvas + **full undo/redo history** as PNG blobs | photo id |
+| `image-horse-gallery` | [`app/src/lib/galleryManifest.ts`](../../app/src/lib/galleryManifest.ts) | The lightweight gallery **manifest** — `PhotoEntry[]` (thumbnails + content keys + metadata) + active id | `"current"` (singleton) |
 
 Plus two non-IDB persistence layers:
 
-- **`localStorage`** (`image-horse-prefs`, [`app/src/lib/preferences.ts`](../app/src/lib/preferences.ts)) — the Settings blob (theme, history depth, idle timeout, rulers/grid, reduce-motion, EXIF-keep, reopen-last-session). Tiny, read synchronously at boot, so `localStorage` is the right tool.
-- **Convex** (`users` row) — when signed in, the same preferences blob is mirrored server-side as JSON + its SHA-256, so settings follow the user across devices. Logged-out users stay `localStorage`-only. See [Architecture](Architecture.md).
+- **`localStorage`** (`image-horse-prefs`, [`app/src/lib/preferences.ts`](../../app/src/lib/preferences.ts)) — the Settings blob (theme, history depth, idle timeout, rulers/grid, reduce-motion, EXIF-keep, reopen-last-session). Tiny, read synchronously at boot, so `localStorage` is the right tool.
+- **Convex** (`users` row) — when signed in, the same preferences blob is mirrored server-side as JSON + its SHA-256, so settings follow the user across devices. Logged-out users stay `localStorage`-only. See [Architecture](../Architecture.md).
 
 > ⚠️ **Measured 2026-07-28, and the table above is now out of date in one
 > place.** A read-only reachability audit found **no `image-horse-originals`
@@ -51,7 +54,7 @@ Plus two non-IDB persistence layers:
 > "new and parallel"; it is the live store. `photos` / `workingCopies` really
 > are still empty, and the gallery list really is still the hand-rolled
 > manifest, so the rest of this page holds. Numbers and method:
-> [content-addressed GC audit](content-addressed-gc-audit.md).
+> the content-addressed GC audit (`docs/internal/`, untracked).
 
 **Design invariant:** the gallery *list* is React/Zustand state, but the *bytes it points at* live in `image-horse-originals` / `image-horse-edits`. The manifest (`image-horse-gallery`) is what lets an anonymous tab survive a close/reload — without it those bytes would be orphaned and the app would boot empty. This is exactly the "keep heavy data out of the JS heap, keep handles in state" pattern.
 
@@ -106,7 +109,7 @@ We **hand-roll** the adapter with the native IndexedDB API rather than add a lib
 | `idb-keyval` | Rejected (for now) | Pleasant API, but it is one more dep for ~40 LOC we can own. Reconsider only if we need its multi-store / cursor helpers. |
 | Dexie.js | Not for the persist adapter; **adopted for the content layer** | Overkill for a keyval prefs blob, so the Zustand persist adapter stays hand-rolled. But for the **heavy content data** (originals / working copies / gallery), Dexie's typed schema, migrations, and live queries do earn their keep — see the new Dexie module below. |
 
-> **Scope note:** the table above is specifically the **Zustand `persist` adapter** decision (a tiny string keyval store → hand-rolled wins). Separately, the **content layer** (images, working copies, gallery metadata) now has a **Dexie** implementation — a new, parallel `image-horse-dexie` database in [`app/src/lib/dexie/db.ts`](../app/src/lib/dexie/db.ts) (schema: `originals` / `workingCopies` / `photos`), with its API mirroring the legacy `originalsStore` names so the three live hand-rolled stores can be migrated incrementally and reversibly. Full usage + migration path: [`app/src/lib/dexie/USAGE.md`](../app/src/lib/dexie/USAGE.md).
+> **Scope note:** the table above is specifically the **Zustand `persist` adapter** decision (a tiny string keyval store → hand-rolled wins). Separately, the **content layer** (images, working copies, gallery metadata) now has a **Dexie** implementation — a new, parallel `image-horse-dexie` database in [`app/src/lib/dexie/db.ts`](../../app/src/lib/dexie/db.ts) (schema: `originals` / `workingCopies` / `photos`), with its API mirroring the legacy `originalsStore` names so the three live hand-rolled stores can be migrated incrementally and reversibly. Full usage + migration path: [`app/src/lib/dexie/USAGE.md`](../../app/src/lib/dexie/USAGE.md).
 
 > **pnpm store-v11 install gotcha:** the active pnpm is 10.x but `node_modules` was built with **pnpm 11.7.0** (store v11), so a plain `pnpm add` fails `ERR_PNPM_UNEXPECTED_STORE`. Adding a dependency requires
 > `COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm@11.7.0 --pm-on-fail=ignore --filter stamp-tool add <pkg>`.

@@ -1,6 +1,6 @@
 # Engine Roadmap
 
-> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [Architecture Roadmap](Architecture-Roadmap.md) · [Refactor Playbook](Refactor-Playbook.md).
+> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [Architecture Roadmap](archive/Architecture-Roadmap.md) · [Refactor Playbook](archive/Refactor-Playbook.md).
 
 Forward-looking engineering roadmap for the high-impact features that lean on the **Rust/WASM
 engine** rather than React. Everything here is **aspirational and unscheduled** — nothing in this doc

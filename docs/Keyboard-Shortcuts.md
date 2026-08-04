@@ -11,6 +11,12 @@
 > Corrected 2026-07-30: this table had gone a month without a pass and four rows
 > were wrong — it still described the pre-restructure ten-tool digit row, and
 > `Alt + U`, `Alt + [` / `Alt + ]` and `Alt + S` had all moved or gone.
+>
+> Corrected 2026-08-04: the Batch row still read "Logo · Text · Rename" — **AI
+> Rename** shipped with it in v7.61 and was never added here. Checked against
+> `TOOL_GROUPS` rather than against the modal, because the modal generates only
+> the digit rows from the registry; every sub-tool list in this file is still
+> hand-written and can drift exactly like this one did.
 
 ## Tools
 
@@ -20,7 +26,7 @@
 | `2`       | Select group (Marquee · Magic Wand · Lasso · …) |
 | `3`       | Create group (Brush · Pen · Clone Stamp · Text · Shapes · …) |
 | `4`       | Edit group (Crop · Transform · Colour Picker · …) |
-| `5`       | Batch group (Logo · Text · Rename) |
+| `5`       | Batch group (Logo · Text · Rename · AI Rename) |
 
 The digits select a **tool group**, not an individual tool — that changed when
 the toolbar became five groups. Sub-tools are reachable by click or through the

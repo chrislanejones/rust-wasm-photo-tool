@@ -1,6 +1,6 @@
 # Architecture
 
-> Part of the [Image Horse](../README.md) docs. See also: [File Map](File-Map.md) · [State Management](State-Management.md) · [Change Summary](Change-summary.md).
+> Part of the [Image Horse](../README.md) docs. See also: [File Map](File-Map.md) · [State Management](archive/State-Management.md) · [Change Summary](Change-summary.md).
 >
 > **Status:** describes what exists on `master` at **v7.8** (`d9960f6`),
 > verified against code and git history on 2026-07-09 — not aspirational.
@@ -162,7 +162,7 @@ what reads it. Durable "remember my choice" prefs persist to IndexedDB
 through a `StateStorage` adapter (`stores/storage/idbStorage.ts`) in
 its own `image-horse-zustand` database, kept separate from content
 data. Heavy data (originals, edits, gallery manifest) never lives in
-Zustand. See [State Management](State-Management.md) (note: that doc
+Zustand. See [State Management](archive/State-Management.md) (note: that doc
 still describes only the original three stores and predates
 `useAnnotationStore`/`useGuidesStore` — flagged stale, out of scope for
 this pass).
@@ -299,5 +299,5 @@ none are Accepted yet (see [ADR index](adr/INDEX.md)).
 - **Service worker / precache** — investigated only, nothing wired.
   Would cache `stamp_tool_bg.wasm` and the app shell for instant
   repeat loads and offline editing. See
-  [Service Workers & Caching](Service-Workers-Caching.md) (status line:
+  [Service Workers & Caching](archive/Service-Workers-Caching.md) (status line:
   "no service worker ships today") — no ADR yet.

@@ -1,6 +1,9 @@
 # Service Workers & Caching — Investigation
 
-> Part of the [Image Horse](../README.md) docs. See also: [IndexedDB Investigation](IndexedDB-Investigation.md) · [Architecture](Architecture.md) · [Getting Started](Getting-Started.md).
+> **ARCHIVED 2026-08-04 — materially out of date, do not trust the status line below.** It says "investigation only — no service worker ships today" and "nothing here is wired yet". Both were true when written and are now false: **Phase 1 and Phase 2 have shipped.** The service worker ships **dark** behind the `__IH_SW_MODE__` build flag (default `"off"`), recorded in ADR-019 and merged in v7.41, and the Phase 2 update prompt is live as `components/UpdatePrompt.tsx` on the `ui/dialog` primitive. Phase 3 (installable PWA) is still not started. ⚠️ Turning the SW off once an ON build has shipped means deploying `kill`, **never** unsetting the flag.
+
+
+> Part of the [Image Horse](../../README.md) docs. See also: [IndexedDB Investigation](IndexedDB-Investigation.md) · [Architecture](../Architecture.md) · [Getting Started](../Getting-Started.md).
 >
 > **Status: investigation only — no service worker ships today.** This note records the case for one, exactly what to cache (and what to never cache), the hosting interplay on Vercel/Netlify, and a phased rollout. Nothing here is wired yet.
 

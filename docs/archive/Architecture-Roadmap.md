@@ -1,6 +1,9 @@
 # Architecture Roadmap
 
-> Part of the [Image Horse](../README.md) docs. See also: [Architecture](Architecture.md) · [State Management](State-Management.md) · [File Map](File-Map.md) · [Security Hardening](Security-Hardening.md).
+> **ARCHIVED 2026-08-04 — superseded.** The prioritised list here has been overtaken by the work actually done (AppShell decomposition, the Zustand stores, the engine-in-a-worker spike, the five-group toolbar). Treat the P-numbers as historical. Live planning happens in `docs/Engine-Roadmap.md` and the ADRs.
+
+
+> Part of the [Image Horse](../../README.md) docs. See also: [Architecture](../Architecture.md) · [State Management](State-Management.md) · [File Map](../File-Map.md) · `docs/internal/Security-Hardening.md` (internal, untracked).
 >
 > The next evolution isn't "add another tool" — it's tightening the architecture so the app stays fast and maintainable as it grows: a **document-based editor** (React = UI, Zustand = app state, Rust/WASM = image document, Workers = heavy processing, Dexie = persistence, WebGPU = acceleration where available). This maps that target onto the *actual* repo and is honest about how much already exists.
 
@@ -14,7 +17,7 @@
 
 ## The real weak point
 
-`app/src/app/AppShell.tsx` (**3,314 lines** as of 2026-07-30 — it was ~3,245 when this was written and 3,220 at the last audit, i.e. it has GROWN while being dismantled; see the [entropy report](entropy-2026-07-30.md)) is the de-facto operating system for the app — dozens of `useState`s + callbacks for uploads, gallery, canvas, tools, history, export, AI, dialogs, zoom, layers, review, compression. **This is where the leverage is.** Everything below orbits shrinking it.
+`app/src/app/AppShell.tsx` (**3,314 lines** as of 2026-07-30 — it was ~3,245 when this was written and 3,220 at the last audit, i.e. it has GROWN while being dismantled; see the the entropy report (`docs/internal/`, untracked)) is the de-facto operating system for the app — dozens of `useState`s + callbacks for uploads, gallery, canvas, tools, history, export, AI, dialogs, zoom, layers, review, compression. **This is where the leverage is.** Everything below orbits shrinking it.
 
 ## Prioritized roadmap
 

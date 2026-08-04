@@ -38,6 +38,9 @@ Don't `git push`/merge without asking.
 
 # 0. The one rule [generic]
 
+> **ARCHIVED 2026-08-04 — reference, not public docs.** Still the canonical source for the single-source-of-truth conventions (colour / type / z-index tokens) that the CI `guardrails` job enforces; see `docs/CI.md` for the checks themselves. Moved out of the README index because it is a contributor playbook, not a question a visitor has.
+
+
 Each fact lives in exactly one place:
 
 | Fact                                 | Single source                                        |
