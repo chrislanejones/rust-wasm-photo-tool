@@ -2741,3 +2741,17 @@ edits or the canvas stopped showing them.
 | 7   | ADR-029 carries a same-day follow-up section: the pre-mortem correctly named the diff as the weak point and incorrectly predicted the mechanism (a stale field list). The general lesson recorded: a diff-based "what did the user change" signal is only as good as the guarantee that the thing being diffed starts in sync with the thing being edited | Complete |
 | 8   | Engine untouched — wasm still **761,213 bytes**. No Rust change, so the 171 Rust tests are unaffected | Verified |
 | 9   | Gates: `tsc --noEmit` clean · lint 0 errors (59 warnings, none new) · 320 vitest · production build succeeds | Verified |
+
+## v7.65 Change Summary — 2026-08-04
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **The start-screen "Paste (Ctrl+V)" button now reports every way it can fail.** All three modes were silent — you clicked Paste and the app sat there | Complete |
+| 2   | **Mode 1: the read never settles.** `navigator.clipboard.read()` needs a VISIBLE, focused document; backgrounded it does not reject, it simply never resolves, so the `await` parked forever and never reached the `catch`. Measured in NIGHT JOB IV and the reason the button sat unverifiable for days. Now raced against a 4s timeout | Complete |
+| 3   | **Mode 2: the read is rejected** (permission denied / API unavailable) — was a bare `console.warn`, which no user reads. Now `toast.error` | Complete |
+| 4   | **Mode 3: the clipboard holds no image** (text, a non-image file) — `files.length === 0` fell off the end of the function doing nothing. Now `toast.info`, not an error, because it isn't one | Complete |
+| 5   | Every message names Ctrl+V, which takes its files from the paste EVENT rather than the async API and therefore works when the button cannot | Complete |
+| 6   | **The Ctrl+V handler in AppShell is deliberately left silent** and now says why in a comment. It runs on every paste over the canvas including plain text, which reaches the same "no image" branch — a toast there fires on ordinary text pastes and is noise, not feedback. Opposite call from the button, for a stated reason | Complete |
+| 7   | Uses `toast` from `@/components/ui/sonner` (the themed wrapper, which re-exports it) rather than `sonner` directly — the dominant convention, 9 call sites to 3. There is no legacy shadcn `Toast` component in the repo; Sonner is the only notification path | Complete |
+| 8   | Verified in a browser, all three branches, in the backgrounded tab that made this untestable before: blocked → error toast; no image → info toast; image present → imports with no toast. The rejection branch fired rather than the timeout because Chrome rejects with "Document is not focused" when `hasFocus()` is false — the timeout covers the parked case NIGHT JOB IV measured with focus true | Verified |
+| 9   | Engine untouched — wasm still **761,213 bytes**. Gates: `tsc --noEmit` clean · lint 0 errors (59 warnings, none new) · 320 vitest · app + marketing builds succeed | Verified |

@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.65",
+    date: "2026-08-04",
+    headline: "The Paste button tells you when it can't paste",
+    entries: [
+      { tag: "fix", text: "Clicking \"Paste (Ctrl+V)\" on the start screen could do nothing at all, with no message, in three different situations: the browser blocked the clipboard, there was no image on the clipboard, or the read never came back because the window was not focused. All three now say what happened." },
+      { tag: "fix", text: "The third one is why this went unnoticed for so long. The read never failed — it just never finished, so there was nothing to report and nothing even to log. It now gives up after four seconds and tells you." },
+      { tag: "ui", text: "Every message points at Ctrl+V, which takes a different route to your clipboard and still works when the button cannot." },
+    ],
+  },
+  {
     version: "v7.64",
     date: "2026-08-04",
     headline: "Recolouring a shape works from the panel it actually shows",

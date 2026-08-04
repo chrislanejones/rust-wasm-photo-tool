@@ -16,6 +16,7 @@ import {
   Link,
   Github,
 } from "lucide-react";
+import { toast } from "@/components/ui/sonner";
 import { Spinner } from "@/components/ui/spinner";
 import { panelSwap } from "@/lib/animations";
 import { useUIStore } from "@/stores/useUIStore";
@@ -235,9 +236,40 @@ export function NewActions({
     ]);
   }, [blankW, blankH, bgColor, transparent, processFiles]);
 
+  /**
+   * The Paste button — the async clipboard path, as opposed to the Ctrl+V
+   * handler below which gets its files free from the paste EVENT.
+   *
+   * Every way this can fail used to be silent: you clicked Paste and the app
+   * sat there. Three distinct modes, all of them now say something.
+   *
+   * 1. **The read never settles.** `navigator.clipboard.read()` needs a
+   *    VISIBLE, focused document. Backgrounded, it does not reject — it just
+   *    never resolves, so an un-raced `await` parks this function forever and
+   *    never reaches the `catch`. Measured in NIGHT JOB IV, which is why the
+   *    button sat unverifiable for days. Hence the timeout race.
+   * 2. **The read is rejected** — permission denied, or the API is missing.
+   *    Was a bare `console.warn`, which no user reads.
+   * 3. **The clipboard holds no image** (text, a file that isn't an image).
+   *    `files.length === 0` fell straight off the end of the function doing
+   *    nothing. This one is not an error, so it gets `info`, not `error`.
+   *
+   * Every message names Ctrl+V, because that path takes its files from the
+   * event and works when this one cannot.
+   */
   const handlePasteClick = useCallback(async () => {
+    const TIMEOUT_MS = 4000;
+    let timer: number | undefined;
     try {
-      const items = await navigator.clipboard.read();
+      const items = await Promise.race([
+        navigator.clipboard.read(),
+        new Promise<never>((_, reject) => {
+          timer = window.setTimeout(
+            () => reject(new Error("clipboard-read-timeout")),
+            TIMEOUT_MS,
+          );
+        }),
+      ]);
       const files: File[] = [];
       for (const item of items) {
         for (const type of item.types) {
@@ -251,9 +283,22 @@ export function NewActions({
           }
         }
       }
-      if (files.length) processFiles(files);
+      if (files.length) {
+        processFiles(files);
+        return;
+      }
+      toast.info("No image on the clipboard. Copy an image, then try again.");
     } catch (err) {
       console.warn("Clipboard read failed — use Ctrl+V:", err);
+      const timedOut =
+        err instanceof Error && err.message === "clipboard-read-timeout";
+      toast.error(
+        timedOut
+          ? "The clipboard didn't answer. Click the page to focus it and try again, or press Ctrl+V."
+          : "Couldn't read the clipboard — your browser may have blocked it. Press Ctrl+V instead.",
+      );
+    } finally {
+      if (timer !== undefined) window.clearTimeout(timer);
     }
   }, [processFiles]);
 

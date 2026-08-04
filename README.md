@@ -73,38 +73,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.64 — 2026-08-04
+### v7.65 — 2026-08-04
 
-**You can change the colour of a shape you have already placed.** Click a square
-or a circle you drew earlier, pick a colour, and it changes. Until this week it
-did nothing at all: the shape kept whatever colour it was drawn with, and the
-only way to change your mind was to delete it and draw it again. That bug was
-seven weeks old. Stroke width, the arrow style and the fill controls were stuck
-in the same way and are fixed with it.
+**The Paste button tells you when it can't paste.** Clicking "Paste (Ctrl+V)" on
+the start screen used to be able to do nothing at all, with no message, in three
+different situations: the browser blocked the clipboard, there was no image on
+the clipboard, or the read simply never came back because the window wasn't
+focused. All three now say what happened, and all three point at Ctrl+V, which
+takes a different route and works when the button can't.
 
-The panel now also loads the shape's own settings when you click it, so it shows
-you what the selected shape is rather than whatever you last used. (v7.63 shipped
-the fix earlier the same day, but only handled the case where the colour you
-clicked differed from the one the panel was already showing — so clicking the
-colour you wanted could do nothing at all. This finishes it.)
-
-Stroke width, the arrow style and the fill controls are fixed with it — they were
-stuck for the same reason. Reselect a pin and recolour it and it stays a pin,
-rather than turning into a plain circle.
-
-Undo, saving and export were checked rather than assumed. Recolouring is one undo
-step, so Ctrl+Z puts the old colour back — a whole run of changes to one shape is
-a single step, not one per click. The new colour survives closing the picture and
-opening it again. And it is the new colour that comes out in the file you export,
-not just the one on screen.
-
-**Dialogs keep the keyboard inside them.** With a dialog open, Tab used to walk
-straight out of it and carry on through the page behind, and closing one left you
-back at the top of the page instead of on the button you opened it from. Every
-dialog now holds the keyboard while it is open and hands it back where you left
-it — the delete confirmations, Settings, the shortcut list, the update prompt.
-Screen readers are also told the rest of the app is inactive while a dialog is
-up, which they were not before.
+The third one was the reason this went unnoticed for so long — the read never
+failed, it just never finished, so there was nothing to report and nothing to
+log. It now gives up after four seconds and says so.
 
 ## License
 

@@ -1627,7 +1627,16 @@ export function AppShell() {
             }
           }
         } catch {
-          /* clipboard API unavailable / denied — nothing to paste */
+          /* Clipboard API unavailable / denied — nothing to paste.
+           *
+           * DELIBERATELY SILENT, unlike the start-screen Paste BUTTON
+           * (`NewActions.handlePasteClick`), which toasts all three of its
+           * failure modes. The difference is what triggers each one. That
+           * button is an explicit "paste an image now", so a failure is worth
+           * reporting. This runs on EVERY Ctrl+V over the canvas, including
+           * pasting plain text — which reaches here with no image on the
+           * clipboard and would fire an error toast on an ordinary text paste.
+           * A toast here is noise, not feedback. Leave it quiet. */
         }
       }
       if (!source) return;
