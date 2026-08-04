@@ -24,6 +24,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.63",
+    date: "2026-08-04",
+    headline: "Change the colour of a shape you already placed",
+    entries: [
+      { tag: "fix", text: "Click a square or a circle you drew earlier, pick a different colour, and it changes. Until now it did nothing at all — the shape kept whatever colour it was drawn with, and the only way to change your mind was to delete it and draw it again. The bug was seven weeks old." },
+      { tag: "fix", text: "Stroke width, the arrow style and the fill controls were stuck in exactly the same way, for exactly the same reason, and they are fixed with it." },
+      { tag: "fix", text: "The parts you would check next were checked rather than assumed. Recolouring is one undo step, so Ctrl+Z puts the old colour back. The new colour survives closing the picture and opening it again. And it is the new colour that comes out in the file you export, not just the one on screen." },
+      { tag: "ui", text: "Dialogs keep the keyboard inside them. With a dialog open, Tab used to walk straight out of it and carry on through the page behind, and closing one left you back at the top of the page instead of on the button you opened it from. Every dialog now holds the keyboard while it is open and hands it back where you left it." },
+      { tag: "ui", text: "Screen readers are told the rest of the app is inactive while a dialog is up, which they were not before. That covers every dialog at once — the delete confirmations, Settings, the shortcut list and the update prompt all share one piece of code, and the fix went there." },
+      { tag: "infra", text: "Seventeen new tests, and both fixes were measured in a real browser rather than reasoned about — including a control run against the old code to confirm the keyboard really did escape before, and really does not now." },
+    ],
+  },
+  {
     version: "v7.62",
     date: "2026-08-01",
     headline: "Shapes and text stay where you put them when you resize",

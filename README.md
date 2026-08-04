@@ -73,28 +73,27 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.62 — 2026-08-01
+### v7.63 — 2026-08-04
 
-**Shapes and text stay where you put them when you resize.** Add a shape or some
-text, then resize the picture, and they used to slide off to one side. They were
-never moving — the picture was moving out from under them. Shapes, text, pen
-paths and their outlines now shrink and grow with the picture, and text scales
-with it instead of staying the same size and swallowing a photo you have just
-made smaller.
+**You can change the colour of a shape you have already placed.** Click a square
+or a circle you drew earlier, pick a different colour, and it changes. Until now
+it did nothing at all: the shape kept whatever colour it was drawn with, and the
+only way to change your mind was to delete it and draw it again. That bug was
+seven weeks old. Stroke width, the arrow style and the fill controls were stuck
+in exactly the same way, and they are fixed with it.
 
-**A layer mask used to stop working altogether after a resize.** The mask is
-stored at the picture's size, and resizing left it at the old one, at which
-point the app quietly ignored it and the layer went back to fully visible. No
-error, no warning — masking just switched itself off. Same cause as the first
-one, and found while fixing it.
+The parts you would check next were checked too, rather than assumed. Recolouring
+is one undo step, so Ctrl+Z puts the old colour back. The new colour survives
+closing the picture and opening it again. And it is the new colour that comes out
+in the file you export, not just the one on screen.
 
-**Cropping had the same blind spot in a different place.** It moved things to
-the right position but never told the screen to redraw them, so they looked
-wrong until you undid something or switched tools. Crop, resize, canvas size and
-the canvas border all say so now.
-
-Nine tests pin it down, including the exact case that was reported: a shape
-centred on a picture is still centred after the picture is halved.
+**Dialogs keep the keyboard inside them.** With a dialog open, Tab used to walk
+straight out of it and carry on through the page behind, and closing one left you
+back at the top of the page instead of on the button you opened it from. Every
+dialog now holds the keyboard while it is open and hands it back where you left
+it — the delete confirmations, Settings, the shortcut list, the update prompt.
+Screen readers are also told the rest of the app is inactive while a dialog is
+up, which they were not before.
 
 ## License
 
