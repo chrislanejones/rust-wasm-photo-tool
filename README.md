@@ -1,12 +1,31 @@
-Image Horse
+# Image Horse
 
 ![Image Horse](public/Rust-Wasm-Photo-Tool-App-June-2.webp)
 
 **Live:** [rust-wasm-photo-tool.netlify.app](https://rust-wasm-photo-tool.netlify.app/) &nbsp;·&nbsp; [![CI](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml)
 
-A browser-based image annotation and editing tool powered by **Rust/WASM** for pixel-level operations, **React + TypeScript** with **Zustand** state stores for the UI, and **Convex** for optional cloud persistence. Edits run locally in WebAssembly and your originals + edits live in the browser's **IndexedDB** — your pixels never leave the tab unless you sign in for persistence or AI features. Includes a **Batch Image Editor** for applying a logo to many photos in one pass, with a grid mosaic view of the gallery.
+A browser-based image annotation and editing tool powered by **Rust/WASM** for pixel-level operations, **React + TypeScript** with **Zustand** state stores for the UI, and **Convex** for optional cloud persistence. Edits run locally in WebAssembly and your originals + edits live in the browser's **IndexedDB** — your pixels never leave the tab unless you sign in for persistence or AI features. Includes a **batch editor** that works across a whole gallery in one pass — stamp a logo, apply text, bulk-rename by pattern, or name every photo from what is actually in it with a local describer that needs no account and no per-image cost.
 
 > Previously called **Clone Stamp App** — the app grew well beyond its origins as a single clone stamp tool.
+
+## Quick start
+
+Needs Node + [pnpm](https://pnpm.io/), and the Rust toolchain plus
+[`wasm-pack`](https://rustwasm.github.io/wasm-pack/) to build the engine.
+
+```bash
+pnpm install
+pnpm run build:wasm   # compile the Rust engine -> pkg/  (required before first run)
+pnpm run dev          # editor at localhost:5173
+```
+
+`pnpm run build` bundles whatever is already in `pkg/` — it does **not** rebuild the
+engine. After changing anything under `src/`, run `build:wasm` again, or use
+`pnpm run build:all` to do both. A stale `pkg/` looks exactly like a broken feature.
+
+Convex and Clerk are optional: with no keys set the app runs fully logged-out,
+which is a supported path and not a degraded one. Full setup, deploy notes and
+environment variables → **[Getting Started](docs/Getting-Started.md)**.
 
 ## Documentation
 
@@ -19,16 +38,16 @@ A browser-based image annotation and editing tool powered by **Rust/WASM** for p
 - **[CI](docs/CI.md)** — the workflow jobs, the deploy sentinel, the static guardrails, and the local git hooks.
 - **[Change Summary](docs/Change-summary.md)** — the full dated release history.
 
-Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in `docs/archive/` rather than deleted.
+Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investigations and planning notes are kept in **[docs/archive/](docs/archive/README.md)** rather than deleted — each one says what went stale about it.
 
 ## Tech Stack
 
 - **Rust** — WASM processing layer (`wasm-bindgen`, `png` crate, `ab_glyph` fonts, SIMD128 kernels)
-- **React 19** — UI framework
+- **React 19** — UI framework (19.2.x, pinned through the pnpm catalog)
 - **TypeScript** — Type safety
 - **Zustand** — Client state management (UI / tool / gallery stores; IndexedDB-persisted prefs)
 - **Vite** — Build tool with WASM support (`vite-plugin-wasm` + top-level await)
-- **Tailwind CSS** — Utility styling (semantic design tokens)
+- **Tailwind CSS v4** — Utility styling via semantic design tokens; core utilities only, variants via cva
 - **Radix UI** — Accessible primitives (Dialog, Tooltip, Context Menu)
 - **Framer Motion** — Panel animations
 - **Lucide React** — Icons
@@ -37,8 +56,8 @@ Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investig
 - **JSZip** — Client-side ZIP (batch export)
 - **IndexedDB** — Local-first storage (originals, edits, gallery); **Dexie** content layer + Zustand persist adapter
 - **Convex** — Real-time database + auth + serverless functions
-- **Clerk** — Authentication (via `@convex-dev/auth`)
-- **Stripe** — Payments / billing
+- **Clerk** — Authentication, wired to Convex through `ConvexProviderWithClerk` (`convex/react-clerk`)
+- **Stripe** — Payments / billing, called over raw REST from Convex (no SDK dependency)
 - **Replicate** — AI image models (background removal, restore) via Convex
 
 ## The marketing site
