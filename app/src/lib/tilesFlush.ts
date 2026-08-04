@@ -51,7 +51,7 @@ function hasOplogExports(t: object): t is OplogWasmExports {
 /** Whether the tile flush path is on. Default ON since the 2026-07-17 flip
  *  (four-check A/B passed); `localStorage.setItem("ih_tiles_flush", "0")` is
  *  the per-profile kill switch. */
-function isTilesFlushEnabled(): boolean {
+export function isTilesFlushEnabled(): boolean {
   try {
     return (
       typeof window === "undefined" ||
@@ -67,7 +67,7 @@ function isTilesFlushEnabled(): boolean {
  *  per-profile kill switch. Recording happens regardless on a tiles build;
  *  this only decides whether `undo()`/`redo()` consult the log — and a
  *  hash-check mismatch still falls back to snapshot undo per ADR-013. */
-function isOplogUndoEnabled(): boolean {
+export function isOplogUndoEnabled(): boolean {
   try {
     return (
       typeof window === "undefined" ||

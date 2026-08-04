@@ -1,4 +1,4 @@
-import { Trash2, Activity, Gauge, Image as ImageIcon } from "lucide-react";
+import { Trash2, Activity, Gauge, Image as ImageIcon, Flag } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { ResourceMonitor } from "@/components/ResourceMonitor";
 import { ImageMetaPanel, type ImageMeta } from "@/components/ImageMetaPanel";
+import { FeatureFlagsPanel } from "@/components/FeatureFlagsPanel";
 import { useDiagnostics } from "@/hooks/useDiagnostics";
 import {
   clearDiagnostics,
@@ -24,7 +25,7 @@ interface Props {
   imageMeta?: ImageMeta;
 }
 
-type Tab = "resources" | "telemetry" | "imagemeta";
+type Tab = "resources" | "telemetry" | "imagemeta" | "flags";
 
 const SOURCE_CLASS: Record<LogSource, string> = {
   WASM_ENGINE: "bg-warning/10 text-warning border-warning/20",
@@ -63,6 +64,9 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
     { id: "resources", label: "Resources", icon: Gauge },
     { id: "telemetry", label: "System Telemetry", icon: Activity },
     { id: "imagemeta", label: "Current Image Meta", icon: ImageIcon },
+    // Flags last: it answers "what am I running with?", which is the question
+    // you ask AFTER the other three tabs have shown you something odd.
+    { id: "flags", label: "Feature Flags", icon: Flag },
   ];
 
   return (
@@ -119,6 +123,8 @@ export function DiagnosticLogOverlay({ open, onClose, imageMeta }: Props) {
         <div className="flex-1 overflow-y-auto">
           {tab === "resources" ? (
             <ResourceMonitor diag={diag} onRefresh={diag.refresh} />
+          ) : tab === "flags" ? (
+            <FeatureFlagsPanel active={open && tab === "flags"} />
           ) : tab === "imagemeta" ? (
             <ImageMetaPanel
               active={open && tab === "imagemeta"}
