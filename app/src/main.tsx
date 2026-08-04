@@ -5,6 +5,17 @@ import App from "./app/App";
 import { ConvexClerkProvider } from "@/components/ConvexClerkProvider";
 import { setupServiceWorker } from "@/lib/pwa/swBoot";
 import "./styles.css";
+import { installGpuBlurSelfTest } from "@/lib/webgpu/selfTest";
+import { webgpuEnabled } from "@/lib/webgpu/detect";
+
+// GPU blur correctness harness (Phase 0, ADR-030). Installs a
+// `window.__ihGpuBlurSelfTest()` that compares the WGSL blur against the CPU
+// oracle. There is no WebGPU in jsdom, so a browser is the only honest place to
+// run it. Attached in dev, or in any build with `ih_webgpu` switched on — it
+// only defines a function, it never touches a pixel on its own.
+if (import.meta.env.DEV || webgpuEnabled()) {
+  installGpuBlurSelfTest();
+}
 
 // No-op (statically eliminated) unless the build ran with VITE_ENABLE_SW set
 // — the service worker ships dark. See vite.config.ts + lib/pwa/swBoot.ts.
