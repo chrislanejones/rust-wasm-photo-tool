@@ -55,6 +55,53 @@ export interface DrawEditState {
   };
 }
 
+/** The style fields a reselected shape carries, minus `shape`/`kindByte`. */
+export type ShapeStylePatch = Partial<NonNullable<DrawEditState["style"]>>;
+
+/**
+ * Which style fields the user just changed in the Shapes panel.
+ *
+ * This is the fix for the seven-week "a placed square cannot be recoloured"
+ * bug. `selectShape` snapshots a reselected shape's own style into
+ * `editState.style` so clicking a red square shows it red rather than
+ * repainting it with whatever the panel happens to hold. But that snapshot
+ * then outranked the panel everywhere (`es.style?.strokeColor ?? s.strokeColor`
+ * in `commitEdit`), so a colour change could never reach the shape — and
+ * because only a handle drag set `editDirtyRef`, a colour-only edit also took
+ * `commitEdit`'s no-op early exit and never called `update_shape_annotation`
+ * at all. Two blockers, one symptom.
+ *
+ * The snapshot is right on reselect and wrong from then on, so it is treated
+ * as a DEFAULT rather than an override: diff the panel against its own
+ * PREVIOUS value and carry across only what actually changed. Comparing
+ * against the shape instead would repaint it the moment it was selected,
+ * which is the behaviour the snapshot exists to prevent.
+ *
+ * Returns `null` when nothing changed, so the caller can skip the re-render
+ * and — more importantly — avoid marking the edit dirty, which would push a
+ * spurious "Edit Shape" step onto the undo stack for merely selecting.
+ *
+ * `shape` is deliberately absent: `kindByte` preserves a pin's real kind
+ * across an edit, so retyping a committed shape is a separate operation and
+ * not something a colour click should trigger.
+ */
+export function panelStylePatch(
+  prev: ToolSettings,
+  next: ToolSettings,
+): ShapeStylePatch | null {
+  const patch: ShapeStylePatch = {};
+  if (next.strokeColor !== prev.strokeColor) patch.strokeColor = next.strokeColor;
+  if (next.strokeWidth !== prev.strokeWidth) patch.strokeWidth = next.strokeWidth;
+  if (next.arrowStyle !== prev.arrowStyle) patch.arrowStyle = next.arrowStyle;
+  if (next.fillMode !== prev.fillMode) patch.fillMode = next.fillMode;
+  if (next.fillColor !== prev.fillColor) patch.fillColor = next.fillColor;
+  if (next.fillColor2 !== prev.fillColor2) patch.fillColor2 = next.fillColor2;
+  if (next.gradientAngle !== prev.gradientAngle)
+    patch.gradientAngle = next.gradientAngle;
+  if (next.fillBlock !== prev.fillBlock) patch.fillBlock = next.fillBlock;
+  return Object.keys(patch).length === 0 ? null : patch;
+}
+
 /** One entry from `tool.get_shape_annotations()`. */
 export interface ShapeMeta {
   id: number;
@@ -539,6 +586,25 @@ export function useDrawingTools({
       return next;
     });
   }, []);
+
+  // Panel restyles of a RESELECTED shape — see `panelStylePatch`.
+  const prevStyleSettingsRef = useRef(settings);
+  useEffect(() => {
+    const prev = prevStyleSettingsRef.current;
+    prevStyleSettingsRef.current = settings;
+    const es = editStateRef.current;
+    // No snapshot = a brand-new shape, which already reads the panel live.
+    if (!es?.style) return;
+    const patch = panelStylePatch(prev, settings);
+    if (!patch) return;
+    editDirtyRef.current = true;
+    setEditState((cur) => {
+      if (!cur?.style) return cur;
+      const next = { ...cur, style: { ...cur.style, ...patch } };
+      editStateRef.current = next;
+      return next;
+    });
+  }, [settings]);
 
   // Commit triggers — listeners exist only while an edit is pending.
   // Enter commits, Escape cancels.
