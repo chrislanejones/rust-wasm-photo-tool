@@ -79,3 +79,35 @@ Early warning sign to watch for: a new field in `DrawEditState["style"]` whose
 name does not also appear in `panelStylePatch`. That is mechanically checkable —
 if a third field is ever added without it, replace the hand-written diff with
 one derived from a single field list rather than adding a fourth.
+
+## Follow-up — the pre-mortem was right that the diff was the weak point, and wrong about how (2026-08-04, same day)
+
+Found in user testing within hours of v7.63 shipping: *"the colour changes of
+shapes are not in history."*
+
+The pre-mortem predicted the diff table going stale as fields were added. The
+actual failure needed no new field at all. `panelStylePatch` diffs the panel
+against **its own previous value**, and reselect did not sync the panel to the
+shape — so the panel kept whatever was last used. Reselect an orange shape while
+the panel still reads purple, click purple because purple is what you want, and
+the panel's value does not change. The diff returned `null`, the edit was never
+marked dirty, the shape stayed orange, and nothing reached history. Reproduced
+in a browser: panel showing purple as selected, shape still drawn orange.
+
+The decision above still holds — one mutation path, fixed in the UI — but it
+rested on an unstated assumption: *a panel value change means the user changed a
+control*. That was false while the panel could disagree with the selection.
+
+`selectShape` now loads the reselected shape's style into `ToolSettings` (via
+`useToolStore.getState().setToolSettings`) and seeds the diff baseline with the
+same values, so the sync is not itself read as an edit. That makes the
+assumption true by construction, and has two further consequences worth stating:
+the panel stops lying about what is selected, and the baseline becomes the
+SHAPE's style — so changing only the stroke width can no longer drag a stale
+panel colour along with it, which the original diff would have done.
+
+Pinned by two regression tests in `useDrawingTools.test.ts` named for the
+symptom. The lesson generalises past this bug: **a diff-based "what did the user
+change" signal is only as good as the guarantee that the thing being diffed
+starts in sync with the thing being edited.** Seed the baseline at selection
+time, or do not diff.

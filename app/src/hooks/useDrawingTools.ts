@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { useToolStore } from "@/stores/useToolStore";
 
 export interface Point {
   x: number;
@@ -279,6 +280,12 @@ export function useDrawingTools({
   // committed without being moved.
   const editDirtyRef = useRef(false);
 
+  // Baseline the panel is diffed against by `panelStylePatch`. Declared up here
+  // with the other refs because `selectShape` re-seeds it from the shape it is
+  // opening, and reading it from below its own declaration is needlessly
+  // fragile.
+  const prevStyleSettingsRef = useRef(settings);
+
   // Live shape annotations (for the Reselect list + canvas hit-test).
   const [shapes, setShapes] = useState<ShapeMeta[]>([]);
   const refreshShapes = useCallback(() => {
@@ -476,6 +483,32 @@ export function useDrawingTools({
       editDirtyRef.current = false;
       editStateRef.current = next;
       setEditState(next);
+      // Load the shape's style INTO the panel, and seed the diff baseline with
+      // the same values so this sync is not mistaken for a user edit.
+      //
+      // Without this the panel keeps whatever was last used, which made
+      // `panelStylePatch` unable to see a real edit: reselect an orange shape
+      // while the panel still reads purple, click purple because that is the
+      // colour you want, and the panel's value does not change — so the diff
+      // returned null, the shape stayed orange, and nothing reached history.
+      // Syncing here makes "the panel value changed" mean exactly "the user
+      // changed a control", which is the invariant the diff depends on. It also
+      // stops the panel lying about what is selected, and makes the baseline
+      // the SHAPE's style, so changing only the width can no longer drag a
+      // stale panel colour along with it.
+      const synced: ToolSettings = {
+        ...settingsRef.current,
+        strokeColor: next.style!.strokeColor,
+        strokeWidth: next.style!.strokeWidth,
+        arrowStyle: next.style!.arrowStyle,
+        fillMode: next.style!.fillMode,
+        fillColor: next.style!.fillColor,
+        fillColor2: next.style!.fillColor2,
+        gradientAngle: next.style!.gradientAngle,
+        fillBlock: next.style!.fillBlock,
+      };
+      prevStyleSettingsRef.current = synced;
+      useToolStore.getState().setToolSettings((p) => ({ ...p, ...synced }));
       // Selecting a shape — from the canvas OR the Reselect list — makes it
       // the object the Align/Placement grid acts on. Previously only the
       // Reselect list set this, so the grid stayed disabled for objects
@@ -588,7 +621,6 @@ export function useDrawingTools({
   }, []);
 
   // Panel restyles of a RESELECTED shape — see `panelStylePatch`.
-  const prevStyleSettingsRef = useRef(settings);
   useEffect(() => {
     const prev = prevStyleSettingsRef.current;
     prevStyleSettingsRef.current = settings;

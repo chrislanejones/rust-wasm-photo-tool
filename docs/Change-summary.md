@@ -2727,3 +2727,17 @@ edits or the canvas stopped showing them.
 | 18  | Gates: `cargo fmt --check` clean · clippy `-D warnings` clean · 285 Rust tests · `tsc --noEmit` clean · lint 0 errors (59 warnings, none new) · 318 vitest · production build succeeds | Verified |
 | 19  | **OPEN — `?v=` on the app URL is swallowed by the share route.** `http://host/?v=x#/create/shapes` renders "Shared image / This link is no longer available." instead of the editor. Found while cache-busting a rebuild; harmless in normal use, but it makes query params unusable for QC cache-busting | Recorded |
 | 20  | Housekeeping: `feat/vector-tool` confirmed already deleted on both remotes and preserved as the annotated tag `abandoned/vector-tool` (so commit `38275af` is not dangling and needs no rescue); the merged `night/job-iv` worktree removed; ADR-029 written | Complete |
+
+## v7.64 Change Summary — 2026-08-04
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Fixes a hole in v7.63's shape recolour, found in user testing hours after it shipped.** Reselect a shape and click a colour, and it only registered if that colour differed from the one the panel was already showing. Click an orange shape while the panel still read purple, click purple, and nothing happened — no colour change and no history entry | Complete |
+| 2   | Cause: `panelStylePatch` diffs the panel against its OWN previous value, and reselect never synced the panel to the shape. So "the panel value changed" did not reliably mean "the user changed a control" — the assumption the whole diff rested on | Complete |
+| 3   | `selectShape` now loads the reselected shape's style into `ToolSettings` and seeds the diff baseline with the same values, so the sync is not itself read as an edit. The assumption is now true by construction | Complete |
+| 4   | Two further consequences, both good: the panel stops lying about what is selected (it shows the selected shape's colour and width), and the baseline becomes the SHAPE's style — so changing only the stroke width can no longer drag a stale panel colour along with it, which v7.63 would have done | Complete |
+| 5   | Verified in a browser on the production build: panel red / shape orange → reselect → **panel syncs to orange** → click purple → preview turns purple → Enter → **"Edit Shape" appears in History**, undo enabled → Ctrl+Z → shape back to orange | Verified |
+| 6   | Tests: 2 regression tests in `useDrawingTools.test.ts` named for the reported symptom — the inert-swatch case, and that a width-only change does not carry the colour with it. vitest 318 → 320 | Verified |
+| 7   | ADR-029 carries a same-day follow-up section: the pre-mortem correctly named the diff as the weak point and incorrectly predicted the mechanism (a stale field list). The general lesson recorded: a diff-based "what did the user change" signal is only as good as the guarantee that the thing being diffed starts in sync with the thing being edited | Complete |
+| 8   | Engine untouched — wasm still **761,213 bytes**. No Rust change, so the 285 Rust tests are unaffected | Verified |
+| 9   | Gates: `tsc --noEmit` clean · lint 0 errors (59 warnings, none new) · 320 vitest · production build succeeds | Verified |

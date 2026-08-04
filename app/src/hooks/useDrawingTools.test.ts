@@ -106,6 +106,36 @@ describe("panelStylePatch", () => {
     });
   });
 
+  it("REGRESSION: a swatch click is inert when the panel already shows that value", () => {
+    // This is the hole that shipped in v7.63 and was found in user testing:
+    // "the colour changes of shapes are not in history".
+    //
+    // Reselect an ORANGE shape while the panel still reads PURPLE from earlier
+    // use, then click purple because purple is what you want. The panel's value
+    // does not change, so the diff sees nothing, the edit is never marked dirty,
+    // the shape stays orange and no "Edit Shape" reaches history.
+    const purple = settings({ strokeColor: "#8b5cf6" });
+    expect(panelStylePatch(purple, purple)).toBeNull();
+
+    // The function is right — it reports what the PANEL did. The fix is that
+    // `selectShape` now loads the shape's style into the panel and re-seeds
+    // this baseline with it, so the baseline is the SHAPE's orange and the
+    // click becomes a real change. Simulated here as the seeded baseline:
+    const seededFromShape = settings({ strokeColor: "#f97316" }); // shape = orange
+    expect(panelStylePatch(seededFromShape, purple)).toEqual({
+      strokeColor: "#8b5cf6",
+    });
+  });
+
+  it("REGRESSION: with the baseline seeded from the shape, one control does not drag the others", () => {
+    // The flip side of seeding from the shape: reselect an orange shape (panel
+    // now also orange) and change ONLY the stroke width. Colour must not be
+    // dragged along, or every width tweak silently repaints the shape.
+    const seededFromShape = settings({ strokeColor: "#f97316", strokeWidth: 3 });
+    const widthOnly = settings({ strokeColor: "#f97316", strokeWidth: 9 });
+    expect(panelStylePatch(seededFromShape, widthOnly)).toEqual({ strokeWidth: 9 });
+  });
+
   it("treats a change back to the previous value as a change", () => {
     // Red -> green -> red is two edits, not one edit and one no-op; the second
     // has to reach the shape or it keeps the green it was given in between.

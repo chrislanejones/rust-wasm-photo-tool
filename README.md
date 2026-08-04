@@ -73,19 +73,25 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.63 — 2026-08-04
+### v7.64 — 2026-08-04
 
 **You can change the colour of a shape you have already placed.** Click a square
-or a circle you drew earlier, pick a different colour, and it changes. Until now
-it did nothing at all: the shape kept whatever colour it was drawn with, and the
+or a circle you drew earlier, pick a colour, and it changes. Until this week it
+did nothing at all: the shape kept whatever colour it was drawn with, and the
 only way to change your mind was to delete it and draw it again. That bug was
 seven weeks old. Stroke width, the arrow style and the fill controls were stuck
-in exactly the same way, and they are fixed with it.
+in the same way and are fixed with it.
 
-The parts you would check next were checked too, rather than assumed. Recolouring
-is one undo step, so Ctrl+Z puts the old colour back. The new colour survives
-closing the picture and opening it again. And it is the new colour that comes out
-in the file you export, not just the one on screen.
+The panel now also loads the shape's own settings when you click it, so it shows
+you what the selected shape is rather than whatever you last used. (v7.63 shipped
+the fix earlier the same day, but only handled the case where the colour you
+clicked differed from the one the panel was already showing — so clicking the
+colour you wanted could do nothing at all. This finishes it.)
+
+Undo, saving and export were checked rather than assumed. Recolouring is one undo
+step, so Ctrl+Z puts the old colour back. The new colour survives closing the
+picture and opening it again. And it is the new colour that comes out in the file
+you export, not just the one on screen.
 
 **Dialogs keep the keyboard inside them.** With a dialog open, Tab used to walk
 straight out of it and carry on through the page behind, and closing one left you

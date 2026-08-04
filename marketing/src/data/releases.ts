@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.64",
+    date: "2026-08-04",
+    headline: "Recolouring a shape works from the panel it actually shows",
+    entries: [
+      { tag: "fix", text: "The last release made a placed shape recolourable, but only if the colour you clicked was different from the one the panel happened to be showing. Click a shape you drew in orange while the panel still reads purple from earlier, click purple because purple is what you want, and nothing happened — the panel had not changed, so the app thought you had not asked for anything." },
+      { tag: "ui", text: "The panel now loads the shape's own settings when you click it, so it shows you what the selected shape is instead of whatever you last used. A click on any colour is a real change." },
+      { tag: "fix", text: "Changing only the stroke width no longer quietly drags an old panel colour along with it." },
+      { tag: "infra", text: "Two regression tests named for the symptom that was reported, so this exact case cannot come back quietly." },
+    ],
+  },
+  {
     version: "v7.63",
     date: "2026-08-04",
     headline: "Change the colour of a shape you already placed",
