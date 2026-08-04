@@ -88,10 +88,15 @@ the fix earlier the same day, but only handled the case where the colour you
 clicked differed from the one the panel was already showing — so clicking the
 colour you wanted could do nothing at all. This finishes it.)
 
+Stroke width, the arrow style and the fill controls are fixed with it — they were
+stuck for the same reason. Reselect a pin and recolour it and it stays a pin,
+rather than turning into a plain circle.
+
 Undo, saving and export were checked rather than assumed. Recolouring is one undo
-step, so Ctrl+Z puts the old colour back. The new colour survives closing the
-picture and opening it again. And it is the new colour that comes out in the file
-you export, not just the one on screen.
+step, so Ctrl+Z puts the old colour back — a whole run of changes to one shape is
+a single step, not one per click. The new colour survives closing the picture and
+opening it again. And it is the new colour that comes out in the file you export,
+not just the one on screen.
 
 **Dialogs keep the keyboard inside them.** With a dialog open, Tab used to walk
 straight out of it and carry on through the page behind, and closing one left you

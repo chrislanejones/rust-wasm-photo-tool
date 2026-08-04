@@ -31,6 +31,8 @@ export const RELEASES: Release[] = [
       { tag: "fix", text: "The last release made a placed shape recolourable, but only if the colour you clicked was different from the one the panel happened to be showing. Click a shape you drew in orange while the panel still reads purple from earlier, click purple because purple is what you want, and nothing happened — the panel had not changed, so the app thought you had not asked for anything." },
       { tag: "ui", text: "The panel now loads the shape's own settings when you click it, so it shows you what the selected shape is instead of whatever you last used. A click on any colour is a real change." },
       { tag: "fix", text: "Changing only the stroke width no longer quietly drags an old panel colour along with it." },
+      { tag: "fix", text: "Stroke width, the arrow style and the fill controls were stuck for the same reason and are fixed alongside the colour. Reselect a pin and recolour it and it stays a pin, instead of turning into a plain circle." },
+      { tag: "ui", text: "A run of changes to one shape is a single undo step, not one per click — pick a colour, nudge the width, change the fill, and Ctrl+Z takes all of it back at once." },
       { tag: "infra", text: "Two regression tests named for the symptom that was reported, so this exact case cannot come back quietly." },
     ],
   },
