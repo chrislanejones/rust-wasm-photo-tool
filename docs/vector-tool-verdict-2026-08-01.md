@@ -97,3 +97,40 @@ including the shape-colour fix, which it does not contain.
 
 Not merged, per instruction: a `wip(` commit does not go to production
 unattended.
+
+## Outcome — deleted and preserved (recorded 2026-08-04, NIGHT JOB V)
+
+The branch is gone from everywhere: no local ref, and `git ls-remote --heads`
+shows it on neither origin nor codeberg. The deletion happened on 2026-08-01,
+immediately after this verdict; NIGHT JOB V confirmed it rather than performing
+it, so the housekeeping item it was given was already satisfied.
+
+**Nothing was lost.** The commit survives as the annotated tag
+`abandoned/vector-tool` → `38275af`, which is pushed to **both** remotes — the
+same preservation pattern as `negative-result/rayon-wavefront`. The tag's
+annotation carries the evidence above (builds clean, 241 tests, 16 files /
+29 hunks to rebase) and names the salvage. To read it:
+
+```bash
+git show abandoned/vector-tool                       # the annotation
+git show abandoned/vector-tool:app/src/features/tools/vectorGesture.ts
+```
+
+Two corrections to notes written around this branch, both from checking rather
+than remembering:
+
+- Night Job IV's session log says "It is pushed to origin, so rebasing it would
+  rewrite published history." True when written, stale now — the branch ref is
+  deleted on both remotes and only the tag remains.
+- `38275af` is **not** a dangling object awaiting garbage collection. It is
+  reachable from the tag, so it is not in `git fsck --lost-found` and no rescue
+  is needed. (`git branch -a --contains` returns nothing for it, which is what
+  makes it look dangling — that command does not consider tags.)
+
+The tier-mapping argument this branch's commit message made — Convex
+`free|pro|team` against UI `demo|loggedIn|paid` with nothing translating between
+them — has since been answered on master by `userModeForTier()` in
+`app/src/lib/tiers.ts`, shipped with the v7.50 paid-tier gating fix. Only the
+tool-vocabulary half (`vectorGesture.ts`) is still unbuilt, and it has no job
+unless the Shapes-into-Text merge is revived; master still ships Shapes as its
+own tool.
