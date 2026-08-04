@@ -105,7 +105,24 @@ n_any=$(rg -n '\bas any\b' app/src -g '*.ts' -g '*.tsx' -g '!*.d.ts' | wc -l)
 check "as-any" 0 "import real types (R7)" "$n_any"
 
 # SIMD unsafe is expected here; the count keeps it from growing unnoticed.
-n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' | wc -l)
+#
+# `// allow: rust-panic` skips a reviewed site. The docs have promised this
+# escape hatch since the check was written, but only raw-colors ever
+# implemented one — so the only ways to go green were to delete the code or
+# raise the baseline, and this script exists to forbid the second. Added
+# 2026-08-04, mirroring the raw-colors filter above.
+#
+# ⚠️ The annotation MUST be on the SAME LINE as the violation — `rg -v` drops the
+# matching line, so a comment on the line above filters nothing and the count
+# does not move. (Cost twenty minutes the day it was added.)
+#
+# It earns its keep on the inline `#[cfg(test)]` modules in src/: a test that
+# asserts with `.expect(...)` is CORRECT — panicking is how a test fails — but
+# ripgrep cannot tell engine code from test code, so every new engine test
+# pushes this count up for no reason. Annotate those; never annotate a real
+# panic on a pixel path.
+n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
+  | rg -v 'allow: rust-panic' | wc -l)
 check "rust-panics" 67 "panic/unsafe in the engine (§6)" "$n_rust"
 
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)

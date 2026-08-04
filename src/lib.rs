@@ -4554,7 +4554,7 @@ mod layer_persistence_tests {
         let mask = t.layers[t.active]
             .mask
             .as_ref()
-            .expect("mask must survive the resize");
+            .expect("mask must survive the resize"); // allow: rust-panic — test assertion, panicking IS the failure mode
         assert_eq!(
             mask.len(),
             10 * 10,

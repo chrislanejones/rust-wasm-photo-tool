@@ -44,28 +44,60 @@ Nothing here opens GitHub **Issues**. Results surface as a red ✗ check on the 
 
 ## Guardrails
 
-The `guardrails` job runs static checks over the source with ripgrep. Every step carries `continue-on-error: true`, so **all** checks run and every violation is surfaced as a `::error::` annotation while the workflow stays green. They are advisory because the codebase is not clean against them yet — the counts below are the baseline at wire-up.
+The `guardrails` job runs static checks over the source with ripgrep, from
+[`scripts/guardrails.sh`](../scripts/guardrails.sh). **It blocks the build.**
+
+It is not a pass/fail gate on zero, though — it is a **baseline ratchet**. Each
+check carries a recorded count and the build fails when that count goes **up**.
+New violations are blocked from today; the existing ones are counted and can
+only be paid down. Only one of the six checks is actually at zero.
+
+That design exists because the two obvious options were both wrong. Leaving the
+job `continue-on-error` — which is how it started — meant it reported violations
+and failed nothing, which is advisory theater. Flipping it straight to blocking
+was impossible with 112 pre-existing violations, and widening the exclude globs
+to go green is the ratchet anti-pattern the playbook forbids.
 
 | Check | Pattern (scope) | Escape hatch | Baseline |
 | --- | --- | --- | --- |
-| Raw colors | `(bg\|text\|border\|ring)-(zinc\|neutral\|gray\|slate\|stone)-NNN`, `text-white`, `bg-white` in `app/src` | `// allow: raw-color` | 38 / 12 files |
-| Off-scale type / faux weights | `text-[NNpx]`, `font-medium`, `font-black` | — | 9 / 7 files |
-| Raw z-index | `z-10..z-100`, `z-[N…]` | — | 15 / 6 files |
-| `as any` | `\bas any\b` (excl. `*.d.ts`) | import real types | 3 / 3 files |
-| Rust panics / unsafe | `.unwrap()`, `.expect(`, `panic!`, `unsafe ` in `src/*.rs` | `// allow:` after review | 28 / 7 files |
-| a11y | `role="button"` without `aria-label` | add `aria-label` | scanned |
+| Raw colors | `(bg\|text\|border\|ring)-(zinc\|neutral\|gray\|slate\|stone)-NNN`, `text-white`, `bg-white` in `app/src` | `// allow: raw-color` | 26 |
+| Off-scale type / faux weights | `text-[NNpx]`, `font-medium`, `font-black` | — | 9 |
+| Raw z-index | `z-10..z-100`, `z-[N…]` | — | 4 |
+| `as any` | `\bas any\b` (excl. `*.d.ts`) | import real types | **0 — a true hard gate** |
+| Rust panics / unsafe | `.unwrap()`, `.expect(`, `panic!`, `unsafe ` in `src/*.rs` | `// allow: rust-panic` | 67 |
+| a11y | `role="button"` without `aria-label` | add `aria-label` | 5 |
 
-The Rust check intentionally flags `unsafe`, which the `src/simd/` kernels require. Those are legitimate — annotate reviewed sites with `// allow:` rather than removing the check.
+**A baseline raised in a diff is the one thing to challenge in review.** Raising
+it to go green is precisely the move the script exists to prevent, and it says so
+when it fails.
 
-### Making a check blocking
+### Escape hatches
 
-Once a check's baseline is clean and legitimate hits are annotated:
+Two checks support a per-site annotation: `// allow: raw-color` and
+`// allow: rust-panic`. **The comment must be on the SAME LINE as the
+violation** — the filter is `rg -v`, which drops the matching line, so an
+annotation on the line above filters nothing and the count does not move.
 
-1. Remove that step's `continue-on-error: true` — its violations now fail the job.
-2. When every step is enforced, remove the **job-level** `continue-on-error: true` so the job blocks the workflow.
-3. Optionally add `guardrails` to branch protection.
+The Rust hatch earns its keep on the inline `#[cfg(test)]` modules in `src/`: a
+test asserting with `.expect(...)` is *correct*, because panicking is how a test
+fails, but ripgrep cannot tell engine code from test code. Annotate those. Never
+annotate a real panic on a pixel path — the check flags `unsafe` in `src/simd/`
+on purpose, and those are legitimate but reviewed, not waved through.
 
-Silence one legitimate site with an `# allow: <tag>` comment at the use site. **Do not widen the exclude globs** — that is the ratchet anti-pattern.
+### Making a check blocking on zero
+
+Once a check's baseline reaches 0 it is already a hard gate — any reintroduction
+fails, which is what `as any` does today. Nothing else needs configuring.
+
+### Running it locally
+
+```bash
+./scripts/guardrails.sh
+```
+
+It refuses to run without a real `ripgrep` binary rather than reporting a pass it
+cannot substantiate. Note that a shell alias or function named `rg` will not
+satisfy it — `command -v rg` has to find an executable.
 
 ## Local git hooks
 
