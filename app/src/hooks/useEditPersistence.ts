@@ -308,6 +308,7 @@ export function useEditPersistence() {
   const generateUploadUrl = useMutation(api.photoEdits.generateUploadUrl);
   const saveEdit = useMutation(api.photoEdits.save);
   const removeEdit = useMutation(api.photoEdits.remove);
+  const discardFailedUpload = useMutation(api.photoEdits.discardFailedUpload);
   const clearAllConvex = useMutation(api.photoEdits.clearAll);
 
   // photoId → hash of the archive last successfully synced to Convex. Session
@@ -417,6 +418,13 @@ export function useEditPersistence() {
           //
           // If anyone ever adds an `await` above this line, detaching stops
           // being safe and this comment is the reason why.
+          // Hoisted OUT of the try on purpose. The upload commits before the
+          // pointer does, so the only place that knows about a stranded file is
+          // the catch — and a `const` declared beside the upload is not in
+          // scope there. This is the whole reason the orphan sweep had nothing
+          // to work with.
+          let uploadedStorageId: string | null = null;
+
           const cloudSync = (async () => {
             try {
               // ── THE RATE LIMIT ───────────────────────────────────────────
@@ -490,6 +498,10 @@ export function useEditPersistence() {
                 throw new Error("archive upload returned no storageId");
               }
               const { storageId } = body as { storageId: string };
+              // From here on a file exists in storage that nothing points at.
+              // Recorded before the pointer is attempted, because the failure
+              // this guards against is the attempt itself.
+              uploadedStorageId = storageId;
               await withTimeout(
                 saveEdit({ photoKey: photoId, storageId: storageId as Id<"_storage">, canvasW, canvasH }),
                 "saveEdit",
@@ -502,6 +514,7 @@ export function useEditPersistence() {
               // failed would let a broken network burn the hour's allowance
               // without a single byte reaching Convex.
               recordUpload(photoId);
+              uploadedStorageId = null; // pointer committed — no longer stranded
             } catch (err) {
               // Cloud save failed (upload / storage / auth). The local IDB copy is
               // ALREADY written, so nothing is lost — just record the failure so it
@@ -512,6 +525,43 @@ export function useEditPersistence() {
                   err instanceof Error ? err.message : String(err)
                 }`,
               );
+
+              // The archive reached storage but the pointer never committed, so
+              // nothing will ever reference this file and nothing sweeps it.
+              // Every one of these used to be permanent; 3,535 MB of them
+              // disabled the account.
+              //
+              // Best-effort by construction. The mutation refuses if the file
+              // turns out to BE referenced — which is the common case here,
+              // because the usual way into this catch is the 8s timeout around
+              // `save`, and a timed-out mutation frequently lands anyway.
+              // Deleting then would leave a row pointing at nothing, so the
+              // server decides, not this catch.
+              //
+              // Its own failure is swallowed: this is cleanup on an error path,
+              // and an error while handling an error must not replace the
+              // message above with a less useful one.
+              if (uploadedStorageId) {
+                const stranded = uploadedStorageId;
+                uploadedStorageId = null;
+                try {
+                  const r = await withTimeout(
+                    discardFailedUpload({ storageId: stranded as Id<"_storage"> }),
+                    "discardFailedUpload",
+                  );
+                  logDiagnostic(
+                    "CONVEX_DB",
+                    r.deleted
+                      ? `Collected the stranded archive for ${photoId} (${r.reason})`
+                      : `Left the archive for ${photoId} in place — the server says it is ${r.reason}`,
+                  );
+                } catch {
+                  logDiagnostic(
+                    "CONVEX_DB",
+                    `Could not collect the stranded archive for ${photoId}; it is now an orphan`,
+                  );
+                }
+              }
             }
           })();
 
@@ -541,7 +591,7 @@ export function useEditPersistence() {
       // the user's work. A failed cloud leg costs freshness, not data.
       return true;
     },
-    [isAuthenticated, generateUploadUrl, saveEdit],
+    [isAuthenticated, generateUploadUrl, saveEdit, discardFailedUpload],
   );
 
   const loadPhotoEdit = useCallback(

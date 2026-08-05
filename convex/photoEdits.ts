@@ -13,6 +13,70 @@ export const generateUploadUrl = mutation({
   },
 });
 
+/**
+ * Delete an archive that was uploaded but never pointed at.
+ *
+ * THE HOLE THIS CLOSES. `savePhotoEdit` uploads the archive FIRST and commits
+ * the pointer SECOND (`save`, above). Any failure between the two strands a
+ * `_storage` file that nothing will ever reference, and `crons.ts` is empty, so
+ * nothing sweeps it. That is what produced 3,535 MB of orphans — 97% of all
+ * stored bytes — which exceeded the Convex free plan on 2026-08-05, disabled
+ * every deployment on the account, and took an unrelated production site down
+ * with it. Rate-limiting the uploads slowed the rate; only this closes the hole.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * WHY THIS REFUSES INSTEAD OF JUST DELETING
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * The caller reaches this from a `catch`, and the commonest way into that catch
+ * is v7.57's 8-second `withTimeout` around `save`. A client-side timeout does
+ * NOT mean the mutation failed — it very often means it is still in flight and
+ * lands a moment later. Deleting unconditionally would then leave a `photo_edits`
+ * row pointing at a file that no longer exists: an archive that reads as present
+ * and decodes to nothing. That is strictly worse than the orphan it was trying
+ * to prevent, because an orphan only costs bytes.
+ *
+ * So this deletes only what it can prove is unreferenced, checked inside the
+ * same transaction as the delete. If `save` did land, the row references the
+ * file, and this refuses and says so.
+ *
+ * The scan is also the AUTHORISATION check, and that is not incidental. A bare
+ * storage id carries no owner — there is no ownership record for a file that no
+ * row points at — so "delete this id for me" cannot be verified against the
+ * caller. Checking every referencing table closes it from the other side: the
+ * only ids this can delete are ones nobody references, which are garbage by
+ * definition. A caller passing someone else's live storage id gets a refusal.
+ *
+ * Bounded scans rather than an index: these tables are small (single digits to
+ * low hundreds), and adding a `by_storageId` index to three tables to serve a
+ * failure path would be a schema change carried forever for a rare call.
+ */
+export const discardFailedUpload = mutation({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    await requireUser(ctx);
+
+    for (const row of await ctx.db.query("photo_edits").take(2000)) {
+      if (row.storageId === args.storageId) return { deleted: false, reason: "referenced" };
+    }
+    for (const row of await ctx.db.query("shares").take(2000)) {
+      if (row.storageId === args.storageId) return { deleted: false, reason: "referenced" };
+    }
+    for (const row of await ctx.db.query("ai_jobs").take(2000)) {
+      if (
+        row.inputStorageId === args.storageId ||
+        row.outputStorageId === args.storageId ||
+        row.maskStorageId === args.storageId
+      ) {
+        return { deleted: false, reason: "referenced" };
+      }
+    }
+
+    await ctx.storage.delete(args.storageId);
+    return { deleted: true, reason: "unreferenced" };
+  },
+});
+
 /** Upsert the canvas state for a photo (replaces any previous storage blob). */
 export const save = mutation({
   args: {
