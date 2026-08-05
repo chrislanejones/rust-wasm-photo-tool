@@ -280,7 +280,11 @@ export function useEditPersistence() {
   const clearAllConvex = useMutation(api.photoEdits.clearAll);
 
   const savePhotoEdit = useCallback(
-    async (photoId: string, toolRef: RefObject<ImageHorseTool | null>) => {
+    async (
+      photoId: string,
+      toolRef: RefObject<ImageHorseTool | null>,
+      opts?: { detachCloudUpload?: boolean },
+    ) => {
       // ── LOCAL FIRST, ALWAYS ────────────────────────────────────────────────
       // This used to try the cloud first and keep the local IndexedDB write in
       // the `catch`. That is only safe against a REJECTION. When signed in, the
@@ -360,43 +364,81 @@ export function useEditPersistence() {
           const layers = collectLayers(tool);
           const activeLayerId = tool.active_layer_id();
           const archive = encodeArchive(canvasW, canvasH, canvasPng, undoStack, redoStack, annotationsJson, shapesJson, layers, activeLayerId);
-          const uploadUrl = await withTimeout(generateUploadUrl(), "generateUploadUrl");
-          const resp = await withTimeout(
-            fetch(uploadUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/octet-stream" },
-              body: archive.buffer as ArrayBuffer,
-            }),
-            "archive upload",
-          );
-          // A non-2xx upload still parses as JSON — an error body, with no
-          // `storageId` in it. Unchecked, that handed `undefined` to saveEdit
-          // as an Id<"_storage">, persisting a pointer to nothing while the
-          // catch below logged a misleading "cloud save failed" for a request
-          // that had, as far as this code knew, succeeded.
-          if (!resp.ok) {
-            throw new Error(
-              `archive upload failed: HTTP ${resp.status} ${resp.statusText}`,
-            );
-          }
-          const body = (await resp.json()) as { storageId?: string };
-          if (!body.storageId) {
-            throw new Error("archive upload returned no storageId");
-          }
-          const { storageId } = body as { storageId: string };
-          await withTimeout(
-            saveEdit({ photoKey: photoId, storageId: storageId as Id<"_storage">, canvasW, canvasH }),
-            "saveEdit",
-          );
-          // The local copy is already on disk (written before this block).
+
+          // ── END OF THE SYNCHRONOUS CAPTURE ──────────────────────────────
+          // Everything above reads the engine, and there is not a single
+          // `await` in it. That is load-bearing, not incidental.
+          //
+          // `detachCloudUpload` lets a photo switch return the moment the
+          // local write is done instead of waiting ~13s on the network. The
+          // ONLY reason that is safe is that the bytes are already captured
+          // here: an upload that re-read `toolRef` after the switch had
+          // continued would read the INCOMING photo's document and upload it
+          // under the outgoing photo's key — the exact corruption this branch
+          // exists to fix, recreated in the cloud copy where the local guard
+          // cannot see it.
+          //
+          // If anyone ever adds an `await` above this line, detaching stops
+          // being safe and this comment is the reason why.
+          const cloudSync = (async () => {
+            try {
+              const uploadUrl = await withTimeout(generateUploadUrl(), "generateUploadUrl");
+              const resp = await withTimeout(
+                fetch(uploadUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/octet-stream" },
+                  body: archive.buffer as ArrayBuffer,
+                }),
+                "archive upload",
+              );
+              // A non-2xx upload still parses as JSON — an error body, with no
+              // `storageId` in it. Unchecked, that handed `undefined` to saveEdit
+              // as an Id<"_storage">, persisting a pointer to nothing while the
+              // catch below logged a misleading "cloud save failed" for a request
+              // that had, as far as this code knew, succeeded.
+              if (!resp.ok) {
+                throw new Error(
+                  `archive upload failed: HTTP ${resp.status} ${resp.statusText}`,
+                );
+              }
+              const body = (await resp.json()) as { storageId?: string };
+              if (!body.storageId) {
+                throw new Error("archive upload returned no storageId");
+              }
+              const { storageId } = body as { storageId: string };
+              await withTimeout(
+                saveEdit({ photoKey: photoId, storageId: storageId as Id<"_storage">, canvasW, canvasH }),
+                "saveEdit",
+              );
+            } catch (err) {
+              // Cloud save failed (upload / storage / auth). The local IDB copy is
+              // ALREADY written, so nothing is lost — just record the failure so it
+              // shows up in the Diagnostics Window instead of vanishing silently.
+              logDiagnostic(
+                "CONVEX_DB",
+                `Cloud edit save failed for ${photoId}; saved locally only: ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              );
+            }
+          })();
+
+          // The switch path passes detachCloudUpload and returns here, without
+          // waiting on the network. `cloudSync` swallows its own failures, so
+          // this can never become an unhandled rejection; v7.57's 8s
+          // withTimeout stays the backstop that stops a hung Convex mutation
+          // wedging anything.
+          if (opts?.detachCloudUpload) return true;
+          await cloudSync;
           return true;
         } catch (err) {
-          // Cloud save failed (upload / storage / auth). The local IDB copy is
-          // ALREADY written, so nothing is lost — just record the failure so it
-          // shows up in the Diagnostics Window instead of vanishing silently.
+          // The SYNCHRONOUS CAPTURE failed — a dead engine handle, an encode
+          // error. Distinct from an upload failure, which the inner catch owns.
+          // The local copy is already on disk either way, so this costs
+          // freshness, not data.
           logDiagnostic(
             "CONVEX_DB",
-            `Cloud edit save failed for ${photoId}; saved locally only: ${
+            `Cloud edit capture failed for ${photoId}; saved locally only: ${
               err instanceof Error ? err.message : String(err)
             }`,
           );

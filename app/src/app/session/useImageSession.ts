@@ -143,24 +143,34 @@ export function useImageSession({
   const savingRef = useRef(false);
   dirtyRef.current = stamp.state.undoCount > 0 || hasBeenModified;
 
-  const flushEditArchive = useCallback(async () => {
-    const id = activeIdRef.current;
-    if (!id || !dirtyRef.current || !stamp.toolRef.current) return;
-    if (savingRef.current) return; // never overlap two archive writes
-    savingRef.current = true;
-    try {
-      await savePhotoEdit(id, stamp.toolRef);
-    } catch (err) {
-      // Never let an autosave failure surface as an unhandled rejection — but
-      // never swallow it either: the Diagnostics window is where it belongs.
-      logDiagnostic(
-        "CONSOLE",
-        `Autosave failed for ${id}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    } finally {
-      savingRef.current = false;
-    }
-  }, [stamp, savePhotoEdit]);
+  const flushEditArchive = useCallback(
+    async (photoId?: string, opts?: { detachCloudUpload?: boolean }) => {
+      // A caller with a specific photo in mind MUST pass it. `activeIdRef` has
+      // already been advanced to the INCOMING photo by the time a switch reaches
+      // its saveOutgoing block — it is set synchronously so gallery cycling
+      // reads the right thing — so defaulting to it there would ask for the
+      // outgoing photo's document to be written under the incoming photo's id.
+      // The ownership guard refuses exactly that, which would turn a routing
+      // change into a silently dropped save.
+      const id = photoId ?? activeIdRef.current;
+      if (!id || !dirtyRef.current || !stamp.toolRef.current) return;
+      if (savingRef.current) return; // never overlap two archive writes
+      savingRef.current = true;
+      try {
+        await savePhotoEdit(id, stamp.toolRef, opts);
+      } catch (err) {
+        // Never let an autosave failure surface as an unhandled rejection — but
+        // never swallow it either: the Diagnostics window is where it belongs.
+        logDiagnostic(
+          "CONSOLE",
+          `Autosave failed for ${id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      } finally {
+        savingRef.current = false;
+      }
+    },
+    [stamp, savePhotoEdit],
+  );
 
   // Idle debounce. Keyed on the engine's undo count + the modified flag, so it
   // re-arms on every recordable edit and fires once the user pauses.
@@ -389,7 +399,20 @@ export function useImageSession({
           // dropped by the photo switch — land it while the engine still
           // holds the outgoing document. No-op when persistence is off.
           await flushPendingOplogSave(stamp.toolRef.current);
-          await savePhotoEdit(outgoing, stamp.toolRef);
+          // Through flushEditArchive rather than calling savePhotoEdit
+          // directly, so the switch finally inherits `savingRef`. Bypassing
+          // that overlap guard is how one brush stroke became ten concurrent
+          // uploads of identical bytes and 238s of network: every click
+          // started its own save, and none of them knew about the others.
+          //
+          // detachCloudUpload — the local archive is written and awaited, the
+          // UPLOAD is not. A 13-second cloud round trip inside the switch is
+          // what made switches die in saveOutgoing in the first place, and a
+          // switch that dies there is precisely what leaves the engine holding
+          // the outgoing document while the UI has moved on. The archive bytes
+          // are captured synchronously before the upload detaches, so the
+          // upload cannot read a document that has since been replaced.
+          await flushEditArchive(outgoing, { detachCloudUpload: true });
         }
       }
       if (!isCurrent()) return; // a newer selection superseded this one
@@ -449,7 +472,7 @@ export function useImageSession({
         void loadPhotoFromEntry(entry, isCurrent);
       }
     },
-    [activePhotoId, hasBeenModified, stamp, loadPhotoFromEntry, savePhotoEdit, loadPhotoEdit],
+    [activePhotoId, hasBeenModified, stamp, loadPhotoFromEntry, flushEditArchive, loadPhotoEdit],
   );
 
   // Item 4: PgUp/PgDn gallery cycling
