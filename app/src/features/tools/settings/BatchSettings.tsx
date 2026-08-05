@@ -17,6 +17,7 @@ import { TEXT_COLORS } from "@/lib/colors";
 import { getOriginal, putOriginal } from "@/lib/dexie/originalsAdapter";
 import { deleteReplacedOriginal } from "@/lib/originalRefs";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { registerExtraRootProvider } from "@/lib/extraRoots";
 import {
   makeWorkingCopy,
   makeThumbnail,
@@ -206,6 +207,16 @@ export function BatchSettings({
   // onto that baseline instead of the already-logo'd result — so re-applying
   // *replaces* the logo rather than stacking a second one on top.
   const logoBaselineRef = useRef<Map<string, string>>(new Map());
+
+  // Publish these baselines as GC roots. They live in a ref and appear in no
+  // manifest, so the delete path (app/session/useImageSession.ts) cannot see
+  // them the way the repoint call sites below can — collecting one would break
+  // re-apply by making a second logo stack instead of replace. Deregisters on
+  // unmount, which is correct: an unmounted panel has no live baselines either.
+  useEffect(
+    () => registerExtraRootProvider(() => logoBaselineRef.current.values()),
+    [],
+  );
 
   /** The gallery AS OF NOW, for the delete guard. The `photos` prop is a
    *  render-time snapshot and a batch pass repoints many photos in a loop, so a
@@ -965,6 +976,12 @@ function TextBatchPanel({
   // onto that baseline, so re-applying *replaces* the previous text instead of
   // stacking a second layer on top.
   const textBaselineRef = useRef<Map<string, string>>(new Map());
+
+  // Same as the logo baselines above — invisible to the gallery, so declared.
+  useEffect(
+    () => registerExtraRootProvider(() => textBaselineRef.current.values()),
+    [],
+  );
 
   /** The gallery as of now — see the identical helper in BatchSettings. This
    *  panel is its own component, so it needs its own. */

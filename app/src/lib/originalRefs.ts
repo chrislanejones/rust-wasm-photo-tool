@@ -152,3 +152,72 @@ export async function deleteReplacedOriginal({
   }
   return "deleted";
 }
+
+export interface CollectDeletedArgs {
+  /** The entry being deleted — read BEFORE it leaves the gallery. */
+  entry: OriginalRef;
+  /** The gallery. Safe to pass either before or after removal; see below. */
+  photos: readonly OriginalRef[];
+  /** Keys referenced from outside the gallery — see the ROOTS note above.
+   *  For a delete this means `collectExtraRoots()` (lib/extraRoots.ts), because
+   *  the delete path cannot see BatchSettings' baseline refs the way the repoint
+   *  call sites can. */
+  extraRoots?: readonly (string | undefined)[];
+  /** Seam for tests; defaults to the real adapter. */
+  remove?: (key: string) => Promise<void>;
+}
+
+/**
+ * Collect the blobs a DELETED photo pointed at — its `originalKey` and its
+ * `uploadKey` A/B baseline — each through the same reachability check a repoint
+ * uses. Audit finding #2: `handleRemovePhoto` used to drop the edit archive and
+ * the gallery entry and leave both blobs stranded, up to two per delete.
+ *
+ * Why the baseline goes too: `uploadKey` exists solely to A/B against THIS
+ * photo. Once the photo is gone it compares nothing, and it is a full-size
+ * original — the largest thing this app stores. Keeping it would strand exactly
+ * the bytes the fix is meant to reclaim. It is still routed through the guard,
+ * so a baseline shared with a surviving photo (duplicates share both keys) is
+ * kept like any other live reference.
+ *
+ * Delete is NOT a repoint, and the difference is the whole correctness
+ * argument: a repointed photo still contributes roots (it is going somewhere),
+ * a deleted one contributes none. So the entry is filtered out of `photos`
+ * here rather than trusting the caller to pass a post-removal gallery. Passing
+ * the pre-removal array would otherwise make the entry root its own keys and
+ * silently collect nothing — a no-op that looks like success. Filtering makes
+ * the call correct either way.
+ *
+ * Never throws, for the same reason `deleteReplacedOriginal` does not: a failed
+ * delete leaves garbage the audit can measure, whereas a throw here surfaces as
+ * a broken gallery for something the user did not ask for.
+ */
+export async function collectDeletedPhotoOriginals({
+  entry,
+  photos,
+  extraRoots = [],
+  remove = deleteOriginal,
+}: CollectDeletedArgs): Promise<CollectVerdict[]> {
+  const remaining = photos.filter((p) => p.id !== entry.id);
+
+  // Dedupe: on a freshly imported photo originalKey === uploadKey, and asking
+  // twice would report two verdicts for one blob.
+  const keys = [...new Set([entry.originalKey, entry.uploadKey].filter(Boolean))];
+
+  const verdicts: CollectVerdict[] = [];
+  for (const key of keys as string[]) {
+    verdicts.push(
+      await deleteReplacedOriginal({
+        oldKey: key,
+        // The photo is gone, so it is not going anywhere. An empty newKey adds
+        // no root and can never equal a real content hash.
+        newKey: "",
+        photoId: entry.id,
+        photos: remaining,
+        extraRoots,
+        remove,
+      }),
+    );
+  }
+  return verdicts;
+}

@@ -14,6 +14,8 @@ import { usePreferences, canvasBgToRgba } from "@/lib/preferences";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
 import type { UserMode } from "@/components/StatusBar";
 import { useGalleryStore } from "@/stores/useGalleryStore";
+import { collectDeletedPhotoOriginals } from "@/lib/originalRefs";
+import { collectExtraRoots } from "@/lib/extraRoots";
 import { useUIStore } from "@/stores/useUIStore";
 import { toast } from "@/components/ui/sonner";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
@@ -452,6 +454,22 @@ export function useImageSession({
   const handleRemovePhoto = useCallback(
     (id: string) => {
       deletePhotoEdit(id).catch(() => {});
+
+      // Collect the originals this photo pointed at — audit finding #2. The
+      // entry has to be read BEFORE setPhotos drops it, and the collection has
+      // to run AFTER, so the deleted photo no longer roots its own keys.
+      //
+      // Routed through the same reachability guard a repoint uses rather than
+      // deleting the two keys directly: duplicates share an originalKey, so a
+      // direct delete would take a surviving photo's bytes with it. Inventing a
+      // second delete path is exactly how the shared-blob data loss happened in
+      // the compress paths (see lib/originalRefs.ts).
+      //
+      // Fire-and-forget with a swallowed rejection, deliberately: a failed
+      // collect leaves garbage the audit can measure, whereas awaiting it would
+      // make a storage hiccup look like a failed delete and leave the gallery
+      // showing a photo the user already removed.
+      const doomed = useGalleryStore.getState().photos.find((p) => p.id === id);
       setImageSavings((prev) => {
         const next = { ...prev };
         delete next[id];
@@ -484,6 +502,21 @@ export function useImageSession({
         }
         return next;
       });
+
+      if (doomed) {
+        void collectDeletedPhotoOriginals({
+          entry: doomed,
+          // Read fresh: setPhotos above has already removed the entry, so this
+          // is the post-removal gallery. collectDeletedPhotoOriginals filters
+          // the entry out again anyway, so a stale array cannot cause a wrong
+          // delete — only a missed one.
+          photos: useGalleryStore.getState().photos,
+          // BatchSettings' pre-logo / pre-text baselines live in refs and are in
+          // no manifest. Without these, deleting any photo could collect another
+          // photo's baseline and break re-apply.
+          extraRoots: collectExtraRoots(),
+        }).catch(() => {});
+      }
     },
     [activePhotoId, loadPhotoFromEntry, deletePhotoEdit],
   );
