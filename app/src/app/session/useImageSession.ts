@@ -172,27 +172,48 @@ export function useImageSession({
     [stamp, savePhotoEdit],
   );
 
+  // Always the newest flushEditArchive, without being a dependency of anything.
+  //
+  // THE BUG THIS FIXES. `flushEditArchive` is a useCallback over [stamp,
+  // savePhotoEdit], and `stamp` is a fresh object on every engine state sync —
+  // which is most renders. So its identity churned constantly, and the two
+  // effects below listed it as a dependency. The debounce effect therefore tore
+  // down and re-armed its 2.5s timer on render churn rather than on edits:
+  // photo jzfnrd saved at 0s, 7s, 15.4s and 25s at an IDENTICAL undo count,
+  // because each burst of churn restarted the clock and each lull let it fire.
+  // Not an idle loop — 15s of sitting still produced no saves at all — but
+  // nothing about that timing had anything to do with the user editing.
+  //
+  // A ref instead of a dependency. The effects read the current function
+  // through it and depend only on signals that actually mean "the document
+  // changed", so the debounce measures idleness rather than render quiet.
+  const flushRef = useRef(flushEditArchive);
+  flushRef.current = flushEditArchive;
+
   // Idle debounce. Keyed on the engine's undo count + the modified flag, so it
   // re-arms on every recordable edit and fires once the user pauses.
   useEffect(() => {
     if (!activePhotoId || !dirtyRef.current) return;
-    const t = window.setTimeout(() => void flushEditArchive(), 2500);
+    const t = window.setTimeout(() => void flushRef.current(), 2500);
     return () => window.clearTimeout(t);
-  }, [activePhotoId, stamp.state.undoCount, hasBeenModified, flushEditArchive]);
+  }, [activePhotoId, stamp.state.undoCount, hasBeenModified]);
 
-  // Leaving the page: last chance to write.
+  // Leaving the page: last chance to write. Same treatment, for a smaller
+  // reason: this used to remove and re-add both listeners on every render that
+  // changed `stamp`, which is pointless work on a path that must not be flaky.
+  // Registered once now, for the life of the hook.
   useEffect(() => {
     const onLeave = () => {
-      if (document.visibilityState === "hidden") void flushEditArchive();
+      if (document.visibilityState === "hidden") void flushRef.current();
     };
-    const onPageHide = () => void flushEditArchive();
+    const onPageHide = () => void flushRef.current();
     document.addEventListener("visibilitychange", onLeave);
     window.addEventListener("pagehide", onPageHide);
     return () => {
       document.removeEventListener("visibilitychange", onLeave);
       window.removeEventListener("pagehide", onPageHide);
     };
-  }, [flushEditArchive]);
+  }, []);
 
   // Op-log persistence follows the active photo through EVERY path that sets
   // it (select, add, remove, boot auto-select) — the write path keys its
