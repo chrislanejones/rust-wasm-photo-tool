@@ -84,23 +84,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.66 — 2026-08-05
+### v7.67 — 2026-08-05
 
-**Deleting a photo now actually frees its space.** Removing a photo used to
-delete its edit history and take it off the screen — and quietly keep its
-full-size original in your browser's storage, forever. Up to two copies per
-deleted photo, and originals are the biggest thing the app stores. They are now
-cleaned up the moment you delete.
+**Photos no longer overwrite each other's edits.** Switching away from a photo
+saved it — but it saved whatever was on the canvas at that moment, without ever
+checking the canvas still held that photo. If a switch stalled partway, the
+canvas stayed on the photo you left while the app had already moved on, and the
+next switch wrote the old photo's picture into a different photo's saved edits.
+Four photos ended up holding the same painted canvas. Three of them had never
+been touched.
 
-Carefully, though. Duplicates share their bytes with the photo they were copied
-from, so the cleanup first checks that nothing else still needs them — deleting
-a copy never touches the photo it came from, and a batch job's saved
-before-picture is never taken out from under it. When in doubt, it keeps: extra
-bytes are recoverable, a deleted photo is not.
+Saving now refuses when the canvas is holding a different photo than the one
+being saved. It refuses only when it is certain — if it cannot tell, it saves,
+because a refused save loses work you actually did, and that is worse than the
+problem it prevents.
 
-If storage cleanup fails for any reason, the delete still succeeds and the
-leftover bytes just wait for next time — a full disk never turns into a broken
-gallery.
+Switching is much faster, too. It used to wait for the whole upload to finish
+before letting you move, about thirteen seconds on a slow connection, and that
+wait is what made switches stall in the first place. Your edits are written to
+this browser first; the upload follows on its own time.
+
+It also stopped re-uploading photos that had not changed. One brush stroke used
+to cost twenty-eight uploads. It now costs five, and there is a ceiling so a
+future bug cannot run away with it.
 
 ## License
 

@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.67",
+    date: "2026-08-05",
+    headline: "Photos no longer overwrite each other's edits",
+    entries: [
+      { tag: "fix", text: "Switching away from a photo saved whatever was on the canvas at that moment, without checking the canvas still held that photo. If a switch stalled partway, the next one wrote the old photo's picture into a different photo's saved edits. Four photos ended up holding the same painted canvas, and three of them had never been touched. Saving now refuses when the canvas is holding someone else." },
+      { tag: "fix", text: "It refuses only when it is certain. If it cannot tell which photo the canvas is holding, it saves anyway — a refused save loses work you actually did, and that is worse than the problem it prevents." },
+      { tag: "perf", text: "Switching photos no longer waits for the upload. It used to sit through the whole round trip, about thirteen seconds on a slow connection, and that wait is what made switches stall to begin with. Your edits go to this browser first and the upload follows on its own time." },
+      { tag: "perf", text: "Photos that have not changed are no longer re-uploaded, and there is now a ceiling on how often the app can upload at all, so a future bug cannot run away with it. One brush stroke used to cost twenty-eight uploads. It now costs five." },
+      { tag: "infra", text: "Reproduced under test fixtures before it was fixed, then the same tests inverted to pin the fix. Measured again in a real browser afterwards: nineteen photo switches, not one landing on another photo's edits, and none stalling." },
+    ],
+  },
+  {
     version: "v7.66",
     date: "2026-08-05",
     headline: "Deleting a photo actually frees its space",
