@@ -2755,3 +2755,19 @@ edits or the canvas stopped showing them.
 | 7   | Uses `toast` from `@/components/ui/sonner` (the themed wrapper, which re-exports it) rather than `sonner` directly — the dominant convention, 9 call sites to 3. There is no legacy shadcn `Toast` component in the repo; Sonner is the only notification path | Complete |
 | 8   | Verified in a browser, all three branches, in the backgrounded tab that made this untestable before: blocked → error toast; no image → info toast; image present → imports with no toast. The rejection branch fired rather than the timeout because Chrome rejects with "Document is not focused" when `hasFocus()` is false — the timeout covers the parked case NIGHT JOB IV measured with focus true | Verified |
 | 9   | Engine untouched — wasm still **761,213 bytes**. Gates: `tsc --noEmit` clean · lint 0 errors (59 warnings, none new) · 320 vitest · app + marketing builds succeed | Verified |
+
+## v7.66 Change Summary — 2026-08-05
+
+| #   | Change | Status |
+| --- | ------ | ------ |
+| 1   | **Deleting a photo now collects its originals** — audit finding #2. `handleRemovePhoto` deleted the edit archive and the gallery entry and never touched the content store, stranding up to two full-size blobs per delete (`originalKey` + the `uploadKey` A/B baseline) | Complete |
+| 2   | Reproduced BEFORE fixing, under fixtures (fake-indexeddb through the real Dexie adapter): Phase 1's tests assert the leak and pass, then Phase 2 inverts the same assertions over the fix — the diff between commits `b24ef0a` and `f667eb7` is the before/after | Verified |
+| 3   | Routed through the SAME reachability guard a repoint uses (`collectDeletedPhotoOriginals` → `deleteReplacedOriginal` per distinct key), not a second delete path. Duplicates share blobs; a shared blob survives its sibling's deletion and is collected only when the LAST referrer goes | Complete |
+| 4   | **Decision: the `uploadKey` baseline is collected too.** It exists solely to A/B against its own photo; with the photo gone it compares nothing, and it is a full-size original. Still guard-checked, so a baseline shared with a survivor is kept | Complete |
+| 5   | Batch pre-logo/pre-text baselines live in React refs and appear in NO manifest — new `lib/extraRoots.ts` provider registry lets BatchSettings publish them and the delete path honour them. A provider (not a store) so the refs' unmount lifetime is preserved exactly | Complete |
+| 6   | Failure mode: a failed collect is swallowed, never thrown — garbage is recoverable, a broken gallery is not. Pinned: a rejecting adapter leaves the blob and the verdict says so; one key failing does not stop the other | Verified |
+| 7   | **Phase 3 re-measure (read-only, QC profile): ~84 MB stranded against 1 live photo** — 19 originals / 55.3 MB + 22.6 MB edits + 6.1 MB keyframes. Source is NOT the fixed path: `handleDeleteSelected`, `confirmDeleteAll` and `handleStartFresh` all drop entries without collecting. Verdict: extend collect-at-source (2 of 3 are mechanical now), one-shot cleanup for the existing pile, still no resident sweeper. #15 stays open with evidence | Recorded |
+| 8   | The reachability audit is now invocable in-app: `await window.__ihContentAudit()` (dev builds or `ih_webgpu`-flagged) returns the report + markdown. It previously had no caller anywhere | Complete |
+| 9   | ⚠️ Any cleanup driven off the audit's orphan list MUST use `collectExtraRoots()` — the audit cannot see batch-baseline roots and counts them as orphans | Recorded |
+| 10  | Tests: 12 in `deletePhotoOriginals.test.ts` (leak → collect → shared-blob survivor → provider registry → swallowed failures → pre-removal-gallery caller error). vitest 332 → 344 | Verified |
+| 11  | Gates: tsc clean · lint 0 errors (59 warnings, none new) · 344 vitest · production build succeeds · engine untouched at **761,213 B** | Verified |

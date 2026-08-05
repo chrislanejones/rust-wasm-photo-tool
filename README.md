@@ -84,18 +84,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.65 — 2026-08-04
+### v7.66 — 2026-08-05
 
-**The Paste button tells you when it can't paste.** Clicking "Paste (Ctrl+V)" on
-the start screen used to be able to do nothing at all, with no message, in three
-different situations: the browser blocked the clipboard, there was no image on
-the clipboard, or the read simply never came back because the window wasn't
-focused. All three now say what happened, and all three point at Ctrl+V, which
-takes a different route and works when the button can't.
+**Deleting a photo now actually frees its space.** Removing a photo used to
+delete its edit history and take it off the screen — and quietly keep its
+full-size original in your browser's storage, forever. Up to two copies per
+deleted photo, and originals are the biggest thing the app stores. They are now
+cleaned up the moment you delete.
 
-The third one was the reason this went unnoticed for so long — the read never
-failed, it just never finished, so there was nothing to report and nothing to
-log. It now gives up after four seconds and says so.
+Carefully, though. Duplicates share their bytes with the photo they were copied
+from, so the cleanup first checks that nothing else still needs them — deleting
+a copy never touches the photo it came from, and a batch job's saved
+before-picture is never taken out from under it. When in doubt, it keeps: extra
+bytes are recoverable, a deleted photo is not.
+
+If storage cleanup fails for any reason, the delete still succeeds and the
+leftover bytes just wait for next time — a full disk never turns into a broken
+gallery.
 
 ## License
 

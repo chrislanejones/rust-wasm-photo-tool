@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.66",
+    date: "2026-08-05",
+    headline: "Deleting a photo actually frees its space",
+    entries: [
+      { tag: "fix", text: "Removing a photo used to delete its edit history and take it off the screen — and quietly keep its full-size original in your browser's storage, forever. Up to two copies per deleted photo, and originals are the biggest thing the app stores. They are now cleaned up the moment you delete." },
+      { tag: "fix", text: "Carefully, though. Duplicates share their bytes with the photo they were copied from, so the cleanup first checks that nothing else still needs them. Deleting a copy never touches the photo it came from. When in doubt, it keeps — extra bytes are recoverable, a deleted photo is not." },
+      { tag: "fix", text: "If storage cleanup fails for any reason, the delete still succeeds and the leftover bytes wait for next time. A full disk never turns into a broken gallery." },
+      { tag: "infra", text: "The leak was reproduced under test fixtures before it was fixed, and the fix is pinned by twelve tests — including the one where two photos share bytes and one of them is deleted." },
+    ],
+  },
+  {
     version: "v7.65",
     date: "2026-08-04",
     headline: "The Paste button tells you when it can't paste",
