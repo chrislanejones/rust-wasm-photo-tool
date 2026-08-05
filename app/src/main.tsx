@@ -8,6 +8,7 @@ import "./styles.css";
 import { installGpuBlurSelfTest } from "@/lib/webgpu/selfTest";
 import { webgpuEnabled } from "@/lib/webgpu/detect";
 import { installContentAudit } from "@/lib/contentAuditInstall";
+import { installSaveGuardProbe } from "@/lib/engineDocument";
 
 // GPU blur correctness harness (Phase 0, ADR-030). Installs a
 // `window.__ihGpuBlurSelfTest()` that compares the WGSL blur against the CPU
@@ -20,6 +21,15 @@ if (import.meta.env.DEV || webgpuEnabled()) {
   installGpuBlurSelfTest();
   installContentAudit();
 }
+
+// `window.__ihSaveGuard()` — the archive-ownership guard's decision tally.
+// Deliberately NOT behind the gate above: the re-measure that decides whether
+// the guard works at all runs against a PRODUCTION build, and the guard's
+// failure mode is being inert (allowing everything because ownership is
+// unknown), which is invisible without these counts. Chris also needs it to
+// check his own production profile. It defines a function that reads three
+// integers and a string — no side effects, no cost.
+installSaveGuardProbe();
 
 // No-op (statically eliminated) unless the build ran with VITE_ENABLE_SW set
 // — the service worker ships dark. See vite.config.ts + lib/pwa/swBoot.ts.

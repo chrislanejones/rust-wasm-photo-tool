@@ -292,12 +292,24 @@ export function useEditPersistence() {
       //
       // IndexedDB is the restore path; Convex is a bonus. Write the copy that
       // restores the user's work first, then try to sync it.
-      await idbSave(photoId, toolRef);
+      //
+      // The return value is the OWNERSHIP GUARD's verdict, and the cloud leg
+      // below has to respect it. This block does not re-use anything the local
+      // save computed — it re-reads the engine and builds its own archive — so
+      // without this gate a refused local write would still upload the wrong
+      // photo's pixels, and the cloud copy would be the corrupt one. Same bug,
+      // one layer further out, and harder to see because it only reproduces
+      // signed in.
+      const written = await idbSave(photoId, toolRef);
+      if (!written) return false;
 
       if (isAuthenticated) {
         try {
           const tool = toolRef.current;
-          if (!tool) return;
+          // Unreachable in practice — idbSave returns false without a tool, so
+          // the gate above already returned. Kept as a type narrower, and it
+          // reports the local write that did happen.
+          if (!tool) return true;
 
           const canvasPng = new Uint8Array(tool.export_png());
           const canvasW = tool.width();
@@ -377,7 +389,7 @@ export function useEditPersistence() {
             "saveEdit",
           );
           // The local copy is already on disk (written before this block).
-          return;
+          return true;
         } catch (err) {
           // Cloud save failed (upload / storage / auth). The local IDB copy is
           // ALREADY written, so nothing is lost — just record the failure so it
@@ -391,6 +403,9 @@ export function useEditPersistence() {
         }
       }
       // No trailing local save: it already happened at the top, unconditionally.
+      // True either way: the local archive is written, which is what restores
+      // the user's work. A failed cloud leg costs freshness, not data.
+      return true;
     },
     [isAuthenticated, generateUploadUrl, saveEdit],
   );

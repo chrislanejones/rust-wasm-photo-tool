@@ -26,6 +26,7 @@ import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { clearGalleryManifest } from "@/lib/galleryManifest";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
+import { setEngineDocument } from "@/lib/engineDocument";
 
 type Preferences = ReturnType<typeof usePreferences>[0];
 type EditPersistence = ReturnType<typeof useEditPersistence>;
@@ -218,6 +219,14 @@ export function useImageSession({
           ? { pad: prefs.canvasPadding, ...canvasBgToRgba(prefs.canvasBgColor) }
           : undefined,
       );
+      // The engine has been handed THIS photo's pixels. `loadImageFromPixels`
+      // is fire-and-forget (it voids the engine promise), so this is "committed
+      // to", not "finished". If that load were to fail the marker would name a
+      // photo the engine never got — which is exactly the unguarded behaviour
+      // shipping today, so it degrades to the status quo rather than to a
+      // refusal. Parked as OPEN: making the engine load awaitable would let
+      // ownership follow the document instead of the intent.
+      setEngineDocument(entry.id);
     },
     [loadImageFromPixels, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
   );
@@ -320,6 +329,7 @@ export function useImageSession({
             setHasBeenModified(false);
             activeIdRef.current = entry.id;
             setActivePhotoId(entry.id);
+            setEngineDocument(entry.id); // fresh import — the engine holds it now
             setCompareActive(false);
           }
         } catch (err) {
@@ -404,6 +414,13 @@ export function useImageSession({
       // the safety net for one release.
       setActiveOplogPhoto(entry.id);
       const restored = await stamp.restoreFromOplog(entry.id);
+      // Ownership tracks the ENGINE, not the UI, so it is recorded BEFORE the
+      // supersession check: a switch that gets superseded still replaced the
+      // document. Recording it after the `isCurrent` bail would leave the
+      // marker naming the PREVIOUS photo while the engine holds this one, and
+      // the next entirely legitimate save would be refused. False refusals lose
+      // real work — the one outcome this guard must never produce.
+      if (restored) setEngineDocument(entry.id);
       if (!isCurrent()) return;
       if (restored) {
         setLoadProgress(100);
@@ -420,6 +437,7 @@ export function useImageSession({
       if (saved) {
         setLoadProgress(20);
         await stamp.loadFromSaved(saved);
+        setEngineDocument(entry.id); // before the bail — see the op-log note above
         if (!isCurrent()) return;
         setLoadProgress(100);
         setTimeout(() => {
@@ -493,6 +511,7 @@ export function useImageSession({
         } else if (next.length === 0) {
           activeIdRef.current = null;
           setActivePhotoId(null);
+          setEngineDocument(null); // nothing left to hold
           setHasBeenModified(false);
           setCompareActive(false);
           // The user removed the LAST photo — clear the resume manifest

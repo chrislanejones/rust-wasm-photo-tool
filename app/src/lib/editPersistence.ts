@@ -8,6 +8,9 @@
 import type { RefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 
+import { logDiagnostic } from "./diagnosticsLog";
+import { engineHolds, getEngineDocument } from "./engineDocument";
+
 // ── Minimal IndexedDB wrapper ──────────────────────────────────────────────
 
 const DB_NAME = "image-horse-edits";
@@ -333,13 +336,36 @@ export function parseSnapshotAnnotations(raw: string): PersistedAnnotation[] {
  * Snapshot the current WASM canvas + full undo/redo history and persist it
  * under `edit-<photoId>` in IndexedDB. Each history snapshot is PNG-encoded
  * to keep storage compact.
+ *
+ * Returns whether the archive was actually written. `false` means either there
+ * was no engine to read or the OWNERSHIP GUARD refused — the engine was holding
+ * a different photo's document, so writing it under `photoId` would have
+ * corrupted that photo's archive (see lib/engineDocument.ts for the measured
+ * sequence). Callers with a second persistence leg — the Convex upload in
+ * `hooks/useEditPersistence` — must gate it on this, or they will push the
+ * wrong pixels to the cloud after the local write was correctly refused.
+ *
+ * A refusal is deliberately quiet: no toast, no throw. It means the user's work
+ * is still safe in the engine and the save will land under the right id once
+ * the document catches up, which is not an event worth interrupting anyone for.
+ * The Diagnostics line is there so it is never invisible.
  */
 export async function savePhotoEdit(
   photoId: string,
   toolRef: RefObject<ImageHorseTool | null>,
-): Promise<void> {
+): Promise<boolean> {
   const t = toolRef.current;
-  if (!t) return;
+  if (!t) return false;
+
+  // Ahead of export_png() on purpose: a refused save should cost nothing, and
+  // encoding a full canvas we are about to discard is the expensive part.
+  if (!engineHolds(photoId)) {
+    logDiagnostic(
+      "CONSOLE",
+      `Save refused: engine holds ${getEngineDocument() ?? "nothing"}, not ${photoId}`,
+    );
+    return false;
+  }
 
   const canvasPng = new Uint8Array(t.export_png());
   const canvasW = t.width();
@@ -386,6 +412,7 @@ export async function savePhotoEdit(
     layers,
     activeLayerId,
   });
+  return true;
 }
 
 /** Return the persisted edit for a photo, or null if none exists. */
