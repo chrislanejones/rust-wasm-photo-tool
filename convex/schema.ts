@@ -214,6 +214,14 @@ export default defineSchema({
       v.literal("upscale"),
       v.literal("inpaint"),
       v.literal("ocr"),
+      // REGISTERED BUT DELIBERATELY UNIMPLEMENTED — do not wire this up.
+      // "alt" is the hosted caption model that ADR-028 considered and REJECTED
+      // in favour of running image description locally in the Rust engine. It
+      // survives in this union only because removing a literal from a schema
+      // union is a migration, not an edit. Without this note the next person
+      // reads an unhandled case as an oversight and implements it, quietly
+      // undoing the decision. See docs/adr/028-image-description-runs-locally
+      // -in-the-engine.md before touching it.
       v.literal("alt"),
     ),
     status: v.union(

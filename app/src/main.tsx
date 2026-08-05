@@ -7,7 +7,10 @@ import { setupServiceWorker } from "@/lib/pwa/swBoot";
 import "./styles.css";
 import { installGpuBlurSelfTest } from "@/lib/webgpu/selfTest";
 import { webgpuEnabled } from "@/lib/webgpu/detect";
-import { installContentAudit } from "@/lib/contentAuditInstall";
+import {
+  installContentAudit,
+  installArchiveCorruptionAudit,
+} from "@/lib/contentAuditInstall";
 import { installSaveGuardProbe } from "@/lib/engineDocument";
 
 // GPU blur correctness harness (Phase 0, ADR-030). Installs a
@@ -30,6 +33,12 @@ if (import.meta.env.DEV || webgpuEnabled()) {
 // check his own production profile. It defines a function that reads three
 // integers and a string — no side effects, no cost.
 installSaveGuardProbe();
+
+// `window.__ihArchiveCorruptionAudit()` — read-only detection of archives that
+// hold another photo's canvas. Ungated for the same reason: the archives worth
+// checking are the ones on a real production profile, written by builds that
+// shipped before the ownership guard existed. It reports and never repairs.
+installArchiveCorruptionAudit();
 
 // No-op (statically eliminated) unless the build ran with VITE_ENABLE_SW set
 // — the service worker ships dark. See vite.config.ts + lib/pwa/swBoot.ts.

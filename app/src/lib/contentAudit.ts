@@ -534,3 +534,273 @@ export function formatAuditMarkdown(r: ContentAuditReport): string {
   }
   return L.join("\n");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ARCHIVE CORRUPTION DETECTOR (read-only, never repairs)
+//
+// The bug: `savePhotoEdit(photoId, toolRef)` wrote whatever document the engine
+// was holding under `edit-${photoId}`, without checking the engine held that
+// photo. A switch that died in saveOutgoing left the engine on the PREVIOUS
+// photo, so the next save stamped that photo's canvas into a different photo's
+// archive. Fixed at the source by the ownership guard (lib/engineDocument.ts);
+// this measures what the unguarded builds already wrote.
+//
+// TWO SIGNALS, AND THEY ARE NOT EQUALLY GOOD
+//
+//   1. COLLISION (strong). Two or more photos whose archives share identical
+//      canvas dimensions while the photos themselves are different shapes.
+//      This is exactly how the bug was caught: four photos with four different
+//      aspect ratios, four archives all 1445×2128. It is close to
+//      false-positive-free, because independent photos landing on byte-identical
+//      canvas dimensions is a coincidence, and a whole GROUP of them is not a
+//      coincidence at all.
+//
+//   2. ASPECT DRIFT (weak, advisory). One archive whose aspect ratio does not
+//      match its own photo's. Legitimate edits change this all the time — crop,
+//      resize, and the artboard border all move the canvas away from the
+//      photo's native shape — so this is reported as SUSPECT, never as
+//      corrupt, and a clean run with drift is not a finding.
+//
+// WHY THIS NEVER REPAIRS. A heuristic that deletes or rewrites a user's archive
+// is worse than the bug it is chasing: the bug costs one photo's edits, a wrong
+// repair costs the edits it was pointed at. IndexedDB is user data with no
+// backup. Detect, report, and let a human decide.
+
+export interface ArchiveCollision {
+  /** The shared canvas dimensions, e.g. "1445×2128". */
+  dimensions: string;
+  /** Photo ids whose archives all carry these dimensions. */
+  photoIds: string[];
+  /** The photos' OWN dimensions, to show they genuinely differ. */
+  photoDimensions: string[];
+}
+
+export interface ArchiveDrift {
+  photoId: string;
+  archive: string;
+  photo: string;
+  /** Percent difference between archive aspect and photo aspect. */
+  aspectDeltaPct: number;
+}
+
+export interface ArchiveCorruptionReport {
+  manifestFound: boolean;
+  photosInManifest: number;
+  archivesFound: number;
+  /** Archives whose photo id is not in the manifest — cannot be checked. */
+  archivesWithoutPhoto: number;
+  collisions: ArchiveCollision[];
+  drift: ArchiveDrift[];
+  /** Photos implicated by at least one collision. The headline number. */
+  suspectPhotoCount: number;
+  notes: string[];
+}
+
+interface ManifestDimShape {
+  id?: unknown;
+  workingWidth?: unknown;
+  workingHeight?: unknown;
+}
+
+const num = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+
+/**
+ * Compare every local edit archive's canvas dimensions against the photo it
+ * claims to belong to. Reads only — opens nothing that does not already exist,
+ * writes nothing, deletes nothing.
+ */
+export async function auditArchiveCorruption(): Promise<ArchiveCorruptionReport> {
+  const notes: string[] = [];
+  const empty = (why: string): ArchiveCorruptionReport => {
+    notes.push(why);
+    return {
+      manifestFound: false,
+      photosInManifest: 0,
+      archivesFound: 0,
+      archivesWithoutPhoto: 0,
+      collisions: [],
+      drift: [],
+      suspectPhotoCount: 0,
+      notes,
+    };
+  };
+
+  if (typeof indexedDB.databases !== "function") {
+    return empty(
+      "indexedDB.databases() is unavailable in this browser, so no database was opened — " +
+        "opening a name that does not exist would CREATE it, and an audit must not write. " +
+        "Run this in a Chromium-based browser.",
+    );
+  }
+  let names: string[];
+  try {
+    names = (await indexedDB.databases())
+      .map((d) => d.name)
+      .filter((n): n is string => typeof n === "string");
+  } catch {
+    return empty("indexedDB.databases() threw; nothing was opened.");
+  }
+
+  // ── The photos and their true dimensions ────────────────────────────────
+  const photoDims = new Map<string, { w: number; h: number }>();
+  let manifestFound = false;
+  if (names.includes("image-horse-gallery")) {
+    const db = await openExisting("image-horse-gallery");
+    if (db) {
+      const rows = await readAll(db, "manifest");
+      const photos = (
+        rows?.find((r) => r.key === "current")?.value as { photos?: unknown } | undefined
+      )?.photos;
+      if (Array.isArray(photos)) {
+        manifestFound = true;
+        for (const p of photos as ManifestDimShape[]) {
+          const w = num(p.workingWidth);
+          const h = num(p.workingHeight);
+          if (typeof p.id === "string" && w && h) photoDims.set(p.id, { w, h });
+        }
+      }
+      db.close();
+    }
+  }
+  if (!manifestFound) {
+    return empty(
+      "No gallery manifest was found, so there are no true dimensions to compare against. " +
+        "This is not evidence that archives are clean — it means they cannot be checked.",
+    );
+  }
+
+  // ── The archives ────────────────────────────────────────────────────────
+  const archives = new Map<string, { w: number; h: number }>();
+  let archivesWithoutPhoto = 0;
+  if (names.includes("image-horse-edits")) {
+    const db = await openExisting("image-horse-edits");
+    const rows = db ? await readAll(db, "edits") : null;
+    if (rows) {
+      for (const r of rows) {
+        if (!r.key.startsWith("edit-")) continue;
+        const id = photoIdFromEditKey(r.key);
+        const v = r.value as { canvasW?: unknown; canvasH?: unknown } | undefined;
+        const w = num(v?.canvasW);
+        const h = num(v?.canvasH);
+        if (!w || !h) continue;
+        archives.set(id, { w, h });
+        if (!photoDims.has(id)) archivesWithoutPhoto += 1;
+      }
+    }
+    db?.close();
+  }
+
+  // ── Signal 1: collisions ────────────────────────────────────────────────
+  const byDims = new Map<string, string[]>();
+  for (const [id, a] of archives) {
+    if (!photoDims.has(id)) continue; // uncheckable, counted separately
+    const key = `${a.w}×${a.h}`;
+    const list = byDims.get(key);
+    if (list) list.push(id);
+    else byDims.set(key, [id]);
+  }
+
+  const collisions: ArchiveCollision[] = [];
+  const suspects = new Set<string>();
+  for (const [dimensions, ids] of byDims) {
+    if (ids.length < 2) continue;
+    // Photos that are genuinely the SAME shape sharing a canvas size is
+    // ordinary — a burst off one camera, edited the same way. Only flag when
+    // the photos themselves differ, which is what makes one canvas impossible.
+    const shapes = new Set(ids.map((id) => {
+      const p = photoDims.get(id)!;
+      return `${p.w}×${p.h}`;
+    }));
+    if (shapes.size < 2) continue;
+    collisions.push({
+      dimensions,
+      photoIds: ids,
+      photoDimensions: ids.map((id) => {
+        const p = photoDims.get(id)!;
+        return `${p.w}×${p.h}`;
+      }),
+    });
+    for (const id of ids) suspects.add(id);
+  }
+
+  // ── Signal 2: aspect drift (advisory) ───────────────────────────────────
+  const drift: ArchiveDrift[] = [];
+  for (const [id, a] of archives) {
+    const p = photoDims.get(id);
+    if (!p) continue;
+    const aAsp = a.w / a.h;
+    const pAsp = p.w / p.h;
+    const deltaPct = Math.abs(aAsp - pAsp) / pAsp * 100;
+    if (deltaPct > 2) {
+      drift.push({
+        photoId: id,
+        archive: `${a.w}×${a.h}`,
+        photo: `${p.w}×${p.h}`,
+        aspectDeltaPct: +deltaPct.toFixed(1),
+      });
+    }
+  }
+  drift.sort((x, y) => y.aspectDeltaPct - x.aspectDeltaPct);
+
+  if (archivesWithoutPhoto > 0) {
+    notes.push(
+      `${archivesWithoutPhoto} archive(s) belong to photo ids that are no longer in the ` +
+        "manifest, so they have no true dimensions to compare against and were skipped. " +
+        "They are orphans for the content audit's purposes, not corruption evidence.",
+    );
+  }
+  if (collisions.length === 0 && drift.length > 0) {
+    notes.push(
+      "Aspect drift with no collisions is NOT a finding on its own — crop, resize and the " +
+        "artboard border all legitimately move a canvas away from its photo's native shape.",
+    );
+  }
+
+  return {
+    manifestFound,
+    photosInManifest: photoDims.size,
+    archivesFound: archives.size,
+    archivesWithoutPhoto,
+    collisions,
+    drift,
+    suspectPhotoCount: suspects.size,
+    notes,
+  };
+}
+
+/** Human-readable rendering of the corruption report. */
+export function formatArchiveCorruptionMarkdown(r: ArchiveCorruptionReport): string {
+  const L: string[] = ["# Archive corruption audit", ""];
+  if (!r.manifestFound) {
+    L.push("**Could not run.**", "");
+    for (const n of r.notes) L.push(`> ${n}`);
+    return L.join("\n");
+  }
+  L.push(
+    `Photos in manifest: ${r.photosInManifest}`,
+    `Edit archives found: ${r.archivesFound}`,
+    "",
+    r.suspectPhotoCount > 0
+      ? `## ⚠ ${r.suspectPhotoCount} photo(s) implicated in ${r.collisions.length} collision(s)`
+      : "## No collisions found",
+    "",
+  );
+  for (const c of r.collisions) {
+    L.push(`- **${c.dimensions}** shared by ${c.photoIds.length} archives:`);
+    c.photoIds.forEach((id, i) => {
+      L.push(`  - \`${id}\` — the photo itself is ${c.photoDimensions[i]}`);
+    });
+  }
+  if (r.drift.length > 0) {
+    L.push("", `## Aspect drift (advisory, ${r.drift.length})`, "");
+    for (const d of r.drift) {
+      L.push(`- \`${d.photoId}\`: archive ${d.archive} vs photo ${d.photo} (${d.aspectDeltaPct}% off)`);
+    }
+  }
+  if (r.notes.length > 0) {
+    L.push("");
+    for (const n of r.notes) L.push(`> ${n}`);
+  }
+  return L.join("\n");
+}
