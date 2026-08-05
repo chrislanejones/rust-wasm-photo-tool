@@ -23,6 +23,7 @@ import type {
   PersistedLayer,
 } from "@/lib/editPersistence";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
+import { mayUpload, recordUpload } from "@/lib/uploadBudget";
 
 // ── Archive encoding ───────────────────────────────────────────────────────
 // Packs canvas + full undo/redo history into a single binary blob so one
@@ -418,6 +419,30 @@ export function useEditPersistence() {
           // being safe and this comment is the reason why.
           const cloudSync = (async () => {
             try {
+              // ── THE RATE LIMIT ───────────────────────────────────────────
+              // Checked BEFORE the hash below, deliberately: an upload that is
+              // not allowed to happen should not pay for a SHA-256 first.
+              //
+              // This is the backstop, not the fix. The specific causes of the
+              // 28-uploads-per-stroke incident are fixed upstream; this exists
+              // for the causes that are not, and the ones nobody has thought
+              // of. It bounds the blast radius of any future runaway to a log
+              // line — 3.45 GB of orphaned storage disabled every deployment
+              // on the account and took down an unrelated production site.
+              //
+              // The local IndexedDB write above already happened and is never
+              // subject to this. Losing cloud freshness is recoverable; losing
+              // the user's edits is not.
+              const verdict = mayUpload(photoId);
+              if (!verdict.ok) {
+                logDiagnostic(
+                  "CONVEX_DB",
+                  `Cloud upload rate-limited for ${photoId} (${verdict.reason}); ` +
+                    `saved locally, retry in ~${Math.ceil(verdict.retryInMs / 1000)}s`,
+                );
+                return;
+              }
+
               // ── THE REDUNDANT-UPLOAD SKIP ────────────────────────────────
               // 28 uploads happened where 4 were needed, because nothing in
               // the app knew a photo was already in sync: `dirtyRef` derives
@@ -473,6 +498,10 @@ export function useEditPersistence() {
               // success but before the pointer is committed would mark a photo
               // synced whose cloud record still points at the previous archive.
               if (hash !== null) lastUploadedRef.current.set(photoId, hash);
+              // Budget is spent on SUCCESS only. Charging for an upload that
+              // failed would let a broken network burn the hour's allowance
+              // without a single byte reaching Convex.
+              recordUpload(photoId);
             } catch (err) {
               // Cloud save failed (upload / storage / auth). The local IDB copy is
               // ALREADY written, so nothing is lost — just record the failure so it

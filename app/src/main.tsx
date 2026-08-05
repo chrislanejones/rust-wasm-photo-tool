@@ -12,6 +12,7 @@ import {
   installArchiveCorruptionAudit,
 } from "@/lib/contentAuditInstall";
 import { installSaveGuardProbe } from "@/lib/engineDocument";
+import { installUploadBudgetProbe } from "@/lib/uploadBudget";
 
 // GPU blur correctness harness (Phase 0, ADR-030). Installs a
 // `window.__ihGpuBlurSelfTest()` that compares the WGSL blur against the CPU
@@ -39,6 +40,12 @@ installSaveGuardProbe();
 // checking are the ones on a real production profile, written by builds that
 // shipped before the ownership guard existed. It reports and never repairs.
 installArchiveCorruptionAudit();
+
+// `window.__ihUploadBudget()` — the cloud-upload rate limiter's state. Ungated
+// for the same reason as the others: a limiter nobody can observe is
+// indistinguishable from a broken one, and the runaway it guards against
+// happens in production, not in dev.
+installUploadBudgetProbe();
 
 // No-op (statically eliminated) unless the build ran with VITE_ENABLE_SW set
 // — the service worker ships dark. See vite.config.ts + lib/pwa/swBoot.ts.
