@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useConvexAuth, useConvex, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -257,6 +257,36 @@ const CLOUD_STEP_TIMEOUT_MS = 8000;
  *  the underlying request; it frees the caller, which is the part that matters.
  *  The local IndexedDB copy is already on disk by the time any of this runs, so
  *  giving up on the cloud leg loses nothing but freshness. */
+/** Content hash of an already-encoded archive.
+ *
+ *  Deliberately hashing the ARCHIVE BYTES rather than tracking undo depth.
+ *  Undo depth is the obvious signal and it is lossy: paint A (depth 1) → sync →
+ *  undo (depth 0) → paint B (depth 1, redo cleared) puts the counters back
+ *  exactly where they were with entirely different pixels underneath, so a
+ *  depth-keyed skip drops stroke B. Engine mutators that snapshot are not the
+ *  problem — `set_artboard_border` and `update_text_annotation` both call
+ *  `snap()` — the collision is undo followed by a fresh edit, which is an
+ *  ordinary thing to do.
+ *
+ *  Identical bytes, by contrast, mean the upload is redundant as a matter of
+ *  fact rather than inference. A few ms of SHA-256 against a 13-second upload
+ *  is not a trade worth agonising over. */
+async function archiveHash(archive: Uint8Array): Promise<string | null> {
+  // `crypto.subtle` only exists in a secure context. A dev server reached over
+  // a LAN IP is not one, and there this would throw — into the catch that
+  // reports "cloud save failed", silently disabling sync altogether. Null means
+  // "cannot tell", and the caller uploads, which is the shipped behaviour.
+  if (typeof crypto === "undefined" || !crypto.subtle) return null;
+  const buf = archive.buffer.slice(
+    archive.byteOffset,
+    archive.byteOffset + archive.byteLength,
+  ) as ArrayBuffer;
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function withTimeout<T>(p: Promise<T>, what: string): Promise<T> {
   return Promise.race([
     p,
@@ -278,6 +308,12 @@ export function useEditPersistence() {
   const saveEdit = useMutation(api.photoEdits.save);
   const removeEdit = useMutation(api.photoEdits.remove);
   const clearAllConvex = useMutation(api.photoEdits.clearAll);
+
+  // photoId → hash of the archive last successfully synced to Convex. Session
+  // -lived on purpose: a reload re-uploads once per photo, which is the cheap
+  // direction to be wrong in. Entries are dropped on delete/clear below, or a
+  // photo whose cloud record was removed would look synced and never come back.
+  const lastUploadedRef = useRef(new Map<string, string>());
 
   const savePhotoEdit = useCallback(
     async (
@@ -382,6 +418,29 @@ export function useEditPersistence() {
           // being safe and this comment is the reason why.
           const cloudSync = (async () => {
             try {
+              // ── THE REDUNDANT-UPLOAD SKIP ────────────────────────────────
+              // 28 uploads happened where 4 were needed, because nothing in
+              // the app knew a photo was already in sync: `dirtyRef` derives
+              // from `undoCount > 0 || hasBeenModified`, and NEITHER of those
+              // is changed by a successful upload, so a photo stayed "dirty"
+              // forever once touched.
+              //
+              // The skip is on the UPLOAD ONLY. The local IndexedDB write
+              // above always happens, unconditionally. That asymmetry is the
+              // whole safety argument: IndexedDB is the restore path and has
+              // no backup, so a wrongly-skipped local write would lose the
+              // user's work, whereas a wrongly-skipped upload costs cloud
+              // freshness until the next real edit. Same one-directional bias
+              // as the ownership guard — degrade to staleness, never to loss.
+              const hash = await archiveHash(archive);
+              if (hash !== null && lastUploadedRef.current.get(photoId) === hash) {
+                logDiagnostic(
+                  "CONVEX_DB",
+                  `Cloud upload skipped for ${photoId}: archive unchanged since last sync`,
+                );
+                return;
+              }
+
               const uploadUrl = await withTimeout(generateUploadUrl(), "generateUploadUrl");
               const resp = await withTimeout(
                 fetch(uploadUrl, {
@@ -410,6 +469,10 @@ export function useEditPersistence() {
                 saveEdit({ photoKey: photoId, storageId: storageId as Id<"_storage">, canvasW, canvasH }),
                 "saveEdit",
               );
+              // Recorded only after saveEdit resolves. A hash stored on upload
+              // success but before the pointer is committed would mark a photo
+              // synced whose cloud record still points at the previous archive.
+              if (hash !== null) lastUploadedRef.current.set(photoId, hash);
             } catch (err) {
               // Cloud save failed (upload / storage / auth). The local IDB copy is
               // ALREADY written, so nothing is lost — just record the failure so it
@@ -509,6 +572,10 @@ export function useEditPersistence() {
 
   const deletePhotoEdit = useCallback(
     async (photoId: string) => {
+      // Drop the sync record first. Leaving it would mark a photo whose cloud
+      // record has just been removed as already-synced, so an identical archive
+      // saved later would be skipped and never make it back to the cloud.
+      lastUploadedRef.current.delete(photoId);
       if (isAuthenticated) {
         try {
           await removeEdit({ photoKey: photoId });
@@ -523,6 +590,7 @@ export function useEditPersistence() {
   );
 
   const clearAllEdits = useCallback(async () => {
+    lastUploadedRef.current.clear(); // same reason as the single delete above
     if (isAuthenticated) {
       try {
         await clearAllConvex();
