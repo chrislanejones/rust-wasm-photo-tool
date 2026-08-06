@@ -169,6 +169,12 @@ export function useSelectionActions(
     const tool = stamp.toolRef.current;
     if (!tool) return;
     const mask = tool.select_all();
+    // `select_all` pushes a "Select All" step (selection.rs:481) — selections
+    // are undoable, Photoshop-style. Without this the engine's undo_count moves
+    // and `stamp.state.undoCount` does not, so the History panel is a step
+    // short and the photo does not read as dirty. handleDeleteSelection below
+    // has always done this; these two were missed, not decided.
+    stamp.syncState();
     setSelectionMask(mask.length ? mask : null);
   }, [stamp]);
   const handleDeselect = useCallback(() => {
@@ -176,6 +182,9 @@ export function useSelectionActions(
     // wire on the canvas would be a lie.
     stamp.toolRef.current?.lasso_cancel();
     stamp.toolRef.current?.clear_selection();
+    // `clear_selection` pushes a "Deselect" step (selection.rs:507) — same
+    // reason as handleSelectAll above.
+    stamp.syncState();
     setLassoCommitted(null);
     setLassoPreview(null);
     setCombineHint(0);

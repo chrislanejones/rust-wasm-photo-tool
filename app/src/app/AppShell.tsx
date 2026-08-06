@@ -2082,10 +2082,24 @@ export function AppShell() {
     // newly-selected one. Wait until the load settles and undoCount reflects the
     // photo that's actually on the canvas.
     if (isImageLoading) return;
-    // Only light the "altered" dot for *applied* canvas edits (which bump the
-    // WASM undo count) — not for transient control changes like dragging the
-    // quality slider (which only sets `hasBeenModified` pending an apply).
-    if (activePhotoId && stamp.state.undoCount > 0) {
+    // ONE DEFINITION OF DIRTY, SHARED WITH THE SAVE.
+    //
+    // This used to be `undoCount > 0` alone, excluding `hasBeenModified` so a
+    // half-dragged quality slider would not dot before Apply. The cost of that
+    // was worse than the thing it avoided: `dirtyRef` in useImageSession is
+    // `undoCount > 0 || hasBeenModified`, so a photo could be WRITTEN TO DISK
+    // while the gallery still showed it as untouched. The app persisted an edit
+    // it was telling the user did not exist.
+    //
+    // Aligned to the save condition, deliberately. If it is dirty enough to
+    // write, it is dirty enough to show a dot. A slider drag now dots before
+    // Apply — which is correct, because switching photos mid-drag already
+    // saves it; the dot's absence was the lie, not its presence.
+    //
+    // Keep these two in step. They are the same question asked twice, and they
+    // drifted once already. (QC 2026-08-05: text edits appearing undotted was
+    // this, not a text bug.)
+    if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
       setModifiedPhotos((prev) => {
         if (prev.has(activePhotoId)) return prev;
         const next = new Set(prev);
@@ -2093,7 +2107,7 @@ export function AppShell() {
         return next;
       });
     }
-  }, [activePhotoId, stamp.state.undoCount, isImageLoading]);
+  }, [activePhotoId, stamp.state.undoCount, hasBeenModified, isImageLoading]);
 
   // Persist compression savings
   useEffect(() => {
