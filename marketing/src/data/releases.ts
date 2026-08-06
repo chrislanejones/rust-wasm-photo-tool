@@ -34,6 +34,7 @@ export const RELEASES: Release[] = [
       { tag: "ui", text: "Picking PNG now says it is lossless and will be larger than the source, rather than leaving you to discover that on disk. For an app about compression, a silent surprise was the wrong default." },
       { tag: "fix", text: "Resize Layer opened its box flush against the edge of the picture, so every handle sat on the border and nothing appeared to happen when you clicked it. The tool always worked; it just gave you nothing to grab. It opens inset now." },
       { tag: "ui", text: "On a large display the site pinned everything to the left edge with a wide empty strip down the right. The content column is centred, on every page rather than just the homepage." },
+      { tag: "ui", text: "New screenshot on the homepage and the README. The old one was taken in June and still showed a menu two revisions out of date — the site was advertising an app that no longer existed." },
       { tag: "infra", text: "The contribution squares counted whichever branch the generator happened to run in, so work could show up before it shipped or vanish until it merged. It reads the merged history now, and says so when it is running ahead of it." },
     ],
   },

@@ -536,7 +536,7 @@ a { color: inherit; }
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 1800 / 1075;      /* holds the box before the image decodes */
+  aspect-ratio: 2048 / 1219;      /* holds the box before the image decodes */
 }
 
 .hero__spotlight {

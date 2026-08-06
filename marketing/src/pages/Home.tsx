@@ -90,12 +90,12 @@ export default function Home() {
               eagerly and carries its own dimensions to hold layout. */}
           <figure className="hero__shot shot-frame">
             <img
-              src="/Rust-Photo-Car-Test-July-17.webp"
-              width={1800}
-              height={1075}
+              src="/IH-Hero-Image-August-2026.webp"
+              width={2048}
+              height={1219}
               fetchPriority="high"
               decoding="async"
-              alt="The Image Horse editor open on a photo of a white Fiat 500, a red ellipse drawn around the rusty roof and a yellow ‘Window Repair’ label beside it — annotated in the browser."
+              alt="The Image Horse editor open on a photo of a white Mercedes SUV, a magic-wand selection marching around the bonnet, with the Wand and Selection panels on the left and History and Layers on the right — five photos in the gallery strip below, all held in the browser."
             />
           </figure>
         </header>

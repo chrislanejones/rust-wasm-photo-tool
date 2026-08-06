@@ -1,6 +1,6 @@
 # Image Horse
 
-![Image Horse](public/Rust-Wasm-Photo-Tool-App-June-2.webp)
+![Image Horse](public/IH-Hero-Image-August-2026.webp)
 
 **Live:** [rust-wasm-photo-tool.netlify.app](https://rust-wasm-photo-tool.netlify.app/) &nbsp;·&nbsp; [![CI](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/chrislanejones/rust-wasm-photo-tool/actions/workflows/ci.yml)
 
