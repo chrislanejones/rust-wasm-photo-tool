@@ -39,6 +39,21 @@
 // human editing photos does not approach 60 uploads in an hour; the measured
 // incident would have hit it in minutes.
 
+/** Kill switch for the deferred retry (see the caller in useEditPersistence).
+ *
+ *  Default ON. `localStorage.ih_upload_retry = "0"` disables it, and the
+ *  behaviour falls back to what shipped in v7.67: a denied upload is skipped
+ *  and never retried. Worth having a switch because the retry schedules a timer
+ *  that touches the save path, and the save path is where this repo's
+ *  expensive bugs live. */
+export function isUploadRetryEnabled(): boolean {
+  try {
+    return localStorage.getItem("ih_upload_retry") !== "0";
+  } catch {
+    return true;
+  }
+}
+
 /** Minimum gap between two uploads OF THE SAME PHOTO. */
 export const MIN_INTERVAL_MS = 10_000;
 /** Width of the rolling window for the global ceiling. */

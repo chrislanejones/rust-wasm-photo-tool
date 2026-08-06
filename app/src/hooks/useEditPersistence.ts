@@ -23,7 +23,7 @@ import type {
   PersistedLayer,
 } from "@/lib/editPersistence";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
-import { mayUpload, recordUpload } from "@/lib/uploadBudget";
+import { mayUpload, recordUpload, isUploadRetryEnabled } from "@/lib/uploadBudget";
 
 // ── Archive encoding ───────────────────────────────────────────────────────
 // Packs canvas + full undo/redo history into a single binary blob so one
@@ -317,6 +317,12 @@ export function useEditPersistence() {
   // photo whose cloud record was removed would look synced and never come back.
   const lastUploadedRef = useRef(new Map<string, string>());
 
+  // photoId → the sequence number of the most recently STARTED save for that
+  // photo. A deferred retry compares its own token against this and drops
+  // itself if a newer save has begun, so a retry can never write stale bytes
+  // over fresher ones.
+  const attemptSeqRef = useRef(new Map<string, number>());
+
   const savePhotoEdit = useCallback(
     async (
       photoId: string,
@@ -425,7 +431,13 @@ export function useEditPersistence() {
           // to work with.
           let uploadedStorageId: string | null = null;
 
-          const cloudSync = (async () => {
+          // One retry per attempt-chain, and a token so a deferred attempt can
+          // tell whether a newer save for this photo has started since.
+          let retried = false;
+          const mySeq = (attemptSeqRef.current.get(photoId) ?? 0) + 1;
+          attemptSeqRef.current.set(photoId, mySeq);
+
+          const runAttempt = async (): Promise<void> => {
             try {
               // ── THE RATE LIMIT ───────────────────────────────────────────
               // Checked BEFORE the hash below, deliberately: an upload that is
@@ -441,6 +453,19 @@ export function useEditPersistence() {
               // The local IndexedDB write above already happened and is never
               // subject to this. Losing cloud freshness is recoverable; losing
               // the user's edits is not.
+              // Superseded? A newer save for this same photo started while this
+              // one was waiting out its interval, so its bytes are fresher and
+              // this attempt would write staleness over them. Checked on every
+              // attempt, not just the deferred one, because the immediate path
+              // can also lose a race with a switch.
+              if (attemptSeqRef.current.get(photoId) !== mySeq) {
+                logDiagnostic(
+                  "CONVEX_DB",
+                  `Cloud upload for ${photoId} superseded by a newer save; dropped`,
+                );
+                return;
+              }
+
               const verdict = mayUpload(photoId);
               if (!verdict.ok) {
                 logDiagnostic(
@@ -448,6 +473,28 @@ export function useEditPersistence() {
                   `Cloud upload rate-limited for ${photoId} (${verdict.reason}); ` +
                     `saved locally, retry in ~${Math.ceil(verdict.retryInMs / 1000)}s`,
                 );
+                // WHY A RETRY EXISTS AT ALL. Without one, a denied upload is
+                // simply dropped — and the debounce fires 2.5s after the last
+                // edit while the interval is 10s, so ordinary editing denies
+                // roughly half of its own saves. Measured on a real profile:
+                // 4 saves, 2 allowed, 2 denied. That is the limiter working as
+                // designed, but it means the LAST edit of a session can be the
+                // denied one, and nothing ever carries it to the cloud.
+                //
+                // Local IndexedDB is written regardless, so this was never data
+                // loss — only silent cloud staleness, which is worse than it
+                // sounds across devices and invisible on one.
+                //
+                // ONCE, and only for the interval. A ceiling denial means the
+                // hour's budget is gone and retrying is exactly the runaway the
+                // ceiling exists to stop. `retried` is per attempt-chain, so a
+                // retry that is denied again gives up rather than looping.
+                if (verdict.reason === "interval" && !retried && isUploadRetryEnabled()) {
+                  retried = true;
+                  // +250ms so the timer cannot land a hair early and re-deny on
+                  // a rounding difference.
+                  window.setTimeout(() => void runAttempt(), verdict.retryInMs + 250);
+                }
                 return;
               }
 
@@ -563,7 +610,12 @@ export function useEditPersistence() {
                 }
               }
             }
-          })();
+          };
+
+          // `runAttempt` handles its own failures end to end, including the
+          // stranded-archive collect, so a deferred retry re-enters it directly
+          // and cannot produce an unhandled rejection either.
+          const cloudSync = runAttempt();
 
           // The switch path passes detachCloudUpload and returns here, without
           // waiting on the network. `cloudSync` swallows its own failures, so

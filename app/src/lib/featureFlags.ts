@@ -29,6 +29,7 @@ import { isTilesFlushEnabled, isOplogUndoEnabled } from "@/lib/tilesFlush";
 import { isPatchmatchEnabled } from "@/lib/patchmatch";
 import { isSelectionBoolEnabled } from "@/lib/selectionBool";
 import { isSmartEdgeEnabled } from "@/lib/smartEdge";
+import { isUploadRetryEnabled } from "@/lib/uploadBudget";
 import { webgpuEnabled } from "@/lib/webgpu/detect";
 
 export type FlagKind = "kill" | "optin";
@@ -86,6 +87,15 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     isOn: isSelectionBoolEnabled,
     effect: "Add/subtract/intersect when combining selections. Off means each new selection replaces the last.",
     source: "lib/selectionBool.ts",
+  },
+  {
+    key: "ih_upload_retry",
+    label: "Deferred upload retry",
+    kind: "kill",
+    isOn: isUploadRetryEnabled,
+    effect:
+      "Re-attempts a cloud upload the rate limiter denied, once, after the interval expires. Off restores v7.67 behaviour: a denied upload is skipped and never retried. The local copy is written either way, so this only affects cloud freshness.",
+    source: "lib/uploadBudget.ts",
   },
   {
     key: "ih_smart_edge",
