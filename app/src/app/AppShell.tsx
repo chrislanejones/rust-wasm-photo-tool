@@ -900,15 +900,22 @@ export function AppShell() {
   // below — including `setQuality(q)` and the two panel props — are untouched.
   const exportFormat = useToolStore((s) => s.exportFormat);
   const setExportFormat = useToolStore((s) => s.setExportFormat);
-  // ADR-031. `useToolStore.quality` is the PERSISTED PREFERENCE — "the quality
-  // I like" — and it seeds a fresh document. It is deliberately NOT what the
-  // slider shows or what an export uses; that is `stamp.state.exportQuality`,
-  // owned by the engine so undo can reverse it. Two roles, not two owners:
-  // reading the store for display is precisely what would make it a mirror,
-  // and unowned mirrors caused both August incidents.
-  const qualityPreference = useToolStore((s) => s.quality);
+  // ADR-031, and the two values are NOT the same question.
+  //
+  //   `quality`                   the DRAFT — what the slider shows, what an
+  //                               export encodes at, what Apply commits. Also
+  //                               the persisted preference, so it survives a
+  //                               reload like every other panel setting.
+  //   `stamp.state.exportQuality` the APPLIED value, engine-owned, on the undo
+  //                               Snapshot. Undo moves it, and the effect
+  //                               below drags the draft along.
+  //
+  // The draft must not write to the engine as you drag: `push_compress_marker`
+  // snaps and then sets, so it needs the engine still holding the OUTGOING
+  // value at Apply time. A live write makes undo restore what you just asked
+  // for — which is exactly the bug this arrangement replaced.
+  const quality = useToolStore((s) => s.quality);
   const setQuality = useToolStore((s) => s.setQuality);
-  const quality = stamp.state.exportQuality;
 
   const effectiveBrushSize = (() => {
     switch (activeTool) {
@@ -934,42 +941,53 @@ export function AppShell() {
   const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(effectiveBrushSize, stamp.state.zoom, canvasRef);
 
-  const handleQualityChange = useCallback(
-    (q: number) => {
-      // The live drag. `set_export_quality` records NO history — one drag must
-      // be one undo step, not one per input event, matching how
-      // EffectsSettings latches brightness/contrast to the released position.
-      // The step itself is pushed by Apply (`push_compress_marker`).
-      stamp.toolRef.current?.set_export_quality(q);
-      stamp.syncState();
-      // Remember it as the preference for the NEXT document. Never read back
-      // for display — see the note at the declaration.
-      setQuality(q);
-      setHasBeenModified(true);
-    },
-    [stamp],
-  );
-
-  // Seed a freshly-loaded document with the remembered preference. Without
-  // this, every photo would open at the crate's default of 75 and the
-  // persisted preference would be silently ignored — a regression, since
-  // quality has been a remembered setting since it existed.
+  // The live drag is a DRAFT and must not touch the engine.
   //
-  // Keyed on the photo, and skipped once there is history to undo into, so it
-  // can never clobber a value that an undo just restored.
+  // It did, in the first cut, and that broke the whole feature: the drag set
+  // the engine's quality immediately, so by the time Apply ran the engine
+  // already held the new value. `push_compress_marker` snaps and then sets, so
+  // the snapshot captured the value being applied rather than the one being
+  // replaced — undo restored what you had just asked for and the slider never
+  // moved. Snap-then-set only works while the engine still holds the OLD value.
+  //
+  // So the split is: the panel's slider is pending state, exactly like its
+  // width/height fields, and the engine holds what has actually been APPLIED.
+  const handleQualityChange = useCallback((q: number) => {
+    setQuality(q);
+    setHasBeenModified(true);
+  }, []);
+
+  // Seed once per photo, then follow the engine. ONE effect, because the order
+  // matters and two effects raced.
+  //
+  // A fresh engine starts at its own default (75) and knows nothing about the
+  // remembered preference, so a sync-only effect would fire on load, see 75,
+  // and overwrite the user's saved setting — destroying the preference on
+  // every photo open. Seeding first, then following, is the whole reason this
+  // is one effect keyed on the photo rather than two independent ones.
+  //
+  // After the seed, the engine is authoritative: undo and redo move
+  // `exportQuality`, and the draft is pulled along. That is what makes undo
+  // VISIBLE, which is the entire point of ADR-031.
   //
   // ⚠️ When the archive learns to carry quality (the remaining half of
   // ADR-031, needing archive v6), a RESTORED document must keep its own stored
-  // value and this seed must yield to it. Today no archive carries one, so
+  // value and the seed must yield to it. Today no archive carries one, so
   // seeding from the preference is both correct and what users already expect.
+  const qualitySeededForRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activePhotoId || !stamp.state.ready || isImageLoading) return;
-    if (stamp.state.undoCount > 0) return;
-    if (stamp.state.exportQuality === qualityPreference) return;
-    stamp.toolRef.current?.set_export_quality(qualityPreference);
-    stamp.syncState();
+    if (qualitySeededForRef.current !== activePhotoId) {
+      qualitySeededForRef.current = activePhotoId;
+      if (stamp.state.exportQuality !== quality) {
+        stamp.toolRef.current?.set_export_quality(quality);
+        stamp.syncState();
+      }
+      return;
+    }
+    setQuality(stamp.state.exportQuality);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePhotoId, stamp.state.ready, isImageLoading]);
+  }, [activePhotoId, stamp.state.ready, isImageLoading, stamp.state.exportQuality]);
 
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
