@@ -6,6 +6,7 @@
 // destructive flatten); the lossy formats read the <canvas> via toBlob after a
 // flush, so what exports is exactly what is on screen.
 import { useCallback, useMemo } from "react";
+import { extFromMime } from "@/lib/exportImage";
 import type { EngineCore } from "./useEngineCore";
 
 export function useExport(engine: EngineCore) {
@@ -88,7 +89,13 @@ export function useExport(engine: EngineCore) {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = revisedName(sourceName, extMap[format]);
+          // Name the file after what the encoder ACTUALLY produced, not what
+          // was asked for. An unsupported type falls back to PNG silently (see
+          // lib/encodeSupport.ts), and `extMap[format]` would then stamp
+          // ".avif" onto PNG bytes. `blob.type` is the ground truth; extMap is
+          // only the fallback for the rare blob with no type at all.
+          const ext = blob.type ? extFromMime(blob.type) : extMap[format];
+          a.download = revisedName(sourceName, ext || extMap[format]);
           a.click();
           URL.revokeObjectURL(url);
         },

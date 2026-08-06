@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SlidersHorizontal, Zap, Scaling, ChevronDown, FileArchive } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { canEncode } from "@/lib/encodeSupport";
 import { DimensionFields } from "@/components/DimensionFields";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
@@ -152,6 +153,30 @@ export function ResizeSettings({
   const baseQualityRef = useRef(quality);
   const baseFormatRef = useRef(exportFormat);
   const baseMethodRef = useRef(method);
+
+  // Whether the browser can really encode the chosen format. `undefined` until
+  // the one-pixel probe resolves — the note simply stays hidden until then
+  // rather than flashing a wrong answer.
+  const [avifOk, setAvifOk] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void canEncode("image/avif").then((ok) => {
+      if (live) setAvifOk(ok);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // A quiet line under the picker. Information, not a warning: PNG being large
+  // is correct behaviour, and the surprise it causes is only that the status
+  // bar shows the SOURCE size while a lossless re-encode lands on disk.
+  const formatNote =
+    exportFormat === "png"
+      ? "Lossless — the largest file, and larger than the source for photos."
+      : exportFormat === "avif" && avifOk === false
+        ? "This browser can't encode AVIF — the file will be saved as PNG."
+        : null;
 
   useEffect(() => {
     setWidth(String(imageWidth));
@@ -352,6 +377,11 @@ export function ResizeSettings({
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
                   </div>
+                  {formatNote && (
+                    <p className="text-2xs text-theme-muted-foreground leading-snug">
+                      {formatNote}
+                    </p>
+                  )}
                 </div>
               </div>
 
