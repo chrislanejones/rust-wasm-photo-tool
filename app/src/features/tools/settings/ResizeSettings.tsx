@@ -168,6 +168,12 @@ export function ResizeSettings({
     };
   }, []);
 
+  // The format that will actually be written. Chrome answers an AVIF request
+  // with PNG (silently — see lib/encodeSupport.ts), so every number derived
+  // from "the chosen format" has to be derived from this instead.
+  const effectiveFormat: ExportFormat =
+    exportFormat === "avif" && avifOk === false ? "png" : exportFormat;
+
   // A quiet line under the picker. Information, not a warning: PNG being large
   // is correct behaviour, and the surprise it causes is only that the status
   // bar shows the SOURCE size while a lossless re-encode lands on disk.
@@ -282,7 +288,11 @@ export function ResizeSettings({
       newH,
       quality,
       curMime: currentMime,
-      newFormat: exportFormat,
+      // Model the format that will ACTUALLY land, not the one requested. AVIF
+      // weights as the most efficient format in the Rust scorer, so an AVIF
+      // selection the browser cannot encode would promise a large gain and then
+      // write a PNG — the panel contradicting its own note one line below.
+      newFormat: effectiveFormat,
     }).then((m) => {
       if (!alive) return;
       setLighthouseScore(m.lighthouseScore);
@@ -300,7 +310,11 @@ export function ResizeSettings({
     newW,
     newH,
     quality,
-    exportFormat,
+    // effectiveFormat, not exportFormat: the AVIF probe resolves asynchronously,
+    // so the first render models AVIF and only the re-run after `avifOk` lands
+    // corrects it. Depending on exportFormat alone would leave the AVIF numbers
+    // on screen permanently, since exportFormat never changed.
+    effectiveFormat,
   ]);
 
   return (
