@@ -120,7 +120,25 @@ export function usePastePlacementTool({
     onCancelRef.current = null; // layer-resize cancel leaves the layer as-is
     t.begin_layer_resize_preview();
     if (!t.has_paste_preview()) return; // no active layer — Rust no-op'd
-    setRect({ x: 0, y: 0, width: canvas.width, height: canvas.height });
+    // Seed the box INSET from the canvas edge rather than flush against it.
+    //
+    // Seeded at the full canvas, every handle sat exactly on the image border:
+    // nothing moved at the moment of click, the handles were the hardest pixels
+    // on the canvas to find, and the tool read as a dead button. A regular
+    // paste never had this problem because it seeds at the pasted content's own
+    // size, comfortably inside the canvas — which is why resizing by other
+    // means always "worked".
+    //
+    // The inset is cosmetic only: the preview still holds the layer's full
+    // pixels, and dragging a handle back out restores the original framing. It
+    // costs one visible gesture to undo and buys the tool announcing itself.
+    const inset = Math.round(Math.min(canvas.width, canvas.height) * 0.08);
+    setRect({
+      x: inset,
+      y: inset,
+      width: Math.max(1, canvas.width - inset * 2),
+      height: Math.max(1, canvas.height - inset * 2),
+    });
     flushToCanvas();
   }, [toolRef, canvasRef, flushToCanvas]);
 
