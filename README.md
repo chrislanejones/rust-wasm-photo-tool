@@ -84,13 +84,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.71 — 2026-08-06
+### v7.72 — 2026-08-06
 
-**The architecture page stopped claiming something the app cannot do.** It
-described the browser as "fully functional offline". There is no service worker
-in a shipped build, so opening the app with no connection fails. It now says
-what is true: no server in the edit path. Editing needs no round trip once the
-tab is open — that part was always real, and it is the part worth claiming.
+**The gallery's transparency checkerboard now shows on every thumbnail.** It was
+switched on by the format of the file you opened — PNG got it, JPEG never did —
+which had nothing to do with the picture on screen, because every thumbnail is
+re-encoded to WebP on import. A JPEG that picked up transparency from the canvas
+or the eraser still showed none. It is unconditional now, and it hides itself:
+the image is painted over it, so a thumbnail that fills its tile covers it
+completely.
 
 ## License
 

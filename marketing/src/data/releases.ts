@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.72",
+    date: "2026-08-06",
+    headline: "The gallery shows transparency on every thumbnail, not just the PNGs",
+    entries: [
+      { tag: "fix", text: "The checkerboard behind a gallery thumbnail was switched on by the format of the file you opened. PNG got it, JPEG never did — which had nothing to do with the picture, because every thumbnail is re-encoded to WebP on import. A photo that picked up transparency from the canvas or the eraser showed none of it." },
+      { tag: "ui", text: "It is unconditional now. Nothing is needed to hide it either: the image paints over the checkerboard, so a thumbnail that fills its tile covers it completely and only the letterbox bars of a portrait or landscape shot show through." },
+    ],
+  },
+  {
     version: "v7.71",
     date: "2026-08-06",
     headline: "The architecture page stops claiming something the app cannot do",

@@ -88,8 +88,6 @@ interface ThumbProps {
   vertical?: boolean;
 }
 
-const TRANSPARENT_TYPES = new Set(["image/png", "image/webp", "image/svg+xml"]);
-
 function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, vertical }: ThumbProps) {
   const [loading, setLoading] = useState(true);
   const [thumbUrl, setThumbUrl] = useState("");
@@ -106,7 +104,6 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
   const isDone = progress === 100;
   const isError = progress === -1;
   const hasSavings = savings != null && savings.savingsPercent > 0;
-  const maybeTransparent = TRANSPARENT_TYPES.has(entry.mimeType);
 
   const dims =
     entry.origWidth && entry.origHeight
@@ -134,9 +131,20 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           {...(vertical ? {} : thumbEnter(index))}
           style={vertical ? { width: "100%", height: "auto" } : undefined}
         >
-      {maybeTransparent && (
-        <div className="absolute inset-0 checkerboard rounded-lg" />
-      )}
+      {/* Unconditional. It used to be gated on the SOURCE file's mime being
+          png/webp/svg, which tested the wrong thing twice over: the thumbnail
+          is re-encoded to WebP for every photo (makeThumbnailFromPixels), so
+          the source format says nothing about the pixels being drawn, and a
+          JPEG that gained transparency from the artboard or the eraser still
+          got no checker while a fully opaque PNG always did.
+
+          No gate is needed to hide it, either — this div is BEHIND the image
+          in paint order, so a thumb that fills its tile occludes it entirely:
+          the vertical grid (object-fit: cover) shows it only through real
+          alpha, and a square photo in the strip covers it outright. What is
+          left visible is the strip's letterbox bars on non-square photos,
+          which is the intended look. */}
+      <div className="absolute inset-0 checkerboard rounded-lg" />
       <img
         ref={imgRef}
         src={thumbUrl || undefined}

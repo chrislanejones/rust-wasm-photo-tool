@@ -2859,3 +2859,20 @@ edits or the canvas stopped showing them.
 
 **How this happened, since it will happen again:** the claim was written when the service worker was designed, and it shipped dark. Nothing in the build fails when a marketing claim outruns the code, so the only guard is checking the served bundle. `VITE_ENABLE_SW=1` is the moment to restore the offline wording, and a comment in `Architecture.tsx` now says so at the point of edit.
 
+
+## v7.72 Change Summary — 2026-08-06
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **The gallery checkerboard was gated on the source file's mime type** — `png`/`webp`/`svg` got it, everything else did not. That tested the wrong thing: `makeThumbnailFromPixels` re-encodes **every** thumbnail to WebP on import, so the format you opened says nothing about the pixels being drawn. A JPEG that gained transparency from the artboard or the eraser still showed no checker, and a fully opaque PNG always showed one | **Fixed** |
+| 2 | The gate is gone rather than replaced. Nothing is needed to hide the checkerboard either — the div sits **behind** the image in paint order, so a thumbnail that fills its tile occludes it outright. The vertical grid is `object-fit: cover`, so there it shows only through real alpha; the horizontal strip is `contain`, so what stays visible is the letterbox bars on non-square photos | **Fixed** |
+
+**Found in the same pass, not fixed here:** the ZIP export ignores Settings →
+Layers and Canvas → **Photo only**. `exportPhotosToZip` never reads
+`exportCanvasBackground` — it composites through `compositeSavedEdit`, which
+loads the flattened `canvasPng` and returns `get_image_data()`, the whole
+document including the backing canvas. Share, Copy to clipboard and the single
+Download all honour the setting; the archive is the one surface that does not.
+`handleExport`'s dependency array also omits the preference, so even the single
+Download serves a stale value until some other dependency changes. Both are
+open.
