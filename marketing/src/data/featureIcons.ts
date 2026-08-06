@@ -6,8 +6,8 @@ import type { ElementType } from "react";
 import { CpuIcon } from "../components/Icons";
 import {
   AppWindow,
+  BadgeCheck,
   Stamp,
-  FileBadge2,
   Move,
   Layers2,
   ShieldCheck,
@@ -56,7 +56,7 @@ export const GROUP_ICONS: Record<string, ElementType> = {
 
 export const FEATURE_ICONS: Record<string, ElementType> = {
   "Clone Stamp": Stamp,
-  "Red Stamps": FileBadge2,
+  "Red Stamps": BadgeCheck,
   "Edit & Move (Crop · Transform · Align · Select)": Move,
   "Text Shadow": Layers2,
   "Security tab": ShieldCheck,

@@ -166,17 +166,17 @@ export default function Home() {
         </section>
 
         {/* The tool run, deliberately a dense typographic list not an icon grid —
-            with the ⌘K palette beside it, which is how you actually reach any of
-            these. */}
+            with the button set beside it, so the words have faces. The shot is
+            rendered from the app's own stylesheet, not redrawn. */}
         <section className="editor" id="editor">
           <figure className="editor__shot shot-frame">
             <img
-              src="/command-palette.webp"
-              width={793}
-              height={816}
+              src="/button-set.webp"
+              width={832}
+              height={1106}
               loading="lazy"
               decoding="async"
-              alt="Image Horse's ⌘K command palette, filtered to “pen” — Shapes › Pens is highlighted, with Paint, Eraser, Adjust &amp; Select, Stamps and more listed below."
+              alt="Image Horse's button set — Paint, Magic Wand, Crop, Resize, Download, Text, Eraser, Clone, Pen, Move, Color and Adjust, shown in their idle and selected states."
             />
           </figure>
           <div className="editor__text">
@@ -196,14 +196,27 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Two columns: the mark alone on the left, everything that can be read
+            or clicked on the right. The mark is decorative — the sentence beside
+            it carries the meaning — so it is aria-hidden and never focusable. */}
         <section className="close">
-          <p className="close__line">Open an image. No account, no upload.</p>
-          <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
-            Open the demo
-          </a>
-          <a className="cta cta--outline cta--lg" href={GITHUB_URL} {...external}>
-            Read the source
-          </a>
+          <svg className="close__mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/></svg>
+          <div className="close__body">
+            <p className="close__line">Open an image. No account, no upload.</p>
+            <p className="close__sub">
+              Once it loads, the network is optional. Drop your connection mid-edit and nothing
+              stops — none of the work was leaving this machine anyway. The editing happens in
+              this tab, not on a server, so there is nothing to be slow and nothing to go down.
+            </p>
+            <div className="close__actions">
+              <a className="cta cta--fill cta--lg" href={EDITOR_URL} {...external}>
+                Open the demo
+              </a>
+              <a className="cta cta--outline cta--lg" href={GITHUB_URL} {...external}>
+                Read the source
+              </a>
+            </div>
+          </div>
         </section>
       </main>
 

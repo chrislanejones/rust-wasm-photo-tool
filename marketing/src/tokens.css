@@ -79,14 +79,14 @@
      rather than fighting it. */
   --page-max: 72rem;
 
-  /* Gutter, and on a big display also the centring lever.
+  /* Gutter, and on a big display also the centering lever.
    *
    * Every top-level section pads by this token (18 rules), and the sections lay
    * their content out from the start edge — so with the gutter capped at 4rem a
    * 2560px display drew the whole site hard against the left with ~800px of
    * dead space to the right. It read as a broken layout rather than a wide one.
    *
-   * max() with the centring term needs no breakpoint and no second rule: below
+   * max() with the centering term needs no breakpoint and no second rule: below
    * --page-max the term is small or negative and the clamp wins, so narrow and
    * mid widths are byte-for-byte unchanged. They cross over exactly at
    * 80rem — 5vw == 4rem == (80rem - 72rem) / 2 — so the gutter grows

@@ -719,7 +719,7 @@ a { color: inherit; }
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 793 / 816;
+  aspect-ratio: 832 / 1106;
 }
 .editor__text {
   display: flex;
@@ -742,14 +742,71 @@ a { color: inherit; }
 
 .close {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-2xl);
   padding: var(--space-3xl) var(--page-gutter);
 }
 
+/* The mark, alone in the left column. Sized against the viewport rather than
+   the type: it is the graphic half of a two-column close, not an inline glyph,
+   so it should hold its own against the text block instead of tracking it.
+   clamp keeps it from swallowing a phone or getting lost on a 2560px display. */
+.close__mark {
+  flex: none;
+  width: clamp(5rem, 11vw, 11rem);
+  height: auto;
+  aspect-ratio: 1;
+  color: var(--color-accent);
+}
+
+/* Everything readable or clickable, stacked in the right column. */
+.close__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+
+
+.close__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+/* Below the breakpoint the two columns stop being two: a 5rem mark beside a
+   full paragraph leaves the text about 60% of a phone screen. Stack it. */
+@media (max-width: 46rem) {
+  .close {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-lg);
+  }
+}
+
+.close__sub {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: var(--leading-tight);
+  /* One step down from --color-ink so the line above stays the first thing
+     read. Same size, same weight, slightly quieter — hierarchy by value. */
+  color: var(--color-ink-2);
+  /* `pretty` not `balance`: balance evens line lengths, which suits a short
+     heading and works against a multi-line paragraph. */
+  text-wrap: pretty;
+}
+
 .close__line {
-  flex: 1 1 22ch;
+  /* `flex: none`, NOT `1 1 22ch`. That basis dates from when `.close` itself was
+     the flex row and this headline shared it with the CTAs. It now lives in
+     `.close__body`, a COLUMN — so a grow factor of 1 stretched a single line of
+     text to 488px tall and pushed the paragraph to the bottom of the gap. */
+  flex: none;
   font-family: var(--font-display);
   font-size: var(--text-2xl);
   font-weight: 700;

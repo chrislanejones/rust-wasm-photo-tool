@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.70",
+    date: "2026-08-06",
+    headline: "The homepage shows the buttons, not a screenshot you cannot read",
+    entries: [
+      { tag: "ui", text: "New image on the homepage: nine of the app's controls, each one rendered from the app's own stylesheet rather than redrawn. It replaces a screenshot of the command palette that was unreadable at the size it actually displayed." },
+      { tag: "ui", text: "The closing section is two columns now — the no-wifi mark on the left, everything you can read or click on the right." },
+      { tag: "ui", text: "A line about what the network is actually for: once the app has loaded, dropping your connection mid-edit stops nothing, because none of the work was leaving your machine." },
+      { tag: "fix", text: "A stray gap above that paragraph. The headline was stretching to 488px tall for a single line of text — a leftover flex rule from when the section was laid out sideways." },
+      { tag: "ui", text: "Clone Stamp's icon was a pair of sheets, which says duplicate rather than clone from a point. It takes the stamp mark now, and the red marker presets take a badge — matching what the feature list on the site already showed." },
+    ],
+  },
+  {
     version: "v7.69",
     date: "2026-08-06",
     headline: "Export names the file after what is in it",

@@ -2836,3 +2836,16 @@ edits or the canvas stopped showing them.
 
 **Not built:** real AVIF encoding. No encoder exists in the browser, in the app, or in the crate; adding one is a dependency decision (`@jsquash/avif` is 7.97 MB unpacked, or a `ravif` feature in the crate). AVIF stays in the format list and is now honest about what it produces.
 
+## v7.70 Change Summary — 2026-08-06
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **New button-set image on the homepage**, replacing a command-palette screenshot that could not be read at the size it renders. Nine controls in a 3×3 grid, each square carrying its own border, background and text colour rather than a small button floating inside a larger tile — so nothing overflows and nothing is decorative. Rendered from the app's own stylesheet and Lucide geometry, not redrawn. 832×1106, **18,888 bytes** lossless WebP | **Done** |
+| 2 | Sized backwards from the 414px column it renders in rather than guessed: captions land at **14.9px** on screen, against 4.0px for the first attempt at 16 tiles. Lossless beat quality-88 on both counts — smaller *and* sharper — because the sheet is flat panels and hard edges, which is what lossy WebP wastes bits on | **Done** |
+| 3 | **The closing section is two columns**: the wifi-off mark alone on the left, headline, paragraph and both buttons on the right | **Done** |
+| 4 | A line about the network being optional once the app has loaded. Deliberately NOT "works offline" — the service worker has never shipped, so a cold load with no connection still fails. What is true is that nothing stops mid-edit, and that is what it says | **Done** |
+| 5 | **`.close__line` carried `flex: 1 1 22ch`** from when `.close` was itself the flex row and the headline shared it with the buttons. Moved into a column, that grow factor applied down the main axis and stretched one line of text to **488px tall**, which read as a mysterious gap above the paragraph. A first fix at equal specificity but earlier in the file silently lost the cascade and changed nothing | **Fixed** |
+| 6 | **Clone Stamp's icon was `Copy`** — a two-sheets glyph that reads as "duplicate", not as sampling a source point and painting from it. Clone Stamp takes `Stamp`; the red marker presets take `BadgeCheck`, which is what an APPROVED/REJECTED mark looks like. The app and the marketing feature list disagreed on both before this and now agree | **Fixed** |
+
+**Note:** `Architecture.tsx` still claims the browser plane is "fully functional offline". That is not true as shipped and is left alone deliberately — it is a claim to decide on, not a typo to patch.
+

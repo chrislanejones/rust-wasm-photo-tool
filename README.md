@@ -84,27 +84,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.69 — 2026-08-06
+### v7.70 — 2026-08-06
 
-**Export names the file after what is actually in it.** Chrome cannot encode
-AVIF, and the browser answers an AVIF request with a PNG without saying so — no
-error, no warning. So "export as AVIF" wrote PNG bytes into a `.avif` file, and
-three separate places repeated the claim: the filename, the performance figures
-beside the format picker, and the download dialog's "Smallest · modern" tile.
-All three now describe the file you actually get. Real AVIF encoding is still
-not built — nothing in the browser can do it, and adding an encoder is its own
-decision.
+**The homepage shows the buttons.** The old shot was the command palette, and
+at the size it actually rendered you could not read it. Nine controls now, each
+one drawn from the app's own stylesheet rather than redrawn by hand.
 
-**PNG was never broken.** A 636×865 export really is 636×865 at 8 bits, and
-~0.93 MB is simply what lossless costs for a photograph. What was missing was
-anyone saying so, which is why the picker now does.
+**A line about what the network is for.** Once the app has loaded, dropping your
+connection mid-edit stops nothing — none of the work was leaving your machine.
+Not a claim to work offline from cold: that needs the service worker, which has
+not shipped.
 
-**Resize Layer's handles are where you can find them.** The tool always worked;
-its box opened flush against the edge of the picture, so every handle sat on the
-border and nothing appeared to happen when you clicked. It opens inset now.
-
-**The trail log counts the right commits**, and the marketing site no longer
-hugs the left edge of a large display.
+**Clone Stamp's icon was a pair of sheets**, which says duplicate rather than
+clone from a point. It takes the stamp mark now, and the red marker presets
+take a badge.
 
 ## License
 
