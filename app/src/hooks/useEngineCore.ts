@@ -86,6 +86,13 @@ export interface CloneStampState {
   layers: LayerInfo[];
   /** Id of the active layer (receives all tool edits). */
   activeLayerId: number;
+  /** Export quality, 1..=100 — ADR-031. Engine-owned so undo can reverse it.
+   *
+   *  This is the value to DISPLAY and to EXPORT with. `useToolStore.quality`
+   *  still exists but has a different job: it is the persisted preference that
+   *  seeds a new document, and is never read for display. Two roles, not two
+   *  owners — reading the store for display is what would make it a mirror. */
+  exportQuality: number;
 }
 
 const INITIAL_STATE: CloneStampState = {
@@ -101,6 +108,9 @@ const INITIAL_STATE: CloneStampState = {
   hasTransparency: false,
   layers: [],
   activeLayerId: 0,
+  // Matches DEFAULT_EXPORT_QUALITY in the crate. Both defaults are asserted
+  // against each other by an engine test — they must not drift.
+  exportQuality: 75,
 };
 
 /** The engine context + public core surface. Domain hooks (useHistory,
@@ -226,6 +236,10 @@ export function useEngineCore(
       hasTransparency: t.has_transparency(),
       layers,
       activeLayerId,
+      // ADR-031. Published here rather than mirrored in React, so an undo that
+      // restores the snapshot's quality reaches the slider through the same
+      // path as every other engine change.
+      exportQuality: t.export_quality(),
     });
   }, []);
 

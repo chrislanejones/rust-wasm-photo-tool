@@ -900,8 +900,15 @@ export function AppShell() {
   // below — including `setQuality(q)` and the two panel props — are untouched.
   const exportFormat = useToolStore((s) => s.exportFormat);
   const setExportFormat = useToolStore((s) => s.setExportFormat);
-  const quality = useToolStore((s) => s.quality);
+  // ADR-031. `useToolStore.quality` is the PERSISTED PREFERENCE — "the quality
+  // I like" — and it seeds a fresh document. It is deliberately NOT what the
+  // slider shows or what an export uses; that is `stamp.state.exportQuality`,
+  // owned by the engine so undo can reverse it. Two roles, not two owners:
+  // reading the store for display is precisely what would make it a mirror,
+  // and unowned mirrors caused both August incidents.
+  const qualityPreference = useToolStore((s) => s.quality);
   const setQuality = useToolStore((s) => s.setQuality);
+  const quality = stamp.state.exportQuality;
 
   const effectiveBrushSize = (() => {
     switch (activeTool) {
@@ -927,10 +934,42 @@ export function AppShell() {
   const { pos, visible, diameter, onCanvasEnter, onCanvasLeave } =
     useBrushPreview(effectiveBrushSize, stamp.state.zoom, canvasRef);
 
-  const handleQualityChange = useCallback((q: number) => {
-    setQuality(q);
-    setHasBeenModified(true);
-  }, []);
+  const handleQualityChange = useCallback(
+    (q: number) => {
+      // The live drag. `set_export_quality` records NO history — one drag must
+      // be one undo step, not one per input event, matching how
+      // EffectsSettings latches brightness/contrast to the released position.
+      // The step itself is pushed by Apply (`push_compress_marker`).
+      stamp.toolRef.current?.set_export_quality(q);
+      stamp.syncState();
+      // Remember it as the preference for the NEXT document. Never read back
+      // for display — see the note at the declaration.
+      setQuality(q);
+      setHasBeenModified(true);
+    },
+    [stamp],
+  );
+
+  // Seed a freshly-loaded document with the remembered preference. Without
+  // this, every photo would open at the crate's default of 75 and the
+  // persisted preference would be silently ignored — a regression, since
+  // quality has been a remembered setting since it existed.
+  //
+  // Keyed on the photo, and skipped once there is history to undo into, so it
+  // can never clobber a value that an undo just restored.
+  //
+  // ⚠️ When the archive learns to carry quality (the remaining half of
+  // ADR-031, needing archive v6), a RESTORED document must keep its own stored
+  // value and this seed must yield to it. Today no archive carries one, so
+  // seeding from the preference is both correct and what users already expect.
+  useEffect(() => {
+    if (!activePhotoId || !stamp.state.ready || isImageLoading) return;
+    if (stamp.state.undoCount > 0) return;
+    if (stamp.state.exportQuality === qualityPreference) return;
+    stamp.toolRef.current?.set_export_quality(qualityPreference);
+    stamp.syncState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePhotoId, stamp.state.ready, isImageLoading]);
 
   const { progress: compressProgress, compressAll } = useAutoCompress();
 
