@@ -84,20 +84,13 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.70 — 2026-08-06
+### v7.71 — 2026-08-06
 
-**The homepage shows the buttons.** The old shot was the command palette, and
-at the size it actually rendered you could not read it. Nine controls now, each
-one drawn from the app's own stylesheet rather than redrawn by hand.
-
-**A line about what the network is for.** Once the app has loaded, dropping your
-connection mid-edit stops nothing — none of the work was leaving your machine.
-Not a claim to work offline from cold: that needs the service worker, which has
-not shipped.
-
-**Clone Stamp's icon was a pair of sheets**, which says duplicate rather than
-clone from a point. It takes the stamp mark now, and the red marker presets
-take a badge.
+**The architecture page stopped claiming something the app cannot do.** It
+described the browser as "fully functional offline". There is no service worker
+in a shipped build, so opening the app with no connection fails. It now says
+what is true: no server in the edit path. Editing needs no round trip once the
+tab is open — that part was always real, and it is the part worth claiming.
 
 ## License
 

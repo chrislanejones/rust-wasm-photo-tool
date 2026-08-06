@@ -227,8 +227,9 @@ the browser.
 
 ### Rust ↔ Convex bridge (signed-in only; the app must work logged out)
 
-**Principle**: WASM processes pixels locally (fast, zero-latency, works
-offline/logged-out). Convex stores metadata, edit archives, and account
+**Principle**: WASM processes pixels locally (fast, zero-latency, no
+network round trip, works logged out). Convex stores metadata, edit
+archives, and account
 state for signed-in users only — nothing here is on the critical
 editing path.
 

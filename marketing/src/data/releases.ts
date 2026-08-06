@@ -24,6 +24,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.71",
+    date: "2026-08-06",
+    headline: "The architecture page stops claiming something the app cannot do",
+    entries: [
+      { tag: "fix", text: "The system map described the browser as \"fully functional offline\". It is not — there is no service worker in a shipped build, so opening the app with no connection fails. It now says what is actually true: no server in the edit path." },
+      { tag: "fix", text: "The architecture doc made the same claim about the engine. Working without an account is true; working with no network from cold was not." },
+    ],
+  },
+  {
     version: "v7.70",
     date: "2026-08-06",
     headline: "The homepage shows the buttons, not a screenshot you cannot read",

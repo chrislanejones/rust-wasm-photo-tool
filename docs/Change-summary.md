@@ -2849,3 +2849,13 @@ edits or the canvas stopped showing them.
 
 **Note:** `Architecture.tsx` still claims the browser plane is "fully functional offline". That is not true as shipped and is left alone deliberately — it is a claim to decide on, not a typo to patch.
 
+## v7.71 Change Summary — 2026-08-06
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **The Architecture page claimed the browser plane was "fully functional offline". It is not.** There is no service worker in a shipped build — `VITE_ENABLE_SW` is set nowhere, so the registration code constant-folds out and the served bundle carries zero `serviceWorker` references. A cold load with no network fails. The badge now reads **"no server in the edit path"**, which is both true and the thing that actually distinguishes this plane from the Convex one | **Fixed** |
+| 2 | `docs/Architecture.md` described WASM processing as working "offline/logged-out". Logged-out is true; offline was not. Now "no network round trip, works logged out" | **Fixed** |
+| 3 | Left alone as already honest: the same file's service-worker entry says "investigated only, nothing wired", and a v6-era changelog line describes a *future* worker that "would cache" the app. Both are accurate about a thing that has not shipped | **No change** |
+
+**How this happened, since it will happen again:** the claim was written when the service worker was designed, and it shipped dark. Nothing in the build fails when a marketing claim outruns the code, so the only guard is checking the served bundle. `VITE_ENABLE_SW=1` is the moment to restore the offline wording, and a comment in `Architecture.tsx` now says so at the point of edit.
+

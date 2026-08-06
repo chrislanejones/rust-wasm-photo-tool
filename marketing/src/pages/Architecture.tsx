@@ -79,9 +79,16 @@ export default function Architecture() {
           </h2>
 
           <div className={`map__plane map__plane--client${dim("demo free pro")}`}>
+            {/* NOT "fully functional offline", which is what this said until
+                2026-08-06. There is no service worker in a shipped build —
+                VITE_ENABLE_SW is set nowhere, so the registration code is
+                constant-folded out and a cold load with no network fails. What
+                is true, and what distinguishes this plane from the Convex one,
+                is that nothing here needs a round trip once the tab is open.
+                Restore the offline claim only when the SW actually ships. */}
             <div className="plane__head">
               <span className="plane__name">Browser</span>
-              <span className="plane__note">fully functional offline</span>
+              <span className="plane__note">no server in the edit path</span>
             </div>
 
             <div className="map__row">
