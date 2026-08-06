@@ -84,29 +84,30 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.67 — 2026-08-05
+### v7.68 — 2026-08-06
 
-**Photos no longer overwrite each other's edits.** Switching away from a photo
-saved it — but it saved whatever was on the canvas at that moment, without ever
-checking the canvas still held that photo. If a switch stalled partway, the
-canvas stayed on the photo you left while the app had already moved on, and the
-next switch wrote the old photo's picture into a different photo's saved edits.
-Four photos ended up holding the same painted canvas. Three of them had never
-been touched.
+**Every edit shows up as an edit.** Adding text, dragging a slider, or selecting
+the whole photo all changed it — and the gallery still showed it as untouched.
+The dot and the save had drifted apart, so the app could write a photo to disk
+while telling you nothing had happened to it. They ask the same question now.
 
-Saving now refuses when the canvas is holding a different photo than the one
-being saved. It refuses only when it is certain — if it cannot tell, it saves,
-because a refused save loses work you actually did, and that is worse than the
-problem it prevents.
+**Undo reaches things it used to skip.** Changing export quality recorded a step
+that put nothing back: the pixels were identical, so undo consumed the step and
+left the slider where it was. Quality now travels with the step, and it is
+undoable whether or not you press Apply. Selecting everything and deselecting
+are steps as well.
 
-Switching is much faster, too. It used to wait for the whole upload to finish
-before letting you move, about thirteen seconds on a slow connection, and that
-wait is what made switches stall in the first place. Your edits are written to
-this browser first; the upload follows on its own time.
+**Drawing a pen path, Ctrl+Z takes back one point** instead of deleting the
+whole path. It used to reach past the path you were drawing and undo the last
+one you finished.
 
-It also stopped re-uploading photos that had not changed. One brush stroke used
-to cost twenty-eight uploads. It now costs five, and there is a ceiling so a
-future bug cannot run away with it.
+**A photo that fails to reach the cloud no longer leaves anything behind.** The
+upload happened before the record that points at it, so any failure between the
+two stranded a file that nothing would ever reference and nothing would ever
+clean up. It is collected the moment it happens now, and an upload that gets
+rate-limited is retried rather than dropped. Your edits are always written to
+this browser first, so nothing was ever at risk — but the copy in the cloud
+could quietly fall behind.
 
 ## License
 

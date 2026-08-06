@@ -24,6 +24,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.68",
+    date: "2026-08-06",
+    headline: "Every edit shows up as an edit",
+    entries: [
+      { tag: "fix", text: "Adding text, dragging a slider, or selecting the whole photo all changed it — and the gallery still showed it as untouched. The dot and the save had drifted apart, so the app could write a photo to disk while telling you nothing had happened to it. They ask the same question now." },
+      { tag: "fix", text: "Changing export quality recorded an undo step that put nothing back: the pixels were identical, so undo consumed the step and left the slider where it was. Quality now travels with the step, and it is undoable whether or not you press Apply." },
+      { tag: "fix", text: "While you are drawing a pen path, Ctrl+Z takes back one point instead of deleting the whole path. It used to reach past the path you were drawing and undo the last one you finished." },
+      { tag: "fix", text: "A photo that fails to reach the cloud no longer leaves anything behind. The upload happened before the record that points at it, so any failure in between stranded a file that nothing would ever reference and nothing would ever clean up. It is collected the moment it happens now." },
+      { tag: "perf", text: "An upload that gets rate-limited is retried rather than dropped. Your edits are always written to this browser first, so nothing was ever at risk — but the copy in the cloud could quietly fall behind." },
+      { tag: "rust", text: "Export quality moved into the engine so it can ride the undo history properly. The engine grew by 625 bytes and is pinned by 207 tests." },
+    ],
+  },
+  {
     version: "v7.67",
     date: "2026-08-05",
     headline: "Photos no longer overwrite each other's edits",
