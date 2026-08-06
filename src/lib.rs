@@ -406,6 +406,14 @@ struct PastePreview {
     is_layer_source: bool,
 }
 
+/// Export quality a fresh document starts at, 1..=100. ADR-031.
+///
+/// MUST match `useToolStore`'s `quality: 75`. Two defaults that disagree would
+/// have the slider showing one value while the engine held another, which is
+/// the drift this ADR exists to remove — one owner is only one owner if they
+/// start in the same place.
+const DEFAULT_EXPORT_QUALITY: u8 = 75;
+
 #[wasm_bindgen]
 pub struct ImageHorseTool {
     /// Layer stack, bottom (index 0) → top (last). Always non-empty.
@@ -427,6 +435,19 @@ pub struct ImageHorseTool {
     hist: History,
     stamp: StampState,
     zoom: f64,
+    /// Export quality, 1..=100. ADR-031.
+    ///
+    /// The engine never reads this — the codec worker and the JS export path
+    /// do the encoding. It lives here solely so it can ride the undo history:
+    /// a quality-only Apply changes no pixels, so before ADR-031 its
+    /// `"Compress"` step restored an identical document and the slider stayed
+    /// put. An undo that consumed a step and reversed nothing.
+    ///
+    /// Owning it here rather than mirroring it in React is the point. The two
+    /// production incidents preceding this decision (archive corruption
+    /// 2026-08-04, syncState drift 2026-08-05) were both a JS-side copy of
+    /// engine truth that nothing owned.
+    export_quality: u8,
     // Scratch buffers reused across blur_region calls to avoid per-stroke allocation.
     blur_scratch_a: Vec<u8>,
     blur_scratch_b: Vec<u8>,
@@ -638,6 +659,7 @@ impl ImageHorseTool {
             height: self.height,
             selection: self.selection.clone(),
             selection_only: false,
+            export_quality: self.export_quality,
         }
     }
 
@@ -685,6 +707,14 @@ impl ImageHorseTool {
         // The mask that was live at that moment comes back too — undoing a
         // Delete Selection / Layer Via Cut restores what was selected.
         self.selection = snap.selection;
+        // ADR-031: restore APPLIES the parameter, it does not merely carry it.
+        // Storing without applying is exactly what the old "Compress" marker
+        // did, and that is the bug this exists to fix.
+        //
+        // Deliberately NOT mirrored in the two selection-only undo/redo paths
+        // below: those restore just the mask by design, and a selection step
+        // cannot change quality, so the value there always equals the live one.
+        self.export_quality = snap.export_quality;
         // Source point may now reference out-of-bounds pixels.
         self.stamp.source_x = None;
         self.stamp.source_y = None;
@@ -826,6 +856,7 @@ impl ImageHorseTool {
     pub fn new(width: u32, height: u32) -> ImageHorseTool {
         let base = Layer::new(1, "Background".to_string(), width, height);
         ImageHorseTool {
+            export_quality: DEFAULT_EXPORT_QUALITY,
             layers: vec![base],
             active: 0,
             next_layer_id: 2,
@@ -2318,6 +2349,9 @@ impl ImageHorseTool {
             shape_annotations: Vec::new(),
         };
         self.hist.undo_stack.push_back(Snapshot {
+            // Reconstructed from the op log — it rebuilds a document, it does
+            // not change a setting, so it carries the live quality (ADR-031).
+            export_quality: self.export_quality,
             label: label.to_string(),
             layers: vec![layer],
             active: 0,
@@ -2346,6 +2380,7 @@ impl ImageHorseTool {
             shape_annotations: Vec::new(),
         };
         self.hist.redo_stack.push(Snapshot {
+            export_quality: self.export_quality,
             label: label.to_string(),
             layers: vec![layer],
             active: 0,
@@ -3153,8 +3188,34 @@ impl ImageHorseTool {
     /// format but the dimensions are unchanged — the stored file changed, so
     /// the action should appear in the History panel even though undoing it
     /// is a visual no-op.
-    pub fn push_compress_marker(&mut self) {
+    /// Record a quality-only Apply, capturing the quality it applied. ADR-031.
+    ///
+    /// Snaps FIRST so the step carries the OUTGOING quality, then sets the new
+    /// one. That order is what makes undo work: `restore_snapshot` puts back
+    /// the snapshot's value, so a step holding the incoming quality would
+    /// "undo" to the state you just asked for.
+    ///
+    /// Out-of-range input is clamped rather than rejected — this crosses the
+    /// wasm boundary and must not panic (rust-wasm-loop rule).
+    pub fn push_compress_marker(&mut self, quality: u8) {
         self.snap("Compress");
+        self.export_quality = quality.clamp(1, 100);
+    }
+
+    /// Export quality, 1..=100. Engine-owned so React reads it rather than
+    /// keeping a copy — ADR-031.
+    pub fn export_quality(&self) -> u8 {
+        self.export_quality
+    }
+
+    /// Set the export quality WITHOUT recording a history step — for the live
+    /// slider drag, which must not push a step per input event.
+    ///
+    /// One drag is one undo step: the UI drags through this and calls
+    /// `push_compress_marker` once on Apply, matching how EffectsSettings
+    /// latches brightness/contrast to the slider's released position.
+    pub fn set_export_quality(&mut self, quality: u8) {
+        self.export_quality = quality.clamp(1, 100);
     }
 
     // ── Filters ─────────────────────────────────────────────────────────
@@ -4820,5 +4881,98 @@ mod layer_persistence_tests {
         assert!(json.contains("\"text\":\"hi\""), "got {json}");
         // No history pushed by the restore path.
         assert_eq!(t.undo_count(), 0);
+    }
+
+    // ── ADR-031: export quality rides the Snapshot ──────────────────────────
+    //
+    // The bug these pin: a quality-only Apply pushed a "Compress" step, but
+    // snap() captures pixels and a quality-only apply changes none, so undo
+    // consumed a step and reversed nothing.
+
+    #[test]
+    fn export_quality_defaults_to_the_ui_default() {
+        // Two defaults that disagree would show one value and hold another.
+        let t = ImageHorseTool::new(8, 8);
+        assert_eq!(
+            t.export_quality(),
+            75,
+            "must match useToolStore quality: 75"
+        );
+    }
+
+    #[test]
+    fn undo_restores_the_previous_export_quality() {
+        let mut t = ImageHorseTool::new(8, 8);
+        assert_eq!(t.export_quality(), 75);
+
+        t.push_compress_marker(40);
+        assert_eq!(t.export_quality(), 40, "apply takes effect");
+
+        t.undo();
+        assert_eq!(t.export_quality(), 75, "undo returns the OUTGOING quality");
+    }
+
+    #[test]
+    fn redo_restores_the_applied_export_quality() {
+        let mut t = ImageHorseTool::new(8, 8);
+        t.push_compress_marker(40);
+        t.undo();
+        assert_eq!(t.export_quality(), 75);
+
+        t.redo();
+        assert_eq!(t.export_quality(), 40, "redo puts the applied value back");
+    }
+
+    #[test]
+    fn a_quality_only_apply_is_exactly_one_history_step() {
+        // Not zero (the change would be unundoable) and not two (one Apply is
+        // one step the user can reason about).
+        let mut t = ImageHorseTool::new(8, 8);
+        let before = t.undo_count();
+        t.push_compress_marker(40);
+        assert_eq!(t.undo_count(), before + 1);
+    }
+
+    #[test]
+    fn dragging_the_slider_records_no_history() {
+        // The live drag goes through set_export_quality; only Apply records.
+        // Otherwise one drag would be dozens of undo steps.
+        let mut t = ImageHorseTool::new(8, 8);
+        let before = t.undo_count();
+        for q in [10u8, 20, 30, 40, 50] {
+            t.set_export_quality(q);
+        }
+        assert_eq!(t.export_quality(), 50, "the drag still takes effect");
+        assert_eq!(t.undo_count(), before, "but records nothing");
+    }
+
+    #[test]
+    fn out_of_range_quality_is_clamped_not_panicking() {
+        // This crosses the wasm boundary; a panic there is unrecoverable.
+        let mut t = ImageHorseTool::new(8, 8);
+        t.set_export_quality(0);
+        assert_eq!(t.export_quality(), 1);
+        t.set_export_quality(255);
+        assert_eq!(t.export_quality(), 100);
+        t.push_compress_marker(0);
+        assert_eq!(t.export_quality(), 1);
+    }
+
+    #[test]
+    fn a_pixel_edit_also_carries_the_quality_live_at_the_time() {
+        // Every snapshot captures it, not just compress ones — so undoing a
+        // brush stroke restores the quality that was live when it was made.
+        let mut t = ImageHorseTool::new(8, 8);
+        t.push_compress_marker(30);
+        assert_eq!(t.export_quality(), 30);
+
+        t.adjust_brightness(0.1); // any snapping pixel edit
+        t.set_export_quality(90); // a later drag, never applied
+        t.undo(); // undoes the brightness step
+        assert_eq!(
+            t.export_quality(),
+            30,
+            "the snapshot's quality wins over an unapplied drag"
+        );
     }
 }

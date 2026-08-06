@@ -32,6 +32,13 @@ pub struct Snapshot {
     /// `ImageHorseTool::undo`). The layer stack in a selection-only snapshot
     /// is identical to the state below it by construction.
     pub selection_only: bool,
+    /// Export quality at the time of the snapshot, 1..=100. ADR-031.
+    ///
+    /// The only non-pixel parameter here that the engine itself never reads —
+    /// see `ImageHorseTool::export_quality`. Captured on every snapshot, not
+    /// just compress ones, so undoing a brush stroke also restores the quality
+    /// that was live when that stroke was made.
+    pub export_quality: u8,
 }
 
 impl Snapshot {

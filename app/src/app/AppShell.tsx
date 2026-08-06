@@ -1894,7 +1894,13 @@ export function AppShell() {
       } else {
         // Quality/format-only apply: pixels are unchanged but the stored file
         // is re-encoded — record a "Compress" entry so History reflects it.
-        stamp.toolRef.current?.push_compress_marker();
+        //
+        // ADR-031: the quality goes WITH the step. Before that, this pushed a
+        // bare marker, so undo restored identical pixels and left the slider
+        // where it was — a step consumed, nothing reversed. The engine snaps
+        // the outgoing value and applies the incoming one, so undo returns the
+        // quality that was live before this Apply.
+        stamp.toolRef.current?.push_compress_marker(quality);
         stamp.syncState();
       }
       setHasBeenModified(true);

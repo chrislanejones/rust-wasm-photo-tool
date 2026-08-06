@@ -277,7 +277,15 @@ declare module "stamp_tool" {
       bg_a: number,
     ): void;
     /** History marker for a quality/format-only re-encode (pixels unchanged). */
-    push_compress_marker(): void;
+    /** Record a quality-only Apply, capturing the quality it applied.
+     *  ADR-031 — snaps first so the step carries the OUTGOING quality. */
+    push_compress_marker(quality: number): void;
+    /** Export quality, 1..=100. Engine-owned; React reads this rather than
+     *  keeping its own copy (ADR-031). */
+    export_quality(): number;
+    /** Set export quality WITHOUT a history step — for the live slider drag.
+     *  One drag is one undo step; Apply calls push_compress_marker once. */
+    set_export_quality(quality: number): void;
     adjust_brightness(delta: number): void;
     adjust_contrast(factor: number): void;
     /** 0 = grayscale, 1 = unchanged, >1 = more saturated (grayscale-lerp
