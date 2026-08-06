@@ -1220,3 +1220,43 @@ fn restore_rejects_a_pre_canvas_v1_annotations_blob() {
         "the rejected restore changed nothing"
     );
 }
+
+#[test]
+fn oplog_undo_restores_export_quality_too() {
+    // REGRESSION, ADR-031. The op-log replay path returns before
+    // `restore_snapshot`, so it never restored non-pixel parameters — it popped
+    // the lockstep snapshot and discarded it wholesale. Quality silently did
+    // not undo in exactly the configuration production ships (tiles + oplog
+    // undo on, single content layer).
+    //
+    // The unit tests in lib.rs could not catch this: a bare tool has no started
+    // log, so they fall through to the snapshot path even under --features
+    // tiles. It took a human clicking Ctrl+Z on a real build.
+    let (mut t, _px) = seeded_tool(96, 80);
+    t.set_oplog_undo(true);
+
+    // A recorded stroke, so the log is live and undo takes the op-log path.
+    stroke(&mut t, (10.0, 10.0), (60.0, 40.0), "#ff0000");
+    assert!(
+        t.oplog_active(),
+        "log must be live or this tests the wrong path"
+    );
+
+    assert_eq!(t.export_quality(), 75, "default");
+    t.push_compress_marker(40);
+    assert_eq!(t.export_quality(), 40, "apply took effect");
+
+    // A second stroke so the next undo is unambiguously an op-log undo.
+    stroke(&mut t, (20.0, 60.0), (80.0, 20.0), "#0044ff");
+
+    assert!(t.undo(), "undo the second stroke");
+    assert!(t.undo(), "undo the compress marker");
+    assert_eq!(
+        t.export_quality(),
+        75,
+        "quality must come back through the op-log path, not just the snapshot path"
+    );
+
+    assert!(t.redo());
+    assert_eq!(t.export_quality(), 40, "redo restores it as well");
+}

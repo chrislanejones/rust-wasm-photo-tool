@@ -1512,10 +1512,17 @@ impl ImageHorseTool {
             return false;
         }
         // Keep the snapshot stacks moving in lockstep (each recorded op
-        // pushed exactly one snapshot), discarding the restore — the log is
-        // authoritative here. This keeps the history panel + fallback sane.
+        // pushed exactly one snapshot). The log is authoritative for PIXELS,
+        // so the restored layers are discarded — but it records no non-pixel
+        // parameter, and the snapshot is the only thing carrying one. Taking
+        // `export_quality` off it here is what makes ADR-031 hold on this path
+        // as well as the snapshot path; discarding the whole restore silently
+        // dropped it, and the unit tests could not see that because a bare
+        // test tool has no started log and never reaches this branch.
         let current = self.make_snapshot("Current State");
-        let _ = self.hist.undo(current);
+        if let Some(snap) = self.hist.undo(current) {
+            self.export_quality = snap.export_quality;
+        }
         // Re-acquire: the `log` borrow from the guard above ended at the
         // `&mut self` calls in between, which is the only reason this was ever
         // an unwrap. Falling back to `false` routes the caller to snapshot
@@ -1553,8 +1560,12 @@ impl ImageHorseTool {
             self.oplog_broken = true;
             return false;
         }
+        // Mirror of the undo path above: pixels come from the log, non-pixel
+        // parameters come from the snapshot (ADR-031).
         let current = self.make_snapshot("Current State");
-        let _ = self.hist.redo(current);
+        if let Some(snap) = self.hist.redo(current) {
+            self.export_quality = snap.export_quality;
+        }
         // Re-acquire + graceful bail — mirror of try_oplog_undo.
         let Some(log) = self.oplog.as_mut() else {
             return false;
