@@ -20,6 +20,7 @@ import { useTextTool } from "@/hooks/useTextTool";
 import { useRedStampTool } from "@/hooks/useRedStampTool";
 import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
+import { canEncode } from "@/lib/encodeSupport";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { panelSpacingTransition, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
@@ -900,6 +901,33 @@ export function AppShell() {
   // below — including `setQuality(q)` and the two panel props — are untouched.
   const exportFormat = useToolStore((s) => s.exportFormat);
   const setExportFormat = useToolStore((s) => s.setExportFormat);
+  // The Download dialog is a SECOND format picker, and it was still selling
+  // AVIF as "Smallest · modern" while this browser silently writes PNG. The
+  // Compress panel's note does not reach here, so the dialog has to say it too
+  // — otherwise the more prominent of the two surfaces is the dishonest one.
+  const [avifEncodable, setAvifEncodable] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void canEncode("image/avif").then((ok) => {
+      if (live) setAvifEncodable(ok);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const downloadFormats = useMemo(
+    () =>
+      DOWNLOAD_FORMATS.map((o) =>
+        o.value === "avif" && avifEncodable === false
+          ? { ...o, hint: "Not supported here · saves as PNG" }
+          : o,
+      ),
+    [avifEncodable],
+  );
+  /** What will actually be written — drives the dialog's button label so it
+   *  cannot offer "Download AVIF" and then hand over a PNG. */
+  const effectiveExportFormat: ExportFormat =
+    exportFormat === "avif" && avifEncodable === false ? "png" : exportFormat;
   // ADR-031, and the two values are NOT the same question.
   //
   //   `quality`                   the DRAFT — what the slider shows, what an
@@ -2761,7 +2789,7 @@ export function AppShell() {
                 name="download-format"
                 value={exportFormat}
                 onValueChange={setExportFormat}
-                options={DOWNLOAD_FORMATS}
+                options={downloadFormats}
                 columns={2}
               />
             </div>
@@ -2770,7 +2798,7 @@ export function AppShell() {
           <DialogFooter className="flex-row gap-2">
             <ActionTile
               icon={ImageIcon}
-              label={`Download ${exportFormat.toUpperCase()}`}
+              label={`Download ${effectiveExportFormat.toUpperCase()}`}
               onClick={() => {
                 setExportDialogOpen(false);
                 void handleExport();

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SlidersHorizontal, Zap, Scaling, ChevronDown, FileArchive } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { canEncode } from "@/lib/encodeSupport";
 import { DimensionFields } from "@/components/DimensionFields";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
@@ -153,6 +154,36 @@ export function ResizeSettings({
   const baseFormatRef = useRef(exportFormat);
   const baseMethodRef = useRef(method);
 
+  // Whether the browser can really encode the chosen format. `undefined` until
+  // the one-pixel probe resolves — the note simply stays hidden until then
+  // rather than flashing a wrong answer.
+  const [avifOk, setAvifOk] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void canEncode("image/avif").then((ok) => {
+      if (live) setAvifOk(ok);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // The format that will actually be written. Chrome answers an AVIF request
+  // with PNG (silently — see lib/encodeSupport.ts), so every number derived
+  // from "the chosen format" has to be derived from this instead.
+  const effectiveFormat: ExportFormat =
+    exportFormat === "avif" && avifOk === false ? "png" : exportFormat;
+
+  // A quiet line under the picker. Information, not a warning: PNG being large
+  // is correct behaviour, and the surprise it causes is only that the status
+  // bar shows the SOURCE size while a lossless re-encode lands on disk.
+  const formatNote =
+    exportFormat === "png"
+      ? "Lossless — the largest file, and larger than the source for photos."
+      : exportFormat === "avif" && avifOk === false
+        ? "This browser can't encode AVIF — the file will be saved as PNG."
+        : null;
+
   useEffect(() => {
     setWidth(String(imageWidth));
     setHeight(String(imageHeight));
@@ -257,7 +288,11 @@ export function ResizeSettings({
       newH,
       quality,
       curMime: currentMime,
-      newFormat: exportFormat,
+      // Model the format that will ACTUALLY land, not the one requested. AVIF
+      // weights as the most efficient format in the Rust scorer, so an AVIF
+      // selection the browser cannot encode would promise a large gain and then
+      // write a PNG — the panel contradicting its own note one line below.
+      newFormat: effectiveFormat,
     }).then((m) => {
       if (!alive) return;
       setLighthouseScore(m.lighthouseScore);
@@ -275,7 +310,11 @@ export function ResizeSettings({
     newW,
     newH,
     quality,
-    exportFormat,
+    // effectiveFormat, not exportFormat: the AVIF probe resolves asynchronously,
+    // so the first render models AVIF and only the re-run after `avifOk` lands
+    // corrects it. Depending on exportFormat alone would leave the AVIF numbers
+    // on screen permanently, since exportFormat never changed.
+    effectiveFormat,
   ]);
 
   return (
@@ -352,6 +391,11 @@ export function ResizeSettings({
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
                   </div>
+                  {formatNote && (
+                    <p className="text-2xs text-theme-muted-foreground leading-snug">
+                      {formatNote}
+                    </p>
+                  )}
                 </div>
               </div>
 
