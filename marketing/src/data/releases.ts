@@ -24,6 +24,20 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.69",
+    date: "2026-08-06",
+    headline: "Export names the file after what is in it",
+    entries: [
+      { tag: "fix", text: "Exporting as AVIF wrote a PNG and called it .avif. Chrome cannot encode AVIF and the browser substitutes PNG without saying so — no error, no warning — so the file you got did not match its own name. The name now comes from the bytes." },
+      { tag: "fix", text: "The format picker said the file would be saved as PNG while the performance figures beside it still promised AVIF's savings. Both numbers now describe the format that actually lands." },
+      { tag: "fix", text: "The download dialog is a second format picker, and it was still advertising AVIF as \"Smallest, modern\" with a button that handed over a PNG." },
+      { tag: "ui", text: "Picking PNG now says it is lossless and will be larger than the source, rather than leaving you to discover that on disk. For an app about compression, a silent surprise was the wrong default." },
+      { tag: "fix", text: "Resize Layer opened its box flush against the edge of the picture, so every handle sat on the border and nothing appeared to happen when you clicked it. The tool always worked; it just gave you nothing to grab. It opens inset now." },
+      { tag: "ui", text: "On a large display the site pinned everything to the left edge with a wide empty strip down the right. The content column is centred, on every page rather than just the homepage." },
+      { tag: "infra", text: "The contribution squares counted whichever branch the generator happened to run in, so work could show up before it shipped or vanish until it merged. It reads the merged history now, and says so when it is running ahead of it." },
+    ],
+  },
+  {
     version: "v7.68",
     date: "2026-08-06",
     headline: "Every edit shows up as an edit",

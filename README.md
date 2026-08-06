@@ -84,30 +84,27 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.68 — 2026-08-06
+### v7.69 — 2026-08-06
 
-**Every edit shows up as an edit.** Adding text, dragging a slider, or selecting
-the whole photo all changed it — and the gallery still showed it as untouched.
-The dot and the save had drifted apart, so the app could write a photo to disk
-while telling you nothing had happened to it. They ask the same question now.
+**Export names the file after what is actually in it.** Chrome cannot encode
+AVIF, and the browser answers an AVIF request with a PNG without saying so — no
+error, no warning. So "export as AVIF" wrote PNG bytes into a `.avif` file, and
+three separate places repeated the claim: the filename, the performance figures
+beside the format picker, and the download dialog's "Smallest · modern" tile.
+All three now describe the file you actually get. Real AVIF encoding is still
+not built — nothing in the browser can do it, and adding an encoder is its own
+decision.
 
-**Undo reaches things it used to skip.** Changing export quality recorded a step
-that put nothing back: the pixels were identical, so undo consumed the step and
-left the slider where it was. Quality now travels with the step, and it is
-undoable whether or not you press Apply. Selecting everything and deselecting
-are steps as well.
+**PNG was never broken.** A 636×865 export really is 636×865 at 8 bits, and
+~0.93 MB is simply what lossless costs for a photograph. What was missing was
+anyone saying so, which is why the picker now does.
 
-**Drawing a pen path, Ctrl+Z takes back one point** instead of deleting the
-whole path. It used to reach past the path you were drawing and undo the last
-one you finished.
+**Resize Layer's handles are where you can find them.** The tool always worked;
+its box opened flush against the edge of the picture, so every handle sat on the
+border and nothing appeared to happen when you clicked. It opens inset now.
 
-**A photo that fails to reach the cloud no longer leaves anything behind.** The
-upload happened before the record that points at it, so any failure between the
-two stranded a file that nothing would ever reference and nothing would ever
-clean up. It is collected the moment it happens now, and an upload that gets
-rate-limited is retried rather than dropped. Your edits are always written to
-this browser first, so nothing was ever at risk — but the copy in the cloud
-could quietly fall behind.
+**The trail log counts the right commits**, and the marketing site no longer
+hugs the left edge of a large display.
 
 ## License
 

@@ -529,7 +529,7 @@ a { color: inherit; }
 .hero__shot {
   margin: 0;
   width: 100%;
-  max-width: 72rem;
+  max-width: var(--page-max);   /* never wider than the column that centres it */
   box-shadow: var(--shadow-float);
 }
 .hero__shot img {

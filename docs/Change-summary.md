@@ -2818,3 +2818,20 @@ edits or the canvas stopped showing them.
 | 13  | Phase 1 audit: the `Snapshot` ALREADY carries every other non-pixel parameter (`Layer.opacity`/`.visible`/`.name`/`.mask`, annotations, dims, selection), all restored. The classifier is 94% false-positive on its top bucket — a static scan cannot see that the RESTORE handles state the OPERATION never wrote. Three setters still never snap: `set_layer_opacity`, `set_layer_visible`, `rename_layer` | Recorded |
 | 14   | Engine: **761,213 → 761,838 B, +625 B (+0.082%)** — one `u8` on the struct and Snapshot plus four exported methods. No hot path touched, so no bench. Gates: `cargo fmt` clean · clippy `-D warnings` 0 on default AND tiles,patchmatch · **207 engine tests** (was 171) · tsc clean · **369 vitest** · eslint 0 errors (59 warnings) · production build succeeds | Verified |
 | 15  | ⚠️ `imagehorse-qc` sections 1, 2 and 4 passed against this candidate (boot, demo mode logged-out, core loop, close-tab persistence, cross-photo integrity). **Sections 3 and 5 were NOT formally run** — shipped at the maintainer's explicit call, as with v7.67. Still owed, now for two releases | Recorded |
+
+## v7.69 Change Summary — 2026-08-06
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **AVIF exports were PNG files wearing a `.avif` name.** Chrome decodes AVIF but cannot encode it, and the HTML spec makes the fallback silent — `toBlob` returns a PNG typed `image/png`, with no error. Measured before changing anything: requesting `image/avif` returned PNG magic `89 50 4e 47`, byte-identical in size to the PNG export. The filename now derives from `blob.type`, so a fallback can never mislabel a file | **Fixed** |
+| 2 | The fix first landed on `useExport.exportAs` — a path the Download button does not use. All three gates passed on code that never ran; a single click found it. The real path is `useCanvasActions.handleExport` | **Fixed** |
+| 3 | The Compress panel promised "+83% Web Performance Gain" for AVIF while the note beneath it said the file would be saved as PNG. `formatCode` weights AVIF as the most efficient format, so the panel contradicted itself in one viewport. The figures now model the format that lands | **Fixed** |
+| 4 | The dependency array keyed those figures on `exportFormat`, which never changes — so the async encoder probe could never re-fire the effect and the AVIF numbers would have stayed on screen permanently | **Fixed** |
+| 5 | The Download dialog is a second format picker and still sold AVIF as "Smallest · modern", with a "Download AVIF" button that handed over a PNG | **Fixed** |
+| 6 | **PNG itself was never wrong.** Verified against the shipped engine: after `resize(636,865)` the exported file carries a 636×865 IHDR at bit depth 8, colour type 6. ~0.93 MB is what lossless RGBA costs at 550k pixels — 1.90 bytes/pixel | **No bug** |
+| 7 | **Resize Layer read as a dead button.** It never refused: a single-layer document returns `has_paste_preview() === true`, the composite is unchanged during the preview, and the overlay is ungated. The box was seeded at the full canvas, so every handle sat exactly on the image border. Seeds at an 8% inset now — measured 58/59/59/59 px against master's 0/0/0/0 | **Fixed** |
+| 8 | `gen-trail-data.mjs` ran `git log` with no ref, so the contribution squares depended on which working tree it ran in — a feature worktree counted unmerged commits as shipped, the main tree mid-release missed the commits being released. Resolves against `master` now, and warns how many commits it is not counting | **Fixed** |
+| 9 | The marketing site pinned its content to the left edge on a large display — the gutter capped at 4rem, leaving ~800px of dead space at 2560px wide. One token change centres all 18 sections, with no breakpoint: `max()` hands over from the clamp exactly at 80rem, so narrower widths are unchanged | **Fixed** |
+
+**Not built:** real AVIF encoding. No encoder exists in the browser, in the app, or in the crate; adding one is a dependency decision (`@jsquash/avif` is 7.97 MB unpacked, or a `ravif` feature in the crate). AVIF stays in the format list and is now honest about what it produces.
+
