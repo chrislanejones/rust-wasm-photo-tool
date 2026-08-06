@@ -1,5 +1,5 @@
 # ADR-031: Export quality lives on the engine Snapshot, and the persisted archive goes to v6
-Date: 2026-08-05   Status: draft
+Date: 2026-08-05   Status: accepted
 
 ## Context
 A quality-only Apply pushes a `"Compress"` history entry via
@@ -16,9 +16,11 @@ plus `width`, `height`, `active`, `selection`), all restored by
 Add export quality to the engine `Snapshot`. `push_compress_marker(quality)`
 records it, `restore_snapshot` applies it, and a getter exposes the current
 value so React reads engine truth rather than holding its own. Both persisted
-forms carry it: the binary cloud archive goes **VERSION 5 → 6**, and the local
-`SavedEdit` snapshot entries gain a quality field. v5 archives stay readable and
-decode with quality absent.
+forms carry it, by **different mechanisms**: the binary cloud archive goes
+**VERSION 5 → 6** (explicit version field, decoder accepts 5 and 6, v5 decodes
+with quality absent); the local store needs **no migration at all** — it is raw
+IndexedDB holding structured-clone objects, so an added field is simply present
+on new records and `undefined` on old ones.
 
 ## Consequences
 + Undo genuinely reverses a quality change, and redo restores it.
@@ -26,8 +28,14 @@ decode with quality absent.
   caused the archive corruption (2026-08-04) and the `syncState` drift
   (2026-08-05) within a day of each other.
 + Quality survives reload, because it rides the snapshot that already persists.
-- **A persisted-format change in two places at once.** IndexedDB is user data
-  with no backup; this goes through `dexie-migration` before any code.
+- **One real format bump, not two.** Only the binary cloud archive versions
+  (v5→v6). The local store is `image-horse-edits`/`edits` — raw IndexedDB at
+  version 1, `createObjectStore` with no keyPath, structured-clone values — so
+  it needs no `.version()` bump and no upgrade function. Dexie versions key
+  paths and indexes, not value shape; the `stale` field on `oplogManifests`
+  shipped this way already (`dexie/db.ts:93-96`). The obligation that remains is
+  a read path tolerating `quality === undefined` on every record shipped code
+  has already written.
 - **The engine now owns a value it never reads.** Encoding happens in the codec
   worker and the JS export path, not in Rust. The crate stores and serializes a
   number purely so undo can reverse it.
