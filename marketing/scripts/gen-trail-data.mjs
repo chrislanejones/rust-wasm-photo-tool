@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Regenerates the marketing site's DERIVED data from the repo itself.
 //
-//   src/data/commits.ts   ← `git log` at the repo root   (the Trail Log squares)
+//   src/data/commits.ts   ← `git log master`             (the Trail Log squares)
 //   src/data/features.ts  ← docs/Features.md             (the /features list)
 //
 // Run it as part of the release routine, from anywhere:
@@ -30,11 +30,51 @@ const q = (s) => JSON.stringify(s);
 // ── commits.ts ──────────────────────────────────────────────────────────
 // One line per commit, authored-date in the repo's own local calendar. %ad
 // (author date) rather than %cd, so a rebase doesn't relocate a day's work.
+//
+// Counted from RELEASE_REF, never from bare HEAD. The squares record what
+// shipped, and shipped means merged. Reading HEAD made the output depend on
+// which working tree the script happened to run in: from a feature worktree it
+// counted unmerged commits as shipped; from the main tree mid-release it missed
+// the very commits being released. Both fail silently — the graph draws a wrong
+// number, and a wrong number looks exactly like a right one. An explicit ref
+// gives the same answer from every worktree.
+const RELEASE_REF = (() => {
+  for (const ref of ["master", "main"]) {
+    try {
+      execFileSync("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], {
+        cwd: root,
+        stdio: "ignore",
+      });
+      return ref;
+    } catch {
+      // not this one — try the next
+    }
+  }
+  return "HEAD"; // detached head, or a clone with neither branch: count what's here
+})();
+
 const log = execFileSync(
   "git",
-  ["log", "--date=format:%Y-%m-%d", "--pretty=format:%ad"],
+  ["log", RELEASE_REF, "--date=format:%Y-%m-%d", "--pretty=format:%ad"],
   { cwd: root, encoding: "utf8" },
 );
+
+// Running before the merge is legitimate — the release routine regenerates
+// while the release commit is still on a branch. But the output lags until the
+// merge lands, so say so out loud. The whole reason this file is generated is
+// that staleness must not be able to hide.
+const unmerged = Number(
+  execFileSync("git", ["rev-list", "--count", `${RELEASE_REF}..HEAD`], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim(),
+);
+if (unmerged > 0) {
+  console.warn(
+    `gen-trail-data: WARNING — ${unmerged} commit(s) on HEAD are not in ${RELEASE_REF}.\n` +
+      `  They will not appear as squares until merged. Re-run after the merge.`,
+  );
+}
 
 const perDay = {};
 for (const day of log.split("\n").filter(Boolean)) {
@@ -46,9 +86,10 @@ const total = days.reduce((n, d) => n + perDay[d], 0);
 
 let c = `// GENERATED — do not edit. Run: node marketing/scripts/gen-trail-data.mjs
 //
-// Commits per day, from \`git log\` at the repo root. This is what draws the
-// contribution squares on /trail-log: the release log counts releases, git
-// counts the work that went into them.
+// Commits per day, from \`git log ${RELEASE_REF}\` — the merged history, not the
+// current worktree's HEAD. This is what draws the contribution squares on
+// /trail-log: the release log counts releases, git counts the work that went
+// into them.
 //
 // ${total} commits across ${days.length} active days, ${days[0]} → ${days[days.length - 1]}.
 
