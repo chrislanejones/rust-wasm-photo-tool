@@ -8,7 +8,7 @@ import { useGalleryStore } from "@/stores/useGalleryStore";
 import { toast } from "@/components/ui/sonner";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
 import { readExifTiff, applyExifToReencoded } from "@/lib/exif";
-import { EXT, encodeRgba } from "@/lib/exportImage";
+import { EXT, encodeRgba, extFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 
 export function useCanvasActions({
@@ -146,7 +146,13 @@ export function useCanvasActions({
     const url = URL.createObjectURL(new Blob([bytes], { type: blob.type }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${stem}-revised${EXT[exportFormat]}`;
+    // Name the file after the bytes, not the request. `blob.type` is already
+    // trusted one line above to type the Blob itself; trusting it here too is
+    // what stops an AVIF request — which Chrome silently satisfies with PNG —
+    // from landing as a `.avif` file full of PNG. EXT stays as the fallback for
+    // the rare blob with no type at all.
+    const ext = extFromMime(blob.type) || EXT[exportFormat];
+    a.download = `${stem}-revised${ext}`;
     a.click();
     URL.revokeObjectURL(url);
   }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep]);
