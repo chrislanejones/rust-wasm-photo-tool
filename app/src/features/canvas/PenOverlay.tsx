@@ -314,6 +314,46 @@ export function PenOverlay({
     return () => window.removeEventListener("keydown", onKey);
   }, [finish]);
 
+  // Ctrl+Z steps back ONE anchor while a path is in progress, the way every
+  // other pen tool behaves. Backspace already did this; Ctrl+Z is what people
+  // actually reach for, and it fell straight through to the global shortcut —
+  // which undoes the ENGINE, so it deleted a whole committed path while the
+  // one being drawn sat there untouched.
+  //
+  // In-progress anchors are not engine state. They live in this component
+  // until `finish()` commits them, so there is no History step to walk back
+  // and this cannot be fixed on the Rust side.
+  //
+  // ── WHY THIS IS A SEPARATE, CAPTURE-PHASE LISTENER ──────────────────────
+  //
+  // Both this and `useKeyboardShortcuts` bind keydown on `window` in the
+  // bubble phase, and AppShell mounts before PenOverlay — so the global
+  // handler is registered FIRST and runs FIRST. From the bubble phase there is
+  // nothing this can do about that: `stopImmediatePropagation` only stops
+  // handlers registered after it on the same target, and the engine undo would
+  // already have happened.
+  //
+  // Capture runs before every bubble listener on window regardless of
+  // registration order, which is the only ordering that works here. It is a
+  // second listener rather than moving the handler above into capture, because
+  // that one owns Enter / Escape / Backspace and preempting the rest of the
+  // app for those would break things that legitimately answer them first.
+  useEffect(() => {
+    const onUndoKey = (e: KeyboardEvent) => {
+      if (e.shiftKey || !(e.ctrlKey || e.metaKey)) return;
+      if (e.key !== "z" && e.key !== "Z") return;
+      // Only swallow it when there is something to swallow it for. With no
+      // anchors down, this must reach the global handler so Ctrl+Z still
+      // undoes the last committed path.
+      if (anchorsRef.current.length === 0) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setAnchors((a) => a.slice(0, -1));
+    };
+    window.addEventListener("keydown", onUndoKey, true);
+    return () => window.removeEventListener("keydown", onUndoKey, true);
+  }, []);
+
   // Click off the canvas → finish (commit when editing, finish-open when drawing).
   //
   // EXCEPT on the tool panel. This listener fires on raw coordinates, so every

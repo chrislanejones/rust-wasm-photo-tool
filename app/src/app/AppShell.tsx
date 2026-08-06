@@ -957,6 +957,22 @@ export function AppShell() {
     setHasBeenModified(true);
   }, []);
 
+  // Slider RELEASE. One drag is one undo step, whatever the drag emitted along
+  // the way — the same contract EffectsSettings gives brightness and contrast.
+  //
+  // This is what makes a quality change undoable WITHOUT applying compression:
+  // changing the setting and re-encoding the file are two different actions,
+  // and undo should walk back through both. `commit_export_quality` records
+  // nothing when the value did not actually move, so a pointer-up that never
+  // dragged adds no step.
+  const handleQualityCommit = useCallback(
+    (q: number) => {
+      stamp.toolRef.current?.commit_export_quality(q);
+      stamp.syncState();
+    },
+    [stamp],
+  );
+
   // Seed once per photo, then follow the engine. ONE effect, because the order
   // matters and two effects raced.
   //
@@ -2903,6 +2919,7 @@ export function AppShell() {
             undoCount={stamp.state.undoCount}
             quality={quality}
             onQualityChange={handleQualityChange}
+            onQualityCommit={handleQualityCommit}
             onToggleCompare={handleToggleCompare}
             onAutoCompress={handleAutoCompress}
             isCompressing={compressProgress.running}

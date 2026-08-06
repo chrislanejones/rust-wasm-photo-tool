@@ -86,6 +86,9 @@ interface ResizeSettingsProps {
   activePhotoId: string | null;
   quality: number;
   onQualityChange: (q: number) => void;
+  /** Fired on slider RELEASE — commits the quality as one undo step.
+   *  ADR-031: `onQualityChange` is the live draft and records nothing. */
+  onQualityCommit: (q: number) => void;
   /** Apply Compression & Resize: resample to w×h with the given Rust filter
    *  code, then re-encode at the panel's format + quality. */
   onResize: (w: number, h: number, filter: number) => void;
@@ -118,6 +121,7 @@ export function ResizeSettings({
   activePhotoId,
   quality,
   onQualityChange,
+  onQualityCommit,
   onResize,
   exportFormat,
   onExportFormatChange,
@@ -357,6 +361,7 @@ export function ResizeSettings({
                 labelInfo="Lower quality = smaller file. Drag & release — recalculates Web Performance Gain and PageSpeed Insights Score below."
                 value={quality}
                 onChange={handleQualityChange}
+                onCommit={onQualityCommit}
                 min={10}
                 max={100}
                 unit="%"

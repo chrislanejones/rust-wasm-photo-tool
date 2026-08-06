@@ -283,9 +283,12 @@ declare module "stamp_tool" {
     /** Export quality, 1..=100. Engine-owned; React reads this rather than
      *  keeping its own copy (ADR-031). */
     export_quality(): number;
-    /** Set export quality WITHOUT a history step — for the live slider drag.
-     *  One drag is one undo step; Apply calls push_compress_marker once. */
+    /** Set export quality WITHOUT a history step — for the live slider drag. */
     set_export_quality(quality: number): void;
+    /** Commit a quality change as its OWN undo step, without applying
+     *  compression. Fired on slider release, so one drag is one step. Records
+     *  nothing when the value did not move (ADR-031). */
+    commit_export_quality(quality: number): void;
     adjust_brightness(delta: number): void;
     adjust_contrast(factor: number): void;
     /** 0 = grayscale, 1 = unchanged, >1 = more saturated (grayscale-lerp

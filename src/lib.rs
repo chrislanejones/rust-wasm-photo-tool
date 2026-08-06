@@ -3219,6 +3219,29 @@ impl ImageHorseTool {
         self.export_quality
     }
 
+    /// Commit a quality change as its OWN undo step, without applying
+    /// compression. ADR-031.
+    ///
+    /// The slider fires this on pointer-up, so one drag is one step no matter
+    /// how many input events it produced. Applying compression is a separate
+    /// action and records its own "Compress" step — changing the setting and
+    /// re-encoding the file really are two things, and undo should walk back
+    /// through both.
+    ///
+    /// A no-op change records NOTHING. Pointer-up fires even when the handle
+    /// never moved, and a history full of steps that change nothing is the
+    /// same defect ADR-031 set out to remove, just at the other end.
+    pub fn commit_export_quality(&mut self, quality: u8) {
+        let q = quality.clamp(1, 100);
+        if q == self.export_quality {
+            return;
+        }
+        // Snap BEFORE the set, so the step carries the OUTGOING value — see
+        // `push_compress_marker` for why that order is the whole trick.
+        self.snap("Quality");
+        self.export_quality = q;
+    }
+
     /// Set the export quality WITHOUT recording a history step — for the live
     /// slider drag, which must not push a step per input event.
     ///
@@ -4985,5 +5008,50 @@ mod layer_persistence_tests {
             30,
             "the snapshot's quality wins over an unapplied drag"
         );
+    }
+
+    #[test]
+    fn committing_quality_without_applying_is_one_undoable_step() {
+        // The slider's pointer-up path: a quality change is undoable on its
+        // own, without applying compression.
+        let mut t = ImageHorseTool::new(8, 8);
+        let before = t.undo_count();
+        t.commit_export_quality(40);
+        assert_eq!(t.undo_count(), before + 1, "exactly one step");
+        assert_eq!(t.export_quality(), 40);
+        t.undo();
+        assert_eq!(t.export_quality(), 75, "undo returns the outgoing value");
+        t.redo();
+        assert_eq!(t.export_quality(), 40);
+    }
+
+    #[test]
+    fn a_commit_that_changes_nothing_records_nothing() {
+        // Pointer-up fires even when the handle never moved. A history full of
+        // steps that change nothing is the same defect ADR-031 removed, at the
+        // other end.
+        let mut t = ImageHorseTool::new(8, 8);
+        let before = t.undo_count();
+        t.commit_export_quality(75); // already 75
+        assert_eq!(t.undo_count(), before, "no-op records no step");
+        t.commit_export_quality(40);
+        t.commit_export_quality(40); // same again
+        assert_eq!(t.undo_count(), before + 1, "still just the one real change");
+    }
+
+    #[test]
+    fn each_slider_release_is_its_own_step() {
+        // Three drags, three steps, walking back one at a time.
+        let mut t = ImageHorseTool::new(8, 8);
+        t.commit_export_quality(60);
+        t.commit_export_quality(45);
+        t.commit_export_quality(30);
+        assert_eq!(t.export_quality(), 30);
+        t.undo();
+        assert_eq!(t.export_quality(), 45);
+        t.undo();
+        assert_eq!(t.export_quality(), 60);
+        t.undo();
+        assert_eq!(t.export_quality(), 75);
     }
 }
