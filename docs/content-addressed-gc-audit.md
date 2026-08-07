@@ -3,6 +3,34 @@
 Measured 2026-08-06. The sweeper was always conditional: build it only if
 orphans accumulate. This is the measurement that decides.
 
+> ## ⚠️ SUPERSEDED IN PART, 2026-08-07 — read this first
+>
+> **The cause was found, and it is not any of the three this document suspects.
+> `Delete All` stranded every original.** Full writeup and the controlled
+> before/after in **`docs/gc-delete-all-leak.md`**; fixed in `dc56b08`.
+>
+> The 2026-08-06 numbers below are correct and stand. What was wrong was the
+> *attribution* — each path was then measured one at a time on the deployed app
+> with `livePhotos` checked either side, so a changing photo set could not fake
+> a result:
+>
+> | This doc's suspicion | Measured 2026-08-07 |
+> |---|---|
+> | Cause 1 — `image-horse-originals` is a **dead** legacy store, 0 of 72 reachable | **Not dead, cold.** 12 live photos resolved into it during one session. It is content-addressed, so re-importing the same file makes an existing row reachable again |
+> | Cause 2 — compression repoints strand the previous blob `[assumed]` | **Backwards.** Compressing *reclaims*: the new blob's hash matched an existing orphan and made it reachable. **−183,798 bytes** |
+> | Cause 3 — photo delete leaves op-logs behind | **Dormant.** The op-log tables did not move across any action including an edit — the artboard default gives every document two layers, and ADR-004 scopes the op log to single-layer documents |
+> | *(not on the list)* | **`Delete All` collected the edit archives and never the blobs.** Row counts unchanged while 26 reachable rows went to zero: **+108.6 MiB from one click** |
+>
+> Single-photo delete was always correct — it is the bulk path that did the
+> `setPhotos([])` half and not the collect half.
+>
+> **What this means for the recommendation below.** "Backlog or still growing?"
+> was the right question and the answer is *both*: the ~316.9 MiB already
+> present is backlog, and Delete All was actively adding to it until `dc56b08`.
+> With that fixed, every remaining byte is historical and the recommendation
+> stands — **one-time cleanup, no permanent sweeper.** The largest single win is
+> unchanged: `indexedDB.deleteDatabase("image-horse-originals")`, 93.7 MiB.
+
 ## Verdict: the cloud half is clean, the local half is not
 
 | Half | Orphans | Verdict |
@@ -179,6 +207,14 @@ never claimed the local half was clean — it named the condition and waited.
 **The condition failed.** 252.8 MiB across 376 rows, 51% of everything stored.
 So "no sweeper needed" is off the table, and the three causes above want three
 different responses — one deleteDatabase, one unproven, one missing delete leg.
+
+> **RESOLVED 2026-08-07.** "No sweeper needed" is back ON the table, for a
+> reason this section could not have known: the accumulation had a single
+> active source — `Delete All` — and it is fixed (`dc56b08`). Every path was
+> then measured individually and none of the rest strands anything. So the
+> remaining ~316.9 MiB is inert history, which wants a **one-time cleanup**,
+> not a collector that runs forever. The three causes named above are not the
+> three responses to plan around; see the banner at the top of this file.
 
 What still holds from the original reasoning: the *cloud* generators are closed
 at the source, and the `photo_edits` path is genuinely clean at both ends —
