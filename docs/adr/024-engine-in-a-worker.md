@@ -137,12 +137,38 @@ is worth more before that than after it.**
 
 ## Open questions
 
+> **Status 2026-08-07: both measurable unknowns are closed.** OPEN-B and OPEN-D
+> were the two questions that could have killed an option. Neither did, and both
+> point the same way. The decision is now a judgement call, not a research
+> problem.
+
 - **OPEN-A** — does popup OAuth sign-in survive `COOP: same-origin`? Only
-  matters if threads are ever pursued.
-- **OPEN-B** — does zoom/pan survive canvas transfer? Today the element is
-  CSS-sized while its backing store stays at image resolution; that split is
-  unverified under transfer.
-- **OPEN-C** — sequencing: close #1's safety net before opening this?
-- **OPEN-D** — what happens to the op-log and undo ordering when operations
-  become asynchronous? Untouched by Phase 0 by instruction, and the largest
-  remaining unknown.
+  matters if threads are ever pursued, which this project tried and rejected
+  (8–31× slower). **Effectively dead.**
+- **OPEN-B** — ~~does zoom/pan survive canvas transfer?~~ **ANSWERED — yes.**
+  `docs/engine-worker-open-b-finding.md`. 11/11 across four browsers and two
+  engines (Blink ×3, Gecko), plus overlays 9/9 and `desynchronized` honoured
+  4/4. CSS fit, zoom and pan are element-level layout and never involved the
+  drawing context, so transferring it changes nothing. The worker resized the
+  backing store 1600×1200 → 800×600 and the on-screen size did not move.
+  Remaining gap: no engine in the harness, and no WebKit.
+- **OPEN-C** — sequencing: close #1's safety net before opening this? Still
+  open, and now the *only* thing in front of the migration besides the option
+  choice itself.
+- **OPEN-D** — ~~op-log and undo ordering under async~~ **ANSWERED — safe by
+  construction.** `docs/engine-worker-open-d-finding.md`. `OpLog::append`
+  records arrival order with no sequence number, `apply` is atomic, and a Worker
+  port is FIFO — so **one port** means postMessage order equals append order.
+  The risk is not ordering but **9 read-modify-write sequences**
+  (`scripts/engine-rmw-audit.mjs`), not the 119 value-consumed reads. The worst
+  is `flushToCanvas` reading `width`/`height` then recompositing — which stops
+  crossing the boundary at all under Option A.
+
+**What that does to the options.** The two reasons to prefer B over A were the
+OffscreenCanvas unknowns and the fear of async ordering. Neither survived
+measurement, and Option A additionally dissolves the worst read-modify-write
+site rather than requiring it to be rewritten. Option C's cost is unchanged and
+is the one the pre-mortem was most worried about — an undocumented boundary
+that migrates one PR at a time until both engines hold state.
+
+**Still DRAFT. No option is chosen here — that remains Chris's call.**
