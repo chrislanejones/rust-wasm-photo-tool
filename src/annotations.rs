@@ -1444,12 +1444,28 @@ impl ImageHorseTool {
 
     /// Burn the active layer's overlays (shapes + text) into its pixel buffer
     /// with a single history snapshot, then clear that layer's overlay lists.
-    pub fn flatten_text_annotations(&mut self) {
+    /// Returns whether anything was actually flattened.
+    ///
+    /// ADR-024 Stage 2. Callers used to ask first —
+    /// `if (tool.text_annotation_count() > 0) tool.flatten_text_annotations()`
+    /// — which is a read-modify-write across the JS/engine boundary: harmless
+    /// while the call is synchronous, a stale decision once the read resolves
+    /// on a later task. The emptiness check already lived here, so the guard
+    /// was duplicating engine logic in JS. Returning the verdict lets callers
+    /// that need to know (OpenRaster export tracks whether any layer changed)
+    /// get it from the same call that did the work, and lets callers that do
+    /// not simply call it.
+    ///
+    /// Note it reports the ACTIVE layer only, and counts shapes as well as
+    /// text — which is what the emptiness check has always done, and is
+    /// strictly more accurate than the `text_annotation_count() > 0` guard it
+    /// replaces.
+    pub fn flatten_text_annotations(&mut self) -> bool {
         let active = self.active;
         if self.layers[active].text_annotations.is_empty()
             && self.layers[active].shape_annotations.is_empty()
         {
-            return;
+            return false;
         }
         self.snap("Flatten");
         let w = self.width;
@@ -1474,5 +1490,6 @@ impl ImageHorseTool {
             );
         }
         self.editing_shape_id = None;
+        true
     }
 }

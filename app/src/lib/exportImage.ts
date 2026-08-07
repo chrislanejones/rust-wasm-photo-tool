@@ -130,7 +130,11 @@ export async function compositeSavedEdit(
     // Layer-restored documents carry their overlays per layer; bake them into
     // pixels so the export matches what the editor shows. (The legacy branch
     // above already flattened its own.)
-    if (usedLayers && tool.text_annotation_count() > 0) {
+    // ADR-024 Stage 2: the `text_annotation_count() > 0` guard is gone. It
+    // duplicated a check the engine already makes, and duplicating it across
+    // the boundary is what makes it a read-modify-write. `usedLayers` stays —
+    // it is local state, not an engine read.
+    if (usedLayers) {
       tool.flatten_text_annotations();
     }
 

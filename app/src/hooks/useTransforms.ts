@@ -245,11 +245,14 @@ export function useTransforms(engine: EngineCore) {
       const t = toolRef.current;
       if (!t) return;
       const kernelRadius = Math.max(1, Math.round(intensity * 30));
-      const cx = t.width() / 2;
-      const cy = t.height() / 2;
-      const r = Math.max(t.width(), t.height());
-      t.begin_blur_stroke();
-      t.blur_region(cx, cy, r, kernelRadius);
+      // ADR-024 Stage 2. This was four crossings — read width, read height,
+      // compute the centre and radius here, then hand them back to
+      // blur_region. That is a read-modify-write: synchronously nothing can
+      // change in between, but once the reads resolve on a later task a resize
+      // landing in the gap blurs the new image around the old image's centre.
+      // `blur_whole_image` computes the geometry where the dimensions live, so
+      // there is no gap to narrow. Same snapshot, same kernel, same result.
+      t.blur_whole_image(kernelRadius);
       flushToCanvas();
       syncState();
     },

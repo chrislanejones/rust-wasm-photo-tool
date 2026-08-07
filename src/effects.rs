@@ -42,6 +42,39 @@ impl ImageHorseTool {
         self.snap("Blur");
     }
 
+    /// Blur the WHOLE image in one call — history snapshot included.
+    ///
+    /// ADR-024 Stage 2. `useTransforms.applyGlobalBlur` used to build this out
+    /// of four crossings:
+    ///
+    /// ```text
+    /// const cx = t.width() / 2;                 // read
+    /// const cy = t.height() / 2;                // read
+    /// const r  = Math.max(t.width(), t.height());
+    /// t.begin_blur_stroke();                    // write
+    /// t.blur_region(cx, cy, r, kernelRadius);   // write, using the reads
+    /// ```
+    ///
+    /// That is a read-modify-write: the geometry is measured on the JS side
+    /// and handed back. Synchronously nothing can change in between; once the
+    /// reads resolve on a later task, a resize landing in the gap blurs the new
+    /// image around the old image's centre. Computing the geometry where the
+    /// dimensions live removes the gap rather than narrowing it — and is the
+    /// project's standing rule anyway: the engine owns pixels.
+    ///
+    /// `intensity` is the same clamped 1..=30 kernel radius `blur_region`
+    /// takes, so the visual result is identical to the sequence above.
+    pub fn blur_whole_image(&mut self, intensity: u32) {
+        self.snap("Blur");
+        let (w, h) = (self.width as f64, self.height as f64);
+        // Radius covers the far corner from the centre, matching the previous
+        // `max(width, height)` — which already over-covered, and still does.
+        // `blur_region` does not snap — the snapshot is `begin_blur_stroke`'s
+        // job, done above — so this is exactly the old two-call sequence with
+        // the geometry computed on this side of the boundary.
+        self.blur_region(w / 2.0, h / 2.0, w.max(h), intensity);
+    }
+
     // ── Effects brush: pixelate (mosaic) + solid redaction ───────────────
     // Sibling modes of the blur brush. Same brush footprint (radius = half the
     // brush-size slider); each mode paints destructively into the active layer.

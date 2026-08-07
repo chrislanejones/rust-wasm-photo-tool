@@ -307,6 +307,9 @@ declare module "stamp_tool" {
       intensity: number,
     ): void;
     begin_blur_stroke(): void;
+    /** Blur the whole image, snapshot included — geometry computed engine-side
+     *  so the caller never measures width/height and hands them back. */
+    blur_whole_image(intensity: number): void;
     /** Pixelate (mosaic) a circular brush region into block_size px squares. */
     pixelate_region(
       cx: number,
@@ -525,7 +528,10 @@ declare module "stamp_tool" {
       bg_padding: number,
     ): Int32Array;
     get_text_annotations(): string;
-    flatten_text_annotations(): void;
+    /** Returns whether anything was flattened (ADR-024 Stage 2 — the
+     *  verdict comes from the call that does the work, so no caller has to
+     *  read state first). Reports the ACTIVE layer, text AND shapes. */
+    flatten_text_annotations(): boolean;
 
     // History snapshot serialization (for JS-side persistence)
     undo_snapshot_count(): number;
@@ -645,7 +651,10 @@ declare module "stamp_tool" {
     /** Returns the matching annotation id, or -1 if no hit. */
     text_annotation_at(x: number, y: number): number;
     render_with_annotations(): Uint8Array;
-    flatten_text_annotations(): void;
+    /** Returns whether anything was flattened (ADR-024 Stage 2 — the
+     *  verdict comes from the call that does the work, so no caller has to
+     *  read state first). Reports the ACTIVE layer, text AND shapes. */
+    flatten_text_annotations(): boolean;
 
     // ── Layers (Photoshop-style stack) ──
     /** Recompute the cached composite of all visible layers (call before reading data_ptr). */

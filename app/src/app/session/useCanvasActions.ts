@@ -61,8 +61,13 @@ export function useCanvasActions({
     try {
       // Match the export-path semantics: bake any live text overlays into
       // pixels first so the clipboard image reflects what's on screen.
-      if (tool.text_annotation_count() > 0) {
-        tool.flatten_text_annotations();
+      // ADR-024 Stage 2. The old shape read `text_annotation_count()` and used
+      // it to gate three calls. Now the engine reports whether it flattened, so
+      // the flush and sync are driven by what actually happened rather than by
+      // a separate read that could go stale — and they still only run when
+      // something changed, which is why this is an `if` and not three bare
+      // calls.
+      if (tool.flatten_text_annotations()) {
         stamp.flushToCanvas();
         stamp.syncState();
       }

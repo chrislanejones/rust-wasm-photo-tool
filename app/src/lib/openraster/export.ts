@@ -25,14 +25,17 @@ function flattenAllLayersInPlace(tool: ImageHorseTool): boolean {
   let flattenedAny = false;
 
   for (let i = 0; i < n; i++) {
-    const hasText = tool.get_layer_text_annotations(i) !== "[]";
-    const hasShapes = tool.get_layer_shape_annotations(i) !== "[]";
-    if (!hasText && !hasShapes) continue;
+    // ADR-024 Stage 2. This used to read both annotation lists per layer and
+    // skip on empty, which is a read-modify-write: the decision to flatten was
+    // made from a value fetched a moment earlier. `flatten_text_annotations`
+    // now reports whether it did anything, so the verdict comes from the call
+    // that does the work — and it is a strictly better test, because it checks
+    // the same emptiness the engine checks (active layer, text AND shapes)
+    // rather than JSON-comparing two strings to "[]".
     const id = layers[i]?.id;
     if (id === undefined) continue;
     tool.set_active_layer(id);
-    tool.flatten_text_annotations();
-    flattenedAny = true;
+    if (tool.flatten_text_annotations()) flattenedAny = true;
   }
 
   tool.set_active_layer(originalActiveId);
