@@ -28,6 +28,7 @@ import {
   registerWasmMemory,
 } from "@/lib/resourceMonitor";
 import { restoreLayerStack } from "@/lib/restoreLayerStack";
+import { attachLivePort, detachLivePort } from "@/lib/engine/port";
 import { syncOplog, tryTilesFlush } from "@/lib/tilesFlush";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
@@ -189,6 +190,7 @@ export function useEngineCore(
    */
   const reset = useCallback(() => {
     toolRef.current = null;
+    detachLivePort();
     sourcePosRef.current = null;
     isDrawingRef.current = false;
     sourceDisarmedRef.current = false;
@@ -343,7 +345,7 @@ export function useEngineCore(
         const imageData = ctx.getImageData(0, 0, img.width, img.height);
         const tool = new Tool(img.width, img.height);
         tool.load_image(new Uint8Array(imageData.data));
-        toolRef.current = tool;
+        toolRef.current = attachLivePort(tool);
         sourcePosRef.current = null;
         URL.revokeObjectURL(url);
         syncState();
@@ -411,7 +413,7 @@ export function useEngineCore(
         // reads as modified, lighting the gallery "edited" dot and dotting
         // each photo you switch past.
         tool.clear_history();
-        toolRef.current = tool;
+        toolRef.current = attachLivePort(tool);
         canvas.width = tool.width();
         canvas.height = tool.height();
         // No raw putImageData here (the composite differs from the photo
@@ -425,7 +427,7 @@ export function useEngineCore(
         ctx.putImageData(new ImageData(clamped, width, height), 0, 0);
         const tool = new Tool(width, height);
         tool.load_image(src);
-        toolRef.current = tool;
+        toolRef.current = attachLivePort(tool);
       }
       sourcePosRef.current = null;
       syncState();
@@ -462,7 +464,7 @@ export function useEngineCore(
       // oplog_restore replaces the document (dimensions included) wholesale.
       const tool = toolRef.current ?? new Tool(1, 1);
       if ((await restoreOplog(tool, photoId)) !== "restored") return false;
-      toolRef.current = tool;
+      toolRef.current = attachLivePort(tool);
       sourcePosRef.current = null;
       flushToCanvas(); // resizes the canvas to the restored dimensions
       syncState();
@@ -582,7 +584,7 @@ export function useEngineCore(
         }
       }
 
-      toolRef.current = tool;
+      toolRef.current = attachLivePort(tool);
       sourcePosRef.current = null;
 
       const canvas = canvasRef.current;

@@ -29,12 +29,32 @@ the two "Layers and Canvas" surfaces. C buys time and charges rent.
 
 ### The invariant this decision rests on
 
-**ONE PORT.** Every mutation reaches the engine through a single message queue.
+**ONE PORT PER DOCUMENT.** Every mutation *of the document the user is editing*
+reaches the engine through a single message queue.
+
+> **Corrected 2026-08-07, during Stage 1.** This originally read "every mutation
+> reaches the engine through a single message queue", and that version causes a
+> regression rather than preventing one. Two modules legitimately build their
+> own engine for a document the user is NOT editing — `lib/exportImage.ts`
+> (compositing a saved edit during a batch export) and
+> `features/tools/settings/BatchSettings.tsx`. They are separate documents with
+> their own lifetimes and no op log. Routing them through the live port would
+> put their ops in the live document's log — undo would replay edits to a photo
+> nobody opened — and would serialise a 40-photo batch behind the open photo,
+> which is the stall this arc exists to remove. A structural test written
+> against the uncorrected wording flags both as violations, and the obvious fix
+> is that regression, made by someone trusting the test.
+
 `OpLog::append` records arrival order — there is no sequence number anywhere in
 `Op` — and a `MessagePort` is FIFO, so one port means postMessage order *is*
 append order and the log is byte-identical to today's. Two ports, or any path
 that reaches the engine outside the queue, and that guarantee is gone silently.
-This is the thing to test, not to remember.
+
+**This is the thing to test, not to remember** — and as of Stage 1 it is tested:
+`app/src/lib/engine/engineOwnership.contract.test.ts` fails on a second writer
+to the live handle, on an engine constructed outside the owner and outside the
+declared throwaway allowlist, and on an assignment that bypasses the port seam.
+All three were mutation-tested rather than assumed.
 
 ### Stages
 
@@ -45,7 +65,7 @@ first.
 | # | Stage | Ships | Reversible by |
 |---|---|---|---|
 | **0** | **OPEN-C first** — the registry↔routes↔palette↔ShortcutModal↔dispatch contract test | a test, no product change | n/a |
-| **1** | **One port, no worker.** Route every engine call through a single dispatch module, still synchronous. Add the test that fails if anything reaches the engine off-queue | no behaviour change | plain revert |
+| **1** | **One port, no worker.** ✅ **DONE 2026-08-07.** `lib/engine/port.ts` is the named Stage-3 swap point (identity today); `engineOwnership.contract.test.ts` fails on a second writer, an undeclared engine, or a bypassed seam. NOT the ~152-call-site rewrite first imagined — the ownership invariant already held (`toolRef` created once, assigned only in `useEngineCore`), so the missing piece was the seam and the guard, not churn | no behaviour change | plain revert |
 | **2** | **The 8 read-modify-write sites.** Make each read + dependent write one atomic request. Still synchronous, still no worker | no behaviour change | plain revert |
 | **3** | **The worker exists, off by default.** Message protocol with the four things the Phase 3 spike lacked: request ids, queueing, cancellation, errors. Flag `ih_engine_worker`, default OFF, both paths live | nothing user-visible | flag stays off |
 | **4** | **Canvas transfer.** `canvas.width`/`height` assignments (`useEngineCore` ~240, ~324, ~406) move into the worker as messages; flush moves with them. Still flagged | nothing user-visible | flag stays off |
