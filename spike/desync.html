@@ -1,0 +1,63 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>desynchronized: is the hint honoured on an OffscreenCanvas?</title>
+<!--
+  A caveat left open by OPEN-B. Every main-canvas context in the app is created
+  with `{ desynchronized: true }` (useEngineCore, 4 sites), which suggests input
+  latency was already being tuned there. If that hint is silently dropped when
+  the canvas moves into a worker, the migration would cost latency in exactly
+  the place it is meant to improve it.
+
+  `getContextAttributes()` reports what the implementation actually SETTLED ON,
+  not what was asked for — so this is a direct read, not an inference.
+
+  Compares four cases so a difference can be attributed:
+    main thread, regular canvas          ← what the app does today
+    main thread, OffscreenCanvas         ← isolates "offscreen" from "worker"
+    worker, OffscreenCanvas (transferred)← Option A
+    worker, OffscreenCanvas (standalone) ← Option B's flush target
+-->
+<style>
+  body { font: 13px/1.6 ui-monospace, monospace; margin: 20px; background: #111; color: #ddd; }
+  table { border-collapse: collapse; margin-top: 12px; }
+  td, th { border: 1px solid #333; padding: 4px 10px; text-align: left; }
+  .yes { color: #4ade80; } .no { color: #f87171; }
+</style>
+<canvas id="c" width="64" height="64" style="display:none"></canvas>
+<div id="out">running…</div>
+<script type="module">
+const rows = [];
+
+// 1 — main thread, regular canvas (today's app)
+{
+  const ctx = document.getElementById("c").getContext("2d", { desynchronized: true });
+  rows.push(["main thread, regular canvas", ctx.getContextAttributes?.().desynchronized]);
+}
+// 2 — main thread, OffscreenCanvas (isolates offscreen-ness from worker-ness)
+{
+  const ctx = new OffscreenCanvas(64, 64).getContext("2d", { desynchronized: true });
+  rows.push(["main thread, OffscreenCanvas", ctx.getContextAttributes?.().desynchronized]);
+}
+
+// 3 + 4 — inside a worker
+const w = new Worker("./desync.worker.js", { type: "module" });
+const off = document.createElement("canvas");
+off.width = 64; off.height = 64;
+const transferred = off.transferControlToOffscreen();
+const res = await new Promise((r) => {
+  w.onmessage = (e) => r(e.data);
+  w.postMessage({ canvas: transferred }, [transferred]);
+});
+rows.push(["worker, transferred (Option A)", res.transferred]);
+rows.push(["worker, standalone (Option B)", res.standalone]);
+
+const cell = (v) => v === true ? '<span class="yes">true</span>'
+  : v === false ? '<span class="no">false — hint dropped</span>'
+  : `<span class="no">${String(v)}</span>`;
+document.getElementById("out").innerHTML =
+  "<table><tr><th>context</th><th>desynchronized</th></tr>" +
+  rows.map(([n, v]) => `<tr><td>${n}</td><td>${cell(v)}</td></tr>`).join("") + "</table>" +
+  `<p>ua: ${navigator.userAgent}</p>`;
+window.__desync = rows.map(([n, v]) => n + " = " + String(v));
+console.log(window.__desync.join("\n"));
+</script>

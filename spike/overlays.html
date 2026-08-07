@@ -1,0 +1,103 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>OPEN-B follow-up — do overlays stay pinned to a transferred canvas?</title>
+<!--
+  The last caveat left open by OPEN-B. Phase 0 argued from structure that the
+  overlays survive transfer, because each owns its own canvas or is SVG and none
+  reads a context from the main canvas. Strong argument, never run.
+
+  This runs it, mirroring SelectionOverlay's actual design (its own doc comment):
+  "an image-resolution canvas sized to the image and transformed with the very
+  same translate(pan) scale(zoom) the main canvas uses (and laid out as a
+  sibling, exactly like the transparency checkerboard)."
+
+  So: two sibling canvases, same backing resolution, same CSS rules, same
+  transform. One is TRANSFERRED to a worker; the other stays on the main thread.
+  Plus an SVG sibling, since the guides/lasso overlays are SVG.
+
+  The whole question is whether they stay pinned to each other. Measured with
+  getBoundingClientRect to 0.1px, not by eye.
+-->
+<style>
+  body { font: 13px/1.6 ui-monospace, monospace; margin: 20px; background: #111; color: #ddd; }
+  #stage { position: relative; width: 400px; height: 300px; border: 1px solid #444;
+           display: flex; align-items: center; justify-content: center; }
+  .layer { max-width: 100%; max-height: 100%; display: block; object-fit: contain;
+           position: absolute; top: 50%; left: 50%; translate: -50% -50%; }
+  table { border-collapse: collapse; margin-top: 12px; }
+  td, th { border: 1px solid #333; padding: 4px 10px; text-align: left; }
+  .pass { color: #4ade80; } .fail { color: #f87171; }
+</style>
+
+<div id="stage">
+  <canvas id="main" class="layer"></canvas>
+  <canvas id="ovl"  class="layer"></canvas>
+  <svg   id="svg"   class="layer" viewBox="0 0 1600 1200"><rect x="0" y="0" width="1600" height="1200" fill="none" stroke="lime" stroke-width="8"/></svg>
+</div>
+<div id="out">running…</div>
+
+<script type="module">
+const W = 1600, H = 1200;
+const main = document.getElementById("main");
+const ovl  = document.getElementById("ovl");
+const svg  = document.getElementById("svg");
+const rows = [];
+const r = (el) => el.getBoundingClientRect();
+const same = (a, b) => Math.abs(a.left-b.left)<0.5 && Math.abs(a.top-b.top)<0.5 &&
+                       Math.abs(a.width-b.width)<0.5 && Math.abs(a.height-b.height)<0.5;
+const fmt = (x) => `${x.left.toFixed(1)},${x.top.toFixed(1)} ${x.width.toFixed(1)}×${x.height.toFixed(1)}`;
+
+main.width = W; main.height = H;
+ovl.width  = W; ovl.height  = H;
+svg.setAttribute("width", W); svg.setAttribute("height", H);
+
+// overlay is drawn on the MAIN THREAD, as SelectionOverlay is
+const octx = ovl.getContext("2d");
+octx.strokeStyle = "magenta"; octx.lineWidth = 10;
+octx.strokeRect(5, 5, W - 10, H - 10);
+
+// main canvas goes to a worker
+const worker = new Worker("./open-b.worker.js", { type: "module" });
+const off = main.transferControlToOffscreen();
+worker.postMessage({ type: "init", canvas: off, w: W, h: H }, [off]);
+const ask = (m) => new Promise((res) => {
+  const h = (e) => { if (e.data.type === m.type + ":done") { worker.removeEventListener("message", h); res(e.data); } };
+  worker.addEventListener("message", h); worker.postMessage(m);
+});
+await ask({ type: "draw" });
+
+function check(label) {
+  const m = r(main), o = r(ovl), s = r(svg);
+  rows.push([`${label} — overlay canvas vs main`, fmt(o), same(m, o) ? "PASS" : "FAIL"]);
+  rows.push([`${label} — SVG overlay vs main`,    fmt(s), same(m, s) ? "PASS" : "FAIL"]);
+}
+
+check("at rest");
+
+// zoom + pan, applied identically to all three exactly as the app does
+for (const el of [main, ovl, svg]) {
+  el.style.transformOrigin = "center center";
+  el.style.transform = "scale(2)";
+}
+check("zoom scale(2)");
+
+for (const el of [main, ovl, svg]) el.style.transform = "translate(53px, -21px) scale(2)";
+check("pan + zoom");
+
+// the worker changes the main canvas's backing store; the overlay does NOT.
+// In the app React would resize the overlay in the same commit — this asks
+// whether a transferred canvas drifts on its own when only IT is resized.
+const before = r(main);
+await ask({ type: "resize", w: 800, h: 600 });
+const after = r(main);
+rows.push(["main rect after worker resize (aspect kept)", fmt(after),
+           same(before, after) ? "PASS" : "FAIL"]);
+check("after worker resize");
+
+document.getElementById("out").innerHTML =
+  "<table><tr><th>check</th><th>rect</th><th>verdict</th></tr>" +
+  rows.map(([n, v, k]) => `<tr><td>${n}</td><td>${v}</td><td class="${k==='PASS'?'pass':'fail'}">${k}</td></tr>`).join("") +
+  "</table>";
+window.__ovl = rows.map(([n,,k]) => k + " | " + n);
+console.log(window.__ovl.join("\n"));
+</script>
