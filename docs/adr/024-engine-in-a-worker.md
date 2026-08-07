@@ -82,11 +82,32 @@ strokes, selection preview and text layout stay synchronous on the main thread.
 
 ### The idea worth stealing regardless of option
 
-`width`, `height`, `layer_count`, `active_layer_id` and friends account for
-~25 of the 117 and are cheap scalars. **A state snapshot mirrored to the main
-thread on every change removes them from the async problem entirely** — those
-call sites read a plain local object and never become async. It also solves the
-two render-time reads in `CanvasArea`, which have no other clean answer.
+`width`, `height`, `layer_count`, `active_layer_id` and friends are cheap
+scalars. **A state snapshot mirrored to the main thread on every change removes
+them from the async problem entirely** — those call sites read a plain local
+object and never become async. It also solves the two render-time reads in
+`CanvasArea`, which have no other clean answer.
+
+> **CORRECTED 2026-08-06 — this said "~25 of the 117". The measured number is
+> 8.** Phase 1a went and counted (`ca47935`, preserved as the tag
+> `abandoned/scalar-mirror`, written up in
+> `docs/engine-worker-scalar-mirror-finding.md`). Two things it found change
+> this section rather than just its arithmetic:
+>
+> - **The mirror already exists and already has exactly one publisher.**
+>   `syncState()` in `useEngineCore.ts` is the sole writer and already
+>   publishes `width`, `height`, `layers`, `activeLayerId`, `undoCount`,
+>   `redoCount`, `zoom` and `hasTransparency`. The pre-mortem below worries
+>   about a mirror that drifts because nothing owns it; that risk is already
+>   retired, and the section should be read with that in mind.
+> - **The consumers cannot reach it.** Of 38 value-consumed scalar sites, 14
+>   are plain modules with no hook context — they receive the engine handle as
+>   a parameter. Repointing is what is expensive, not mirroring.
+>
+> The brief that opened Phase 1a set its own bar: *"117 → ~90 is a different
+> project than 117 → 112."* The achievable number is **117 → 109**, which
+> lands on the wrong side of it. Phase 1a stopped there deliberately and built
+> nothing.
 
 ## Pre-mortem — it is six months later and this went badly
 

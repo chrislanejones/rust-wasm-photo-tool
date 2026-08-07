@@ -94,6 +94,15 @@ silently escape the count.
 > handle, which swept in ~100 `rect.width`/`t.height` hits on unrelated objects.
 > 206 is the figure after removing it. Believe 206.
 
+> **Re-measured 2026-08-06 against v7.72 (`a1437a0`): 208 total — 77
+> fire-and-forget, 119 value-consumed, 12 hot-path.** The numbers above are the
+> 2026-07-27 reading against v7.6x and are left as written. The job grew by two
+> value-consumed sites in ten days, which is the more useful fact: this surface
+> is not static, and every release that adds an engine read adds to the
+> migration. Re-run `node scripts/engine-call-audit.mjs` before planning
+> against these figures — it takes the method list from `stamp_tool.d.ts`, so a
+> new engine method cannot escape the count.
+
 ### By owning file (a / b / c)
 
 | File | a | b | c | total |
@@ -134,6 +143,14 @@ would erase roughly 25 of the 117 without any call site becoming async** —
 they'd read a plain local object. That is the single highest-leverage idea this
 audit produced.
 
+> **CORRECTED 2026-08-06 — the 25 was an estimate and it is wrong. It is 8.**
+> Phase 1a counted properly (`ca47935`, tag `abandoned/scalar-mirror`,
+> `docs/engine-worker-scalar-mirror-finding.md`): 117 → **109**, not 117 → 92.
+> The mirror also already exists with a single publisher (`syncState()` in
+> `useEngineCore.ts`); the cost is that 14 of the 38 scalar sites are plain
+> modules that cannot reach React state at all. Phase 1a stopped and built
+> nothing. See ADR-024 for what this does to "the idea worth stealing".
+
 ### The 12 hot-path sites
 
 ```
@@ -170,14 +187,25 @@ operation, 5 runs, medians.
 | — as a share of one 60fps frame (16.7 ms) | **0.6%** |
 | Cold op, synchronous on the main thread | 468.6 ms |
 | Cold op, via worker round-trip | 483.6 ms (**1.03×**) |
-| Messaging overhead carrying a 48 MB transferable | **0.5 ms** |
+| ~~Messaging overhead carrying a 48 MB transferable~~ | ~~0.5 ms~~ **STRUCK — see below** |
 | One-off: wasm `init()` inside the worker | 8.5 ms |
 | One-off: 48 MB transfer into the worker | 67.5 ms |
 
-**The boundary is effectively free.** Transferables move a pointer, not 48 MB,
-so payload size barely registers; 0.5 ms of overhead sits inside the run-to-run
-noise of the operation itself. Even a per-frame call would spend 0.6% of its
-frame budget on the round trip.
+> **The "messaging overhead" row is unsound and is withdrawn (2026-08-06).**
+> `spike/index.html:108` computes it by subtracting three independently-sorted
+> medians of ~470 ms operations. Re-running the harness printed **+14.9 / +1.6
+> / −12.2 ms** across three runs. A negative overhead is not a small number; it
+> is proof the method has no resolution here. You cannot measure a
+> sub-millisecond quantity by differencing two half-second ones. Nothing
+> replaces it — the honest statement is that transferable payload size was not
+> measured, only the empty-payload round trip was.
+
+**The boundary is effectively free** — on the strength of the 0.100 ms
+empty-payload round trip, which was measured directly over 50 pings and stands.
+Transferables move a pointer rather than the buffer, so payload size is not
+expected to register, but that expectation is now unmeasured rather than
+confirmed. Even a per-frame call would spend 0.6% of its frame budget on the
+round trip.
 
 Two honest caveats:
 

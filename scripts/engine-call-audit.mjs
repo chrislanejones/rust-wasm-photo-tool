@@ -11,7 +11,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const ROOT = "/home/clj/ai-repo/ih-engine-worker";
+const ROOT = process.argv[2] ?? process.cwd();
 const DTS = join(ROOT, "app/src/hooks/stamp_tool.d.ts");
 const SRC = join(ROOT, "app/src");
 
