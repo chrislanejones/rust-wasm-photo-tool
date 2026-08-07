@@ -107,6 +107,38 @@ export default tseslint.config(
   },
 
   {
+    // ── Export paths: exhaustive-deps is an ERROR here, not a warning ───────
+    //
+    // Repo-wide, `react-hooks/exhaustive-deps` is a warning and there is a
+    // backlog of ~59. That is deliberate (see CLAUDE.md) and this override is
+    // NOT a step toward `--max-warnings 0`. It is scoped to the handful of
+    // files where a stale closure does not merely re-render late — it writes
+    // the wrong bytes to a file the user keeps.
+    //
+    // `useCanvasActions.handleExport` omitted `exportCanvasBackground` from
+    // its dependency array while reading it in the body, so flipping Settings
+    // → Layers and Canvas → "Photo only" and pressing Download immediately
+    // gave you the PREVIOUS setting's output. Nothing failed, nothing warned
+    // loudly, and the file looked plausible. The warning naming the exact
+    // identifier had been sitting in the backlog the whole time.
+    //
+    // A warning among 59 warnings is not a check. In these files it fails.
+    //
+    // Scoped to two files on purpose. The rest of `app/src/app/session/` was
+    // tried and reverted: it raises ~15 more, and nearly all of them are
+    // zustand setters (`setPhotos`, `setHasBeenModified`) pulled out with
+    // `useGalleryStore(s => s.setX)`. Those references are stable, so the
+    // warnings are false here — but ESLint cannot know that, and "just add
+    // them to the deps" changes memoization on the photo-switch path, which
+    // is not a change to make without measuring. Widen this glob file by
+    // file, each with its own reasoning, not in one sweep.
+    files: ["app/src/app/session/useCanvasActions.ts", "app/src/hooks/useExport.ts"],
+    rules: {
+      "react-hooks/exhaustive-deps": "error",
+    },
+  },
+
+  {
     // This config file itself: ESM running under Node.
     files: ["eslint.config.mjs"],
     languageOptions: {

@@ -155,7 +155,16 @@ export function useCanvasActions({
     a.download = `${stem}-revised${ext}`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep]);
+    // `exportCanvasBackground` is read at the top of this callback and was
+    // missing here. Without it the memoized closure kept whichever value was
+    // current when it was last rebuilt, so flipping Settings → Layers and
+    // Canvas → "Photo only" and pressing Download straight away exported the
+    // PREVIOUS setting — the padded canvas when you asked for the photo, or
+    // the reverse. It corrected itself as soon as any other dependency moved
+    // (switching photos, changing format), which is what made it look
+    // intermittent rather than broken. `handleCopyToClipboard` above always
+    // had it; only this path did not.
+  }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep, exportCanvasBackground]);
 
   return {
     getHistogram,
