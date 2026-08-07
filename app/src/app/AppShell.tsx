@@ -88,7 +88,8 @@ import { useAutoCompress } from "@/hooks/useAutoCompress";
 import { useEditPersistence } from "@/hooks/useEditPersistence";
 import { useRecentTexts } from "@/hooks/useRecentTexts";
 import { putOriginal, getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
-import { deleteReplacedOriginal } from "@/lib/originalRefs";
+import { collectDeletedPhotoOriginals, deleteReplacedOriginal } from "@/lib/originalRefs";
+import { collectExtraRoots } from "@/lib/extraRoots";
 import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 import { RadioCards } from "@/components/ui/radio-cards";
@@ -1163,6 +1164,26 @@ export function AppShell() {
 
   const confirmDeleteAll = useCallback(() => {
     setDeleteAllOpen(false);
+
+    // Collect every photo's originals. This was missing, and it is the whole
+    // bug: `clearAllEdits` below collected the edit archives, nothing collected
+    // the blobs, and `setPhotos([])` then dropped the only roots that pointed
+    // at them. Measured on the deployed app 2026-08-07 — deleting 12 photos
+    // left the row counts UNCHANGED (189 and 72) while 26 reachable rows went
+    // to zero: +108.6 MiB stranded from one click. The single-photo path
+    // (`handleRemovePhoto`) has always done this correctly; this one did the
+    // `setPhotos([])` half and not the collect half.
+    //
+    // Read BEFORE the state clears, for the same reason the single path does:
+    // once `setPhotos([])` runs there is nothing left to read the keys off.
+    const doomed = useGalleryStore.getState().photos;
+    // Roots from outside the gallery — BatchSettings' pre-logo/pre-text
+    // baselines live in refs and are in no manifest. Passed even here, where
+    // every photo is going: the bias in this whole area is KEEP, and a
+    // baseline held by a still-mounted Batch panel is a live reference
+    // whatever the gallery is doing.
+    const extraRoots = collectExtraRoots();
+
     clearAllEdits().catch(() => {});
     clearWorkingCopyCache(); // free the decoded-photo cache (all photos gone)
     // Explicit user deletion → the resume manifest goes with the photos
@@ -1178,6 +1199,36 @@ export function AppShell() {
     setHasBeenModified(false);
     setCompareActive(false);
     setPhotos([]);
+
+    // AFTER the gallery is empty, so no doomed photo roots its own keys.
+    //
+    // `photos: []` is the load-bearing argument: it is the SURVIVING gallery,
+    // and in a delete-all nothing survives. Passing the doomed list instead
+    // fails in one specific way — `collectDeletedPhotoOriginals` filters the
+    // entry out of `photos` itself, so photos with DISTINCT keys still collect
+    // correctly, but two doomed photos SHARING a key each root the other and
+    // the blob survives them both. Silently, looking like success. Pinned by
+    // "leaks a SHARED blob if the doomed list is passed" in
+    // lib/deletePhotoOriginals.test.ts.
+    //
+    // Per-photo through the same guard rather than one bulk key sweep.
+    // Duplicates share an `originalKey`, so a direct delete of every key would
+    // be a second delete path — which is precisely how the shared-blob data
+    // loss happened in the compress paths (see lib/originalRefs.ts). Two
+    // doomed photos sharing a key just means the second call finds it already
+    // gone; `deleteReplacedOriginal` never throws.
+    //
+    // Fire-and-forget with a swallowed rejection, matching `handleRemovePhoto`:
+    // a failed collect leaves garbage the audit can measure, whereas awaiting
+    // it would make a storage hiccup look like a failed delete and leave the
+    // gallery showing photos the user already removed.
+    for (const entry of doomed) {
+      void collectDeletedPhotoOriginals({
+        entry,
+        photos: [],
+        extraRoots,
+      }).catch(() => {});
+    }
   }, [clearAllEdits, stamp]);
 
   const handlePickColor = useCallback((hex: string) => {

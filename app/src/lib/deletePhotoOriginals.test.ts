@@ -254,3 +254,134 @@ describe("robustness of the photos argument", () => {
     expect(await getOriginal(key)).toBeNull();
   });
 });
+
+// ── 5. deleting the WHOLE gallery ───────────────────────────────────────────
+//
+// Found 2026-08-07 by measuring the deployed app: Delete All left the row
+// counts unchanged (189 and 72) while 26 reachable rows dropped to zero —
+// +108.6 MiB stranded from one click. `confirmDeleteAll` collected the edit
+// archives and never collected the blobs, then `setPhotos([])` dropped the only
+// roots that pointed at them. The single-photo path had been correct all along.
+//
+// The subtle argument is `photos: []`. It is the SURVIVING gallery, and in a
+// delete-all nothing survives. Handing it the doomed list instead would have
+// every photo rooted by its neighbours, collect nothing, and look exactly like
+// success — which is the shape of the original bug.
+
+/** `confirmDeleteAll` with the React parts stripped. Mirrors the real handler:
+ *  read the entries first, clear the gallery, then collect each against an
+ *  EMPTY surviving set. */
+async function deleteAllPhotos(
+  gallery: OriginalRef[],
+  extraRoots: readonly (string | undefined)[] = [],
+): Promise<void> {
+  const doomed = [...gallery];
+  for (const id of doomed.map((p) => p.id)) await deletePhotoEdit(id).catch(() => {});
+  for (const entry of doomed) {
+    await collectDeletedPhotoOriginals({ entry, photos: [], extraRoots });
+  }
+}
+
+describe("deleting the whole gallery collects every original", () => {
+  it("collects all of them, not just the last", async () => {
+    const a = await putOriginal(fileOf("a.png", "AAAA"), 10, 10);
+    const b = await putOriginal(fileOf("b.png", "BBBB"), 10, 10);
+    const c = await putOriginal(fileOf("c.png", "CCCC"), 10, 10);
+
+    await deleteAllPhotos([
+      { id: "p1", originalKey: a },
+      { id: "p2", originalKey: b },
+      { id: "p3", originalKey: c },
+    ]);
+
+    expect(await listOriginals()).toHaveLength(0);
+  });
+
+  it("collects a blob two doomed photos share, exactly once", async () => {
+    const shared = await putOriginal(fileOf("dup.png", "SAME"), 10, 10);
+
+    // Both entries point at the same content hash — the duplicate case that
+    // makes a bulk key-sweep dangerous. The second collect finds it already
+    // gone and must not throw.
+    await deleteAllPhotos([
+      { id: "p1", originalKey: shared },
+      { id: "p2", originalKey: shared },
+    ]);
+
+    expect(await getOriginal(shared)).toBeFalsy();
+  });
+
+  it("collects the A/B upload baseline too", async () => {
+    const orig = await putOriginal(fileOf("small.png", "SMALL"), 10, 10);
+    const upload = await putOriginal(fileOf("big.png", "BIGGER"), 40, 40);
+
+    await deleteAllPhotos([{ id: "p1", originalKey: orig, uploadKey: upload }]);
+
+    expect(await listOriginals()).toHaveLength(0);
+  });
+
+  it("still keeps a blob held only by a batch baseline outside the gallery", async () => {
+    const gone = await putOriginal(fileOf("gone.png", "GONE"), 10, 10);
+    const held = await putOriginal(fileOf("held.png", "HELD"), 10, 10);
+    registerExtraRootProvider(() => [held]);
+
+    await deleteAllPhotos(
+      [{ id: "p1", originalKey: gone }, { id: "p2", originalKey: held }],
+      collectExtraRoots(),
+    );
+
+    // Bias is KEEP: a still-mounted Batch panel holding a baseline is a live
+    // reference whatever the gallery is doing.
+    expect(await getOriginal(gone)).toBeFalsy();
+    expect(await getOriginal(held)).toBeTruthy();
+  });
+
+  it("leaks a SHARED blob if the doomed list is passed as the surviving set", async () => {
+    // Why `photos: []` is load-bearing, stated as a test — and narrower than I
+    // first wrote it. `collectDeletedPhotoOriginals` filters the entry out of
+    // `photos` itself, so photos with DISTINCT keys collect correctly either
+    // way. The mistake only bites on a shared key: pass the doomed list and
+    // each of the two entries is rooted by the other, so the blob survives them
+    // both. Silently, looking like success.
+    const shared = await putOriginal(fileOf("dup.png", "SAME"), 10, 10);
+    const gallery: OriginalRef[] = [
+      { id: "p1", originalKey: shared },
+      { id: "p2", originalKey: shared },
+    ];
+
+    for (const entry of gallery) {
+      await collectDeletedPhotoOriginals({ entry, photos: gallery, extraRoots: [] });
+    }
+    expect(await getOriginal(shared), "the wrong-argument leak").toBeTruthy();
+
+    // The real handler passes [] and the blob goes.
+    await deleteAllPhotos(gallery);
+    expect(await getOriginal(shared), "the correct argument").toBeFalsy();
+  });
+});
+
+// The tests above mirror `confirmDeleteAll`; they cannot notice the handler
+// forgetting to call the collector at all — which is exactly what shipped. This
+// reads the source, like the tool-surface contract guard, because the bug was
+// an absent call rather than a wrong value.
+describe("confirmDeleteAll actually collects", () => {
+  it("calls collectDeletedPhotoOriginals with an empty surviving set", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(process.cwd(), "src/app/AppShell.tsx"), "utf8");
+
+    const start = src.indexOf("const confirmDeleteAll");
+    expect(start, "confirmDeleteAll not found — was it renamed?").toBeGreaterThan(-1);
+    const raw = src.slice(start, src.indexOf("}, [clearAllEdits", start));
+
+    // Strip comments FIRST. The first version of this check passed against a
+    // handler with the call deleted, because the comment explaining the fix
+    // contains the function name — a test satisfied by its own documentation.
+    const body = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+    expect(body, "confirmDeleteAll no longer collects originals — the blobs leak")
+      .toContain("collectDeletedPhotoOriginals");
+    expect(body, "the surviving gallery must be [] in a delete-all")
+      .toMatch(/photos:\s*\[\]/);
+  });
+});
