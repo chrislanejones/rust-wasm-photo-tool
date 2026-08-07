@@ -1,0 +1,131 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>OPEN-B — zoom/pan under transferControlToOffscreen</title>
+<!--
+  OPEN-B asks whether the app's zoom/pan survives moving the main canvas into a
+  worker. ADR-024 argued it from structure and said so: "argued from structure,
+  not observed — none of them were changed or run against a transferred canvas."
+
+  This runs it. The setup mirrors the app EXACTLY, not a simplification:
+
+    .main-canvas { max-width: 100%; max-height: 100% }   app/src/styles.css:430
+    transform: translate(Xpx, Ypx) scale(Z)              CanvasArea.tsx:1262
+    transform-origin: center center
+    backing store = image resolution, set by flushToCanvas (useEngineCore)
+
+  The split under test is that the ELEMENT is CSS-sized while its BACKING STORE
+  stays at image resolution. Every assertion below is a number read back from
+  the DOM, not a look at the screen.
+-->
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 20px; background: #111; color: #ddd; }
+  #stage { width: 400px; height: 300px; border: 1px solid #444; overflow: hidden;
+           display: flex; align-items: center; justify-content: center; }
+  /* the app's own rules, copied verbatim */
+  .main-canvas { max-width: 100%; max-height: 100%; display: block;
+                 object-fit: contain; background: transparent; position: relative; }
+  table { border-collapse: collapse; margin-top: 16px; }
+  td, th { border: 1px solid #333; padding: 4px 10px; text-align: left; }
+  .pass { color: #4ade80; } .fail { color: #f87171; } .info { color: #fbbf24; }
+</style>
+
+<div id="stage"><canvas id="c" class="main-canvas"></canvas></div>
+<div id="out">running…</div>
+
+<script type="module">
+const IMG_W = 1600, IMG_H = 1200;          // "image resolution" backing store
+const rows = [];
+const push = (name, got, expect, verdict) => rows.push({ name, got, expect, verdict });
+const rect = () => { const r = c.getBoundingClientRect(); return `${r.width.toFixed(1)}×${r.height.toFixed(1)}`; };
+
+const c = document.getElementById("c");
+c.width = IMG_W; c.height = IMG_H;          // set BEFORE transfer, as the app does
+
+// Baseline: CSS fit shrinks the element to the 400×300 stage, backing store stays 1600×1200.
+const fitted = rect();
+push("CSS fit before transfer", fitted, "400.0×300.0", fitted === "400.0×300.0" ? "PASS" : "CHECK");
+push("backing store before transfer", `${c.width}×${c.height}`, "1600×1200",
+     c.width === IMG_W && c.height === IMG_H ? "PASS" : "FAIL");
+
+// ── transfer ──────────────────────────────────────────────────────────────
+let worker, transferred = false, transferErr = "";
+try {
+  const off = c.transferControlToOffscreen();
+  worker = new Worker("./open-b.worker.js", { type: "module" });
+  worker.postMessage({ type: "init", canvas: off, w: IMG_W, h: IMG_H }, [off]);
+  transferred = true;
+} catch (e) { transferErr = String(e); }
+push("transferControlToOffscreen", transferred ? "ok" : transferErr, "ok", transferred ? "PASS" : "FAIL");
+
+const ask = (msg) => new Promise((res) => {
+  const h = (e) => { if (e.data.type === msg.type + ":done") { worker.removeEventListener("message", h); res(e.data); } };
+  worker.addEventListener("message", h);
+  worker.postMessage(msg);
+});
+
+await ask({ type: "draw" });   // worker paints a known grid at backing resolution
+
+// ── 1. does the main thread still get a context? (must not) ───────────────
+let ctxAfter = "null";
+try { ctxAfter = String(c.getContext("2d")); } catch (e) { ctxAfter = "threw: " + e.name; }
+push("main-thread getContext after transfer", ctxAfter, "null or throw",
+     ctxAfter === "null" || ctxAfter.startsWith("threw") ? "PASS" : "FAIL");
+
+// ── 2. can the main thread still resize the backing store? (must not) ─────
+let sizeErr = "no error";
+const wBefore = c.width;
+try { c.width = 800; } catch (e) { sizeErr = e.name; }
+push("main-thread canvas.width = 800", `${sizeErr}, width now ${c.width}`,
+     "throws or ignored; stays 1600",
+     c.width === wBefore ? "PASS" : "FAIL — main thread still owns sizing");
+
+// ── 3. CSS fit still applies to the transferred element ──────────────────
+const afterFit = rect();
+push("CSS fit after transfer", afterFit, fitted, afterFit === fitted ? "PASS" : "FAIL");
+
+// ── 4. ZOOM — the app's transform: scale() ───────────────────────────────
+c.style.transformOrigin = "center center";
+c.style.transform = "scale(2)";
+const zoomed = c.getBoundingClientRect();
+const expectW = parseFloat(fitted) * 2;
+push("zoom scale(2) → rect width", zoomed.width.toFixed(1), expectW.toFixed(1),
+     Math.abs(zoomed.width - expectW) < 0.5 ? "PASS" : "FAIL");
+
+// ── 5. PAN — translate on top of scale ──────────────────────────────────
+// Order matters and the app relies on it. `translate(...) scale(...)` composes
+// as T×S, so a point maps p → T(S(p)): the scale happens in the element's own
+// space and the translate then moves the result in the PARENT's space. The pan
+// is therefore 37 screen px, NOT 37 × zoom.
+//
+// The first version of this check expected 74 and printed CHECK. The browser
+// was right and the expectation was wrong — worth leaving in the file, because
+// the app's own transform is written in exactly this order (CanvasArea:1262),
+// so pan is in screen pixels and does not accelerate as you zoom in.
+const beforePan = c.getBoundingClientRect().left;
+c.style.transform = "translate(37px, 0px) scale(2)";
+const afterPan = c.getBoundingClientRect().left;
+push("pan translate(37px) → rect shift", (afterPan - beforePan).toFixed(1), "37.0 (screen px; T×S)",
+     Math.abs((afterPan - beforePan) - 37) < 1 ? "PASS" : "FAIL");
+
+// ── 6. worker resizes the backing store; display size must not move ─────
+c.style.transform = "none";
+const beforeResize = rect();
+const r = await ask({ type: "resize", w: 800, h: 600 });
+const afterResize = rect();
+push("worker set backing store 800×600", `${r.w}×${r.h}`, "800×600",
+     r.w === 800 && r.h === 600 ? "PASS" : "FAIL");
+push("display size after worker resize", afterResize, beforeResize + " (unchanged)",
+     afterResize === beforeResize ? "PASS" : "CHECK — aspect changed, so fit re-ran");
+
+// ── 7. worker can still read its own pixels back ────────────────────────
+const pr = await ask({ type: "probe" });
+push("worker pixel readback at (10,10)", pr.px, "the drawn colour", pr.ok ? "PASS" : "FAIL");
+
+document.getElementById("out").innerHTML =
+  "<table><tr><th>check</th><th>got</th><th>expected</th><th>verdict</th></tr>" +
+  rows.map((r) => `<tr><td>${r.name}</td><td>${r.got}</td><td>${r.expect}</td>` +
+    `<td class="${r.verdict.startsWith("PASS") ? "pass" : r.verdict.startsWith("FAIL") ? "fail" : "info"}">${r.verdict}</td></tr>`).join("") +
+  "</table>";
+console.log("OPEN-B", JSON.stringify(rows, null, 1));
+window.__openB = rows;
+</script>
