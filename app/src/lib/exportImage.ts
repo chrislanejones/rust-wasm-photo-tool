@@ -10,6 +10,7 @@
 
 import type { SavedEdit } from "@/lib/editPersistence";
 import { encodeViaWorker } from "@/lib/codecWorkerClient";
+import { restoreLayerStack } from "@/lib/restoreLayerStack";
 
 /** Every export format, as a tuple so it can be range-checked at runtime —
  *  the persisted `exportFormat` preference is rehydrated from same-origin-
@@ -73,6 +74,7 @@ async function decodeToRgba(
  */
 export async function compositeSavedEdit(
   edit: SavedEdit,
+  opts?: { excludeBackground?: boolean },
 ): Promise<{ pixels: Uint8Array; w: number; h: number }> {
   const mod = await import("stamp_tool");
   await mod.default();
@@ -82,7 +84,28 @@ export async function compositeSavedEdit(
   try {
     tool.load_image(new Uint8Array(rgba.buffer as ArrayBuffer));
 
-    if (edit.annotations && edit.annotations.length > 0) {
+    // Rebuild the layer stack (archive v5+) before anything else. Two reasons,
+    // and the second is the whole point of `opts.excludeBackground`:
+    //
+    //  1. Shared with the editor's own restore (lib/restoreLayerStack.ts) so
+    //     the two cannot drift apart — see that file.
+    //  2. `finish_layer_restore` is what promotes the bottom layer to
+    //     LayerKind::Canvas. Without it this throwaway tool holds ONE Content
+    //     layer built from the flattened canvasPng, `canvas_idx()` returns
+    //     None, and `get_image_data_excluding_background()` has nothing to
+    //     exclude — it would hand back the full padded document and quietly
+    //     look like it had honoured the setting.
+    //
+    // Legacy archives with no `layers` return false and keep the flat canvas,
+    // which is correct: a pre-v5 document has no Canvas layer to leave out.
+    const usedLayers = await restoreLayerStack(
+      tool,
+      edit.layers,
+      edit.activeLayerId,
+      (png) => decodeToRgba(png, "image/png"),
+    );
+
+    if (!usedLayers && edit.annotations && edit.annotations.length > 0) {
       for (const a of edit.annotations) {
         tool.add_text_annotation(
           a.text,
@@ -102,6 +125,30 @@ export async function compositeSavedEdit(
         );
       }
       tool.flatten_text_annotations();
+    }
+
+    // Layer-restored documents carry their overlays per layer; bake them into
+    // pixels so the export matches what the editor shows. (The legacy branch
+    // above already flattened its own.)
+    if (usedLayers && tool.text_annotation_count() > 0) {
+      tool.flatten_text_annotations();
+    }
+
+    // "Photo only" — leave the artboard's backing Canvas layer out and crop to
+    // the photo's own bounding box. Same Rust call the single-Download and
+    // clipboard paths use, so all three surfaces agree.
+    //
+    // Guarded on `usedLayers`: without a restored stack there is no Canvas
+    // layer, and `composite_excluding_background` would fall through to the
+    // full layer list and return the whole document. Returning the same bytes
+    // as the include-canvas branch is the honest outcome for a legacy archive,
+    // but it must not be reached by accident.
+    if (opts?.excludeBackground && usedLayers) {
+      return {
+        pixels: new Uint8Array(tool.get_image_data_excluding_background()),
+        w: tool.export_width_excluding_background(),
+        h: tool.export_height_excluding_background(),
+      };
     }
 
     return {

@@ -27,6 +27,7 @@ import {
   registerTilesDirtyCount,
   registerWasmMemory,
 } from "@/lib/resourceMonitor";
+import { restoreLayerStack } from "@/lib/restoreLayerStack";
 import { syncOplog, tryTilesFlush } from "@/lib/tilesFlush";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
@@ -503,86 +504,15 @@ export function useEngineCore(
       // Rebuild the full layer stack (archive v5+) BEFORE injecting history —
       // begin_layer_restore clears history, so it must run first. Each layer's
       // own text/shape overlays are restored onto it (no history noise).
-      const usedLayers = !!(saved.layers && saved.layers.length > 0);
-      if (usedLayers) {
-        tool.begin_layer_restore();
-        for (const layer of saved.layers!) {
-          const { rgba, w, h } = await decodePngToRgba(layer.png);
-          tool.push_restored_layer(
-            new Uint8Array(rgba.buffer as ArrayBuffer),
-            w,
-            h,
-            layer.name,
-            layer.visible,
-            layer.opacity,
-          );
-          for (const a of layer.annotations ?? []) {
-            tool.restore_text_annotation(
-              a.text,
-              a.font_size,
-              a.r, a.g, a.b,
-              a.bold,
-              a.x, a.y,
-              a.rotation_deg,
-              a.background_kind ?? 0,
-              a.bg_r ?? 255,
-              a.bg_g ?? 255,
-              a.bg_b ?? 255,
-              a.bg_a ?? 255,
-              a.bg_padding ?? 8,
-              a.bg_corner_radius ?? 8,
-              a.bg_tail ?? 0,
-              a.shadow_box ?? false,
-              a.shadow_text ?? false,
-              a.shadow_r ?? 0,
-              a.shadow_g ?? 0,
-              a.shadow_b ?? 0,
-              a.shadow_a ?? 0,
-              a.shadow_dx ?? 0,
-              a.shadow_dy ?? 0,
-              a.shadow_blur ?? 0,
-            );
-          }
-          for (const s of layer.shapes ?? []) {
-            if (s.kind === 5) {
-              tool.restore_pin_annotation(
-                s.x0, s.y0, s.x1, s.y1,
-                s.number ?? 0, s.r, s.g, s.b,
-                s.label_kind ?? 0,
-              );
-            } else if (s.kind === 6) {
-              const flat = new Float64Array((s.points ?? []).flat());
-              tool.restore_polyline_annotation(flat, s.r, s.g, s.b, s.stroke_width);
-            } else if (s.kind === 7) {
-              const flat = new Float64Array((s.points ?? []).flat());
-              tool.restore_bezier_annotation(
-                flat, s.r, s.g, s.b, s.stroke_width,
-                s.fill_kind ?? 0,
-                s.fill_r ?? 0, s.fill_g ?? 0, s.fill_b ?? 0, s.fill_a ?? 0,
-              );
-            } else {
-              tool.restore_shape_annotation(
-                s.kind,
-                s.x0, s.y0, s.x1, s.y1,
-                s.r, s.g, s.b,
-                s.stroke_width,
-                s.arrow_style,
-                s.fill_kind ?? 0,
-                s.fill_r ?? 0, s.fill_g ?? 0, s.fill_b ?? 0, s.fill_a ?? 0,
-                s.fill2_r ?? 0, s.fill2_g ?? 0, s.fill2_b ?? 0, s.fill2_a ?? 0,
-                s.fill_angle ?? 0,
-                s.fill_block ?? 0,
-              );
-            }
-          }
-        }
-        const activeIdx = saved.layers!.findIndex(
-          (l) => l.id === saved.activeLayerId,
-        );
-        tool.finish_layer_restore(
-          activeIdx >= 0 ? activeIdx : saved.layers!.length - 1,
-        );
-      }
+      // Rebuild the full layer stack (archive v5+) via the shared helper —
+      // lib/restoreLayerStack.ts. It is shared with the batch-export path so
+      // the two cannot drift; see that file for why (#22).
+      const usedLayers = await restoreLayerStack(
+        tool,
+        saved.layers,
+        saved.activeLayerId,
+        decodePngToRgba,
+      );
 
       // Re-inject undo snapshots (oldest first — preserves original order).
       // Each snapshot's annotations are pushed via per-annotation calls so

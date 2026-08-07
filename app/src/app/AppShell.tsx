@@ -2314,7 +2314,14 @@ export function AppShell() {
         if (edit) {
           // Canvas edits (draw / text / crop / resize / transform) →
           // composite via Rust + re-encode at the chosen format/quality.
-          const { pixels, w, h } = await compositeSavedEdit(edit);
+          // Honour Settings → Layers and Canvas → "Photo only" here too. This
+          // was the one export surface that ignored it: Share, Copy and the
+          // single Download all consulted `exportCanvasBackground`, the ZIP
+          // never read it at all, so a batch export always shipped the padded
+          // artboard even when every other path cropped to the photo.
+          const { pixels, w, h } = await compositeSavedEdit(edit, {
+            excludeBackground: !exportCanvasBackground,
+          });
           const enc = await encodeRgba(pixels, w, h, exportFormat, quality / 100);
           bytes = new Uint8Array(await enc.arrayBuffer());
           mime = enc.type || "application/octet-stream";
@@ -2392,6 +2399,7 @@ export function AppShell() {
       savePhotoEdit,
       exifKeep,
       exifStripMode,
+      exportCanvasBackground,
     ],
   );
 
