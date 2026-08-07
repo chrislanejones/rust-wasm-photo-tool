@@ -84,15 +84,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.72 — 2026-08-06
+### v7.73 — 2026-08-07
 
-**The gallery's transparency checkerboard now shows on every thumbnail.** It was
-switched on by the format of the file you opened — PNG got it, JPEG never did —
-which had nothing to do with the picture on screen, because every thumbnail is
-re-encoded to WebP on import. A JPEG that picked up transparency from the canvas
-or the eraser still showed none. It is unconditional now, and it hides itself:
-the image is painted over it, so a thumbnail that fills its tile covers it
-completely.
+**Downloading a whole gallery as a zip now respects "Photo only".** Every other
+way out of the app — Share, Copy, the single Download — left the backing canvas
+out when you asked it to. The zip never did, so a batch export always shipped
+the padded artboard. It could not have, either: it rebuilt each photo from a
+flattened image with no layers, and with no layers there is no canvas to leave
+out. It restores the real layer stack now, through the same code the editor
+uses rather than a second copy of it.
 
 ## License
 

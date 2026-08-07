@@ -2876,3 +2876,25 @@ Download all honour the setting; the archive is the one surface that does not.
 `handleExport`'s dependency array also omits the preference, so even the single
 Download serves a stale value until some other dependency changes. Both are
 open.
+
+## v7.73 Change Summary — 2026-08-07
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **Download All → `.zip` ignored Settings → Layers and Canvas → "Photo only".** Share, Copy to clipboard and the single Download all consulted `exportCanvasBackground`; `exportPhotosToZip` never read it, so a batch export always shipped the padded artboard | **Fixed** |
+| 2 | Passing the flag through would not have worked. `compositeSavedEdit` built its throwaway engine from the flattened `canvasPng` as ONE layer and ignored `edit.layers`. With a single Content layer, `canvas_idx()` is `None` and `composite_excluding_background()` falls through to the whole stack — it would have returned identical bytes and **looked** like it honoured the setting. `finish_layer_restore` is what promotes the bottom layer to `LayerKind::Canvas` | **Fixed** |
+| 3 | The 78-line restore loop (25 text-annotation parameters, four shape kinds) is now **`lib/restoreLayerStack.ts`**, shared by `useEngineCore.loadFromSaved` and `compositeSavedEdit`. Copying it was the cheaper move and is the mistake this repo already paid for — `stripLiveAnnotations` carries the note about the local and cloud annotation maps drifting until the cloud copy silently dropped all nine `shadow_*` fields (#22) | **Refactor** |
+| 4 | `handleExport` read `exportCanvasBackground` without declaring it in its `useCallback` deps. Fixed, and `react-hooks/exhaustive-deps` is now an **error** for that file and `useExport.ts` — scoped, not a step toward `--max-warnings 0` | **Fixed** |
+
+**Measured, not assumed.** Two photos, A edited and B untouched, through Download All, zip parsed byte-wise:
+
+| Setting | A (edited) | B (untouched) |
+|---|---|---|
+| Include canvas | 1530×1030 | 1500×1125 |
+| Photo only | **1500×1000** | 1500×1125 |
+
+A loses exactly the 15px border per side; B is unchanged either way, which is correct — a photo with no edit never had a canvas. The edit survives the crop (saturation 0.366 → 0.463). Legacy pre-v5 archives have no `layers`, so they keep the flat canvas and skip the exclude branch.
+
+**On #4, the honest version:** the missing dependency is real but currently unreachable. A control build with the fix removed produced the *correct* value, because `useCloneStamp` returns a bare object literal with no `useMemo` — `stamp` is a new reference every render, so that dependency array rebuilds the callback every time and can never go stale. It is fixed because memoizing the engine handle is on the roadmap, and the day it lands, every decorative deps array in these files becomes load-bearing at once.
+
+**Two candidate bugs investigated and closed:** an early `URL.revokeObjectURL` after `a.click()` (6 sites) — real pattern, but 10/10 downloads landed on real user clicks, so it is hardening, not a defect; and `<button>` without `type="button"` — cannot fire, the app contains no `<form>` at all.

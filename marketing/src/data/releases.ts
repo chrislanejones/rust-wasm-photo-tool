@@ -24,6 +24,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.73",
+    date: "2026-08-07",
+    headline: "Downloading a whole gallery respects the setting the rest of the app already did",
+    entries: [
+      { tag: "fix", text: "Settings has a switch for whether the backing canvas is baked into what you export. Share, Copy and the single Download all obeyed it. Downloading the whole gallery as a zip did not, so a batch export always carried the padded border." },
+      { tag: "fix", text: "It could not have obeyed it, either. The zip rebuilt each photo from a flattened image with no layers — and with no layers there is no canvas to leave out. It restores the real layer stack now." },
+      { tag: "infra", text: "That restore is one piece of code shared with the editor rather than a second copy of it. The last time this codebase kept two copies of a save routine, they drifted, and the cloud one quietly stopped saving drop shadows." },
+    ],
+  },
+  {
     version: "v7.72",
     date: "2026-08-06",
     headline: "The gallery shows transparency on every thumbnail, not just the PNGs",
