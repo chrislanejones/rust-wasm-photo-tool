@@ -65,22 +65,50 @@ Pan is 37 **screen** pixels. The app writes its transform in exactly this order,
 so pan does not accelerate as you zoom in. The expectation was the error; the
 comment is left in the harness.
 
-## Caveats — what this does not cover
+## Cross-browser — 4 browsers, 2 engines, 44/44
 
-- **One browser.** Chrome on Windows only. `OffscreenCanvas` and
-  `transferControlToOffscreen` are Baseline, but Safari has its own history with
-  `desynchronized`.
-- **No overlays.** `SelectionOverlay`, `HistogramView`, `LassoOverlay` and the
-  SVG guides were not run against a transferred canvas. Phase 0's structural
-  argument for them is strong — they own their own canvas or are SVG, and none
-  reads a context from the main canvas — but it is still an argument, not a
-  measurement.
+Run by Chris, 2026-08-07:
+
+| Browser | Engine | Result | Pixel readback |
+|---|---|---|---|
+| Chrome | Blink | **11/11** | `rgba(249,115,22,255)` — exact |
+| Brave | Blink | **11/11** | `rgba(248,115,23,255)` — **±1** |
+| Edge | Blink | **11/11** | exact |
+| **Firefox** | **Gecko** | **11/11** | exact |
+
+Rows 4 and 5 were the ones expected to diverge — engines have historically
+disagreed about whether a transferred canvas *throws* or *silently ignores* a
+main-thread `getContext` / `canvas.width` write. **Both engines throw
+`InvalidStateError`, identically.** That is the loud failure mode, in both.
+
+**Brave's ±1 is canvas farbling**, not a rendering difference — per-session
+noise injected into readback to defeat fingerprinting. The check used a
+tolerance so it passed; an exact-match assertion would have failed and looked
+like a transfer bug. Worth carrying beyond this spike: the app decodes images
+through `getImageData` (`decodeToRgba`, `makeThumbnail`), so any byte-exact
+pixel comparison in this repo is unreliable on Brave.
+
+## Caveats — what this still does not cover
+
 - **No engine.** The harness draws a grid with plain 2D calls. It proves the
-  canvas plumbing, not that `stamp_tool` is happy inside a worker (Phase 3
-  already showed a wasm instance booting in one, separately).
-- **`desynchronized: true`** was requested in the worker and not verified to be
-  honoured on an `OffscreenCanvas`. It is a latency hint, so a silent downgrade
-  costs smoothness, not correctness.
+  canvas plumbing, not that `stamp_tool` is happy inside a worker — though
+  Phase 3 already showed a wasm instance booting in one, separately. **This is
+  the only remaining gap.**
+- **No Safari / WebKit.** Third engine, untested, no machine to hand. Lower risk
+  than it was: the two engines that were tested agree exactly, including on the
+  error behaviour.
+
+### Closed since first writing
+
+- ~~One browser~~ — four browsers, two engines, above.
+- ~~No overlays~~ — `spike/overlays.html`, **9/9**. Two sibling canvases plus an
+  SVG sibling, same backing resolution and CSS, one transferred and one on the
+  main thread. Rects compared to 0.1px at rest, under `scale(2)`, under
+  translate+scale, and after the worker resized only the main canvas's backing
+  store. Every pairing stays pinned.
+- ~~`desynchronized` unverified~~ — `spike/desync.html`, **true in all four
+  shapes**: main-thread canvas, main-thread `OffscreenCanvas`, worker
+  transferred, worker standalone.
 
 ## Where this leaves ADR-024
 
