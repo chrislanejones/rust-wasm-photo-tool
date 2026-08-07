@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Engine-in-worker spike — Phase 3</title>
+    <style>
+      body { font: 14px ui-monospace, monospace; background: #14100e; color: #eee; padding: 24px; }
+      h1 { font-size: 16px; } table { border-collapse: collapse; margin-top: 12px; }
+      td, th { border: 1px solid #444; padding: 4px 10px; text-align: right; }
+      th:first-child, td:first-child { text-align: left; }
+      #out { white-space: pre; margin-top: 16px; }
+    </style>
+  </head>
+  <body>
+    <h1>Engine-in-worker spike — sync vs worker round-trip</h1>
+    <div id="out">running…</div>
+
+    <script type="module">
+      // THROWAWAY. Measures one cold-path op (adjust_sharpen) three ways on a
+      // large synthetic photo, so the migration decision has a number instead of
+      // an intuition.
+      import init, { ImageHorseTool } from "../pkg/stamp_tool.js";
+
+      const W = 4000, H = 3000;         // 12 MP — a large photo
+      const BYTES = W * H * 4;          // 48 MB RGBA
+      const RUNS = 5;
+      const log = (s) => (document.getElementById("out").textContent += "\n" + s);
+      const med = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+
+      function makePhoto() {
+        const px = new Uint8Array(BYTES);
+        for (let i = 0; i < BYTES; i += 4) {
+          px[i] = i % 251; px[i + 1] = (i >> 3) % 241; px[i + 2] = (i >> 5) % 239; px[i + 3] = 255;
+        }
+        return px;
+      }
+
+      document.getElementById("out").textContent = `photo ${W}x${H} = ${(BYTES / 1e6).toFixed(0)} MB RGBA, ${RUNS} runs`;
+
+      // ---- 1. synchronous, on the main thread (what we do today) ----------
+      await init();
+      const photo = makePhoto();
+      const syncTool = new ImageHorseTool(W, H);
+      syncTool.load_image(photo);
+
+      const syncMs = [];
+      for (let i = 0; i < RUNS; i++) {
+        const t0 = performance.now();
+        syncTool.adjust_sharpen(0.5);
+        const view = syncTool.get_image_data();
+        // The app flushes this view to a canvas; copying it is the fair
+        // comparison against the worker, which MUST copy to transfer.
+        const copy = new Uint8Array(view);
+        syncMs.push(performance.now() - t0);
+        if (copy.length !== BYTES) throw new Error("size mismatch");
+      }
+      log(`sync total        median ${med(syncMs).toFixed(1)} ms   [${syncMs.map(n => n.toFixed(0)).join(", ")}]`);
+
+      // ---- 2. worker: init + load (one-off costs) -------------------------
+      const worker = new Worker("./engine.worker.js", { type: "module" });
+      const call = (msg, transfer) =>
+        new Promise((res, rej) => {
+          const onMsg = (e) => {
+            if (e.data.type === "error") { worker.removeEventListener("message", onMsg); rej(new Error(e.data.message)); return; }
+            worker.removeEventListener("message", onMsg);
+            res(e.data);
+          };
+          worker.addEventListener("message", onMsg);
+          worker.postMessage(msg, transfer || []);
+        });
+
+      const initRes = await call({ type: "init", id: 0 });
+      log(`worker wasm init  ${initRes.ms.toFixed(1)} ms  (one-off)`);
+
+      const loadCopy = makePhoto();
+      const tLoad = performance.now();
+      const loadRes = await call({ type: "load", id: 1, rgba: loadCopy.buffer, width: W, height: H }, [loadCopy.buffer]);
+      log(`worker load       ${(performance.now() - tLoad).toFixed(1)} ms round-trip (inside ${loadRes.ms.toFixed(1)} ms)  (one-off)`);
+
+      // ---- 3. worker round-trip per operation ----------------------------
+      const rtMs = [], opMs = [], copyMs = [];
+      for (let i = 0; i < RUNS; i++) {
+        const t0 = performance.now();
+        const r = await call({ type: "op", id: 10 + i, amount: 0.5 });
+        rtMs.push(performance.now() - t0);
+        opMs.push(r.opMs); copyMs.push(r.copyMs);
+        if (r.rgba.byteLength !== BYTES) throw new Error("size mismatch");
+      }
+      log(`worker round-trip median ${med(rtMs).toFixed(1)} ms   [${rtMs.map(n => n.toFixed(0)).join(", ")}]`);
+      log(`  of which op     median ${med(opMs).toFixed(1)} ms`);
+      log(`  of which copy   median ${med(copyMs).toFixed(1)} ms`);
+
+      // ---- 4. FIXED round-trip cost, tiny payload ------------------------
+      // The cold-path number above is dominated by the op. What decides whether
+      // a PER-FRAME call can cross the boundary is the fixed cost of a round
+      // trip carrying almost nothing. 60fps leaves a 16.7 ms budget for
+      // everything, so this number is the one the hot-path sites live or die by.
+      const pingMs = [];
+      for (let i = 0; i < 50; i++) {
+        const t0 = performance.now();
+        await call({ type: "init", id: 100 + i }); // already inited: pure round trip
+        pingMs.push(performance.now() - t0);
+      }
+      const sorted = pingMs.slice().sort((a, b) => a - b);
+      log(`\nfixed round-trip  median ${med(pingMs).toFixed(3)} ms  p95 ${sorted[Math.floor(sorted.length * 0.95)].toFixed(3)} ms  (50 pings, empty payload)`);
+      log(`  frame budget    16.7 ms @60fps → round trip is ${((med(pingMs) / 16.7) * 100).toFixed(1)}% of one frame`);
+
+      const overhead = med(rtMs) - med(opMs) - med(copyMs);
+      log(`\nMESSAGING OVERHEAD median ${overhead.toFixed(1)} ms per operation`);
+      log(`sync ${med(syncMs).toFixed(1)} ms  vs  worker ${med(rtMs).toFixed(1)} ms  (${(med(rtMs) / med(syncMs)).toFixed(2)}x)`);
+      log(`crossOriginIsolated=${globalThis.crossOriginIsolated} SAB=${typeof SharedArrayBuffer !== "undefined"}`);
+      log("\nDONE");
+    </script>
+  </body>
+</html>
