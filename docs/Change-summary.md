@@ -3016,3 +3016,49 @@ still reads pixels back off the main canvas via `canvas.toBlob()`
 canvas element is re-created on ordinary tool switches, which in worker mode
 would leave the worker drawing into a detached surface with nothing thrown and
 a blank canvas shown.
+
+## v7.77 Change Summary — 2026-08-08
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | The Share button's export dimensions were read in JSX prop position, so `export_width_excluding_background()` and `_height_` ran on **every AppShell render**. Each one calls `composite_excluding_background()` — a whole-document composite plus `tight_bbox` — to return one integer. Moved into `useExportDimensions`, an effect keyed on the document version | **Fixed** |
+| 2 | JPEG / WebP / AVIF export read the pixels back off the main canvas with `canvas.toBlob()`. They now read the engine and encode through `encodeRgba`, which hands the work to an encode worker where one is available. `useExport` no longer references the canvas at all | **Changed** |
+
+**#1 only bit the `Photo only` preference.** The default ("Include canvas")
+takes the other branch of the ternary, which is why it went unnoticed — and why
+the fix changes nothing for most users. Measured on the production build with
+`Photo only` set:
+
+| Scenario | Before | After |
+|---|---|---|
+| Two zoom clicks, export dialog **closed** | **24 composites** | **0** |
+| Opening the export dialog | — | 2 |
+
+**It was deliberately not added to `syncState`**, which was the obvious home —
+it already publishes `width`/`height` right beside these and both call sites
+already fell back to it. But `syncState` runs after every mutation, so hanging
+two whole-document composites off it would make every brush dab pay for a
+number only the export dialog reads.
+
+**#2 clears ADR-024 Stage-4 blocker #2.** After `transferControlToOffscreen()`
+the main thread cannot call `toBlob` on that canvas, so the lossy formats would
+have thrown. It also stops coupling the exported bytes to whatever happens to
+be painted: the engine is the document, the canvas is a view of it.
+
+Verified on the production build, since gates cannot see either change:
+
+| Check | Result |
+|---|---|
+| `canvas.toBlob` calls during a JPEG export | **0** |
+| Engine `get_image_data()` calls | **1** |
+| Blob produced | `image/jpeg`, 384,433 B, magic `ffd8ffe0` |
+| Decoded dimensions vs engine | **1395×2078 = 1395×2078** |
+
+⚠️ `exportAs` in `useExport.ts` is a **zero-reference export** — reachable only
+through the `useCloneStamp` facade and called nowhere. It was changed to match
+but deliberately not deleted: a zero-reference export in this codebase was a
+missing wire rather than dead code the last time one was found.
+
+Remaining Stage-4 blocker: **canvas element identity**. The element is
+re-created on ordinary tool switches, which in worker mode would leave the
+worker drawing into a detached surface — nothing thrown, blank canvas shown.

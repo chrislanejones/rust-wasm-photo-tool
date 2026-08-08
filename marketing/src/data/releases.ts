@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.77",
+    date: "2026-08-08",
+    headline: "Exporting stops doing work it doesn't need to",
+    entries: [
+      {
+        tag: "perf",
+        text: "With exports set to \"Photo only\", the app was compositing the whole image twice on every redraw just to work out how big the export would be — even with the download dialog shut. It now works that out once, when you open the dialog.",
+      },
+      {
+        tag: "perf",
+        text: "JPEG, WebP and AVIF exports read the image from the engine instead of scraping it back off the canvas, and the encoding moves off the main thread where the browser allows it.",
+      },
+    ],
+  },
+  {
     version: "v7.76",
     date: "2026-08-08",
     headline: "Dragging a shape no longer redraws your photo",

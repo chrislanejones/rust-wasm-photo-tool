@@ -84,6 +84,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.77 — 2026-08-08
+
+**Exporting stops doing work it doesn't need to.** If you'd set exports to
+"Photo only", the app was compositing the whole image twice on every redraw
+just to work out how big the export would be — even with the download dialog
+shut. It now works that out once, when you open the dialog.
+
+JPEG, WebP and AVIF exports also read the image from the engine now instead of
+scraping it back off the canvas, and the encoding moves off the main thread
+where the browser allows it.
+
+<details><summary>Older releases</summary>
+
 ### v7.76 — 2026-08-08
 
 **Dragging a shape, arrow or crop box no longer redraws your photo.** The
@@ -97,8 +110,6 @@ band is a clear instead of a full-resolution copy.
 Copying to the clipboard also stops rewriting the document. It was calling a
 flatten on the live image first; the copy never needed it, because the
 composite already draws text and shapes.
-
-<details><summary>Older releases</summary>
 
 ### v7.75 — 2026-08-08
 

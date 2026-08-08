@@ -81,6 +81,7 @@ import { useMaskActions } from "./session/useMaskActions";
 import { useSelectionActions } from "./session/useSelectionActions";
 import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
+import { useExportDimensions } from "./session/useExportDimensions";
 import { useImageSession } from "./session/useImageSession";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
@@ -1161,6 +1162,15 @@ export function AppShell() {
     handleCopyToClipboard,
     handleExport,
   } = useCanvasActions({ stamp, exportFormat, quality, exifKeep, exportCanvasBackground });
+
+  // The size the export will actually produce. Computed in an effect, because
+  // the "Photo only" branch costs a whole-image composite per call and used to
+  // run twice per render from JSX prop position — see the hook's header.
+  const exportDims = useExportDimensions({
+    stamp,
+    active: exportDialogOpen,
+    excludeBackground: !exportCanvasBackground,
+  });
 
   const handleDeleteAll = useCallback(() => {
     setDeleteAllOpen(true);
@@ -2881,18 +2891,8 @@ export function AppShell() {
                   1,
                 );
               }}
-              canvasW={
-                exportCanvasBackground
-                  ? stamp.state.width
-                  : (stamp.toolRef.current?.export_width_excluding_background() ??
-                    stamp.state.width)
-              }
-              canvasH={
-                exportCanvasBackground
-                  ? stamp.state.height
-                  : (stamp.toolRef.current?.export_height_excluding_background() ??
-                    stamp.state.height)
-              }
+              canvasW={exportDims.width}
+              canvasH={exportDims.height}
               fileName={photos.find((p) => p.id === activePhotoId)?.name}
               disabled={!hasImage}
               onShared={() => setExportDialogOpen(false)}

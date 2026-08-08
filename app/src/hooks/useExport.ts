@@ -1,16 +1,35 @@
-// Export — encoded output (PNG via the engine, JPEG/WebP/AVIF via the canvas)
-// and the Rust-scaled thumbnails the gallery strip runs on.
+// Export — encoded output and the Rust-scaled thumbnails the gallery strip
+// runs on. EVERY format now reads the engine, never the <canvas>.
 //
 // Extracted VERBATIM from useCloneStamp.ts in the clonestamp-split refactor.
-// PNG comes straight from `export_png()` (composites every visible layer — no
-// destructive flatten); the lossy formats read the <canvas> via toBlob after a
-// flush, so what exports is exactly what is on screen.
+// PNG always came straight from `export_png()` (composites every visible layer
+// — no destructive flatten). The lossy formats used to `flushToCanvas()` and
+// then `canvas.toBlob()`, i.e. read the pixels back off the main canvas
+// element. Three reasons that changed:
+//
+//  1. It made this hook a reader of the main canvas, which blocks ADR-024
+//     Stage 4 — after `transferControlToOffscreen()` the main thread cannot
+//     call `toBlob` on that element at all, and the lossy formats would throw.
+//  2. `canvas.toBlob` encodes on the main thread. `encodeRgba` hands the
+//     pixels to an encode worker where one is available and only falls back to
+//     a main-thread OffscreenCanvas if not.
+//  3. It coupled the exported bytes to whatever happened to be painted. Both
+//     paths agreed in practice — `flushToCanvas` paints the same composite
+//     `get_image_data()` returns — but "what is on screen" and "what the
+//     document is" are two different sources of truth, and only one of them is
+//     the engine's.
+//
+// The `flushToCanvas` calls went with it: nothing here reads the canvas now,
+// so there is nothing to bring up to date first.
 import { useCallback, useMemo } from "react";
-import { extFromMime } from "@/lib/exportImage";
+import { encodeRgba, extFromMime } from "@/lib/exportImage";
 import type { EngineCore } from "./useEngineCore";
 
 export function useExport(engine: EngineCore) {
-  const { toolRef, canvasRef, flushToCanvas } = engine;
+  // No `canvasRef` and no `flushToCanvas`: this hook no longer touches the
+  // main canvas at all. Keeping either would re-create the Stage-4 coupling
+  // the header describes.
+  const { toolRef } = engine;
 
   // ── Export ────────────────────────────────────────────────────────────────
   // Derive a download filename: strip original extension, append "-revised" + new ext.
@@ -42,68 +61,51 @@ export function useExport(engine: EngineCore) {
       quality: number = 0.92,
     ): Promise<Blob | null> => {
       const t = toolRef.current;
+      if (!t) return null;
       if (format === "png") {
-        if (!t) return null;
         return new Blob([new Uint8Array(t.export_png())], { type: "image/png" });
       }
-      const canvas = canvasRef.current;
-      if (!canvas) return null;
-      flushToCanvas();
-      const mimeMap: Record<string, string> = {
-        jpeg: "image/jpeg",
-        webp: "image/webp",
-        avif: "image/avif",
-      };
-      return await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob((blob) => resolve(blob), mimeMap[format], quality),
+      // `get_image_data()` is the same composite `flushToCanvas` paints — every
+      // visible layer plus live overlays — so the bytes are unchanged from the
+      // old toBlob path, they just no longer travel via the canvas element.
+      return await encodeRgba(
+        new Uint8Array(t.get_image_data()),
+        t.width(),
+        t.height(),
+        format,
+        quality,
       );
     },
-    [toolRef, canvasRef, flushToCanvas],
+    [toolRef],
   );
 
   const exportAs = useCallback(
-    (format: "png" | "jpeg" | "webp" | "avif", quality: number = 0.92, sourceName = "image") => {
+    async (format: "png" | "jpeg" | "webp" | "avif", quality: number = 0.92, sourceName = "image") => {
       if (format === "png") {
         exportPng(sourceName);
         return;
       }
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      // Non-PNG export reads the canvas pixels via toBlob. flushToCanvas paints
-      // the full composite (all visible layers + overlays), so just ensure the
-      // canvas is current — no destructive flatten needed.
-      flushToCanvas();
-      const mimeMap: Record<string, string> = {
-        jpeg: "image/jpeg",
-        webp: "image/webp",
-        avif: "image/avif",
-      };
       const extMap: Record<string, string> = {
         jpeg: ".jpg",
         webp: ".webp",
         avif: ".avif",
       };
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          // Name the file after what the encoder ACTUALLY produced, not what
-          // was asked for. An unsupported type falls back to PNG silently (see
-          // lib/encodeSupport.ts), and `extMap[format]` would then stamp
-          // ".avif" onto PNG bytes. `blob.type` is the ground truth; extMap is
-          // only the fallback for the rare blob with no type at all.
-          const ext = blob.type ? extFromMime(blob.type) : extMap[format];
-          a.download = revisedName(sourceName, ext || extMap[format]);
-          a.click();
-          URL.revokeObjectURL(url);
-        },
-        mimeMap[format],
-        quality,
-      );
+      const blob = await exportBlob(format, quality);
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      // Name the file after what the encoder ACTUALLY produced, not what was
+      // asked for. An unsupported type falls back to PNG silently (see
+      // lib/encodeSupport.ts), and `extMap[format]` would then stamp ".avif"
+      // onto PNG bytes. `blob.type` is the ground truth; extMap is only the
+      // fallback for the rare blob with no type at all.
+      const ext = blob.type ? extFromMime(blob.type) : extMap[format];
+      a.download = revisedName(sourceName, ext || extMap[format]);
+      a.click();
+      URL.revokeObjectURL(url);
     },
-    [canvasRef, exportPng, flushToCanvas],
+    [exportPng, exportBlob],
   );
 
   // ── Thumbnail generation ──────────────────────────────────────────────────
