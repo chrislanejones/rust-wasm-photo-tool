@@ -68,8 +68,8 @@ first.
 | **1** | **One port, no worker.** ✅ **DONE 2026-08-07.** `lib/engine/port.ts` is the named Stage-3 swap point (identity today); `engineOwnership.contract.test.ts` fails on a second writer, an undeclared engine, or a bypassed seam. NOT the ~152-call-site rewrite first imagined — the ownership invariant already held (`toolRef` created once, assigned only in `useEngineCore`), so the missing piece was the seam and the guard, not churn | no behaviour change | plain revert |
 | **2** | **The read-modify-write sites.** ✅ **DONE 2026-08-07 — 9 → 3, all FEED sites gone.** Two engine methods absorbed the decisions: `flatten_text_annotations` returns whether it flattened, and `blur_whole_image` computes its own geometry. Four JS guards deleted. The 3 remaining are 2 that dissolve at Stage 4 (`flushToCanvas`) and 1 false positive (`align_annotation`'s return is a mutation's result, not stale-able state) | no behaviour change | revert **+ `build:wasm`** |
 | **3** | **The worker exists, off by default.** ✅ **DONE 2026-08-07.** `workers/engine.worker.ts` (own wasm instance, one-at-a-time FIFO `drain()`) + `lib/engine/workerClient.ts` (request ids, 30 s timeout that also withdraws the queued call, `failAll` on crash). All four gaps the Phase 3 spike had are closed. Deliberately **not** Comlink — see the file header; Comlink gives correct results with no ordering promise, and arrival order *is* the op log. Flag `ih_engine_worker`, default OFF. The build emits **no worker chunk**, because nothing imports it yet — that is the honest status, not an oversight | nothing user-visible | flag stays off |
-| **3.5** | **The 121 async conversions.** ADDED 2026-08-07 — the stage list had an invisible middle. `scripts/engine-call-audit.mjs` counts 209 call sites: 76 fire-and-forget (a postMessage suffices), **121 value-consumed** (each needs a Promise *and* a call-site restructure), 12 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. Batches by file — `useEngineCore` 46, `useTransforms` 25, `AppShell` 23, `useSelectionActions` 22 are about half between them. Same flag, still OFF | nothing user-visible | flag stays off |
-| **4** | **Canvas transfer.** `canvas.width`/`height` assignments (`useEngineCore` ~240, ~324, ~406) move into the worker as messages; flush moves with them. Still flagged | nothing user-visible | flag stays off |
+| **3.5** | **The 162 async conversions.** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. Batches by file, value-consumed only — `editPersistence` 18, `useEngineCore` 17, `useSelectionActions` 15, `openraster/export` 13, `useLayers` 13, `useEditPersistence` 12. Same flag, still OFF | nothing user-visible | flag stays off |
+| **4** | **Canvas transfer.** **SCOPE CORRECTED 2026-08-08 — it is not just the `width`/`height` assignments; see "Stage 4's real scope" below.** Three subsystems must leave the main canvas first (engine flush, the arrow/shapes/crop rubber-band preview, lossy export), and canvas element *identity* has to be owned. Still flagged | nothing user-visible | **NOT by the flag alone** — see the kill-switch note |
 | **5** | **Measure, then flip.** A/B the 470 ms freeze against master. Default ON only if it is actually gone, with `ih_engine_worker=0` as the kill switch | the feature | kill switch |
 
 **Why 3.5 exists.** It was not in the original list, and its absence is the
@@ -78,19 +78,167 @@ kind of gap this ADR's own pre-mortem warns about: Stage 3 ships a worker, Stage
 flippable. Discovered while starting Stage 3 — the seam was ready and the call
 sites were not. Note the two counts are different lists and neither subsumes the
 other: **Stage 2 fixed 6 read-modify-WRITE sequences** (a read whose value
-informs a later mutation, 9 → 3); **Stage 3.5 is the 121 plain value-consumed
+informs a later mutation, 9 → 3); **Stage 3.5 is the 162 plain value-consumed
 READS**, which were never in that count. Reducing one did not reduce the other.
 
-**The part of 3.5 that has no answer yet.** Three of the 121 are read *during
-render* — `selection_preview`, `measure_text` and `text_ink_offset` in
-`CanvasArea`, called to lay text out while React is building the tree. A render
-pass cannot `await`. So those three are not a conversion at all; they need a
-synchronous local answer, which means either a mirrored snapshot on the main
-thread or a layout cache. That matters for the ordering of 3.5: converting the
-other ~118 first and meeting these last would be discovering the hard
-requirement after the cheap work is spent. It also partly rehabilitates the
-scalar mirror (preserved as tag `abandoned/scalar-mirror`), which was shelved
-for covering only 8 sites — the count was never the argument for it here.
+**The recount, 2026-08-08 — the audit was undercounting by a third.**
+`engine-call-audit.mjs` matched engine calls by receiver name and only knew
+three literal names (`toolRef.current`, `tool`, `engine`). The dominant shape in
+this codebase is an alias — `const t = toolRef.current; t.width()` — and every
+one of those was invisible. That hid **93 of 290 call sites (33%)**, including
+`editPersistence.ts` entirely and most of `useTransforms`, `useLayers` and
+`usePaintTool`. The script now resolves per-file aliases; the header records the
+gap that is still open (handles arriving as typed parameters).
+
+The per-file batching numbers in the old table were the worst casualty, because
+they mixed totals with the value-consumed subset. `useTransforms` was listed as
+the second-biggest job at 25; it has **20 sites of which only 3 are
+value-consumed** — 17 are fire-and-forget, so it is one of the cheapest files,
+not the second-hardest. The genuinely biggest file, `editPersistence.ts` at 18
+value-consumed, was not in the list at all. **Anyone batching Stage 3.5 off the
+old numbers would have started in close to the wrong place.**
+
+**The part of 3.5 that had no answer — ANSWERED 2026-08-08.** It needs neither
+a mirrored snapshot nor a new mechanism. The paragraph that used to sit here
+was wrong in both directions: it counted a site that is not a render read, and
+missed two that are.
+
+The claim was: *three of the 121 are read during render — `selection_preview`,
+`measure_text` and `text_ink_offset` in `CanvasArea` — so they need a
+synchronous local answer, a mirrored snapshot or a layout cache.* What is
+actually there:
+
+| Site | Method | Render read? | Reads engine state? | What it needs |
+|---|---|---|---|---|
+| `CanvasArea.tsx:688` | `selection_preview` | **No** | yes | Nothing special — it sits inside a `requestAnimationFrame` callback, which can `await`. An ordinary Stage-3.5 conversion |
+| `CanvasArea.tsx:2018` | `measure_text` | Yes | **No — pure** | A memo cache. `self` is never touched |
+| `CanvasArea.tsx:2185` | `text_ink_offset` | Yes | **No — pure** | Same cache |
+| `AppShell.tsx:2882` | `export_width_excluding_background` | Yes | yes | Lift out of render (see below) |
+| `AppShell.tsx:2888` | `export_height_excluding_background` | Yes | yes | Same |
+
+**The two text metrics are pure functions.** `measure_text` is
+`crate::text::measure(text, font_size, bold)` (src/lib.rs:3457 → src/text.rs:220)
+and `text_ink_offset` is `crate::layer::annotation_ink_offset(...)`
+(src/annotations.rs:1131 → src/layer.rs:649). Both targets are **free
+functions**; both wrappers take `&self` purely as a wasm-bindgen calling
+convention and read no field. That collapses the problem the old paragraph
+described. A *mirror* of engine state has to be invalidated whenever the engine
+changes — that cost is what made this look hard. A *cache of a pure function
+keyed on its arguments can never go stale*, so there is nothing to invalidate
+and nothing to keep in step. The scalar mirror
+(tag `abandoned/scalar-mirror`) is not rehabilitated by this; it is not needed.
+
+**The two AppShell reads were never counted, and they are the expensive ones.**
+They are JSX prop values on `<ShareButton>`, so they evaluate whenever AppShell
+renders. Each one calls `composite_excluding_background()`, which composites
+every layer into a full-document RGBA buffer and then runs `tight_bbox` over it
+— **a whole-image composite to return one integer**, twice per render.
+
+They are guarded by a ternary on the `exportCanvasBackground` preference, and
+its default ("Include canvas") takes the other branch, so the default path
+costs nothing. With the preference set to "Photo only" the guard opens:
+
+Measured twice, on different builds and by different methods. Both confirm it;
+**take the production row as the user-facing number.**
+
+| Build | Method | `Include canvas` (default) | `Photo only` |
+|---|---|---|---|
+| dev, 2.9 MP | count calls via prototype patch | **0** calls | **24** composites, 525.7 ms of engine time |
+| **production, 3.0 MP** | `PerformanceObserver` long tasks | **0** long tasks, 0 ms | **2** long tasks, **105 ms** blocked |
+
+The two figures are not the same measurement and should not be reconciled into
+one. The dev run instruments every call and sums total engine time; the
+production run counts only tasks over 50 ms, so it is a floor on total work and
+a fair estimate of *perceptible* blocking. Dev also double-renders under
+StrictMode, so its call count overstates production.
+
+What matches exactly is the shape: **zero on the default preference, one
+composite per zoom click on `Photo only`.** That is the defect.
+
+Instrumentation detail worth keeping: the dev run's first result was 0 calls,
+which is also what a broken probe returns — a control call proving the patch
+intercepted came before the zero was trusted. A single call costs **29.7 ms**
+in wasm at 2.9 MP; native-release bench puts the pair at 41.6 + 39.1 ms at
+12 MP, so expect this to scale several-fold on a large photo.
+
+**That is a live defect on master, not a worker problem**, and it is
+independent of this ADR — a user who picks "Photo only" pays a whole-image
+composite twice on every AppShell render, for two integers only read while the
+export dialog is open. The fix is to lift them out of render (an effect keyed
+on the open dialog, or two more fields on `syncState`, which already publishes
+`width`/`height` right beside them and which both call sites already fall back
+to). Either shape is `await`-able, so under the worker these become ordinary
+Stage-3.5 conversions too. **Do not add them to `syncState` naively** —
+`syncState` runs after every mutation, and hanging two full composites off it
+would be far worse than the bug.
+
+**Net: zero of the five need a synchronous engine read across the boundary**,
+so the ordering worry that put this paragraph here is resolved — nothing in
+3.5 has to wait for a new mechanism to be designed first.
+
+### Stage 4's real scope — investigated 2026-08-08
+
+`transferControlToOffscreen()` is permanent **for the element it is called on**.
+Afterwards, on the main thread, `getContext()`, `toBlob()`/`toDataURL()` and any
+`width`/`height` **assignment** all throw `InvalidStateError`. Reads of
+`width`/`height`, `getBoundingClientRect`, styles and events keep working.
+
+Audited every main-thread touch of the main canvas (129 of them). Three
+subsystems break, and **the stage list only ever named one**:
+
+| Subsystem | Sites | In the stage list? | Why it breaks |
+|---|---|---|---|
+| Engine flush | `useEngineCore` 199, 260, 343, 425 + the `width`/`height` assignments | yes | intended — it moves with the engine |
+| **Rubber-band preview** (arrow / shapes / crop) | `useDrawingTools` 731, 771, 821 | **no** | `getImageData` on mousedown, `putImageData` + preview draw **per pointermove**, on the main canvas |
+| **Lossy export** (JPEG / WebP / AVIF) | `useExport` 58, 86 | **no** | `canvas.toBlob()` reads pixels back off the element. PNG is unaffected — it goes through `export_png()` |
+
+**This retires measured finding #5.** That finding reads *"The main canvas has
+exactly one writer (`useEngineCore`). Every overlay either draws to its own
+canvas or is SVG; `CanvasArea` only measures."* `useDrawingTools` is a second
+writer and it writes on every pointermove — `ctx.putImageData(preSnapshot, 0, 0)`
+followed by `drawArrowPreview`/`drawShapePreview`. `CanvasArea` measuring only
+is still true; the single-writer claim is not.
+
+It is also a standing violation of the project invariant *"the engine owns
+pixels — no canvas 2D pixel manipulation in React land"*. Stage 4 is where that
+debt comes due: the preview has to move to its own overlay canvas or into the
+engine before the main canvas can be transferred.
+
+### The one-way door, and why the flag is not enough
+
+The stage table used to say Stage 4 was reversible by "flag stays off". For a
+page **load** that is true — no transfer happens with the flag off. But
+`ih_engine_worker=0` is specified as a *runtime kill switch*, and once the
+element is transferred, nothing can give its 2D context back. **A kill switch
+flipped mid-session cannot restore the main-thread path on that element.**
+
+The fix is cheap and the codebase already runs it: **never transfer the
+long-lived element — key the `<canvas>` on the mode so switching remounts it.**
+A remounted element is a new DOM node and was never transferred.
+
+`CanvasArea.tsx:528–556` already documents and handles exactly this: *"The
+`<canvas>` DOM element gets re-created whenever the surrounding tool wrapper
+changes... WASM still holds the pixels but they need to be re-blitted"*, with a
+`useEffect` that re-flushes on ref change, dimension change and container
+resize. Losing the bitmap on a remount is already normal and already recovered
+from, because the engine owns the pixels.
+
+⚠️ **That same behaviour is a hazard in the other direction, and it is the
+sharpest thing on this page.** The canvas element is re-created on ordinary tool
+switches — not just on a mode flip. In worker mode a remount leaves the worker
+holding the OffscreenCanvas of a **detached** element: it keeps drawing, nothing
+throws, and the user sees a blank canvas. So Stage 4 must own canvas element
+*identity* — every remount re-transfers and the worker drops the stale handle —
+and that is a larger job than moving the `width`/`height` assignments.
+
+**Recommended ordering**, since none of it needs the worker to exist:
+
+| # | Work | Ships on its own? |
+|---|---|---|
+| 1 | Move the rubber-band preview off the main canvas | yes — also pays down the pixels-in-React-land invariant |
+| 2 | Route lossy export through the engine like PNG already is | yes |
+| 3 | Make canvas element identity explicit and remount-safe | yes |
+| 4 | Then transfer | needs 1–3 |
 
 Stage 5's gate is the pre-mortem's last line: *"Nobody measured after. The
 freeze moved rather than disappeared."* The flip does not happen on the
@@ -141,8 +289,15 @@ decision.
 4. **The boundary costs 0.100 ms** median (p95 0.300 ms) — 0.6% of a 60fps
    frame. Carrying a 48 MB transferable adds 0.5 ms. Latency is not the problem.
 
-5. **The main canvas has exactly one writer** (`useEngineCore`). Every overlay
-   either draws to its own canvas or is SVG; `CanvasArea` only measures.
+5. ~~**The main canvas has exactly one writer** (`useEngineCore`). Every overlay
+   either draws to its own canvas or is SVG; `CanvasArea` only measures.~~
+   **RETIRED 2026-08-08 — this is false and it was load-bearing.**
+   `useDrawingTools` (731, 771, 821) takes a 2D context on the main canvas and
+   writes to it on every pointermove to draw the arrow/shapes/crop rubber-band
+   preview. `useExport` (58, 86) reads pixels back off it via `toBlob` for the
+   lossy formats. The `CanvasArea`-only-measures half is still true. See
+   "Stage 4's real scope" — this finding is cited as the reason canvas transfer
+   is "unusually clean here", and that conclusion does not survive it.
 
 ## The decision to make
 
@@ -155,8 +310,12 @@ during render.** Any option must be judged on that, not on milliseconds.
 Move the engine and `transferControlToOffscreen()` the main canvas.
 
 - **For:** the main thread stops doing pixel work entirely; the 470 ms freeze
-  becomes a spinner that actually spins. Canvas transfer is unusually clean here
-  because of the single-writer finding.
+  becomes a spinner that actually spins. ~~Canvas transfer is unusually clean
+  here because of the single-writer finding.~~ **That clause is withdrawn —
+  finding #5 was retired 2026-08-08.** Transfer is not clean here: two
+  subsystems outside the engine still need a 2D context on the main canvas.
+  The decision for A stands (it rested on the OffscreenCanvas and op-ordering
+  measurements, not on this), but Stage 4 is more expensive than it looked.
 - **Against:** all 117 rewrites, plus moving `canvas.width/height` assignments
   into the worker, plus a real message protocol (ids, queueing, cancellation,
   errors). The two `CanvasArea` render-time reads (`measure_text`,

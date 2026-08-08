@@ -1197,4 +1197,52 @@ mod magic_eraser_brush_tests {
             "a selection-mask stroke touches no pixels, so it must not record an op"
         );
     }
+
+    /// The property the Copy path now depends on: the COMPOSITE already draws
+    /// overlays, so nothing has to be flattened into pixels first.
+    ///
+    /// `handleCopyToClipboard` used to call `flatten_text_annotations()` on the
+    /// live engine before reading it. Reading this crate says that should push
+    /// a "Flatten" snapshot into the user's undo history on every Copy and turn
+    /// live text into pixels — `flatten_text_annotations` calls `snap("Flatten")`
+    /// and then `mem::take`s both overlay lists.
+    ///
+    /// **It does neither in practice, and this comment said it did until QC
+    /// checked.** Measured on the shipped app 2026-08-08: no Flatten entry
+    /// appears in the history, and the annotation is still selectable after a
+    /// Copy. The call reports the ACTIVE layer only and the text generally is
+    /// not on it, so it returns `false` and does nothing.
+    ///
+    /// So the call was removed as hardening, not as a fix: a read path must not
+    /// be able to write to the document, and the only reason this one currently
+    /// doesn't is which layer happens to be selected. The removal is safe
+    /// because of the property below — if someone ever makes the composite skip
+    /// overlays, the JS has no guard left and copies would silently lose the
+    /// annotation, so the guard is here instead.
+    #[test]
+    fn the_composite_draws_overlays_without_flattening() {
+        let mut t = ImageHorseTool::new(40, 40);
+        t.load_image(&solid(40, 40, [200, 100, 50, 255]));
+        let clean = t.get_image_data();
+
+        // A filled rectangle in a colour nothing else in the image uses.
+        t.add_shape_annotation(
+            0, 8.0, 8.0, 32.0, 32.0, "#0000ff", 2.0, 0, 1, "#0000ff", "#0000ff", 0, 0,
+        );
+
+        let with_overlay = t.get_image_data();
+        assert_ne!(
+            clean, with_overlay,
+            "adding a shape must change the composite WITHOUT any flatten call — \
+             the Copy path deleted its flatten because of this"
+        );
+
+        // And the overlay must still be an overlay: flattening is what moves it
+        // into the buffer, so until then the annotation list is non-empty.
+        assert_eq!(
+            t.shape_annotation_count(),
+            1,
+            "reading the composite must not consume the annotation"
+        );
+    }
 }

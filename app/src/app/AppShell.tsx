@@ -249,6 +249,10 @@ const BOOT_MIN_SPLASH_MS = 900;
 
 export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // The arrow/shapes/crop rubber-band surface. Lives here only because
+  // `useDrawingTools` (which draws on it) and `CanvasArea` (which mounts it)
+  // both hang off this component; it carries no logic.
+  const drawPreviewRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stamp = useCloneStamp(canvasRef);
   const { savePhotoEdit, loadPhotoEdit, deletePhotoEdit, duplicatePhotoEdit, clearAllEdits } = useEditPersistence();
@@ -1356,6 +1360,7 @@ export function AppShell() {
   const drawingTools = useDrawingTools({
     toolRef: stamp.toolRef,
     canvasRef,
+    previewRef: drawPreviewRef,
     activeTool: effectiveDrawingTool,
     settings: toolSettings,
     flushToCanvas: flushAndSync,
@@ -3136,6 +3141,7 @@ export function AppShell() {
                       <div style={{ position: "absolute", inset: 0 }}>
                         <CanvasArea
                           ref={canvasRef}
+                          drawPreviewRef={drawPreviewRef}
                           hookResult={effectiveStamp}
                           brushDiameter={diameter}
                           cursorPos={pos}
@@ -3224,6 +3230,7 @@ export function AppShell() {
                   <div className="canvas-fullsize-slot">
                     <CanvasArea
                       ref={canvasRef}
+                      drawPreviewRef={drawPreviewRef}
                       hookResult={effectiveStamp}
                       brushDiameter={diameter}
                       cursorPos={pos}

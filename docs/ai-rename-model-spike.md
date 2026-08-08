@@ -21,6 +21,23 @@ nouns.
 The header also says a caption model "does not run offline". **That claim is
 now out of date**, and this spike is the evidence.
 
+### The control — what shipped `describe.rs` scores today
+
+Stage 6 has to beat something, and this is it. From the QC pass over 12 photos
+(reported by the QC terminal, 2026-08-06 session — **not re-measured here**):
+
+| Measure | Shipped `describe.rs` |
+|---|---|
+| Names containing any true subject word | **2 / 12** |
+| `{kind}` slot | said `photo` **12 / 12** |
+| Skin heuristic | labelled a car, a house and a volcano `portrait` |
+| The one actual person in the set | came back **empty** |
+
+The skin-ratio row is the sharpest one: the heuristic is not merely weak, it is
+anti-correlated on this sample — it fired on three photos with no person in
+them and stayed silent on the only photo with one. Any stage-6 comparison that
+does not re-run these 12 is comparing against a number nobody has reproduced.
+
 ## Candidates
 
 | Model | Size shipped | Tokyo street | Woman with daisies |

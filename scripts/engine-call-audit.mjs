@@ -8,6 +8,14 @@
 //
 // Method names come from the engine's own .d.ts rather than a hand-written list,
 // so a method added to the engine cannot silently escape the audit.
+//
+// KNOWN REMAINING GAP (2026-08-08). Receivers are matched by name: the literal
+// handles, plus locals bound from `toolRef.current` in the same file. An engine
+// handle that arrives as a typed PARAMETER (`function f(t: ImageHorseTool)`) is
+// only counted when that file happens to also bind an alias of the same name —
+// true in editPersistence.ts, not guaranteed anywhere else. So these counts are
+// a floor, not a total. Fixing it properly wants the TS type-checker, not a
+// regex; until then, do not treat a file's absence here as proof it is clean.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -41,17 +49,39 @@ function walk(dir, out = []) {
 const HOT_FILE = /useDrawingTools|useCloneStamp|usePaintTool|useMagicEraser|CanvasArea|LassoOverlay|useMoveLayerTool|usePastePlacementTool|useColorPicker/;
 const HOT_CTX = /pointermove|onPointerMove|requestAnimationFrame|flushToCanvas|hover|preview|stroke|drag/i;
 
+// Receivers this audit used to recognise. It only ever matched these three
+// literal names, so `const t = toolRef.current; t.width()` — the dominant shape
+// in useTransforms, editPersistence, useLayers and usePaintTool — was invisible.
+// That hid 93 of 285 call sites (33%), and ADR-024 Stage 3.5 was scoped off the
+// undercount. Local aliases are now resolved per file; see `aliasesIn`.
+const LITERAL_RECEIVER = /^(?:toolRef\.current|hookResult\.toolRef\.current|tool|engine)$/;
+
+/** Names bound from the engine handle somewhere in this file. */
+function aliasesIn(text) {
+  const out = new Set();
+  for (const m of text.matchAll(
+    /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:[A-Za-z_$][\w$]*\.)?toolRef\.current/g,
+  )) {
+    out.add(m[1]);
+  }
+  return out;
+}
+
 const rows = [];
 for (const file of walk(SRC)) {
   const rel = relative(ROOT, file);
-  const lines = readFileSync(file, "utf8").split("\n");
+  const text = readFileSync(file, "utf8");
+  const lines = text.split("\n");
+  const aliases = aliasesIn(text);
   lines.forEach((line, i) => {
-    // a call on the engine handle: tool.foo(  /  toolRef.current.foo(  /  engine.foo(
-    const re = /(?:toolRef\.current|\btool\b|\bengine\b)\??\.([a-z_][a-z0-9_]*)\s*\(/gi;
+    // A call on the engine handle, by literal name OR via a local alias.
+    const re = /([A-Za-z_$][\w$.]*)\??\.([a-z_][a-z0-9_]*)\s*\(/g;
     let m;
     while ((m = re.exec(line)) !== null) {
-      const name = m[1];
+      const recv = m[1];
+      const name = m[2];
       if (!methods.has(name)) continue;
+      if (!LITERAL_RECEIVER.test(recv) && !aliases.has(recv)) continue;
       const before = line.slice(0, m.index);
       // Consumed if the call feeds an assignment, condition, return, arg, await,
       // property access, or template — i.e. anything but a bare statement.

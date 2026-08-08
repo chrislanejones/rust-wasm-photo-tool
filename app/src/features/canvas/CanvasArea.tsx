@@ -26,6 +26,7 @@ import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
+import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
@@ -112,6 +113,11 @@ interface AnnotationBox {
 
 interface Props {
   hookResult: ReturnType<typeof useCloneStamp>;
+  /** Ref for the arrow/shapes/crop rubber-band surface. Owned by AppShell only
+   *  because `useDrawingTools` lives there too and needs the same element; the
+   *  canvas itself is mounted here, beside the main one, so it inherits the
+   *  fit-scale and pan/zoom transform for free. */
+  drawPreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   brushDiameter: number;
   cursorPos: { x: number; y: number };
   cursorVisible: boolean;
@@ -390,6 +396,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
   (
     {
       hookResult,
+      drawPreviewRef,
       brushDiameter,
       cursorPos,
       cursorVisible,
@@ -1294,6 +1301,24 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           }
           onMouseOut={onCanvasLeave}
         />
+        {/* ── Arrow / shapes / crop rubber band ────────────────────────────
+            Transparent sibling at image resolution. The preview used to be
+            drawn straight onto the main canvas via getImageData/putImageData,
+            which made this hook a second writer to the engine's own output
+            surface — see ADR-024 "Stage 4's real scope". Nothing in React
+            draws on the main canvas now. */}
+        {imgW > 0 && imgH > 0 && (
+          <DrawPreviewOverlay
+            ref={drawPreviewRef}
+            width={imgW}
+            height={imgH}
+            cssWidth={canvasCss?.w}
+            cssHeight={canvasCss?.h}
+            panOffset={panOffset}
+            zoom={zoom}
+          />
+        )}
+
         <CompareSlider canvasEl={canvasRef.current} />
 
         {/* ── Magnetic lasso: the frozen path + the live wire (both from Rust) ── */}

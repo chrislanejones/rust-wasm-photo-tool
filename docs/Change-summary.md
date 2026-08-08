@@ -2966,3 +2966,53 @@ nothing" is exactly the kind of note a later reader trusts without re-testing.
 **Not browser-verified.** Gates cannot see layout, and this is the second call
 on this grid, the first of which was wrong. `grid-template-rows` at tablet
 width should be measured before it is trusted.
+
+## v7.76 Change Summary — 2026-08-08
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | The arrow / shapes / crop rubber band drew directly on the main canvas: `getImageData` of the whole canvas on mouse-down, `putImageData` of that snapshot on **every** pointermove to erase the previous frame, and once more on release. It now draws on `DrawPreviewOverlay`, a transparent sibling at image resolution riding the same pan/zoom transform. No snapshot, no restore, and erasing is a `clearRect` | **Changed** |
+| 2 | Copy to clipboard no longer calls `flatten_text_annotations()` on the live engine before reading pixels. A read path must not be able to write to the document | **Changed** |
+| 3 | `scripts/engine-call-audit.mjs` matched engine calls by receiver name and knew only three literal names, so every aliased call (`const t = toolRef.current; t.width()`) was invisible — **93 of 290 sites, 33%**, including all of `editPersistence.ts`. It now resolves per-file aliases | **Fixed** |
+| 4 | ADR-024 Stage 3.5's open question answered; Stage 4's scope corrected; measured finding #5 retired | **Documented** |
+
+**#1 is what unblocks ADR-024 Stage 4.** After `transferControlToOffscreen()`
+the main thread cannot get a 2D context on that canvas at all, so a preview
+painted there would simply stop working. It was also a standing violation of
+the project's own rule that the engine owns pixels and React does not touch
+them.
+
+**It retires ADR-024's measured finding #5**, which read *"the main canvas has
+exactly one writer (`useEngineCore`)"*. `useDrawingTools` was a second writer
+and wrote on every pointermove. That finding is cited in the ADR as the reason
+canvas transfer would be "unusually clean here", so that clause is withdrawn
+too. The decision to move the engine into a worker still stands — it rested on
+the OffscreenCanvas and op-ordering measurements — but Stage 4 costs more than
+it looked.
+
+**Verified in a browser, not just by gates.** For each of shapes, arrow and
+crop: the main canvas is byte-identical before and during the drag, the band
+appears on the overlay, and the overlay is empty again after release. A shape
+still commits through Rust on Enter. Gates cannot see a rubber band, so this
+was measured rather than assumed.
+
+**On #2, the reason recorded in the code was wrong and is now marked
+retracted rather than replaced.** It said the flatten was inert because "the
+text generally is not on the active layer". `add_text_annotation` pushes onto
+the active layer, so text lands there by default, and QC confirmed it. Why the
+flatten was inert in practice is still unexplained.
+
+⚠️ **One case where removing that flatten does change output.** The composite
+deliberately skips the annotation being edited, while the flatten baked it in,
+so a Copy reached with a text annotation mid-edit would omit it. Both routes
+into Copy foreclose that state today — the export dialog commits the text when
+clicked, and `Ctrl+Shift+C` returns early while a textarea has focus, both
+verified in a browser. That is focus handling, not a guarantee: any new path
+into Copy must not be reachable mid-edit.
+
+Two more Stage-4 blockers were found and are **not** fixed here: lossy export
+still reads pixels back off the main canvas via `canvas.toBlob()`
+(`useExport.ts:58`, `:86` — PNG already goes through the engine), and the
+canvas element is re-created on ordinary tool switches, which in worker mode
+would leave the worker drawing into a detached surface with nothing thrown and
+a blank canvas shown.

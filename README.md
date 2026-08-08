@@ -84,6 +84,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.76 — 2026-08-08
+
+**Dragging a shape, arrow or crop box no longer redraws your photo.** The
+rubber band you drag out used to be painted straight onto the image: the whole
+canvas was copied on mouse-down, copied back on every mouse-move to erase the
+last frame, and copied back once more on release. On a 12-megapixel photo that
+is a lot of pixels moved to draw a rectangle. It now draws on its own
+transparent layer, so the image underneath is never touched — and erasing the
+band is a clear instead of a full-resolution copy.
+
+Copying to the clipboard also stops rewriting the document. It was calling a
+flatten on the live image first; the copy never needed it, because the
+composite already draws text and shapes.
+
+<details><summary>Older releases</summary>
+
 ### v7.75 — 2026-08-08
 
 **The gallery grid stops reserving space it doesn't use.** v7.74 stopped the
@@ -104,6 +120,8 @@ went missing.
 grew to match the tallest one in its row, leaving up to 188px of bare
 checkerboard under the image. The checkerboard still shows through genuinely
 transparent pixels, which is the point of it.
+
+</details>
 
 ## License
 

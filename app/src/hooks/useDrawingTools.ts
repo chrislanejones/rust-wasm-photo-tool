@@ -156,6 +156,18 @@ function rgbToHex(r: number, g: number, b: number): string {
 interface UseDrawingToolsOptions {
   toolRef: React.RefObject<ImageHorseTool | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  /** The rubber-band preview surface (`DrawPreviewOverlay`) — a transparent
+   *  sibling of the main canvas at the same resolution and transform.
+   *
+   *  Every preview stroke goes HERE, never on `canvasRef`. The main canvas is
+   *  the engine's output surface and nothing in React may draw on it: that is
+   *  the project's engine-owns-pixels invariant, and it is also what ADR-024
+   *  Stage 4 needs, since a canvas handed to a worker via
+   *  `transferControlToOffscreen()` can no longer return a 2D context here.
+   *
+   *  Optional so the hook still functions if the overlay has not mounted yet
+   *  (first frame); the preview is simply not drawn until it has. */
+  previewRef?: React.RefObject<HTMLCanvasElement | null>;
   activeTool: ToolType;
   settings: ToolSettings;
   flushToCanvas: () => void;
@@ -173,6 +185,7 @@ interface UseDrawingToolsOptions {
 export function useDrawingTools({
   toolRef,
   canvasRef,
+  previewRef,
   activeTool,
   settings,
   flushToCanvas,
@@ -262,7 +275,27 @@ export function useDrawingTools({
   const isDrawing = useRef(false);
   const startPoint = useRef<Point | null>(null);
   const lastPoint = useRef<Point | null>(null);
-  const preSnapshot = useRef<ImageData | null>(null);
+
+  // The preview surface's 2D context, or null while it is unmounted.
+  //
+  // There used to be a `preSnapshot` ImageData ref here holding a full-canvas
+  // copy taken on mousedown, restored on every pointermove and again on mouseup
+  // to erase the rubber band. Drawing on a transparent overlay removes the need
+  // for it entirely — `clearRect` erases in constant time instead of blitting a
+  // 12-megapixel copy back.
+  const previewCtx = useCallback(() => {
+    const c = previewRef?.current;
+    if (!c) return null;
+    return c.getContext("2d");
+  }, [previewRef]);
+
+  /** Wipe the rubber band. Safe to call when nothing is drawn or unmounted. */
+  const clearPreviewSurface = useCallback(() => {
+    const c = previewRef?.current;
+    const ctx = c?.getContext("2d");
+    if (!c || !ctx) return;
+    ctx.clearRect(0, 0, c.width, c.height);
+  }, [previewRef]);
   const [cropSelection, setCropSelection] = useState<CropSelection | null>(
     null,
   );
@@ -728,11 +761,9 @@ export function useDrawingTools({
       if (e.button !== 0) return;
       if (!["arrow", "shapes", "crop"].includes(activeTool)) return;
       const canvas = canvasRef.current;
-      const ctx = canvas?.getContext("2d");
-      if (!canvas || !ctx) return;
-      // Starting a new drag on empty canvas commits the pending edit first.
-      // commitEdit flushes WASM→canvas synchronously, so the snapshot below
-      // includes the just-committed pixels.
+      if (!canvas) return;
+      // Starting a new drag on empty canvas commits the pending edit first, so
+      // the committed geometry is in the engine before a new one begins.
       if (editStateRef.current) commitEdit();
       const p = getCoords(e);
       // Pins tab: clicking drops a callout disc, or re-selects an existing pin.
@@ -757,23 +788,33 @@ export function useDrawingTools({
       isDrawing.current = true;
       startPoint.current = p;
       lastPoint.current = p;
-      preSnapshot.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      clearPreviewSurface(); // a stale band from an aborted drag must not linger
       if (activeTool === "crop") setCropSelection(null);
     },
-    [activeTool, canvasRef, getCoords, commitEdit, toolRef, selectShape, dropPin],
+    [
+      activeTool,
+      canvasRef,
+      getCoords,
+      commitEdit,
+      toolRef,
+      selectShape,
+      dropPin,
+      clearPreviewSurface,
+    ],
   );
 
   const onMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!isDrawing.current || !startPoint.current || !preSnapshot.current)
-        return;
+      if (!isDrawing.current || !startPoint.current) return;
       const canvas = canvasRef.current;
-      const ctx = canvas?.getContext("2d");
+      const ctx = previewCtx();
       if (!canvas || !ctx) return;
       const p = getCoords(e);
       lastPoint.current = p;
       const start = startPoint.current;
-      ctx.putImageData(preSnapshot.current, 0, 0);
+      // Erase last frame's band. The overlay is transparent, so this reveals
+      // the engine's pixels underneath rather than needing them blitted back.
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (activeTool === "arrow") {
         drawArrowPreview(
           ctx,
@@ -811,20 +852,18 @@ export function useDrawingTools({
         ctx.setLineDash([]);
       }
     },
-    [activeTool, canvasRef, getCoords, settings, constrainDrag],
+    [activeTool, canvasRef, getCoords, settings, constrainDrag, previewCtx],
   );
 
   const onMouseUp = useCallback(() => {
     if (!isDrawing.current || !startPoint.current) return;
     isDrawing.current = false;
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
     const start = startPoint.current;
     const end = lastPoint.current ?? start;
+    // One clear covers every branch — the band is gone the moment the drag
+    // ends, whether it produced a crop rect, an edit overlay, or nothing.
+    clearPreviewSurface();
     if (activeTool === "crop") {
-      if (preSnapshot.current && ctx) {
-        ctx.putImageData(preSnapshot.current, 0, 0);
-      }
       const constrained = constrainDrag(start, end);
       const x = constrained ? constrained.x : Math.min(start.x, end.x);
       const y = constrained ? constrained.y : Math.min(start.y, end.y);
@@ -839,12 +878,9 @@ export function useDrawingTools({
         });
       }
     } else if (activeTool === "arrow" || activeTool === "shapes") {
-      // Edit-overlay flow: erase the rubber-band preview from the 2D canvas
-      // and hand the geometry to the SVG overlay instead of committing.
-      // Rust rasterization happens once, in commitEdit.
-      if (preSnapshot.current && ctx) {
-        ctx.putImageData(preSnapshot.current, 0, 0);
-      }
+      // Edit-overlay flow: the rubber band is already gone (cleared above) and
+      // the geometry goes to the SVG overlay instead of being committed. Rust
+      // rasterization happens once, in commitEdit.
       // Ignore stray clicks / sub-3px drags — they'd produce invisible
       // geometry (and, previously, an empty history snapshot).
       if (Math.hypot(end.x - start.x, end.y - start.y) > 3) {
@@ -859,8 +895,7 @@ export function useDrawingTools({
     }
     startPoint.current = null;
     lastPoint.current = null;
-    preSnapshot.current = null;
-  }, [activeTool, canvasRef, constrainDrag, toolRef, flushToCanvas, syncState, refreshShapes]);
+  }, [activeTool, constrainDrag, clearPreviewSurface]);
 
   const applyCrop = useCallback(() => {
     const tool = toolRef.current;

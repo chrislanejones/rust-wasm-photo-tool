@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.76",
+    date: "2026-08-08",
+    headline: "Dragging a shape no longer redraws your photo",
+    entries: [
+      {
+        tag: "perf",
+        text: "The rubber band you drag out for a shape, arrow or crop box used to be painted onto the image itself — the whole canvas copied on mouse-down, copied back on every mouse-move to erase the last frame, and copied back again on release. On a 12-megapixel photo that is a lot of pixels moved to draw a rectangle. It now draws on its own transparent layer and the image underneath is never touched.",
+      },
+      {
+        tag: "fix",
+        text: "Copying to the clipboard stops rewriting the document. It was flattening the live image first; the copy never needed it, because text and shapes are already drawn into what gets copied.",
+      },
+    ],
+  },
+  {
     version: "v7.75",
     date: "2026-08-08",
     headline: "The gallery grid stops reserving space it doesn't use",
