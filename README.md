@@ -84,6 +84,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.78 — 2026-08-08
+
+**Docs only.** ADR-024 claimed the export-dimension cost "scales several-fold
+on a large photo" and cited a 12-megapixel benchmark. It can't: every import is
+downscaled to 2048 on the long edge, so the biggest document the editor ever
+holds is about 4.3 MP. The measurements were already near the ceiling. No code
+changed.
+
+<details><summary>Older releases</summary>
+
 ### v7.77 — 2026-08-08
 
 **Exporting stops doing work it doesn't need to.** If you'd set exports to
@@ -95,7 +105,6 @@ JPEG, WebP and AVIF exports also read the image from the engine now instead of
 scraping it back off the canvas, and the encoding moves off the main thread
 where the browser allows it.
 
-<details><summary>Older releases</summary>
 
 ### v7.76 — 2026-08-08
 

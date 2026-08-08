@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.78",
+    date: "2026-08-08",
+    headline: "A correction to the last release's own notes",
+    entries: [
+      {
+        tag: "infra",
+        text: "The v7.77 write-up said the export slowdown got several times worse on large photos. It doesn't — every image is scaled to 2048px on its long edge when it opens, so the editor never holds a photo big enough for that to be true. Documentation only; nothing in the app changed.",
+      },
+    ],
+  },
+  {
     version: "v7.77",
     date: "2026-08-08",
     headline: "Exporting stops doing work it doesn't need to",

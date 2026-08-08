@@ -3062,3 +3062,21 @@ missing wire rather than dead code the last time one was found.
 Remaining Stage-4 blocker: **canvas element identity**. The element is
 re-created on ordinary tool switches, which in worker mode would leave the
 worker drawing into a detached surface — nothing thrown, blank canvas shown.
+
+## v7.78 Change Summary — 2026-08-08
+
+Docs only. No code changed.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | ADR-024's Stage-3.5 measurement section claimed the export-dimension cost "scales several-fold on a large photo", citing a native bench at 12 MP. **A 12 MP document cannot exist in this app** — `makeWorkingCopy` downscales every import to `WORKING_MAX_EDGE = 2048` on the long edge and no caller overrides it, so the engine document tops out near 2048² plus the canvas border, about **4.3 MP** | **Corrected** |
+
+The 2.9–3.0 MP figures measured for v7.77 were therefore already close to the
+practical ceiling, not a small sample of a much worse case. The defect was real
+and worth fixing; its worst case is roughly **1.5×** what was measured, not
+fivefold. The native bench numbers still stand as engine cost per megapixel —
+they just describe a document size the app will not hand you.
+
+Found while checking why a 432 MP Wikimedia scan was rejected on import, which
+surfaced the 100 MP source ceiling (`MAX_SOURCE_MEGAPIXELS`) and the 2048
+working-copy downscale sitting behind it.

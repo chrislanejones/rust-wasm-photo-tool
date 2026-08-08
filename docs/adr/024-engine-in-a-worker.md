@@ -158,8 +158,20 @@ composite per zoom click on `Photo only`.** That is the defect.
 Instrumentation detail worth keeping: the dev run's first result was 0 calls,
 which is also what a broken probe returns — a control call proving the patch
 intercepted came before the zero was trusted. A single call costs **29.7 ms**
-in wasm at 2.9 MP; native-release bench puts the pair at 41.6 + 39.1 ms at
-12 MP, so expect this to scale several-fold on a large photo.
+in wasm at 2.9 MP.
+
+⚠️ **Correction 2026-08-08 — an earlier version of this paragraph said the
+native bench's 41.6 + 39.1 ms at 12 MP meant this "scales several-fold on a
+large photo". That is wrong: a 12 MP document cannot exist in this app.**
+`makeWorkingCopy` downscales every import to `WORKING_MAX_EDGE = 2048` on the
+long edge (`lib/workingCopy.ts`), and no caller overrides it — so the engine
+document tops out around 2048² plus the canvas border, roughly **4.3 MP**. The
+2.9–3.0 MP figures measured here are already near the practical ceiling, not a
+small sample of a much worse case. The defect was real and worth fixing; its
+worst case is ~1.5× what was measured, not fivefold.
+
+The native bench numbers are still valid as engine cost per megapixel — they
+just describe a document size the app will not hand you.
 
 **That is a live defect on master, not a worker problem**, and it is
 independent of this ADR — a user who picks "Photo only" pays a whole-image
