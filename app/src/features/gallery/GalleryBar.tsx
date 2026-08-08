@@ -139,11 +139,19 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           got no checker while a fully opaque PNG always did.
 
           No gate is needed to hide it, either — this div is BEHIND the image
-          in paint order, so a thumb that fills its tile occludes it entirely:
-          the vertical grid (object-fit: cover) shows it only through real
-          alpha, and a square photo in the strip covers it outright. What is
-          left visible is the strip's letterbox bars on non-square photos,
-          which is the intended look. */}
+          in paint order, so a thumb that fills its tile occludes it. In the
+          strip that leaves the letterbox bars on non-square photos, which is
+          the intended look; in the vertical grid (object-fit: cover) the image
+          fills the tile and nothing shows but real alpha.
+
+          THAT SECOND HALF WAS ASSERTED IN v7.72 AND WAS FALSE AT THE TIME.
+          The grid's tiles were stretching to fill a flex-1 panel, so the image
+          was 108px inside a 300px tile and this div — `absolute inset-0` —
+          filled the rest: 188px of bare checkerboard under every thumbnail,
+          every format. The layout bug predates v7.72; deleting the mime gate
+          is what made it visible. Fixed by `items-start` on the grid container
+          below, where the reasoning lives. The claim is true now; it was not
+          when it was written. */}
       <div className="absolute inset-0 checkerboard rounded-lg" />
       <img
         ref={imgRef}
@@ -551,7 +559,28 @@ export function GalleryBar({
               className={
                 vertical
                   ? // Two thumbs per row, with breathing room between tiles + above.
-                    "grid w-full grid-cols-2 gap-x-3 gap-y-4 overflow-y-auto px-2 pt-3 pb-3"
+                    //
+                    // `items-start` is load-bearing, not cosmetic. This grid
+                    // lives in a `flex-1` column, so without it the rows
+                    // STRETCH to fill the panel: with four photos in a 640px
+                    // panel each 108px thumbnail sat in a 300px tile. The
+                    // image is unaffected (aspect-ratio 1 + object-fit cover),
+                    // but the checkerboard behind it is `absolute inset-0` and
+                    // filled the whole stretched tile — 188px of bare
+                    // checkerboard under every thumbnail, reading as a failed
+                    // image load.
+                    //
+                    // v7.72 made that visible: the checkerboard used to be
+                    // gated on the source file's mime, so only PNG/WebP/SVG
+                    // could show it. Removing the gate was right; this is the
+                    // layout bug it uncovered, and it predates v7.72.
+                    //
+                    // `content-start` does NOT fix it — measured, not guessed.
+                    // The rows are not mis-packed, the ITEMS are stretching
+                    // inside them, so align-items is the axis that matters.
+                    // Verified with 4 tiles and with 14 (scrolling): exposed
+                    // checkerboard 188px → 0px, image size unchanged.
+                    "grid w-full grid-cols-2 items-start gap-x-3 gap-y-4 overflow-y-auto px-2 pt-3 pb-3"
                   : "flex gap-2 overflow-x-auto py-1.5 pl-2"
               }
               style={{ scrollbarWidth: "none" }}
