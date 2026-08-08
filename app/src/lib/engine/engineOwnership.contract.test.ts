@@ -71,19 +71,40 @@ const THROWAWAY_ENGINES: Record<string, string> = {
     "batch operations render each photo in turn without opening it",
 };
 
+// The LIVE document's engine. Two entries, and the second one is the whole
+// point of ADR-024: under Option A the owner MOVES into the worker. They are
+// not throwaways — each is the document the user is editing, one on the main
+// thread and one behind the port — so they get their own category rather than
+// being waved through the throwaway list.
+//
+// Stage 3 added the worker and this test failed until it was listed. That is
+// the guard working: relocating the live engine is a decision, and it should
+// cost somebody a deliberate edit here.
+//
+// Exactly one of these is live at a time — `ih_engine_worker` decides which,
+// and it is OFF. Two simultaneous live engines would be two ports, which is
+// precisely what the ONE PORT PER DOCUMENT invariant forbids.
+const LIVE_ENGINE_OWNERS: Record<string, string> = {
+  "hooks/useEngineCore.ts":
+    "the main-thread engine — today's only live document owner",
+  "workers/engine.worker.ts":
+    "ADR-024 Stage 3 — the same live document behind the port; unreachable while ih_engine_worker is off",
+};
+
 describe("throwaway engines are declared, not incidental", () => {
   it("only the allowlisted modules construct their own engine", () => {
-    const owner = "hooks/useEngineCore.ts";
     const builders = FILES.filter((f) =>
       /new\s+(?:mod\.)?(?:ImageHorseTool|Tool)\s*\(/.test(code(f)),
     ).map(rel);
 
-    const unexpected = builders.filter((f) => f !== owner && !(f in THROWAWAY_ENGINES));
+    const unexpected = builders.filter(
+      (f) => !(f in LIVE_ENGINE_OWNERS) && !(f in THROWAWAY_ENGINES),
+    );
     expect(
       unexpected,
-      "a new engine instance outside useEngineCore and outside the allowlist.\n" +
+      "a new engine instance outside every declared owner.\n" +
         "If it renders a document the user is NOT editing, add it to THROWAWAY_ENGINES with a reason.\n" +
-        "If it is the live document, it belongs in useEngineCore — see ADR-024.",
+        "If it IS the live document, that is a port decision — add it to LIVE_ENGINE_OWNERS and read ADR-024's ONE PORT PER DOCUMENT invariant first.",
     ).toEqual([]);
   });
 

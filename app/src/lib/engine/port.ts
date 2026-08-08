@@ -59,3 +59,26 @@ export function attachLivePort(tool: ImageHorseTool): ImageHorseTool {
 export function detachLivePort(): void {
   /* no channel to close until Stage 3 */
 }
+
+/** ADR-024 Stage 3 — the switch that will one day route through the worker.
+ *
+ *  Read fresh each call, like every other flag in this repo, so a tab can be
+ *  flipped without a rebuild. OFF by default and there is no path that turns it
+ *  on yet: `attachLivePort` above still returns the tool directly, because the
+ *  121 value-consumed reads are synchronous and Stage 3.5 has not converted
+ *  them. Turning this on today would change nothing; that is deliberate, so the
+ *  worker and its protocol can be built and tested before anything depends on
+ *  them.
+ *
+ *  Stage 5 flips the default, and only on a measured frame timeline showing the
+ *  main thread idle during a 12MP sharpen — not on the architecture being
+ *  correct. `ih_engine_worker=0` is then the kill switch, matching
+ *  `ih_tiles_flush` / `ih_oplog_undo` / `ih_patchmatch`. */
+export function engineWorkerEnabled(): boolean {
+  try {
+    return localStorage.getItem("ih_engine_worker") === "1";
+  } catch {
+    // Storage can throw in a partitioned/blocked context; treat as off.
+    return false;
+  }
+}

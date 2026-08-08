@@ -84,15 +84,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v7.73 — 2026-08-07
+### v7.74 — 2026-08-08
 
-**Downloading a whole gallery as a zip now respects "Photo only".** Every other
-way out of the app — Share, Copy, the single Download — left the backing canvas
-out when you asked it to. The zip never did, so a batch export always shipped
-the padded artboard. It could not have, either: it rebuilt each photo from a
-flattened image with no layers, and with no layers there is no canvas to leave
-out. It restores the real layer stack now, through the same code the editor
-uses rather than a second copy of it.
+**Emptying the gallery gets your storage back.** Delete All removed the photos
+and left every original image file behind — 108.6 MiB stranded in one click, on
+a real gallery. Deleting photos one at a time always cleaned up properly; only
+the bulk path skipped it. Nothing was visible in the app, so the space just
+went missing.
+
+**Gallery tiles stop stretching.** In the vertical layout a short photo's tile
+grew to match the tallest one in its row, leaving up to 188px of bare
+checkerboard under the image. The checkerboard still shows through genuinely
+transparent pixels, which is the point of it.
 
 ## License
 

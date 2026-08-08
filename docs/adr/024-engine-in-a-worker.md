@@ -67,7 +67,7 @@ first.
 | **0** | **OPEN-C first** — the registry↔routes↔palette↔ShortcutModal↔dispatch contract test | a test, no product change | n/a |
 | **1** | **One port, no worker.** ✅ **DONE 2026-08-07.** `lib/engine/port.ts` is the named Stage-3 swap point (identity today); `engineOwnership.contract.test.ts` fails on a second writer, an undeclared engine, or a bypassed seam. NOT the ~152-call-site rewrite first imagined — the ownership invariant already held (`toolRef` created once, assigned only in `useEngineCore`), so the missing piece was the seam and the guard, not churn | no behaviour change | plain revert |
 | **2** | **The read-modify-write sites.** ✅ **DONE 2026-08-07 — 9 → 3, all FEED sites gone.** Two engine methods absorbed the decisions: `flatten_text_annotations` returns whether it flattened, and `blur_whole_image` computes its own geometry. Four JS guards deleted. The 3 remaining are 2 that dissolve at Stage 4 (`flushToCanvas`) and 1 false positive (`align_annotation`'s return is a mutation's result, not stale-able state) | no behaviour change | revert **+ `build:wasm`** |
-| **3** | **The worker exists, off by default.** Message protocol with the four things the Phase 3 spike lacked: request ids, queueing, cancellation, errors. Flag `ih_engine_worker`, default OFF, both paths live | nothing user-visible | flag stays off |
+| **3** | **The worker exists, off by default.** ✅ **DONE 2026-08-07.** `workers/engine.worker.ts` (own wasm instance, one-at-a-time FIFO `drain()`) + `lib/engine/workerClient.ts` (request ids, 30 s timeout that also withdraws the queued call, `failAll` on crash). All four gaps the Phase 3 spike had are closed. Deliberately **not** Comlink — see the file header; Comlink gives correct results with no ordering promise, and arrival order *is* the op log. Flag `ih_engine_worker`, default OFF. The build emits **no worker chunk**, because nothing imports it yet — that is the honest status, not an oversight | nothing user-visible | flag stays off |
 | **3.5** | **The 121 async conversions.** ADDED 2026-08-07 — the stage list had an invisible middle. `scripts/engine-call-audit.mjs` counts 209 call sites: 76 fire-and-forget (a postMessage suffices), **121 value-consumed** (each needs a Promise *and* a call-site restructure), 12 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. Batches by file — `useEngineCore` 46, `useTransforms` 25, `AppShell` 23, `useSelectionActions` 22 are about half between them. Same flag, still OFF | nothing user-visible | flag stays off |
 | **4** | **Canvas transfer.** `canvas.width`/`height` assignments (`useEngineCore` ~240, ~324, ~406) move into the worker as messages; flush moves with them. Still flagged | nothing user-visible | flag stays off |
 | **5** | **Measure, then flip.** A/B the 470 ms freeze against master. Default ON only if it is actually gone, with `ih_engine_worker=0` as the kill switch | the feature | kill switch |
@@ -80,6 +80,17 @@ sites were not. Note the two counts are different lists and neither subsumes the
 other: **Stage 2 fixed 6 read-modify-WRITE sequences** (a read whose value
 informs a later mutation, 9 → 3); **Stage 3.5 is the 121 plain value-consumed
 READS**, which were never in that count. Reducing one did not reduce the other.
+
+**The part of 3.5 that has no answer yet.** Three of the 121 are read *during
+render* — `selection_preview`, `measure_text` and `text_ink_offset` in
+`CanvasArea`, called to lay text out while React is building the tree. A render
+pass cannot `await`. So those three are not a conversion at all; they need a
+synchronous local answer, which means either a mirrored snapshot on the main
+thread or a layout cache. That matters for the ordering of 3.5: converting the
+other ~118 first and meeting these last would be discovering the hard
+requirement after the cheap work is spent. It also partly rehabilitates the
+scalar mirror (preserved as tag `abandoned/scalar-mirror`), which was shelved
+for covering only 8 sites — the count was never the argument for it here.
 
 Stage 5's gate is the pre-mortem's last line: *"Nobody measured after. The
 freeze moved rather than disappeared."* The flip does not happen on the

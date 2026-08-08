@@ -2898,3 +2898,49 @@ A loses exactly the 15px border per side; B is unchanged either way, which is co
 **On #4, the honest version:** the missing dependency is real but currently unreachable. A control build with the fix removed produced the *correct* value, because `useCloneStamp` returns a bare object literal with no `useMemo` — `stamp` is a new reference every render, so that dependency array rebuilds the callback every time and can never go stale. It is fixed because memoizing the engine handle is on the roadmap, and the day it lands, every decorative deps array in these files becomes load-bearing at once.
 
 **Two candidate bugs investigated and closed:** an early `URL.revokeObjectURL` after `a.click()` (6 sites) — real pattern, but 10/10 downloads landed on real user clicks, so it is hardening, not a defect; and `<button>` without `type="button"` — cannot fire, the app contains no `<form>` at all.
+
+## v7.74 Change Summary — 2026-08-08
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | **Delete All stranded every original.** The bulk path did the `setPhotos([])` half and never the collect half, so each original blob stayed in IndexedDB with nothing referencing it — **+108.6 MiB from one click**, measured on the deployed app. Single-photo delete was always correct | **Fixed** |
+| 2 | Gallery tiles stretched to fill their grid row. CSS grid items default to `align-items: stretch`, so a short photo's tile grew to match the tallest in the row and rendered up to **188 px** of bare checkerboard beneath the image. `items-start` on the container | **Fixed** |
+| 3 | ADR-024 Stages 0–3 — the engine-in-a-worker arc. A cross-surface contract test, the port seam (`lib/engine/port.ts`) and its ownership guard, the read-modify-write sites 9 → 3, and the worker itself with request ids, FIFO queueing, cancellation and error propagation. **Flag `ih_engine_worker`, default OFF**; nothing imports the worker yet, so the build emits no chunk for it | **Internal** |
+| 4 | Two decisions moved from JS into the engine: `flatten_text_annotations` returns whether it flattened (four JS guards deleted) and `blur_whole_image` computes its own geometry | **Rust** |
+| 5 | ADR-032 — AI Rename will use an on-device vision model, with a cloud caption model as a paid upgrade. Decision recorded, no code yet | **Docs** |
+
+**On #1, all three of the audit's suspected causes were wrong.** The content-GC
+audit had blamed orphan accumulation on three mechanisms; each was checked and
+none of them was happening. The leak was in the one path nobody had audited,
+and it was not accumulation at all — it was a single missing call on the bulk
+delete. Content-addressed storage also means re-importing the same file makes
+an existing orphan reachable again, so orphan counts drifting downward is
+normal and is not evidence of collection.
+
+**On #2, the v7.72 commit that caused it asserted something untrue.** It
+claimed the vertical grid used `object-fit: cover`, so the checkerboard could
+only show through real alpha. It did not, and the claim was wrong when it was
+written. `content-start` was tried first and measured as doing nothing —
+`items-start` is the correct axis. The comment in `GalleryBar.tsx` now records
+the false claim rather than quietly replacing it.
+
+**On #3, the ownership guard is the deliverable, not the port module.** Two
+ports — or any path reaching the engine outside the queue — breaks op-log
+ordering *silently*: not a crash, an undo stack that stops reproducing.
+`engineOwnership.contract.test.ts` fails on a second writer to the live handle,
+on an undeclared engine instance, or on a bypassed seam. It failed when the
+worker was added, which is the guard working: relocating the live engine should
+cost somebody a deliberate edit.
+
+**Ordering is safe by construction, and that was checked rather than assumed.**
+`OpLog::append` records arrival order and no `Op` carries a sequence number, so
+postMessage order *is* append order — but only while every mutation goes
+through one port, in order. That is why the queue is written out explicitly
+instead of delegated to Comlink, which gives correct results with no ordering
+promise between concurrent calls.
+
+**Stage 3.5 was discovered missing.** The stage list went "ship a worker" →
+"flip a flag" with nothing owning the ~118 async call-site conversions that
+make the flag flippable. Three of them are read *during render* and cannot
+become Promises at all; they need a synchronous local answer. Recorded in
+ADR-024 rather than found later.

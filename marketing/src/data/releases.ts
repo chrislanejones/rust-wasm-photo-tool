@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.74",
+    date: "2026-08-08",
+    headline: "Emptying the gallery gets your storage back",
+    entries: [
+      {
+        tag: "fix",
+        text: "Delete All removed the photos and left every original file behind — 108.6 MiB stranded in one click. Deleting photos one at a time was always correct; only the bulk path skipped the cleanup.",
+      },
+      {
+        tag: "ui",
+        text: "Gallery tiles stopped stretching to fill their row. A short photo could sit above 188px of bare checkerboard. It still shows through genuinely transparent pixels, which is what it is for.",
+      },
+      {
+        tag: "rust",
+        text: "Two decisions moved out of JavaScript and into the engine: flattening text and shapes now reports whether it did anything, and a whole-image blur works out its own geometry.",
+      },
+      {
+        tag: "infra",
+        text: "Groundwork for running the image engine off the main thread — the message protocol, the queue that keeps edits in order, and a test that fails if anything reaches the engine outside it. Off by default, nothing user-visible yet.",
+      },
+    ],
+  },
+  {
     version: "v7.73",
     date: "2026-08-07",
     headline: "Downloading a whole gallery respects the setting the rest of the app already did",
