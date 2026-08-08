@@ -2944,3 +2944,25 @@ promise between concurrent calls.
 make the flag flippable. Three of them are read *during render* and cannot
 become Promises at all; they need a synchronous local answer. Recorded in
 ADR-024 rather than found later.
+
+## v7.75 Change Summary — 2026-08-08
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Gallery grid row tracks stretched to fill the panel. v7.74's `items-start` stopped the ITEMS stretching; `align-content` still defaults to `stretch`, so the leftover height moved into the ROW TRACKS instead — QC measured **99px tiles in 215.7px tracks**, ~117px of dead space per row, worst at tablet width. `content-start` on the grid container | **Fixed** |
+| 2 | `docs/PARKING_LOT.md` is tracked. It was ignored by `.gitignore`, grouped with genuinely disposable run artifacts (`SESSION_LOG.md`, `NIGHT*_PROMPT.md`) — **98 KB of parked findings living on one machine**, invisible to every clone. The Hard Rules say to park adjacent problems rather than fix them in passing; that only works if the parking lot survives | **Fixed** |
+| 3 | `scripts/git-prune-stale.sh` — deletes local branches fully merged into the base whose tip is older than N hours, removing their worktrees first and only when clean. Dry-run by default. Was 4 KB of working tool in `~/bin`, untracked and outside the repo | **Added** |
+
+**On #1, the earlier note in this file was wrong and is now corrected in
+place.** `content-start` was tried first, alone, and measured as doing nothing;
+the code comment recorded that as "content-start does NOT fix it". The
+measurement was accurate and the conclusion was not. While the items still
+stretched they filled their own tracks, leaving `align-content` no free space
+to distribute — it genuinely had nothing to do until `items-start` shrank the
+items. `align-items` and `align-content` are different axes and this needed
+both. The comment now carries that reasoning, because "we measured X does
+nothing" is exactly the kind of note a later reader trusts without re-testing.
+
+**Not browser-verified.** Gates cannot see layout, and this is the second call
+on this grid, the first of which was wrong. `grid-template-rows` at tablet
+width should be measured before it is trusted.

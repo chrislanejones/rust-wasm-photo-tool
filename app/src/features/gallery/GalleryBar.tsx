@@ -575,12 +575,27 @@ export function GalleryBar({
                     // could show it. Removing the gate was right; this is the
                     // layout bug it uncovered, and it predates v7.72.
                     //
-                    // `content-start` does NOT fix it — measured, not guessed.
-                    // The rows are not mis-packed, the ITEMS are stretching
-                    // inside them, so align-items is the axis that matters.
-                    // Verified with 4 tiles and with 14 (scrolling): exposed
-                    // checkerboard 188px → 0px, image size unchanged.
-                    "grid w-full grid-cols-2 items-start gap-x-3 gap-y-4 overflow-y-auto px-2 pt-3 pb-3"
+                    // `content-start` is the SECOND half, and the reason the
+                    // two are here together is worth keeping.
+                    //
+                    // It was tried first, on its own, and measured as doing
+                    // nothing — so an earlier version of this comment said it
+                    // "does NOT fix it". That was true of the state it was
+                    // measured in and wrong as a conclusion. While the items
+                    // still stretched, they filled their tracks themselves and
+                    // there was no free space for align-content to distribute,
+                    // so it had nothing to do.
+                    //
+                    // Once `items-start` shrank the items, the leftover height
+                    // moved somewhere else: `align-content` defaults to
+                    // `stretch`, so the ROW TRACKS absorbed it instead. QC
+                    // measured 99px tiles sitting in 215.7px tracks — ~117px of
+                    // dead space per row, the checkerboard slab replaced by an
+                    // empty one. Most obvious at tablet width.
+                    //
+                    // Two axes, two properties: items-start stops the ITEM
+                    // stretching, content-start stops the TRACK stretching.
+                    "grid w-full grid-cols-2 content-start items-start gap-x-3 gap-y-4 overflow-y-auto px-2 pt-3 pb-3"
                   : "flex gap-2 overflow-x-auto py-1.5 pl-2"
               }
               style={{ scrollbarWidth: "none" }}

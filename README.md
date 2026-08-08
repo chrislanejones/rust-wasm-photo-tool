@@ -84,6 +84,14 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.75 — 2026-08-08
+
+**The gallery grid stops reserving space it doesn't use.** v7.74 stopped the
+tiles stretching, which removed a slab of bare checkerboard under every
+thumbnail. It left the row heights alone, so the slab came back as empty
+background — about 117px of it per row, worst at tablet width. Both halves are
+fixed now.
+
 ### v7.74 — 2026-08-08
 
 **Emptying the gallery gets your storage back.** Delete All removed the photos

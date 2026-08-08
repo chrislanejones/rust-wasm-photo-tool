@@ -53,6 +53,13 @@ DAY*_PROMPT.md
 E2E_PROMPT.md
 SESSION_LOG.md
 PARKING_LOT.md
+# ...except the real one. The rule above sat in this block of disposable
+# run artifacts, so the project's actual backlog was untracked for months:
+# 98 KB of parked findings that existed on one machine, invisible to every
+# clone and every other terminal, and gone with the disk. The Hard Rules say
+# to park adjacent problems rather than fix them in passing — that only works
+# if the parking lot survives.
+!docs/PARKING_LOT.md
 
 # Overnight-run tooling (any *_PROMPT.md + the status dashboard)
 *_PROMPT.md

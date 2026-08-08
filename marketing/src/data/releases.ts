@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.75",
+    date: "2026-08-08",
+    headline: "The gallery grid stops reserving space it doesn't use",
+    entries: [
+      {
+        tag: "ui",
+        text: "v7.74 stopped the gallery tiles stretching, which cleared a slab of bare checkerboard under every thumbnail. The row heights were untouched, so the slab came back as empty background — about 117px per row, worst at tablet width. Both halves are fixed.",
+      },
+      {
+        tag: "infra",
+        text: "The parking lot — the running list of known-but-deferred problems — is now part of the repo instead of one machine's disk.",
+      },
+    ],
+  },
+  {
     version: "v7.74",
     date: "2026-08-08",
     headline: "Emptying the gallery gets your storage back",
