@@ -19,6 +19,7 @@
 use wasm_bindgen::prelude::*;
 
 mod annotations;
+mod capture;
 mod codec;
 mod core;
 mod describe;

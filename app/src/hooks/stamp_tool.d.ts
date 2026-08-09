@@ -207,6 +207,17 @@ declare module "stamp_tool" {
     /** Returns true if any pixel in the loaded image has alpha < 255. */
     has_transparency(): boolean;
     export_png(): Uint8Array;
+    /** ADR-024 Stage 3.5 — everything the save path reads, in ONE call.
+     *
+     *  Exists so the save capture cannot be interleaved. The 18 separate reads
+     *  it replaces had no `await` between them and `useEditPersistence.ts` says
+     *  that is load-bearing: a capture that yields lets a photo switch land
+     *  midway, and the second half of the archive would describe the incoming
+     *  photo while being stored under the outgoing photo's key.
+     *
+     *  Returns a TRANSPORT frame (magic "IHCS"), not the persisted archive —
+     *  `encodeArchive` still owns the bytes on disk. See src/capture.rs. */
+    capture_state(): Uint8Array;
     width(): number;
     height(): number;
     data_ptr(): number;

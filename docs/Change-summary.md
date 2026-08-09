@@ -3257,3 +3257,77 @@ page reload, which vitest cannot stage; it needs Playwright or an extracted
 "which photos have edits" helper to unit-test. Recorded here rather than
 quietly skipped — the bug survived two months and two investigations, and
 nothing in the suite would catch its return.
+
+## v7.82 Change Summary — 2026-08-09
+
+ADR-024 Stage 3.5. Engine addition only; no JS consumes it yet, so nothing
+user-visible changes.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `ImageHorseTool::capture_state()` — one call returning everything the save path reads: canvas PNG + dimensions, every undo/redo snapshot with labels and per-step annotations, live text and shape overlays, the full layer stack, and the active layer id | **Added** |
+
+**Why, and why it is not the obvious conversion.** Stage 3.5's instruction is
+"make every value-consuming engine call async". Applied to the save path that
+produces a bug. `useEditPersistence.ts` states the invariant outright:
+
+> "Everything above reads the engine, and there is not a single `await` in it.
+> That is load-bearing, not incidental. […] If anyone ever adds an `await` above
+> this line, detaching stops being safe and this comment is the reason why."
+
+`detachCloudUpload` lets a photo switch return as soon as the local write lands
+rather than blocking ~13s on the network, and that is only safe because the
+bytes were already captured. A capture that yields midway can have the switch
+complete underneath it, so the second half of the archive describes the
+**incoming** photo while being stored under the **outgoing** photo's key —
+silent cross-photo corruption, in the cloud copy where the local guard cannot
+see it.
+
+Today it survives by luck: `await` on a synchronous value yields only to the
+microtask queue, so DOM events cannot interleave. Once the engine is behind the
+worker every await is a real round trip, and a photo switch, stroke or undo can
+land mid-capture. Nothing throws; the archive is simply wrong.
+
+So the sequence is removed rather than guarded. One call is atomic by
+construction — `&self` cannot be mutated while it runs — and it deletes roughly
+**32 conversions** across `editPersistence.ts` and `useEditPersistence.ts`
+instead of turning each into a hazard. ADR-024 does not address multi-read
+consistency anywhere; it covers op-log ordering (Stage 1) and read-modify-write
+(Stage 2), and this is a third category.
+
+**Two constraints shaped the implementation.**
+
+It returns a **transport frame, not the persisted archive** (magic `IHCS`, not
+the archive's `IHST`). ADR-024 says persisted formats are untouched by every
+stage, and this repo routes any IndexedDB format change through the
+`dexie-migration` skill — "no exceptions, even just adding a field". `encodeArchive`
+still owns the bytes that land on disk: same format, same version, same loader,
+same tests. The cost is one extra copy in memory; the alternative is the engine
+quietly becoming the author of user data with no migration story.
+
+It adds **no dependency and no feature gate**. `postcard` was the natural
+encoder — the op log uses it — but it sits behind `tiles`, and a
+persistence-critical method that vanishes from a default build is exactly the
+shape of the bug that shipped a featureless wasm for ten releases. Hand-rolled
+little-endian framing has no such failure mode.
+
+**It is an aggregation, not a reimplementation.** Every field goes through the
+same getter the JS used to call, so there is no second definition of "what the
+canvas PNG is" to drift from the first.
+
+Three tests: a full round-trip that re-reads the frame the way the consumer
+will and asserts every field against its own getter (plus that the frame is
+fully consumed, catching a length-maths error), a non-mutation check that two
+captures of an unchanged document are byte-identical, and an empty-document
+parse.
+
+| Gate | Result |
+|---|---|
+| Rust tests | **297** (was 294) |
+| `cargo fmt` / `clippy -D warnings` | clean |
+| wasm size | 762,102 → **766,158 B** (+4,056, +0.53%) |
+| `capture_state` in glue + binary | verified present |
+
+⚠️ **No JS calls it yet.** The payoff — rewiring both save paths and dropping
+the audit's un-awaited count by ~32 — is the next session. Recorded here so the
+method's presence without a consumer reads as deliberate rather than forgotten.

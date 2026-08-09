@@ -84,6 +84,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.82 — 2026-08-09
+
+**Groundwork, nothing user-visible.** The engine can now hand over everything a
+save needs in one call instead of eighteen. That matters for a bug nobody has
+hit yet: the save reads a photo's canvas, its history and its layers as a set,
+and once the engine moves onto a background thread those reads could be
+interrupted halfway by switching photos — saving the first half of one photo
+and the second half of another. One call cannot be interrupted.
+
+<details><summary>Older releases</summary>
+
 ### v7.81 — 2026-08-09
 
 **"Download All" stops throwing your edits away.** Edit a photo, reload the
@@ -93,7 +104,6 @@ gone from the archive with nothing to show it. Exporting a single photo was
 always correct; only the batch ZIP did this, and only after a reload, which is
 why it looked random.
 
-<details><summary>Older releases</summary>
 
 ### v7.80 — 2026-08-09
 

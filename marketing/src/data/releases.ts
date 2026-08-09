@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.82",
+    date: "2026-08-09",
+    headline: "The engine can hand over a whole save in one go",
+    entries: [
+      {
+        tag: "rust",
+        text: "Saving a photo reads its canvas, its history and its layers as a set. The engine can now hand all of that over in a single call instead of eighteen — so once the engine moves onto a background thread, switching photos mid-save can't mix half of one photo with half of another. Nothing uses it yet; nothing visible changes.",
+      },
+    ],
+  },
+  {
     version: "v7.81",
     date: "2026-08-09",
     headline: "Download All stops throwing your edits away",
