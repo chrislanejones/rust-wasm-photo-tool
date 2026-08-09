@@ -2,7 +2,8 @@
 //
 // One client, one worker, one queue. `lib/engine/port.ts` is where this gets
 // swapped in; today it is not, because `ih_engine_worker` defaults OFF and the
-// 121 synchronous reads have not been converted (Stage 3.5).
+// 166 synchronous reads have not been converted (Stage 3.5). That count comes
+// from `scripts/engine-call-audit.mjs`; do not hand-edit it.
 //
 // WHY NOT COMLINK, when the codec worker uses it. Comlink is the right tool
 // there: `codec.worker.ts` holds no state, each call builds its own

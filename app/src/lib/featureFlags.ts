@@ -111,7 +111,7 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
     label: "Engine in a Worker (ADR-024 Stage 3)",
     kind: "optin",
     isOn: engineWorkerEnabled,
-    effect: "Builds the engine worker and its request/queue/cancel/error protocol. Turning it ON currently changes NOTHING — the 121 synchronous engine reads have not been converted (Stage 3.5), so attachLivePort still hands back the tool directly. Stage 5 flips the default, on a measured frame timeline.",
+    effect: "Builds the engine worker and its request/queue/cancel/error protocol. Turning it ON currently changes NOTHING — the 166 synchronous engine reads have not been converted (Stage 3.5), so attachLivePort still hands back the tool directly. Stage 5 flips the default, on a measured frame timeline.",
     source: "lib/engine/port.ts",
   },
   {

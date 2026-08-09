@@ -84,6 +84,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.79 — 2026-08-08
+
+**Tooling only.** The engine-call audit now measures whether the
+engine-in-a-worker migration has actually happened, rather than just how big it
+is, and a contract test pins the number so it can only go down. Nothing in the
+app changed.
+
+<details><summary>Older releases</summary>
+
 ### v7.78 — 2026-08-08
 
 **Docs only.** ADR-024 claimed the export-dimension cost "scales several-fold
@@ -92,7 +101,6 @@ downscaled to 2048 on the long edge, so the biggest document the editor ever
 holds is about 4.3 MP. The measurements were already near the ceiling. No code
 changed.
 
-<details><summary>Older releases</summary>
 
 ### v7.77 — 2026-08-08
 

@@ -3080,3 +3080,57 @@ they just describe a document size the app will not hand you.
 Found while checking why a 432 MP Wikimedia scan was rejected on import, which
 surfaced the 100 MP source ceiling (`MAX_SOURCE_MEGAPIXELS`) and the 2048
 working-copy downscale sitting behind it.
+
+## v7.79 Change Summary — 2026-08-08
+
+Tooling only. No app code changed. ADR-024 Stage 3.5, step a1.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `scripts/engine-call-audit.mjs` counted `await` as a *consuming* context, so converting all 166 value-consumed sites would leave the report reading 166. Added an orthogonal **awaited** axis: the gate is now "how many remain un-converted", 166 → 0 | **Added** |
+| 2 | `engineAsyncMigration.contract.test.ts` — a ratchet pinning that count. Fails when it goes **up** (a new synchronous call sneaked in) and when it goes **down** without the budget being lowered (a batch cannot land unrecorded) | **Added** |
+| 3 | The audit matched engine calls **inside comments**. Every count it has printed included whatever appeared in prose | **Fixed** |
+| 4 | `enclosingIsAsync` was a backward line-scan and mis-bucketed **18 of 166** sites. Replaced with a TypeScript AST parse | **Fixed** |
+| 5 | The stale "121 value-consumed reads" figure, in `port.ts`, `featureFlags.ts` and `workerClient.ts` | **Corrected to 166** |
+
+**On #3 — found the honest way.** A comment added to `port.ts` explaining the
+alias problem contained the words `const t = toolRef.current; t.width()` as an
+*example*. The count went 164 → 165 and the new ratchet failed on its own
+author. Stripping comments also stopped nearby prose ("preview", "stroke",
+"drag") from classifying sites as hot-path: 6 moved to value-consumed and 3
+phantom sites disappeared. This is the failure `engineOwnership.contract.test.ts`
+warns about in its own header — a check satisfied by its own documentation.
+
+**On #4 — found by QC, not by me.** The plan asked for five hand-checked sites;
+the QC terminal did those, saw a systematic pattern, and swept all 166 against
+the TypeScript AST:
+
+| Bucket | Regex scan | AST truth |
+|---|---|---|
+| un-awaited | 47 | **61** |
+| needs-restructure | 95 | **81** |
+| truthy-trap | 24 | **24** |
+| **gate total** | **166** | **166** |
+
+Two causes, neither fixable by widening the pattern. A multi-line parameter
+list — `async (` on one line, `) => {` several lines later — made the scan read
+the closing line, find no `async`, and call the function synchronous; that was
+sixteen sites, including all nine inside `savePhotoEdit`. And an expired
+60-line lookback returned `null`, which fell through to *un-awaited*, so
+"couldn't tell" silently became "just add await".
+
+The gate total survived the bug; the split did not. **a3–a10 are scoped off the
+split**, and sixteen sites wrongly filed as needing a restructure is a fortnight
+of imaginary work. The script now parses with the compiler and matches that
+sweep exactly; the split is pinned in the test so it cannot drift back.
+
+**The audit resolves `typescript` where it is declared** (`app/`), not by
+trusting pnpm's hoist. A bare import worked only by accident of the current
+node-linker, and the failure mode would have been a module-not-found inside the
+contract test — the whole suite red for a reason nothing on screen explains.
+
+All three guards were mutation-tested: an un-awaited call, a flag read outside
+the port, and a throwaway engine on the live port each turn the suite red with
+the message that names the invariant. QC independently re-ran all three.
+
+Suite 400 → **408 tests**, 33 → 34 files.

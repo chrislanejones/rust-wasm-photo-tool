@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.79",
+    date: "2026-08-08",
+    headline: "Groundwork for moving the engine off the main thread",
+    entries: [
+      {
+        tag: "infra",
+        text: "The tool that tracks the engine-in-a-worker migration now measures how much of it has actually been done, not just how big it is — and a test pins that number so it can only go down. Nothing in the app changed.",
+      },
+    ],
+  },
+  {
     version: "v7.78",
     date: "2026-08-08",
     headline: "A correction to the last release's own notes",

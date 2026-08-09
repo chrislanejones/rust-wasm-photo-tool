@@ -18,8 +18,33 @@
 // regex; until then, do not treat a file's absence here as proof it is clean.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { createRequire } from "node:module";
 
-const ROOT = process.argv[2] ?? process.cwd();
+// argv may carry flags (`--samples`); the first NON-flag argument is the root.
+const ROOT = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? process.cwd();
+
+// `typescript` is declared in app/package.json, NOT at the repo root — a bare
+// `import ts from "typescript"` here only works because pnpm happens to hoist
+// it, and a stricter node-linker or a fresh install would break it. That would
+// surface as a module-not-found inside
+// `engineAsyncMigration.contract.test.ts`, which shells out to this script, so
+// the whole suite would fail for a reason nothing on screen explains. Resolve
+// it where it is actually declared instead of trusting the hoist.
+const require_ = createRequire(import.meta.url);
+const ts = (() => {
+  for (const from of [join(ROOT, "app/package.json"), join(ROOT, "package.json")]) {
+    try {
+      return require_(require_.resolve("typescript", { paths: [join(from, "..")] }));
+    } catch {
+      /* try the next location */
+    }
+  }
+  throw new Error(
+    "engine-call-audit needs the TypeScript compiler to classify awaited call sites.\n" +
+      "It is a devDependency of app/. Run `pnpm install` — do NOT add it at the root\n" +
+      "just to satisfy this script.",
+  );
+})();
 const DTS = join(ROOT, "app/src/hooks/stamp_tool.d.ts");
 const SRC = join(ROOT, "app/src");
 
@@ -56,6 +81,57 @@ const HOT_CTX = /pointermove|onPointerMove|requestAnimationFrame|flushToCanvas|h
 // undercount. Local aliases are now resolved per file; see `aliasesIn`.
 const LITERAL_RECEIVER = /^(?:toolRef\.current|hookResult\.toolRef\.current|tool|engine)$/;
 
+/**
+ * Blank out comments, preserving line COUNT and column positions.
+ *
+ * Found 2026-08-08 the honest way: a comment added to `port.ts` explaining the
+ * alias problem contained the words `const t = toolRef.current; t.width()`, and
+ * the audit counted it as a real call site — the total went 164 -> 165 and the
+ * Stage 3.5 ratchet failed. Every count this script has ever printed included
+ * whatever engine calls appeared in prose.
+ *
+ * Same failure `engineOwnership.contract.test.ts` guards against in its own
+ * header: "an earlier guard in this repo passed against deleted code because it
+ * matched the identifier inside the comment explaining the code — a test
+ * satisfied by its own docs."
+ *
+ * Characters are replaced with spaces rather than removed so `file:line` stays
+ * accurate and `line.slice(0, m.index)` still describes real syntax.
+ */
+function stripComments(text) {
+  let out = "";
+  let i = 0;
+  let mode = "code"; // code | line | block | sq | dq | tpl
+  while (i < text.length) {
+    const c = text[i];
+    const n = text[i + 1];
+    const blank = c === "\n" ? "\n" : " ";
+    if (mode === "code") {
+      if (c === "/" && n === "/") { mode = "line"; out += "  "; i += 2; continue; }
+      if (c === "/" && n === "*") { mode = "block"; out += "  "; i += 2; continue; }
+      if (c === "'") mode = "sq";
+      else if (c === '"') mode = "dq";
+      else if (c === "`") mode = "tpl";
+      out += c; i++; continue;
+    }
+    if (mode === "line") {
+      if (c === "\n") { mode = "code"; out += "\n"; i++; continue; }
+      out += " "; i++; continue;
+    }
+    if (mode === "block") {
+      if (c === "*" && n === "/") { mode = "code"; out += "  "; i += 2; continue; }
+      out += blank; i++; continue;
+    }
+    // inside a string literal: copy verbatim, honour escapes and terminators
+    if (c === "\\") { out += c + (text[i + 1] ?? ""); i += 2; continue; }
+    if ((mode === "sq" && c === "'") || (mode === "dq" && c === '"') || (mode === "tpl" && c === "`")) {
+      mode = "code";
+    }
+    out += c; i++;
+  }
+  return out;
+}
+
 /** Names bound from the engine handle somewhere in this file. */
 function aliasesIn(text) {
   const out = new Set();
@@ -67,12 +143,142 @@ function aliasesIn(text) {
   return out;
 }
 
+// --- the AWAITED dimension (ADR-024 Stage 3.5 acceptance gate) -------------
+//
+// Category (a/b/c) says what a site COSTS to migrate. It does not say whether
+// the migration has happened, and the two must not be conflated: the consumed
+// test above treats `await` as one of the consuming contexts, so converting all
+// of them leaves the value-consumed count exactly where it started. The gate is
+// the un-awaited count going 164 -> 0, which needs its own axis.
+//
+// TWO TRAPS, both named in the Stage 3.5 contract, both reported separately
+// because a miscounting audit is worse than none:
+//
+//   1. `if (t.width())` on a Promise is ALWAYS TRUTHY and compiles clean. tsc
+//      cannot catch it — a Promise is a perfectly good `unknown` in a
+//      condition. Flagged as `truthy-trap`, and it is the dangerous bucket:
+//      the code is wrong rather than merely unconverted.
+//   2. A call inside a NON-ASYNC callback cannot simply gain an `await`; the
+//      callback has to be restructured first. That is a different, larger job
+//      than adding a keyword, so it is `needs-restructure`, not `un-awaited`.
+//
+// Accuracy note, deliberately not papered over: enclosing-function detection is
+// a backward scan for the nearest `function` / `=>` and whether `async` precedes
+// it. It is a heuristic. It will misread deeply nested or oddly formatted
+// callbacks. Widen it only from hand-checked false positives, the same standard
+// the receiver regex was held to — a clean-looking number from a wrong method is
+// the failure mode this whole axis exists to prevent.
+
+/** Is the call at `before`…`match` directly awaited? */
+function isAwaited(before) {
+  // `await t.foo()`, `await (t.foo())`, `return await t.foo()`
+  return /\bawait\s*\(?\s*$/.test(before);
+}
+
+/** Does this call feed a condition, where an un-awaited Promise is truthy? */
+function inCondition(before, after) {
+  if (/\b(?:if|while|switch)\s*\($/.test(before.replace(/\s+$/, "") + "")) return true;
+  if (/\b(?:if|while)\s*\(\s*!?\s*$/.test(before)) return true;
+  if (/[!]\s*$/.test(before)) return true;
+  if (/\?\?|&&|\|\|/.test(before) && /\b(?:if|while|return|\?)/.test(before)) return true;
+  // ternary test position: `cond ? a : b` where the call is before the `?`
+  if (/^\s*\??\s*[:?]/.test(after)) return true;
+  return false;
+}
+
+/**
+ * Nearest enclosing function is `async`?
+ *
+ * PARSED, not pattern-matched. The first version of this scanned backwards for
+ * a line that looked like a function head, and QC's AST sweep found it wrong on
+ * **18 of 166 sites** — the gate total was right, the split was not:
+ *
+ *   un-awaited        47 reported / 61 true   (30% understated)
+ *   needs-restructure 95 reported / 81 true   (17% overstated)
+ *   truthy-trap       24 reported / 24 true   (clean)
+ *
+ * Two causes, both fatal to a backward line scan and neither fixable by
+ * widening the regex:
+ *
+ *   1. A multi-line parameter list. `async (` opens on one line and `) => {`
+ *      closes several lines later; the scan hit `) => {`, saw no `async` on
+ *      THAT line, and declared the function synchronous. Sixteen sites,
+ *      including all nine inside `savePhotoEdit`.
+ *   2. The 60-line lookback expiring returned `null`, and `null` fell through
+ *      to `un-awaited` — "couldn't tell" silently became "just add await".
+ *
+ * Both disappear against a real parse. `null` now means genuinely module top
+ * level, where top-level await IS available, so it stays awaitable.
+ *
+ * Costs one `createSourceFile` per file (~30 files, unmeasurable next to the
+ * regex sweep). Worth it: a3–a10 are scoped off this split, and sixteen sites
+ * wrongly filed as "needs a restructure" is a fortnight of imaginary work.
+ */
+function asyncLookupFor(raw, filePath) {
+  const sf = ts.createSourceFile(
+    filePath,
+    raw,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    /\.tsx$/.test(filePath) ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+
+  const isFunctionLike = (n) =>
+    ts.isFunctionDeclaration(n) ||
+    ts.isFunctionExpression(n) ||
+    ts.isArrowFunction(n) ||
+    ts.isMethodDeclaration(n) ||
+    ts.isConstructorDeclaration(n) ||
+    ts.isGetAccessor(n) ||
+    ts.isSetAccessor(n);
+
+  /** Innermost node containing `offset`. */
+  function innermost(node, offset) {
+    let hit = node;
+    const visit = (n) => {
+      if (offset < n.getStart(sf) || offset >= n.getEnd()) return;
+      hit = n;
+      ts.forEachChild(n, visit);
+    };
+    ts.forEachChild(node, visit);
+    return hit;
+  }
+
+  return (offset) => {
+    let n = innermost(sf, offset);
+    while (n) {
+      if (isFunctionLike(n)) {
+        return Boolean(
+          n.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.AsyncKeyword),
+        );
+      }
+      n = n.parent;
+    }
+    return null; // module top level — top-level await is available here
+  };
+}
+
+/** Byte offset of the start of each line, for line/col -> offset. */
+function lineStarts(text) {
+  const starts = [0];
+  for (let i = 0; i < text.length; i++) if (text[i] === "\n") starts.push(i + 1);
+  return starts;
+}
+
 const rows = [];
 for (const file of walk(SRC)) {
   const rel = relative(ROOT, file);
-  const text = readFileSync(file, "utf8");
+  const raw = readFileSync(file, "utf8");
+  const text = stripComments(raw);
   const lines = text.split("\n");
+  // Snippets come from the ORIGINAL text so the report stays readable; only
+  // matching runs against the stripped copy.
+  const rawLines = raw.split("\n");
   const aliases = aliasesIn(text);
+  // One parse per file. Comment-stripping preserves offsets, so a position
+  // computed from the stripped copy indexes the original correctly.
+  const isAsyncAt = asyncLookupFor(raw, file);
+  const starts = lineStarts(raw);
   lines.forEach((line, i) => {
     // A call on the engine handle, by literal name OR via a local alias.
     const re = /([A-Za-z_$][\w$.]*)\??\.([a-z_][a-z0-9_]*)\s*\(/g;
@@ -89,16 +295,113 @@ for (const file of walk(SRC)) {
       const consumed = !bare;
       const ctx = lines.slice(Math.max(0, i - 6), i + 2).join("\n");
       const hot = HOT_FILE.test(rel) && HOT_CTX.test(ctx);
+
+      // --- awaited axis, orthogonal to the a/b/c category -------------------
+      const after = line.slice(m.index + m[0].length);
+      let awaited = "n/a"; // fire-and-forget needs no await
+      if (consumed) {
+        const offset = (starts[i] ?? 0) + m.index;
+        if (isAwaited(before)) awaited = "awaited";
+        else if (inCondition(before, after)) awaited = "truthy-trap";
+        else if (isAsyncAt(offset) === false) awaited = "needs-restructure";
+        else awaited = "un-awaited";
+      }
+
       rows.push({
+        awaited,
         file: rel,
         line: i + 1,
         method: name,
         category: hot ? "c-hot-path" : consumed ? "b-value-consumed" : "a-fire-and-forget",
-        snippet: line.trim().slice(0, 110),
+        snippet: (rawLines[i] ?? line).trim().slice(0, 110),
       });
     }
   });
 }
+
+// --- THE STAGE 3.5 GATE ----------------------------------------------------
+// Printed first because it is the number the stage is accepted on, and because
+// the category totals below deliberately do NOT move as conversions land.
+const consumedRows = rows.filter((r) => r.category === "b-value-consumed");
+const gate = {
+  awaited: consumedRows.filter((r) => r.awaited === "awaited").length,
+  unawaited: consumedRows.filter((r) => r.awaited === "un-awaited").length,
+  restructure: consumedRows.filter((r) => r.awaited === "needs-restructure").length,
+  truthy: consumedRows.filter((r) => r.awaited === "truthy-trap").length,
+};
+const remaining = gate.unawaited + gate.restructure + gate.truthy;
+
+// `--json` prints ONLY this and exits. `engineAsyncMigration.contract.test.ts`
+// consumes it, so the test and this script cannot drift into two different
+// definitions of "converted" — there is one implementation and the test shells
+// out to it rather than reimplementing the classification.
+if (process.argv.includes("--json")) {
+  console.log(
+    JSON.stringify({
+      total: rows.length,
+      valueConsumed: consumedRows.length,
+      ...gate,
+      remaining,
+      remainingByFile: consumedRows
+        .filter((r) => r.awaited !== "awaited")
+        .reduce((acc, r) => ((acc[r.file] = (acc[r.file] || 0) + 1), acc), {}),
+      truthySites: consumedRows
+        .filter((r) => r.awaited === "truthy-trap")
+        .map((r) => `${r.file}:${r.line}`),
+    }),
+  );
+  process.exit(0);
+}
+
+console.log("=".repeat(64));
+console.log("ADR-024 STAGE 3.5 GATE — value-consumed sites not yet converted");
+console.log("=".repeat(64));
+console.log(`  REMAINING (the gate: this must reach 0)   ${String(remaining).padStart(4)}`);
+console.log(`    un-awaited        (add await)           ${String(gate.unawaited).padStart(4)}`);
+console.log(`    needs-restructure (non-async callback)  ${String(gate.restructure).padStart(4)}`);
+console.log(`    truthy-trap       (feeds a condition)   ${String(gate.truthy).padStart(4)}  <-- highest risk to convert`);
+console.log(`  already awaited                           ${String(gate.awaited).padStart(4)}`);
+console.log("");
+
+if (gate.truthy > 0) {
+  // NOT bugs today — these are synchronous and correct. The bucket exists
+  // because they are the conversions most likely to go wrong SILENTLY: make the
+  // method return a Promise and forget the `await`, and the condition becomes
+  // permanently true with no type error and no test failure. Convert these
+  // deliberately and last within their file, never by sweep.
+  console.log("TRUTHY-TRAP SITES — correct today; convert deliberately.");
+  console.log("If one of these becomes a Promise without `await`, the test is always true");
+  console.log("and neither tsc nor the existing tests can see it:");
+  for (const r of consumedRows.filter((x) => x.awaited === "truthy-trap")) {
+    console.log(`  ${r.file}:${r.line}  ${r.method}  |  ${r.snippet}`);
+  }
+  console.log("");
+}
+
+// `--samples` dumps a handful of sites per bucket. The awaited axis is a
+// heuristic (see the header), so it has to stay spot-checkable by hand rather
+// than trusted because the total looks plausible.
+if (process.argv.includes("--samples")) {
+  const buckets = {};
+  for (const r of consumedRows) (buckets[r.awaited] ??= []).push(r);
+  for (const [k, v] of Object.entries(buckets)) {
+    console.log(`--- ${k} (${v.length}) ---`);
+    for (const r of v.slice(0, 5)) {
+      console.log(`   ${r.file}:${r.line}  |  ${r.snippet.slice(0, 84)}`);
+    }
+  }
+  console.log("");
+}
+
+console.log("REMAINING BY FILE (un-awaited + restructure + truthy):");
+const remByFile = {};
+for (const r of consumedRows.filter((x) => x.awaited !== "awaited")) {
+  remByFile[r.file] = (remByFile[r.file] || 0) + 1;
+}
+for (const [f, n] of Object.entries(remByFile).sort((a, b) => b[1] - a[1])) {
+  console.log(`  ${String(n).padStart(3)}  ${f}`);
+}
+console.log("");
 
 // --- report ---------------------------------------------------------------
 const byCat = {};
