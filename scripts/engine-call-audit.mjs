@@ -77,7 +77,15 @@ function walk(dir, out = []) {
 }
 
 // Files/functions where a round trip lands inside an interaction loop.
-const HOT_FILE = /useDrawingTools|useCloneStamp|usePaintTool|useMagicEraser|CanvasArea|LassoOverlay|useMoveLayerTool|usePastePlacementTool|useColorPicker/;
+// `useSelectionActions` added 2026-08-09. Its `handleLassoMove` is bound to
+// onLassoMove and its own comment says so: "recomputed on every mouse-move
+// while a session is open. This is the interactive path... which is what keeps
+// it inside a frame budget on a big image." Without it in this list, two
+// per-pointermove calls (`lasso_active`, `lasso_path_to`) were classified as
+// ordinary value-consumed work and would have been swept into the a5 batch.
+// The contract puts hot-path sites LAST on purpose: an await on pointermove is
+// a dropped frame, not a slower call, and they need their own reasoning.
+const HOT_FILE = /useDrawingTools|useCloneStamp|usePaintTool|useMagicEraser|CanvasArea|LassoOverlay|useMoveLayerTool|usePastePlacementTool|useColorPicker|useSelectionActions/;
 const HOT_CTX = /pointermove|onPointerMove|requestAnimationFrame|flushToCanvas|hover|preview|stroke|drag/i;
 
 // Receivers this audit used to recognise. It only ever matched these three

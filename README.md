@@ -84,6 +84,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.86 — 2026-08-09
+
+**Tooling only.** The audit that tracks the background-thread migration was
+mis-filing the lasso's live preview as ordinary work. It runs on every mouse
+move, where waiting on a background thread would cost a frame, so it belongs in
+the group that gets handled last and separately. No app code changed.
+
+<details><summary>Older releases</summary>
+
 ### v7.85 — 2026-08-09
 
 **Groundwork, nothing user-visible.** More of the engine-on-a-background-thread
@@ -92,7 +101,6 @@ and hide, opacity, masks — are ready for an engine that answers over a message
 queue. Behaviour is unchanged; verified by driving every one of them and
 checking the layer stack after each.
 
-<details><summary>Older releases</summary>
 
 ### v7.84 — 2026-08-09
 

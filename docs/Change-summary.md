@@ -3510,3 +3510,36 @@ layers is not the same thing as the document:
 | JS tests | **417** |
 | tsc / eslint | clean, 0 errors |
 | Rust tests | 297 |
+
+## v7.86 Change Summary — 2026-08-09
+
+Tooling only. No app or engine code.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `engine-call-audit.mjs` now counts `useSelectionActions` as a hot-path file | **Fixed** |
+| 2 | Stage 3.5 gate: **125 → 121** — a reclassification, **not** work done | — |
+
+**The lasso's live wire runs on every mouse move**, and its own comment says so:
+
+> "recomputed on every mouse-move while a session is open. This is the
+> interactive path: the engine bounds its search to a window around the
+> segment, which is what keeps it inside a frame budget on a big image."
+
+`handleLassoMove` is bound to `onLassoMove` in `CanvasArea` and calls
+`lasso_active()` and `lasso_path_to(x, y)` per event. The audit's `HOT_FILE`
+list did not include `useSelectionActions`, so those four sites were filed as
+ordinary value-consumed work — and would have been swept into the a5 batch as a
+routine conversion.
+
+The contract puts hot-path sites last on purpose: *"an await there is a dropped
+frame, not a slower call."* They want their own reasoning, not the same
+mechanical treatment. Found by applying v7.85's own triage rule to the next
+file rather than starting on it.
+
+**The gate moving 125 → 121 is the measurement getting more honest, not
+progress.** Four sites left the value-consumed count and joined the hot-path
+count; none were converted. That distinction has been kept explicit in the
+budget history in `engineAsyncMigration.contract.test.ts` every time it has
+happened, because conflating the two is how the earlier 121/162/166/171 muddle
+started.

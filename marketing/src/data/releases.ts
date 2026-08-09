@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.86",
+    date: "2026-08-09",
+    headline: "A mis-filed hot path in the migration tracker",
+    entries: [
+      {
+        tag: "infra",
+        text: "The tool tracking the background-thread migration was treating the lasso's live preview as ordinary work. It recomputes on every mouse move, where waiting on a background thread would cost a frame, so it belongs with the cases handled last and separately. Nothing in the app changed.",
+      },
+    ],
+  },
+  {
     version: "v7.85",
     date: "2026-08-09",
     headline: "Layer operations get ready for the background thread",

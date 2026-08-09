@@ -53,11 +53,16 @@ import { join } from "node:path";
  *    125  a7 landed: `useLayers.ts` fully converted, 13 -> 0. Nine of those
  *         were truthy-trap guards (`if (t.remove_layer(id))`), which is why
  *         they were done deliberately as one file rather than swept.
+ *    121  NOT work: `useSelectionActions` joined the audit's HOT_FILE list.
+ *         Its `handleLassoMove` runs per pointermove — its own comment says
+ *         "the interactive path... inside a frame budget" — so four sites
+ *         moved from value-consumed to hot-path, where the contract puts them
+ *         LAST on purpose. They were about to be swept into the a5 batch.
  *
  *  Only the last line is work. Measured both sides with the same audit against
  *  a worktree at HEAD, which is the only way to tell a real delta from a
  *  measurement change — the two had been tangled twice before. */
-const BUDGET = 125;
+const BUDGET = 121;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -149,7 +154,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
       gate.restructure,
       "needs-restructure moved. If real, update this and re-scope a3–a10; " +
         "if the classifier changed, check it against a parse before trusting it.",
-    ).toBe(73);
+    ).toBe(71);
     expect(gate.unawaited).toBe(39);
   });
 
