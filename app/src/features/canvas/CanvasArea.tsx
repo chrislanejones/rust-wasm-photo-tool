@@ -27,6 +27,7 @@ import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
+import { measureText, textInkOffset } from "@/lib/engine/textMetricsCache";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
@@ -2040,7 +2041,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // matches exactly; fall back to the JS-measured box centre.
           let pivotLocalX = boxW / 2;
           let pivotLocalY = boxH / 2;
-          const measured = hookResult.toolRef.current?.measure_text(
+          // Through the cache, not the engine. This is a RENDER-position read
+          // and a render pass cannot await, so it is one of the two sites
+          // Stage 3.5 cannot convert — see `textMetricsCache.ts`. The
+          // JS-measured box above stays as the miss fallback, which is exactly
+          // what it was before the engine was consulted here.
+          const measured = measureText(
+            hookResult.toolRef.current,
             textInput.text || " ",
             effFontSize,
             effFontWeight === "bold",
@@ -2206,8 +2213,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // — so the box doesn't jump when the ink-anchored commit lands
           // (commitText stores (x,y) = overlay + cssPad − text_ink_offset_bg;
           // this is the same geometry projected back onto the preview).
+          // Cached, for the same reason as the pivot above: render position.
+          // The `: sx - bgPad` branches below are the miss fallback.
           const inkBase = showBg
-            ? hookResult.toolRef.current?.text_ink_offset(
+            ? textInkOffset(
+                hookResult.toolRef.current,
                 textInput.text || " ",
                 effFontSize,
                 effFontWeight === "bold",

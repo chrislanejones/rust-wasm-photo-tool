@@ -28,6 +28,7 @@ import { AIRenamePanel } from "./AIRenamePanel";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "@/components/ui/sonner";
+import { measureText } from "@/lib/engine/textMetricsCache";
 
 const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
 
@@ -1049,7 +1050,15 @@ function TextBatchPanel({
           try {
             tool.load_image(targetBytes);
             // Measure in Rust so we can corner-align without knowing glyph metrics.
-            const m = tool.measure_text(text, fontSize, bold);
+            const m = measureText(tool, text, fontSize, bold);
+            // `tool` is live here, so a miss is unreachable today. Throwing rather
+            // than defaulting is deliberate: every available fallback (0, or a
+            // JS-measured box) would corner-align the text to the WRONG place and
+            // silently ship a batch of misplaced stamps. The enclosing catch skips
+            // this photo and reports it, which is the honest outcome. See
+            // `textMetricsCache.ts` — under Stage 3.5 a miss becomes reachable and
+            // this is where it has to be handled.
+            if (!m) throw new Error("text metrics unavailable — skipping this photo");
             // Corner-align the OUTER (padded) box, then inset back to the
             // text's own top-left — commit_text always anchors to the text.
             const { dx: outerDx, dy: outerDy } = computeOffset(
@@ -1176,7 +1185,15 @@ function TextBatchPanel({
             }
             const workW = tool.width();
             const workH = tool.height();
-            const m = tool.measure_text(text, fontSize, bold);
+            const m = measureText(tool, text, fontSize, bold);
+            // `tool` is live here, so a miss is unreachable today. Throwing rather
+            // than defaulting is deliberate: every available fallback (0, or a
+            // JS-measured box) would corner-align the text to the WRONG place and
+            // silently ship a batch of misplaced stamps. The enclosing catch skips
+            // this photo and reports it, which is the honest outcome. See
+            // `textMetricsCache.ts` — under Stage 3.5 a miss becomes reachable and
+            // this is where it has to be handled.
+            if (!m) throw new Error("text metrics unavailable — skipping this photo");
             const { dx: outerDx, dy: outerDy } = computeOffset(
               position,
               workW,

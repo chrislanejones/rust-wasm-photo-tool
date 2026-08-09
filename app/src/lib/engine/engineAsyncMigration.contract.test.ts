@@ -10,13 +10,13 @@
 // This file proves the STRUCTURAL half. It cannot prove the behavioural half —
 // that needs a running worker and an op-log equivalence run, which is a12/a13.
 //
-// WHY A RATCHET AND NOT A BOOLEAN. All 164 value-consuming sites are un-awaited
+// WHY A RATCHET AND NOT A BOOLEAN. All 168 value-consuming sites are un-awaited
 // today, so a test that simply failed on "any un-awaited call" would be red
 // before the first batch and would stay red for weeks — a permanently failing
 // test teaches people to ignore the suite. Instead the count is pinned. It
 // fails if the number goes UP (a new un-converted call sneaked in) and it fails
 // if the number goes DOWN without the budget being lowered (so a batch cannot
-// land without someone deliberately recording the progress). 164 -> 0 is the
+// land without someone deliberately recording the progress). 168 -> 0 is the
 // gate, one edit to `BUDGET` per batch.
 //
 // WHY IT SHELLS OUT. The classification lives in `scripts/engine-call-audit.mjs`
@@ -30,16 +30,27 @@ import { join } from "node:path";
 
 /** Lower this by exactly the batch size as each of a3–a10 lands. Gate is 0.
  *
- *  166, not the contract's 162. Two corrections, both found by running the
- *  script rather than reading it:
- *    +2  v7.77 added engine reads in `useExport.ts` when lossy export moved off
- *        the canvas — the number moves with the code, which is why it is pinned
- *        here and not frozen in a document.
- *    +2  the audit was matching engine calls inside COMMENTS. Stripping them
- *        also stopped prose in nearby comments ("preview", "stroke", "drag")
- *        from classifying sites as hot-path, so 6 moved from hot to
- *        value-consumed and 3 phantom sites disappeared entirely. */
-const BUDGET = 166;
+ *  The history of this number is worth keeping, because every move was a
+ *  measurement getting more honest rather than code getting better:
+ *
+ *    121  the contract's figure. The audit matched only three literal receiver
+ *         names, so `const t = toolRef.current; t.width()` was invisible.
+ *    162  after per-file alias resolution (+93 sites found, −some reclassified).
+ *    164  v7.77 added engine reads in `useExport.ts`.
+ *    166  after comment-stripping — the audit had been counting engine calls
+ *         written inside comments, and prose near a site ("preview", "stroke")
+ *         was classifying it as hot-path.
+ *    171  after the consumed test moved to the AST. The single-line version
+ *         read a call that merely STARTS a line as a bare statement, so any
+ *         call formatted as an argument on its own line counted as
+ *         fire-and-forget. Five sites had been invisible this way.
+ *    168  a2 landed: six direct call sites became three inside
+ *         `textMetricsCache.ts`.
+ *
+ *  Only the last line is work. Measured both sides with the same audit against
+ *  a worktree at HEAD, which is the only way to tell a real delta from a
+ *  measurement change — the two had been tangled twice before. */
+const BUDGET = 168;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -115,7 +126,8 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
   });
 
   it("the bucket split matches the AST, not a pattern guess", () => {
-    // QC's independent AST sweep, 2026-08-08, put the split at 61/81/24. The
+    // QC's independent AST sweep, 2026-08-08, put the split at 61/81/24 on the
+    // code as it stood then; a2 and the consumed fix moved it to 65/79/24. The
     // first version of `enclosingIsAsync` scanned lines backwards and got 18 of
     // 166 wrong — multi-line `async (` … `) => {` heads read as synchronous,
     // and an expired lookback returned null which fell through to "un-awaited",
@@ -130,8 +142,8 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
       gate.restructure,
       "needs-restructure moved. If real, update this and re-scope a3–a10; " +
         "if the classifier changed, check it against a parse before trusting it.",
-    ).toBe(81);
-    expect(gate.unawaited).toBe(61);
+    ).toBe(79);
+    expect(gate.unawaited).toBe(65);
   });
 
   it("reports the truthy-trap sites so they are converted deliberately", () => {

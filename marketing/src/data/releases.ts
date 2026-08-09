@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.80",
+    date: "2026-08-09",
+    headline: "Text layout stops re-asking the engine the same question",
+    entries: [
+      {
+        tag: "perf",
+        text: "Measuring where text sits used to go to the engine on every redraw. Those measurements depend only on the words, the size and the weight — nothing else — so the answer is now remembered and reused. Identical results, less work, and one more piece of groundwork for moving the engine off the main thread.",
+      },
+    ],
+  },
+  {
     version: "v7.79",
     date: "2026-08-08",
     headline: "Groundwork for moving the engine off the main thread",

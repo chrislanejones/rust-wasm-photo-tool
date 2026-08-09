@@ -84,6 +84,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.80 — 2026-08-09
+
+**Groundwork, nothing user-visible.** Text layout now reads its measurements
+from a cache instead of asking the engine on every render. The numbers are
+identical — these particular measurements depend only on the text, size and
+weight you asked about, so a cached answer can never be out of date.
+
+<details><summary>Older releases</summary>
+
 ### v7.79 — 2026-08-08
 
 **Tooling only.** The engine-call audit now measures whether the
@@ -91,7 +100,6 @@ engine-in-a-worker migration has actually happened, rather than just how big it
 is, and a contract test pins the number so it can only go down. Nothing in the
 app changed.
 
-<details><summary>Older releases</summary>
 
 ### v7.78 — 2026-08-08
 

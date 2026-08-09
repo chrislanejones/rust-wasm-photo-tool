@@ -3134,3 +3134,72 @@ the port, and a throwaway engine on the live port each turn the suite red with
 the message that names the invariant. QC independently re-ran all three.
 
 Suite 400 → **408 tests**, 33 → 34 files.
+
+## v7.80 Change Summary — 2026-08-09
+
+ADR-024 Stage 3.5, step a2. Nothing user-visible.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `lib/engine/textMetricsCache.ts` — a memo cache in front of `measure_text`, `text_ink_offset` and `text_ink_offset_bg`, keyed on their arguments. All six call sites go through it | **Added** |
+| 2 | `textMetricsCache.contract.test.ts` — asserts against the **Rust source** that all three still delegate to free functions and never touch `self` | **Added** |
+| 3 | The audit's value-consumed test was single-line, so a call that merely *starts* a line read as a bare statement. Moved to the AST | **Fixed** |
+
+**Why a cache and not the mirror ADR-024 called for.** The two reads that happen
+during React's render pass cannot be converted by Stage 3.5 — a render pass
+cannot `await`. ADR-024 proposed a mirrored snapshot of engine state and treated
+it as substantial work. That rested on a wrong premise: these functions read no
+engine state at all. `measure_text` forwards to `crate::text::measure`
+(`src/text.rs:220`) and the ink offsets to `crate::layer::annotation_ink_offset`
+(`src/layer.rs:649`), both **free functions**. The `&self` is a wasm-bindgen
+calling convention; the only other input is a `const` font.
+
+A mirror of engine state must be invalidated whenever the engine changes, and
+that is the cost that made this look hard. **A cache of a pure function keyed on
+its arguments can never go stale**, so there is nothing to invalidate and
+nothing to get wrong. `abandoned/scalar-mirror` is not rehabilitated by this; it
+is unnecessary. Entries are valid across engine *instances* too, which is why
+`BatchSettings` — a throwaway engine — shares the cache with the live document.
+
+That assumption is the whole basis of the design, so it is tested rather than
+remembered. Mutation-tested by making `measure_text` read `self.width`: the
+guard goes red with *"measure_text reads engine state — the metrics cache key is
+now incomplete."*
+
+**Two places where a default would have been a silent defect.** `useTextTool`
+and `BatchSettings` needed a miss branch to satisfy the compiler, and the
+obvious `?? [0, 0]` is not a neutral value — a zero ink offset is a *wrong
+correction* that lands committed text `bg_padding` + tail-margin px away from
+its preview, which is the exact drift that code exists to cancel. No metric now
+means no correction in `useTextTool`, and a thrown error in `BatchSettings` so
+the enclosing catch skips that photo rather than shipping a batch of misplaced
+stamps.
+
+**On #3 — the same bug family as v7.79's, found by writing a2.** A call
+formatted as an argument on its own line counted as fire-and-forget:
+
+```
+Array.from(
+  tool.text_ink_offset_bg(text, size, bold, kind, pad),   // <- read as "bare"
+)
+```
+
+Five sites had been invisible. Because that lands at the same time as a2's own
+reduction, both sides were measured with the same audit against a **git worktree
+at HEAD** — the only way to separate a real delta from a measurement change,
+having conflated the two twice already:
+
+| | Pre-a2 | Post-a2 |
+|---|---|---|
+| Value-consumed | **171** | **168** |
+
+So a2's contribution is **−3** (six direct call sites became three inside the
+cache), and 166 → 171 was the measurement catching up. The budget history is
+recorded in `engineAsyncMigration.contract.test.ts`.
+
+Verified in a browser, since gates cannot see text land 4px off: committed
+"ANCHOR" at engine anchor (504, 771) against the mapping's own prediction of
+(503, 771) — y exact, x within the rounding of a screen-derived measurement —
+with the cached ink offset `[6, 10]` being the value the commit used.
+
+Suite 408 → **417 tests**, 34 → 36 files.

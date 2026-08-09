@@ -32,9 +32,15 @@ const ROOT = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? process.c
 // it where it is actually declared instead of trusting the hoist.
 const require_ = createRequire(import.meta.url);
 const ts = (() => {
-  for (const from of [join(ROOT, "app/package.json"), join(ROOT, "package.json")]) {
+  // ROOT first (the tree being audited), then the SCRIPT's own checkout. The
+  // second is not redundant: pointing this at a git worktree — the only honest
+  // way to measure "what did that change actually move?" — gives a tree with
+  // source but no `node_modules`, and the resolver has to fall back to the
+  // checkout it was launched from.
+  const here = new URL(".", import.meta.url).pathname;
+  for (const dir of [join(ROOT, "app"), ROOT, join(here, "../app"), join(here, "..")]) {
     try {
-      return require_(require_.resolve("typescript", { paths: [join(from, "..")] }));
+      return require_(require_.resolve("typescript", { paths: [dir] }));
     } catch {
       /* try the next location */
     }
@@ -244,7 +250,7 @@ function asyncLookupFor(raw, filePath) {
     return hit;
   }
 
-  return (offset) => {
+  const enclosingAsync = (offset) => {
     let n = innermost(sf, offset);
     while (n) {
       if (isFunctionLike(n)) {
@@ -256,6 +262,56 @@ function asyncLookupFor(raw, filePath) {
     }
     return null; // module top level — top-level await is available here
   };
+
+  /**
+   * Is the call at `offset` VALUE-CONSUMED?
+   *
+   * Was `!/^\s*(?:void\s+)?$/.test(textBeforeItOnThisLine)` — a single-line
+   * test, and therefore blind in exactly the way the awaited axis was. A call
+   * that merely *starts* a line reads as bare even when it is an argument to
+   * something opened on the line above:
+   *
+   *     Array.from(
+   *       tool.text_ink_offset_bg(text, size, bold, kind, pad),   // <- "bare"
+   *     )
+   *
+   * Found while writing `textMetricsCache.ts`, whose own formatting produced
+   * one. Consumed is now "the call is not the whole statement", asked of the
+   * parse: walk out through parentheses and `as`/`!` wrappers to the first
+   * meaningful parent, and it is fire-and-forget only if that is an
+   * ExpressionStatement (or a `void` of one).
+   */
+  const isConsumed = (offset) => {
+    let n = innermost(sf, offset);
+    // Climb to the CallExpression the offset sits inside.
+    while (n && !ts.isCallExpression(n)) n = n.parent;
+    if (!n) return null;
+    let cur = n;
+    let parent = cur.parent;
+    while (
+      parent &&
+      (ts.isParenthesizedExpression(parent) ||
+        ts.isAsExpression(parent) ||
+        ts.isNonNullExpression(parent) ||
+        ts.isSatisfiesExpression?.(parent))
+    ) {
+      cur = parent;
+      parent = cur.parent;
+    }
+    if (!parent) return true;
+    if (ts.isExpressionStatement(parent)) return false;
+    // `void tool.foo()` as a statement is a deliberate discard.
+    if (
+      ts.isVoidExpression(parent) &&
+      parent.parent &&
+      ts.isExpressionStatement(parent.parent)
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  return { enclosingAsync, isConsumed };
 }
 
 /** Byte offset of the start of each line, for line/col -> offset. */
@@ -277,7 +333,7 @@ for (const file of walk(SRC)) {
   const aliases = aliasesIn(text);
   // One parse per file. Comment-stripping preserves offsets, so a position
   // computed from the stripped copy indexes the original correctly.
-  const isAsyncAt = asyncLookupFor(raw, file);
+  const { enclosingAsync: isAsyncAt, isConsumed } = asyncLookupFor(raw, file);
   const starts = lineStarts(raw);
   lines.forEach((line, i) => {
     // A call on the engine handle, by literal name OR via a local alias.
@@ -291,8 +347,13 @@ for (const file of walk(SRC)) {
       const before = line.slice(0, m.index);
       // Consumed if the call feeds an assignment, condition, return, arg, await,
       // property access, or template — i.e. anything but a bare statement.
-      const bare = /^\s*(?:void\s+)?$/.test(before);
-      const consumed = !bare;
+      // AST first; the single-line test survives only as a fallback for a file
+      // TypeScript could not parse (none today, but a silent crash here would
+      // read as "everything is fire-and-forget", i.e. a passing gate).
+      const offsetForNode = (starts[i] ?? 0) + m.index;
+      const astConsumed = isConsumed(offsetForNode);
+      const consumed =
+        astConsumed === null ? !/^\s*(?:void\s+)?$/.test(before) : astConsumed;
       const ctx = lines.slice(Math.max(0, i - 6), i + 2).join("\n");
       const hot = HOT_FILE.test(rel) && HOT_CTX.test(ctx);
 

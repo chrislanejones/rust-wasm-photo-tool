@@ -3,6 +3,7 @@ import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { parseColorSync, warmColorParser } from "@/lib/colorParser";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
+import { textInkOffsetBg } from "@/lib/engine/textMetricsCache";
 
 interface TextInput {
   screenX: number;
@@ -247,15 +248,23 @@ export function useTextTool({
         const cr = canvas.getBoundingClientRect();
         const scaleX = cr.width / canvas.width || 1;
         const scaleY = cr.height / canvas.height || 1;
-        const ink = tool.text_ink_offset_bg(
+        const ink = textInkOffsetBg(
+          tool,
           ti.text,
           ti.fontSize,
           bold,
           bgKind,
           bgPadding,
         );
-        x = Math.round(ti.canvasX + TEXT_OVERLAY_PAD_X / scaleX - ink[0]);
-        y = Math.round(ti.canvasY + TEXT_OVERLAY_PAD_Y / scaleY - ink[1]);
+        // NOT `?? [0, 0]`. A zero offset is not a neutral default here — it is
+        // a wrong correction, and it would land committed text `bg_padding` +
+        // tail-margin px off from its preview, which is the exact drift this
+        // block exists to cancel. With no metric, apply no correction and keep
+        // the uncorrected anchor, the same as the `if (canvas)` miss above.
+        if (ink) {
+          x = Math.round(ti.canvasX + TEXT_OVERLAY_PAD_X / scaleX - ink[0]);
+          y = Math.round(ti.canvasY + TEXT_OVERLAY_PAD_Y / scaleY - ink[1]);
+        }
       }
     }
 
@@ -356,15 +365,21 @@ export function useTextTool({
       let boxX = ann.x;
       let boxY = ann.y;
       if (toolRef.current) {
-        const ink = toolRef.current.text_ink_offset_bg(
+        const ink = textInkOffsetBg(
+          toolRef.current,
           ann.text,
           ann.font_size,
           ann.bold,
           ann.background_kind,
           ann.bg_padding,
         );
-        boxX = ann.x + ink[0] - TEXT_OVERLAY_PAD_X / (scaleX || 1);
-        boxY = ann.y + ink[1] - TEXT_OVERLAY_PAD_Y / (scaleY || 1);
+        // Same reasoning as the commit path: no metric means no correction,
+        // not a zero one. This is the exact inverse of the mapping applied on
+        // commit, so a bogus value here makes re-edit cycles drift.
+        if (ink) {
+          boxX = ann.x + ink[0] - TEXT_OVERLAY_PAD_X / (scaleX || 1);
+          boxY = ann.y + ink[1] - TEXT_OVERLAY_PAD_Y / (scaleY || 1);
+        }
       }
       const screenX = cr.left - ctr.left + boxX * scaleX;
       const screenY = cr.top - ctr.top + boxY * scaleY;
