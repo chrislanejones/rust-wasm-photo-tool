@@ -3628,3 +3628,50 @@ engine exactly. Save, restore and undo unchanged.
 
 **Gates.** `cargo fmt`/`clippy` clean, 190 Rust tests, 417 JS tests, `tsc` clean,
 eslint 0 errors, production build clean. Engine grew 1,397 bytes.
+
+## v7.89 Change Summary — 2026-08-09
+
+No user-visible change. Test cover for a data-loss fix that shipped without it.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Regression test for the v7.81 batch-export data loss — 10 tests | **Added** |
+| 2 | The export's source decision extracted to `lib/batchExportPlan.ts` | **Refactored** |
+| 3 | Four mutants introduced and caught, including the original bug verbatim | **Verified** |
+
+**Why this was owed.** The v7.81 bug shipped originals instead of edits, lost
+user data, and survived two months and two investigations. The fix was correct
+and went out with no test, because the failure only appears across a page
+reload and vitest cannot stage one. Since then the code underneath it has been
+substantially rewritten twice — v7.84 moved both save paths onto
+`capture_state()`, v7.88 moved the export paths onto `capture_composite*()` —
+so an untested data-loss fix has been sitting under two rounds of change.
+
+**What made it testable.** A reload's only relevant effect is that session
+state is empty while storage is populated, and that state is reachable
+directly. The decision moved into `resolveExportSource(photoId, loadEdit)`,
+whose signature has no session-state parameter — so the post-reload condition
+is its only condition, and the old bug is not merely untested there but
+unrepresentable.
+
+**Two halves, both load-bearing.** The behavioural tests prove the decision
+reads storage. They cannot see a gate re-added upstream of the call, so a
+source-level test covers that — same style and reasoning as
+`engineOwnership.contract.test.ts`. The structural rule distinguishes two uses
+of the same identifiers: `undoCount` and `hasBeenModified` are read
+legitimately BEFORE the loop, to flush the active photo INTO storage, and
+banned inside it, where reading them decides what to LOAD.
+
+**Deliberately not built: a "which photos have edits" list.** `loadPhotoEdit`
+falls back to Convex after IndexedDB, so a list built from local keys would
+report "no edit" for a signed-in user on a new device — the same bug,
+reintroduced by the refactor meant to test it. It would also hold every photo's
+archive in memory at once, which is a known tab-crash.
+
+**Verified against the full repro**, production build: stroke drawn (17,448
+red px) → page reload → undo count 0 with the stroke intact at 17,448 →
+Download All → the archive entry is 2020x1353, the canvas size rather than the
+source, and carries 16,967 red px. The remaining 2.8% is JPEG edge softening.
+
+**Gates.** 427 JS tests (up from 417), `tsc` clean, eslint 0 errors, production
+build clean. Engine unchanged.

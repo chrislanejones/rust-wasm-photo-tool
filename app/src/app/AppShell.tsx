@@ -93,6 +93,7 @@ import { collectDeletedPhotoOriginals, deleteReplacedOriginal } from "@/lib/orig
 import { collectExtraRoots } from "@/lib/extraRoots";
 import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
+import { resolveExportSource } from "@/lib/batchExportPlan";
 import { RadioCards } from "@/components/ui/radio-cards";
 import {
   readExifTiff,
@@ -2398,8 +2399,11 @@ export function AppShell() {
       let mime: string;
       let ext: string;
 
-      const edit = await loadPhotoEdit(photo.id);
-      if (edit) {
+      // The decision lives in `lib/batchExportPlan.ts` so it can be tested.
+      // Its signature takes storage and nothing else, which is the guarantee —
+      // see that file's header and `batchExportPlan.contract.test.ts`.
+      const { source, edit } = await resolveExportSource(photo.id, loadPhotoEdit);
+      if (source === "edit" && edit) {
           // Canvas edits (draw / text / crop / resize / transform) →
           // composite via Rust + re-encode at the chosen format/quality.
           // Honour Settings → Layers and Canvas → "Photo only" here too. This

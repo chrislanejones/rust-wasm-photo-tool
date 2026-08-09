@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.89",
+    date: "2026-08-09",
+    headline: "Cover for the Download All fix",
+    entries: [
+      {
+        tag: "infra",
+        text: "The v7.81 fix \u2014 Download All shipping your original files instead of your edits \u2014 now has a regression test. That bug only appeared after a page reload, which is why it lasted two months and why the fix went out without one. Nothing changes for you; the fix is simply harder to lose now.",
+      },
+    ],
+  },
+  {
     version: "v7.88",
     date: "2026-08-09",
     headline: "Photo-only exports stop doing the work three times",

@@ -84,6 +84,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.89 — 2026-08-09
+
+**No user-visible change.** The v7.81 fix — Download All shipping your original
+files instead of your edits — now has a regression test. That bug only appeared
+after a page reload, which is why it lasted two months and why the fix went out
+without one. The code underneath it has been rewritten twice since, so the
+cover is overdue.
+
+<details><summary>Older releases</summary>
+
 ### v7.88 — 2026-08-09
 
 **Exports that leave the canvas background out are three times faster.**
@@ -95,8 +105,6 @@ all took the slow path.
 
 Also groundwork: nine places that read a picture and the dimensions describing
 it now read both in one call, so nothing can change in between.
-
-<details><summary>Older releases</summary>
 
 ### v7.87 — 2026-08-09
 
