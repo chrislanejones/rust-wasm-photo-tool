@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.83",
+    date: "2026-08-09",
+    headline: "A tidier button set and a sharper nav underline",
+    entries: [
+      {
+        tag: "ui",
+        text: "The button-set image on the home page dropped its caption strip and got 34% smaller, and the two tiles that had no name — Undo and Layers — now say what they are.",
+      },
+      {
+        tag: "fix",
+        text: "The underline that follows your cursor across the nav looked smeared while it moved. It was a one-pixel line stretched by the graphics card; it is now drawn at its real width, so every frame is sharp.",
+      },
+    ],
+  },
+  {
     version: "v7.82",
     date: "2026-08-09",
     headline: "The engine can hand over a whole save in one go",

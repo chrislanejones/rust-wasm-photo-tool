@@ -84,6 +84,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.83 — 2026-08-09
+
+**Marketing site.** The button-set image on the home page lost its caption
+strip and got 34% smaller, the two unlabelled tiles (Undo and Layers) now say
+what they are, and the nav's hover underline is drawn at its real width instead
+of being a one-pixel line stretched by the GPU — which is what made it look
+smeared while it moved.
+
+<details><summary>Older releases</summary>
+
 ### v7.82 — 2026-08-09
 
 **Groundwork, nothing user-visible.** The engine can now hand over everything a
@@ -93,7 +103,6 @@ and once the engine moves onto a background thread those reads could be
 interrupted halfway by switching photos — saving the first half of one photo
 and the second half of another. One call cannot be interrupted.
 
-<details><summary>Older releases</summary>
 
 ### v7.81 — 2026-08-09
 

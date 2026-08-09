@@ -173,10 +173,10 @@ export default function Home() {
             <img
               src="/button-set.webp"
               width={832}
-              height={1106}
+              height={859}
               loading="lazy"
               decoding="async"
-              alt="Image Horse's button set — Paint, Magic Wand, Crop, Resize, Download, Text, Eraser, Clone, Pen, Move, Color and Adjust, shown in their idle and selected states."
+              alt="Nine of Image Horse's own controls — Paint, Magic Wand, Crop, Resize, Download, Undo, Layers, Apply and Export — some idle, some selected."
             />
           </figure>
           <div className="editor__text">

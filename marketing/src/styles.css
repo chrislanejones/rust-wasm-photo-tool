@@ -421,22 +421,34 @@ a { color: inherit; }
  * A 2px bar, not a filled pill: the bar is already a pill and the CTA is a
  * pill, and a third would be pill soup. It rests under the current page and
  * returns there on leave, so it says where you ARE as well as where you point.
- * Only transform is animated — width would be a layout property,
- * so the bar is 1px wide and scaled.
+ *
+ * WIDTH IS ANIMATED, NOT scaleX. This used to be a 1px bar blown up by
+ * `scaleX(var(--gw))` — up to 73x for "Architecture" — on the reasoning that
+ * width is a layout property and transform is not. The geometry that produced
+ * was exact (measured: 0.00px error against every link, at rest and hovered),
+ * but the RENDERING was not: an animating transform promotes the bar to its own
+ * compositor layer, which is rasterized at the element's layout size — one
+ * pixel wide — and then stretched by the GPU. A stretched 1px texture is a
+ * smear, so the bar arrived soft and unevenly lit while it travelled and only
+ * snapped crisp once the animation settled and Chrome re-rastered.
+ *
+ * The bar is out of flow (`position: absolute`), so animating its width lays
+ * out one 2px element and reflows nothing else. Every frame is rasterized at
+ * its true size, which is what keeps it sharp.
  */
 .nav-pill__glide {
   position: absolute;
   left: 0;
   bottom: -2px;
-  width: 1px;
+  width: var(--gw, 0px);
   height: 2px;
   border-radius: 1px;
   background: var(--color-accent);
-  transform-origin: left center;
-  transform: translateX(var(--gx, 0)) scaleX(var(--gw, 0));
+  transform: translateX(var(--gx, 0));
   opacity: var(--go, 0);
   pointer-events: none;
   transition: transform var(--dur-short) var(--ease-out),
+              width var(--dur-short) var(--ease-out),
               opacity var(--dur-micro) var(--ease-out);
 }
 
@@ -719,7 +731,7 @@ a { color: inherit; }
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 832 / 1106;
+  aspect-ratio: 832 / 859;
 }
 .editor__text {
   display: flex;

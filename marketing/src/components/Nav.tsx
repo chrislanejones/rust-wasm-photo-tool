@@ -36,7 +36,10 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
     const box = el.getBoundingClientRect();
     const origin = list.getBoundingClientRect();
     list.style.setProperty("--gx", `${box.left - origin.left}px`);
-    list.style.setProperty("--gw", String(box.width));
+    // A length, not a bare number: --gw is the bar's WIDTH now, not a scaleX
+    // multiplier. See the .nav-pill__glide comment in styles.css for why the
+    // 1px-and-scale version had to go.
+    list.style.setProperty("--gw", `${box.width}px`);
     list.style.setProperty("--go", "1");
   }, []);
 

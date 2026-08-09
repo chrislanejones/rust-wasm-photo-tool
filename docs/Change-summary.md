@@ -3331,3 +3331,55 @@ parse.
 ⚠️ **No JS calls it yet.** The payoff — rewiring both save paths and dropping
 the audit's un-awaited count by ~32 — is the next session. Recorded here so the
 method's presence without a consumer reads as deliberate rather than forgotten.
+
+## v7.83 Change Summary — 2026-08-09
+
+Marketing site only. No app or engine code.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `button-set.webp` recomposed: caption strip removed, **832×1106 → 832×859**, **18,888 → 12,418 bytes (−34%)** | **Changed** |
+| 2 | Undo and Layers tiles relabelled — all 9 tiles now carry a name, where 7 did before | **Fixed** |
+| 3 | `Home.tsx` height attr + `styles.css` `aspect-ratio` follow the new dimensions, so there is no layout shift | **Changed** |
+| 4 | The `alt` text describes the nine controls actually shown, rather than twelve that were not | **Fixed** |
+| 5 | Nav hover underline animates **`width`** instead of `scaleX` | **Fixed** |
+
+**On #5 — the underline looked smeared while it moved.** The bar was
+`width: 1px` blown up by `scaleX(var(--gw))`, up to 73× for "Architecture", on
+the reasoning that transform is cheaper than a layout property. The geometry
+was never wrong — measured 0.000px error against all five links, at rest and
+hovered. The *rendering* was: an animating transform promotes the bar to its
+own compositor layer, which is rasterized at the element's layout size — one
+pixel — and then stretched by the GPU. A stretched 1px texture is a smear,
+which is exactly why it arrived soft while travelling and snapped crisp once
+the animation settled and Chrome re-rastered.
+
+The bar is `position: absolute`, so animating its width lays out one 2px
+element and reflows nothing else. Every frame is now rasterized at its true
+size.
+
+Ruled out by measurement first, and recorded in PARKING_LOT so they are not
+re-litigated: horizontal misalignment (0.000px on all five links), the bar
+tracking the text box rather than glyph ink (sub-pixel, ±1px), and the
+v7.54-era sub-pixel rounding bug (already fixed, still holding). A separate
+finding: `prefers-reduced-motion` was `reduce` on the reporting machine, which
+disabled the transition entirely and made an earlier "pixel-exact" reading
+meaningless.
+
+**Verification, stated precisely.** The mechanism is confirmed — the bar is now
+a real 35px element rather than a 1px one scaled 35×, landing on the "Home"
+link exactly (left 674.90 = 674.90, width 35.00 = 35.00, height 2px), and it
+renders as a clean solid rule at rest. **The mid-travel frame — the actual
+symptom — is still unobserved after the fix**, because Chrome freezes CSS
+animations in a backgrounded tab and no session has had the window frontmost.
+
+That same trap is worth knowing: a hidden tab also returns fallback `var()`
+substitutions from `getComputedStyle`, which reported the glide's width as
+**`0px`** while `--gw` was plainly `"35px"`. It cost one false regression call.
+`getBoundingClientRect()` reflects real layout and survives it — that is what
+the numbers above come from.
+
+Also noted, not acted on: `docs/Change-summary.md` still describes this image
+as "832×1106, 18,888 bytes" with captions in an older entry. That is a
+historical record of what shipped then, so it stays; this entry is the
+correction.

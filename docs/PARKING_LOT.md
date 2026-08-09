@@ -1444,3 +1444,66 @@ a guess.
 A false start worth not repeating: I briefly called this confirmed off a photo
 count of 5. That was a transient value read during the dialog's own render; the
 settled count was 4 with no duplicates.
+
+## Marketing nav glide — fix applied, mechanism verified (2026-08-09)
+
+In the tree, uncommitted, alongside the button-set image work:
+`marketing/src/styles.css` + `marketing/src/components/Nav.tsx`.
+
+**Symptom.** Chris: "hover bar in menu is off again." Two phone shots: the bar
+under "Architecture", caught mid-travel, renders as a left-dark → right-bright
+gradient; the bar under "Trail Log", at rest, renders as a clean solid rule.
+
+**Ruled out by measurement, do not re-litigate:**
+
+| Suspect | Measured | Verdict |
+|---|---|---|
+| Horizontal misalignment | `dLeft` / `dW` = **0.000px** on all 5 links, at rest and hovered | not it |
+| Bar tracks text box, not glyph ink | overhang 0.29 / 0.29 / −0.24 / 0.72 / −1.00 px | sub-pixel, not it |
+| Sub-pixel rounding (the old v7.54-era bug) | rects already used, not `offsetLeft` | already fixed, still holding |
+| `prefers-reduced-motion` | was `reduce` on Chris's Win11; he turned Windows "Animation effects" back on | separate issue, closed |
+
+**Hypothesis behind the change (NOT proven).** The bar was `width: 1px` blown
+up by `scaleX(var(--gw))` — up to 73x for "Architecture". An animating
+transform promotes it to its own compositor layer, which is rasterized at the
+element's layout size (1px) and stretched by the GPU; a stretched 1px texture
+is a smear, which would explain soft-while-moving / crisp-at-rest exactly.
+The change animates `width` instead. The bar is `position: absolute`, so this
+lays out one 2px element and reflows nothing.
+
+**Why it is unverified.** Chrome was never frontmost during the session. In a
+backgrounded tab it freezes CSS animations *and* returns fallback `var()`
+substitutions from `getComputedStyle` — the old build reported
+`transform: matrix(0,0,0,1,0,0)` (scaleX **0**) while `--gw` was plainly `"35"`.
+Any glide reading taken from a hidden tab is worthless; that trap cost a false
+"regression" call mid-session. **Verify with the window actually in front.**
+
+**If it turns out the smear was only phone-screenshot downscaling of a 2px
+line, revert both hunks** — the scaleX version's geometry was never wrong.
+
+### Verified 2026-08-09, partially — by the next session
+
+The hidden-tab trap above is real and reproduced exactly: `visibilityState`
+`"hidden"`, `getComputedStyle(glide).width` reporting **`0px`** while `--gw`
+was plainly `"35px"`. That reading is a fallback substitution and must not be
+trusted, exactly as this note warns.
+
+What DOES survive it is `getBoundingClientRect()`, which reflects real layout
+rather than a computed-style substitution. Against the built site on a fresh
+port:
+
+| Measure | Glide bar | "Home" link |
+|---|---|---|
+| left | 674.90 | 674.90 |
+| width | **35.00** | 35.00 |
+| height | 2.00 | — |
+
+So the **mechanism is confirmed**: the bar is now a real 35px-wide element
+rather than a 1px one scaled 35x, and its geometry still lands on the link
+exactly. A forced screenshot also renders it as a clean solid rule at rest.
+
+**Still not verified: the mid-travel frame** — the actual symptom. Animations
+are frozen in a hidden tab, so nobody has yet seen the bar *while it moves*
+under the new code. The hypothesis (GPU-stretched 1px texture) predicts this
+fixes it, and the change is sound regardless, but the smear itself remains
+unobserved-after. Worth one look with the window frontmost.
