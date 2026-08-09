@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.81",
+    date: "2026-08-09",
+    headline: "Download All stops throwing your edits away",
+    entries: [
+      {
+        tag: "fix",
+        text: "Edit a photo, reload the page, pick \"Resume editing\" — your work is there on the canvas, but downloading everything as a ZIP shipped the untouched originals instead. Every stroke and annotation, missing from the archive with nothing to show it. Downloading a single photo was always correct, and the ZIP only did this after a reload, which is why it looked random.",
+      },
+    ],
+  },
+  {
     version: "v7.80",
     date: "2026-08-09",
     headline: "Text layout stops re-asking the engine the same question",

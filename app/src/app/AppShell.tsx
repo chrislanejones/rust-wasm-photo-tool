@@ -2354,14 +2354,29 @@ export function AppShell() {
       await savePhotoEdit(activePhotoId, stamp.toolRef);
     }
 
-    // A photo is "changed" if it was edited on the canvas (modifiedPhotos) or
-    // compressed/quality-changed (imageSavings), or is the active photo with
-    // pending edits. Changed photos export their processed result re-encoded at
-    // the chosen format/quality; untouched photos export the original verbatim.
-    const isChanged = (id: string) =>
-      modifiedPhotos.has(id) ||
-      imageSavings[id] != null ||
-      (id === activePhotoId && activeChanged);
+    // THERE IS NO `isChanged` GATE ANY MORE, and its absence is the fix.
+    //
+    // It used to decide whether a photo was worth looking up:
+    //
+    //   modifiedPhotos.has(id) || imageSavings[id] != null
+    //     || (id === activePhotoId && (undoCount > 0 || hasBeenModified))
+    //
+    // Every one of those is TRANSIENT REACT STATE, and a page reload clears all
+    // of them. The saved edit is in IndexedDB and survives; the gate that
+    // decides whether to read it does not. So: edit a photo, reload, choose
+    // "Resume editing" — the stroke is right there on the canvas, `undoCount`
+    // is back to 0, `modifiedPhotos` is empty, the gate says "untouched", and
+    // the ZIP ships the untouched ORIGINAL. `loadPhotoEdit` was never called.
+    // Reproduced 2026-08-09 on v7.80; first reported v7.68. It looked
+    // intermittent because edit-then-export-immediately is correct — only a
+    // reload in between breaks it.
+    //
+    // The gate was never load-bearing, only an optimisation: BOTH of its
+    // "ship the original" branches were byte-identical, so all it ever decided
+    // was whether to spend one IndexedDB read. The presence of a saved edit is
+    // the real question, and `loadPhotoEdit` answers it directly from storage
+    // that outlives the session. One `get` per photo, against a composite and a
+    // re-encode — not a cost worth being wrong for.
 
     const { default: JSZip } = await import("jszip");
     const zip = new JSZip();
@@ -2375,9 +2390,8 @@ export function AppShell() {
       let mime: string;
       let ext: string;
 
-      if (isChanged(photo.id)) {
-        const edit = await loadPhotoEdit(photo.id);
-        if (edit) {
+      const edit = await loadPhotoEdit(photo.id);
+      if (edit) {
           // Canvas edits (draw / text / crop / resize / transform) →
           // composite via Rust + re-encode at the chosen format/quality.
           // Honour Settings → Layers and Canvas → "Photo only" here too. This
@@ -2400,23 +2414,13 @@ export function AppShell() {
             if (src) sourceTiff = readExifTiff(new Uint8Array(src.bytes), src.mimeType);
           }
           bytes = applyExifToReencoded(bytes, exportFormat, mode, sourceTiff, w, h);
-        } else {
-          // Compressed/quality-changed only (no canvas snapshot): the processed
-          // bytes already live at originalKey.
-          const orig = await getOriginal(photo.originalKey);
-          if (!orig) continue;
-          bytes = applyExifToVerbatim(
-            new Uint8Array(orig.bytes),
-            orig.mimeType,
-            mode,
-            exifStripMode,
-          );
-          mime = orig.mimeType;
-          ext = extFromMime(orig.mimeType);
-        }
       } else {
-        // Untouched → original bytes in their original format. Keep passes them
-        // through verbatim; strip scrubs EXIF/GPS before they leave the device.
+        // No saved edit. Two cases land here and both want the same bytes,
+        // which is why the old gate's two "original" branches were identical:
+        //   - never edited      -> originalKey holds the untouched upload
+        //   - compressed only   -> originalKey ALREADY holds the processed
+        //                          bytes, so verbatim is the processed result
+        // Keep passes them through as-is; strip scrubs EXIF/GPS on the way out.
         const orig = await getOriginal(photo.originalKey);
         if (!orig) continue;
         bytes = applyExifToVerbatim(
@@ -2459,8 +2463,6 @@ export function AppShell() {
       stamp,
       exportFormat,
       quality,
-      modifiedPhotos,
-      imageSavings,
       loadPhotoEdit,
       savePhotoEdit,
       exifKeep,

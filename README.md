@@ -84,6 +84,17 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.81 — 2026-08-09
+
+**"Download All" stops throwing your edits away.** Edit a photo, reload the
+page, pick "Resume editing" — your work is right there on the canvas, but the
+ZIP shipped the untouched original instead. Every stroke, every annotation,
+gone from the archive with nothing to show it. Exporting a single photo was
+always correct; only the batch ZIP did this, and only after a reload, which is
+why it looked random.
+
+<details><summary>Older releases</summary>
+
 ### v7.80 — 2026-08-09
 
 **Groundwork, nothing user-visible.** Text layout now reads its measurements
@@ -91,7 +102,6 @@ from a cache instead of asking the engine on every render. The numbers are
 identical — these particular measurements depend only on the text, size and
 weight you asked about, so a cached answer can never be out of date.
 
-<details><summary>Older releases</summary>
 
 ### v7.79 — 2026-08-08
 

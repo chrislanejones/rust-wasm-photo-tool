@@ -3203,3 +3203,57 @@ Verified in a browser, since gates cannot see text land 4px off: committed
 with the cached ink offset `[6, 10]` being the value the commit used.
 
 Suite 408 → **417 tests**, 34 → 36 files.
+
+## v7.81 Change Summary — 2026-08-09
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Batch export (`Alt+Shift+E` → `photos.zip`) shipped the **original** files and silently discarded every edit, whenever the page had been reloaded since the edit was made | **Fixed** |
+
+**First reported v7.68 (2026-08-06). Reproduced and diagnosed 2026-08-09.** Two
+earlier investigations narrowed it and both stopped at the wrong suspect.
+
+`exportPhotosToZip` decided whether a photo was worth looking up:
+
+```
+modifiedPhotos.has(id) || imageSavings[id] != null
+  || (id === activePhotoId && (undoCount > 0 || hasBeenModified))
+```
+
+Every one of those is **transient React state**, and a page reload clears all of
+them. The saved edit lives in IndexedDB and survives; the gate that decides
+whether to read it does not. So: edit a photo, reload, choose "Resume editing" —
+the stroke is visibly on the canvas, `undoCount` is back to 0, `modifiedPhotos`
+is empty, the gate says "untouched", and the archive gets the original.
+`loadPhotoEdit` was **never called**.
+
+That is why it read as intermittent for two months: edit-then-export-immediately
+is correct, and every quick test does exactly that. Only a reload in between
+breaks it.
+
+**The fix is a deletion.** The gate was never load-bearing — both of its "ship
+the original" branches were byte-identical, so all it ever decided was whether
+to spend one IndexedDB read. The presence of a saved edit is the real question
+and `loadPhotoEdit` answers it directly, from storage that outlives the session.
+One `get` per photo, against a composite and a re-encode.
+
+**The prime suspect carried since 2026-08-06 was wrong.** It held that
+`savePhotoEdit` → `idbSave` returned false when the archive-ownership guard
+refused, so no edit existed to load. QC ruled that out on 2026-08-08 — the row
+exists, `window.__ihSaveGuard()` reports `refused: 0` while holding that photo's
+key, and the edit reliably survives a reload. The save path is healthy end to
+end; the export simply never asked it anything.
+
+Verified against the exact repro that had just failed, same conditions both
+runs — reload, "Resume editing", Undo disabled, `modifiedPhotos` empty:
+
+| | Before | After |
+|---|---|---|
+| Edited photo in the zip | **3300×2550**, original bytes | **2068×1603**, 152 KB composite |
+| Untouched photo | 3072×864 verbatim | 3072×864 verbatim, unchanged |
+
+⚠️ **No regression test ships with this.** The failure only appears across a
+page reload, which vitest cannot stage; it needs Playwright or an extracted
+"which photos have edits" helper to unit-test. Recorded here rather than
+quietly skipped — the bug survived two months and two investigations, and
+nothing in the suite would catch its return.
