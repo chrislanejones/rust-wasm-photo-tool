@@ -65,16 +65,25 @@ export function useExport(engine: EngineCore) {
       if (format === "png") {
         return new Blob([new Uint8Array(t.export_png())], { type: "image/png" });
       }
-      // `get_image_data()` is the same composite `flushToCanvas` paints — every
-      // visible layer plus live overlays — so the bytes are unchanged from the
-      // old toBlob path, they just no longer travel via the canvas element.
-      return await encodeRgba(
-        new Uint8Array(t.get_image_data()),
-        t.width(),
-        t.height(),
-        format,
-        quality,
-      );
+      // `capture_composite()` is the same composite `flushToCanvas` paints —
+      // every visible layer plus live overlays — so the bytes are unchanged
+      // from the old toBlob path, they just no longer travel via the canvas
+      // element.
+      //
+      // ATOMIC CAPTURE (ADR-024). This was `get_image_data()` + `width()` +
+      // `height()`. Those three reads describe ONE document state, and the
+      // encoder is about to interpret the buffer AT those dimensions — so they
+      // cannot be converted to three awaits. A resize landing between them
+      // behind the worker pairs one state's pixels with another state's size:
+      // encodeRgba then either throws on the length mismatch or shears the
+      // image, depending which way the size moved. One call, one round trip,
+      // atomic because `&self` cannot be mutated while it runs.
+      const cap = t.capture_composite();
+      // Read each field exactly once — every `.rgba` access clones the whole
+      // buffer out of wasm memory — then free the boxed allocation.
+      const { rgba, width, height } = cap;
+      cap.free();
+      return await encodeRgba(rgba, width, height, format, quality);
     },
     [toolRef],
   );
@@ -120,10 +129,16 @@ export function useExport(engine: EngineCore) {
     ): { data: Uint8ClampedArray; width: number; height: number } | null => {
       const t = toolRef.current;
       if (!t) return null;
-      const w = t.thumbnail_width(maxPx);
-      const h = t.thumbnail_height(maxPx);
-      const raw = t.thumbnail_data(maxPx);
-      return { data: new Uint8ClampedArray(raw), width: w, height: h };
+      // ATOMIC CAPTURE (ADR-024) — same reason as `exportBlob` above. This was
+      // `thumbnail_width` + `thumbnail_height` + `thumbnail_data`, and the
+      // caller builds an `ImageData` from the buffer AT those dimensions, which
+      // throws outright if they disagree. `codec::thumbnail_data` returns all
+      // three from one computation anyway; only the wasm-bindgen wrappers split
+      // them.
+      const cap = t.capture_thumbnail(maxPx);
+      const { rgba, width, height } = cap;
+      cap.free();
+      return { data: new Uint8ClampedArray(rgba), width, height };
     },
     [toolRef],
   );

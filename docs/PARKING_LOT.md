@@ -1507,3 +1507,83 @@ are frozen in a hidden tab, so nobody has yet seen the bar *while it moves*
 under the new code. The hypothesis (GPU-stretched 1px texture) predicts this
 fixes it, and the change is sound regardless, but the smear itself remains
 unobserved-after. Worth one look with the window frontmost.
+
+### Closed as far as measurement can take it, 2026-08-09 (third pass)
+
+Geometry re-measured across **all five** links, not just Home. `transition:
+none` first — otherwise a hidden tab freezes the transition at 0% and the bar
+reads `width: 0` with an identity transform, which is the same worthless
+reading that caused the earlier false regression call.
+
+| Link | Bar width | dLeft | dWidth | Transform |
+|---|---|---|---|---|
+| Home | 35.00 | **0** | **0** | translate only |
+| Architecture | 72.89 | **0** | **0** | translate only |
+| Features | 51.97 | **0** | **0** | translate only |
+| Pricing | 41.24 | **0** | **0** | translate only |
+| Trail Log | 49.83 | **0** | **0** | translate only |
+
+Max absolute error across all ten measurements: **0.000px**.
+
+**The `anyScale: false` result is the one that retires the hypothesis**, and it
+is categorical rather than a sample. `getComputedStyle(glide).transform` is
+`matrix(1, 0, 0, 1, …)` at every stop — pure translation. The smear mechanism
+REQUIRED a `scaleX` resampling a 1px-wide texture; a translation samples 1:1 at
+every width and every point in the travel, so there is no frame at which the
+old artifact could occur. This does not depend on catching the animation
+mid-flight.
+
+**What is left is a perceptual call, and it is Chris's to make, not a
+session's.** The symptom was only ever reported from phone screenshots, and a
+desktop Chrome at localhost cannot answer it. The relevant build is already
+deployed: a local `pnpm run build:marketing` produces `index-wlAWpulG.js`,
+the identical hash `image-horse.vercel.app` serves. So the check is "open the
+live site on the same phone", with no local server involved.
+
+If it still reads soft there, the remaining explanation is the one this note
+already flagged — phone-screenshot downscaling of a 2px line — and both hunks
+should be reverted, because the scaleX version's geometry was never wrong.
+
+---
+
+## ~~The third atomic-capture shape~~ — DONE v7.88
+
+Closed same day. It was four sites, not two (`useCanvasActions` had two of its
+own), all now on `capture_composite_excluding_background()`. Measured 3.45×
+faster than the three-getter form. Details in ADR-024.
+
+**One piece deliberately left**: `app/session/useExportDimensions.ts` still
+calls `export_width/height_excluding_background()` to label the Share button.
+Not a capture — no pixels are paired with it — but still **two full composites
+to produce two integers**, which that file's own header already documents.
+
+Do NOT point it at `capture_composite_excluding_background()`: that trades two
+composites for one composite plus an ~11 MB pixel clone it immediately throws
+away (`getter_with_clone` copies the buffer on every field access). The right
+fix is a dimensions-only engine call — one `composite_excluding_background()`,
+returning just the two `u32`s. Small, and it makes the "Photo only" preference
+free rather than merely cheaper.
+
+## `useExport` is four-fifths unreachable (found v7.88)
+
+`useExport` returns five members. Only **`exportBlob`** has a caller.
+
+| Member | Reachable? | Evidence |
+|---|---|---|
+| `exportBlob` | **yes** | `useCanvasActions.ts:166`, `AppShell.tsx:2888` |
+| `exportPng` | no | `AppShell.tsx:2887`'s `exportPng={...}` is a *prop name* on `ShareButton`; its lambda calls `stamp.exportBlob("png")` |
+| `exportAs` | no | already noted in `docs/Change-summary.md:3057` |
+| `generateThumbnail` | no | — |
+| `generateThumbnailUrl` | no | — |
+
+**Do not delete on this evidence alone** — repo precedent (`useRealTier`) is
+that a zero-reference export can be a missing wire. But this case is
+distinguishable and the distinction is the useful part: `git log --all -G
+"\.generateThumbnail"` returns **no commits at all**, so no caller was ever
+lost. Supporting signals: `generateThumbnailUrl` emits JPEG q0.82 while the
+entire gallery pipeline is WebP q0.78 (`lib/workingCopy.ts:6`), and the
+`PhotoStrip` its comments name does not exist (the real strip is
+`GalleryBar.tsx`). It is a spec awaiting a consumer.
+
+The standing "zero-reference export" note in `Change-summary.md` therefore
+undercounts this file: it is four of five, not one.

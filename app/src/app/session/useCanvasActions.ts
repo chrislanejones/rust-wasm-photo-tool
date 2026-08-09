@@ -132,14 +132,13 @@ export function useCanvasActions({
         pngBytes.set(pngView);
         blob = new Blob([pngBytes], { type: "image/png" });
       } else {
-        const pixels = new Uint8Array(tool.get_image_data_excluding_background());
-        blob = await encodeRgba(
-          pixels,
-          tool.export_width_excluding_background(),
-          tool.export_height_excluding_background(),
-          "png",
-          1,
-        );
+        // ATOMIC CAPTURE (ADR-024). Was three reads; the crop is
+        // content-dependent, so they can disagree, and each getter recomputed
+        // the whole composite + bbox + crop on its own.
+        const cap = tool.capture_composite_excluding_background();
+        const { rgba, width, height } = cap;
+        cap.free();
+        blob = await encodeRgba(rgba, width, height, "png", 1);
       }
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": blob }),
@@ -165,15 +164,18 @@ export function useCanvasActions({
     if (exportCanvasBackground) {
       blob = await stamp.exportBlob(exportFormat, quality / 100);
     } else if (tool) {
-      exportW = tool.export_width_excluding_background();
-      exportH = tool.export_height_excluding_background();
-      blob = await encodeRgba(
-        new Uint8Array(tool.get_image_data_excluding_background()),
-        exportW,
-        exportH,
-        exportFormat,
-        quality / 100,
-      );
+      // ATOMIC CAPTURE (ADR-024). This site matters more than the others that
+      // share the shape: `exportW`/`exportH` outlive the encode and are stamped
+      // into the WebP/JPEG EXIF below. Read separately, a stroke between them
+      // could put one state's dimensions in the metadata of another state's
+      // pixels — a wrong size recorded in the file itself, which survives
+      // export and nothing downstream would question.
+      const cap = tool.capture_composite_excluding_background();
+      const { rgba, width, height } = cap;
+      cap.free();
+      exportW = width;
+      exportH = height;
+      blob = await encodeRgba(rgba, exportW, exportH, exportFormat, quality / 100);
     } else {
       blob = null;
     }

@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.88",
+    date: "2026-08-09",
+    headline: "Photo-only exports stop doing the work three times",
+    entries: [
+      {
+        tag: "perf",
+        text: "Exporting with the canvas background left out was rebuilding the whole image three times to answer one question \u2014 once for the pixels, once for the width, once for the height. It does it once now: 69 ms down to 20 ms on a 1385\u00d72068 photo, with the same bytes coming out. Copying to the clipboard, saving a single photo and batch export all took the slow path.",
+      },
+      {
+        tag: "infra",
+        text: "Nine places that read an image and the dimensions describing it now read both in one call, so nothing can change in between. More of the groundwork for moving the engine onto a background thread.",
+      },
+    ],
+  },
+  {
     version: "v7.87",
     date: "2026-08-09",
     headline: "Notes for the next hands on the migration",

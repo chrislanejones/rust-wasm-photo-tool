@@ -3570,3 +3570,61 @@ engine call returning data and dimensions together, the same shape as
 
 The table is in the ADR rather than a session note because the next person to
 open Stage 3.5 needs it before they touch a file, not after.
+
+## v7.88 Change Summary — 2026-08-09
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Exports that exclude the canvas background composite the document **once instead of three times** — 69.1 ms → **20.0 ms** on a 1385×2068 photo | **Fixed** |
+| 2 | Three engine capture methods: `capture_composite`, `capture_thumbnail`, `capture_composite_excluding_background` | **Added** |
+| 3 | Nine call sites converted — 27 engine reads become 9 calls | **Converted** |
+| 4 | ADR-024 Stage 3.5 gate **121 → 103** | **Measured** |
+| 5 | `useExport`'s thumbnail half found unreachable; `openraster/export.ts` converted instead | **Traced** |
+
+**#1 — a bug that had been shipping, not a migration side effect.**
+`get_image_data_excluding_background()`, `export_width_excluding_background()`
+and `export_height_excluding_background()` each call the same private
+`composite_excluding_background()` and throw away two thirds of its result.
+That helper composites every layer into a full-document RGBA buffer, scans it
+for a tight bounding box and crops. Reading all three — which every
+exclude-background export did — ran that whole sequence three times to produce
+one image and its two dimensions.
+
+`capture_composite_excluding_background()` calls the helper once and keeps all
+three values. Measured in the browser against the production build:
+
+| Form | Time |
+|---|---|
+| three getters | 69.1 ms |
+| one capture | **20.0 ms** |
+| | **3.45×** |
+
+It affects copy-to-clipboard, single download and batch export. The default
+preference is "Include canvas", which takes the other branch, so only users who
+had switched to "Photo only" were paying it.
+
+**#2 — why one call rather than three awaits.** These are ADR-024's ATOMIC
+CAPTURE category: reads that describe one document state and are then used
+together. Splitting them into three awaited calls behind a worker lets a resize
+or a stroke land in the middle, pairing one state's pixels with another state's
+dimensions. In the download path the dimensions outlive the encode and are
+written into the exported file's EXIF, so a mismatch would be recorded in the
+file itself.
+
+**#5 — the check that changed the plan.** The handoff named `hooks/useExport.ts`
+as the next batch. Its thumbnail half turned out to have no caller at all:
+`git log --all -G "\.generateThumbnail"` returns zero commits, so no wire was
+ever lost — it is a spec waiting for a consumer, unlike the `useRealTier` case
+that looked similar. Every thumbnail a user sees comes from a stored blob made
+by `lib/workingCopy.ts`. Converting only the named file would have hardened a
+path that never runs, so `lib/openraster/export.ts` — the one place
+`capture_thumbnail()` executes in production — was converted too.
+
+**Verified.** Exported JPEG's SOF header reads 1365×2048, the capture's cropped
+size rather than the document's 1385×2068, with the old getters recording zero
+calls on the export path. Exported `.ora` archive parsed from its central
+directory: `Thumbnails/thumbnail.png` is a real PNG at 256×173, matching the
+engine exactly. Save, restore and undo unchanged.
+
+**Gates.** `cargo fmt`/`clippy` clean, 190 Rust tests, 417 JS tests, `tsc` clean,
+eslint 0 errors, production build clean. Engine grew 1,397 bytes.

@@ -98,9 +98,17 @@ export async function exportOra(tool: ImageHorseTool): Promise<ExportOraResult> 
   // Thumbnail — Rust-side resize + encode (no OffscreenCanvas round trip).
   const mod = await import("stamp_tool");
   await mod.default(); // idempotent: returns the already-initialized wasm
-  const tw = tool.thumbnail_width(THUMBNAIL_MAX_PX);
-  const th = tool.thumbnail_height(THUMBNAIL_MAX_PX);
-  const tdata = tool.thumbnail_data(THUMBNAIL_MAX_PX);
+  // ATOMIC CAPTURE (ADR-024). Was `thumbnail_width` + `_height` + `_data`.
+  // `encode_png_pixels` interprets the buffer AT the dimensions it is handed,
+  // so those three reads have to describe one state — and unlike the rest of
+  // this file, which the ADR triaged as "already interleaves await", this
+  // particular sequence sits immediately after two REAL awaits (the dynamic
+  // import and the init above). Behind the worker it is the likeliest place in
+  // the file for something to land mid-read. One call closes it; the
+  // pre-existing interleaving elsewhere here is untouched and still open.
+  const thumb = tool.capture_thumbnail(THUMBNAIL_MAX_PX);
+  const { rgba: tdata, width: tw, height: th } = thumb;
+  thumb.free();
   zip.file("Thumbnails/thumbnail.png", mod.encode_png_pixels(tdata, tw, th));
 
   const blob = await zip.generateAsync({ type: "blob" });

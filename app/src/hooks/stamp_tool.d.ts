@@ -103,6 +103,23 @@ declare module "stamp_tool" {
   }
 
   /**
+   * Pixels + the dimensions that describe them, out of one wasm-bindgen call.
+   * Returned by `capture_composite()` and `capture_thumbnail()`.
+   *
+   * Read each field ONCE and then `.free()`. Every access to `.rgba` clones
+   * the whole buffer out of wasm memory (~10 MB for a 3072×864 composite),
+   * and the object holds a boxed allocation on the wasm heap until freed.
+   * `openraster/import.ts` shows the shape: destructure, free, return.
+   */
+  export class RgbaCapture {
+    private constructor();
+    free(): void;
+    width: number;
+    height: number;
+    rgba: Uint8Array;
+  }
+
+  /**
    * Stateless: decode PNG bytes back into straight (non-premultiplied)
    * RGBA8 pixels, normalizing any source color type (RGB, RGBA, indexed,
    * grayscale…) to the same convention `encode_png_pixels`/`get_layer_png`
@@ -218,10 +235,29 @@ declare module "stamp_tool" {
      *  Returns a TRANSPORT frame (magic "IHCS"), not the persisted archive —
      *  `encodeArchive` still owns the bytes on disk. See src/capture.rs. */
     capture_state(): Uint8Array;
+    /** The composite and its dimensions, atomically — the one-call form of
+     *  `get_image_data()` + `width()` + `height()`. Prefer it wherever the
+     *  pixels are encoded or scaled AT those dimensions: read separately,
+     *  behind the worker, a resize can land between them and pair one state's
+     *  pixels with another state's size. Free it when done. */
+    capture_composite(): RgbaCapture;
+    /** The background-excluded composite and its CROPPED dimensions, atomically
+     *  — the one-call form of `get_image_data_excluding_background()` +
+     *  `export_width_excluding_background()` + `export_height_excluding_background()`.
+     *  Prefer it everywhere: those three getters each recompute the whole
+     *  composite + tight-bbox + crop internally, so the split form does the
+     *  work three times, and the crop is content-dependent so the three reads
+     *  can disagree. Free it when done. */
+    capture_composite_excluding_background(): RgbaCapture;
     width(): number;
     height(): number;
     data_ptr(): number;
     data_len(): number;
+    /** The scaled thumbnail and its dimensions, atomically — the one-call form
+     *  of `thumbnail_width(n)` + `thumbnail_height(n)` + `thumbnail_data(n)`.
+     *  `codec::thumbnail_data` computes all three together anyway; the split
+     *  wrappers threw two away at the boundary. Free it when done. */
+    capture_thumbnail(max_px: number): RgbaCapture;
     thumbnail_width(max_px: number): number;
     thumbnail_height(max_px: number): number;
     thumbnail_data(max_px: number): Uint8Array;

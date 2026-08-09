@@ -1987,9 +1987,14 @@ export function AppShell() {
     const tool = stamp.toolRef.current;
     if (!entry || !tool) return;
     try {
-      const pixels = new Uint8Array(tool.get_image_data());
-      const tw = tool.width();
-      const th = tool.height();
+      // ATOMIC CAPTURE (ADR-024). Was `get_image_data()` + `width()` +
+      // `height()`. These three are not merely read together, they TRAVEL
+      // together: `pixels`, `tw` and `th` cross three awaits below and are then
+      // written to IndexedDB as one record (`putOriginal(newFile, tw, th)`) and
+      // scaled as one image. A mismatch here is persisted, not transient.
+      const cap = tool.capture_composite();
+      const { rgba: pixels, width: tw, height: th } = cap;
+      cap.free();
       // encodeRgba and makeThumbnailFromPixels each hand their buffer to the
       // codec worker, which transfers (detaches) it. Give encodeRgba its own
       // copy so the original `pixels` survives for the thumbnail below.
@@ -2888,13 +2893,12 @@ export function AppShell() {
                 if (exportCanvasBackground) return stamp.exportBlob("png");
                 const tool = stamp.toolRef.current;
                 if (!tool) return Promise.resolve(null);
-                return encodeRgba(
-                  new Uint8Array(tool.get_image_data_excluding_background()),
-                  tool.export_width_excluding_background(),
-                  tool.export_height_excluding_background(),
-                  "png",
-                  1,
-                );
+                // ATOMIC CAPTURE (ADR-024) — one call for pixels and the
+                // cropped dimensions that describe them.
+                const cap = tool.capture_composite_excluding_background();
+                const { rgba, width, height } = cap;
+                cap.free();
+                return encodeRgba(rgba, width, height, "png", 1);
               }}
               canvasW={exportDims.width}
               canvasH={exportDims.height}

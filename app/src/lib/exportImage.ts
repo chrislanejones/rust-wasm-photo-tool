@@ -147,19 +147,27 @@ export async function compositeSavedEdit(
     // full layer list and return the whole document. Returning the same bytes
     // as the include-canvas branch is the honest outcome for a legacy archive,
     // but it must not be reached by accident.
+    // ADR-024 atomic capture. This engine is a throwaway (the one-port
+    // allowlist), so nothing can mutate it mid-read and the CORRECTNESS half
+    // does not apply here. The work does: each of the three
+    // `*_excluding_background` getters recomputes the whole composite, its
+    // tight bounding box and the crop, so the old three-call form did that
+    // three times per exported photo — across a 40-photo batch, twice for
+    // nothing each time.
+    // NB: `rgba` is already taken in this scope by the decoded source PNG
+    // above, so these destructure to `pixels`/`w`/`h` — the names this function
+    // returns anyway.
     if (opts?.excludeBackground && usedLayers) {
-      return {
-        pixels: new Uint8Array(tool.get_image_data_excluding_background()),
-        w: tool.export_width_excluding_background(),
-        h: tool.export_height_excluding_background(),
-      };
+      const cap = tool.capture_composite_excluding_background();
+      const { rgba: pixels, width: w, height: h } = cap;
+      cap.free();
+      return { pixels, w, h };
     }
 
-    return {
-      pixels: new Uint8Array(tool.get_image_data()),
-      w: tool.width(),
-      h: tool.height(),
-    };
+    const cap = tool.capture_composite();
+    const { rgba: pixels, width: w, height: h } = cap;
+    cap.free();
+    return { pixels, w, h };
   } finally {
     tool.free();
   }

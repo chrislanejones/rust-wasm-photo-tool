@@ -68,7 +68,7 @@ first.
 | **1** | **One port, no worker.** ✅ **DONE 2026-08-07.** `lib/engine/port.ts` is the named Stage-3 swap point (identity today); `engineOwnership.contract.test.ts` fails on a second writer, an undeclared engine, or a bypassed seam. NOT the ~152-call-site rewrite first imagined — the ownership invariant already held (`toolRef` created once, assigned only in `useEngineCore`), so the missing piece was the seam and the guard, not churn | no behaviour change | plain revert |
 | **2** | **The read-modify-write sites.** ✅ **DONE 2026-08-07 — 9 → 3, all FEED sites gone.** Two engine methods absorbed the decisions: `flatten_text_annotations` returns whether it flattened, and `blur_whole_image` computes its own geometry. Four JS guards deleted. The 3 remaining are 2 that dissolve at Stage 4 (`flushToCanvas`) and 1 false positive (`align_annotation`'s return is a mutation's result, not stale-able state) | no behaviour change | revert **+ `build:wasm`** |
 | **3** | **The worker exists, off by default.** ✅ **DONE 2026-08-07.** `workers/engine.worker.ts` (own wasm instance, one-at-a-time FIFO `drain()`) + `lib/engine/workerClient.ts` (request ids, 30 s timeout that also withdraws the queued call, `failAll` on crash). All four gaps the Phase 3 spike had are closed. Deliberately **not** Comlink — see the file header; Comlink gives correct results with no ordering promise, and arrival order *is* the op log. Flag `ih_engine_worker`, default OFF. The build emits **no worker chunk**, because nothing imports it yet — that is the honest status, not an oversight | nothing user-visible | flag stays off |
-| **3.5** | **The async conversions — 168 → 138 as of v7.84.** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. Batches by file, value-consumed only — `editPersistence` 18, `useEngineCore` 17, `useSelectionActions` 15, `openraster/export` 13, `useLayers` 13, `useEditPersistence` 12. Same flag, still OFF. **a1 (measurable gate) v7.79 · a2 (text-metrics cache) v7.80 · a3 (one-call save capture) v7.84.** a3 also found the category this ADR missed — see "ATOMIC CAPTURE" below, and triage every remaining file against it before converting | nothing user-visible | flag stays off |
+| **3.5** | **The async conversions — 168 → 138 as of v7.84.** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. Batches by file, value-consumed only — `editPersistence` 18, `useEngineCore` 17, `useSelectionActions` 15, `openraster/export` 13, `useLayers` 13, `useEditPersistence` 12. Same flag, still OFF. **a1 (measurable gate) v7.79 · a2 (text-metrics cache) v7.80 · a3 (one-call save capture) v7.84 · a4 (one-call pixels+dimensions capture) v7.88 — 121 → 103, three capture methods and eleven call sites.** a3 also found the category this ADR missed — see "ATOMIC CAPTURE" below, and triage every remaining file against it before converting | nothing user-visible | flag stays off |
 | **4** | **Canvas transfer.** **SCOPE CORRECTED 2026-08-08 — it is not just the `width`/`height` assignments; see "Stage 4's real scope" below.** Three subsystems must leave the main canvas first (engine flush, the arrow/shapes/crop rubber-band preview, lossy export), and canvas element *identity* has to be owned. Still flagged | nothing user-visible | **NOT by the flag alone** — see the kill-switch note |
 | **5** | **Measure, then flip.** A/B the 470 ms freeze against master. Default ON only if it is actually gone, with `ih_engine_worker=0` as the kill switch | the feature | kill switch |
 
@@ -236,10 +236,13 @@ does not have to re-derive them:**
 | `hooks/useEditPersistence.ts` | atomic capture — **fixed** v7.84, same call |
 | `hooks/useLayers.ts` | independent mutations, no shared picture — **converted** v7.85 |
 | `app/session/useSelectionActions.ts` | contains a per-pointermove hot path — reclassified v7.86, belongs in a10 |
-| `hooks/useExport.ts` | **two small atomic captures — do NOT convert individually** |
-| `lib/openraster/export.ts` | already interleaves `await`, and mutates mid-export |
+| `hooks/useExport.ts` | atomic capture — **fixed** v7.88 via `capture_composite()` / `capture_thumbnail()` |
+| `lib/openraster/export.ts` | its thumbnail triple **fixed** v7.88; the rest still interleaves `await` and mutates mid-export |
+| `app/AppShell.tsx` | triaged v7.88 — its two atomic captures (`persistActiveCanvas`, ShareButton) are **fixed**; the remaining sites are independent single reads |
+| `app/session/useCanvasActions.ts` | two exclude-background captures — **fixed** v7.88 |
+| `lib/exportImage.ts` | throwaway engine, so no correctness risk — converted v7.88 for the 3× work saving |
 
-`useExport.ts` has two three-read captures where the pixels and the dimensions
+`useExport.ts` had two three-read captures where the pixels and the dimensions
 that describe them must come from the same state:
 
 ```
@@ -249,14 +252,82 @@ generateThumbnail thumbnail_width(n) + thumbnail_height(n) + thumbnail_data(n)
 
 Convert those individually and a resize landing between the reads encodes one
 state's pixels at another state's dimensions — a corrupt or failed encode, from
-three lines that look entirely routine. They are small enough that the fix is
-cheap: one engine call returning data and dimensions together, the same shape
-as `capture_state`.
+three lines that look entirely routine. The fix (v7.88) is the same shape as
+`capture_state`: `capture_composite()` and `capture_thumbnail(max_px)` in
+`src/capture.rs`, each returning an `RgbaCapture { width, height, rgba }`.
+Both are aggregations of the getters they replace, so there is no second
+definition of "the composite" to drift.
 
-`lib/openraster/export.ts` already interleaves `await import("jszip")` between
-its reads AND mutates the live document mid-export (`set_active_layer` +
-`flatten_text_annotations`). That is a pre-existing problem, not one Stage 3.5
-would introduce, but it should not be swept through as a routine conversion.
+Worth noting for the pattern: `codec::thumbnail_data` **already** computed and
+returned all three values together. The split into three `#[wasm_bindgen]`
+wrappers discarded two of them at the boundary and made every caller recompute
+them. Some of these captures are not new engine work at all — they are
+re-exposing something the engine never stopped knowing.
+
+**`lib/openraster/export.ts` was partially converted, deliberately.** The file
+still interleaves `await import("jszip")` between reads AND mutates the live
+document mid-export (`set_active_layer` + `flatten_text_annotations`); that is
+pre-existing and remains open. But its thumbnail triple sits *immediately after
+two real awaits* (`await import("stamp_tool")`, `await mod.default()`), which
+makes it the likeliest interleave in the file, and it feeds
+`encode_png_pixels(data, w, h)` — a function that reads the buffer at whatever
+dimensions it is handed. That one sequence moved to `capture_thumbnail()`.
+
+The reason it was not left for later is worth recording: **`useExport`'s
+thumbnail half is unreachable.** Nothing has ever read `generateThumbnail` or
+`generateThumbnailUrl` — `git log --all -G "\.generateThumbnail"` returns no
+commits, so this is a spec awaiting a consumer, not a broken wire (contrast
+`useRealTier`). Every user-visible thumbnail comes from a Dexie `thumbBlob`
+produced by `lib/workingCopy.ts`. So converting only `useExport` would have
+hardened a path that never runs; `openraster/export.ts` is where
+`capture_thumbnail()` actually executes in production.
+
+**The third capture shape — the exclude-background composite. FIXED v7.88.**
+`capture_composite_excluding_background()` now serves all of it. It turned out
+to be FOUR sites, not the two first spotted — `useCanvasActions` has one for
+the clipboard copy and another for the download, and the download's is the
+worst of the set because its dimensions outlive the encode and are stamped into
+the exported file's EXIF. The reads were:
+
+```
+get_image_data_excluding_background() + export_width_excluding_background()
+                                      + export_height_excluding_background()
+```
+
+Three reads, one document state, fed straight to an encoder — the same hazard
+as `exportBlob`. `exportImage.ts`'s copy runs on a throwaway engine (the
+one-port allowlist above), so only the live-engine sites are a correctness
+risk; the wasted work was real in all of them.
+
+**This one is also a performance fix, and that is the part worth generalising.**
+Each of those three getters calls `composite_excluding_background()` internally
+— a full-document composite, a `tight_bbox` scan and a crop — and discards two
+of its three results. The split form therefore did all of that three times to
+answer one question. Measured in the browser on a 1385×2068 document:
+
+| Form | Time |
+|---|---|
+| three getters | 69.1 ms |
+| one `capture_composite_excluding_background()` | **20.0 ms** |
+| | **3.45× faster** |
+
+So unlike `capture_composite` and `capture_thumbnail`, this method is NOT
+written as an aggregation of the three public getters — that would preserve the
+3× cost. It calls the private helper once and keeps all three values. Same
+single definition underneath, so nothing can drift.
+
+**Verified end to end** (Netlify-equivalent production build, fresh port): with
+"Photo only" set, the exported JPEG's SOF header reads **1365×2048** — the
+capture's cropped size, not the document's 1385×2068 — and the old pixel getter
+recorded **zero** calls on the export path.
+
+**Still reading the split getters, and correctly so:**
+`app/session/useExportDimensions.ts` calls `export_width/height_excluding_background()`
+to label the Share button. That is not a capture — no pixels are paired with it
+— so it stays separate. It is, however, still two full composites to produce two
+integers, which its own header already documents. Handing it this method would
+trade that for one composite plus an 11 MB pixel clone it would throw away;
+the right fix is a dimensions-only call. Parked, not done.
 
 **Net: zero of the five need a synchronous engine read across the boundary**,
 so the ordering worry that put this paragraph here is resolved — nothing in

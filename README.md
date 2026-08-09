@@ -84,14 +84,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.88 — 2026-08-09
+
+**Exports that leave the canvas background out are three times faster.**
+Choosing "Photo only" was rebuilding the whole image three times to answer one
+question — once for the pixels, once for the width, once for the height. It
+does it once now. On a 1385x2068 photo that is 69 ms down to 20 ms, and the
+same bytes come out the other end. Copy to clipboard, download and batch export
+all took the slow path.
+
+Also groundwork: nine places that read a picture and the dimensions describing
+it now read both in one call, so nothing can change in between.
+
+<details><summary>Older releases</summary>
+
 ### v7.87 — 2026-08-09
 
 **Docs only.** ADR-024 gains a triage table recording which files in the
 background-thread migration have been checked and what was found, so the next
 session does not re-derive it. Two more places were caught where reads that
 must describe the same moment would break if converted one at a time.
-
-<details><summary>Older releases</summary>
 
 ### v7.86 — 2026-08-09
 

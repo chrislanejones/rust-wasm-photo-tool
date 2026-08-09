@@ -58,11 +58,35 @@ import { join } from "node:path";
  *         "the interactive path... inside a frame budget" — so four sites
  *         moved from value-consumed to hot-path, where the contract puts them
  *         LAST on purpose. They were about to be swept into the a5 batch.
+ *    117  a4 landed: `useExport.ts`'s two atomic captures, 6 sites -> 2.
+ *         `capture_composite()` and `capture_thumbnail()` return pixels and the
+ *         dimensions that describe them together. Small number, and that is the
+ *         point — the ADR had already triaged this file as "do NOT convert
+ *         individually", so the six were never six independent conversions.
+ *    115  a4 continued: the ORA thumbnail, 3 sites -> 1, onto the same
+ *         `capture_thumbnail()`. Done because tracing found `useExport`'s
+ *         thumbnail half is UNREACHABLE (nothing has ever read
+ *         `generateThumbnail`; `git log --all -G` is empty), so `openraster/
+ *         export.ts` is the only place that call runs in production. The a4
+ *         entry above is honest about the static count and this one is what
+ *         makes it buy runtime safety.
  *
- *  Only the last line is work. Measured both sides with the same audit against
- *  a worktree at HEAD, which is the only way to tell a real delta from a
- *  measurement change — the two had been tangled twice before. */
-const BUDGET = 121;
+ *    103  a4 finished: the THIRD capture shape — the exclude-background
+ *         composite — plus AppShell's `persistActiveCanvas`. Six sites of three
+ *         reads became six of one, across `useCanvasActions` (clipboard +
+ *         export), `AppShell` (ShareButton + persistActiveCanvas) and
+ *         `exportImage` (both branches). Biggest single drop that is real work.
+ *         Unlike the other two captures this one is also a WORK fix: each of
+ *         the three `*_excluding_background` getters recomputed the whole
+ *         composite, its tight bbox and the crop, so the split form did all of
+ *         that three times to answer one question.
+ *
+ *  Work: the 138, 125, 117, 115 and 103 lines. The rest is the measurement
+ *  catching up.
+ *  Measured both sides with the same audit against a worktree at HEAD, which is
+ *  the only way to tell a real delta from a measurement change — the two had
+ *  been tangled twice before. */
+const BUDGET = 103;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -154,8 +178,21 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
       gate.restructure,
       "needs-restructure moved. If real, update this and re-scope a3–a10; " +
         "if the classifier changed, check it against a parse before trusting it.",
-    ).toBe(71);
-    expect(gate.unawaited).toBe(39);
+    //
+    // a4 moved both buckets by 2, and the arithmetic is worth writing down
+    // because it is the check that the drop is real work and not a classifier
+    // wobble. `exportBlob`'s three reads sat in an async callback, so they were
+    // un-awaited (39 − 3 + 1 `capture_composite` = 37); `generateThumbnail`'s
+    // three sat in a synchronous one, so they were restructure (71 − 3 + 1
+    // `capture_thumbnail` = 69). Six out, two in, both buckets −2, gate −4.
+    // The ORA thumbnail then took un-awaited 37 − 3 + 1 = 35 (it sits in an
+    // async function, so all three were in that bucket), leaving restructure
+    // untouched at 69. Gate 117 − 2 = 115.
+    // a4's final batch: five async sites (exportImage ×2, useCanvasActions ×2,
+    // persistActiveCanvas) took un-awaited 35 − 10 = 25; ShareButton's
+    // non-async arrow took restructure 69 − 2 = 67. Gate 115 − 12 = 103.
+    ).toBe(67);
+    expect(gate.unawaited).toBe(25);
   });
 
   it("reports the truthy-trap sites so they are converted deliberately", () => {
