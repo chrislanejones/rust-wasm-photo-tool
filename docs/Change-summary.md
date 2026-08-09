@@ -3451,3 +3451,62 @@ disagreed, the test would be asserting against a fiction.
 | Rust tests | 297 |
 | JS tests | **417** |
 | `cargo fmt` / tsc / eslint | clean, 0 errors |
+
+## v7.85 Change Summary — 2026-08-09
+
+ADR-024 Stage 3.5. Nothing user-visible.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `useLayers.ts` fully converted — **13 → 0** unconverted sites | **Changed** |
+| 2 | ADR-024 gains the category it was missing: **ATOMIC CAPTURE**, plus a triage rule for every remaining file | **Documented** |
+| 3 | Stage 3.5 gate: **138 → 125** | — |
+
+**On #2 — the rule that came out of a3.** ADR-024 addresses op-log *ordering*
+(Stage 1) and *read-modify-write* (Stage 2). It never addressed multi-read
+*consistency*, and Stage 3.5's instruction — "make every value-consuming call
+async" — actively builds that bug where a file's reads describe one document
+state. v7.84 hit it in the save path, where the code already warned that the
+absence of `await` was load-bearing. The ADR now carries the triage question to
+ask before converting any file, so the remaining 125 do not repeat it.
+
+It also flags the next file to look at with that lens: `lib/openraster/export.ts`
+already interleaves `await import("jszip")` between its engine reads *and*
+mutates the live document mid-export (`set_active_layer` + `flatten_text_annotations`).
+Pre-existing, not something Stage 3.5 would introduce — but not a routine
+sweep either.
+
+**On #1 — why this file was done deliberately rather than swept.** Nine of its
+thirteen were truthy-trap guards, `if (t.remove_layer(id))`. Convert the method
+to return a Promise and forget the `await`, and the condition is permanently
+true: a Promise is a perfectly good `unknown` to tsc, and no existing test
+fails. The audit lists those sites individually for exactly this reason.
+
+These are **not** an atomic capture — each call is one independent mutation
+whose result gates its own follow-up, so there is no multi-read picture to
+tear. That is why the whole file could go at once.
+
+The one call-site ripple was `AppShell`'s `importToNewLayer`, which needs the
+new layer's id before it can tell the placement box what to remove on Escape.
+It became `async` and awaits `addLayer`; nothing between there and `begin`
+reads the engine, so there is no capture to tear.
+
+**Verified by driving every converted operation** against the built app and
+reading the layer stack out of the engine after each — the UI's rendering of
+layers is not the same thing as the document:
+
+| Operation | Result |
+|---|---|
+| `addLayer` | returns a **Promise**; layer count 2 → 3, named correctly |
+| `setLayerVisible` false → true | visible flag flips and flips back |
+| `renameLayer` | name changes in the stack |
+| `setActiveLayer` | active id follows |
+| `setLayerOpacity` | opacity 0.5 lands on the right layer |
+| `removeLayer` | count 3 → 2, correct layer gone |
+| Console errors / rejections | **none** |
+
+| Gate | Result |
+|---|---|
+| JS tests | **417** |
+| tsc / eslint | clean, 0 errors |
+| Rust tests | 297 |

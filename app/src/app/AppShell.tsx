@@ -1926,18 +1926,21 @@ export function AppShell() {
     },
     [stamp.state.width, stamp.state.height],
   );
-  const importToNewLayer = useCallback(() => {
+  const importToNewLayer = useCallback(async () => {
     const img = importImage;
     if (!img) return;
     const { x, y } = importDest(img.w, img.h);
-    const layerId = stamp.addLayer("Pasted Image"); // creates + activates a fresh layer
+    // Awaited: ADR-024 Stage 3.5 made the layer ops async. Nothing between here
+    // and `begin` reads the engine, so there is no capture to tear — the id is
+    // simply needed before the placement box can be told what to remove on Esc.
+    const layerId = await stamp.addLayer("Pasted Image"); // creates + activates a fresh layer
     // Same movable/resizable placement as "Merge into layer" — `begin` scales
     // the box down to fit when the image is bigger than the canvas, so an
     // oversized paste stays fully visible and resizable instead of baking in
     // at 1:1 and permanently clipping at the layer edges. Escape aborts the
     // paste and removes the layer it would have landed on.
     pastePlacement.begin(img.pixels, img.w, img.h, x, y, () =>
-      stamp.removeLayer(layerId),
+      void stamp.removeLayer(layerId),
     );
     toast.success("Pasted on a new layer — Enter places it, Esc cancels");
     closeImportDialog();

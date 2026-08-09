@@ -50,11 +50,14 @@ import { join } from "node:path";
  *         `capture_state()` call instead of ~32 separate reads, and the
  *         superseded `collectLayers` went with them. This is the first entry
  *         that is real work rather than the measurement catching up.
+ *    125  a7 landed: `useLayers.ts` fully converted, 13 -> 0. Nine of those
+ *         were truthy-trap guards (`if (t.remove_layer(id))`), which is why
+ *         they were done deliberately as one file rather than swept.
  *
  *  Only the last line is work. Measured both sides with the same audit against
  *  a worktree at HEAD, which is the only way to tell a real delta from a
  *  measurement change — the two had been tangled twice before. */
-const BUDGET = 138;
+const BUDGET = 125;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -146,7 +149,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
       gate.restructure,
       "needs-restructure moved. If real, update this and re-scope a3–a10; " +
         "if the classifier changed, check it against a parse before trusting it.",
-    ).toBe(75);
+    ).toBe(73);
     expect(gate.unawaited).toBe(39);
   });
 

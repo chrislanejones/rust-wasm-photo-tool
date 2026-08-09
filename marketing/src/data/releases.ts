@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.85",
+    date: "2026-08-09",
+    headline: "Layer operations get ready for the background thread",
+    entries: [
+      {
+        tag: "infra",
+        text: "Add, remove, rename, reorder, merge, show and hide, opacity and masks are all ready for an engine that answers over a message queue instead of instantly. Behaviour is unchanged — every one of them was driven and the layer stack checked afterwards.",
+      },
+    ],
+  },
+  {
     version: "v7.84",
     date: "2026-08-09",
     headline: "Saving a photo now happens in one read, not eighteen",

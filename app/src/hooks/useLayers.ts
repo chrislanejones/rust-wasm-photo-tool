@@ -6,6 +6,21 @@
 // re-syncs the mirrored layer list into React state; the ops that can swap
 // which overlays are live (active-layer switch, merge, flatten) also bump the
 // annotation revision.
+// ADR-024 Stage 3.5 — every engine call whose RETURN VALUE is consumed here is
+// awaited. Today the engine is synchronous and `await` on a plain value is a
+// no-op beyond a microtask tick; behind the worker these become real round
+// trips and the call sites already read correctly.
+//
+// The `if (await t.remove_layer(id))` shape is the one that mattered. The
+// audit calls these "truthy-trap" sites: convert the method to return a
+// Promise and forget the `await`, and the condition is permanently TRUE with
+// nothing to catch it — a Promise is a perfectly good `unknown` to tsc, and no
+// existing test fails. Nine of this file's guards are that shape, which is why
+// they were converted deliberately rather than swept.
+//
+// These are NOT an atomic capture (see ADR-024's "ATOMIC CAPTURE" note): each
+// call is one independent mutation whose result gates its own follow-up, so
+// there is no multi-read picture to tear.
 import { useCallback, useMemo } from "react";
 import type { EngineCore } from "./useEngineCore";
 
@@ -17,10 +32,10 @@ export function useLayers(engine: EngineCore) {
   // Each mutates the Rust layer stack, then repaints the composite and re-syncs
   // the mirrored layer list into React state.
   const addLayer = useCallback(
-    (name = ""): number => {
+    async (name = ""): Promise<number> => {
       const t = toolRef.current;
       if (!t) return 0;
-      const id = t.add_layer(name);
+      const id = await t.add_layer(name);
       flushToCanvas();
       syncState();
       return id;
@@ -29,10 +44,10 @@ export function useLayers(engine: EngineCore) {
   );
 
   const removeLayer = useCallback(
-    (id: number) => {
+    async (id: number) => {
       const t = toolRef.current;
       if (!t) return;
-      if (t.remove_layer(id)) {
+      if (await t.remove_layer(id)) {
         flushToCanvas();
         syncState();
       }
@@ -41,10 +56,10 @@ export function useLayers(engine: EngineCore) {
   );
 
   const duplicateLayer = useCallback(
-    (id: number): number => {
+    async (id: number): Promise<number> => {
       const t = toolRef.current;
       if (!t) return 0;
-      const newId = t.duplicate_layer(id);
+      const newId = await t.duplicate_layer(id);
       flushToCanvas();
       syncState();
       return newId;
@@ -53,10 +68,10 @@ export function useLayers(engine: EngineCore) {
   );
 
   const setActiveLayer = useCallback(
-    (id: number) => {
+    async (id: number) => {
       const t = toolRef.current;
       if (!t) return;
-      if (t.set_active_layer(id)) {
+      if (await t.set_active_layer(id)) {
         flushToCanvas();
         syncState();
         broadcastAnnotationsChanged();
@@ -66,10 +81,10 @@ export function useLayers(engine: EngineCore) {
   );
 
   const setLayerVisible = useCallback(
-    (id: number, visible: boolean) => {
+    async (id: number, visible: boolean) => {
       const t = toolRef.current;
       if (!t) return;
-      if (t.set_layer_visible(id, visible)) {
+      if (await t.set_layer_visible(id, visible)) {
         flushToCanvas();
         syncState();
       }
@@ -78,10 +93,10 @@ export function useLayers(engine: EngineCore) {
   );
 
   const setLayerOpacity = useCallback(
-    (id: number, opacity: number) => {
+    async (id: number, opacity: number) => {
       const t = toolRef.current;
       if (!t) return;
-      if (t.set_layer_opacity(id, opacity)) {
+      if (await t.set_layer_opacity(id, opacity)) {
         flushToCanvas();
         syncState();
       }
@@ -90,10 +105,10 @@ export function useLayers(engine: EngineCore) {
   );
 
   const renameLayer = useCallback(
-    (id: number, name: string) => {
+    async (id: number, name: string) => {
       const t = toolRef.current;
       if (!t) return;
-      if (t.rename_layer(id, name)) {
+      if (await t.rename_layer(id, name)) {
         syncState();
       }
     },
@@ -101,10 +116,10 @@ export function useLayers(engine: EngineCore) {
   );
 
   const moveLayer = useCallback(
-    (id: number, newIndex: number) => {
+    async (id: number, newIndex: number) => {
       const t = toolRef.current;
       if (!t) return;
-      if (t.move_layer(id, newIndex)) {
+      if (await t.move_layer(id, newIndex)) {
         flushToCanvas();
         syncState();
       }
@@ -113,10 +128,10 @@ export function useLayers(engine: EngineCore) {
   );
 
   const mergeDown = useCallback(
-    (id: number) => {
+    async (id: number) => {
       const t = toolRef.current;
       if (!t) return;
-      if (t.merge_down(id)) {
+      if (await t.merge_down(id)) {
         flushToCanvas();
         syncState();
         broadcastAnnotationsChanged();
@@ -136,8 +151,8 @@ export function useLayers(engine: EngineCore) {
 
   // ── Layer masks (non-destructive) ──
   const addLayerMask = useCallback(
-    (id: number) => {
-      if (toolRef.current?.add_layer_mask(id)) {
+    async (id: number) => {
+      if (await toolRef.current?.add_layer_mask(id)) {
         flushToCanvas();
         syncState();
       }
@@ -145,8 +160,8 @@ export function useLayers(engine: EngineCore) {
     [toolRef, flushToCanvas, syncState],
   );
   const removeLayerMask = useCallback(
-    (id: number) => {
-      if (toolRef.current?.remove_layer_mask(id)) {
+    async (id: number) => {
+      if (await toolRef.current?.remove_layer_mask(id)) {
         flushToCanvas();
         syncState();
       }
@@ -154,8 +169,8 @@ export function useLayers(engine: EngineCore) {
     [toolRef, flushToCanvas, syncState],
   );
   const applyLayerMask = useCallback(
-    (id: number) => {
-      if (toolRef.current?.apply_layer_mask(id)) {
+    async (id: number) => {
+      if (await toolRef.current?.apply_layer_mask(id)) {
         flushToCanvas();
         syncState();
       }
@@ -163,8 +178,8 @@ export function useLayers(engine: EngineCore) {
     [toolRef, flushToCanvas, syncState],
   );
   const invertLayerMask = useCallback(
-    (id: number) => {
-      if (toolRef.current?.invert_layer_mask(id)) {
+    async (id: number) => {
+      if (await toolRef.current?.invert_layer_mask(id)) {
         flushToCanvas();
         syncState();
       }

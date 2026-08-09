@@ -68,7 +68,7 @@ first.
 | **1** | **One port, no worker.** ✅ **DONE 2026-08-07.** `lib/engine/port.ts` is the named Stage-3 swap point (identity today); `engineOwnership.contract.test.ts` fails on a second writer, an undeclared engine, or a bypassed seam. NOT the ~152-call-site rewrite first imagined — the ownership invariant already held (`toolRef` created once, assigned only in `useEngineCore`), so the missing piece was the seam and the guard, not churn | no behaviour change | plain revert |
 | **2** | **The read-modify-write sites.** ✅ **DONE 2026-08-07 — 9 → 3, all FEED sites gone.** Two engine methods absorbed the decisions: `flatten_text_annotations` returns whether it flattened, and `blur_whole_image` computes its own geometry. Four JS guards deleted. The 3 remaining are 2 that dissolve at Stage 4 (`flushToCanvas`) and 1 false positive (`align_annotation`'s return is a mutation's result, not stale-able state) | no behaviour change | revert **+ `build:wasm`** |
 | **3** | **The worker exists, off by default.** ✅ **DONE 2026-08-07.** `workers/engine.worker.ts` (own wasm instance, one-at-a-time FIFO `drain()`) + `lib/engine/workerClient.ts` (request ids, 30 s timeout that also withdraws the queued call, `failAll` on crash). All four gaps the Phase 3 spike had are closed. Deliberately **not** Comlink — see the file header; Comlink gives correct results with no ordering promise, and arrival order *is* the op log. Flag `ih_engine_worker`, default OFF. The build emits **no worker chunk**, because nothing imports it yet — that is the honest status, not an oversight | nothing user-visible | flag stays off |
-| **3.5** | **The 162 async conversions.** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. Batches by file, value-consumed only — `editPersistence` 18, `useEngineCore` 17, `useSelectionActions` 15, `openraster/export` 13, `useLayers` 13, `useEditPersistence` 12. Same flag, still OFF | nothing user-visible | flag stays off |
+| **3.5** | **The async conversions — 168 → 138 as of v7.84.** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. Batches by file, value-consumed only — `editPersistence` 18, `useEngineCore` 17, `useSelectionActions` 15, `openraster/export` 13, `useLayers` 13, `useEditPersistence` 12. Same flag, still OFF. **a1 (measurable gate) v7.79 · a2 (text-metrics cache) v7.80 · a3 (one-call save capture) v7.84.** a3 also found the category this ADR missed — see "ATOMIC CAPTURE" below, and triage every remaining file against it before converting | nothing user-visible | flag stays off |
 | **4** | **Canvas transfer.** **SCOPE CORRECTED 2026-08-08 — it is not just the `width`/`height` assignments; see "Stage 4's real scope" below.** Three subsystems must leave the main canvas first (engine flush, the arrow/shapes/crop rubber-band preview, lossy export), and canvas element *identity* has to be owned. Still flagged | nothing user-visible | **NOT by the flag alone** — see the kill-switch note |
 | **5** | **Measure, then flip.** A/B the 470 ms freeze against master. Default ON only if it is actually gone, with `ih_engine_worker=0` as the kill switch | the feature | kill switch |
 
@@ -183,6 +183,55 @@ to). Either shape is `await`-able, so under the worker these become ordinary
 Stage-3.5 conversions too. **Do not add them to `syncState` naively** —
 `syncState` runs after every mutation, and hanging two full composites off it
 would be far worse than the bug.
+
+### The category this ADR missed — ATOMIC CAPTURE (found 2026-08-09, a3)
+
+**Before converting any file, ask whether its engine reads form one coherent
+picture. If they do, they cannot be converted call-by-call at all.**
+
+This ADR addresses two hazards: op-log **ordering** (Stage 1's one-port
+invariant) and **read-modify-write** (Stage 2). There is a third, and Stage
+3.5's instruction — "make every value-consuming call async" — actively builds it.
+
+The save path reads ~18 values to describe one document: canvas PNG and size,
+every undo and redo snapshot, the live overlays, the layer stack.
+`useEditPersistence.ts` already said what depended on that:
+
+> "Everything above reads the engine, and there is not a single `await` in it.
+> That is load-bearing, not incidental. […] If anyone ever adds an `await` above
+> this line, detaching stops being safe and this comment is the reason why."
+
+`detachCloudUpload` returns as soon as the local write lands rather than
+blocking ~13s on the network, and that is only safe because the bytes were
+already captured. Yield midway and a photo switch completes underneath: the
+second half of the archive describes the **incoming** photo, stored under the
+**outgoing** photo's key.
+
+**Today this hides.** `await` on a synchronous value yields only to the
+microtask queue, so DOM events cannot interleave and a converted sequence looks
+fine. Behind the worker every await is a real round trip, and a switch, stroke
+or undo lands mid-capture. Nothing throws. The archive is simply wrong, in the
+cloud copy where the local guard cannot see it.
+
+**The fix is not to guard the sequence — it is to remove it.** `capture_state()`
+(v7.82, `src/capture.rs`) returns the whole picture in one call; `&self` cannot
+be mutated while it runs, so atomicity is structural rather than a comment
+nobody can enforce. v7.84 moved both save paths onto it and deleted ~32
+conversions instead of turning each into a hazard.
+
+**Triage rule for the remaining sites.** For each file, before converting:
+
+| Question | If yes |
+|---|---|
+| Do these reads describe one document state that is then written, uploaded or archived? | Do NOT convert individually — give the engine one call, as a3 did |
+| Does an existing comment say the absence of `await` matters? | Believe it, and read why before touching anything |
+| Do reads already interleave with `await` today? | Pre-existing; note it, do not silently make it worse |
+
+`lib/openraster/export.ts` is the next one to look at with this lens: it already
+interleaves `await import("jszip")` between its reads AND mutates the live
+document mid-export (`set_active_layer` + `flatten_text_annotations`). That is a
+pre-existing problem, not one Stage 3.5 would introduce, but it should not be
+swept through as a routine conversion.
 
 **Net: zero of the five need a synchronous engine read across the boundary**,
 so the ordering worry that put this paragraph here is resolved — nothing in

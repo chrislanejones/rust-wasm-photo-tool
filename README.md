@@ -84,6 +84,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.85 — 2026-08-09
+
+**Groundwork, nothing user-visible.** More of the engine-on-a-background-thread
+preparation: the layer operations — add, remove, rename, reorder, merge, show
+and hide, opacity, masks — are ready for an engine that answers over a message
+queue. Behaviour is unchanged; verified by driving every one of them and
+checking the layer stack after each.
+
+<details><summary>Older releases</summary>
+
 ### v7.84 — 2026-08-09
 
 **Groundwork, nothing user-visible.** Saving a photo now reads the whole
@@ -92,7 +102,6 @@ verified byte-exact through a save, reload and restore — but the read can no
 longer be interrupted halfway, which is what would have let switching photos
 mid-save mix one photo's canvas with another's history.
 
-<details><summary>Older releases</summary>
 
 ### v7.83 — 2026-08-09
 
