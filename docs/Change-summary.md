@@ -3543,3 +3543,30 @@ count; none were converted. That distinction has been kept explicit in the
 budget history in `engineAsyncMigration.contract.test.ts` every time it has
 happened, because conflating the two is how the earlier 121/162/166/171 muddle
 started.
+
+## v7.87 Change Summary — 2026-08-09
+
+Docs only. No code.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | ADR-024's ATOMIC CAPTURE section gains a **triage table** — every file checked so far and what was found | **Documented** |
+| 2 | Two more atomic captures identified in `hooks/useExport.ts` | **Found, not fixed** |
+
+**#2 — found by applying the rule rather than starting the conversion.**
+`useExport` has two three-read sequences where the pixels and the dimensions
+describing them must come from the same state:
+
+```
+exportBlob         get_image_data() + width() + height()
+generateThumbnail  thumbnail_width(n) + thumbnail_height(n) + thumbnail_data(n)
+```
+
+Convert those individually and a resize landing between the reads encodes one
+state's pixels at another state's dimensions — a corrupt or failed encode, from
+three lines that look entirely routine. Small enough that the fix is cheap: one
+engine call returning data and dimensions together, the same shape as
+`capture_state`.
+
+The table is in the ADR rather than a session note because the next person to
+open Stage 3.5 needs it before they touch a file, not after.

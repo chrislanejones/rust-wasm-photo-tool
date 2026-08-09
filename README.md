@@ -84,6 +84,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.87 — 2026-08-09
+
+**Docs only.** ADR-024 gains a triage table recording which files in the
+background-thread migration have been checked and what was found, so the next
+session does not re-derive it. Two more places were caught where reads that
+must describe the same moment would break if converted one at a time.
+
+<details><summary>Older releases</summary>
+
 ### v7.86 — 2026-08-09
 
 **Tooling only.** The audit that tracks the background-thread migration was
@@ -91,7 +100,6 @@ mis-filing the lasso's live preview as ordinary work. It runs on every mouse
 move, where waiting on a background thread would cost a frame, so it belongs in
 the group that gets handled last and separately. No app code changed.
 
-<details><summary>Older releases</summary>
 
 ### v7.85 — 2026-08-09
 

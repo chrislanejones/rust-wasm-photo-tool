@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.87",
+    date: "2026-08-09",
+    headline: "Notes for the next hands on the migration",
+    entries: [
+      {
+        tag: "infra",
+        text: "The background-thread migration's design record now lists which files have been checked and what turned up, so the next session starts from findings rather than re-deriving them. Two more places were caught where several reads have to describe the same moment. Documentation only.",
+      },
+    ],
+  },
+  {
     version: "v7.86",
     date: "2026-08-09",
     headline: "A mis-filed hot path in the migration tracker",

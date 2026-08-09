@@ -227,11 +227,36 @@ conversions instead of turning each into a hazard.
 | Does an existing comment say the absence of `await` matters? | Believe it, and read why before touching anything |
 | Do reads already interleave with `await` today? | Pre-existing; note it, do not silently make it worse |
 
-`lib/openraster/export.ts` is the next one to look at with this lens: it already
-interleaves `await import("jszip")` between its reads AND mutates the live
-document mid-export (`set_active_layer` + `flatten_text_annotations`). That is a
-pre-existing problem, not one Stage 3.5 would introduce, but it should not be
-swept through as a routine conversion.
+**Files already triaged against this rule (2026-08-09), so the next session
+does not have to re-derive them:**
+
+| File | Verdict |
+|---|---|
+| `lib/editPersistence.ts` | atomic capture — **fixed** v7.84 via `capture_state()` |
+| `hooks/useEditPersistence.ts` | atomic capture — **fixed** v7.84, same call |
+| `hooks/useLayers.ts` | independent mutations, no shared picture — **converted** v7.85 |
+| `app/session/useSelectionActions.ts` | contains a per-pointermove hot path — reclassified v7.86, belongs in a10 |
+| `hooks/useExport.ts` | **two small atomic captures — do NOT convert individually** |
+| `lib/openraster/export.ts` | already interleaves `await`, and mutates mid-export |
+
+`useExport.ts` has two three-read captures where the pixels and the dimensions
+that describe them must come from the same state:
+
+```
+exportBlob        get_image_data() + width() + height()
+generateThumbnail thumbnail_width(n) + thumbnail_height(n) + thumbnail_data(n)
+```
+
+Convert those individually and a resize landing between the reads encodes one
+state's pixels at another state's dimensions — a corrupt or failed encode, from
+three lines that look entirely routine. They are small enough that the fix is
+cheap: one engine call returning data and dimensions together, the same shape
+as `capture_state`.
+
+`lib/openraster/export.ts` already interleaves `await import("jszip")` between
+its reads AND mutates the live document mid-export (`set_active_layer` +
+`flatten_text_annotations`). That is a pre-existing problem, not one Stage 3.5
+would introduce, but it should not be swept through as a routine conversion.
 
 **Net: zero of the five need a synchronous engine read across the boundary**,
 so the ordering worry that put this paragraph here is resolved — nothing in
