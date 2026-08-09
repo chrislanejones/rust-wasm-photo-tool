@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.84",
+    date: "2026-08-09",
+    headline: "Saving a photo now happens in one read, not eighteen",
+    entries: [
+      {
+        tag: "rust",
+        text: "Saving used to ask the engine eighteen separate questions about your photo — its canvas, its history, its layers. It now asks once. The bytes on disk are identical, verified through a save, reload and restore, but the read can no longer be interrupted halfway, which is what would have let switching photos mid-save mix one photo's canvas with another's history once the engine moves to a background thread.",
+      },
+    ],
+  },
+  {
     version: "v7.83",
     date: "2026-08-09",
     headline: "A tidier button set and a sharper nav underline",

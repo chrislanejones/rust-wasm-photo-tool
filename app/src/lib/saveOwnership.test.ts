@@ -40,10 +40,71 @@ import {
 } from "@/lib/engineDocument";
 import type { ImageHorseTool } from "stamp_tool";
 
+/**
+ * Build the same little-endian frame `capture_state()` returns, from the
+ * double's own getters.
+ *
+ * Encoding it rather than hand-rolling a fixture keeps the double honest: if
+ * the double's `width()` and its frame ever disagreed, the test would be
+ * asserting against a fiction. The layout mirrors `src/capture.rs`.
+ */
+function encodeFrame(g: {
+  width: number; height: number; png: Uint8Array;
+  undo: Array<{ label: string; png: Uint8Array; ann: string }>;
+  redo: Array<{ label: string; png: Uint8Array; ann: string }>;
+  text: string; shapes: string; layersJson: string; activeLayerId: number;
+}): Uint8Array {
+  const enc = new TextEncoder();
+  const parts: Uint8Array[] = [];
+  const u32 = (v: number) => {
+    const b = new Uint8Array(4);
+    new DataView(b.buffer).setUint32(0, v, true);
+    parts.push(b);
+  };
+  const blob = (b: Uint8Array) => { u32(b.length); parts.push(b); };
+  const str = (t: string) => blob(enc.encode(t));
+
+  u32(0x49484353); // "IHCS"
+  u32(1);
+  u32(g.width);
+  u32(g.height);
+  blob(g.png);
+  u32(g.undo.length);
+  for (const e of g.undo) { str(e.label); blob(e.png); str(e.ann); }
+  u32(g.redo.length);
+  for (const e of g.redo) { str(e.label); blob(e.png); str(e.ann); }
+  str(g.text);
+  str(g.shapes);
+  str(g.layersJson);
+  u32(0); // layer_count
+  u32(g.activeLayerId);
+
+  const total = parts.reduce((n, b) => n + b.length, 0);
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const b of parts) { out.set(b, o); o += b.length; }
+  return out;
+}
+
 /** A stand-in engine whose document is identifiable by its dimensions. */
 function fakeTool(docWidth: number, docHeight: number) {
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, docWidth & 0xff, docHeight & 0xff]);
   return {
+    // The save path reads the document through this one call now (ADR-024
+    // Stage 3.5). Every value below still comes from the same getters, so the
+    // double describes one coherent document exactly as the engine would.
+    capture_state: () =>
+      encodeFrame({
+        width: docWidth,
+        height: docHeight,
+        png,
+        undo: [{ label: "Brush", png, ann: "[]" }],
+        redo: [],
+        text: "[]",
+        shapes: "[]",
+        layersJson: "[]",
+        activeLayerId: 0,
+      }),
     export_png: () => png,
     width: () => docWidth,
     height: () => docHeight,

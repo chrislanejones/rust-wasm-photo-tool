@@ -185,27 +185,155 @@ interface LayerMeta {
   active: boolean;
 }
 
+/** Everything one `capture_state()` call hands back, already decoded into the
+ *  shapes the two save paths were building by hand. */
+export interface CapturedState {
+  canvasW: number;
+  canvasH: number;
+  canvasPng: Uint8Array;
+  undoStack: SnapEntry[];
+  redoStack: SnapEntry[];
+  /** Live text overlays, tile cache stripped — same as `stripLiveAnnotations`. */
+  annotations: PersistedAnnotation[];
+  shapes: PersistedShape[];
+  layers: PersistedLayer[];
+  activeLayerId: number;
+}
+
+const CAPTURE_MAGIC = 0x49484353; // "IHCS"
+const CAPTURE_VERSION = 1;
+
 /**
- * Read the full layer stack (pixels + per-layer overlays) out of the WASM tool,
- * bottom → top. Used by both the IDB and Convex save paths.
+ * Decode the engine's one-call state capture. ADR-024 Stage 3.5.
+ *
+ * WHY THIS REPLACES ~18 SEPARATE READS. `useEditPersistence.ts` states the
+ * invariant the save path depends on: "Everything above reads the engine, and
+ * there is not a single `await` in it. That is load-bearing, not incidental."
+ * `detachCloudUpload` lets a photo switch return the moment the local write
+ * lands rather than blocking ~13s on the network, and that is only safe
+ * because the bytes were already captured. A capture that yields midway can
+ * have the switch complete underneath it, so the second half of the archive
+ * describes the INCOMING photo while being stored under the OUTGOING photo's
+ * key.
+ *
+ * Converting those reads one-by-one — Stage 3.5's mechanical instruction —
+ * creates exactly that. One call cannot be interleaved, so the sequence is
+ * removed rather than guarded.
+ *
+ * The frame is TRANSPORT only, never persisted: `savePhotoEdit` and
+ * `encodeArchive` still own what lands on disk. See `src/capture.rs`.
  */
-export function collectLayers(t: ImageHorseTool): PersistedLayer[] {
+export function decodeCapture(blob: Uint8Array): CapturedState {
+  const dv = new DataView(blob.buffer, blob.byteOffset, blob.byteLength);
+  let p = 0;
+  const u32 = () => {
+    const v = dv.getUint32(p, true);
+    p += 4;
+    return v;
+  };
+  // Copies rather than subarray views: these outlive the frame (they go into
+  // IndexedDB and, on the cloud path, into an upload), and a view would pin
+  // the whole capture buffer alive behind every snapshot PNG.
+  const bytes = () => {
+    const n = u32();
+    const out = blob.slice(p, p + n);
+    p += n;
+    return out;
+  };
+  const dec = new TextDecoder();
+  const text = () => dec.decode(bytes());
+
+  const magic = u32();
+  const version = u32();
+  if (magic !== CAPTURE_MAGIC || version !== CAPTURE_VERSION) {
+    // Loud, not silent. A mismatch means the wasm and the JS disagree about
+    // the frame — almost always a stale `pkg/` — and a half-decoded archive
+    // written to IndexedDB is far worse than a failed save.
+    throw new Error(
+      `capture_state frame mismatch (magic 0x${magic.toString(16)}, version ${version}). ` +
+        "The engine and this decoder disagree — rebuild with `pnpm run build:wasm`.",
+    );
+  }
+
+  const canvasW = u32();
+  const canvasH = u32();
+  const canvasPng = bytes();
+
+  const readStack = (): SnapEntry[] => {
+    const n = u32();
+    const out: SnapEntry[] = [];
+    for (let i = 0; i < n; i++) {
+      const label = text();
+      const png = bytes();
+      const annotations = parseSnapshotAnnotations(text());
+      out.push({ png, label, annotations });
+    }
+    return out;
+  };
+  const undoStack = readStack();
+  const redoStack = readStack();
+
+  const annotations = stripLiveAnnotations(text());
+  const shapes = parseShapes(text());
+
   let metas: LayerMeta[];
   try {
-    metas = JSON.parse(t.get_layers()) as LayerMeta[];
+    metas = JSON.parse(text()) as LayerMeta[];
   } catch {
-    return [];
+    metas = [];
   }
-  return metas.map((m, i) => ({
-    id: m.id,
-    name: m.name,
-    visible: m.visible,
-    opacity: m.opacity,
-    png: new Uint8Array(t.get_layer_png(i)),
-    annotations: parseSnapshotAnnotations(t.get_layer_text_annotations(i)),
-    shapes: parseShapes(t.get_layer_shape_annotations(i)),
-  }));
+  const layerCount = u32();
+  const layers: PersistedLayer[] = [];
+  for (let i = 0; i < layerCount; i++) {
+    const png = bytes();
+    const layerAnnotations = parseSnapshotAnnotations(text());
+    const layerShapes = parseShapes(text());
+    const m = metas[i];
+    // Metadata and pixels are indexed the same way by the engine. If they ever
+    // disagree in length, prefer keeping the pixels over dropping a layer.
+    layers.push({
+      id: m?.id ?? i,
+      name: m?.name ?? `Layer ${i + 1}`,
+      visible: m?.visible ?? true,
+      opacity: m?.opacity ?? 1,
+      png,
+      annotations: layerAnnotations,
+      shapes: layerShapes,
+    });
+  }
+
+  const activeLayerId = u32();
+
+  if (p !== blob.byteLength) {
+    throw new Error(
+      `capture_state frame not fully consumed (${p} of ${blob.byteLength} bytes) — ` +
+        "the decoder and the engine's writer have drifted.",
+    );
+  }
+
+  return {
+    canvasW,
+    canvasH,
+    canvasPng,
+    undoStack,
+    redoStack,
+    annotations,
+    shapes,
+    layers,
+    activeLayerId,
+  };
 }
+
+// `collectLayers(t)` used to live here and read the layer stack out of the
+// engine one call at a time. Both of its callers — the IDB path below and the
+// Convex path in `useEditPersistence.ts` — now get the stack from
+// `decodeCapture(t.capture_state())` instead, so it had no callers left.
+//
+// Deleted rather than kept: this is supersession, not the zero-reference
+// export that turned out to be a MISSING WIRE last time (`useRealTier`, the
+// paid-tier gating bug). The difference is that here the reason is known —
+// its two call sites were replaced in the same change — and it was checked
+// repo-wide before removal, not assumed dead from a grep.
 
 export interface SavedEdit {
   canvasW: number;
@@ -367,39 +495,21 @@ export async function savePhotoEdit(
     return false;
   }
 
-  const canvasPng = new Uint8Array(t.export_png());
-  const canvasW = t.width();
-  const canvasH = t.height();
-
-  const undoCount = t.undo_snapshot_count();
-  const undoStack: SnapEntry[] = [];
-  for (let i = 0; i < undoCount; i++) {
-    undoStack.push({
-      png: new Uint8Array(t.get_undo_snapshot_png(i)),
-      label: t.get_undo_snapshot_label(i),
-      annotations: parseSnapshotAnnotations(t.get_undo_snapshot_annotations(i)),
-    });
-  }
-
-  const redoCount = t.redo_snapshot_count();
-  const redoStack: SnapEntry[] = [];
-  for (let i = 0; i < redoCount; i++) {
-    redoStack.push({
-      png: new Uint8Array(t.get_redo_snapshot_png(i)),
-      label: t.get_redo_snapshot_label(i),
-      annotations: parseSnapshotAnnotations(t.get_redo_snapshot_annotations(i)),
-    });
-  }
-
-  // Live (non-destructive) text annotations — shared stripper, see #22.
-  const annotations = stripLiveAnnotations(t.get_text_annotations());
-
-  // Live (non-destructive) shape annotations.
-  const shapes = parseShapes(t.get_shape_annotations());
-
-  // Full layer stack (pixels + per-layer overlays).
-  const layers = collectLayers(t);
-  const activeLayerId = t.active_layer_id();
+  // ONE call, not eighteen. ADR-024 Stage 3.5 — see `decodeCapture` above for
+  // why the sequence was removed rather than converted call-by-call. The whole
+  // document is read while the engine cannot change, which is the property the
+  // old run of separate reads had only by virtue of being synchronous.
+  const {
+    canvasW,
+    canvasH,
+    canvasPng,
+    undoStack,
+    redoStack,
+    annotations,
+    shapes,
+    layers,
+    activeLayerId,
+  } = decodeCapture(t.capture_state());
 
   await idbSet<SavedEdit>(`edit-${photoId}`, {
     canvasW,

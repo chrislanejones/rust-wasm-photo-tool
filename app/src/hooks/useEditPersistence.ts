@@ -12,8 +12,7 @@ import {
   clearAllEdits as idbClear,
   parseSnapshotAnnotations,
   parseShapes,
-  collectLayers,
-  stripLiveAnnotations,
+  decodeCapture,
 } from "@/lib/editPersistence";
 import type {
   SavedEdit,
@@ -359,54 +358,29 @@ export function useEditPersistence() {
           // reports the local write that did happen.
           if (!tool) return true;
 
-          const canvasPng = new Uint8Array(tool.export_png());
-          const canvasW = tool.width();
-          const canvasH = tool.height();
-
-          const undoStack: SnapEntry[] = [];
-          for (let i = 0; i < tool.undo_snapshot_count(); i++) {
-            undoStack.push({
-              png: new Uint8Array(tool.get_undo_snapshot_png(i)),
-              label: tool.get_undo_snapshot_label(i),
-              annotations: parseSnapshotAnnotations(
-                tool.get_undo_snapshot_annotations(i),
-              ),
-            });
-          }
-          const redoStack: SnapEntry[] = [];
-          for (let i = 0; i < tool.redo_snapshot_count(); i++) {
-            redoStack.push({
-              png: new Uint8Array(tool.get_redo_snapshot_png(i)),
-              label: tool.get_redo_snapshot_label(i),
-              annotations: parseSnapshotAnnotations(
-                tool.get_redo_snapshot_annotations(i),
-              ),
-            });
-          }
-
-          // Live text annotations (re-editable overlay). Strip tile_* so we
-          // don't bake a stale pre-rotated tile cache into the archive — tiles
-          // are re-rendered on load.
+          // ── THE CAPTURE — ONE CALL ──────────────────────────────────────
+          // This was eighteen separate engine reads, and the comment below
+          // explained at length why not one of them could become an `await`.
+          // ADR-024 Stage 3.5 would have converted them all; doing so would
+          // have produced exactly the corruption the note warns about.
           //
-          // This used to be its own inline copy of the map, and it had drifted:
-          // it stopped at `bg_tail` and silently dropped all nine `shadow_*`
-          // fields, so a cross-device restore lost drop shadows while a local
-          // restore kept them (#22). It shares `stripLiveAnnotations` with the
-          // local path now, so the two cannot disagree again.
-          const annotationsJson = JSON.stringify(
-            stripLiveAnnotations(tool.get_text_annotations()),
-          );
+          // `capture_state()` reads the whole document while the engine cannot
+          // change — `&self` in Rust — so the atomicity is now STRUCTURAL
+          // rather than a property of the call sequence that a future edit
+          // could quietly break. The note below still applies to everything
+          // after this line.
+          const cap = decodeCapture(tool.capture_state());
+          const { canvasW, canvasH, canvasPng, undoStack, redoStack, layers, activeLayerId } = cap;
 
-          // Live shape annotations (re-editable overlay) — current state only.
-          let shapesJson = "[]";
-          try {
-            shapesJson = tool.get_shape_annotations() || "[]";
-          } catch {
-            shapesJson = "[]";
-          }
+          // Serialised here rather than in the decoder: the archive wants JSON
+          // strings, the local IDB path wants parsed objects, and `decodeCapture`
+          // returns the parsed form both share. Strip semantics are identical —
+          // `decodeCapture` applies `stripLiveAnnotations` for us, which is what
+          // fixed the #22 drift where this path silently dropped all nine
+          // `shadow_*` fields and cross-device restores lost drop shadows.
+          const annotationsJson = JSON.stringify(cap.annotations);
+          const shapesJson = JSON.stringify(cap.shapes);
 
-          const layers = collectLayers(tool);
-          const activeLayerId = tool.active_layer_id();
           const archive = encodeArchive(canvasW, canvasH, canvasPng, undoStack, redoStack, annotationsJson, shapesJson, layers, activeLayerId);
 
           // ── END OF THE SYNCHRONOUS CAPTURE ──────────────────────────────

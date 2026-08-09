@@ -238,7 +238,7 @@ app/src/
     ├── colors.ts                     Color utility helpers
     ├── editPersistence.ts            Per-photo edit persistence via IndexedDB — saves full canvas
     │                                 state + undo/redo history (PNG-encoded) plus the layer stack
-    │                                 (collectLayers reads pixels + per-layer overlays out of WASM;
+    │                                 (decodeCapture unpacks the engine's one-call capture_state();
     │                                 SavedEdit gained layers[] + activeLayerId); copyPhotoEdit clones
     │                                 a photo's archive to a new id (gallery Duplicate)
     ├── originalsStore.ts             Content-addressed IndexedDB store for original photo bytes;

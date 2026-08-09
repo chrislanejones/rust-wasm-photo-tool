@@ -3383,3 +3383,71 @@ Also noted, not acted on: `docs/Change-summary.md` still describes this image
 as "832×1106, 18,888 bytes" with captions in an older entry. That is a
 historical record of what shipped then, so it stays; this entry is the
 correction.
+
+## v7.84 Change Summary — 2026-08-09
+
+ADR-024 Stage 3.5, step a3 — and it is the first entry in this arc that is
+real work rather than the measurement catching up.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Both save paths read the document through **one** `capture_state()` call instead of ~32 separate engine reads | **Changed** |
+| 2 | `decodeCapture()` in `editPersistence.ts` unpacks the engine's transport frame into the shapes both paths were building by hand | **Added** |
+| 3 | `collectLayers()` removed — both callers now get the layer stack from the capture | **Removed** |
+| 4 | Stage 3.5 gate: **168 → 138** unconverted value-consuming calls | — |
+
+**Why a3 was not the mechanical conversion the plan called for.** The contract
+said "convert the 18 value-consumed sites in `editPersistence.ts`". Reading the
+code it was about to change stopped that: `useEditPersistence.ts` states the
+invariant outright —
+
+> "Everything above reads the engine, and there is not a single `await` in it.
+> That is load-bearing, not incidental. […] If anyone ever adds an `await` above
+> this line, detaching stops being safe and this comment is the reason why."
+
+`detachCloudUpload` lets a photo switch return as soon as the local write lands
+rather than blocking ~13s on the network, and that is only safe because the
+bytes were already captured. A capture that yields midway lets the switch
+complete underneath it, so the second half of the archive describes the
+**incoming** photo while being stored under the **outgoing** photo's key.
+
+Converting those reads one at a time — exactly what the stage instructed —
+would have built that. Today it survives by luck: `await` on a synchronous
+value yields only to the microtask queue, so DOM events cannot interleave.
+Behind the worker every await is a real round trip and a photo switch, stroke
+or undo can land mid-capture, with nothing thrown and a wrong archive written.
+
+So the sequence was removed rather than guarded. **ADR-024 does not cover this
+category** — it addresses op-log ordering (Stage 1) and read-modify-write
+(Stage 2); multi-read *consistency* is a third thing and was not in the plan.
+
+**Atomicity is now structural.** `&self` cannot be mutated while `capture_state`
+runs, so the property holds by construction rather than by a comment nobody can
+enforce. The frame is transport only — `savePhotoEdit` and `encodeArchive` still
+own what lands on disk, so the persisted format, its version and its loader are
+untouched, per ADR-024 and the `dexie-migration` rule.
+
+**On #3.** `collectLayers` became unreferenced when both its callers moved to
+`decodeCapture`. Deleted rather than kept, because this is supersession with a
+known cause — not the zero-reference export that turned out to be a **missing
+wire** last time (`useRealTier`, the paid-tier gating bug). Checked repo-wide
+before removal, not assumed dead from one grep.
+
+**Verified in a browser, not just by gates**, because this is the save path and
+a wrong archive is silent:
+
+| Check | Result |
+|---|---|
+| Stroke pixels before reload | 925 red px, checksum 19,784,688 |
+| After reload + "Resume editing" | **925 red px, checksum 19,784,688 — identical** |
+| Batch export after restore | edited photo composited at 2068×1603; untouched photo verbatim at 3072×864 |
+
+The `saveOwnership` test double now encodes a real capture frame from its own
+getters rather than a hand-written fixture — if its `width()` and its frame ever
+disagreed, the test would be asserting against a fiction.
+
+| Gate | Result |
+|---|---|
+| Rust tests | 297 |
+| JS tests | **417** |
+| `cargo fmt` / tsc / eslint | clean, 0 errors |

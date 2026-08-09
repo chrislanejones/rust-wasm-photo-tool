@@ -10,7 +10,7 @@
 // This file proves the STRUCTURAL half. It cannot prove the behavioural half —
 // that needs a running worker and an op-log equivalence run, which is a12/a13.
 //
-// WHY A RATCHET AND NOT A BOOLEAN. All 168 value-consuming sites are un-awaited
+// WHY A RATCHET AND NOT A BOOLEAN. Value-consuming sites start un-awaited
 // today, so a test that simply failed on "any un-awaited call" would be red
 // before the first batch and would stay red for weeks — a permanently failing
 // test teaches people to ignore the suite. Instead the count is pinned. It
@@ -46,11 +46,15 @@ import { join } from "node:path";
  *         fire-and-forget. Five sites had been invisible this way.
  *    168  a2 landed: six direct call sites became three inside
  *         `textMetricsCache.ts`.
+ *    138  a3 landed: both save paths now read the document through ONE
+ *         `capture_state()` call instead of ~32 separate reads, and the
+ *         superseded `collectLayers` went with them. This is the first entry
+ *         that is real work rather than the measurement catching up.
  *
  *  Only the last line is work. Measured both sides with the same audit against
  *  a worktree at HEAD, which is the only way to tell a real delta from a
  *  measurement change — the two had been tangled twice before. */
-const BUDGET = 168;
+const BUDGET = 138;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -142,8 +146,8 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
       gate.restructure,
       "needs-restructure moved. If real, update this and re-scope a3–a10; " +
         "if the classifier changed, check it against a parse before trusting it.",
-    ).toBe(79);
-    expect(gate.unawaited).toBe(65);
+    ).toBe(75);
+    expect(gate.unawaited).toBe(39);
   });
 
   it("reports the truthy-trap sites so they are converted deliberately", () => {

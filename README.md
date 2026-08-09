@@ -84,6 +84,16 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.84 — 2026-08-09
+
+**Groundwork, nothing user-visible.** Saving a photo now reads the whole
+document in one go rather than eighteen separate reads. Same bytes on disk —
+verified byte-exact through a save, reload and restore — but the read can no
+longer be interrupted halfway, which is what would have let switching photos
+mid-save mix one photo's canvas with another's history.
+
+<details><summary>Older releases</summary>
+
 ### v7.83 — 2026-08-09
 
 **Marketing site.** The button-set image on the home page lost its caption
@@ -92,7 +102,6 @@ what they are, and the nav's hover underline is drawn at its real width instead
 of being a one-pixel line stretched by the GPU — which is what made it look
 smeared while it moved.
 
-<details><summary>Older releases</summary>
 
 ### v7.82 — 2026-08-09
 
