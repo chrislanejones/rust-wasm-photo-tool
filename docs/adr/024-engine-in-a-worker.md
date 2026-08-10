@@ -374,6 +374,46 @@ pixels — no canvas 2D pixel manipulation in React land"*. Stage 4 is where tha
 debt comes due: the preview has to move to its own overlay canvas or into the
 engine before the main canvas can be transferred.
 
+### ⚠️ ELEMENT REMOUNT ≠ COMPONENT REMOUNT — read this before touching a11
+
+**This single fact has caused two real bugs in two days, in two different
+sub-steps, and both passed every gate.** It is the load-bearing fact of the
+whole a11 arc.
+
+The `<canvas>` element and the `CanvasArea` component are re-created by
+*different* events:
+
+| Event | Component remounts? | Element remounts? | Effects re-run? |
+|---|---|---|---|
+| Ordinary tool switch (compress → brush → crop) | no | **no** | no |
+| Crossing the **Batch** boundary (`activeTool === "emoji"`) | **yes** | **yes** | **yes** |
+| A change to the `<canvas>`'s React `key` (a11.3's flag flip) | **no** | **yes** | **NO** |
+
+That last row is the trap. A keyed element is replaced by React while the
+component around it is merely re-rendered, so nothing in `CanvasArea` runs
+again — and the recovery everyone assumes is automatic does not happen.
+
+**Bug 1 (a11.1).** `useCanvasIdentity` was called inside `CanvasArea`, so the
+generation counter was destroyed by the very event it counts. The browser showed
+five distinct canvas elements and a generation still reading 1. Fixed by moving
+ownership to `AppShell`, which does not remount.
+
+**Bug 2 (a11.3).** Keying the `<canvas>` on the engine mode remounted the
+element, but `CanvasArea`'s re-blit effect never re-ran — every one of its
+dependencies was unchanged, and `canvasRef` is a `useRef` whose object identity
+never changes. Result: a blank canvas on every flag flip. Fixed by putting the
+surface key in that effect's dependency array.
+
+**Neither was caught by `tsc`, eslint, the unit suite or the production build.**
+Both were caught by driving the real app and reading the generation counter.
+Anything in a11 that changes when or how the canvas element is created must be
+verified that way — the gates cannot see this class of bug.
+
+**a11.4 walks straight back into it.** "After a re-transfer, the worker re-blits
+from the engine" is the same mechanism from the other side. Note that a11.3's
+fix — `surfaceKey` in the re-blit dependency array — may already cover part of
+it: different trigger, same path.
+
 ### The one-way door, and why the flag is not enough
 
 The stage table used to say Stage 4 was reversible by "flag stays off". For a

@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.92",
+    date: "2026-08-09",
+    headline: "An off switch that works while you are using it",
+    entries: [
+      {
+        tag: "infra",
+        text: "More groundwork for moving the engine onto a background thread. The switch that turns that mode off now takes effect mid-session instead of only on reload: it swaps in a fresh drawing surface rather than trying to reclaim one it can no longer draw to. Nothing changes for you \u2014 the mode is still off.",
+      },
+    ],
+  },
+  {
     version: "v7.91",
     date: "2026-08-09",
     headline: "Knowing which canvas is the real one",

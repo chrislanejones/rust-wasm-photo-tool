@@ -89,3 +89,35 @@ export function engineWorkerEnabled(): boolean {
     return false;
   }
 }
+
+/** ADR-024 Stage 4, step a11.3 — the React key for the main `<canvas>`.
+ *
+ *  WHAT THIS REPAIRS. `ih_engine_worker=0` is specified as a RUNTIME kill
+ *  switch, and after `transferControlToOffscreen()` that promise cannot be kept
+ *  on a transferred element: nothing can give a canvas its 2D context back.
+ *  Flipping the flag mid-session would leave the user on a surface the main
+ *  thread can no longer draw to — a kill switch that only works on reload,
+ *  which is the guardrail-that-cannot-fire pattern this repo has been bitten by
+ *  before.
+ *
+ *  Keying the element on the mode makes the flip remount it. A remounted
+ *  `<canvas>` is a NEW DOM node that was never transferred, so the main-thread
+ *  path is available again immediately. Losing the bitmap on a remount is
+ *  already normal and already recovered from — the engine owns the pixels and
+ *  `CanvasArea` re-blits on mount.
+ *
+ *  ⚠️ THIS DELIBERATELY CHANGES WHEN THE CANVAS REMOUNTS, which is the opposite
+ *  of a11.1's stop condition — and correctly so, because here the remount IS
+ *  the mechanism rather than a side effect. The flip is the only new remount:
+ *  the value is stable for the life of a tab that never touches the flag, so
+ *  ordinary use sees exactly the reconciliation it saw before.
+ *
+ *  RETURNS A STRING, not the boolean. A caller keying on `engineWorkerEnabled()`
+ *  would be a call site branching on the flag, which
+ *  `engineAsyncMigration.contract.test.ts` forbids for good reason — every such
+ *  branch is a place the two implementations can diverge. The flag stays here;
+ *  callers get an opaque identity token and cannot infer behaviour from it.
+ */
+export function canvasSurfaceKey(): string {
+  return engineWorkerEnabled() ? "canvas-worker" : "canvas-local";
+}

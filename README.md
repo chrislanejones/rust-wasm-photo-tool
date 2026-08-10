@@ -84,6 +84,15 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.92 — 2026-08-09
+
+**Nothing you can see.** More groundwork for moving the engine onto a background
+thread. The switch that turns that mode off now works mid-session instead of
+only on reload — it swaps the drawing surface for a fresh one rather than trying
+to reclaim a surface it can no longer draw to.
+
+<details><summary>Older releases</summary>
+
 ### v7.91 — 2026-08-09
 
 **Nothing you can see.** Groundwork for moving the engine onto a background
@@ -95,8 +104,6 @@ Worth knowing why that matters: once the engine draws from a background thread,
 switching in and out of Batch replaces the canvas underneath it. Without this,
 the background thread would keep painting into the old one — no error, no
 warning, just a blank screen.
-
-<details><summary>Older releases</summary>
 
 ### v7.90 — 2026-08-09
 

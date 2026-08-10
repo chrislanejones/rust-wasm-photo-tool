@@ -36,6 +36,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
 import { selectionCombineMode } from "@/lib/selectionBool";
+import { canvasSurfaceKey } from "@/lib/engine/port";
 
 const EMPTY_SEGMENTS = new Float32Array(0);
 
@@ -481,6 +482,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     //
     // Falls back to the forwarded ref so the component still works standalone.
     const attachCanvas = externalAttachCanvas ?? ref;
+
+    // ADR-024 a11.3 — read ONCE per render, used by both the <canvas> key and
+    // the re-blit effect's deps. Two separate calls could in principle straddle
+    // a flag flip and leave the element on one surface while the effect thinks
+    // it is on the other, which is the same one-state-two-reads shape Stage 3.5
+    // spent the week removing.
+    const surfaceKey = canvasSurfaceKey();
     const internalContainerRef = useRef<HTMLDivElement>(null);
     const containerRef = externalContainerRef ?? internalContainerRef;
 
@@ -596,7 +604,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       });
       ro.observe(container);
       return () => ro.disconnect();
-    }, [canvasRef, containerRef, flushToCanvas, state.ready, state.width, state.height]);
+      // ADR-024 a11.3 — `surfaceKey` is in the deps, and it is load-bearing.
+      //
+      // Keying the <canvas> remounts the ELEMENT but not this COMPONENT, so
+      // none of the effects here re-run on their own. Every other dep is
+      // unchanged across a flag flip, and `canvasRef` is a stable ref object
+      // that cannot signal anything. Without this entry the flip produced a
+      // fresh, empty canvas that nothing ever painted — measured: generation
+      // advanced 1 -> 2 and the element went blank. That is the exact silent
+      // blank the whole of a11 exists to prevent, arriving early by a
+      // different route.
+    }, [canvasRef, containerRef, flushToCanvas, state.ready, state.width, state.height, surfaceKey]);
 
     // Item 2: Pan offset state
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -1299,6 +1317,22 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             As the element's own background it shares every scaling mechanism —
             CSS fit, zoom transform, pan — by construction. */}
         <canvas
+          // ADR-024 a11.3 — keyed on the engine mode so flipping
+          // `ih_engine_worker` mid-session REMOUNTS this element.
+          //
+          // After `transferControlToOffscreen()` a canvas can never return its
+          // 2D context, so a runtime kill switch cannot restore the main-thread
+          // path on the element it killed. A remount sidesteps that: the new
+          // node was never transferred. Losing the bitmap is already normal —
+          // the engine owns the pixels and the effect above re-blits on mount.
+          //
+          // The token comes from `port.ts`, not from the flag. A component
+          // reading `engineWorkerEnabled()` would be a call site branching on
+          // the flag, which `engineAsyncMigration.contract.test.ts` forbids;
+          // this is an opaque identity string that says nothing about
+          // behaviour. Its value is stable for any tab that never touches the
+          // flag, so ordinary use sees the same reconciliation as before.
+          key={surfaceKey}
           ref={attachCanvas}
           className="main-canvas checkerboard-canvas"
           style={{

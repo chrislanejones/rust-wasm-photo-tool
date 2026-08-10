@@ -3842,3 +3842,59 @@ Asserting the message pins the branch.
 
 **Gates.** 453 JS tests (up from 440), `tsc` clean, eslint 0 errors, app +
 marketing builds clean. Engine untouched.
+
+## v7.92 Change Summary — 2026-08-09
+
+ADR-024 Stage 4, step a11.3. No user-visible change; the flag is still off.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | The `<canvas>` is keyed on the engine mode, so flipping `ih_engine_worker` remounts it | **Added** |
+| 2 | A bug a11.3 itself introduced — blank canvas on every flip | **Found and fixed** |
+| 3 | ELEMENT REMOUNT ≠ COMPONENT REMOUNT, written into ADR-024 | **Documented** |
+
+**#1 — what this repairs.** `ih_engine_worker=0` is specified as a RUNTIME kill
+switch. After `transferControlToOffscreen()` a canvas can never return its 2D
+context, so flipping the flag mid-session could not restore the main-thread path
+on the element that was transferred — a kill switch that only works on reload,
+which is the guardrail-that-cannot-fire pattern this repo has shipped before.
+Keying the element on the mode means the flip remounts it, and the new node was
+never transferred.
+
+The key comes from `port.ts` as an **opaque token** (`canvas-local` /
+`canvas-worker`), not the flag. `engineAsyncMigration.contract.test.ts` forbids
+call sites branching on `ih_engine_worker`, and its own message says "fix the
+seam, not the caller" — so the seam gained a function rather than the contract
+gaining an exception.
+
+**#2 — the fix introduced a blank canvas, and only the browser saw it.** Keying
+the `<canvas>` remounts the ELEMENT but not the COMPONENT, so `CanvasArea`'s
+re-blit effect never re-ran: every one of its dependencies was unchanged across
+a flip, and `canvasRef` is a `useRef` whose object identity never changes.
+Measured before the fix — generation advanced 1 → 2 → 3 on each flip and the
+element went blank every time, with `tsc`, eslint, 460 tests and the production
+build all green. Fixed by putting the surface key in that effect's dependency
+array, computed once per render and shared with the element's `key` so the two
+cannot straddle a flip and disagree.
+
+**#3 — the fact behind both bugs.** a11.1's counter died because it lived inside
+the component that remounts; a11.3's re-blit never fired because the component
+did NOT remount. Same underlying fact from opposite directions, twice in two
+days, both invisible to every gate. Now a section in ADR-024 with the three
+trigger cases tabulated, flagged for a11.4 — which walks back into the same
+mechanism.
+
+**Verified by driving the real app**, since the gates provably cannot see this
+class of bug: one flip → generation advances by exactly one, canvas stays
+painted; a re-render with no flip → no remount; three ordinary tool switches →
+generation unchanged; Batch crossings → still one remount each.
+
+**Two properties worth knowing.** The flip applies on the NEXT RENDER, not
+instantly — for a devtools kill switch that is fine, since any interaction
+applies it, but it is a real property rather than an implementation detail. And
+reading the flag per render costs **0.86 µs**, measured rather than assumed,
+given this repo's history with per-render costs.
+
+**Gates.** 461 JS tests (up from 453), `tsc` clean, eslint 0 errors, app +
+marketing builds clean. Engine untouched. Mutation-tested: 4 mutants on the key,
+all caught.
