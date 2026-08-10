@@ -4591,3 +4591,59 @@ false alarm looked exactly like a broken button.
 
 **Gates.** 467 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
 marketing builds clean. Engine untouched — no `build:wasm`.
+
+## v8.2 Change Summary — 2026-08-10
+
+ADR-024 Stage 3.5, **a8 scoping pass 3**. **No product code changed.**
+Gate 77 -> 73, hot-path 13 -> 17.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Four sites reached from `flushToCanvas` across a file boundary | **Reclassified** |
+| 2 | A new SHAPE of detection miss, not a new instance of an old one | **Recorded** |
+
+**#1 — the call chain.** Two `lib/` functions with thoroughly ordinary names
+are called from inside `useEngineCore.flushToCanvas` — the per-frame blit — via
+an import:
+
+```
+flushToCanvas (useEngineCore.ts:300)  ->  syncOplog         (lib/tilesFlush.ts)
+flushToCanvas (useEngineCore.ts:301)  ->  onOplogFlush      (lib/oplogPersistence.ts)
+                                            -> isLogTrustworthy
+```
+
+| Sites | Handler | File |
+|---|---|---|
+| `:145 :146` | `syncOplog` | `lib/tilesFlush.ts` |
+| `:125 :127` | `isLogTrustworthy` | `lib/oplogPersistence.ts` |
+
+`flushToCanvas` consumes the result **synchronously** —
+`registerOplogStats(syncOplog(t))` — so converting these would have handed a
+Promise to a stats registrar and put a round trip on every frame.
+
+**#2 — why nothing caught it.** The enclosing-function-name test introduced in
+v7.97 only ever sees a function's **own** name. A hot caller in another module
+is invisible to it, and the retired `HOT_FILE && HOT_CTX` rule would not have
+helped either: neither file was on its allowlist. This is structurally different
+from the earlier misses, which were all about a rule failing to see something
+inside the same file. Found by tracing the call chain out of `flushToCanvas` by
+hand.
+
+Note `isLogTrustworthy` is **also** called from the async `saveOplogInner`, so it
+cannot simply be made async for that caller's benefit — the flush caller is the
+binding one. That is recorded next to the entry.
+
+Mutation tested: **3 mutants, all 3 killed** — dropping either entry, and
+widening the list with a discrete action.
+
+**Where the numbers stand.**
+
+| | v8.1 | v8.2 |
+|---|---|---|
+| Gate | 77 | **73** |
+| Convertible (above the floor of 5) | 72 | **68** |
+| Hot-path / a10 | 13 | **17** |
+
+**Gates.** 467 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
+marketing builds clean. The only files changed are the audit script and its
+contract test, so no `build:wasm` and no browser check.

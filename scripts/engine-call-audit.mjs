@@ -114,6 +114,30 @@ const HOT_BY_CALLER = {
   "app/src/hooks/useMagicEraserTool.ts::pushOverlay":
     "called from inside `requestAnimationFrame` in `scheduleOverlay` — " +
     "rAF-throttled, once per frame for the whole magic-eraser stroke",
+
+  // ── reached from `flushToCanvas` ACROSS A FILE BOUNDARY (found 2026-08-10) ──
+  // These two are the reason the name test needs this list at all. Both live in
+  // `lib/`, both have thoroughly ordinary names, and both are called from inside
+  // `useEngineCore.flushToCanvas` — the per-frame blit — via an import:
+  //
+  //   flushToCanvas (useEngineCore.ts:300)  ->  syncOplog        (tilesFlush.ts)
+  //   flushToCanvas (useEngineCore.ts:301)  ->  onOplogFlush     (oplogPersistence.ts)
+  //                                              -> isLogTrustworthy
+  //
+  // Converting them makes the function async, and `flushToCanvas` consumes both
+  // SYNCHRONOUSLY (`registerOplogStats(syncOplog(t))`), so it would hand a
+  // Promise to a stats registrar and put a round trip on every frame.
+  //
+  // Nothing else could have caught this: the enclosing-name test only sees the
+  // function's OWN name, and a caller in another module is invisible to it.
+  // Found by tracing the call chain out of `flushToCanvas` by hand.
+  "app/src/lib/tilesFlush.ts::syncOplog":
+    "called from useEngineCore.flushToCanvas:300 — runs on every flush, and its " +
+    "result is consumed synchronously by registerOplogStats",
+  "app/src/lib/oplogPersistence.ts::isLogTrustworthy":
+    "reached from useEngineCore.flushToCanvas:301 via onOplogFlush. NOTE it is " +
+    "ALSO called from the async saveOplogInner, so the function cannot simply be " +
+    "made async for that caller's benefit — the flush caller is the binding one",
 };
 
 /**

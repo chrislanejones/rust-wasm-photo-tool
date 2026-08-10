@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.2",
+    date: "2026-08-10",
+    headline: "Four calls that were on the redraw path all along",
+    entries: [
+      {
+        tag: "infra",
+        text: "Four more engine calls turned out to sit on the path that repaints the canvas \u2014 not because of anything in the functions themselves, but because the redraw reaches into two other files to call them. Their names give nothing away, and the check that finds this class of problem only ever looks at a function's own name, never at who calls it from somewhere else. Left in the ordinary queue, the next batch would have made the redraw wait for a round trip on every frame.",
+      },
+    ],
+  },
+  {
     version: "v8.1",
     date: "2026-08-10",
     headline: "A source file that no search could see",

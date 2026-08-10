@@ -84,6 +84,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.2 — 2026-08-10
+
+**Nothing you can see.** Four more engine calls turned out to sit on the path
+that repaints the canvas — not because of anything in the functions themselves,
+but because the redraw reaches into two other files to call them. Their names
+give nothing away, and the check that finds this class of problem only ever
+looks at a function's own name, never at who calls it from somewhere else.
+
+Left in the ordinary queue, the next batch would have made the redraw wait for
+a round trip on every frame. They are now listed with the reason, and the list
+of remaining work drops accordingly.
+
+<details><summary>Older releases</summary>
+
 ### v8.1 — 2026-08-10
 
 **Nothing you can see.** Flip-horizontal, flip-vertical and copy-region now wait
@@ -96,8 +110,6 @@ every search tool classify the file as *binary* and skip it silently, so
 searching the project for anything defined in it returned a confident zero. The
 characters are now written as an escape — identical behaviour, and the file is
 searchable again.
-
-<details><summary>Older releases</summary>
 
 ### v8.0 — 2026-08-10
 

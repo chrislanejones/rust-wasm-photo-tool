@@ -170,6 +170,17 @@ import { join } from "node:path";
  *         two reads sit AFTER their mutation deliberately and must stay there;
  *         ordering survives the worker because the port is FIFO.
  *
+ *     73  NOT work — scoping again, and a new SHAPE of miss. Four sites sit in
+ *         `lib/tilesFlush.ts` and `lib/oplogPersistence.ts` under thoroughly
+ *         ordinary names (`syncOplog`, `isLogTrustworthy`) and are called from
+ *         inside `useEngineCore.flushToCanvas` — the per-frame blit — ACROSS A
+ *         FILE BOUNDARY via an import. The enclosing-name test only ever sees a
+ *         function's OWN name, so a hot caller in another module is invisible to
+ *         it. `flushToCanvas` consumes `syncOplog(t)` synchronously, so
+ *         converting it would have handed a Promise to a stats registrar and put
+ *         a round trip on every frame. Found by tracing the call chain out of
+ *         `flushToCanvas` by hand.
+ *
  *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74 and 77 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
@@ -195,7 +206,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 77;
+const BUDGET = 73;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -337,7 +348,10 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // a8 batch 3 (useTransforms): all three sat in non-async callbacks, so they
     // came out of restructure (51 - 3 = 48). un-awaited and truthy untouched;
     // awaited 20 -> 23. Gate 80 - 3 = 77.
-    ).toBe(48);
+    // a8 scoping pass 3: four sites reached from `flushToCanvas` ACROSS a file
+    // boundary (`syncOplog`, `isLogTrustworthy`) moved to hot-path. All four sat
+    // in plain functions, so restructure 48 - 4 = 44. Gate 77 - 4 = 73.
+    ).toBe(44);
     expect(gate.unawaited).toBe(20);
     expect(gate.truthy).toBe(9);
     expect(gate.awaited, "cumulative converted sites").toBe(23);
@@ -514,7 +528,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
       exceptions,
       "a handler reached the hot queue without a per-move name — justify it in " +
         "HOT_BY_CALLER by reading its caller, or it belongs in a8",
-    ).toEqual(["pushOverlay", "update"]);
+    ).toEqual(["isLogTrustworthy", "pushOverlay", "syncOplog", "update"]);
   });
 
   it("does not drag a discrete action into the hot queue on a name match", () => {
