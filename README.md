@@ -84,6 +84,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.99 — 2026-08-10
+
+**Nothing you can see.** The checklist tracking the background-thread migration
+had a target it could never reach: five of the calls it was counting are ones
+the plan says must *not* be changed, because a later stage removes that code
+path entirely. The checklist wanted them at zero; the plan forbade touching
+them.
+
+Left alone that doesn't just stall — it pushes the wrong way. Sooner or later
+someone grinds the number down, meets those five, and "finishes the job" by
+changing the one piece of code that repaints the canvas on every frame. Those
+five are now named, with the reason, and changing them makes the test suite fail
+loudly instead of looking like progress.
+
+<details><summary>Older releases</summary>
+
 ### v7.98 — 2026-08-10
 
 **Nothing you can see.** Undo, redo, jump-to-step and delete-step now wait for
@@ -97,8 +113,6 @@ Checked in a browser rather than only by tests, because a broken undo button is
 not something a type checker can see: undo and redo work from both the toolbar
 and the keyboard, and pressing Ctrl+Z with nothing left to undo correctly does
 nothing at all.
-
-<details><summary>Older releases</summary>
 
 ### v7.97 — 2026-08-10
 

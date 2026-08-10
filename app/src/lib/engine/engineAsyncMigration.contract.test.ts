@@ -146,8 +146,16 @@ import { join } from "node:path";
  *         undone, with nothing to catch it. The fifth is `selection_overlay`
  *         inside `refreshSelectionMask`.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87 and 76 lines. The rest is
- *  the measurement catching up.
+ *     74  a8 batch 2: `loadImageFromPixels`'s two `width`/`height` reads, which
+ *         sit in an already-`async` function so they needed only the `await`.
+ *         The `canvas.width =` ASSIGNMENTS they feed are Stage 4's problem, not
+ *         this stage's — after `transferControlToOffscreen()` they throw on the
+ *         main thread. Awaiting the read is orthogonal to that.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76 and 74 lines. The rest
+ *  is the measurement catching up.
+ *
+ *  ⚠️ THE GATE'S TARGET IS 5, NOT 0 — see `DISSOLVES_AT_STAGE_4` below.
  *
  *  THE THIRD FORMATTING BLIND SPOT (found during a5, 2026-08-09). The audit
  *  matches an engine call's RECEIVER with a regex, so a call whose receiver and
@@ -168,7 +176,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 76;
+const BUDGET = 74;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -299,10 +307,13 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // `useCallback` leaves restructure (50 - 1 = 49); the four truthy traps
     // leave truthy (9 - 4 = 5). un-awaited untouched at 22 again, and `awaited`
     // rises 13 -> 18. Gate 81 - 5 = 76.
+    // a8 batch 2: `loadImageFromPixels` is already `async`, so its two reads
+    // were un-awaited (22 - 2 = 20). restructure and truthy untouched.
+    // Gate 76 - 2 = 74.
     ).toBe(49);
-    expect(gate.unawaited).toBe(22);
+    expect(gate.unawaited).toBe(20);
     expect(gate.truthy, "useHistory's four guards are now awaited").toBe(5);
-    expect(gate.awaited, "five newly converted sites").toBe(18);
+    expect(gate.awaited, "cumulative converted sites").toBe(20);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
@@ -377,6 +388,80 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
       stragglers,
       "these run per pointer-move but are queued as ordinary a8 work",
     ).toEqual([]);
+  });
+
+  // ── the gate's target is 5, not 0 ────────────────────────────────────────
+  //
+  // ADR-024 says two things that cannot both be true, and this is where they
+  // meet:
+  //
+  //   Stage 3.5  "Until these are done the Stage 3 flag can never be turned
+  //              on" — i.e. the gate must reach 0, and Stage 4 is now gated on
+  //              Stage 3.5 alone.
+  //   Triage     "`flushToCanvas`'s remaining reads dissolve at Stage 4 and
+  //              must NOT be converted."
+  //
+  // So five sites sit inside the gate, can only leave it when Stage 4 lands,
+  // and Stage 4 waits on the gate. Left implicit, that deadlock does not just
+  // stall — it PRESSURES. A future session grinding toward zero meets five
+  // stubborn sites in `flushToCanvas` and converts them to finish the job,
+  // which puts an `await` on the per-frame blit: the exact regression this
+  // whole arc exists to prevent, and the same shape as the six per-mouse-move
+  // sites v7.97 pulled back out of the queue.
+  //
+  // Naming them makes the target reachable AND makes converting them fail
+  // loudly instead of looking like progress.
+  //
+  // Keyed by FILE + HANDLER, never by line number: line numbers drift with
+  // every edit above them, and a stale allowlist entry that silently stops
+  // matching is worse than no allowlist.
+  const DISSOLVES_AT_STAGE_4: Record<string, string> = {
+    "app/src/hooks/useEngineCore.ts::flushToCanvas":
+      "the per-frame blit. Under Option A the canvas moves INTO the worker, so " +
+      "this path stops crossing the boundary at all — it dissolves rather than " +
+      "converting. Converting it instead adds a round trip per frame.",
+  };
+  const EXEMPT_TOTAL = 5;
+
+  const keyOf = (row: string) => {
+    const [site, ...rest] = row.split(" ");
+    return `${site.replace(/:\d+$/, "")}::${rest.join(" ")}`;
+  };
+
+  it("the Stage-4 exempt sites are all still present and still unconverted", () => {
+    // If this fails LOW, someone converted `flushToCanvas` — read the reason
+    // above before "fixing" the number. It is not progress.
+    const exempt = gate.remainingHandlers.filter((r) => keyOf(r) in DISSOLVES_AT_STAGE_4);
+    expect(
+      exempt.length,
+      "flushToCanvas's reads must stay UNCONVERTED until Stage 4 dissolves them — " +
+        `converting them puts an await on the per-frame blit.\n${Object.entries(
+          DISSOLVES_AT_STAGE_4,
+        )
+          .map(([k, why]) => `  ${k}\n    ${why}`)
+          .join("\n")}`,
+    ).toBe(EXEMPT_TOTAL);
+  });
+
+  it("has a reachable target: the gate bottoms out at the Stage-4 floor", () => {
+    // THE NUMBER THAT ACTUALLY MATTERS. `BUDGET` counts everything still
+    // un-awaited; this is the part a8/a9 can actually act on. Stage 3.5 is
+    // done when this reaches 0 — not when BUDGET does, which it cannot.
+    const convertible = gate.remaining - EXEMPT_TOTAL;
+    expect(convertible, "convertible work left in Stage 3.5").toBe(BUDGET - EXEMPT_TOTAL);
+    expect(gate.remaining).toBeGreaterThanOrEqual(EXEMPT_TOTAL);
+  });
+
+  it("every allowlist entry still matches something", () => {
+    // Guards the allowlist itself. An entry that stops matching — because the
+    // handler was renamed or the file moved — would silently grant a blanket
+    // exemption to nothing while the real sites drift back into the count.
+    for (const key of Object.keys(DISSOLVES_AT_STAGE_4)) {
+      expect(
+        gate.remainingHandlers.some((r) => keyOf(r) === key),
+        `stale allowlist entry: ${key} matches no remaining call site`,
+      ).toBe(true);
+    }
   });
 
   it("does not drag a discrete action into the hot queue on a name match", () => {

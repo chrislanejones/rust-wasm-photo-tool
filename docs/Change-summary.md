@@ -4374,3 +4374,77 @@ Undo correctly greys out at the bottom of the stack and the status bar drops its
 
 **Gates.** 463 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
 marketing builds clean. Engine untouched — no Rust changed, so no `build:wasm`.
+
+## v7.99 Change Summary — 2026-08-10
+
+ADR-024 Stage 3.5, **a8 batch 2 + the gate's reachability**. Gate 76 → 74, and
+the target is now **5, not 0**. No user-visible change.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | The gate could never reach its own target | **Found** |
+| 2 | `DISSOLVES_AT_STAGE_4` allowlist, keyed by file + handler | **Added** |
+| 3 | `loadImageFromPixels`'s two reads | **Converted** |
+| 4 | `syncState`'s remaining site | **Deferred — 74 callers, its own batch** |
+
+**#1 — the deadlock.** ADR-024 says two things that cannot both hold:
+
+| Where | What it says |
+|---|---|
+| Stage 3.5 | *"Until these are done the Stage 3 flag can never be turned on"* — the gate must reach 0, and Stage 4 is gated on Stage 3.5 alone |
+| Triage, line 303 | *"`flushToCanvas`'s remaining reads dissolve at Stage 4 and must NOT be converted"* |
+
+Five sites sit inside the gate, can only leave when Stage 4 lands, and Stage 4
+waits on the gate. **The floor is 5.**
+
+The danger is not the stall — it is the pressure. A session grinding toward zero
+meets five stubborn sites in `flushToCanvas` and converts them to finish the
+job, putting an `await` on the per-frame blit. That is the regression this whole
+arc exists to prevent, and the same shape as the six per-mouse-move sites v7.97
+pulled back out of the queue. Until now the prohibition lived only in ADR prose
+that the gate actively contradicted.
+
+**#2 — named, with the reason, and enforced.** The allowlist follows the
+existing `FLAG_READERS` pattern and is keyed by **file + handler, never by line
+number** — line numbers drift with every edit above them, and an allowlist entry
+that silently stops matching is worse than no allowlist. Three assertions:
+
+| Assertion | Catches |
+|---|---|
+| exempt count is exactly 5 | someone converting `flushToCanvas` "to finish" |
+| `remaining − exempt` is the real ratchet | the reachable target, which is what a8/a9 act on |
+| every entry still matches a real site | a stale allowlist granting a blanket exemption to nothing |
+
+Mutation tested: **4 mutants, all 4 killed** — converting one `flushToCanvas`
+read, converting all five, renaming the allowlist key so it matches nothing, and
+widening the exempt total from 5 to 9.
+
+**#3 — the only casual conversion in the file.** `loadImageFromPixels` is
+already `async`, so its `width`/`height` reads needed just the `await`. The
+`canvas.width =` **assignments** they feed are Stage 4's problem, not this
+stage's — after `transferControlToOffscreen()` those throw on the main thread.
+Awaiting the read is orthogonal to that, and the code now says so.
+
+**#4 — `syncState` is not a casual conversion and was left alone.** Its one
+remaining site is `capture_ui_state()`, and awaiting it makes `syncState` async
+across **74 call sites**, every one of which currently relies on it completing
+before the next statement. That is its own batch with its own reasoning, not
+something to sweep into a file visit.
+
+**Verified in the browser** against the production build. The changed branch is
+the artboard path, which is how every ordinary photo load runs (`Canvas` +
+`Photo` layers):
+
+| Check | Result |
+|---|---|
+| Engine vs canvas backing store, on load | 1385×2068, **exact match** |
+| Photo switch to a different orientation | 2068×1385, **exact match** |
+| Centre pixel after switch | `rgba(21,28,5,255)` — painted, not blank |
+| `undoCount` after load | 0 — clean baseline preserved |
+| Console errors | none |
+
+The orientation change is the load-bearing case: it forces `canvas.width` to a
+genuinely different value through the converted read.
+
+**Gates.** 466 JS tests (up from 463), 148 Rust tests, `tsc` clean, eslint 0
+errors, app + marketing builds clean. Engine untouched — no `build:wasm`.

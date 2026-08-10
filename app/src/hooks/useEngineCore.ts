@@ -447,8 +447,13 @@ export function useEngineCore(
         // each photo you switch past.
         tool.clear_history();
         toolRef.current = attachLivePort(tool);
-        canvas.width = tool.width();
-        canvas.height = tool.height();
+        // ADR-024 Stage 3.5 (a8). The READS are awaited here; the
+        // `canvas.width =` ASSIGNMENTS are a separate problem that Stage 4 owns
+        // — after `transferControlToOffscreen()` they throw on the main thread
+        // (see "Stage 4's real scope"). Orthogonal: awaiting the read neither
+        // fixes nor worsens the assignment.
+        canvas.width = await tool.width();
+        canvas.height = await tool.height();
         // No raw putImageData here (the composite differs from the photo
         // pixels), so paint the layer composite straight away.
         flushToCanvas();

@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.99",
+    date: "2026-08-10",
+    headline: "A checklist that could never reach zero",
+    entries: [
+      {
+        tag: "infra",
+        text: "The checklist tracking the background-thread migration had a target it could never reach: five of the calls it was counting are ones the plan says must not be changed, because a later stage removes that code path entirely. The checklist wanted them at zero; the plan forbade touching them.",
+      },
+      {
+        tag: "fix",
+        text: "Left alone that doesn't just stall, it pushes the wrong way — sooner or later someone grinds the number down, meets those five, and “finishes the job” by changing the one piece of code that repaints the canvas on every frame. They are now named with the reason, and changing them makes the test suite fail loudly instead of looking like progress.",
+      },
+    ],
+  },
+  {
     version: "v7.98",
     date: "2026-08-10",
     headline: "Undo waits for the answer before it repaints",
