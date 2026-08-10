@@ -84,14 +84,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.93 — 2026-08-10
+
+**Nothing you can see.** The plan to move the engine onto a background thread
+rested on a number nobody had measured: what it costs to get finished pixels
+onto the screen from over there. It is 22 ms on a 3.1 megapixel photo, against
+23 ms for the main thread doing the same work — so there is no penalty, and the
+reason for picking this approach over the alternative holds up.
+
+Getting that number needed a real engine running inside a background thread that
+owns the canvas. Two earlier experiments had each done one half of that and
+never both at once. Two other things fell out of the run: the first operation
+after switching costs about 1.8x the ones after it, so the switch has to warm
+the thread up before handing it work; and the old thread has to be shut down
+rather than left idle, because the memory it holds is never given back.
+
+<details><summary>Older releases</summary>
+
 ### v7.92 — 2026-08-09
 
 **Nothing you can see.** More groundwork for moving the engine onto a background
 thread. The switch that turns that mode off now works mid-session instead of
 only on reload — it swaps the drawing surface for a fresh one rather than trying
 to reclaim a surface it can no longer draw to.
-
-<details><summary>Older releases</summary>
 
 ### v7.91 — 2026-08-09
 

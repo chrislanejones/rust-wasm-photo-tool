@@ -3898,3 +3898,84 @@ given this repo's history with per-render costs.
 **Gates.** 461 JS tests (up from 453), `tsc` clean, eslint 0 errors, app +
 marketing builds clean. Engine untouched. Mutation-tested: 4 mutants on the key,
 all caught.
+
+## v7.93 Change Summary — 2026-08-10
+
+ADR-024 Stage 4, step a11.0. No product code changed; the flag is still off.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | A real `stamp_tool` measured inside a transferred-canvas worker | **Validated** |
+| 2 | The in-worker flush cost — the number Option A rested on | **22.14 ms, no penalty** |
+| 3 | Three hard constraints for a12, written into ADR-024 | **Documented** |
+| 4 | a11.4 re-scoped and folded into a12 | **Closed** |
+
+**#1 — the gap this closes.** Two earlier spikes each did half the job.
+Phase 0 booted wasm in a worker; the OPEN-B spike transferred a canvas to a
+worker and drew on it with plain 2D. Nothing had ever held both at once, so
+Stage 4's whole approach — the engine and the canvas together, off the main
+thread — was still an assumption. `spike/a11-0.html` + `spike/a11-0.worker.js`
+run it for real, served under COOP/COEP with `crossOriginIsolated` confirmed
+true in-page.
+
+It works. wasm boots in 39.6 ms in a worker that already owns the transferred
+canvas, the engine sizes the backing store from inside the worker (2048x1536),
+and `resize` driven from the worker lands. `desynchronized` survives with wasm
+live in the same worker — previously only verified without it.
+
+The pixel check was made deliberately falsifiable: the engine's test image is
+**red** where OPEN-B's plain-2D harness painted **blue**, so reading blue or
+empty would have meant the two halves were not actually connected. It read red.
+
+**#2 — the number.** ADR-024 chose Option A (engine and canvas both in the
+worker) over Option B (canvas stays on the main thread) on the argument that the
+flush stays cheap from inside the worker. That had never been measured, and it
+is the one result that could have invalidated the choice.
+
+| Path | Median, 3.1 MP |
+|---|---|
+| Flush in the worker, straight to the transferred canvas | **22.14 ms** |
+| Flush on the main thread, same build, same image | 23.86 ms |
+
+No worker penalty. The slow path (`get_image_data` + `putImageData`) was
+measured on purpose rather than the zero-copy `data_ptr`/`data_len` route —
+measuring the fast one would have flattered the result. 22 ms is the honest
+ceiling, and 12.6 MB moves per flush entirely inside the worker, which is
+exactly what Option B would have pushed across a postMessage boundary.
+
+Warm `adjust_sharpen(50)` at 3.1 MP: 392.1 ms in the worker against 418.8 ms on
+the main thread — 0.94x, marginally faster, within noise.
+
+**#3 — three constraints a12 now inherits.** Each is a measurement, not a
+preference, and each is now in ADR-024 rather than only in the findings doc.
+
+| Constraint | The number behind it |
+|---|---|
+| Warm the worker before the flip hands it work | cold first op **715 ms** vs 392 ms warm — a lazy flip regresses against the 419 ms it replaced |
+| Terminate the losing instance | wasm linear memory only grows; a flip holds ~75 MB twice and never gives it back unless the worker is torn down |
+| Do not model the flush as free | 22 ms exceeds a 60 fps frame budget of 16.7 ms |
+
+**Two traps caught by cross-checking, both of which would have shipped a
+confident wrong headline.** The first run reported 786 ms and looked like a 1.9x
+worker regression — it was a cold first call compared against a warm median.
+The memory reading was taken on a page that had already run the engine and read
+134 MB before allocating anything; wasm memory never shrinks, so the baseline
+was meaningless. Neither was visible from the worker numbers alone. Both were
+caught against a same-conditions main-thread baseline.
+
+**#4 — a11.4 is smaller than it was scoped.** Its trigger half is already done:
+a11.3 put `surfaceKey` in the re-blit effect's dependency array, so the effect
+re-runs on both remount causes. What remains is the destination —
+`flushToCanvas` calls `getContext("2d")` and assigns `canvas.width`, both of
+which throw after transfer, so the re-blit has to become a message to the
+worker. That is the `flushToCanvas` dissolution ADR-024 already assigns to
+Stage 4. Folded into a12: it cannot be built or verified before the transfer
+exists, and would otherwise be a third guard with no traffic.
+
+**Stage 4's prerequisites are now 1, 2 and 3 all done.** The transfer is gated
+on Stage 3.5 alone. Full record in
+[docs/engine-worker-a11-0-finding.md](engine-worker-a11-0-finding.md).
+
+**Gates.** 461 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Stage 3.5 gate holds at 93. Engine untouched — no product code in this
+release.

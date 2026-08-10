@@ -69,6 +69,24 @@ first.
 | **2** | **The read-modify-write sites.** ✅ **DONE 2026-08-07 — 9 → 3, all FEED sites gone.** Two engine methods absorbed the decisions: `flatten_text_annotations` returns whether it flattened, and `blur_whole_image` computes its own geometry. Four JS guards deleted. The 3 remaining are 2 that dissolve at Stage 4 (`flushToCanvas`) and 1 false positive (`align_annotation`'s return is a mutation's result, not stale-able state) | no behaviour change | revert **+ `build:wasm`** |
 | **3** | **The worker exists, off by default.** ✅ **DONE 2026-08-07.** `workers/engine.worker.ts` (own wasm instance, one-at-a-time FIFO `drain()`) + `lib/engine/workerClient.ts` (request ids, 30 s timeout that also withdraws the queued call, `failAll` on crash). All four gaps the Phase 3 spike had are closed. Deliberately **not** Comlink — see the file header; Comlink gives correct results with no ordering promise, and arrival order *is* the op log. Flag `ih_engine_worker`, default OFF. The build emits **no worker chunk**, because nothing imports it yet — that is the honest status, not an oversight | nothing user-visible | flag stays off |
 | **3.5** | **The async conversions — 168 → 94 as of v7.90.** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** ⚠️ **This figure goes stale every batch; `scripts/engine-call-audit.mjs` is the authority and `engineAsyncMigration.contract.test.ts` pins it. If they disagree with this line, they are right.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. The per-file batch list that used to sit here named six files; **four of them have since shipped** (`editPersistence` and `useEditPersistence` v7.84, `useLayers` v7.85, `useEngineCore` v7.90) and it was read as outstanding work for days after they were done. It is deliberately not replaced with another hand-written list — run the audit, which prints remaining-by-file. Same flag, still OFF. **a1 (measurable gate) v7.79 · a2 (text-metrics cache) v7.80 · a3 (one-call save capture) v7.84 · a4 (one-call pixels+dimensions capture) v7.88 — 121 → 103 · a5 (one-call UI-state capture) v7.90 — 103 → 94.** a3 also found the category this ADR missed — see "ATOMIC CAPTURE" below, and triage every remaining file against it before converting | nothing user-visible | flag stays off |
+**a11.0 CLOSED 2026-08-10 — the last OPEN-B gap.** A real `stamp_tool` running
+inside a transferred-canvas worker: it works, `desynchronized` survives with wasm
+in the same worker, and the flush costs **22.1 ms at 3.1 MP — the same as the
+main thread**, which is the number Option A's whole argument over B rested on and
+had never been measured. Warm in-worker `adjust_sharpen` is 392 ms against the
+main thread's 419 ms: no worker penalty. Full record and the Stage 5 baseline in
+`docs/engine-worker-a11-0-finding.md`.
+
+**a11 IS COMPLETE, 2026-08-10.** a11.1 (canvas identity, v7.91), a11.2 (the
+staleness rule + protocol slot, v7.91) and a11.3 (the canvas keyed on the mode,
+which repairs the runtime kill switch, v7.92) all shipped. a11.0 validated the
+approach. a11.4 folded into a12. **Stage 4's prerequisites are 1 ✅ 2 ✅ 3 ✅, and
+the transfer is now gated on Stage 3.5 alone.**
+
+a12 inherits three hard requirements from a11.0 — warm the worker before the
+flip hands it work, terminate the losing instance, and do not model the flush as
+free. All three are set out under Stage 5 below.
+
 | **4** | **Canvas transfer.** **SCOPE CORRECTED 2026-08-08 — it is not just the `width`/`height` assignments; see "Stage 4's real scope" below.** Three subsystems had to leave the main canvas first: the rubber-band preview ✅ **v7.76**, lossy export ✅ **v7.77**, and the engine flush — which does not need converting because it *dissolves* under Option A (see "Why A" above). So the only thing left before the transfer is canvas element **identity**, which is a larger job than it sounds — see "Stage 4's real scope" below. Still flagged | nothing user-visible | **NOT by the flag alone** — see the kill-switch note |
 | **5** | **Measure, then flip.** A/B the 470 ms freeze against master. Default ON only if it is actually gone, with `ih_engine_worker=0` as the kill switch | the feature | kill switch |
 
@@ -409,10 +427,15 @@ Both were caught by driving the real app and reading the generation counter.
 Anything in a11 that changes when or how the canvas element is created must be
 verified that way — the gates cannot see this class of bug.
 
-**a11.4 walks straight back into it.** "After a re-transfer, the worker re-blits
-from the engine" is the same mechanism from the other side. Note that a11.3's
-fix — `surfaceKey` in the re-blit dependency array — may already cover part of
-it: different trigger, same path.
+**a11.4 walks straight back into it** — and is smaller than scoped. Checked
+2026-08-10 (`docs/engine-worker-a11-0-finding.md`): a11.3's `surfaceKey` in the
+re-blit dependency array IS a11.4's trigger, arriving by a different route, so
+the effect now re-runs on both remount causes. What remains is the destination —
+`flushToCanvas` calls `getContext("2d")` and assigns `canvas.width`, both of
+which throw after transfer, so the re-blit must become a message to the worker.
+That is the `flushToCanvas` dissolution this ADR already assigns to Stage 4.
+**Fold a11.4 into a12**; it cannot be built or verified before the transfer
+exists, and would otherwise be a third guard with no traffic.
 
 ### The one-way door, and why the flag is not enough
 
@@ -471,6 +494,44 @@ timeline showing the main thread idle during a 12-megapixel sharpen.
 
 The flag follows the house pattern — `ih_tiles_flush`, `ih_oplog_undo`,
 `ih_patchmatch` all shipped this way and all still carry a kill switch.
+
+### Three constraints a11.0 measured — design inputs, not footnotes
+
+All three come from `docs/engine-worker-a11-0-finding.md` (2026-08-10). They are
+repeated here because they constrain Stage 5 and a12 specifically, and a number
+sitting in a findings doc is a number nobody reads at the moment it matters.
+
+**1. THE FLIP MUST WARM THE WORKER BEFORE HANDING IT WORK.**
+
+| `adjust_sharpen` @ 3.1 MP | ms |
+|---|---|
+| worker, cold first call | **715** |
+| worker, warm steady state | 392 |
+| main thread, warm | 419 |
+
+A lazy flip whose next user action is a sharpen delivers **715 ms against the
+419 ms it replaced** — a regression on the exact operation the migration exists
+to fix, as the user's first impression of the feature. Steady state is fine
+(0.94× the main thread). Warm the instance during the flip, before it is given
+real work.
+
+**2. WORKER TERMINATION IS A CORRECTNESS REQUIREMENT, NOT HOUSEKEEPING.**
+
+wasm linear memory only ever grows; it is never returned. A flip has both
+instances alive (~75 MB for a 3.1 MP document, which is fine and bounded by the
+2048-long-edge working copy) — but if the dead side is left running, the tab's
+floor rises permanently and never comes back down. The only thing that reclaims
+it is terminating the worker outright, which frees the whole instance. a12 must
+tear down the losing side, and that is a hard requirement.
+
+**3. THE FLUSH IS NOT FREE — 22 ms at 3.1 MP.**
+
+Measured in-worker at **22.14 ms**, against **23.86 ms** on the main thread, so
+there is no worker penalty and Option A's central claim holds. But 22 ms exceeds
+a 60 fps frame budget (16.7 ms). Fine for a per-operation flush; not something
+Stage 5 should model as zero. Note this is the SLOW path (`get_image_data` +
+`putImageData`) measured deliberately rather than the zero-copy
+`data_ptr`/`data_len` route, so it is a ceiling, not a typical cost.
 
 ### What is deliberately NOT decided here
 

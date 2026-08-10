@@ -1,0 +1,128 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>a11.0 — stamp_tool inside a transferred-canvas worker</title>
+<!--
+  ADR-024 a11.0 — the last OPEN-B gap.
+
+  Phase 3 booted wasm in a worker. OPEN-B transferred a canvas to a worker and
+  drew to it with plain 2D calls. Neither has ever run in the SAME worker, and
+  docs/engine-worker-open-b-finding.md names that as the remaining gap.
+
+  Four questions, in the order they matter:
+
+    1  Does it work at all — a real ImageHorseTool in a worker that also owns a
+       transferred OffscreenCanvas, with the engine's pixels reaching it.
+    2  Does `desynchronized` survive. Verified 4/4 WITHOUT wasm in the worker;
+       whether a wasm instance in the same worker changes it is unmeasured, and
+       the latency argument leans on it.
+    3  What the flush costs from inside the worker. Option A beat B because the
+       worker draws direct — no 48 MB transfer. That has been asserted from
+       structure and never measured. This number is also Stage 5's baseline.
+    4  What memory looks like during a flip, when a main-thread engine and a
+       worker engine can both exist.
+
+  Every row below is a number read back from the worker, not a look at the
+  screen. Served by coep-server.mjs so the COOP/COEP condition matches the one
+  OPEN-B tested under.
+-->
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 20px; background: #111; color: #ddd; }
+  #stage { width: 420px; height: 320px; border: 1px solid #444; overflow: hidden;
+           display: flex; align-items: center; justify-content: center; }
+  .main-canvas { max-width: 100%; max-height: 100%; display: block;
+                 object-fit: contain; background: transparent; position: relative; }
+  table { border-collapse: collapse; margin-top: 16px; }
+  td, th { border: 1px solid #333; padding: 4px 10px; text-align: left; vertical-align: top; }
+  .pass { color: #4ade80; } .fail { color: #f87171; } .info { color: #fbbf24; }
+  h2 { font-size: 14px; margin: 20px 0 4px; color: #93c5fd; }
+</style>
+
+<h1 style="font-size:16px">a11.0 — engine + transferred canvas, same worker</h1>
+<div id="stage"><canvas id="c" class="main-canvas"></canvas></div>
+<div id="out">running…</div>
+
+<script type="module">
+const W = 2048, H = 1536; // ~3.1 MP — makeWorkingCopy caps the long edge at 2048
+const rows = [];
+const add = (q, what, value, verdict) => rows.push({ q, what, value, verdict });
+
+const render = () => {
+  document.getElementById("out").innerHTML =
+    "<table><tr><th>#</th><th>What</th><th>Value</th><th></th></tr>" +
+    rows.map(r =>
+      `<tr><td>${r.q}</td><td>${r.what}</td><td>${r.value}</td>` +
+      `<td class="${r.verdict === true ? "pass" : r.verdict === false ? "fail" : "info"}">` +
+      `${r.verdict === true ? "PASS" : r.verdict === false ? "FAIL" : (r.verdict ?? "")}</td></tr>`
+    ).join("") + "</table>";
+};
+
+const worker = new Worker("./a11-0.worker.js", { type: "module" });
+const once = (type) => new Promise((res, rej) => {
+  const h = (e) => {
+    if (e.data.type === "error") { worker.removeEventListener("message", h); rej(new Error(`${e.data.stage}: ${e.data.message}`)); }
+    if (e.data.type !== type) return;
+    worker.removeEventListener("message", h); res(e.data);
+  };
+  worker.addEventListener("message", h);
+});
+
+try {
+  const el = document.getElementById("c");
+  // Mirrors the app: the element is CSS-sized while the backing store is at
+  // image resolution.
+  const off = el.transferControlToOffscreen();
+
+  // ── Q1: does it work at all ──────────────────────────────────────────────
+  worker.postMessage({ type: "init", canvas: off, w: W, h: H }, [off]);
+  const init = await once("init:done");
+  add(1, "wasm init inside a transferred-canvas worker", `${init.wasmMs.toFixed(1)} ms`, init.wasmMs > 0);
+  add(1, "ImageHorseTool constructed + image loaded", `${init.loadMs.toFixed(1)} ms`, init.loadMs > 0);
+  add(1, "canvas backing store as set from the worker", `${init.canvasW}×${init.canvasH}`,
+      init.canvasW === W && init.canvasH === H);
+
+  // ── Q2: does desynchronized survive with wasm in the same worker ─────────
+  add(2, "getContextAttributes().desynchronized", String(init.desynchronized), init.desynchronized === true);
+
+  // Engine pixels must actually reach the transferred surface. The engine's
+  // image is RED; OPEN-B's plain-2D harness painted BLUE. Blue or empty here
+  // would mean the two halves are not really connected.
+  worker.postMessage({ type: "flush", runs: 7 });
+  const f = await once("flush:done");
+  worker.postMessage({ type: "probe" });
+  const p = await once("probe:done");
+  add(1, "engine pixels present on the canvas (read in-worker)", p.px, p.enginePixelsPresent);
+
+  // ── Q3: the flush cost, in-worker — Stage 5's baseline ───────────────────
+  add(3, `flush total, median of 7 (${f.megapixels.toFixed(1)} MP)`, `<b>${f.medianTotalMs.toFixed(2)} ms</b>`, "");
+  add(3, "  ├ get_image_data (wasm view)", `${f.medianReadMs.toFixed(2)} ms`, "");
+  add(3, "  ├ copy into ImageData", `${f.medianCopyMs.toFixed(2)} ms`, "");
+  add(3, "  └ putImageData onto the transferred canvas", `${f.medianPutMs.toFixed(2)} ms`, "");
+  add(3, "bytes moved per flush", `${(f.bytes / 1e6).toFixed(1)} MB`, "");
+  add(3, "all runs", f.runs.join(", ") + " ms", "");
+
+  // A real cold-path op + flush — the shape Stage 5 compares against 470 ms.
+  worker.postMessage({ type: "op", amount: 50 });
+  const op = await once("op:done");
+  add(3, "adjust_sharpen + flush, in-worker", `${op.totalMs.toFixed(1)} ms (op ${op.opMs.toFixed(1)}, flush ${op.flushMs.toFixed(1)})`, "");
+
+  // Resize is the assignment the main thread can no longer make after transfer.
+  worker.postMessage({ type: "resize", w: 1024, h: 768 });
+  const rz = await once("resize:done");
+  add(1, "resize driven from inside the worker", `${rz.w}×${rz.h}`, rz.w === 1024 && rz.h === 768);
+
+  // ── Q4: memory during a flip ─────────────────────────────────────────────
+  worker.postMessage({ type: "mem" });
+  const mem = await once("mem:done");
+  const mainMem = performance.memory ? performance.memory.usedJSHeapSize : null;
+  add(4, "worker wasm linear memory", mem.wasmBytes ? `${(mem.wasmBytes / 1e6).toFixed(1)} MB` : "unavailable", "");
+  add(4, "main-thread JS heap (informational)", mainMem ? `${(mainMem / 1e6).toFixed(1)} MB` : "unavailable", "");
+  add(4, "both engines alive during a flip", "see note below", "info");
+
+  render();
+  window.__a11_0 = { init, flush: f, op, resize: rz, mem, rows };
+} catch (err) {
+  add(0, "HARNESS THREW", String(err.message || err), false);
+  render();
+  window.__a11_0 = { error: String(err.message || err) };
+}
+</script>

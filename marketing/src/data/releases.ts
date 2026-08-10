@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.93",
+    date: "2026-08-10",
+    headline: "The one number the background-thread plan assumed, measured",
+    entries: [
+      {
+        tag: "perf",
+        text: "The plan to move the engine onto a background thread rested on a number nobody had measured: what it costs to get finished pixels onto the screen from over there. It is 22 ms on a 3.1 megapixel photo, against 23 ms for the main thread doing the same work — no penalty, so the reason for picking this approach over the alternative holds up. Getting the number needed a real engine running inside a background thread that owns the canvas; two earlier experiments had each done one half of that and never both at once.",
+      },
+      {
+        tag: "infra",
+        text: "Two more things fell out of the run. The first operation after switching costs about 1.8x the ones after it, so the switch has to warm the thread up before handing it work. And the old thread has to be shut down rather than left idle, because the memory it holds is never given back. Nothing changes for you — the mode is still off.",
+      },
+    ],
+  },
+  {
     version: "v7.92",
     date: "2026-08-09",
     headline: "An off switch that works while you are using it",
