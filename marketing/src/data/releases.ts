@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.3",
+    date: "2026-08-10",
+    headline: "The export paths wait for the answer",
+    entries: [
+      {
+        tag: "infra",
+        text: "Saving a photo, sharing a link and building the .zip of a whole gallery now wait for the engine's answer before using it \u2014 six more calls converted for the background-thread move.",
+      },
+      {
+        tag: "fix",
+        text: "One of them could not simply wait: the thumbnail helper checked its result for emptiness inside a hand-rolled promise, and once the thing it was checking became a promise itself, that check would have quietly stopped working. Rewritten so the check still fires. Verified against the real thing rather than only by tests \u2014 PNG, JPEG and WebP each came back as genuinely that format, and a twelve-photo .zip built correctly with an edited photo among them.",
+      },
+    ],
+  },
+  {
     version: "v8.2",
     date: "2026-08-10",
     headline: "Four calls that were on the redraw path all along",

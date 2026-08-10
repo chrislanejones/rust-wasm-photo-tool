@@ -84,6 +84,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.3 — 2026-08-10
+
+**Nothing you can see.** The export paths now wait for the engine's answer
+before using it — saving a photo, sharing a link, and building the .zip of a
+whole gallery.
+
+Checked against the real thing rather than only by tests: PNG, JPEG and WebP
+each came back as genuinely that format, and a twelve-photo .zip built
+correctly with an edited photo among them.
+
+<details><summary>Older releases</summary>
+
 ### v8.2 — 2026-08-10
 
 **Nothing you can see.** Four more engine calls turned out to sit on the path
@@ -95,8 +107,6 @@ looks at a function's own name, never at who calls it from somewhere else.
 Left in the ordinary queue, the next batch would have made the redraw wait for
 a round trip on every frame. They are now listed with the reason, and the list
 of remaining work drops accordingly.
-
-<details><summary>Older releases</summary>
 
 ### v8.1 — 2026-08-10
 

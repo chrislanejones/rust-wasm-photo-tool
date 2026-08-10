@@ -38,12 +38,12 @@ export function useExport(engine: EngineCore) {
     return `${stem}-revised${ext}`;
   }
 
-  const exportPng = useCallback((sourceName = "image") => {
+  const exportPng = useCallback(async (sourceName = "image") => {
     const t = toolRef.current;
     if (!t) return;
     // export_png composites every visible layer (pixels + live overlays +
     // opacity) — no destructive flatten needed.
-    const png = t.export_png();
+    const png = await t.export_png();
     const blob = new Blob([new Uint8Array(png)], { type: "image/png" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -63,7 +63,7 @@ export function useExport(engine: EngineCore) {
       const t = toolRef.current;
       if (!t) return null;
       if (format === "png") {
-        return new Blob([new Uint8Array(t.export_png())], { type: "image/png" });
+        return new Blob([new Uint8Array(await t.export_png())], { type: "image/png" });
       }
       // `capture_composite()` is the same composite `flushToCanvas` paints —
       // every visible layer plus live overlays — so the bytes are unchanged
@@ -78,7 +78,7 @@ export function useExport(engine: EngineCore) {
       // encodeRgba then either throws on the length mismatch or shears the
       // image, depending which way the size moved. One call, one round trip,
       // atomic because `&self` cannot be mutated while it runs.
-      const cap = t.capture_composite();
+      const cap = await t.capture_composite();
       // Read each field exactly once — every `.rgba` access clones the whole
       // buffer out of wasm memory — then free the boxed allocation.
       const { rgba, width, height } = cap;
@@ -124,9 +124,9 @@ export function useExport(engine: EngineCore) {
    * or convert to a Blob URL for the PhotoStrip without any extra canvas work.
    */
   const generateThumbnail = useCallback(
-    (
+    async (
       maxPx: number,
-    ): { data: Uint8ClampedArray; width: number; height: number } | null => {
+    ): Promise<{ data: Uint8ClampedArray; width: number; height: number } | null> => {
       const t = toolRef.current;
       if (!t) return null;
       // ATOMIC CAPTURE (ADR-024) — same reason as `exportBlob` above. This was
@@ -135,7 +135,7 @@ export function useExport(engine: EngineCore) {
       // throws outright if they disagree. `codec::thumbnail_data` returns all
       // three from one computation anyway; only the wasm-bindgen wrappers split
       // them.
-      const cap = t.capture_thumbnail(maxPx);
+      const cap = await t.capture_thumbnail(maxPx);
       const { rgba, width, height } = cap;
       cap.free();
       return { data: new Uint8ClampedArray(rgba), width, height };
@@ -148,24 +148,25 @@ export function useExport(engine: EngineCore) {
    * ready to drop straight into an <img src=...>.
    * Caller is responsible for calling URL.revokeObjectURL when done.
    */
+  // ADR-024 Stage 3.5 (a8). Restructured off a manual `new Promise` executor
+  // rather than just awaited, because `generateThumbnail` becoming async turns
+  // `if (!thumb)` into a TRUTHY TRAP inside that executor — a Promise is always
+  // truthy, so the guard would stop firing and an `ImageData` would be built
+  // from `undefined`. An async callback expresses the same thing with the guard
+  // intact.
   const generateThumbnailUrl = useCallback(
-    (maxPx: number): Promise<string | null> => {
-      return new Promise((resolve) => {
-        const thumb = generateThumbnail(maxPx);
-        if (!thumb) return resolve(null);
-        const offscreen = new OffscreenCanvas(thumb.width, thumb.height);
-        const ctx = offscreen.getContext("2d")!;
-        ctx.putImageData(
-          new ImageData(new Uint8ClampedArray(thumb.data.buffer as ArrayBuffer), thumb.width, thumb.height),
-          0,
-          0,
-        );
-        offscreen
-          .convertToBlob({ type: "image/jpeg", quality: 0.82 })
-          .then((blob) => {
-            resolve(URL.createObjectURL(blob));
-          });
-      });
+    async (maxPx: number): Promise<string | null> => {
+      const thumb = await generateThumbnail(maxPx);
+      if (!thumb) return null;
+      const offscreen = new OffscreenCanvas(thumb.width, thumb.height);
+      const ctx = offscreen.getContext("2d")!;
+      ctx.putImageData(
+        new ImageData(new Uint8ClampedArray(thumb.data.buffer as ArrayBuffer), thumb.width, thumb.height),
+        0,
+        0,
+      );
+      const blob = await offscreen.convertToBlob({ type: "image/jpeg", quality: 0.82 });
+      return URL.createObjectURL(blob);
     },
     [generateThumbnail],
   );

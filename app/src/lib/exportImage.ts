@@ -158,13 +158,13 @@ export async function compositeSavedEdit(
     // above, so these destructure to `pixels`/`w`/`h` — the names this function
     // returns anyway.
     if (opts?.excludeBackground && usedLayers) {
-      const cap = tool.capture_composite_excluding_background();
+      const cap = await tool.capture_composite_excluding_background();
       const { rgba: pixels, width: w, height: h } = cap;
       cap.free();
       return { pixels, w, h };
     }
 
-    const cap = tool.capture_composite();
+    const cap = await tool.capture_composite();
     const { rgba: pixels, width: w, height: h } = cap;
     cap.free();
     return { pixels, w, h };

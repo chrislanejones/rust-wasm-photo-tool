@@ -181,7 +181,18 @@ import { join } from "node:path";
  *         a round trip on every frame. Found by tracing the call chain out of
  *         `flushToCanvas` by hand.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74 and 77 lines. The
+ *     67  a8 batch 4: `useExport.ts` 4 -> 0 and `lib/exportImage.ts` 2 -> 0.
+ *         PARKING_LOT records `useExport` as four-fifths unreachable (only
+ *         `exportBlob` has a caller), and the pickaxe agrees — `.exportPng(`,
+ *         `.generateThumbnail(` and `.generateThumbnailUrl(` return NO commits
+ *         against a working control of 5 for `.exportBlob(`. Converted anyway
+ *         so the file is not left half-done, but the live value is `exportBlob`
+ *         (share + download) and `compositeSavedEdit` (batch export).
+ *         `generateThumbnailUrl` needed a RESTRUCTURE, not an await: it called
+ *         `generateThumbnail` inside a manual `new Promise` executor, where an
+ *         async callee turns `if (!thumb)` into a truthy trap.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77 and 67 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -206,7 +217,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 73;
+const BUDGET = 67;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -351,10 +362,13 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // a8 scoping pass 3: four sites reached from `flushToCanvas` ACROSS a file
     // boundary (`syncOplog`, `isLogTrustworthy`) moved to hot-path. All four sat
     // in plain functions, so restructure 48 - 4 = 44. Gate 77 - 4 = 73.
-    ).toBe(44);
-    expect(gate.unawaited).toBe(20);
+    // a8 batch 4: `useExport` 4 -> 0 and `exportImage` 2 -> 0. Four sat in
+    // already-async functions (un-awaited 20 - 4 = 16) and two in non-async
+    // callbacks (restructure 44 - 2 = 42). awaited 23 -> 29. Gate 73 - 6 = 67.
+    ).toBe(42);
+    expect(gate.unawaited).toBe(16);
     expect(gate.truthy).toBe(9);
-    expect(gate.awaited, "cumulative converted sites").toBe(23);
+    expect(gate.awaited, "cumulative converted sites").toBe(29);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

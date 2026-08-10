@@ -4647,3 +4647,76 @@ widening the list with a discrete action.
 **Gates.** 467 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
 marketing builds clean. The only files changed are the audit script and its
 contract test, so no `build:wasm` and no browser check.
+
+## v8.3 Change Summary — 2026-08-10
+
+ADR-024 Stage 3.5, **a8 batch 4** — the export layer. Gate 73 -> 67.
+No user-visible change.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `useExport.ts` 4 -> 0 | **Converted** |
+| 2 | `lib/exportImage.ts` 2 -> 0 | **Converted** |
+| 3 | `generateThumbnailUrl` needed a restructure, not an await | **Latent truthy trap removed** |
+| 4 | Three of `useExport`'s five members have never had a caller | **Confirmed, not newly found** |
+
+**#1/#2 — what is live here.** `exportBlob` backs the Share button and single
+download; `compositeSavedEdit` backs the batch `.zip`. Those are the two that
+matter. Mutation tested: **6 mutants, all 6 killed.**
+
+**#3 — the one that was not a plain `await`.** `generateThumbnailUrl` called
+`generateThumbnail` inside a manual `new Promise` executor:
+
+```ts
+return new Promise((resolve) => {
+  const thumb = generateThumbnail(maxPx);
+  if (!thumb) return resolve(null);      // <- Promise is always truthy
+```
+
+Making the callee async turns that guard into a **truthy trap** — the check
+stops firing and an `ImageData` gets built from `undefined`. Rewritten as an
+async callback, which expresses the same thing with the guard intact. This is
+the second truthy trap of the arc that was invisible until the callee changed;
+the first was `useHistory`'s four.
+
+**#4 — already on the record.** `docs/PARKING_LOT.md` documented at v7.88 that
+`useExport` is four-fifths unreachable — only `exportBlob` has a caller. The
+pickaxe agrees, against a working control:
+
+| | commits with a real call |
+|---|---|
+| `.exportBlob(` | **5** (control) |
+| `.exportPng(` | 0 |
+| `.generateThumbnail(` | 0 |
+| `.generateThumbnailUrl(` | 0 |
+
+Converted anyway: a single un-awaited read left in an otherwise finished file
+reads as unfinished work to the next person. But the runtime value of this batch
+is `exportBlob` and `compositeSavedEdit`, and the changelog should not imply
+otherwise.
+
+**Verified in the browser** against the production build:
+
+| Path | Result |
+|---|---|
+| `exportBlob("png")` | magic `89504e47`, 5,637,638 B |
+| `exportBlob("jpeg")` | magic `ffd8ffe0`, 732,031 B |
+| `exportBlob("webp")` | magic `52494646` (RIFF), 560,858 B |
+| `exportPng()` | download named `probe-revised.png` |
+| Download All (12) | **`photos.zip`, magic `504b0304`, 46.7 MB, 12 entries** |
+| Console | no errors |
+
+The `.zip` included a photo that had been flipped and persisted first, which is
+what forces the export through `compositeSavedEdit`'s edit branch rather than
+the untouched-original branch.
+
+**A note on the browser check, because it looked like a bug twice.** The
+"Download & Share" button sits at y=1201 in a ~1050px viewport — below the fold —
+so three clicks at its apparent position hit nothing and read exactly like a
+dead button. It is wired (`hasOnClick`, not disabled); the handler had to be
+invoked directly. With more than one photo it also opens a Selected/All chooser
+rather than exporting immediately, which accounts for the empty first result.
+Neither was a regression.
+
+**Gates.** 467 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
+marketing builds clean. Engine untouched — no `build:wasm`.
