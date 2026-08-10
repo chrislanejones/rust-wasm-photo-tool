@@ -82,8 +82,6 @@ export interface CloneStampState {
   // Exposed so components can re-render when dimensions change (e.g. after rotate)
   width: number;
   height: number;
-  /** True if the loaded image contains any transparent pixels (from Rust alpha scan). */
-  hasTransparency: boolean;
   /** Layer stack, bottom → top, mirrored from Rust. */
   layers: LayerInfo[];
   /** Id of the active layer (receives all tool edits). */
@@ -107,7 +105,6 @@ const INITIAL_STATE: CloneStampState = {
   zoom: 1,
   width: 0,
   height: 0,
-  hasTransparency: false,
   layers: [],
   activeLayerId: 0,
   // Matches DEFAULT_EXPORT_QUALITY in the crate. Both defaults are asserted
@@ -227,7 +224,6 @@ export function useEngineCore(
       zoom,
       width,
       height,
-      has_transparency,
       layers_json,
       active_layer_id,
       export_quality,
@@ -274,7 +270,6 @@ export function useEngineCore(
       zoom,
       width,
       height,
-      hasTransparency: has_transparency,
       layers,
       activeLayerId,
       // ADR-031. Published here rather than mirrored in React, so an undo that

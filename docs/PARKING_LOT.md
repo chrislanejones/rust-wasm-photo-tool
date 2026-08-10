@@ -1604,7 +1604,17 @@ undercounts this file: it is four of five, not one.
 
 ---
 
-## `has_transparency()` costs a full composite, on every sync (found a5, 2026-08-09)
+## ✅ RESOLVED v7.96 — `has_transparency()` cost a full composite, on every sync
+
+**Found a5 (2026-08-09), fixed 2026-08-10 by DELETION, not optimisation.**
+Nothing consumed the value: `CanvasArea` was its only reader and stopped gating
+on it in `5e46921` (2026-06-27) when the checkerboard became unconditional CSS.
+Removed from `UiStateCapture`; `has_transparency()` stays as a method.
+Measured on the production build: `syncState` **30.9 ms → 0.0 ms**. None of the
+three approaches below was needed. Kept for the record — and for the lesson,
+which is to check for a consumer before designing a cache.
+
+### Original entry
 
 **Measured in the browser, production build, 1385×2068 document:**
 

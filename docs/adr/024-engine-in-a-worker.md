@@ -322,11 +322,28 @@ a full composite of the document built from scratch, allocated, then scanned.
 `capture_layer_stack()` touches no pixels at all. **Split the captures by what
 they cost, not by what they are called.**
 
-That also surfaces a fact worth knowing independently: **every `syncState()`
-composites the whole document and scans it** to answer one boolean. Pre-existing
-(syncState read the same getter before a5 folded it in), so not a regression —
-but a real per-edit cost hiding behind a `bool`, and a candidate for a cached or
-incremental flag if it ever shows up in a profile.
+That also surfaced a fact worth knowing independently: every `syncState()`
+composited the whole document and scanned it to answer one boolean.
+
+**✅ FIXED v7.96, and the fix was a deletion.** `has_transparency` came off
+`UiStateCapture` entirely, because **nothing consumed it** — `CanvasArea` was its
+only reader and stopped gating on it in `5e46921` (2026-06-27) when the
+checkerboard became unconditional CSS. Six weeks of computing a discarded
+boolean. Measured on the production build, 1385×2068: `syncState` **30.9 ms →
+0.0 ms**, `capture_ui_state` **29.1 → 0.0**, other ten fields 0.0 throughout.
+
+No cache, so no invalidation contract — which is the point. The obvious fix here
+was a cached-and-invalidated flag, and that would have meant inventing a
+"correct" for a consumer that does not exist, in a codebase that has already been
+bitten by two-publishers-one-state. `has_transparency()` stays on
+`ImageHorseTool` for a caller that genuinely wants it, now documented as
+expensive.
+
+**The generalisable bit: before optimising a hot read, check whether anything
+reads it.** This is the second thing the migration found that was a real
+user-facing win and not a migration step (the first was the 3.45× exclude-
+background composite, v7.88). Both were getters recomputing a whole-document
+product to answer a small question; this one answered it for nobody.
 
 **The third capture shape — the exclude-background composite. FIXED v7.88.**
 `capture_composite_excluding_background()` now serves all of it. It turned out

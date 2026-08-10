@@ -203,6 +203,29 @@ pub struct ExportDims {
 /// formats — it splits the label string on `|` and `JSON.parse`s the layer
 /// array — and parsing them engine-side would create a second definition of a
 /// format that is currently defined in exactly one place.
+///
+/// ## `has_transparency` was REMOVED from this struct in v7.96
+///
+/// It used to be the eleventh field, and it was **the entire cost of this
+/// call**: `has_transparency()` is `get_image_data().chunks_exact(4).any(...)`,
+/// and `get_image_data()` composites every layer into a full-document RGBA
+/// buffer first, so `.any()`'s early exit saves nothing. Measured on a
+/// 1385×2068 document: **29.8 ms for that one field against 0.0 ms for the
+/// other ten combined**, on a call `syncState` makes after essentially every
+/// mutation.
+///
+/// It was removed rather than made cheap because **nothing consumed it**. The
+/// canvas checkerboard was its only reader and stopped gating on it in
+/// `5e46921` (2026-06-27), when the checkerboard became unconditional CSS; the
+/// reader was deleted and this producer was left computing a discarded boolean
+/// for six weeks. Proven by removing the React field outright — `tsc`, 461
+/// tests, eslint and the production build all passed untouched.
+///
+/// **`has_transparency()` itself is deliberately still on `ImageHorseTool`.**
+/// The capability is fine; paying for it on every sync was not. A future
+/// consumer calls it directly and knowingly pays — and if it ever needs to be
+/// cheap, THAT is the moment to design a cached-and-invalidated flag, with a
+/// real consumer to define what "correct" means.
 #[wasm_bindgen(getter_with_clone)]
 pub struct UiStateCapture {
     pub has_source: bool,
@@ -212,7 +235,6 @@ pub struct UiStateCapture {
     pub zoom: f64,
     pub width: u32,
     pub height: u32,
-    pub has_transparency: bool,
     pub layers_json: String,
     pub active_layer_id: u32,
     pub export_quality: u8,
@@ -221,18 +243,30 @@ pub struct UiStateCapture {
 /// The layer stack and the canvas it sits on. Returned by
 /// `capture_layer_stack()`.
 ///
-/// ⚠️ **A third "document" capture, and the reason it is not the second one.**
-/// Every field here is also on `UiStateCapture`, so reaching for
-/// `capture_ui_state()` instead looks obviously right. It is not:
-/// `UiStateCapture.has_transparency` is `self.has_transparency()`, which is
-/// `self.get_image_data().chunks_exact(4).any(...)` — a **full composite of the
-/// document from scratch, allocated and then scanned**. That is the correct
-/// price for the call that feeds React's render; it is entirely wasted on a
-/// caller that wants five scalars and a metadata string, and the `.ora` export
-/// is already compositing every layer separately.
+/// ⚠️ **A third "document" capture, and the reason it is not the second one —
+/// REVISED in v7.96, because the original reason no longer exists.**
 ///
-/// So the split is by COST, not by naming: this capture touches no pixels at
-/// all. Every field is a struct read or a small string build.
+/// When this was added (v7.95) the argument was cost: `UiStateCapture` carried
+/// `has_transparency`, which composited the whole document, so an `.ora` export
+/// that wanted five scalars would have paid ~30 ms for a boolean it discarded.
+/// **v7.96 removed that field entirely** (nothing consumed it), so
+/// `capture_ui_state()` is now cheap too and that argument is gone. Recorded
+/// rather than quietly deleted: a justification that has stopped being true is
+/// worse than none, because the next reader trusts it.
+///
+/// What remains is weaker but still real:
+///
+/// - `capture_ui_state()` builds `history_labels`, a string over the whole undo
+///   stack, which an export has no use for. Small, but not nothing, and it
+///   grows with history depth.
+/// - `layer_count` is not on `UiStateCapture` at all.
+/// - Scope: the export path should not be shaped by the render capture. They
+///   change for different reasons, and coupling them is how one caller's field
+///   ends up added "just for" the other.
+///
+/// If a later session judges that too thin and folds this back into
+/// `capture_ui_state()`, that is a defensible call — make it deliberately,
+/// knowing this note is the whole argument, rather than by accident.
 ///
 /// The overlap is safe for the same reason `capture_state` and
 /// `capture_ui_state`'s is: all three are pure aggregations of the same public
@@ -417,7 +451,6 @@ impl ImageHorseTool {
             zoom: self.get_zoom(),
             width: self.width(),
             height: self.height(),
-            has_transparency: self.has_transparency(),
             layers_json: self.get_layers(),
             active_layer_id: self.active_layer_id(),
             export_quality: self.export_quality(),
@@ -839,13 +872,17 @@ mod capture_tests {
     }
 
     #[test]
-    fn capture_ui_state_matches_the_eleven_getters_it_replaces() {
+    fn capture_ui_state_matches_the_ten_getters_it_replaces() {
         // EVERY FIELD IS DRIVEN OFF ITS DEFAULT FIRST, and that is the point.
-        // The first version of this test used a solid opaque image at default
-        // zoom and quality, so `has_transparency: false` — a field pinned to a
-        // constant — passed against a getter that also returned false. Mutation
-        // testing caught it. A field is only really asserted if the document
-        // makes its value distinctive.
+        // An earlier version used a solid opaque image at default zoom and
+        // quality, so a field pinned to a constant passed against a getter that
+        // also returned false. Mutation testing caught it. A field is only
+        // really asserted if the document makes its value distinctive.
+        //
+        // The field that taught that lesson was `has_transparency`, which left
+        // this struct in v7.96 — see `UiStateCapture`'s header. The alpha in the
+        // fixture below is kept anyway: it costs nothing and it keeps the
+        // document non-trivial.
         let mut t = ImageHorseTool::new(32, 24);
         t.load_image(&solid(32, 24, [10, 20, 30, 128])); // alpha < 255
         t.add_layer("Art");
@@ -858,7 +895,6 @@ mod capture_tests {
 
         // Prove the setup actually moved things, or the assertions below are
         // once again comparing defaults to defaults.
-        assert!(t.has_transparency(), "setup: document must have alpha");
         assert!(t.has_source(), "setup: source must be set");
         assert_eq!(t.get_zoom(), 2.5, "setup: zoom must be non-default");
         assert_eq!(t.export_quality(), 37, "setup: quality must be non-default");
@@ -876,11 +912,6 @@ mod capture_tests {
         assert_eq!(ui.zoom, t.get_zoom(), "zoom");
         assert_eq!(ui.width, t.width(), "width");
         assert_eq!(ui.height, t.height(), "height");
-        assert_eq!(
-            ui.has_transparency,
-            t.has_transparency(),
-            "has_transparency"
-        );
         assert_eq!(ui.layers_json, t.get_layers(), "layers_json");
         assert_eq!(ui.active_layer_id, t.active_layer_id(), "active_layer_id");
         assert_eq!(ui.export_quality, t.export_quality(), "export_quality");
@@ -1299,17 +1330,16 @@ mod capture_tests {
 
     #[test]
     fn capture_layer_stack_touches_no_pixels() {
-        // The whole reason this is not `capture_ui_state()`: that one carries
-        // `has_transparency`, which composites the entire document and scans
-        // every pixel. This must stay cheap, so it is pinned against a document
-        // whose composite would be enormous relative to its metadata.
+        // This capture must never grow a field that touches pixels. When it was
+        // added, the contrast was `capture_ui_state`'s `has_transparency`, which
+        // composited the whole document; v7.96 removed that field, so BOTH
+        // captures are cheap now and the contrast no longer exists.
         //
-        // Proven structurally rather than by timing (a timing test on a build
-        // machine is a flake): capturing must not disturb the document, and
-        // every field must still equal its getter after an arbitrary number of
-        // captures — which a compositing implementation would also satisfy, so
-        // the real guard is the assertion that the two capture types differ in
-        // exactly this field.
+        // The invariant this still pins is the one that matters going forward:
+        // capturing must not disturb the document, and every field must still
+        // equal its getter after an arbitrary number of captures. Proven
+        // structurally rather than by timing — a timing assertion on a build
+        // machine is a flake.
         let mut t = ImageHorseTool::new(64, 48);
         t.load_image(&solid(64, 48, [9, 8, 7, 255]));
         t.add_layer("b");
@@ -1322,17 +1352,16 @@ mod capture_tests {
         }
         assert_eq!(t.get_layers(), before, "capturing must not mutate anything");
 
-        // The distinguishing field: `capture_ui_state` pays for a composite to
-        // answer this; `capture_layer_stack` deliberately does not offer it.
+        // The two captures overlap on width/height/layers/active-id and must
+        // never disagree — both are aggregations of the same getters.
         let ui = t.capture_ui_state();
+        let ls = t.capture_layer_stack();
+        assert_eq!(ui.width, ls.width, "shared field: width");
+        assert_eq!(ui.height, ls.height, "shared field: height");
+        assert_eq!(ui.layers_json, ls.layers_json, "shared field: layers_json");
         assert_eq!(
-            ui.width,
-            t.capture_layer_stack().width,
-            "the shared fields agree"
-        );
-        assert!(
-            !ui.has_transparency,
-            "control: an opaque document, so the field is real and computed"
+            ui.active_layer_id, ls.active_layer_id,
+            "shared field: active_layer_id"
         );
     }
 

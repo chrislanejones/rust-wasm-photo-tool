@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.96",
+    date: "2026-08-10",
+    headline: "The editor stopped answering a question nobody asked",
+    entries: [
+      {
+        tag: "perf",
+        text: "Every time the editor refreshed itself — after a brush stroke, an undo, a layer change — it rebuilt the entire image from scratch and checked every single pixel, to work out whether the picture had any transparency in it. On a 1385x2068 photo that was about 30 ms, and it was the whole cost of the refresh: the other ten things it collects took no measurable time at all. Nothing was using the answer. The canvas checkerboard used to ask and stopped in June when it became always-on; the question kept being asked anyway. Refreshing now costs nothing measurable.",
+      },
+      {
+        tag: "rust",
+        text: "The engine can still answer the question — it was taken off the path that runs after every edit, not deleted. If something needs it cheaply one day, that is the point to design it properly, with a real user of the answer to say what correct means.",
+      },
+    ],
+  },
+  {
     version: "v7.95",
     date: "2026-08-10",
     headline: "Saving a layered project describes one document, not several",

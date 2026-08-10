@@ -120,8 +120,13 @@ declare module "stamp_tool" {
   }
 
   /**
-   * The eleven values `useEngineCore`'s `syncState` publishes to React, out of
+   * The ten values `useEngineCore`'s `syncState` publishes to React, out of
    * one wasm-bindgen call. Returned by `capture_ui_state()`.
+   *
+   * Was eleven until v7.96, when `has_transparency` was removed — it was the
+   * entire cost of this call (a full document composite) and nothing consumed
+   * it. `has_transparency()` is still available as a method for a caller that
+   * genuinely wants it.
    *
    * No pixels — that is the difference from `capture_state()`, which carries
    * every undo/redo snapshot PNG. One is what gets DRAWN, the other is what
@@ -149,10 +154,13 @@ declare module "stamp_tool" {
    * The layer stack and the canvas it sits on, with NO pixels touched.
    * Returned by `capture_layer_stack()`.
    *
-   * Every field is also on `UiStateCapture` — use THIS one anywhere the
-   * composite is not wanted. `UiStateCapture.has_transparency` composites the
-   * whole document and scans every pixel to answer, which is the right price
-   * for React's render and pure waste for a caller that wants five scalars.
+   * Every field except `layer_count` is also on `UiStateCapture`. The original
+   * reason to prefer this one — that `UiStateCapture.has_transparency`
+   * composited the whole document — went away in v7.96 when that field was
+   * removed for having no consumer. What is left is that `capture_ui_state`
+   * builds `history_labels` over the whole undo stack, which an export has no
+   * use for, and that the export path should not be shaped by the render
+   * capture. See `LayerStackCapture` in src/capture.rs for the full note.
    *
    * `layer_count` always equals `JSON.parse(layers_json).length`.
    * Read each field once and `.free()` when done.
@@ -196,7 +204,6 @@ declare module "stamp_tool" {
     zoom: number;
     width: number;
     height: number;
-    has_transparency: boolean;
     layers_json: string;
     active_layer_id: number;
     export_quality: number;
@@ -304,7 +311,15 @@ declare module "stamp_tool" {
     get_image_data_excluding_background(): Uint8Array;
     export_width_excluding_background(): number;
     export_height_excluding_background(): number;
-    /** Returns true if any pixel in the loaded image has alpha < 255. */
+    /** Returns true if any pixel in the loaded image has alpha < 255.
+     *
+     *  ⚠️ EXPENSIVE — it composites the entire document into a fresh RGBA
+     *  buffer before scanning, so `.any()`'s early exit saves nothing (~30 ms
+     *  on a 1385x2068 document). It was removed from `capture_ui_state()` in
+     *  v7.96 precisely because `syncState` paid that on every mutation for a
+     *  value nothing read. Call it deliberately, not on a hot or per-sync path;
+     *  if a consumer ever needs it cheap, that is the point to design a cached
+     *  flag with real invalidation. */
     has_transparency(): boolean;
     export_png(): Uint8Array;
     /** ADR-024 Stage 3.5 — everything the save path reads, in ONE call.
@@ -340,10 +355,9 @@ declare module "stamp_tool" {
     capture_pen_hit(x: number, y: number): PenHit;
     /** The layer stack and its canvas, atomically and WITHOUT compositing —
      *  the one-call form of `layer_count()` + `width()` + `height()` +
-     *  `active_layer_id()` + `get_layers()`. Prefer it over `capture_ui_state()`
-     *  wherever the composite is not wanted: that one answers
-     *  `has_transparency` by building and scanning the whole image. Free it
-     *  when done. */
+     *  `active_layer_id()` + `get_layers()`. Both captures are cheap since
+     *  v7.96; prefer this one where the undo-history label string is not
+     *  wanted. Free it when done. */
     capture_layer_stack(): LayerStackCapture;
     capture_composite(): RgbaCapture;
     /** The background-excluded composite and its CROPPED dimensions, atomically

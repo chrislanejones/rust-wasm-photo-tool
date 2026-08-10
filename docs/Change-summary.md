@@ -4156,3 +4156,78 @@ active layer and undo count all unchanged). No console errors.
 **Gates.** 461 JS tests, 148 Rust tests (up from 143), `tsc` clean, eslint 0
 errors, `cargo fmt --check` + `clippy -D warnings` clean, app + marketing builds
 clean. `build:wasm` run before the app build; wasm 773,763 → 775,209 B.
+
+## v7.96 Change Summary — 2026-08-10
+
+The first user-facing win found by the ADR-024 migration that is not itself a
+migration step — same family as the 3.45x exclude-background fix (v7.88).
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `has_transparency` removed from `UiStateCapture` | **Removed** |
+| 2 | `syncState()` on a 1385x2068 document | **30.9 ms → 0.0 ms** |
+| 3 | `has_transparency()` as an `ImageHorseTool` method | **Kept** |
+| 4 | Stage 3.5 gate | **87, unchanged** |
+| 5 | `LayerStackCapture`'s v7.95 justification | **Revised — it was made stale by this** |
+
+**#1/#2 — what it cost and why.**
+
+```rust
+pub fn has_transparency(&self) -> bool {
+    self.get_image_data().chunks_exact(4).any(|px| px[3] < 255)
+}
+```
+
+`get_image_data()` is `composite_layers(...)`, so it builds a full-document RGBA
+buffer from scratch before the scan starts — `.any()`'s early exit saves nothing,
+because the composite already happened. `capture_ui_state()` called it, and
+`syncState` calls `capture_ui_state()` after essentially every mutation.
+
+Measured in the browser against the production build, same document both sides:
+
+| Call | Before | After |
+|---|---|---|
+| `syncState()` | 30.9 ms | **0.0 ms** |
+| `capture_ui_state()` | 29.1 ms | **0.0 ms** |
+| `has_transparency()` alone | 29.8 ms | (unchanged — still callable) |
+| The other ten fields combined | 0.0 ms | 0.0 ms |
+
+It is not per-frame — `usePaintTool` syncs at stroke END — so this was a ~30 ms
+hitch when you lifted the brush, finished a layer operation or hit undo.
+
+**Nothing consumed it.** `CanvasArea` was its only reader and stopped gating on
+it in `5e46921` (2026-06-27), when the transparency checkerboard became
+unconditional CSS. The reader was deleted; this producer was left computing a
+discarded boolean for six weeks. Confirmed three ways: no reference anywhere in
+`app/src`, zero call sites in `scripts/engine-call-audit.mjs`, and a control test
+that removed the React field outright and passed `tsc`, 461 tests, eslint and the
+production build untouched.
+
+**#3 — removed from the capture, not from the engine.** `has_transparency()` is
+still a public method and is now documented as expensive. The capability was
+never the problem; paying for it on every sync was. A future consumer calls it
+deliberately — and if it ever needs to be cheap, that is the moment to design a
+cached-and-invalidated flag, with a real consumer to define what correct means.
+Designing that cache now would have been inventing an invalidation contract for
+nobody.
+
+**#5 — a justification this release made false, and did not leave standing.**
+v7.95 added `capture_layer_stack()` one day earlier, and its stated reason was
+that `capture_ui_state()` composited. That is no longer true. The doc comment now
+says so explicitly and gives the weaker reasons that survive — `capture_ui_state`
+still builds `history_labels` over the whole undo stack, `layer_count` is not on
+it, and the export path should not be shaped by the render capture — plus an
+explicit note that folding the two together later is a defensible call, provided
+it is made deliberately. A rationale that has stopped being true is worse than no
+rationale, because the next reader trusts it.
+
+**Gates.** 461 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors,
+`cargo fmt --check` + `clippy -D warnings` clean, app + marketing builds clean.
+Stage 3.5 gate unchanged at 87 — `has_transparency` was never a JS call site.
+wasm 775,209 → 774,688 B.
+
+**Verified in the browser** on the production build: `capture_ui_state()` returns
+exactly ten fields with `has_transparency` absent, `has_transparency()` is still
+callable, the canvas renders, the checkerboard is intact, and the
+syncState → React loop still drives the UI (zoom click → engine 1.1 → React 1.1
+→ label "110%"). No console errors.
