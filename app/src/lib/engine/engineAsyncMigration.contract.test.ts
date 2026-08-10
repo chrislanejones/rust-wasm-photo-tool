@@ -118,6 +118,26 @@ import { join } from "node:path";
  *         from the layer PNGs, and the file still mutates mid-export. Both are
  *         pre-existing and triaged in ADR-024; both stay open.
  *
+ *     81  NOT work — the measurement getting more honest, and in the direction
+ *         that matters most: six live PER-MOUSE-MOVE sites were sitting in the
+ *         ordinary queue, where the next batch would have added an `await` to a
+ *         frame path. Hot-path detection was `HOT_FILE && HOT_CTX` — a
+ *         hand-maintained file allowlist AND a keyword inside a ±6-line window
+ *         — and it failed three separate ways at once:
+ *           1. the allowlist omits AppShell, so `blurMove`'s blur-brush drag
+ *              was ordinary despite its own line calling `flushToCanvas`;
+ *           2. HOT_CTX knows `pointermove` but not `mousemove`, missing
+ *              `useColorPicker.onMouseMove` and `useTextTool.onCanvasHover`;
+ *           3. the window cannot see the handler it is inside, so ONE function
+ *              was split across two categories twice over — `handleLassoMove`
+ *              (130 ordinary, 132 hot) and `usePaintTool.onMouseMove` (138/140
+ *              ordinary, 141 hot). The only thing that made 132 hot was the
+ *              substring "preview" inside `setLassoPreview`.
+ *         Now also classified by the ENCLOSING FUNCTION NAME from the AST the
+ *         audit already parses. See `hotByName` for why it matches the TRAILING
+ *         camelCase segment only: any-segment matching pulled in `moveLayer`, a
+ *         discrete layers-panel reorder, where `move` is the leading verb.
+ *
  *  Work: the 138, 125, 117, 115, 103, 94, 93, 92 and 87 lines. The rest is the
  *  measurement catching up.
  *
@@ -140,7 +160,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 87;
+const BUDGET = 81;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -155,6 +175,8 @@ interface Gate {
   remaining: number;
   remainingByFile: Record<string, number>;
   truthySites: string[];
+  remainingHandlers: string[];
+  hotHandlers: string[];
 }
 
 const gate: Gate = JSON.parse(
@@ -260,7 +282,12 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // its three reads were restructure (56 - 3 + 1 `capture_layer_stack` = 54);
     // `exportOra` is `async`, so its four were un-awaited
     // (25 - 4 + 1 = 22). Seven out, two in, gate 92 - 5 = 87.
-    ).toBe(54);
+    // a8 scoping: six sites left the value-consumed bucket entirely for
+    // hot-path. Four were in non-async handlers (restructure 54 - 4 = 50) and
+    // two were truthy traps (11 - 2 = 9). un-awaited is untouched at 22 — none
+    // of the six sat in an async function. Gate 87 - 6 = 81, and this is a
+    // RECLASSIFICATION, not a conversion: no call site changed.
+    ).toBe(50);
     expect(gate.unawaited).toBe(22);
   });
 
@@ -311,6 +338,40 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // listed rather than merely counted so a batch cannot sweep them by accident.
     expect(gate.truthySites.length).toBe(gate.truthy);
     for (const s of gate.truthySites) expect(s).toMatch(/^app\/src\/.+:\d+$/);
+  });
+
+  // ── the hot-path split, pinned in BOTH directions (a8 scoping) ────────────
+  //
+  // The gate reaching 0 means "every ordinary value-consuming call is async".
+  // That is only meaningful if the ordinary/hot split is right, and it was
+  // wrong six times — always in the dangerous direction, leaving a live
+  // per-mouse-move site in the queue for the next batch to `await`.
+  const lastSegment = (name: string) =>
+    (name.replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(/[^A-Za-z0-9]+/).filter(Boolean).pop() ??
+      "").toLowerCase();
+  const HOT_WORDS = ["move", "hover", "drag", "stroke", "preview", "scrub", "pan"];
+  const handlerOf = (row: string) => row.split(" ").slice(1).join(" ");
+
+  it("leaves no per-move handler in the ordinary queue", () => {
+    // Direction 1 — the one that can do harm. An `await` added to a handler
+    // that runs on every mouse-move is a dropped frame, which is precisely why
+    // ADR-024 puts hot-path sites LAST (a10).
+    const stragglers = gate.remainingHandlers.filter((r) =>
+      HOT_WORDS.includes(lastSegment(handlerOf(r))),
+    );
+    expect(
+      stragglers,
+      "these run per pointer-move but are queued as ordinary a8 work",
+    ).toEqual([]);
+  });
+
+  it("does not drag a discrete action into the hot queue on a name match", () => {
+    // Direction 2 — the false positive designed out of `hotByName`. `moveLayer`
+    // is a layers-panel reorder: `move` is the leading VERB, not a trailing
+    // event noun. Loosening the match to any segment pulls it in, which would
+    // quietly park finished work in a10 and flatter the gate.
+    const dragged = gate.hotHandlers.filter((r) => handlerOf(r) === "moveLayer");
+    expect(dragged, "moveLayer is a discrete reorder, not a frame path").toEqual([]);
   });
 });
 

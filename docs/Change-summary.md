@@ -4231,3 +4231,80 @@ exactly ten fields with `has_transparency` absent, `has_transparency()` is still
 callable, the canvas renders, the checkerboard is intact, and the
 syncState → React loop still drives the UI (zoom click → engine 1.1 → React 1.1
 → label "110%"). No console errors.
+
+## v7.97 Change Summary — 2026-08-10
+
+ADR-024 Stage 3.5, a8 scoping. **No product code changed** — this corrects the
+instrument, not the app. Gate 87 → 81, and none of that is work done.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Six live per-mouse-move sites were queued as ordinary a8 work | **Reclassified** |
+| 2 | Hot-path detection now uses the enclosing function name | **Fixed** |
+| 3 | The ordinary/hot split, pinned in both directions | **2 tests added** |
+| 4 | The hot bucket's own false positives | **Found, NOT fixed — needs a scoping call** |
+
+**#1/#2 — three failures at once.** Hot-path detection was
+`HOT_FILE && HOT_CTX`: a hand-maintained file allowlist AND a keyword inside a
+±6-line text window. Every one of these was a live per-move site sitting where
+the next a8 batch would have added an `await` to it:
+
+| Site | Handler | Why it was missed |
+|---|---|---|
+| `AppShell.tsx:1374` `effect_move` | `blurMove()` | `AppShell` is not on the file allowlist — even though the line itself calls `flushToCanvas`, which the keyword list matches |
+| `useColorPicker.ts:70` `get_pixel_region` | `onMouseMove()` | the keyword list knows `pointermove`, not `mousemove` |
+| `useTextTool.ts:704` `text_annotation_at` | `onCanvasHover()` | same |
+| `useSelectionActions.ts:130` `lasso_active` | `handleLassoMove()` | the window cannot see the handler it is inside |
+| `usePaintTool.ts:138` `mask_paint_move` | `onMouseMove()` | same |
+| `usePaintTool.ts:140` `erase_move` | `onMouseMove()` | same |
+
+The third cause is the interesting one, because it split **one function across
+two categories, twice**. In `handleLassoMove`, `lasso_active` (line 130) was
+ordinary and `lasso_path_to` (line 132) was hot — two lines apart, same handler.
+The only thing that made 132 hot is the substring **"preview"** inside
+`setLassoPreview`. `usePaintTool.onMouseMove` does it again: one ternary,
+three engine calls, and only `paint_move` (line 141) was classified hot.
+
+Meanwhile the comment three lines above `handleLassoMove` reads *"recomputed on
+every mouse-move … inside a frame budget"* — the one definitive piece of
+evidence, and unreadable by that test because comments are blanked first.
+
+The fix classifies by the **enclosing function's name**, taken from the AST the
+audit already parses for the async/consumed axes. It matches the **trailing**
+camelCase segment only, and both narrower choices were forced by a false
+positive rather than guessed:
+
+| Rule tried | Rejected because |
+|---|---|
+| substring `/move/i` | matches `removeLayer`, `removeShape`, `remove_layer` |
+| any segment | pulls in `moveLayer` — a discrete layers-panel reorder, already converted, where `move` is the leading VERB |
+| **trailing segment** | kept: hot handlers end in the event noun (`blurMove`, `onMouseMove`, `onCanvasHover`) |
+
+The keyword-window test is kept as a second, independent signal — neither is a
+superset of the other, and an inline or oddly-named handler still needs it.
+
+**#3 — pinned in both directions.** Two contract tests: no remaining site sits
+in a handler whose name ends in a hot word, and no discrete action (`moveLayer`
+as the canary) is dragged into the hot queue by a loose match. Mutation tested:
+**4 mutants, all 4 killed** — reverting to the old classifier, loosening to
+any-segment, disabling the name test, and switching to substring matching.
+
+**#4 — the mirror problem, reported rather than fixed.** The same window-based
+rule produced false positives in the other direction, and they were already
+there:
+
+| Hot bucket (32 sites) | Count |
+|---|---|
+| Genuinely per-move/hover by name | **11** |
+| Discrete actions inherited from `HOT_FILE && HOT_CTX` | **21** |
+
+`onMouseDown`, `onMouseUp`, `commit`, `cancel`, `applyCrop`, `dropPin`,
+`handleDeleteSelection`, `selectShape` are once-per-gesture, not frame paths.
+So a10 is much smaller than its headline and a8's real ordinary work is larger
+than 81. Not corrected here on purpose: that direction moves sites **into** the
+gate, raising the number, and each needs a per-site judgment rather than a
+regex. It is a scoping decision, not a bug fix.
+
+**Gates.** 463 JS tests (up from 461), 148 Rust tests, `tsc` clean, eslint 0
+errors, app + marketing builds clean. Engine untouched, no `build:wasm` needed —
+no Rust changed and no product code changed.

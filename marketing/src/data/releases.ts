@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.97",
+    date: "2026-08-10",
+    headline: "Correcting the instrument, not the app",
+    entries: [
+      {
+        tag: "infra",
+        text: "The tool that decides which engine calls sit on a drawing hot path had six of them filed as ordinary work — including the blur brush's drag, the eyedropper's magnifier and the text tool's hover highlight. The next batch of background-thread work would have made those wait for a round trip on every mouse movement, which is a dropped frame in exactly the places you would notice one. Nothing in the app changed; the list it was working from did.",
+      },
+      {
+        tag: "fix",
+        text: "The old check looked for keywords in the six lines around a call, which meant it could not see which handler the call was inside. It had split a single mouse-move handler across two categories — twice — and in one case the only thing marking a line as hot was the word “preview” appearing inside a nearby variable name. It now reads the enclosing function's name instead.",
+      },
+    ],
+  },
+  {
     version: "v7.96",
     date: "2026-08-10",
     headline: "The editor stopped answering a question nobody asked",

@@ -88,6 +88,55 @@ function walk(dir, out = []) {
 const HOT_FILE = /useDrawingTools|useCloneStamp|usePaintTool|useMagicEraser|CanvasArea|LassoOverlay|useMoveLayerTool|usePastePlacementTool|useColorPicker|useSelectionActions/;
 const HOT_CTX = /pointermove|onPointerMove|requestAnimationFrame|flushToCanvas|hover|preview|stroke|drag/i;
 
+/**
+ * Hot-path detection by the ENCLOSING FUNCTION'S NAME (a8 scoping, 2026-08-10).
+ *
+ * WHY THIS EXISTS. `HOT_FILE && HOT_CTX` misfiled three different ways, and all
+ * three were live per-mouse-move sites sitting in the ordinary a8 queue where
+ * the next batch would have added an `await` to them:
+ *
+ *   1. HOT_FILE is a hand-maintained ALLOWLIST, and `AppShell.tsx` is not on
+ *      it — so `blurMove`'s `effect_move` (the blur-brush drag) was ordinary
+ *      even though its own line calls `flushToCanvas`, which HOT_CTX matches.
+ *   2. HOT_CTX knows `pointermove` but not `mousemove`, so
+ *      `useColorPicker.onMouseMove` and `useTextTool.onCanvasHover` missed.
+ *   3. The ±6-line window cannot see the handler it is inside. In
+ *      `handleLassoMove`, `lasso_active` (line 130) was ordinary and
+ *      `lasso_path_to` (line 132) was hot — SAME FUNCTION, two lines apart.
+ *      The only thing that made 132 hot is the substring "preview" inside
+ *      `setLassoPreview`. Meanwhile the comment three lines above says
+ *      "recomputed on every mouse-move ... inside a frame budget" — the one
+ *      definitive piece of evidence, and unreadable here because comments are
+ *      blanked before this test runs.
+ *
+ * TRAILING WORD-SEGMENT, NOT SUBSTRING, AND NOT ANY SEGMENT. Two false
+ * positives had to be designed out, and both were caught by checking the moved
+ * list rather than trusting the delta:
+ *
+ *   - Substring `/move/i` matches `removeLayer`, `removeShape`, `remove_layer`.
+ *     So the name is split on camelCase and underscores and segments are
+ *     matched whole — `remove` never reads as `move`.
+ *   - ANY-segment matching then caught `moveLayer`, a discrete layer reorder
+ *     from the layers panel that is already converted and is not a frame path.
+ *     The difference is grammatical: in a hot handler the word is the trailing
+ *     EVENT noun (`blurMove`, `onMouseMove`, `handleLassoMove`, `onCanvasHover`)
+ *     while in `moveLayer` it is the leading VERB. Only the LAST segment counts.
+ *
+ * Known limit, stated rather than hidden: a hot handler whose name does not end
+ * in one of these words (`onPointerMoveThrottled`) is missed by this test. That
+ * is why HOT_CTX stays as a second, independent signal rather than being
+ * replaced — neither is a superset of the other.
+ */
+const HOT_SEGMENT = /^(?:move|hover|drag|stroke|preview|scrub|pan)$/i;
+function hotByName(name) {
+  if (!name) return false;
+  const segs = name
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean);
+  return HOT_SEGMENT.test(segs[segs.length - 1] ?? "");
+}
+
 // Receivers this audit used to recognise. It only ever matched these three
 // literal names, so `const t = toolRef.current; t.width()` — the dominant shape
 // in useTransforms, editPersistence, useLayers and usePaintTool — was invisible.
@@ -272,6 +321,39 @@ function asyncLookupFor(raw, filePath) {
   };
 
   /**
+   * Name of the innermost NAMED function enclosing `offset`, or "" at module
+   * top level.
+   *
+   * Added 2026-08-10 (a8 scoping). Hot-path classification used to be a
+   * ±6-line text window plus a keyword list, and that produced three separate
+   * misfilings — see HOT_NAME below. An arrow function assigned to a const
+   * (`const onMouseMove = useCallback((e) => {...})`) carries its name on the
+   * VariableDeclaration, not the arrow, so climb through the initializer
+   * wrappers (`useCallback(...)`, parens) to find it.
+   */
+  const enclosingName = (offset) => {
+    let n = innermost(sf, offset);
+    while (n) {
+      if (isFunctionLike(n)) {
+        if (n.name && ts.isIdentifier(n.name)) return n.name.text;
+        // Arrow/function expression: the name lives on an ancestor
+        // VariableDeclaration or PropertyAssignment, possibly through a
+        // `useCallback(` / `useMemo(` call wrapper.
+        let up = n.parent;
+        while (up) {
+          if (ts.isVariableDeclaration(up) && ts.isIdentifier(up.name)) return up.name.text;
+          if (ts.isPropertyAssignment(up) && ts.isIdentifier(up.name)) return up.name.text;
+          if (ts.isFunctionDeclaration(up) || ts.isMethodDeclaration(up)) break;
+          up = up.parent;
+        }
+        return "";
+      }
+      n = n.parent;
+    }
+    return "";
+  };
+
+  /**
    * Is the call at `offset` VALUE-CONSUMED?
    *
    * Was `!/^\s*(?:void\s+)?$/.test(textBeforeItOnThisLine)` — a single-line
@@ -319,7 +401,7 @@ function asyncLookupFor(raw, filePath) {
     return true;
   };
 
-  return { enclosingAsync, isConsumed };
+  return { enclosingAsync, isConsumed, enclosingName };
 }
 
 /** Byte offset of the start of each line, for line/col -> offset. */
@@ -341,7 +423,7 @@ for (const file of walk(SRC)) {
   const aliases = aliasesIn(text);
   // One parse per file. Comment-stripping preserves offsets, so a position
   // computed from the stripped copy indexes the original correctly.
-  const { enclosingAsync: isAsyncAt, isConsumed } = asyncLookupFor(raw, file);
+  const { enclosingAsync: isAsyncAt, isConsumed, enclosingName } = asyncLookupFor(raw, file);
   const starts = lineStarts(raw);
   lines.forEach((line, i) => {
     // A call on the engine handle, by literal name OR via a local alias.
@@ -363,7 +445,12 @@ for (const file of walk(SRC)) {
       const consumed =
         astConsumed === null ? !/^\s*(?:void\s+)?$/.test(before) : astConsumed;
       const ctx = lines.slice(Math.max(0, i - 6), i + 2).join("\n");
-      const hot = HOT_FILE.test(rel) && HOT_CTX.test(ctx);
+      // Either signal is enough. The name test catches what the window cannot
+      // see; the window test catches unnamed/inline handlers the name test
+      // cannot reach. Neither is a superset of the other, so both stay.
+      const hot =
+        (HOT_FILE.test(rel) && HOT_CTX.test(ctx)) ||
+        hotByName(enclosingName((starts[i] ?? 0) + m.index));
 
       // --- awaited axis, orthogonal to the a/b/c category -------------------
       const after = line.slice(m.index + m[0].length);
@@ -382,6 +469,9 @@ for (const file of walk(SRC)) {
         line: i + 1,
         method: name,
         category: hot ? "c-hot-path" : consumed ? "b-value-consumed" : "a-fire-and-forget",
+        // The enclosing function's name, so the hot-path decision is auditable
+        // from the JSON rather than only reproducible by re-running the regex.
+        handler: enclosingName((starts[i] ?? 0) + m.index),
         snippet: (rawLines[i] ?? line).trim().slice(0, 110),
       });
     }
@@ -417,6 +507,15 @@ if (process.argv.includes("--json")) {
       truthySites: consumedRows
         .filter((r) => r.awaited === "truthy-trap")
         .map((r) => `${r.file}:${r.line}`),
+      // Handler names, so the contract test can assert the hot-path split in
+      // BOTH directions: nothing per-move left in the ordinary queue, and no
+      // discrete action dragged into the hot queue by a loose name match.
+      remainingHandlers: consumedRows
+        .filter((r) => r.awaited !== "awaited")
+        .map((r) => `${r.file}:${r.line} ${r.handler}`),
+      hotHandlers: rows
+        .filter((r) => r.category === "c-hot-path")
+        .map((r) => `${r.file}:${r.line} ${r.handler}`),
     }),
   );
   process.exit(0);

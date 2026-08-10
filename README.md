@@ -84,6 +84,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.97 — 2026-08-10
+
+**Nothing you can see — a measuring instrument corrected.** The tool that
+decides which engine calls sit on a drawing hot path had six of them filed as
+ordinary work, including the blur brush's drag, the eyedropper's magnifier and
+the text tool's hover highlight. The next batch of background-thread work would
+have made those wait for a round trip on every mouse movement, which is a
+dropped frame in exactly the places you would notice one.
+
+Nothing in the app changed. The list it was working from did.
+
+<details><summary>Older releases</summary>
+
 ### v7.96 — 2026-08-10
 
 **Something you can feel.** Every time the editor refreshed itself — after a
@@ -99,8 +112,6 @@ gone, and the refresh now costs nothing measurable.
 
 The engine can still answer it — that hasn't been removed, just taken off the
 path that runs after every edit.
-
-<details><summary>Older releases</summary>
 
 ### v7.95 — 2026-08-10
 
