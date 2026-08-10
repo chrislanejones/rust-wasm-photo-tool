@@ -152,8 +152,22 @@ import { join } from "node:path";
  *         this stage's — after `transferControlToOffscreen()` they throw on the
  *         main thread. Awaiting the read is orthogonal to that.
  *
+ *     80  NOT work, and the number went UP — the measurement getting honest in
+ *         the OTHER direction. v7.97 fixed the hot-path rule's false negatives;
+ *         this retires the rule for its false positives. Of the 21 sites
+ *         `HOT_FILE && HOT_CTX` alone called hot, **19 were discrete
+ *         once-per-gesture actions** (`onMouseDown`, `onMouseUp`, `commitEdit`,
+ *         `cancelEdit`, `applyCrop`, `dropPin`, `clearCloneSource`,
+ *         `selectShape`, `beginLayerResize`, `begin`, `commit`, `cancel`,
+ *         `handleSelectionClick`, `handleDeleteSelection`,
+ *         `handleNewLayerFromSelection`) parked in a10 where a8 could not see
+ *         them. A rule right 2 times out of 21 is noise, not a heuristic.
+ *         Six of the nineteen were value-consumed and unconverted, so the gate
+ *         rose 74 -> 80; the other thirteen are fire-and-forget. Hot 32 -> 13.
+ *
  *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76 and 74 lines. The rest
- *  is the measurement catching up.
+ *  is the measurement catching up — in BOTH directions, and the upward moves
+ *  matter just as much: a8 could not have been scoped off 74.
  *
  *  ⚠️ THE GATE'S TARGET IS 5, NOT 0 — see `DISSOLVES_AT_STAGE_4` below.
  *
@@ -176,7 +190,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 74;
+const BUDGET = 80;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -310,9 +324,14 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // a8 batch 2: `loadImageFromPixels` is already `async`, so its two reads
     // were un-awaited (22 - 2 = 20). restructure and truthy untouched.
     // Gate 76 - 2 = 74.
-    ).toBe(49);
+    // a8 scoping pass 2: 19 discrete sites left hot-path and re-entered the
+    // value-consumed bucket. Six were unconverted — four truthy traps
+    // (5 + 4 = 9) and two in non-async callbacks (49 + 2 = 51) — and thirteen
+    // were fire-and-forget, which the gate never counted. un-awaited and
+    // awaited both untouched. Gate 74 + 6 = 80.
+    ).toBe(51);
     expect(gate.unawaited).toBe(20);
-    expect(gate.truthy, "useHistory's four guards are now awaited").toBe(5);
+    expect(gate.truthy).toBe(9);
     expect(gate.awaited, "cumulative converted sites").toBe(20);
   });
 
@@ -462,6 +481,32 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
         `stale allowlist entry: ${key} matches no remaining call site`,
       ).toBe(true);
     }
+  });
+
+  it("the hot queue holds only per-move handlers and verified exceptions", () => {
+    // The anti-regression for the bug this pass fixed. a10 is where work goes
+    // to be done LAST, so anything parked there is invisible to a8 — and 19
+    // discrete actions sat there because they happened to live in a listed file
+    // near a listed word. Getting into the hot queue now requires either a name
+    // that ends in a per-move word, or an explicit entry in the audit's
+    // `HOT_BY_CALLER` justified by reading the CALLER.
+    //
+    // Both exceptions hid behind discrete-sounding names, which is exactly why
+    // a name test alone is not enough:
+    //   update()      <- CanvasArea's `onMove` PointerEvent listener
+    //   pushOverlay() <- inside requestAnimationFrame, per frame while painting
+    const exceptions = [
+      ...new Set(
+        gate.hotHandlers
+          .map(handlerOf)
+          .filter((h) => !HOT_WORDS.includes(lastSegment(h))),
+      ),
+    ].sort();
+    expect(
+      exceptions,
+      "a handler reached the hot queue without a per-move name — justify it in " +
+        "HOT_BY_CALLER by reading its caller, or it belongs in a8",
+    ).toEqual(["pushOverlay", "update"]);
   });
 
   it("does not drag a discrete action into the hot queue on a name match", () => {

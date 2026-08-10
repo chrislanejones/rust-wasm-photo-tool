@@ -85,8 +85,36 @@ function walk(dir, out = []) {
 // ordinary value-consumed work and would have been swept into the a5 batch.
 // The contract puts hot-path sites LAST on purpose: an await on pointermove is
 // a dropped frame, not a slower call, and they need their own reasoning.
-const HOT_FILE = /useDrawingTools|useCloneStamp|usePaintTool|useMagicEraser|CanvasArea|LassoOverlay|useMoveLayerTool|usePastePlacementTool|useColorPicker|useSelectionActions/;
-const HOT_CTX = /pointermove|onPointerMove|requestAnimationFrame|flushToCanvas|hover|preview|stroke|drag/i;
+/**
+ * ⚠️ RETIRED 2026-08-10 (a8 scoping, second pass). Hot-path detection used to be
+ * `HOT_FILE && HOT_CTX` — a hand-maintained FILE allowlist AND a keyword inside a
+ * ±6-line window:
+ *
+ *   const HOT_FILE = /useDrawingTools|useCloneStamp|usePaintTool|.../;
+ *   const HOT_CTX  = /pointermove|requestAnimationFrame|flushToCanvas|.../i;
+ *
+ * v7.97 fixed its FALSE NEGATIVES (six live per-mouse-move sites filed as
+ * ordinary work). This removes it outright, because its FALSE POSITIVES were
+ * worse: of the 21 sites it alone called hot, **19 were discrete once-per-gesture
+ * actions** — `onMouseDown`, `onMouseUp`, `commitEdit`, `cancelEdit`, `applyCrop`,
+ * `dropPin`, `clearCloneSource`, `selectShape`, `beginLayerResize`, `begin`,
+ * `commit`, `cancel`, `handleSelectionClick`, `handleDeleteSelection`,
+ * `handleNewLayerFromSelection`. They inherited "hot" purely from living in a
+ * listed FILE with a listed word within six lines, and being parked in a10 hid
+ * them from the a8 queue they belong in.
+ *
+ * A rule that is right 2 times out of 21 is not a heuristic, it is noise. It is
+ * replaced by the enclosing-function-name test plus the small verified list
+ * below.
+ */
+const HOT_BY_CALLER = {
+  "app/src/hooks/usePastePlacementTool.ts::update":
+    "wired as `onPastePlacementChange` and invoked from CanvasArea's `onMove` " +
+    "PointerEvent listener — runs per pointermove while the paste box is dragged",
+  "app/src/hooks/useMagicEraserTool.ts::pushOverlay":
+    "called from inside `requestAnimationFrame` in `scheduleOverlay` — " +
+    "rAF-throttled, once per frame for the whole magic-eraser stroke",
+};
 
 /**
  * Hot-path detection by the ENCLOSING FUNCTION'S NAME (a8 scoping, 2026-08-10).
@@ -445,12 +473,11 @@ for (const file of walk(SRC)) {
       const consumed =
         astConsumed === null ? !/^\s*(?:void\s+)?$/.test(before) : astConsumed;
       const ctx = lines.slice(Math.max(0, i - 6), i + 2).join("\n");
-      // Either signal is enough. The name test catches what the window cannot
-      // see; the window test catches unnamed/inline handlers the name test
-      // cannot reach. Neither is a superset of the other, so both stay.
-      const hot =
-        (HOT_FILE.test(rel) && HOT_CTX.test(ctx)) ||
-        hotByName(enclosingName((starts[i] ?? 0) + m.index));
+      // Name first; then the two verified exceptions the name cannot express.
+      // Both are per-site facts checked by reading the CALLER, which is how
+      // `update` and `pushOverlay` hid behind discrete-sounding names.
+      const handlerName = enclosingName((starts[i] ?? 0) + m.index);
+      const hot = hotByName(handlerName) || `${rel}::${handlerName}` in HOT_BY_CALLER;
 
       // --- awaited axis, orthogonal to the a/b/c category -------------------
       const after = line.slice(m.index + m[0].length);

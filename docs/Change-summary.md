@@ -4448,3 +4448,76 @@ genuinely different value through the converted read.
 
 **Gates.** 466 JS tests (up from 463), 148 Rust tests, `tsc` clean, eslint 0
 errors, app + marketing builds clean. Engine untouched — no `build:wasm`.
+
+## v8.0 Change Summary — 2026-08-10
+
+ADR-024 Stage 3.5, **a8 scoping pass 2**. **No product code changed.**
+Gate 74 → **80**, hot-path 32 → **13**. The number goes UP, and that is the
+point.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `HOT_FILE && HOT_CTX` retired outright | **Removed** |
+| 2 | 19 discrete actions returned from a10 to the a8 queue | **Reclassified** |
+| 3 | Two genuinely-hot sites the name test cannot see | **Kept, per-site justified** |
+| 4 | The hot queue's entry condition | **Guarded, 4/4 mutants** |
+
+**#1/#2 — a rule right 2 times out of 21.** v7.97 fixed this rule's *false
+negatives* — six live per-mouse-move sites filed as ordinary work. Its *false
+positives* turned out to be the bigger problem:
+
+| Of the 21 sites `HOT_FILE && HOT_CTX` alone called hot | Count |
+|---|---|
+| Genuinely per-frame | **2** |
+| Discrete once-per-gesture actions | **19** |
+
+`onMouseDown`, `onMouseUp`, `commitEdit`, `cancelEdit`, `applyCrop`, `dropPin`,
+`clearCloneSource`, `selectShape`, `beginLayerResize`, `begin`, `commit`,
+`cancel`, `handleSelectionClick`, `handleDeleteSelection`,
+`handleNewLayerFromSelection` inherited "hot" purely from living in a listed
+FILE with a listed word within six lines. a10 is where work goes to be done
+LAST, so parking them there hid them from a8 entirely.
+
+**#3 — and this is why a name test alone is not enough.** Two of the 21 are
+genuinely hot, and both wear discrete-sounding names. Neither was judged by
+name; both were judged by reading the CALLER:
+
+| Site | Caller | Verdict |
+|---|---|---|
+| `usePastePlacementTool.update` | `CanvasArea`'s `onMove` **PointerEvent** listener | per pointermove while dragging the paste box |
+| `useMagicEraserTool.pushOverlay` | inside **`requestAnimationFrame`** in `scheduleOverlay` | once per frame for the whole stroke |
+
+They are now a two-entry `HOT_BY_CALLER` list with the reason recorded, rather
+than an accident of a regex.
+
+**The judgment was cross-checked, and the checker was wrong twice.** A second
+detector — walk every reference to each handler and report the enclosing
+function — flagged `handleSelectionClick` and `selectShape` as reachable from
+move paths. Both were false alarms from that checker: the first "calls" were
+just entries in a hook's `return {…}` object, and `selectShape`'s was inside
+`handlePlace` (the nine-cell align grid), where the `moved` it latched onto is a
+local **variable**, not a function. Read before believing either tool.
+
+**#4 — the entry condition is now guarded.** Reaching the hot queue requires a
+name ending in a per-move word, or an explicit `HOT_BY_CALLER` entry. The
+contract test asserts the non-name exceptions are exactly
+`["pushOverlay", "update"]`, so nothing can be quietly parked in a10 again.
+Mutation tested: **4 mutants, all 4 killed** — dropping the exceptions,
+re-adding a broad file+keyword rule, widening the exception list with a discrete
+action, and disabling the name test.
+
+**What this means for planning.**
+
+| | Headline before | Actual |
+|---|---|---|
+| a10 (hot path, deliberately last) | 27 | **13** |
+| Stage 3.5 gate | 74 | **80** (75 convertible, floor 5) |
+
+Six of the nineteen were value-consumed and unconverted, so the gate rose by 6;
+the other thirteen are fire-and-forget and were never counted. a8 could not have
+been scoped off 74.
+
+**Gates.** 467 JS tests (up from 466), 148 Rust tests, `tsc` clean, eslint 0
+errors, app + marketing builds clean. Engine untouched, no product code touched,
+so no `build:wasm` and no browser check — the only files changed are the audit
+script and its contract test.

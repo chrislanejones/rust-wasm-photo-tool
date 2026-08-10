@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.0",
+    date: "2026-08-10",
+    headline: "The bookkeeping, corrected the other way",
+    entries: [
+      {
+        tag: "infra",
+        text: "Yesterday's release fixed a rule that was filing live drawing code as ordinary work. This one retires that rule entirely, because it was wrong far more often in the opposite direction: of the 21 calls it alone marked as “drawing hot path”, 19 were ordinary once-per-click actions — commit, cancel, apply-crop, drop-a-pin, mouse-down, mouse-up. They had been set aside to be done last, which meant nobody was looking at them.",
+      },
+      {
+        tag: "fix",
+        text: "So the list of remaining work goes up, not down. That is the honest number, and the first one the rest of this migration can actually be planned against. Two calls really do belong on the fast path despite ordinary-sounding names, and they are now listed individually with the reason, rather than caught by a pattern that happened to match.",
+      },
+    ],
+  },
+  {
     version: "v7.99",
     date: "2026-08-10",
     headline: "A checklist that could never reach zero",

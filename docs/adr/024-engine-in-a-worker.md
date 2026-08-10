@@ -68,7 +68,7 @@ first.
 | **1** | **One port, no worker.** ✅ **DONE 2026-08-07.** `lib/engine/port.ts` is the named Stage-3 swap point (identity today); `engineOwnership.contract.test.ts` fails on a second writer, an undeclared engine, or a bypassed seam. NOT the ~152-call-site rewrite first imagined — the ownership invariant already held (`toolRef` created once, assigned only in `useEngineCore`), so the missing piece was the seam and the guard, not churn | no behaviour change | plain revert |
 | **2** | **The read-modify-write sites.** ✅ **DONE 2026-08-07 — 9 → 3, all FEED sites gone.** Two engine methods absorbed the decisions: `flatten_text_annotations` returns whether it flattened, and `blur_whole_image` computes its own geometry. Four JS guards deleted. The 3 remaining are 2 that dissolve at Stage 4 (`flushToCanvas`) and 1 false positive (`align_annotation`'s return is a mutation's result, not stale-able state) | no behaviour change | revert **+ `build:wasm`** |
 | **3** | **The worker exists, off by default.** ✅ **DONE 2026-08-07.** `workers/engine.worker.ts` (own wasm instance, one-at-a-time FIFO `drain()`) + `lib/engine/workerClient.ts` (request ids, 30 s timeout that also withdraws the queued call, `failAll` on crash). All four gaps the Phase 3 spike had are closed. Deliberately **not** Comlink — see the file header; Comlink gives correct results with no ordering promise, and arrival order *is* the op log. Flag `ih_engine_worker`, default OFF. The build emits **no worker chunk**, because nothing imports it yet — that is the honest status, not an oversight | nothing user-visible | flag stays off |
-| **3.5** | **The async conversions — 168 → 74 as of v7.99, and THE TARGET IS 5, NOT 0 (see below).** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** ⚠️ **This figure goes stale every batch; `scripts/engine-call-audit.mjs` is the authority and `engineAsyncMigration.contract.test.ts` pins it. If they disagree with this line, they are right.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. The per-file batch list that used to sit here named six files; **four of them have since shipped** (`editPersistence` and `useEditPersistence` v7.84, `useLayers` v7.85, `useEngineCore` v7.90) and it was read as outstanding work for days after they were done. It is deliberately not replaced with another hand-written list — run the audit, which prints remaining-by-file. Same flag, still OFF. **a1 (measurable gate) v7.79 · a2 (text-metrics cache) v7.80 · a3 (one-call save capture) v7.84 · a4 (one-call pixels+dimensions capture) v7.88 — 121 → 103 · a5 (one-call UI-state capture) v7.90 — 103 → 94 · a7 (the hit-test capture) v7.94 — 93 → 92 · a7 cont. (the OpenRaster captures) v7.95 — 92 → 87 · **a8 scoping v7.97 — 87 → 81, RECLASSIFICATION not work** · **a8 batch 1 v7.98 — 81 → 76, `useHistory.ts` 5 → 0** (four truthy traps, same shape as `useLayers`; the ratchet was mutation-tested and DOES catch a dropped `await`, 5/5) · **a8 batch 2 v7.99 — 76 → 74** (`loadImageFromPixels`'s two reads). **a7 also withdrew one of its own two sites**: `useTextTool`'s hit-test-then-look-up has `commitText()` MUTATING between the two reads, so it is not an atomic capture at all and must not be converted — `docs/engine-worker-capture-sweep.md` is corrected, and the rule it yields is that **two sites with the same read sequence are not the same problem; what sits between the reads is part of the pattern.** a3 also found the category this ADR missed — see "ATOMIC CAPTURE" below, and triage every remaining file against it before converting | nothing user-visible | flag stays off |
+| **3.5** | **The async conversions — 168 → 80 as of v8.0, and THE TARGET IS 5, NOT 0 (see below).** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** ⚠️ **This figure goes stale every batch; `scripts/engine-call-audit.mjs` is the authority and `engineAsyncMigration.contract.test.ts` pins it. If they disagree with this line, they are right.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. The per-file batch list that used to sit here named six files; **four of them have since shipped** (`editPersistence` and `useEditPersistence` v7.84, `useLayers` v7.85, `useEngineCore` v7.90) and it was read as outstanding work for days after they were done. It is deliberately not replaced with another hand-written list — run the audit, which prints remaining-by-file. Same flag, still OFF. **a1 (measurable gate) v7.79 · a2 (text-metrics cache) v7.80 · a3 (one-call save capture) v7.84 · a4 (one-call pixels+dimensions capture) v7.88 — 121 → 103 · a5 (one-call UI-state capture) v7.90 — 103 → 94 · a7 (the hit-test capture) v7.94 — 93 → 92 · a7 cont. (the OpenRaster captures) v7.95 — 92 → 87 · **a8 scoping v7.97 — 87 → 81, RECLASSIFICATION not work** · **a8 batch 1 v7.98 — 81 → 76, `useHistory.ts` 5 → 0** (four truthy traps, same shape as `useLayers`; the ratchet was mutation-tested and DOES catch a dropped `await`, 5/5) · **a8 batch 2 v7.99 — 76 → 74** (`loadImageFromPixels`'s two reads) · **a8 scoping pass 2 v8.0 — 74 → 80, the number went UP** (19 discrete actions came back from a10; hot 32 → 13). **a7 also withdrew one of its own two sites**: `useTextTool`'s hit-test-then-look-up has `commitText()` MUTATING between the two reads, so it is not an atomic capture at all and must not be converted — `docs/engine-worker-capture-sweep.md` is corrected, and the rule it yields is that **two sites with the same read sequence are not the same problem; what sits between the reads is part of the pattern.** a3 also found the category this ADR missed — see "ATOMIC CAPTURE" below, and triage every remaining file against it before converting | nothing user-visible | flag stays off |
 **a11.0 CLOSED 2026-08-10 — the last OPEN-B gap.** A real `stamp_tool` running
 inside a transferred-canvas worker: it works, `desynchronized` survives with wasm
 in the same worker, and the flush costs **22.1 ms at 3.1 MP — the same as the
@@ -289,15 +289,30 @@ TRAILING camelCase segment (any-segment matching pulled in `moveLayer`, a
 discrete reorder where `move` is the leading verb). Pinned in both directions by
 two contract tests, 4/4 mutants killed.
 
-**⚠️ THE MIRROR PROBLEM IS OPEN.** The same window rule produced false positives
-the other way: of 32 hot sites, only **11** are per-move by name. The other 21
-are discrete actions — `onMouseDown`, `onMouseUp`, `commit`, `cancel`,
-`applyCrop`, `dropPin`, `handleDeleteSelection`, `selectShape` — that inherited
-"hot" from living in a hot FILE with a hot word nearby. **So a10 is much smaller
-than its headline and a8's ordinary work is larger than 81.** Not corrected in
-v7.97 deliberately: that direction moves sites INTO the gate and each needs a
-per-site judgment, not a regex. Scope a8/a10 off corrected numbers before
-committing to either.
+**✅ THE MIRROR PROBLEM IS CLOSED (v8.0).** The same window rule produced false
+positives the other way, and they were worse: of the 21 sites it ALONE called
+hot, **19 were discrete once-per-gesture actions** — `onMouseDown`, `onMouseUp`,
+`commitEdit`, `cancelEdit`, `applyCrop`, `dropPin`, `clearCloneSource`,
+`selectShape`, `beginLayerResize`, `begin`, `commit`, `cancel`,
+`handleSelectionClick`, `handleDeleteSelection`, `handleNewLayerFromSelection`.
+Parked in a10 — where work goes to be done LAST — they were invisible to a8.
+
+**`HOT_FILE && HOT_CTX` is retired outright.** A rule right 2 times out of 21 is
+noise, not a heuristic. Hot is now the enclosing-function-name test plus a
+two-entry `HOT_BY_CALLER` list, each justified by reading the CALLER — because
+both genuine ones wear discrete names: `usePastePlacementTool.update` is invoked
+from `CanvasArea`'s `onMove` PointerEvent listener, and
+`useMagicEraserTool.pushOverlay` from inside `requestAnimationFrame`.
+
+**Corrected numbers, which is what a8/a10 must be scoped off:**
+
+| | Headline before | Actual |
+|---|---|---|
+| a10 (hot path, last) | 27 | **13** |
+| Stage 3.5 gate | 74 | **80** (75 convertible above the floor of 5) |
+
+The contract test now pins the hot queue's entry condition in both directions,
+so nothing can be quietly parked in a10 again. 4/4 mutants killed.
 | `hooks/useExport.ts` | atomic capture — **fixed** v7.88 via `capture_composite()` / `capture_thumbnail()` |
 | `lib/openraster/export.ts` | thumbnail triple **fixed** v7.88; both layer-stack captures **fixed** v7.95 via `capture_layer_stack()` (7 reads → 2); the file **still interleaves `await import("jszip")` between the metadata and the layer PNGs, and still mutates mid-export** — unchanged and still open |
 | `hooks/useEngineCore.ts` | `syncState`'s eleven reads are one atomic capture — **fixed** v7.90 via `capture_ui_state()`. `flushToCanvas`'s remaining reads dissolve at Stage 4 and must NOT be converted |

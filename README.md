@@ -84,6 +84,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.0 — 2026-08-10
+
+**Nothing you can see — the migration's own bookkeeping, corrected the other
+way.** Yesterday's release fixed a rule that was filing live drawing code as
+ordinary work. This one retires that rule entirely, because it was wrong far
+more often in the opposite direction: of the 21 calls it alone marked as
+"drawing hot path", **19 were ordinary once-per-click actions** — commit,
+cancel, apply-crop, drop-a-pin, mouse-down, mouse-up. They had been set aside
+to be done last, which meant nobody was looking at them.
+
+The list of remaining work therefore goes **up**, not down. That is the honest
+number, and the first one the rest of this migration can actually be planned
+against.
+
+<details><summary>Older releases</summary>
+
 ### v7.99 — 2026-08-10
 
 **Nothing you can see.** The checklist tracking the background-thread migration
@@ -97,8 +113,6 @@ someone grinds the number down, meets those five, and "finishes the job" by
 changing the one piece of code that repaints the canvas on every frame. Those
 five are now named, with the reason, and changing them makes the test suite fail
 loudly instead of looking like progress.
-
-<details><summary>Older releases</summary>
 
 ### v7.98 — 2026-08-10
 
