@@ -807,6 +807,26 @@ impl ImageHorseTool {
     /// PHOTO of any artboard-off document that had gained a second layer —
     /// `load_image` names the photo "Background" too (ADR-016).
     fn composite_excluding_background(&self) -> (Vec<u8>, u32, u32) {
+        let (full, w, h, bbox) = self.excluding_background_parts();
+        match bbox {
+            Some((x, y, cw, ch)) => transform::crop(&full, w, h, x, y, cw, ch),
+            None => (full, w, h),
+        }
+    }
+
+    /// The composite and the box it wants cropping to, BEFORE the crop happens.
+    ///
+    /// Split out so the dimensions-only path does not have to buy the crop.
+    /// `export_dims_excluding_background` needs the box and throws the pixels
+    /// away; going through `composite_excluding_background` would allocate and
+    /// memcpy a second full-size buffer purely to measure it.
+    ///
+    /// `None` means "no crop applies" — either there is no Canvas layer to
+    /// exclude, or the content already fills the document. Both callers then
+    /// use the untrimmed `w`/`h`, which is the same fallback the single
+    /// function had.
+    #[allow(clippy::type_complexity)]
+    fn excluding_background_parts(&self) -> (Vec<u8>, u32, u32, Option<(u32, u32, u32, u32)>) {
         let (w, h) = (self.width, self.height);
         // The Canvas is the bottom layer by construction, and `move_layer`
         // enforces it — so excluding it is a slice, not a copy (layer buffers
@@ -818,13 +838,13 @@ impl ImageHorseTool {
             &self.layers[..]
         };
         let full = composite_layers(layers, w, h, self.editing_shape_id, self.editing_text_id);
-        match tight_bbox(&full, w, h) {
+        let bbox = match tight_bbox(&full, w, h) {
             Some((x, y, cw, ch)) if !(x == 0 && y == 0 && cw == w && ch == h) => {
-                let (cropped, ncw, nch) = transform::crop(&full, w, h, x, y, cw, ch);
-                (cropped, ncw, nch)
+                Some((x, y, cw, ch))
             }
-            _ => (full, w, h),
-        }
+            _ => None,
+        };
+        (full, w, h, bbox)
     }
 }
 

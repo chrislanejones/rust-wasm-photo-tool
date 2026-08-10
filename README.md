@@ -84,6 +84,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.90 — 2026-08-09
+
+**Nothing you can see, and one thing you can feel.** Creating a share link with
+"Photo only" set was building the whole image twice to work out two numbers; it
+does it once now, and skips a step it never needed — 40 ms down to 17 ms on a
+1385x2068 photo.
+
+The rest is groundwork for moving the engine onto a background thread. The
+eleven values the editor reads to redraw itself — size, zoom, layers, undo
+history, export quality — now come back in one call instead of eleven, so they
+can never describe two different moments.
+
+<details><summary>Older releases</summary>
+
 ### v7.89 — 2026-08-09
 
 **No user-visible change.** The v7.81 fix — Download All shipping your original
@@ -91,8 +105,6 @@ files instead of your edits — now has a regression test. That bug only appeare
 after a page reload, which is why it lasted two months and why the fix went out
 without one. The code underneath it has been rewritten twice since, so the
 cover is overdue.
-
-<details><summary>Older releases</summary>
 
 ### v7.88 — 2026-08-09
 

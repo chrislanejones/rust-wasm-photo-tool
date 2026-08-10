@@ -120,6 +120,48 @@ declare module "stamp_tool" {
   }
 
   /**
+   * The eleven values `useEngineCore`'s `syncState` publishes to React, out of
+   * one wasm-bindgen call. Returned by `capture_ui_state()`.
+   *
+   * No pixels — that is the difference from `capture_state()`, which carries
+   * every undo/redo snapshot PNG. One is what gets DRAWN, the other is what
+   * gets SAVED. `history_labels` and `layers_json` arrive RAW because the JS
+   * owns both formats; parse them the same way `syncState` always has.
+   *
+   * Read each field once and `.free()` when done.
+   */
+  /**
+   * The size an export will produce, with no pixels attached. Returned by
+   * `export_dims_excluding_background()`.
+   *
+   * Both fields are plain numbers, so unlike `RgbaCapture` reading them copies
+   * nothing out of wasm memory. Still `.free()` it — it is a boxed allocation
+   * on the wasm heap like every other wasm-bindgen struct.
+   */
+  export class ExportDims {
+    private constructor();
+    free(): void;
+    width: number;
+    height: number;
+  }
+
+  export class UiStateCapture {
+    private constructor();
+    free(): void;
+    has_source: boolean;
+    undo_count: number;
+    redo_count: number;
+    history_labels: string;
+    zoom: number;
+    width: number;
+    height: number;
+    has_transparency: boolean;
+    layers_json: string;
+    active_layer_id: number;
+    export_quality: number;
+  }
+
+  /**
    * Stateless: decode PNG bytes back into straight (non-premultiplied)
    * RGBA8 pixels, normalizing any source color type (RGB, RGBA, indexed,
    * grayscale…) to the same convention `encode_png_pixels`/`get_layer_png`
@@ -240,6 +282,12 @@ declare module "stamp_tool" {
      *  pixels are encoded or scaled AT those dimensions: read separately,
      *  behind the worker, a resize can land between them and pair one state's
      *  pixels with another state's size. Free it when done. */
+    /** The eleven values React renders from, atomically — the one-call form of
+     *  the reads `syncState` used to make. Split behind the worker, React would
+     *  render a snapshot that never existed (a width from before a resize
+     *  beside an undo count from after). NOT `capture_state()`: that one is
+     *  what gets saved, this is what gets drawn. Free it when done. */
+    capture_ui_state(): UiStateCapture;
     capture_composite(): RgbaCapture;
     /** The background-excluded composite and its CROPPED dimensions, atomically
      *  — the one-call form of `get_image_data_excluding_background()` +
@@ -249,6 +297,14 @@ declare module "stamp_tool" {
      *  work three times, and the crop is content-dependent so the three reads
      *  can disagree. Free it when done. */
     capture_composite_excluding_background(): RgbaCapture;
+    /** The size an export will produce, WITHOUT producing it — the one-call
+     *  form of `export_width_excluding_background()` +
+     *  `export_height_excluding_background()`, each of which composites the
+     *  whole document internally. Use this for anything that only needs the
+     *  numbers (a caption, a label); do NOT reach for
+     *  `capture_composite_excluding_background()` there, because reading its
+     *  `.rgba` copies ~11 MB you would immediately discard. Free it when done. */
+    export_dims_excluding_background(): ExportDims;
     width(): number;
     height(): number;
     data_ptr(): number;

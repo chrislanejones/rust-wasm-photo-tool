@@ -68,8 +68,8 @@ first.
 | **1** | **One port, no worker.** ✅ **DONE 2026-08-07.** `lib/engine/port.ts` is the named Stage-3 swap point (identity today); `engineOwnership.contract.test.ts` fails on a second writer, an undeclared engine, or a bypassed seam. NOT the ~152-call-site rewrite first imagined — the ownership invariant already held (`toolRef` created once, assigned only in `useEngineCore`), so the missing piece was the seam and the guard, not churn | no behaviour change | plain revert |
 | **2** | **The read-modify-write sites.** ✅ **DONE 2026-08-07 — 9 → 3, all FEED sites gone.** Two engine methods absorbed the decisions: `flatten_text_annotations` returns whether it flattened, and `blur_whole_image` computes its own geometry. Four JS guards deleted. The 3 remaining are 2 that dissolve at Stage 4 (`flushToCanvas`) and 1 false positive (`align_annotation`'s return is a mutation's result, not stale-able state) | no behaviour change | revert **+ `build:wasm`** |
 | **3** | **The worker exists, off by default.** ✅ **DONE 2026-08-07.** `workers/engine.worker.ts` (own wasm instance, one-at-a-time FIFO `drain()`) + `lib/engine/workerClient.ts` (request ids, 30 s timeout that also withdraws the queued call, `failAll` on crash). All four gaps the Phase 3 spike had are closed. Deliberately **not** Comlink — see the file header; Comlink gives correct results with no ordering promise, and arrival order *is* the op log. Flag `ih_engine_worker`, default OFF. The build emits **no worker chunk**, because nothing imports it yet — that is the honest status, not an oversight | nothing user-visible | flag stays off |
-| **3.5** | **The async conversions — 168 → 138 as of v7.84.** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. Batches by file, value-consumed only — `editPersistence` 18, `useEngineCore` 17, `useSelectionActions` 15, `openraster/export` 13, `useLayers` 13, `useEditPersistence` 12. Same flag, still OFF. **a1 (measurable gate) v7.79 · a2 (text-metrics cache) v7.80 · a3 (one-call save capture) v7.84 · a4 (one-call pixels+dimensions capture) v7.88 — 121 → 103, three capture methods and eleven call sites.** a3 also found the category this ADR missed — see "ATOMIC CAPTURE" below, and triage every remaining file against it before converting | nothing user-visible | flag stays off |
-| **4** | **Canvas transfer.** **SCOPE CORRECTED 2026-08-08 — it is not just the `width`/`height` assignments; see "Stage 4's real scope" below.** Three subsystems must leave the main canvas first (engine flush, the arrow/shapes/crop rubber-band preview, lossy export), and canvas element *identity* has to be owned. Still flagged | nothing user-visible | **NOT by the flag alone** — see the kill-switch note |
+| **3.5** | **The async conversions — 168 → 94 as of v7.90.** ADDED 2026-08-07, **recounted 2026-08-08 — the old figures were an undercount, see below.** ⚠️ **This figure goes stale every batch; `scripts/engine-call-audit.mjs` is the authority and `engineAsyncMigration.contract.test.ts` pins it. If they disagree with this line, they are right.** `scripts/engine-call-audit.mjs` now counts 290 call sites: 101 fire-and-forget (a postMessage suffices), **162 value-consumed** (each needs a Promise *and* a call-site restructure), 27 hot-path. Until these are done the Stage 3 flag can never be turned on, so Stage 3's worker is scaffolding. The per-file batch list that used to sit here named six files; **four of them have since shipped** (`editPersistence` and `useEditPersistence` v7.84, `useLayers` v7.85, `useEngineCore` v7.90) and it was read as outstanding work for days after they were done. It is deliberately not replaced with another hand-written list — run the audit, which prints remaining-by-file. Same flag, still OFF. **a1 (measurable gate) v7.79 · a2 (text-metrics cache) v7.80 · a3 (one-call save capture) v7.84 · a4 (one-call pixels+dimensions capture) v7.88 — 121 → 103 · a5 (one-call UI-state capture) v7.90 — 103 → 94.** a3 also found the category this ADR missed — see "ATOMIC CAPTURE" below, and triage every remaining file against it before converting | nothing user-visible | flag stays off |
+| **4** | **Canvas transfer.** **SCOPE CORRECTED 2026-08-08 — it is not just the `width`/`height` assignments; see "Stage 4's real scope" below.** Three subsystems had to leave the main canvas first: the rubber-band preview ✅ **v7.76**, lossy export ✅ **v7.77**, and the engine flush — which does not need converting because it *dissolves* under Option A (see "Why A" above). So the only thing left before the transfer is canvas element **identity**, which is a larger job than it sounds — see "Stage 4's real scope" below. Still flagged | nothing user-visible | **NOT by the flag alone** — see the kill-switch note |
 | **5** | **Measure, then flip.** A/B the 470 ms freeze against master. Default ON only if it is actually gone, with `ih_engine_worker=0` as the kill switch | the feature | kill switch |
 
 **Why 3.5 exists.** It was not in the original list, and its absence is the
@@ -227,6 +227,18 @@ conversions instead of turning each into a hazard.
 | Does an existing comment say the absence of `await` matters? | Believe it, and read why before touching anything |
 | Do reads already interleave with `await` today? | Pre-existing; note it, do not silently make it worse |
 
+**THE FULL SWEEP IS DONE — see `docs/engine-worker-capture-sweep.md` (a6, 2026-08-09).**
+Every file under `app/src` was checked against this rule in one pass. Headline:
+**the capture seam is nearly exhausted.** Four captures remain worth converting
+(~11 sites) — two in `openraster/export.ts`, one in `AppShell`, one in
+`useTextTool` — plus two low-stakes ones. Everything else is ordinary
+one-at-a-time work, hot-path work deferred to a10, or reads that dissolve at
+Stage 4. Expect the gate to move slowly from here; the compressible part is gone.
+
+The sweep also named a second capture shape: **hit-test then look up** — an id
+from `*_annotation_at()` indexed into a list from `get_*_annotations()`. An id is
+only meaningful against the list it was drawn from.
+
 **Files already triaged against this rule (2026-08-09), so the next session
 does not have to re-derive them:**
 
@@ -238,6 +250,7 @@ does not have to re-derive them:**
 | `app/session/useSelectionActions.ts` | contains a per-pointermove hot path — reclassified v7.86, belongs in a10 |
 | `hooks/useExport.ts` | atomic capture — **fixed** v7.88 via `capture_composite()` / `capture_thumbnail()` |
 | `lib/openraster/export.ts` | its thumbnail triple **fixed** v7.88; the rest still interleaves `await` and mutates mid-export |
+| `hooks/useEngineCore.ts` | `syncState`'s eleven reads are one atomic capture — **fixed** v7.90 via `capture_ui_state()`. `flushToCanvas`'s remaining reads dissolve at Stage 4 and must NOT be converted |
 | `app/AppShell.tsx` | triaged v7.88 — its two atomic captures (`persistActiveCanvas`, ShareButton) are **fixed**; the remaining sites are independent single reads |
 | `app/session/useCanvasActions.ts` | two exclude-background captures — **fixed** v7.88 |
 | `lib/exportImage.ts` | throwaway engine, so no correctness risk — converted v7.88 for the 3× work saving |
@@ -390,12 +403,26 @@ and that is a larger job than moving the `width`/`height` assignments.
 
 **Recommended ordering**, since none of it needs the worker to exist:
 
-| # | Work | Ships on its own? |
-|---|---|---|
-| 1 | Move the rubber-band preview off the main canvas | yes — also pays down the pixels-in-React-land invariant |
-| 2 | Route lossy export through the engine like PNG already is | yes |
-| 3 | Make canvas element identity explicit and remount-safe | yes |
-| 4 | Then transfer | needs 1–3 |
+| # | Work | Status | Ships on its own? |
+|---|---|---|---|
+| 1 | Move the rubber-band preview off the main canvas | ✅ **DONE v7.76** (`2319255`) | yes — also paid down the pixels-in-React-land invariant |
+| 2 | Route lossy export through the engine like PNG already is | ✅ **DONE v7.77** (`84d5353`) | yes |
+| 3 | Make canvas element identity explicit and remount-safe | ⬜ **OPEN — the only one left** | yes |
+| 4 | Then transfer | ⬜ blocked on 3 | needs 1–3 |
+
+**Status added 2026-08-09.** The table shipped with no status column and was
+read for weeks as four sessions of work; two of them had already shipped. That
+is the same failure as the Stage 3.5 header below — a plan that records what to
+do and never records what got done drifts into overstating the remaining work,
+and the overstatement is what makes people defer starting.
+
+Verified rather than assumed, at 63e4239:
+
+| Claim | Evidence |
+|---|---|
+| 1 is done | `useDrawingTools.ts` draws the rubber band on `previewRef`, a separate overlay; its own comment says the full-canvas `preSnapshot` copy it replaced is gone |
+| 2 is done | `useExport.ts` header: *"EVERY format now reads the engine, never the `<canvas>`"*; `encodeRgba` entered the file at v7.77 |
+| 2 stays done | The only `.toBlob(` calls left in `app/src` are `ObjectRemovalModal.tsx:143` and `rasterizeSvg.ts:86`, both on canvases those files create themselves. Neither touches the main canvas, so a grep for `toBlob` does not reopen this |
 
 Stage 5's gate is the pre-mortem's last line: *"Nobody measured after. The
 freeze moved rather than disappeared."* The flip does not happen on the

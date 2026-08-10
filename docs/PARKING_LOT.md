@@ -1552,17 +1552,31 @@ Closed same day. It was four sites, not two (`useCanvasActions` had two of its
 own), all now on `capture_composite_excluding_background()`. Measured 3.45×
 faster than the three-getter form. Details in ADR-024.
 
-**One piece deliberately left**: `app/session/useExportDimensions.ts` still
-calls `export_width/height_excluding_background()` to label the Share button.
-Not a capture — no pixels are paired with it — but still **two full composites
-to produce two integers**, which that file's own header already documents.
+**~~One piece deliberately left~~ — DONE.** `useExportDimensions` now uses
+`export_dims_excluding_background()`. Measured on a 1385×2068 document:
 
-Do NOT point it at `capture_composite_excluding_background()`: that trades two
-composites for one composite plus an ~11 MB pixel clone it immediately throws
-away (`getter_with_clone` copies the buffer on every field access). The right
-fix is a dimensions-only engine call — one `composite_excluding_background()`,
-returning just the two `u32`s. Small, and it makes the "Photo only" preference
-free rather than merely cheaper.
+| Path | Time |
+|---|---|
+| two getters (old) | 39.9 ms |
+| **dimensions-only (new)** | **17.4 ms** — 2.29× |
+| `capture_composite_excluding_background()` + reading `.rgba` | 27.2 ms |
+
+The third row is why the obvious reuse was wrong, and it is now measured rather
+than argued: routing a caption through the pixel capture is faster than the old
+pair and still 56% slower than asking for what you want, because
+`getter_with_clone` copies ~11 MB you discard.
+
+**⚠️ And the framing everyone had — including this note — was wrong.**
+`useExportDimensions.ts` said it computed "the export dimensions shown on the
+Share button". They are not shown. `exportDims` has exactly one consumer,
+`<ShareButton canvasW= canvasH=>`, and ShareButton passes them to `createShare`,
+which writes them into the Convex **`shares` table** (`schema.ts:192`).
+
+So they are persisted share metadata on a public link, not a caption — which
+makes the atomic-capture argument stronger, not weaker. A caption that is
+briefly wrong self-corrects on the next render; a wrong width stored against a
+share is wrong for the life of the link. Headers corrected in both the JS and
+the Rust.
 
 ## `useExport` is four-fifths unreachable (found v7.88)
 
@@ -1587,3 +1601,51 @@ entire gallery pipeline is WebP q0.78 (`lib/workingCopy.ts:6`), and the
 
 The standing "zero-reference export" note in `Change-summary.md` therefore
 undercounts this file: it is four of five, not one.
+
+---
+
+## `has_transparency()` costs a full composite, on every sync (found a5, 2026-08-09)
+
+**Measured in the browser, production build, 1385×2068 document:**
+
+| Call | Time |
+|---|---|
+| `get_image_data()` — the composite alone | 69.27 ms |
+| `has_transparency()` | **61.91 ms** |
+| The other **ten** `capture_ui_state` fields combined | **0.313 ms** |
+
+One field costs roughly **200×** the other ten put together, and it is the only
+one that is not a plain field read.
+
+```rust
+pub fn has_transparency(&self) -> bool {
+    self.get_image_data().chunks_exact(4).any(|px| px[3] < 255)
+}
+```
+
+`.any()` short-circuits, but `get_image_data()` does not — it composites every
+layer into a full-document RGBA buffer *first*, so the scan's early exit saves
+nothing. The composite is the whole cost.
+
+**Where it lands.** `syncState` has **74 call sites** and calls this once per
+sync. It is NOT per-frame: `usePaintTool` calls it at stroke END (mouse-up) and
+its own comment is explicit that the per-frame path is untouched. So this is a
+~60 ms hitch when you lift the brush, finish a layer operation, or undo — 
+perceptible, not a dropped frame.
+
+**Not introduced by a5, and not made worse by it.** Before: eleven reads, one of
+which composited. After: one capture, still compositing once. Same cost, one
+boundary crossing instead of eleven.
+
+**Why it is not fixed here.** Engine work with its own correctness surface, and
+a5's scope was the capture. Options, roughly in order of appeal:
+
+| Approach | Note |
+|---|---|
+| Track transparency as engine state, updated on mutation | No composite at all; needs every mutation path to maintain it |
+| Answer from layer metadata where it can | A single opaque full-bleed layer cannot have transparency; short-circuits the common case |
+| Composite lazily, bail on the first transparent pixel | Still allocates; helps only when transparency appears early |
+
+Same family as the exclude-background finding fixed in v7.88 — a getter that
+recomputes a whole-document product to answer a small question — except this
+one is on the drawing path rather than the export path.

@@ -3675,3 +3675,98 @@ source, and carries 16,967 red px. The remaining 2.8% is JPEG edge softening.
 
 **Gates.** 427 JS tests (up from 417), `tsc` clean, eslint 0 errors, production
 build clean. Engine unchanged.
+
+## v7.90 Change Summary — 2026-08-09
+
+Groundwork plus one measurable win on the share path. Nothing user-visible
+changes.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `syncState`'s eleven engine reads become one `capture_ui_state()` | **Converted** |
+| 2 | Share-link dimensions: `export_dims_excluding_background()`, **39.9 ms → 17.4 ms** | **Fixed** |
+| 3 | ADR-024 Stage 3.5 gate **103 → 93** | **Measured** |
+| 4 | ADR-024's Stage 4 ordering table was three-ways stale | **Corrected** |
+| 5 | The audit was under-reporting the gate by 1 — a formatting blind spot | **Found, guarded** |
+| 6 | `has_transparency()` costs a full composite on every sync | **Found, parked** |
+| 7 | The capture sweep (a6) — every file checked against the ATOMIC CAPTURE rule | **Documented** |
+
+**#1 — the same atomic-capture family as v7.84 and v7.88.** `useEngineCore`'s
+`syncState` read eleven values — size, zoom, layer stack, undo/redo counts,
+history labels, export quality, transparency, source point — assembled them into
+one object and handed it to one `setState`. Split into eleven awaited calls
+behind a worker, React would render a snapshot that never existed: a width from
+before a resize beside an undo count from after. Nothing throws and it
+self-corrects on the next sync, which is the profile of a months-long
+intermittent rather than a bug report. `syncState` has 74 call sites, so this is
+also eleven boundary crossings per edit reduced to one.
+
+**#2 — two composites to produce two integers.** `export_width_excluding_background()`
+and `export_height_excluding_background()` each run a full
+`composite_excluding_background()` internally and keep one number, so the pair
+did two whole-document composites, two bounding-box scans and two crops. The new
+call composites once and skips the crop entirely — the crop exists to build a
+pixel buffer, and nothing on this path wants pixels.
+
+| Path | Time (1385×2068) |
+|---|---|
+| two getters | 39.9 ms |
+| `export_dims_excluding_background()` | **17.4 ms** |
+| `capture_composite_excluding_background()` + reading `.rgba` | 27.2 ms |
+
+That third row is why the obvious reuse was rejected, measured rather than
+argued: the pixel capture already returns these two numbers, but reading it
+copies ~11 MB out of wasm memory that this path immediately discards.
+
+**And the framing was wrong, in the source and in the notes.**
+`useExportDimensions.ts` said it computed "the export dimensions shown on the
+Share button". They are not shown. Its only consumer passes them to
+`createShare`, which writes them into the Convex `shares` table. They are
+persisted metadata on a public link, which makes the atomicity argument
+stronger: a caption that is briefly wrong self-corrects on the next render, but
+a wrong width stored against a share is wrong for the life of the link.
+
+**#5 — the audit's third formatting blind spot.** It matches a call's receiver
+with a regex, so a call split across lines is invisible to it:
+
+```
+const history = t
+  .history_labels()      // never counted
+```
+
+That is the same failure family as the alias undercount that hid 93 sites and
+the multi-line `async (` head that misfiled 16. Scale was measured rather than
+assumed: exactly one instance existed in the whole codebase, and this release
+removed it. A test now asserts the blind spot stays empty.
+
+**#6 — parked, with numbers.** `has_transparency()` composites the entire
+document and scans every pixel; `.any()` short-circuits but the composite it
+runs first does not. It costs 61.9 ms against 0.3 ms for the other ten fields
+combined, and lands at stroke end — a hitch when you lift the brush, not a
+dropped frame. Not introduced here and not worsened here. Details and options in
+`docs/PARKING_LOT.md`.
+
+**#7 — the sweep says the compressible part is over.** One pass over every
+`.ts`/`.tsx` under `app/src` looking only for the capture shape, written up in
+`docs/engine-worker-capture-sweep.md`. a3–a5 removed ~52 sites between them
+because each found a large capture; **four captures remain worth converting,
+covering ~11 sites.** The other ~82 are genuinely one-at-a-time. Expect the gate
+to slow from here and do not read that as stalling.
+
+It also named a second capture family, **hit-test then look up**: an id from
+`shape_annotation_at(x, y)` indexed into the list from `get_shape_annotations()`.
+An id is only meaningful against the list it was drawn from — delete an
+annotation between the two reads and `.find()` returns undefined and the click
+silently does nothing. Three instances. That shape would not have been found by
+looking for the pixels-at-dimensions one.
+
+And the sweep found a blind spot in itself: optional chaining
+(`toolRef.current?.undo()`) did not match its `receiver.method(` pattern, hiding
+all five of `useHistory`'s sites. That is the fourth detector on this arc
+defeated by formatting, after the alias undercount (93 sites), the multi-line
+`async (` head (16) and the multi-line receiver (1). Cross-checking the sweep
+against `engine-call-audit.mjs` is what caught it, which is the practice to keep.
+
+**Gates.** `cargo fmt`/`clippy` clean, 138 Rust tests, 428 JS tests, `tsc` clean,
+eslint 0 errors, app + marketing builds clean. Engine 767,555 → 772,336 bytes
+(+4,781) for two capture methods, one dimensions method and their structs.

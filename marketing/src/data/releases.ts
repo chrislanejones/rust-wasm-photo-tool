@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.90",
+    date: "2026-08-09",
+    headline: "One question, one answer",
+    entries: [
+      {
+        tag: "perf",
+        text: "Creating a share link with \u201cPhoto only\u201d set was building the whole image twice to work out two numbers. It builds it once now, and skips a step it never needed \u2014 40 ms down to 17 ms on a 1385\u00d72068 photo.",
+      },
+      {
+        tag: "infra",
+        text: "The eleven values the editor reads to redraw itself \u2014 size, zoom, layers, undo history, export quality \u2014 now come back in a single call instead of eleven, so they can never describe two different moments. More groundwork for moving the engine onto a background thread.",
+      },
+    ],
+  },
+  {
     version: "v7.89",
     date: "2026-08-09",
     headline: "Cover for the Download All fix",

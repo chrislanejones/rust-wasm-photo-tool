@@ -81,12 +81,45 @@ import { join } from "node:path";
  *         composite, its tight bbox and the crop, so the split form did all of
  *         that three times to answer one question.
  *
- *  Work: the 138, 125, 117, 115 and 103 lines. The rest is the measurement
- *  catching up.
+ *     94  a5 landed: `useEngineCore`'s `syncState` — the eleven reads React
+ *         renders from — became one `capture_ui_state()`. Same ATOMIC CAPTURE
+ *         family as a3/a4: they are assembled into one object and handed to one
+ *         `setState`, so split behind the worker React would render a snapshot
+ *         that never existed. `syncState` has 74 call sites, so this is also
+ *         eleven boundary crossings per edit reduced to one.
+ *
+ *         ⚠️ THE ARITHMETIC IS 10, NOT 11, AND THE MISSING ONE IS AN AUDIT
+ *         BLIND SPOT — see the note below. 103 - 10 + 1 = 94.
+ *
+ *     93  housekeeping: `useExportDimensions` — the Share button's size label —
+ *         moved onto `export_dims_excluding_background()`. Only 2 -> 1 on the
+ *         counter, but the point was never the counter: each of the two getters
+ *         it replaced ran a whole `composite_excluding_background()` internally
+ *         and kept one integer, so a caption cost two full-document composites.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94 and 93 lines. The rest is the
+ *  measurement catching up.
+ *
+ *  THE THIRD FORMATTING BLIND SPOT (found during a5, 2026-08-09). The audit
+ *  matches an engine call's RECEIVER with a regex, so a call whose receiver and
+ *  method sit on different lines is invisible to it:
+ *
+ *      const history = t
+ *        .history_labels()      // <- never counted
+ *
+ *  That is the same failure family as the two already recorded above — the
+ *  alias undercount that hid 93 sites, and the multi-line `async (` head that
+ *  misfiled 16. Formatting defeats detection, three times now.
+ *
+ *  Scale, measured rather than assumed: a scan of every .ts/.tsx under app/src
+ *  at 63e4239, comments stripped, receiver on one line and a d.ts-declared
+ *  method on the next, found **exactly one** instance — this one. So the gate
+ *  was under-reporting by 1, not by a fraction, and it is now 0 because a5
+ *  removed it. `no_multiline_engine_calls` below keeps it that way.
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 103;
+const BUDGET = 93;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -191,8 +224,53 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // a4's final batch: five async sites (exportImage ×2, useCanvasActions ×2,
     // persistActiveCanvas) took un-awaited 35 − 10 = 25; ShareButton's
     // non-async arrow took restructure 69 − 2 = 67. Gate 115 − 12 = 103.
-    ).toBe(67);
+    // a5: `syncState` is a non-async `useCallback`, so all of its sites were
+    // restructure. Ten counted out, one `capture_ui_state` in: 67 - 10 + 1 = 58.
+    // un-awaited is untouched at 25 — a5 converted nothing in an async context.
+    // useExportDimensions' effect is a non-async callback, so its two sites
+    // were restructure: 58 - 2 + 1 = 57. un-awaited untouched at 25.
+    ).toBe(57);
     expect(gate.unawaited).toBe(25);
+  });
+
+  it("has no engine call the audit cannot see (multi-line receiver)", () => {
+    // THE AUDIT'S THIRD FORMATTING BLIND SPOT, found during a5. It matches a
+    // call's receiver with a regex, so this is invisible to it and silently
+    // absent from the gate:
+    //
+    //     const history = t
+    //       .history_labels()
+    //
+    // The gate is the whole point of Stage 3.5, and a gate that under-reports
+    // is worse than no gate — the same lesson as the alias undercount (93
+    // sites) and the multi-line `async (` head (16 misfiled). Rather than
+    // widen the audit's regex and shift every pinned number at once, this
+    // asserts the blind spot stays EMPTY. It was 1 before a5 and is 0 now.
+    //
+    // If this fails: either reformat the call onto one line, or teach
+    // `engine-call-audit.mjs` to resolve receivers through the AST and re-pin
+    // every count in this file deliberately. Do not just delete the test.
+    const declared = new Set(
+      [...readFileSync(join(SRC, "hooks/stamp_tool.d.ts"), "utf8").matchAll(
+        /^\s+([a-z_][a-z0-9_]*)\(/gm,
+      )].map((m) => m[1]),
+    );
+    const multiline =
+      /(?:toolRef\.current|\bt|\btool|\bengine)\s*\n\s*\.([a-z_][a-z0-9_]*)\s*\(/g;
+
+    const offenders: string[] = [];
+    for (const f of FILES) {
+      for (const m of code(f).matchAll(multiline)) {
+        if (declared.has(m[1])) offenders.push(`${rel(f)} -> .${m[1]}()`);
+      }
+    }
+
+    expect(
+      offenders,
+      `Engine call(s) split across lines, which the audit's receiver regex ` +
+        `cannot match — so they are missing from the gate count (${gate.remaining}) ` +
+        `and would be migrated by nobody:\n  ${offenders.join("\n  ")}`,
+    ).toEqual([]);
   });
 
   it("reports the truthy-trap sites so they are converted deliberately", () => {

@@ -207,8 +207,34 @@ export function useEngineCore(
   const syncState = useCallback(() => {
     const t = toolRef.current;
     if (!t) return;
-    const history: HistoryEntry[] = t
-      .history_labels()
+    // ATOMIC CAPTURE (ADR-024). This used to be eleven separate engine reads
+    // assembled into one object and handed to one `setState`. They describe a
+    // single document state and are consumed together, so they cannot be
+    // converted to eleven awaits: behind the worker React would render a
+    // snapshot that never existed — a width from before a resize beside an undo
+    // count from after, a layer list from one moment beside the active layer id
+    // from another. Nothing throws, and it self-corrects on the next sync,
+    // which is exactly the profile of a months-long intermittent.
+    //
+    // `syncState` runs after essentially every mutation (74 call sites), so
+    // this is also eleven boundary crossings per edit reduced to one.
+    const ui = t.capture_ui_state();
+    const {
+      has_source,
+      undo_count,
+      redo_count,
+      history_labels,
+      zoom,
+      width,
+      height,
+      has_transparency,
+      layers_json,
+      active_layer_id,
+      export_quality,
+    } = ui;
+    ui.free();
+
+    const history: HistoryEntry[] = history_labels
       .split("|")
       .map((part: string, i: number) => {
         const colon = part.indexOf(":");
@@ -218,31 +244,43 @@ export function useEngineCore(
           index: i,
         };
       });
+    // The engine hands `layers_json` over raw and the parse stays here, where
+    // it always was — `LayerInfo`'s shape is a JS type, and parsing it engine
+    // side would put a second definition of the format in Rust.
+    //
+    // `activeLayerId` stays COUPLED to that parse, deliberately. It is a plain
+    // u32 that cannot fail, so hoisting it out reads like an obvious tidy-up —
+    // but the original reset it to 0 when the layer array failed to parse, and
+    // that pairing is the self-consistent one: an empty `layers` beside a
+    // non-zero `activeLayerId` describes a layer that is not in the list, and
+    // anything downstream doing a lookup would find nothing. Same behaviour as
+    // before this became a capture.
     let layers: LayerInfo[];
     let activeLayerId = 0;
     try {
-      layers = JSON.parse(t.get_layers()) as LayerInfo[];
-      activeLayerId = t.active_layer_id();
+      layers = JSON.parse(layers_json) as LayerInfo[];
+      activeLayerId = active_layer_id;
     } catch {
       layers = [];
     }
+
     setState({
       ready: true,
-      hasSource: t.has_source() && !sourceDisarmedRef.current,
+      hasSource: has_source && !sourceDisarmedRef.current,
       sourcePos: sourcePosRef.current,
-      undoCount: t.undo_count(),
-      redoCount: t.redo_count(),
+      undoCount: undo_count,
+      redoCount: redo_count,
       history,
-      zoom: t.get_zoom(),
-      width: t.width(),
-      height: t.height(),
-      hasTransparency: t.has_transparency(),
+      zoom,
+      width,
+      height,
+      hasTransparency: has_transparency,
       layers,
       activeLayerId,
       // ADR-031. Published here rather than mirrored in React, so an undo that
       // restores the snapshot's quality reaches the slider through the same
       // path as every other engine change.
-      exportQuality: t.export_quality(),
+      exportQuality: export_quality,
     });
   }, []);
 
