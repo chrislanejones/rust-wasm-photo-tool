@@ -14,6 +14,7 @@
 // not a crash, an undo stack that stops reproducing. So the ordering is
 // written down here rather than delegated.
 import type { EngineReply, EngineRequest } from "@/workers/engine.worker";
+import { NO_CANVAS } from "./canvasGeneration";
 
 /** How long a single engine call may take before the caller is told it hung.
  *  A 12MP sharpen measured ~470 ms; 30 s is "the worker died", not "slow". */
@@ -76,7 +77,17 @@ export class EngineWorkerClient {
    * they were made here. That is the property the op log needs — see the note
    * at the top of the file.
    */
-  call<T = unknown>(method: string, args: unknown[] = [], transfer: Transferable[] = []): Promise<T> {
+  call<T = unknown>(
+    method: string,
+    args: unknown[] = [],
+    transfer: Transferable[] = [],
+    /** ADR-024 a11.2 — pass the canvas generation this call is aimed at, and
+     *  ONLY for canvas-targeted work. Omit it for everything that does not
+     *  touch the drawing surface, which is nearly everything; tagging those
+     *  would add a failure mode without adding a guarantee. A stale value is
+     *  rejected by the worker, not skipped. */
+    canvasGeneration?: number,
+  ): Promise<T> {
     if (!this.worker) return Promise.reject(new Error("engine worker not started"));
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {
@@ -90,8 +101,35 @@ export class EngineWorkerClient {
       }, CALL_TIMEOUT_MS);
       this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer, method });
       const req: EngineRequest & { kind: "call" } = { kind: "call", id, method, args };
+      if (canvasGeneration !== undefined) req.canvasGeneration = canvasGeneration;
       this.worker!.postMessage(req, transfer);
     });
+  }
+
+  /**
+   * Tell the worker which canvas element is live — ADR-024 a11.2.
+   *
+   * Call this on every canvas mount, with the generation from
+   * `lib/engine/canvasIdentity.ts`. a12 will additionally hand over the
+   * transferred `OffscreenCanvas` here; until then only the number moves, which
+   * is enough for the worker to refuse work aimed at an element that is gone.
+   *
+   * Not batched with `call`: this is a statement about which surface exists,
+   * not a request, and it must not queue behind pending work — the whole point
+   * is that the worker learns the old element died BEFORE it drains anything
+   * else aimed at it.
+   */
+  setCanvas(generation: number, canvas?: OffscreenCanvas): void {
+    if (!this.worker) return;
+    if (generation === NO_CANVAS) {
+      // Detach: nothing is live, so every canvas-targeted call is now stale.
+      this.worker.postMessage({ kind: "canvas", generation: NO_CANVAS });
+      return;
+    }
+    this.worker.postMessage(
+      { kind: "canvas", generation, canvas },
+      canvas ? [canvas] : [],
+    );
   }
 
   /** Withdraw a queued call. No effect once it has entered the engine — wasm

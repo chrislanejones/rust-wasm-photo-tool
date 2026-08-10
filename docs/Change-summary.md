@@ -3770,3 +3770,75 @@ against `engine-call-audit.mjs` is what caught it, which is the practice to keep
 **Gates.** `cargo fmt`/`clippy` clean, 138 Rust tests, 428 JS tests, `tsc` clean,
 eslint 0 errors, app + marketing builds clean. Engine 767,555 → 772,336 bytes
 (+4,781) for two capture methods, one dimensions method and their structs.
+
+## v7.91 Change Summary — 2026-08-09
+
+ADR-024 Stage 4, steps a11.1 and a11.2. No user-visible change. The flag is
+still off and the worker is still unimported.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Canvas element identity — every `<canvas>` gets a generation | **Added** (a11.1) |
+| 2 | The staleness rule + protocol slot, and a guard that arms at a12 | **Added** (a11.2) |
+| 3 | Two comments describing the remount mechanism wrongly | **Corrected** |
+| 4 | a11.2's shipped bytes | **Zero** — bundle hash unchanged from a11.1 |
+
+**Why these ship together.** a11.1 establishes the generation; a11.2 gives it
+meaning. Separately, a11.1 is a counter nothing consults.
+
+**#1 — what actually remounts, measured.** Not "an ordinary tool switch". Against
+the v7.90 production build the canvas element survives compress → brush → crop →
+magic-wand intact. It is re-created when crossing the **Batch** boundary, because
+`AppShell` renders `<CanvasArea>` in both arms of its `activeTool === "emoji"`
+ternary. Five crossings produced five distinct elements.
+
+Today that self-heals: the component remounts, its effects re-run, and
+`flushToCanvas()` repaints. After `transferControlToOffscreen()` it will not —
+the worker holds the surface of an element React has discarded, keeps drawing,
+and nothing throws. Silent, from an ordinary action, and possibly fixed by the
+next remount, which is the profile that let the batch-export bug survive two
+months.
+
+**The counter must outlive what it counts, and the first build got that wrong.**
+`useCanvasIdentity` was called inside `CanvasArea` — the component that remounts
+— so it was destroyed by exactly the event it exists to observe. Every gate was
+green: `tsc`, lint, 439 tests, production build. The browser showed **five
+distinct canvas elements and a generation still reading 1**. Moved to `AppShell`,
+which does not remount; a structural test now pins the ownership.
+
+**#2 — half of a11.2's specification had no subject.** It is written as "transfer
+carries it, draws carry it, stale draws are rejected". The worker owns a wasm
+engine and a FIFO queue, but **no OffscreenCanvas and no drawing** — that arrives
+with a12. So there are no draws to tag.
+
+Rather than invent a draw path to guard, this ships the rule
+(`staleCanvasReason`), the protocol field (`canvasGeneration` on requests), the
+`canvas` message that a12 will use to carry the transferred surface, and
+rejection **before** dispatch with a reply rather than a silent skip. A
+structural test then fails the moment `engine.worker.ts` gains `getContext`,
+`drawImage` or `transferControlToOffscreen` without routing through the check.
+
+**a11.2's real verification therefore arrives at a12, not here.** That is stated
+rather than implied: a guard with no traffic proves nothing by passing.
+
+**#3 — two comments that had shaped the plan.** `CanvasArea.tsx` said the re-blit
+effect fires when "the canvas element re-mounts (ref changes)" — `canvasRef` is a
+`useRef` created once in `AppShell`, and a ref object's identity never changes,
+so that dependency is inert. `AppShell.tsx` said `CanvasArea` is "rendered ONCE
+(a stable React subtree)"; it is rendered twice.
+
+**#4 — the acceptance evidence.** a11.2's production build produced a bundle hash
+**identical** to a11.1's, because `EngineWorkerClient` has no importer. Zero
+shipped bytes, proven rather than argued — which is the right standard for work
+touching the live render path. (a11.1 itself does change the bundle: the callback
+ref is real shipped code.)
+
+**Mutation-tested: 11 mutants, all caught — after two initially survived.** One
+because a windowed source search for `reply(` matched an unrelated later one, so
+deleting the stale-reply passed; it now pins the exact statement. The other
+because removing the generation-0 branch still produced a rejection — the generic
+mismatch arm catches `0 !== 4` anyway — so the verdict was right by accident.
+Asserting the message pins the branch.
+
+**Gates.** 453 JS tests (up from 440), `tsc` clean, eslint 0 errors, app +
+marketing builds clean. Engine untouched.

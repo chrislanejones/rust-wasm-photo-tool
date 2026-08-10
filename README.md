@@ -84,6 +84,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.91 — 2026-08-09
+
+**Nothing you can see.** Groundwork for moving the engine onto a background
+thread. The app now keeps track of which drawing surface is live and gives each
+one a number, so a later change can refuse work aimed at a surface that has been
+replaced instead of drawing into nothing.
+
+Worth knowing why that matters: once the engine draws from a background thread,
+switching in and out of Batch replaces the canvas underneath it. Without this,
+the background thread would keep painting into the old one — no error, no
+warning, just a blank screen.
+
+<details><summary>Older releases</summary>
+
 ### v7.90 — 2026-08-09
 
 **Nothing you can see, and one thing you can feel.** Creating a share link with
@@ -95,8 +109,6 @@ The rest is groundwork for moving the engine onto a background thread. The
 eleven values the editor reads to redraw itself — size, zoom, layers, undo
 history, export quality — now come back in one call instead of eleven, so they
 can never describe two different moments.
-
-<details><summary>Older releases</summary>
 
 ### v7.89 — 2026-08-09
 

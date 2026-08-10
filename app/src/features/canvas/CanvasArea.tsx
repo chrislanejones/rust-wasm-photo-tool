@@ -182,6 +182,10 @@ interface Props {
   lassoCommitted?: Int32Array | null;
   lassoPreview?: Int32Array | null;
   containerRef?: React.RefObject<HTMLDivElement | null>;
+  /** ADR-024 a11.1 — the canvas ref callback, owned by AppShell so the
+   *  generation counter outlives this component's remounts. Optional: without
+   *  it the forwarded ref is used directly, exactly as before. */
+  attachCanvas?: (el: HTMLCanvasElement | null) => void;
   onTextPositionChange?: (canvasX: number, canvasY: number) => void;
   onTextFontSizeChange?: (size: number) => void;
   onTextRotationChange?: (angle: number) => void;
@@ -412,6 +416,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onTextBlur,
       textSettings,
       containerRef: externalContainerRef,
+      attachCanvas: externalAttachCanvas,
       onTextPositionChange,
       onTextFontSizeChange,
       onTextRotationChange,
@@ -458,6 +463,24 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
   ) => {
     const { onMouseDown, onMouseMove, onMouseUp, state, flushToCanvas } = hookResult;
     const canvasRef = ref as React.RefObject<HTMLCanvasElement | null>;
+
+    // ADR-024 a11.1 — the canvas ref, via AppShell's identity tracker when it
+    // supplies one.
+    //
+    // `attachCanvas` MUST come from above this component. The counter has to
+    // outlive the thing it counts, and THIS COMPONENT is the thing it counts:
+    // AppShell renders <CanvasArea> in both arms of its `activeTool ===
+    // "emoji"` ternary, so crossing the Batch boundary unmounts one instance
+    // and mounts the other. A `useRef` in here is destroyed by exactly the
+    // event it exists to observe.
+    //
+    // That was built the wrong way round first and the browser caught it: five
+    // distinct canvas elements, generation still reading 1, because each new
+    // CanvasArea started a fresh counter from zero. Unit tests were green — the
+    // bookkeeping was correct, its OWNER was not.
+    //
+    // Falls back to the forwarded ref so the component still works standalone.
+    const attachCanvas = externalAttachCanvas ?? ref;
     const internalContainerRef = useRef<HTMLDivElement>(null);
     const containerRef = externalContainerRef ?? internalContainerRef;
 
@@ -540,9 +563,21 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // need to be re-blitted. Likewise, if the container resizes and something
     // mutates canvas.width/.height as a side-effect, the bitmap is cleared.
     // This effect re-flushes the WASM buffer to the canvas whenever:
-    //   • the canvas element re-mounts (ref changes),
+    //   • THIS COMPONENT mounts — which is what a canvas remount actually is,
     //   • the WASM image dimensions change (state.width / state.height),
     //   • the surrounding container resizes (via ResizeObserver).
+    //
+    // ⚠️ The first line used to read "the canvas element re-mounts (ref
+    // changes)". Corrected 2026-08-09: `canvasRef` is a `useRef` created once
+    // in AppShell:253, and a ref OBJECT's identity never changes, so listing it
+    // in the dep array below cannot fire on a remount. The recovery works for a
+    // different reason — AppShell renders <CanvasArea> in both arms of its
+    // `activeTool === "emoji"` ternary, so crossing the Batch boundary unmounts
+    // this component and mounts a new one, and a fresh effect flushes on mount.
+    //
+    // Measured against the v7.90 production build: ordinary tool switches
+    // (compress → brush → crop → magic-wand) keep the SAME element; entering
+    // and leaving Batch produced three distinct elements, none blank.
     useEffect(() => {
       const canvas = canvasRef.current;
       const container = containerRef.current;
@@ -1264,7 +1299,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             As the element's own background it shares every scaling mechanism —
             CSS fit, zoom transform, pan — by construction. */}
         <canvas
-          ref={ref}
+          ref={attachCanvas}
           className="main-canvas checkerboard-canvas"
           style={{
             // Item 3: Fixed zoom + pan transform

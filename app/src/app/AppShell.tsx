@@ -82,6 +82,7 @@ import { useSelectionActions } from "./session/useSelectionActions";
 import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
 import { useExportDimensions } from "./session/useExportDimensions";
+import { useCanvasIdentity } from "@/lib/engine/canvasIdentity";
 import { useImageSession } from "./session/useImageSession";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
@@ -251,6 +252,21 @@ const BOOT_MIN_SPLASH_MS = 900;
 
 export function AppShell() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // ADR-024 a11.1 — canvas element identity, owned HERE on purpose.
+  //
+  // `<CanvasArea>` is rendered in both arms of the `activeTool === "emoji"`
+  // ternary below, so crossing the Batch boundary unmounts one instance and
+  // mounts the other, re-creating the <canvas>. The counter therefore cannot
+  // live inside CanvasArea — it would be destroyed by the event it exists to
+  // count. AppShell does not remount, so it does.
+  //
+  // `attachCanvas` still writes the element into `canvasRef`, so every
+  // existing `canvasRef.current` reader is untouched. Nothing else changes
+  // yet: a11.2 carries this generation into the worker protocol so a draw
+  // aimed at a discarded element is REFUSED rather than performed into a
+  // detached surface. See lib/engine/canvasIdentity.ts.
+  const { attach: attachCanvas } = useCanvasIdentity<HTMLCanvasElement>(canvasRef);
   // The arrow/shapes/crop rubber-band surface. Lives here only because
   // `useDrawingTools` (which draws on it) and `CanvasArea` (which mounts it)
   // both hang off this component; it carries no logic.
@@ -3105,9 +3121,21 @@ export function AppShell() {
                   fit between the fixed TopBar and GalleryBar. The grid sits
                   inside, capped at a 5:3 aspect ratio with gap + padding for
                   breathing room. Non-emoji mode falls through to the regular
-                  full-size canvas host. The CanvasArea below is rendered ONCE
-                  (a stable React subtree) so the canvas DOM + WASM pixels
-                  survive tool switches; only the wrapper around it changes. */}
+                  full-size canvas host.
+
+                  ⚠️ This used to claim CanvasArea "is rendered ONCE (a stable
+                  React subtree) so the canvas DOM + WASM pixels survive tool
+                  switches". It is rendered TWICE — once in each arm of this
+                  ternary — so crossing the Batch boundary unmounts one and
+                  mounts the other, and the <canvas> element is genuinely
+                  re-created. Corrected 2026-08-09 after measuring element
+                  identity across tool switches in the browser.
+
+                  The pixels do survive, because WASM owns them and a fresh
+                  CanvasArea re-blits on mount. What does not survive is the
+                  ELEMENT — which is why ADR-024 a11 exists: after
+                  transferControlToOffscreen() the worker would go on drawing
+                  into the discarded one. See lib/engine/canvasIdentity.ts. */}
               {activeTool === "emoji" ? (
                 <div
                   style={{
@@ -3153,6 +3181,7 @@ export function AppShell() {
                     >
                       <div style={{ position: "absolute", inset: 0 }}>
                         <CanvasArea
+                      attachCanvas={attachCanvas}
                           ref={canvasRef}
                           drawPreviewRef={drawPreviewRef}
                           hookResult={effectiveStamp}
@@ -3242,6 +3271,7 @@ export function AppShell() {
                 <div className="canvas-fullsize-host">
                   <div className="canvas-fullsize-slot">
                     <CanvasArea
+                      attachCanvas={attachCanvas}
                       ref={canvasRef}
                       drawPreviewRef={drawPreviewRef}
                       hookResult={effectiveStamp}

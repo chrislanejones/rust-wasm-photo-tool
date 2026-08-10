@@ -22,6 +22,7 @@
 // but only while every mutation goes through one port, in order. Comlink would
 // give correct results with no ordering promise between concurrent calls.
 import type { ImageHorseTool } from "stamp_tool";
+import { staleCanvasReason, NO_CANVAS } from "@/lib/engine/canvasGeneration";
 
 export interface EngineRequest {
   /** Monotonic per-port. Echoed back so a reply cannot be mismatched. */
@@ -31,6 +32,14 @@ export interface EngineRequest {
   args: unknown[];
   /** Transferables the caller handed over; already detached on this side. */
   transfer?: Transferable[];
+  /** ADR-024 a11.2 — which canvas element this call is aimed at.
+   *
+   *  OMITTED for the overwhelming majority of calls, which do not touch the
+   *  drawing surface (`width()`, `undo()`, …). Present only for canvas-targeted
+   *  work, and then checked against the live generation before the call runs.
+   *  See `lib/engine/canvasGeneration.ts` for why a stale one is rejected
+   *  rather than skipped. */
+  canvasGeneration?: number;
 }
 
 export interface EngineReply {
@@ -44,6 +53,18 @@ export interface EngineReply {
 
 let tool: ImageHorseTool | null = null;
 let ready = false;
+
+// ADR-024 a11.2 — which canvas element this worker believes is live.
+//
+// Set by the `canvas` message, which a12 will also use to carry the transferred
+// OffscreenCanvas. Until then it holds a generation and no surface, which is
+// enough to make the staleness rule real and testable.
+//
+// `NO_CANVAS` (0) is the honest starting value: nothing has been attached, so
+// any canvas-targeted call is stale by definition rather than accidentally
+// matching a default.
+let canvasGeneration: number = NO_CANVAS;
+let surface: OffscreenCanvas | null = null;
 
 /** Requests accepted but not yet executed, oldest first. */
 const queue: EngineRequest[] = [];
@@ -76,6 +97,19 @@ async function drain() {
         reply({ id: req.id, ok: false, error: "engine not initialised" });
         continue;
       }
+      // ADR-024 a11.2 — refuse work aimed at a canvas that is gone.
+      //
+      // Before the transfer this can only fire if a caller tags a call with a
+      // generation, which nothing does yet. After it, this is what stops the
+      // worker painting into a detached surface while the user watches a blank
+      // element. REPLYING is the point: skipping the call would reproduce the
+      // silent blank it exists to prevent.
+      const stale = staleCanvasReason(req.canvasGeneration, canvasGeneration);
+      if (stale !== null) {
+        reply({ id: req.id, ok: false, error: stale });
+        continue;
+      }
+
       const fn = (tool as unknown as Record<string, unknown>)[req.method];
       if (typeof fn !== "function") {
         reply({ id: req.id, ok: false, error: `no such engine method: ${req.method}` });
@@ -113,6 +147,7 @@ self.onmessage = async (e: MessageEvent) => {
   const d = e.data as
     | { kind: "init"; width: number; height: number }
     | { kind: "cancel"; id: number }
+    | { kind: "canvas"; generation: number; canvas?: OffscreenCanvas }
     | { kind: "dispose" }
     | ({ kind: "call" } & EngineRequest);
 
@@ -126,6 +161,15 @@ self.onmessage = async (e: MessageEvent) => {
       break;
     }
 
+    case "canvas":
+      // a12 will pass the transferred OffscreenCanvas here. Today the surface
+      // is absent and only the generation moves, which is deliberate: the rule
+      // and its protocol slot exist before the thing they protect, so the
+      // transfer cannot land without them.
+      surface = d.canvas ?? surface;
+      canvasGeneration = d.generation;
+      break;
+
     case "cancel":
       // Only meaningful before the request is shifted off the queue. A call
       // already inside the engine cannot be interrupted — wasm is synchronous
@@ -137,6 +181,8 @@ self.onmessage = async (e: MessageEvent) => {
       tool?.free();
       tool = null;
       ready = false;
+      surface = null;
+      canvasGeneration = NO_CANVAS;
       queue.length = 0;
       cancelled.clear();
       break;

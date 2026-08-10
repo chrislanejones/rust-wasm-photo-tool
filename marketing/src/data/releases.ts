@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.91",
+    date: "2026-08-09",
+    headline: "Knowing which canvas is the real one",
+    entries: [
+      {
+        tag: "infra",
+        text: "Groundwork for moving the engine onto a background thread. The app now tracks which drawing surface is live and gives each one a number, so a later change can refuse work aimed at a surface that has already been replaced. It matters because switching in and out of Batch replaces the canvas underneath \u2014 and a background thread that kept painting into the old one would show a blank screen with no error at all.",
+      },
+    ],
+  },
+  {
     version: "v7.90",
     date: "2026-08-09",
     headline: "One question, one answer",
