@@ -145,6 +145,25 @@ declare module "stamp_tool" {
     height: number;
   }
 
+  /**
+   * The pen path under a canvas point, hit-test and lookup in one call.
+   * Returned by `capture_pen_hit()`.
+   *
+   * `id` is -1 for "no pen path here" — the same sentinel
+   * `shape_annotation_at` uses — and covers BOTH "nothing is there" and "the
+   * topmost shape there is not a pen path". `points` is the flat control
+   * sequence `[x0,y0,x1,y1,…]`, empty on a miss.
+   *
+   * Tens of floats, not megabytes, so there is no read-once discipline here
+   * beyond the usual `.free()`.
+   */
+  export class PenHit {
+    private constructor();
+    free(): void;
+    id: number;
+    points: Float64Array;
+  }
+
   export class UiStateCapture {
     private constructor();
     free(): void;
@@ -288,6 +307,15 @@ declare module "stamp_tool" {
      *  beside an undo count from after). NOT `capture_state()`: that one is
      *  what gets saved, this is what gets drawn. Free it when done. */
     capture_ui_state(): UiStateCapture;
+    /** The pen path under a canvas point, atomically — the one-call form of
+     *  `shape_annotation_at(x, y)` + `get_shape_annotations()`. HIT-TEST THEN
+     *  LOOK UP: an id is only meaningful against the list it was drawn from,
+     *  and behind the worker a shape deleted between the two reads makes the
+     *  lookup miss and the click do nothing, silently. `id` is -1 for both
+     *  "nothing there" and "the topmost shape there is not a pen path" —
+     *  TOPMOST-THEN-CHECK, so a rectangle over a path still means no path.
+     *  Free it when done. */
+    capture_pen_hit(x: number, y: number): PenHit;
     capture_composite(): RgbaCapture;
     /** The background-excluded composite and its CROPPED dimensions, atomically
      *  — the one-call form of `get_image_data_excluding_background()` +

@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.94",
+    date: "2026-08-10",
+    headline: "One question instead of two, where the gap would have mattered",
+    entries: [
+      {
+        tag: "rust",
+        text: "Clicking a pen path to re-edit it used to ask the engine two questions: which path is under this point, then give me every path so I can look that one up. Two questions with a gap between them. The gap is empty today; once the engine moves to a background thread it stops being, and a path deleted in that gap would make the click do nothing at all — no error, no message, just a click that does not work. It is one question now, and the engine keeps the rule the app used to apply itself: a rectangle drawn over a pen path still means “no pen path here” rather than reaching through it.",
+      },
+      {
+        tag: "infra",
+        text: "A second place that looked like exactly the same problem turned out not to be, and was deliberately left alone: clicking a text annotation commits whatever you were typing in between its two reads, so the gap there is intentional rather than accidental. Converting it would have changed what happens when you empty a text box and click where it was.",
+      },
+    ],
+  },
+  {
     version: "v7.93",
     date: "2026-08-10",
     headline: "The one number the background-thread plan assumed, measured",

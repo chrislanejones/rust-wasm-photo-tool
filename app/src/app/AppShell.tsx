@@ -849,18 +849,22 @@ export function AppShell() {
     (ix: number, iy: number): { id: number; points: number[] } | null => {
       const tool = stamp.toolRef.current;
       if (!tool) return null;
-      const id = tool.shape_annotation_at(ix, iy);
-      if (id < 0) return null;
+      // ADR-024 Stage 3.5, a7 — ATOMIC CAPTURE. This was
+      // `shape_annotation_at()` then `get_shape_annotations()`, with the id
+      // from the first used to index into the second. Two reads describing one
+      // document state: behind the worker a shape deleted between them makes
+      // the lookup miss, this return null, and clicking a pen path do nothing
+      // at all — no throw, nothing in the console. `capture_pen_hit` does both
+      // under one `&self`, so there is no between.
+      const hit = tool.capture_pen_hit(ix, iy);
       try {
-        const shapes = JSON.parse(tool.get_shape_annotations()) as Array<{
-          id: number;
-          kind: number;
-          points: number[][];
-        }>;
-        const path = shapes.find((s) => s.id === id && s.kind === 7);
-        return path ? { id, points: path.points.flat() } : null;
-      } catch {
-        return null;
+        // -1 covers both "nothing there" and "the topmost shape there is not a
+        // pen path" — the engine keeps the topmost-then-check rule this call
+        // site used to apply itself via `kind === 7`.
+        if (hit.id < 0) return null;
+        return { id: hit.id, points: Array.from(hit.points) };
+      } finally {
+        hit.free();
       }
     },
     [stamp],

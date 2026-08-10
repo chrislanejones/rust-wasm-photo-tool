@@ -119,7 +119,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 93;
+const BUDGET = 92;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -229,7 +229,12 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // un-awaited is untouched at 25 — a5 converted nothing in an async context.
     // useExportDimensions' effect is a non-async callback, so its two sites
     // were restructure: 58 - 2 + 1 = 57. un-awaited untouched at 25.
-    ).toBe(57);
+    // a7: `handlePenHitTest` is a non-async `useCallback`, so both of its sites
+    // (`shape_annotation_at` + `get_shape_annotations`) were restructure, and
+    // the `capture_pen_hit` replacing them lands in the same bucket:
+    // 57 - 2 + 1 = 56. un-awaited untouched at 25 — a7 converted nothing in an
+    // async context.
+    ).toBe(56);
     expect(gate.unawaited).toBe(25);
   });
 

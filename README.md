@@ -84,6 +84,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.94 — 2026-08-10
+
+**Nothing you can see, and one thing that can no longer go wrong later.**
+Clicking a pen path to re-edit it used to ask the engine two questions: which
+path is under this point, then give me every path so I can look that one up. Two
+questions with a gap between them. Today the gap is empty; once the engine moves
+to a background thread it stops being, and a path deleted in that gap would make
+the click do nothing at all — no error, no message, just a click that does not
+work. It is one question now.
+
+The engine also keeps the rule the app used to apply itself: a rectangle drawn
+over a pen path still means "no pen path here", rather than reaching through it.
+
+<details><summary>Older releases</summary>
+
 ### v7.93 — 2026-08-10
 
 **Nothing you can see.** The plan to move the engine onto a background thread
@@ -98,8 +113,6 @@ never both at once. Two other things fell out of the run: the first operation
 after switching costs about 1.8x the ones after it, so the switch has to warm
 the thread up before handing it work; and the old thread has to be shut down
 rather than left idle, because the memory it holds is never given back.
-
-<details><summary>Older releases</summary>
 
 ### v7.92 — 2026-08-09
 

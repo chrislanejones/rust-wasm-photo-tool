@@ -218,6 +218,27 @@ pub struct UiStateCapture {
     pub export_quality: u8,
 }
 
+/// The pen path under a point, hit-test and lookup in one call. Returned by
+/// `capture_pen_hit()`.
+///
+/// `getter_with_clone` is required for `points` (`Vec<f64>` is not `Copy`), so
+/// reading it copies the control sequence out of wasm memory. A pen path is
+/// tens of points, not megabytes, so unlike `RgbaCapture` there is no
+/// read-once discipline to observe here beyond the usual `.free()`.
+#[wasm_bindgen(getter_with_clone)]
+pub struct PenHit {
+    /// The bezier annotation's id, or **-1** for "no pen path here" — the same
+    /// sentinel `shape_annotation_at` already uses, rather than a second
+    /// convention for absence. (`Option<u32>` was the alternative; the
+    /// annotations module notes wasm-bindgen's `Option` support is uneven, and
+    /// the -1 it settled on is what every caller in this area already reads.)
+    pub id: i32,
+    /// The flat control sequence `[x0,y0,x1,y1,…]`. Flat because that is the
+    /// form the caller built by hand — `path.points.flat()` — from the nested
+    /// pairs in `get_shape_annotations`' JSON. Empty when `id` is -1.
+    pub points: Vec<f64>,
+}
+
 #[wasm_bindgen]
 impl ImageHorseTool {
     /// The composite and its dimensions, atomically.
@@ -366,6 +387,63 @@ impl ImageHorseTool {
             layers_json: self.get_layers(),
             active_layer_id: self.active_layer_id(),
             export_quality: self.export_quality(),
+        }
+    }
+
+    /// The pen path under a canvas-space point, atomically.
+    ///
+    /// Replaces `shape_annotation_at(x, y)` + `get_shape_annotations()` in
+    /// `AppShell`'s `handlePenHitTest`, which is the HIT-TEST THEN LOOK UP
+    /// shape (`docs/engine-worker-capture-sweep.md`): read 1 answers *which
+    /// one*, read 2 returns *all of them*, and the id from the first indexes
+    /// into the second. An id is only meaningful against the list it was drawn
+    /// from. Behind the worker, a shape deleted between the two reads makes
+    /// `find` return `undefined`, `handlePenHitTest` return `null`, and the
+    /// click do nothing at all — no throw, no console error, the pen simply
+    /// does not enter re-edit.
+    ///
+    /// **TOPMOST-THEN-CHECK, not find-a-bezier.** This deliberately calls
+    /// `shape_annotation_at`, which returns the newest shape of ANY kind at the
+    /// point, and only then asks whether that shape is a pen path. Filtering to
+    /// kind 7 inside the hit-test loop would be a different function: it would
+    /// reach THROUGH a rectangle lying over a pen path and re-edit the path
+    /// underneath, where today the rectangle means "no pen path here". That is
+    /// why this is not named `bezier_annotation_at` — the hit-test is not
+    /// bezier-aware and must not become so as a side effect of this change.
+    ///
+    /// Aggregation, not reimplementation: the hit logic is `shape_annotation_at`
+    /// itself, so there is no second copy of the padding and
+    /// distance-to-segment rules to drift from the first. Only the by-id lookup
+    /// is here, and it is the lookup the JS was doing.
+    pub fn capture_pen_hit(&self, x: f64, y: f64) -> PenHit {
+        /// `ShapeAnnotation::kind` for a cubic pen path. The crate carries no
+        /// named constant for the kind codes — they are documented on the field
+        /// and written as literals — so this is local rather than a new shared
+        /// definition that would have exactly one user.
+        const KIND_BEZIER: u8 = 7;
+        const MISS: PenHit = PenHit {
+            id: -1,
+            points: Vec::new(),
+        };
+
+        let id = self.shape_annotation_at(x, y);
+        // A fast path, not the guard. `shape_annotation_at` returns -1 or a real
+        // id, so a -1 reaching the lookup below simply matches nothing and lands
+        // on `_ => MISS` — which is why mutating this condition is an EQUIVALENT
+        // mutant and no test can kill it. The `_` arm is the actual backstop.
+        if id < 0 {
+            return MISS;
+        }
+        match self.layers[self.active]
+            .shape_annotations
+            .iter()
+            .find(|s| s.id as i32 == id)
+        {
+            Some(s) if s.kind == KIND_BEZIER => PenHit {
+                id,
+                points: s.points.iter().flat_map(|&(px, py)| [px, py]).collect(),
+            },
+            _ => MISS,
         }
     }
 }
@@ -845,5 +923,196 @@ mod capture_tests {
         }
         r.u32();
         assert_eq!(r.p, blob.len(), "empty-document frame must parse cleanly");
+    }
+
+    // ── capture_pen_hit ────────────────────────────────────────────────────
+    //
+    // Every field is driven OFF its default before it is asserted: the id is
+    // never 0 or -1 (both defaults for `i32` and for "miss"), and the points
+    // are distinct non-zero values in a deliberate order. A test whose expected
+    // value equals the type's default passes for the wrong reason — that exact
+    // mistake survived a mutant in a5.
+
+    /// A pen path whose control sequence is asymmetric in x, y AND order, so a
+    /// mutant that flattens the pairs the wrong way round, drops a coordinate,
+    /// or reverses the sequence cannot produce this list by accident.
+    const PEN_PTS: [f64; 8] = [12.0, 34.0, 56.0, 78.0, 90.0, 21.0, 43.0, 65.0];
+
+    /// The probe point, and it is asymmetric ON PURPOSE. `PEN_PTS` has a padded
+    /// bounding box of x∈[6,96], y∈[15,84], so a point like (43,65) is inside it
+    /// BOTH ways round and cannot tell `shape_annotation_at(x, y)` from
+    /// `shape_annotation_at(y, x)`. That mutant survived the first version of
+    /// these tests. (85,25) is inside; its swap (25,85) is above the box.
+    const HIT: (f64, f64) = (85.0, 25.0);
+
+    /// The two getters `capture_pen_hit` replaces, run the old way — hit-test,
+    /// parse the whole list, index into it by id. The capture must agree with
+    /// this on every input, because this is literally the code it replaced.
+    fn pen_hit_the_old_way(t: &ImageHorseTool, x: f64, y: f64) -> Option<(i32, Vec<f64>)> {
+        let id = t.shape_annotation_at(x, y);
+        if id < 0 {
+            return None;
+        }
+        let json = t.get_shape_annotations();
+        // Walk the JSON the way the JS did: find the object with this id, and
+        // require kind 7. Parsed by hand — pulling in serde for one test would
+        // add a dependency the crate deliberately does not carry.
+        let needle = format!("\"id\":{},\"kind\":7,", id);
+        let at = json.find(&needle)?;
+        let pts_at = json[at..].find("\"points\":[")? + at + "\"points\":[".len();
+        // Scan to the bracket that MATCHES the one `"points":[` consumed. The
+        // first draft of this helper stopped at the first `]`, which is the end
+        // of the first coordinate PAIR, not of the list — it read 2 values out
+        // of 8 and failed the capture for being right. Depth-count instead.
+        let mut depth = 1usize;
+        let mut end = pts_at;
+        for (i, c) in json[pts_at..].char_indices() {
+            match c {
+                '[' => depth += 1,
+                ']' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = pts_at + i;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut flat = Vec::new();
+        for pair in json[pts_at..end].split("],[") {
+            for n in pair.trim_matches(|c| c == '[' || c == ']').split(',') {
+                if !n.is_empty() {
+                    flat.push(n.parse::<f64>().unwrap());
+                }
+            }
+        }
+        Some((id, flat))
+    }
+
+    #[test]
+    fn capture_pen_hit_agrees_with_the_two_getters_it_replaces() {
+        let mut t = ImageHorseTool::new(128, 128);
+        t.load_image(&solid(128, 128, [10, 20, 30, 255]));
+        // Burn two ids so the one under test is neither 0 nor 1 — a capture
+        // that returned a hardcoded or off-by-one id would still pass against
+        // the first annotation ever added.
+        t.add_shape_annotation(
+            0, 100.0, 100.0, 110.0, 110.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        );
+        t.add_shape_annotation(
+            0, 112.0, 112.0, 120.0, 120.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        );
+        let pen_id = t.add_bezier_annotation(&PEN_PTS, "#00ff00", 3.0, 0, "#000000");
+
+        assert!(pen_id > 1, "id must be off its default: got {pen_id}");
+
+        // A point on the path's bounding box — the same point both paths see.
+        let (hx, hy) = HIT;
+        let old = pen_hit_the_old_way(&t, hx, hy).expect("the old way must find it");
+        assert_eq!(old.0, pen_id as i32);
+
+        let hit = t.capture_pen_hit(hx, hy);
+        assert_eq!(hit.id, old.0, "id must agree with shape_annotation_at");
+        assert_eq!(
+            hit.points, old.1,
+            "points must agree with get_shape_annotations"
+        );
+        // And independently of the old way, against the input itself.
+        assert_eq!(
+            hit.points,
+            PEN_PTS.to_vec(),
+            "points must be the flat input"
+        );
+        assert_eq!(hit.points.len(), 8, "four control points, flattened");
+        assert_ne!(hit.id, 0, "id is off the i32 default");
+        assert_ne!(hit.id, -1, "id is off the miss sentinel");
+    }
+
+    #[test]
+    fn capture_pen_hit_misses_report_minus_one_and_no_points() {
+        let mut t = ImageHorseTool::new(128, 128);
+        t.load_image(&solid(128, 128, [10, 20, 30, 255]));
+        t.add_bezier_annotation(&PEN_PTS, "#00ff00", 3.0, 0, "#000000");
+
+        // Far outside the path's padded bbox.
+        let hit = t.capture_pen_hit(126.0, 126.0);
+        assert_eq!(hit.id, -1, "empty space is a miss");
+        assert!(hit.points.is_empty(), "a miss carries no points");
+        assert!(
+            pen_hit_the_old_way(&t, 126.0, 126.0).is_none(),
+            "and the old way agrees it is a miss"
+        );
+    }
+
+    #[test]
+    fn capture_pen_hit_is_topmost_then_check_not_find_a_bezier() {
+        // THE BEHAVIOUR-PRESERVING CASE, and the one a "smarter" implementation
+        // breaks. `shape_annotation_at` returns the newest shape of ANY kind;
+        // the caller then required kind 7. So a rectangle drawn OVER a pen path
+        // means "no pen path here". An implementation that filtered to kind 7
+        // inside the hit-test loop would reach through the rectangle and return
+        // the path — a different feature, silently introduced.
+        let mut t = ImageHorseTool::new(128, 128);
+        t.load_image(&solid(128, 128, [10, 20, 30, 255]));
+        t.add_bezier_annotation(&PEN_PTS, "#00ff00", 3.0, 0, "#000000");
+        // A rect covering the whole path, added AFTER it so it is newest.
+        t.add_shape_annotation(
+            0, 5.0, 5.0, 95.0, 95.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        );
+
+        let hit = t.capture_pen_hit(HIT.0, HIT.1);
+        assert_eq!(
+            hit.id, -1,
+            "a shape on top of the path must read as a miss, not reach through it"
+        );
+        assert!(hit.points.is_empty());
+        // The old way must agree — this is the whole point of the assertion.
+        let old = pen_hit_the_old_way(&t, HIT.0, HIT.1);
+        assert!(
+            old.is_none(),
+            "the code being replaced also returned nothing here"
+        );
+    }
+
+    #[test]
+    fn capture_pen_hit_takes_self_by_reference() {
+        // `&self` is what makes the capture atomic behind the worker: the
+        // document cannot be mutated while it runs. A future edit promoting it
+        // to `&mut self` would silently remove that guarantee, so it is pinned
+        // by compiling a call through a shared reference — which does not
+        // compile against `&mut self`.
+        let mut t = ImageHorseTool::new(64, 64);
+        t.load_image(&solid(64, 64, [1, 2, 3, 255]));
+        let id = t.add_bezier_annotation(&PEN_PTS, "#00ff00", 3.0, 0, "#000000");
+
+        fn through_shared_ref(t: &ImageHorseTool, x: f64, y: f64) -> i32 {
+            t.capture_pen_hit(x, y).id
+        }
+        // Two live shared borrows across the call: impossible if it took &mut.
+        let borrow_a = &t;
+        let borrow_b = &t;
+        assert_eq!(through_shared_ref(borrow_a, HIT.0, HIT.1), id as i32);
+        assert_eq!(borrow_b.capture_pen_hit(HIT.0, HIT.1).id, id as i32);
+    }
+
+    #[test]
+    fn capture_pen_hit_ignores_non_bezier_shapes_under_the_point() {
+        // A rect alone under the point: hit-test finds it, kind check rejects
+        // it. Distinguishes "found nothing" from "found something that is not a
+        // pen path" — both are -1, and they must be.
+        let mut t = ImageHorseTool::new(128, 128);
+        t.load_image(&solid(128, 128, [10, 20, 30, 255]));
+        t.add_shape_annotation(
+            0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        );
+
+        assert!(
+            t.shape_annotation_at(40.0, 40.0) >= 0,
+            "control: the rect IS under the point"
+        );
+        let hit = t.capture_pen_hit(40.0, 40.0);
+        assert_eq!(hit.id, -1, "a rect is not a pen path");
+        assert!(hit.points.is_empty());
     }
 }

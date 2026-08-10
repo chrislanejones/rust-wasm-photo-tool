@@ -31,13 +31,18 @@ functions that merely sit near each other.
 |---|---|---|---|---|
 | 1 | `lib/openraster/export.ts:56-59` | `layer_count` + `width` + `height` + `get_layers` | one `stack.xml` describing one document | **high** — written into the `.ora` archive |
 | 2 | `lib/openraster/export.ts:22-24` | `active_layer_id` + `layer_count` + `get_layers` | the stack to iterate and flatten | **high** — also read-modify-write |
-| 3 | `app/AppShell.tsx:836-839` | `shape_annotation_at` → id, then `get_shape_annotations` | id looked up in the list | medium |
-| 4 | `hooks/useTextTool.ts:461-470` | `text_annotation_at` → id, then `get_text_annotations` | id looked up in the list | medium |
+| 3 | `app/AppShell.tsx:852-859` | `shape_annotation_at` → id, then `get_shape_annotations` | id looked up in the list | medium — ✅ **DONE v7.94**, `capture_pen_hit` |
+| 4 | ~~`hooks/useTextTool.ts:461-470`~~ | `text_annotation_at` → id, then `get_text_annotations` | id looked up in the list | ⚠️ **NOT A CAPTURE — withdrawn 2026-08-10**, see below |
 
 ### A pattern worth naming: HIT-TEST THEN LOOK UP
 
-Captures 3 and 4 are the same shape in two places, and it is not the
-pixels-at-dimensions shape the earlier ones were:
+> ⚠️ **CORRECTED 2026-08-10 (v7.94).** This section said captures 3 and 4 were
+> "the same shape in two places". They are not, and the paragraph about
+> `useTextTool` below was wrong — see **Capture 4 is withdrawn** at the end of
+> this section. Capture 3 is real and shipped; capture 4 must not be converted.
+
+Capture 3 is this shape, and it is not the pixels-at-dimensions shape the
+earlier ones were:
 
 ```ts
 const id = tool.text_annotation_at(x, y);      // read 1: which one?
@@ -50,11 +55,44 @@ deleted between the two reads, `find` returns `undefined` and the click silently
 does nothing. Today the two reads cannot be separated; behind the worker they
 can.
 
-`useTextTool:466` even says *"Parse fresh list so we pick up the latest
-geometry"* — the freshness is deliberate, but the pairing is assumed.
-
 An engine call taking the coordinates and returning the annotation itself
 removes the id-then-lookup entirely, which is a smaller change than it sounds.
+That is `capture_pen_hit(x, y)`, shipped in v7.94 — and note it is deliberately
+TOPMOST-THEN-CHECK, not find-a-bezier: `shape_annotation_at` returns the newest
+shape of ANY kind and the kind check happens after, so a rectangle over a pen
+path still means "no pen path here" rather than reaching through it.
+
+### Capture 4 is withdrawn — `useTextTool` is not this pattern
+
+The original text here read `useTextTool:466`'s comment — *"Parse fresh list so
+we pick up the latest geometry"* — as "the freshness is deliberate, but the
+pairing is assumed". **The pairing is not assumed. There is a mutation between
+the two reads**, and the sweep missed it:
+
+```ts
+const hitId = tool.text_annotation_at(x, y);   // read 1, PRE-commit state
+if (hitId >= 0) {
+  if (textInputRef.current) commitText();      // <- MUTATES: can remove_text_annotation
+  list = JSON.parse(tool.get_text_annotations());   // read 2, POST-commit state
+  const ann = list.find((a) => a.id === hitId);
+```
+
+Two consequences, both fatal to converting it:
+
+1. The id is read from the pre-commit state and the geometry from the
+   post-commit state **on purpose**. A single atomic call would have to sit on
+   one side of `commitText` or the other, and both change behaviour.
+2. `find` returning `undefined` is a **handled** case here, not a silent
+   failure. It falls through to opening a fresh text input — which is the
+   correct response to emptying a text and clicking where it used to be.
+
+So this site needs ordinary await-restructuring, not a capture. A mirrored
+`capture_text_hit` built "for symmetry" would have been two conventions for one
+problem, which is the mistake this document exists to prevent.
+
+**The general lesson, which is the reason this correction is kept rather than
+edited away: two call sites with the same *read sequence* are not the same
+problem. What sits between the reads is part of the pattern.**
 
 ## Captures found but NOT worth converting
 

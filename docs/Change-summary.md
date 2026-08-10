@@ -3979,3 +3979,92 @@ on Stage 3.5 alone. Full record in
 **Gates.** 461 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Stage 3.5 gate holds at 93. Engine untouched — no product code in this
 release.
+
+## v7.94 Change Summary — 2026-08-10
+
+ADR-024 Stage 3.5, batch a7 — the hit-test capture. No user-visible change.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `capture_pen_hit(x, y)` — hit-test and lookup in one engine call | **Added** |
+| 2 | `AppShell.handlePenHitTest` converted, 2 reads → 1 | **Converted** |
+| 3 | Stage 3.5 gate | **93 → 92** |
+| 4 | The text half of a7, which is NOT this pattern | **Found, not converted** |
+| 5 | The sweep doc's reading of that site | **Corrected** |
+
+**#1/#2 — the pattern.** `docs/engine-worker-capture-sweep.md` calls it HIT-TEST
+THEN LOOK UP:
+
+```ts
+const id     = tool.shape_annotation_at(ix, iy);            // which one?
+const shapes = JSON.parse(tool.get_shape_annotations());    // all of them
+const path   = shapes.find((s) => s.id === id && s.kind === 7);
+```
+
+An id is only meaningful against the list it was drawn from. The two reads
+cannot be separated today. Behind the worker they can, and a shape deleted in
+between makes `find` return `undefined`, `handlePenHitTest` return `null`, and
+clicking a pen path do nothing at all — no throw, nothing in the console, the
+pen simply does not enter re-edit. Same silent-failure family as the rest of
+this arc.
+
+**TOPMOST-THEN-CHECK, not find-a-bezier.** `capture_pen_hit` calls
+`shape_annotation_at` — which returns the newest shape of ANY kind — and only
+then asks whether that shape is a pen path. Filtering to kind 7 inside the
+hit-test loop would have been a different function: it would reach THROUGH a
+rectangle lying over a pen path and re-edit the path underneath, where today the
+rectangle means "no pen path here". That is why the method is not called
+`bezier_annotation_at`, and it is pinned by a test.
+
+**#4 — the other site named in the sweep is not this pattern, and was left
+alone.** `useTextTool.ts:461` looks identical — `text_annotation_at` then
+`get_text_annotations` then `find` — and the plan for this batch called the two
+"the same problem twice". They are not. `commitText()` sits **between** the two
+reads:
+
+```ts
+const hitId = tool.text_annotation_at(x, y);
+if (hitId >= 0) {
+  if (textInputRef.current) commitText();   // <- mutates: can remove_text_annotation
+  list = JSON.parse(tool.get_text_annotations());
+  const ann = list.find((a) => a.id === hitId);
+```
+
+The freshness is deliberate — the code says so: *"Parse fresh list so we pick up
+the latest geometry."* The id is read from the pre-commit state and the geometry
+from the post-commit state, on purpose. And `find` returning `undefined` is a
+**handled** case, not a silent failure: it falls through to opening a fresh text
+input, which is the right thing when you empty a text and click where it was.
+
+So collapsing it into one atomic call would change behaviour whichever side of
+`commitText` the call landed on. That site needs ordinary await-restructuring,
+not a capture. Building a mirrored `capture_text_hit` "for symmetry" would have
+been two conventions for one problem — the exact failure this batch was warned
+about, arriving from the other direction.
+
+**#5** — the sweep doc quoted that same comment and read it as "the freshness is
+deliberate, but the pairing is assumed". The pairing is not assumed; there is a
+mutation between the reads. The doc is corrected.
+
+**Verification.** Five Rust tests, every field driven off its default (the id is
+never 0 or -1; the control points are asymmetric in x, y and order). Mutation
+tested: 8 mutants, **7 killed**. The 8th — weakening the `id < 0` early return —
+is an equivalent mutant, since `shape_annotation_at` only ever returns -1 or a
+real id and the match's `_` arm is the actual backstop; that is now a comment in
+the code rather than an untested branch.
+
+One mutant survived the first version of the tests: swapping the hit-test's `x`
+and `y`. The probe point sat inside the path's bounding box **both ways round**,
+so the test could not see the swap. The probe is now asymmetric on purpose and
+the mutant dies.
+
+Gates cannot see a click that stops working, so this was also driven in the
+browser against the production build: the engine reached through the React fiber
+tree, `capture_pen_hit` compared against the old two-read path across five
+probes (all agreeing, including a rectangle-over-path miss), then a real click on
+a rendered path — pen overlay 0 → 3 anchor handles, baked path hidden, no console
+errors.
+
+**Gates.** 461 JS tests, 143 Rust tests (up from 138), `tsc` clean, eslint 0
+errors, `cargo fmt --check` + `clippy -D warnings` clean, app + marketing builds
+clean. `build:wasm` run before the app build; wasm 753,713 → 773,763 B.
