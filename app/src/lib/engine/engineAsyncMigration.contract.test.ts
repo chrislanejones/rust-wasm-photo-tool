@@ -165,9 +165,14 @@ import { join } from "node:path";
  *         Six of the nineteen were value-consumed and unconverted, so the gate
  *         rose 74 -> 80; the other thirteen are fire-and-forget. Hot 32 -> 13.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76 and 74 lines. The rest
- *  is the measurement catching up — in BOTH directions, and the upward moves
- *  matter just as much: a8 could not have been scoped off 74.
+ *     77  a8 batch 3: `useTransforms.ts` 3 -> 0 — `copyRegion`, and the
+ *         post-flip `width`/`height` reads that mirror the clone source. Those
+ *         two reads sit AFTER their mutation deliberately and must stay there;
+ *         ordering survives the worker because the port is FIFO.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74 and 77 lines. The
+ *  rest is the measurement catching up — in BOTH directions, and the upward
+ *  moves matter just as much: a8 could not have been scoped off 74.
  *
  *  ⚠️ THE GATE'S TARGET IS 5, NOT 0 — see `DISSOLVES_AT_STAGE_4` below.
  *
@@ -190,7 +195,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 80;
+const BUDGET = 77;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -329,10 +334,13 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (5 + 4 = 9) and two in non-async callbacks (49 + 2 = 51) — and thirteen
     // were fire-and-forget, which the gate never counted. un-awaited and
     // awaited both untouched. Gate 74 + 6 = 80.
-    ).toBe(51);
+    // a8 batch 3 (useTransforms): all three sat in non-async callbacks, so they
+    // came out of restructure (51 - 3 = 48). un-awaited and truthy untouched;
+    // awaited 20 -> 23. Gate 80 - 3 = 77.
+    ).toBe(48);
     expect(gate.unawaited).toBe(20);
     expect(gate.truthy).toBe(9);
-    expect(gate.awaited, "cumulative converted sites").toBe(20);
+    expect(gate.awaited, "cumulative converted sites").toBe(23);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

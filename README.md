@@ -84,6 +84,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.1 — 2026-08-10
+
+**Nothing you can see.** Flip-horizontal, flip-vertical and copy-region now wait
+for the engine's answer before using it — three more calls converted for the
+background-thread move.
+
+The more useful find was accidental. One source file contained two invisible
+NUL characters, used as a separator inside a cache key. That is enough to make
+every search tool classify the file as *binary* and skip it silently, so
+searching the project for anything defined in it returned a confident zero. The
+characters are now written as an escape — identical behaviour, and the file is
+searchable again.
+
+<details><summary>Older releases</summary>
+
 ### v8.0 — 2026-08-10
 
 **Nothing you can see — the migration's own bookkeeping, corrected the other
@@ -97,8 +112,6 @@ to be done last, which meant nobody was looking at them.
 The list of remaining work therefore goes **up**, not down. That is the honest
 number, and the first one the rest of this migration can actually be planned
 against.
-
-<details><summary>Older releases</summary>
 
 ### v7.99 — 2026-08-10
 

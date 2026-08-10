@@ -4521,3 +4521,73 @@ been scoped off 74.
 errors, app + marketing builds clean. Engine untouched, no product code touched,
 so no `build:wasm` and no browser check — the only files changed are the audit
 script and its contract test.
+
+## v8.1 Change Summary — 2026-08-10
+
+ADR-024 Stage 3.5, **a8 batch 3**. Gate 80 -> 77. No user-visible change.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Two literal NUL bytes made a source file invisible to every grep | **Found and fixed** |
+| 2 | `useTransforms.ts` 3 -> 0 | **Converted** |
+| 3 | `textMetricsCache.ts`'s 3 sites | **Blocked — cannot be awaited at all** |
+| 4 | `copyRegion` has never had a caller | **Recorded** |
+
+**#1 — the file no search could see.** `app/src/lib/engine/textMetricsCache.ts`
+used U+0000 as its cache-key separator and wrote it as a **literal 0x00 byte**,
+both in the code and in the comment explaining it. Two NULs are enough for
+`grep` to classify the file as binary. Any recursive search that skips binaries
+— `grep -I`, ripgrep and ugrep by default — then skips the file **entirely and
+silently**. Searching the repo for a caller of anything defined there returned a
+confident **zero**.
+
+It surfaced by contradiction: the pickaxe said an identifier had been added and
+never removed, while grep said it did not exist. One of the two had to be wrong.
+`command grep` settled it with *"binary file matches"*.
+
+The fix writes the separator as the escape `\u0000` — the identical runtime
+string (verified: length 1, code point 0), with none of the invisibility. All 72
+engine tests pass, including `textMetricsCache.contract.test.ts`.
+
+This is the **eighth** detection failure on this arc, and the first that was not
+about formatting: aliases, comments, multi-line receivers, multi-line `async (`,
+optional chaining, a type argument between name and paren, the ±6-line hot-path
+window — and now a byte that makes a whole file disappear.
+
+**#2 — the conversions.** `copyRegion`, plus the `width`/`height` reads that
+mirror the clone-stamp source after a flip. Those two reads sit **after** their
+mutation deliberately and must stay there — it is the post-flip dimension that
+mirrors the point. Ordering survives the worker because the port is FIFO, so the
+read is queued behind the mutation; the code now says so. Mutation tested:
+**3 mutants, all 3 killed.**
+
+**#3 — `textMetricsCache` cannot be converted, and its planned fix does not
+exist.** Its three sites are the synchronous cache-miss path called during
+React's **render pass**, which cannot `await` at all. a2's own header names the
+resolution — *"`primeTextMetrics()` fills the cache off the render path"* — and
+that function has never been written. It appears exactly once in the repo, in
+that comment. So these three are blocked on unbuilt work, not on effort. Not
+counted as exempt: unlike `flushToCanvas` they are not dissolved by a later
+stage, they need `primeTextMetrics` built.
+
+**#4** — `git log --all -G "\.copyRegion\("` returns **no commits**, so nothing
+has ever called it. A spec awaiting a consumer, not a lost wire (contrast
+`useRealTier`). Converted regardless, because one un-awaited read left in an
+otherwise converted file reads as unfinished work to the next person.
+
+**Verified in the browser** against the production build:
+
+| Step | Result |
+|---|---|
+| Flip H button | undo 1->2, history `Flip H`, pixels swap |
+| Flip V button | undo ->3, history `Flip V`, sky moves to the bottom |
+| 3x Ctrl+Z | undo->0, redo->3, **pixels byte-identical to baseline** |
+| React state vs engine | matched at every step |
+
+A first attempt read as "flip does nothing" — that was **my click missing the
+button**, not a regression: calling the handler directly produced `undo:Flip H`
+immediately, and clicking by coordinate worked. Worth recording because the
+false alarm looked exactly like a broken button.
+
+**Gates.** 467 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
+marketing builds clean. Engine untouched — no `build:wasm`.

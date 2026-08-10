@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.1",
+    date: "2026-08-10",
+    headline: "A source file that no search could see",
+    entries: [
+      {
+        tag: "fix",
+        text: "One source file contained two invisible NUL characters, used as a separator inside a cache key. That is enough to make every search tool classify the file as binary and skip it silently \u2014 so searching the project for anything defined in it returned a confident zero. It surfaced by contradiction: the history said an identifier had been added and never removed, while the search said it did not exist. The characters are now written as an escape: identical behaviour, and the file is searchable again.",
+      },
+      {
+        tag: "infra",
+        text: "Also three more engine calls converted for the background-thread move \u2014 flip-horizontal, flip-vertical and copy-region now wait for the engine's answer before using it. Checked in a browser: flip both ways, then three undos, landing back on a pixel-for-pixel identical image.",
+      },
+    ],
+  },
+  {
     version: "v8.0",
     date: "2026-08-10",
     headline: "The bookkeeping, corrected the other way",

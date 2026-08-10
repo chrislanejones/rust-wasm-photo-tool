@@ -45,11 +45,16 @@ export function useTransforms(engine: EngineCore) {
    * Pass the result to `pasteRegion` on a different tool instance to
    * composite content between photos.
    */
+  // ADR-024 Stage 3.5 (a8). NOTE: this is a SPEC AWAITING A CONSUMER, not a
+  // live path — `git log --all -G "\.copyRegion\("` returns no commits, so
+  // nothing has ever called it (contrast `useRealTier`, which was a lost wire).
+  // Converted anyway because leaving one un-awaited read in an otherwise
+  // converted file is how the next reader concludes the file is unfinished.
   const copyRegion = useCallback(
-    (x: number, y: number, w: number, h: number): Uint8ClampedArray | null => {
+    async (x: number, y: number, w: number, h: number): Promise<Uint8ClampedArray | null> => {
       const t = toolRef.current;
       if (!t) return null;
-      return new Uint8ClampedArray(t.copy_region(x, y, w, h));
+      return new Uint8ClampedArray(await t.copy_region(x, y, w, h));
     },
     [toolRef],
   );
@@ -76,14 +81,17 @@ export function useTransforms(engine: EngineCore) {
   );
 
   // ── Geometric transforms ──────────────────────────────────────────────────
-  const flipHorizontal = useCallback(() => {
+  const flipHorizontal = useCallback(async () => {
     const t = toolRef.current;
     if (!t) return;
     t.flip_horizontal();
-    // Mirror the tracked source position in React state too
+    // Mirror the tracked source position in React state too.
+    // The width read is deliberately AFTER the flip and must stay there — it is
+    // the post-flip width that mirrors the point. Ordering survives the worker
+    // because the port is FIFO, so the read is queued behind the mutation.
     if (sourcePosRef.current) {
       sourcePosRef.current = {
-        x: t.width() - 1 - sourcePosRef.current.x,
+        x: (await t.width()) - 1 - sourcePosRef.current.x,
         y: sourcePosRef.current.y,
       };
     }
@@ -91,14 +99,15 @@ export function useTransforms(engine: EngineCore) {
     syncState();
   }, [toolRef, sourcePosRef, flushToCanvas, syncState]);
 
-  const flipVertical = useCallback(() => {
+  const flipVertical = useCallback(async () => {
     const t = toolRef.current;
     if (!t) return;
     t.flip_vertical();
+    // Post-flip height, same ordering rule as flipHorizontal above.
     if (sourcePosRef.current) {
       sourcePosRef.current = {
         x: sourcePosRef.current.x,
-        y: t.height() - 1 - sourcePosRef.current.y,
+        y: (await t.height()) - 1 - sourcePosRef.current.y,
       };
     }
     flushToCanvas();
