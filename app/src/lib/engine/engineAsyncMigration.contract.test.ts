@@ -138,8 +138,16 @@ import { join } from "node:path";
  *         camelCase segment only: any-segment matching pulled in `moveLayer`, a
  *         discrete layers-panel reorder, where `move` is the leading verb.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92 and 87 lines. The rest is the
- *  measurement catching up.
+ *     76  a8 batch 1 — `useHistory.ts` fully converted, 5 -> 0. FOUR of the five
+ *         are truthy traps (`if (toolRef.current?.undo())`), the same shape as
+ *         `useLayers.ts` and the reason both files were done as a unit rather
+ *         than swept: drop one `await` and the condition is permanently true,
+ *         so every Ctrl+Z repaints and re-syncs whether or not anything was
+ *         undone, with nothing to catch it. The fifth is `selection_overlay`
+ *         inside `refreshSelectionMask`.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87 and 76 lines. The rest is
+ *  the measurement catching up.
  *
  *  THE THIRD FORMATTING BLIND SPOT (found during a5, 2026-08-09). The audit
  *  matches an engine call's RECEIVER with a regex, so a call whose receiver and
@@ -160,7 +168,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 81;
+const BUDGET = 76;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -287,8 +295,14 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // two were truthy traps (11 - 2 = 9). un-awaited is untouched at 22 — none
     // of the six sat in an async function. Gate 87 - 6 = 81, and this is a
     // RECLASSIFICATION, not a conversion: no call site changed.
-    ).toBe(50);
+    // a8 batch 1 (useHistory): one `selection_overlay` in a non-async
+    // `useCallback` leaves restructure (50 - 1 = 49); the four truthy traps
+    // leave truthy (9 - 4 = 5). un-awaited untouched at 22 again, and `awaited`
+    // rises 13 -> 18. Gate 81 - 5 = 76.
+    ).toBe(49);
     expect(gate.unawaited).toBe(22);
+    expect(gate.truthy, "useHistory's four guards are now awaited").toBe(5);
+    expect(gate.awaited, "five newly converted sites").toBe(18);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

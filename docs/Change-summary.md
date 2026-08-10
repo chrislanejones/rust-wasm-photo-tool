@@ -4308,3 +4308,69 @@ regex. It is a scoping decision, not a bug fix.
 **Gates.** 463 JS tests (up from 461), 148 Rust tests, `tsc` clean, eslint 0
 errors, app + marketing builds clean. Engine untouched, no `build:wasm` needed —
 no Rust changed and no product code changed.
+
+## v7.98 Change Summary — 2026-08-10
+
+ADR-024 Stage 3.5, **a8 batch 1** — `useHistory.ts` fully converted, 5 → 0.
+Gate 81 → 76. No user-visible change.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `undo` / `redo` / `jumpToHistory` / `deleteHistoryEntry` guards awaited | **Converted** |
+| 2 | `refreshSelectionMask`'s `selection_overlay` awaited | **Converted** |
+| 3 | Stage 3.5 gate | **81 → 76** |
+| 4 | The ratchet actually catches a dropped `await` | **Proven, not assumed** |
+
+**#1 — four of the five are truthy traps**, the shape the audit flags as highest
+risk:
+
+```ts
+if (toolRef.current?.undo()) {   // -> if (await toolRef.current?.undo())
+  flushToCanvas(); syncState(); broadcastAnnotationsChanged(); refreshSelectionMask();
+}
+```
+
+Behind the worker, `undo()` returns a Promise. Forget the `await` and the
+condition is **permanently true**: every Ctrl+Z repaints, re-syncs and
+re-broadcasts whether or not anything was undone. Nothing catches it — a Promise
+is a fine `unknown` to tsc, this repo has no `no-floating-promises` rule
+configured, and no test covered this file. That is why `useHistory` was
+converted as a unit rather than swept, exactly as `useLayers.ts` was.
+
+**Not an atomic capture.** Each call is one independent mutation whose own result
+gates its own follow-up, so there is no multi-read picture of the document to
+tear. The four-step ritual that follows reads nothing it must keep consistent
+with the guard.
+
+**Reentrancy is stated in the file rather than left to be discovered.**
+`undo`/`redo` fire from the keydown handler and from TopBar without being
+awaited, so behind the worker two fast Ctrl+Z presses can overlap. That is safe:
+the port is FIFO so the engine still applies them in order, and the ritual is
+idempotent — flush, sync, broadcast and refresh all just re-read whatever is
+current. Worst case is one briefly stale frame, which the second ritual corrects.
+The keydown handler now says `void undo()` so the floating promise is deliberate
+rather than accidental.
+
+**#4 — the safety net is real, and was tested rather than trusted.** The claim
+that the ratchet catches a dropped `await` had never been checked. It does:
+removing the `await` from each of the five sites in turn puts the site back in
+`remaining`, pushing the gate above BUDGET and failing
+`engineAsyncMigration.contract.test.ts`. **5 mutants, 5 killed.** That matters
+beyond this file — it is the guard the whole a8 grind depends on.
+
+**Verified in the browser** against the production build, because green gates do
+not clear a click path:
+
+| Action | Result |
+|---|---|
+| Undo button | undo 2→1, redo 0→1, `probe-B` removed |
+| Ctrl+Z | undo 1→0, redo 1→2, `probe-A` removed |
+| Redo button | undo 0→1, redo 2→1, `probe-A` restored |
+| Ctrl+Z with an empty undo stack | **no change at all** — the guard short-circuits |
+| React state vs engine | matched at every step |
+
+Undo correctly greys out at the bottom of the stack and the status bar drops its
+"Ctrl+Z undo" hint. No console errors.
+
+**Gates.** 463 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
+marketing builds clean. Engine untouched — no Rust changed, so no `build:wasm`.

@@ -84,6 +84,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.98 — 2026-08-10
+
+**Nothing you can see.** Undo, redo, jump-to-step and delete-step now wait for
+the engine's answer before repainting. Four of the five were the same shape:
+"if the engine says it undid something, repaint" — and once the engine answers
+from a background thread, that question stops being answerable on the spot. Left
+alone, every Ctrl+Z would have repainted and re-synced whether or not anything
+was actually undone.
+
+Checked in a browser rather than only by tests, because a broken undo button is
+not something a type checker can see: undo and redo work from both the toolbar
+and the keyboard, and pressing Ctrl+Z with nothing left to undo correctly does
+nothing at all.
+
+<details><summary>Older releases</summary>
+
 ### v7.97 — 2026-08-10
 
 **Nothing you can see — a measuring instrument corrected.** The tool that
@@ -94,8 +110,6 @@ have made those wait for a round trip on every mouse movement, which is a
 dropped frame in exactly the places you would notice one.
 
 Nothing in the app changed. The list it was working from did.
-
-<details><summary>Older releases</summary>
 
 ### v7.96 — 2026-08-10
 

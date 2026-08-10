@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.98",
+    date: "2026-08-10",
+    headline: "Undo waits for the answer before it repaints",
+    entries: [
+      {
+        tag: "infra",
+        text: "Undo, redo, jump-to-step and delete-step now wait for the engine's answer before repainting. Four of the five were the same shape — “if the engine says it undid something, repaint” — and once the engine answers from a background thread that question stops being answerable on the spot. Left alone, every Ctrl+Z would have repainted and re-synced whether or not anything was actually undone.",
+      },
+      {
+        tag: "fix",
+        text: "Checked in a browser rather than only by tests, because a broken undo button is not something a type checker can see. Undo and redo work from both the toolbar and the keyboard, and pressing Ctrl+Z with nothing left to undo correctly does nothing at all.",
+      },
+    ],
+  },
+  {
     version: "v7.97",
     date: "2026-08-10",
     headline: "Correcting the instrument, not the app",
