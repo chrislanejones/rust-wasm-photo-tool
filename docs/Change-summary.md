@@ -4068,3 +4068,91 @@ errors.
 **Gates.** 461 JS tests, 143 Rust tests (up from 138), `tsc` clean, eslint 0
 errors, `cargo fmt --check` + `clippy -D warnings` clean, app + marketing builds
 clean. `build:wasm` run before the app build; wasm 753,713 → 773,763 B.
+
+## v7.95 Change Summary — 2026-08-10
+
+ADR-024 Stage 3.5, batch a7 continued — the OpenRaster captures. No
+user-visible change.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | `capture_layer_stack()` — the layer stack and its canvas, no pixels touched | **Added** |
+| 2 | `openraster/export.ts`'s two captures, 7 reads → 2 calls | **Converted** |
+| 3 | Stage 3.5 gate | **92 → 87** |
+| 4 | `capture_ui_state()` composites the whole document to answer one field | **Found** |
+| 5 | `exportOra`'s `await`-in-the-middle | **Still open, deliberately** |
+
+**#1/#2 — the two captures.**
+
+| Site | Reads | Becomes |
+|---|---|---|
+| `exportOra` | `layer_count` + `width` + `height` + `get_layers` | one `capture_layer_stack()` |
+| `flattenAllLayersInPlace` | `active_layer_id` + `layer_count` + `get_layers` | one `capture_layer_stack()` |
+
+The first four become one `stack.xml`, so they have to describe one document.
+Converted individually behind the worker, a resize landing between them writes a
+canvas size from before it beside a layer list from after — into a file the user
+keeps on disk, with nothing thrown at the time. The second three pick the layers
+to visit and the layer to restore afterwards; split, the "original" active layer
+could be one the list no longer contains, and the restore would leave the
+document on the wrong layer silently.
+
+**#4 — why this is not `capture_ui_state()`, which would have needed no new
+engine code at all.** Every field both sites want is already on
+`UiStateCapture`. The reason to add a method rather than reuse it is cost, not
+naming:
+
+```rust
+pub fn has_transparency(&self) -> bool {
+    self.get_image_data().chunks_exact(4).any(|px| px[3] < 255)
+}
+```
+
+`get_image_data()` is `composite_layers(...)` — a **full composite of the
+document, built from scratch and allocated**, then scanned pixel by pixel. That
+is the correct price for the call that feeds React's render. It is pure waste for
+a caller that wants five scalars and a metadata string, and an `.ora` export
+already encodes every layer separately. `capture_layer_stack()` touches no pixels
+at all: every field is a struct read or a small string build.
+
+Worth noting on its own: this means **every `syncState()` composites the whole
+document and scans it** to answer `has_transparency`. That is pre-existing —
+`syncState` read the same getter before a5 folded it into the capture — so it is
+not a regression, but it is a real per-edit cost hiding behind a boolean, and it
+is now written down.
+
+**#5 — what this deliberately does NOT fix.** `exportOra` still separates these
+reads from `get_layer_png(i)` and `export_png()` with a real `await
+import("jszip")`, and `flattenAllLayersInPlace` still mutates the live document
+mid-export. Both are pre-existing, both are already triaged in ADR-024, and both
+remain open. Closing them needs a single capture that carries the layer PNGs too
+— a design decision about what the engine owns, not a conversion. The boundary
+is the same discipline as v7.88, where the thumbnail triple was converted and the
+rest of the file deliberately was not.
+
+**Verification.** Five Rust tests. Mutation tested: **6 mutants, all 6 killed**,
+including `layer_count` → `content_layer_count`, which is the one that matters —
+`content_layer_count` excludes the artboard Canvas (ADR-016), so an `.ora` built
+on it would silently drop a layer from the archive.
+
+That mutant survived the first run, and so did three others, but **the survivors
+were a broken harness rather than weak tests**: the anchors being patched
+(`width: self.width(),` and friends) appear in `capture_composite` and
+`capture_ui_state` earlier in the file, so a first-occurrence replace was
+mutating a different method than the one under test. Scoped to the function body,
+5 of 6 died immediately. `content_layer_count` was the one real gap — the fixture
+had no Canvas layer, so the two counts were equal and nothing could tell them
+apart. The test now builds an artboard document where they genuinely differ.
+
+Driven in the browser against the production build, on a real Canvas + Photo
+document (`layer_count` 2, `content_layer_count` 1 — the exact case the mutant
+covers): `capture_layer_stack` agreed with all five getters it replaces, a real
+`.ora` export produced a valid archive — ZIP magic, `mimetype` first and stored
+as `image/openraster`, `stack.xml` carrying `w="1445" h="2128"` matching the
+engine, **both** `data/layer0.png` and `data/layer1.png` present, `mergedimage.png`
+and the thumbnail — and the document was byte-identical afterwards (layers,
+active layer and undo count all unchanged). No console errors.
+
+**Gates.** 461 JS tests, 148 Rust tests (up from 143), `tsc` clean, eslint 0
+errors, `cargo fmt --check` + `clippy -D warnings` clean, app + marketing builds
+clean. `build:wasm` run before the app build; wasm 773,763 → 775,209 B.

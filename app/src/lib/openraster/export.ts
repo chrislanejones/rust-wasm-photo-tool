@@ -19,9 +19,21 @@ const THUMBNAIL_MAX_PX = 256;
  * can surface a notice.
  */
 function flattenAllLayersInPlace(tool: ImageHorseTool): boolean {
-  const originalActiveId = tool.active_layer_id();
-  const n = tool.layer_count();
-  const layers: LayerInfo[] = JSON.parse(tool.get_layers());
+  // ATOMIC CAPTURE (ADR-024, a7). Was `active_layer_id()` + `layer_count()` +
+  // `get_layers()` — three reads describing one layer stack, consumed together:
+  // the list and count pick the layers to visit, the id says which layer to put
+  // back afterwards. Behind the worker, converted individually, the "original"
+  // active layer could be one the list no longer contains, so the restore at
+  // the bottom would put the document on the wrong layer, silently.
+  //
+  // `capture_layer_stack` and NOT `capture_ui_state`: the latter answers
+  // `has_transparency` by compositing the whole document and scanning every
+  // pixel, which this needs none of.
+  const stack = tool.capture_layer_stack();
+  const originalActiveId = stack.active_layer_id;
+  const n = stack.layer_count;
+  const layers: LayerInfo[] = JSON.parse(stack.layers_json);
+  stack.free();
   let flattenedAny = false;
 
   for (let i = 0; i < n; i++) {
@@ -53,10 +65,24 @@ export interface ExportOraResult {
 export async function exportOra(tool: ImageHorseTool): Promise<ExportOraResult> {
   const flattenedAnnotations = flattenAllLayersInPlace(tool);
 
-  const n = tool.layer_count();
-  const width = tool.width();
-  const height = tool.height();
-  const layers: LayerInfo[] = JSON.parse(tool.get_layers());
+  // ATOMIC CAPTURE (ADR-024, a7). Was `layer_count()` + `width()` + `height()`
+  // + `get_layers()` — four reads that become one `stack.xml`, so they have to
+  // describe one document. Converted individually behind the worker, a resize
+  // landing between them writes a canvas size from before it beside a layer
+  // list from after, into a file the user keeps on disk. Nothing throws.
+  //
+  // ⚠️ This does NOT make `exportOra` atomic. The `await import("jszip")` below
+  // still separates these four from `get_layer_png(i)` and `export_png()`, and
+  // `flattenAllLayersInPlace` above mutates the live document mid-export. Both
+  // are pre-existing, both are triaged in ADR-024, and both stay open — closing
+  // them needs one capture that carries the layer PNGs too, which is a design
+  // decision about what the engine owns rather than a conversion.
+  const stack = tool.capture_layer_stack();
+  const n = stack.layer_count;
+  const width = stack.width;
+  const height = stack.height;
+  const layers: LayerInfo[] = JSON.parse(stack.layers_json);
+  stack.free();
 
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();

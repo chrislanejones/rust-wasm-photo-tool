@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v7.95",
+    date: "2026-08-10",
+    headline: "Saving a layered project describes one document, not several",
+    entries: [
+      {
+        tag: "rust",
+        text: "Exporting a layered .ora project asked the engine for the canvas size and the layer list as four separate questions, and the routine that flattens each layer first asked three more. Both sets describe one document and get written into one file, so once the engine moves to a background thread, a resize arriving mid-question could put a canvas size from before it next to a layer list from after — a broken .ora saved to disk with no error at the time. Each set is one question now.",
+      },
+      {
+        tag: "perf",
+        text: "The new engine call deliberately does not reuse the one the editor already had, which would have needed no new code: that one works out whether the image has transparency by rebuilding the entire picture and checking every pixel. Fine when the editor needs it, pure waste for a caller that wants a canvas size and a list of layer names.",
+      },
+    ],
+  },
+  {
     version: "v7.94",
     date: "2026-08-10",
     headline: "One question instead of two, where the gap would have mattered",

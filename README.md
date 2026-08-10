@@ -84,6 +84,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v7.95 — 2026-08-10
+
+**Nothing you can see.** More of the same groundwork: exporting a layered `.ora`
+project asked the engine for the canvas size and the layer list as four separate
+questions, and the routine that flattens each layer first asked three more. Both
+sets describe one document and get written into one file, so once the engine
+moves to a background thread, a resize arriving mid-question could put a canvas
+size from before it next to a layer list from after — a broken `.ora` saved to
+disk with no error at the time. Each set is one question now.
+
+This does not make `.ora` export airtight on its own, and it is worth being
+straight about that: the export still loads its ZIP library partway through, and
+the layer images are fetched after that point. Closing that gap is a bigger
+decision, and it is still open.
+
+<details><summary>Older releases</summary>
+
 ### v7.94 — 2026-08-10
 
 **Nothing you can see, and one thing that can no longer go wrong later.**
@@ -96,8 +113,6 @@ work. It is one question now.
 
 The engine also keeps the rule the app used to apply itself: a rectangle drawn
 over a pen path still means "no pen path here", rather than reaching through it.
-
-<details><summary>Older releases</summary>
 
 ### v7.93 — 2026-08-10
 

@@ -146,6 +146,28 @@ declare module "stamp_tool" {
   }
 
   /**
+   * The layer stack and the canvas it sits on, with NO pixels touched.
+   * Returned by `capture_layer_stack()`.
+   *
+   * Every field is also on `UiStateCapture` — use THIS one anywhere the
+   * composite is not wanted. `UiStateCapture.has_transparency` composites the
+   * whole document and scans every pixel to answer, which is the right price
+   * for React's render and pure waste for a caller that wants five scalars.
+   *
+   * `layer_count` always equals `JSON.parse(layers_json).length`.
+   * Read each field once and `.free()` when done.
+   */
+  export class LayerStackCapture {
+    private constructor();
+    free(): void;
+    width: number;
+    height: number;
+    layer_count: number;
+    active_layer_id: number;
+    layers_json: string;
+  }
+
+  /**
    * The pen path under a canvas point, hit-test and lookup in one call.
    * Returned by `capture_pen_hit()`.
    *
@@ -316,6 +338,13 @@ declare module "stamp_tool" {
      *  TOPMOST-THEN-CHECK, so a rectangle over a path still means no path.
      *  Free it when done. */
     capture_pen_hit(x: number, y: number): PenHit;
+    /** The layer stack and its canvas, atomically and WITHOUT compositing —
+     *  the one-call form of `layer_count()` + `width()` + `height()` +
+     *  `active_layer_id()` + `get_layers()`. Prefer it over `capture_ui_state()`
+     *  wherever the composite is not wanted: that one answers
+     *  `has_transparency` by building and scanning the whole image. Free it
+     *  when done. */
+    capture_layer_stack(): LayerStackCapture;
     capture_composite(): RgbaCapture;
     /** The background-excluded composite and its CROPPED dimensions, atomically
      *  — the one-call form of `get_image_data_excluding_background()` +

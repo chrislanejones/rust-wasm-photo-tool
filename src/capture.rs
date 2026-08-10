@@ -218,6 +218,40 @@ pub struct UiStateCapture {
     pub export_quality: u8,
 }
 
+/// The layer stack and the canvas it sits on. Returned by
+/// `capture_layer_stack()`.
+///
+/// ⚠️ **A third "document" capture, and the reason it is not the second one.**
+/// Every field here is also on `UiStateCapture`, so reaching for
+/// `capture_ui_state()` instead looks obviously right. It is not:
+/// `UiStateCapture.has_transparency` is `self.has_transparency()`, which is
+/// `self.get_image_data().chunks_exact(4).any(...)` — a **full composite of the
+/// document from scratch, allocated and then scanned**. That is the correct
+/// price for the call that feeds React's render; it is entirely wasted on a
+/// caller that wants five scalars and a metadata string, and the `.ora` export
+/// is already compositing every layer separately.
+///
+/// So the split is by COST, not by naming: this capture touches no pixels at
+/// all. Every field is a struct read or a small string build.
+///
+/// The overlap is safe for the same reason `capture_state` and
+/// `capture_ui_state`'s is: all three are pure aggregations of the same public
+/// getters, so there is exactly one definition of `width` and one of the layer
+/// metadata. Do not "optimise" any of them into computing a field for itself.
+#[wasm_bindgen(getter_with_clone)]
+pub struct LayerStackCapture {
+    pub width: u32,
+    pub height: u32,
+    /// Always equal to the length of `layers_json`'s array — `layer_count()` is
+    /// `self.layers.len()` and `get_layers()` emits one object per layer. Kept
+    /// as its own field anyway so callers that want a count do not have to know
+    /// that, and so the equality can be pinned by a test rather than assumed at
+    /// each call site.
+    pub layer_count: u32,
+    pub active_layer_id: u32,
+    pub layers_json: String,
+}
+
 /// The pen path under a point, hit-test and lookup in one call. Returned by
 /// `capture_pen_hit()`.
 ///
@@ -387,6 +421,42 @@ impl ImageHorseTool {
             layers_json: self.get_layers(),
             active_layer_id: self.active_layer_id(),
             export_quality: self.export_quality(),
+        }
+    }
+
+    /// The layer stack and its canvas, atomically — with no pixels touched.
+    ///
+    /// Replaces two sequences in `lib/openraster/export.ts`:
+    ///
+    /// ```text
+    ///   exportOra                 layer_count + width + height + get_layers
+    ///   flattenAllLayersInPlace   active_layer_id + layer_count + get_layers
+    /// ```
+    ///
+    /// The first builds one `stack.xml` describing one document; the second
+    /// picks the layers to visit and the layer to restore afterwards. Both are
+    /// atomic captures (ADR-024): read separately behind the worker, the
+    /// `stack.xml` written into the `.ora` archive could state a canvas size
+    /// from before a resize beside a layer list from after it — a corrupt file
+    /// the user keeps on disk, with nothing thrown at the time.
+    ///
+    /// ⚠️ **This does NOT make `exportOra` atomic, and must not be read as
+    /// having done so.** The file separates these reads from
+    /// `get_layer_png(i)` and `export_png()` with a real `await
+    /// import("jszip")`, and mutates the live document mid-export
+    /// (`set_active_layer` + `flatten_text_annotations`). Both are pre-existing,
+    /// both are triaged in ADR-024, and both remain open. Closing them needs a
+    /// single capture that carries the layer PNGs too — a design decision about
+    /// what the engine owns, not a conversion.
+    ///
+    /// See `LayerStackCapture` for why this is not `capture_ui_state()`.
+    pub fn capture_layer_stack(&self) -> LayerStackCapture {
+        LayerStackCapture {
+            width: self.width(),
+            height: self.height(),
+            layer_count: self.layer_count() as u32,
+            active_layer_id: self.active_layer_id(),
+            layers_json: self.get_layers(),
         }
     }
 
@@ -1114,5 +1184,173 @@ mod capture_tests {
         let hit = t.capture_pen_hit(40.0, 40.0);
         assert_eq!(hit.id, -1, "a rect is not a pen path");
         assert!(hit.points.is_empty());
+    }
+
+    // ── capture_layer_stack ────────────────────────────────────────────────
+    //
+    // Driven off defaults throughout: a NON-square canvas (so width and height
+    // cannot be swapped undetectably), more than one layer, and an active layer
+    // that is neither the first nor the default id.
+
+    #[test]
+    fn capture_layer_stack_agrees_with_the_five_getters_it_replaces() {
+        let mut t = ImageHorseTool::new(37, 21); // non-square, non-round
+        t.load_image(&solid(37, 21, [10, 20, 30, 255]));
+        t.add_layer("second");
+        let third = t.add_layer("third");
+        t.add_layer("fourth");
+        // Make a layer active that is NOT the last added and NOT index 0.
+        assert!(t.set_active_layer(third), "control: the layer exists");
+
+        let cap = t.capture_layer_stack();
+
+        assert_eq!(cap.width, t.width(), "width must agree with the getter");
+        assert_eq!(cap.height, t.height(), "height must agree with the getter");
+        assert_eq!(
+            cap.layer_count,
+            t.layer_count() as u32,
+            "layer_count must agree with the getter"
+        );
+        assert_eq!(
+            cap.active_layer_id,
+            t.active_layer_id(),
+            "active_layer_id must agree with the getter"
+        );
+        assert_eq!(
+            cap.layers_json,
+            t.get_layers(),
+            "layers_json must be the getter's string verbatim"
+        );
+
+        // Off their defaults, so none of the above can pass by accident.
+        assert_ne!(cap.width, cap.height, "a square canvas would hide a swap");
+        assert_eq!(cap.width, 37);
+        assert_eq!(cap.height, 21);
+        assert!(cap.layer_count > 2, "got {}", cap.layer_count);
+        assert_eq!(cap.active_layer_id, third);
+        assert_ne!(cap.active_layer_id, 0, "0 is the not-found fallback");
+        assert!(cap.layers_json.contains("\"name\":\"third\""));
+    }
+
+    #[test]
+    fn capture_layer_stack_count_matches_the_json_array_length() {
+        // The invariant `openraster/export.ts` leans on: it iterates by count
+        // and indexes into the parsed array. If these ever disagreed the export
+        // would silently skip or overrun a layer, so it is pinned here rather
+        // than assumed at the call site.
+        let mut t = ImageHorseTool::new(16, 9);
+        t.load_image(&solid(16, 9, [1, 2, 3, 255]));
+        t.add_layer("b");
+        t.add_layer("c");
+
+        let cap = t.capture_layer_stack();
+        let objects = cap.layers_json.matches("\"id\":").count() as u32;
+        assert_eq!(
+            cap.layer_count, objects,
+            "layer_count must equal the number of layer objects in layers_json"
+        );
+        assert!(cap.layer_count >= 3, "got {}", cap.layer_count);
+    }
+
+    #[test]
+    fn capture_layer_stack_counts_every_layer_including_the_canvas() {
+        // `layer_count()` counts ALL layers; `content_layer_count()` excludes the
+        // artboard Canvas (ADR-016). A document with no artboard makes the two
+        // equal, which is why the first version of these tests could not tell
+        // them apart and a `content_layer_count` mutant survived.
+        //
+        // It is not a cosmetic distinction: `exportOra` iterates
+        // `for (i = n - 1; i >= 0; i--)` writing `data/layer${i}.png` from
+        // `get_layer_png(i)`. The content count would silently drop a layer from
+        // the archive — a lossy `.ora` with nothing thrown.
+        let mut t = ImageHorseTool::new(40, 30);
+        t.load_image_artboard(
+            &solid(20, 15, [200, 100, 50, 255]),
+            20,
+            15,
+            5,
+            8,
+            9,
+            10,
+            255,
+        );
+        t.add_layer("content-b");
+
+        let cap = t.capture_layer_stack();
+        assert!(
+            t.content_layer_count() < t.layer_count(),
+            "control: this fixture must actually HAVE a canvas layer \
+             (layer_count {}, content {})",
+            t.layer_count(),
+            t.content_layer_count()
+        );
+        assert_eq!(
+            cap.layer_count,
+            t.layer_count() as u32,
+            "layer_count must count EVERY layer, canvas included"
+        );
+        assert_ne!(
+            cap.layer_count,
+            t.content_layer_count() as u32,
+            "and must not be the content-only count"
+        );
+        assert!(cap.layers_json.contains("\"kind\":\"canvas\""));
+    }
+
+    #[test]
+    fn capture_layer_stack_touches_no_pixels() {
+        // The whole reason this is not `capture_ui_state()`: that one carries
+        // `has_transparency`, which composites the entire document and scans
+        // every pixel. This must stay cheap, so it is pinned against a document
+        // whose composite would be enormous relative to its metadata.
+        //
+        // Proven structurally rather than by timing (a timing test on a build
+        // machine is a flake): capturing must not disturb the document, and
+        // every field must still equal its getter after an arbitrary number of
+        // captures — which a compositing implementation would also satisfy, so
+        // the real guard is the assertion that the two capture types differ in
+        // exactly this field.
+        let mut t = ImageHorseTool::new(64, 48);
+        t.load_image(&solid(64, 48, [9, 8, 7, 255]));
+        t.add_layer("b");
+
+        let before = t.get_layers();
+        for _ in 0..25 {
+            let c = t.capture_layer_stack();
+            assert_eq!(c.width, 64);
+            assert_eq!(c.layer_count, t.layer_count() as u32);
+        }
+        assert_eq!(t.get_layers(), before, "capturing must not mutate anything");
+
+        // The distinguishing field: `capture_ui_state` pays for a composite to
+        // answer this; `capture_layer_stack` deliberately does not offer it.
+        let ui = t.capture_ui_state();
+        assert_eq!(
+            ui.width,
+            t.capture_layer_stack().width,
+            "the shared fields agree"
+        );
+        assert!(
+            !ui.has_transparency,
+            "control: an opaque document, so the field is real and computed"
+        );
+    }
+
+    #[test]
+    fn capture_layer_stack_takes_self_by_reference() {
+        // `&self` is what makes the capture atomic behind the worker. Pinned by
+        // holding two shared borrows across the call, which does not compile
+        // against `&mut self`.
+        let mut t = ImageHorseTool::new(20, 12);
+        t.load_image(&solid(20, 12, [4, 5, 6, 255]));
+        t.add_layer("b");
+
+        fn through_shared_ref(t: &ImageHorseTool) -> u32 {
+            t.capture_layer_stack().layer_count
+        }
+        let borrow_a = &t;
+        let borrow_b = &t;
+        assert_eq!(through_shared_ref(borrow_a), t.layer_count() as u32);
+        assert_eq!(borrow_b.capture_layer_stack().width, 20);
     }
 }

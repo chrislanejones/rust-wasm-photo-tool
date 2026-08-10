@@ -97,7 +97,28 @@ import { join } from "node:path";
  *         it replaced ran a whole `composite_excluding_background()` internally
  *         and kept one integer, so a caption cost two full-document composites.
  *
- *  Work: the 138, 125, 117, 115, 103, 94 and 93 lines. The rest is the
+ *     92  a7 landed (half): AppShell's pen re-edit hit-test. Only 2 -> 1, and
+ *         deliberately small — a7's OTHER named site, `useTextTool`'s
+ *         apparently identical hit-test-then-look-up, turned out NOT to be an
+ *         atomic capture at all and was withdrawn rather than converted.
+ *         `commitText()` MUTATES between its two reads, on purpose, and its
+ *         `find` returning undefined is a handled case rather than a silent
+ *         failure. Two sites with the same read sequence are not the same
+ *         problem; what sits between the reads is part of the pattern.
+ *
+ *     87  a7 finished: both `openraster/export.ts` captures, 7 sites -> 2, onto
+ *         a new `capture_layer_stack()`. NOT `capture_ui_state()`, which would
+ *         have needed no new engine code: that one answers `has_transparency`
+ *         with `get_image_data()`, a full composite of the document allocated
+ *         and scanned, which an `.ora` export that already encodes every layer
+ *         separately has no use for. Split by cost, not by naming.
+ *
+ *         This does NOT make `exportOra` atomic and must not be read as having
+ *         done so — the `await import("jszip")` still separates the metadata
+ *         from the layer PNGs, and the file still mutates mid-export. Both are
+ *         pre-existing and triaged in ADR-024; both stay open.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92 and 87 lines. The rest is the
  *  measurement catching up.
  *
  *  THE THIRD FORMATTING BLIND SPOT (found during a5, 2026-08-09). The audit
@@ -119,7 +140,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 92;
+const BUDGET = 87;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -232,10 +253,15 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // a7: `handlePenHitTest` is a non-async `useCallback`, so both of its sites
     // (`shape_annotation_at` + `get_shape_annotations`) were restructure, and
     // the `capture_pen_hit` replacing them lands in the same bucket:
-    // 57 - 2 + 1 = 56. un-awaited untouched at 25 — a7 converted nothing in an
-    // async context.
-    ).toBe(56);
-    expect(gate.unawaited).toBe(25);
+    // 57 - 2 + 1 = 56. un-awaited untouched at 25 — that half of a7 converted
+    // nothing in an async context.
+    // a7's openraster half splits across BOTH buckets, which is the check that
+    // it is real work: `flattenAllLayersInPlace` is a plain sync function, so
+    // its three reads were restructure (56 - 3 + 1 `capture_layer_stack` = 54);
+    // `exportOra` is `async`, so its four were un-awaited
+    // (25 - 4 + 1 = 22). Seven out, two in, gate 92 - 5 = 87.
+    ).toBe(54);
+    expect(gate.unawaited).toBe(22);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
