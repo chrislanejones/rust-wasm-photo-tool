@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.9",
+    date: "2026-08-11",
+    headline: "Shapes, arrows and pins wait for the answer",
+    entries: [
+      {
+        tag: "infra",
+        text: "Seven more engine calls converted — but the work was the wiring between them rather than the calls themselves. Committing a shape and reloading the shape list are each triggered from four or five places (Enter, clicking away, switching tools, undo), and two of those had to keep their order: clicking an existing shape re-selects it only because the pending edit is committed first, and the check for “what did I click” reads the list that commit writes.",
+      },
+      {
+        tag: "fix",
+        text: "The clearest proof it still works is the pins: drop two and they come out numbered 1 and 2. The second one only knows it is the second because it reads the first back from the engine — so that sequence is the conversion working, observed rather than argued.",
+      },
+    ],
+  },
+  {
     version: "v8.8",
     date: "2026-08-11",
     headline: "The whole Select tool waits for the answer",

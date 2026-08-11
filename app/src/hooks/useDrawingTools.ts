@@ -321,14 +321,17 @@ export function useDrawingTools({
 
   // Live shape annotations (for the Reselect list + canvas hit-test).
   const [shapes, setShapes] = useState<ShapeMeta[]>([]);
-  const refreshShapes = useCallback(() => {
+  // ADR-024 Stage 3.5. `try/catch` keeps working around the await: a rejected
+  // engine call lands in the same catch that a malformed JSON string does, and
+  // the fallback is the same empty list.
+  const refreshShapes = useCallback(async () => {
     const tool = toolRef.current;
     if (!tool) {
       setShapes([]);
       return;
     }
     try {
-      setShapes(JSON.parse(tool.get_shape_annotations()) as ShapeMeta[]);
+      setShapes(JSON.parse(await tool.get_shape_annotations()) as ShapeMeta[]);
     } catch {
       setShapes([]);
     }
@@ -341,7 +344,7 @@ export function useDrawingTools({
    * stays in Rust; the shape remains re-selectable. No-op when nothing is
    * pending, so every trigger can call it unconditionally.
    */
-  const commitEdit = useCallback(() => {
+  const commitEdit = useCallback(async () => {
     const es = editStateRef.current;
     if (!es) return;
     editStateRef.current = null;
@@ -389,7 +392,7 @@ export function useDrawingTools({
       if (!editDirtyRef.current) {
         tool.set_editing_shape(-1);
         flushToCanvas();
-        refreshShapes();
+        await refreshShapes();
         return;
       }
       tool.update_shape_annotation(
@@ -410,7 +413,7 @@ export function useDrawingTools({
       );
       tool.set_editing_shape(-1);
     } else {
-      const newId = tool.add_shape_annotation(
+      const newId = await tool.add_shape_annotation(
         kind,
         es.start.x,
         es.start.y,
@@ -438,7 +441,7 @@ export function useDrawingTools({
     }
     flushToCanvas();
     syncState();
-    refreshShapes();
+    await refreshShapes();
   }, [toolRef, flushToCanvas, syncState, refreshShapes]);
 
   /** Escape: drop the pending edit. For an existing-shape edit this also
@@ -457,13 +460,17 @@ export function useDrawingTools({
    *  resized, or re-angled. The committed shape is suppressed from the Rust
    *  render while editing (the overlay preview stands in for it). */
   const selectShape = useCallback(
-    (id: number) => {
+    async (id: number) => {
       const tool = toolRef.current;
       if (!tool) return;
-      if (editStateRef.current) commitEdit();
+      // AWAITED, not fire-and-forget. `commitEdit` writes the pending shape into
+      // the engine, and the very next line reads the annotation list back — so
+      // dropping the await would race the read against the write and the list
+      // could arrive without the shape just committed.
+      if (editStateRef.current) await commitEdit();
       let list: ShapeMeta[];
       try {
-        list = JSON.parse(tool.get_shape_annotations()) as ShapeMeta[];
+        list = JSON.parse(await tool.get_shape_annotations()) as ShapeMeta[];
       } catch {
         list = [];
       }
@@ -558,7 +565,7 @@ export function useDrawingTools({
 
   /** Delete a live shape (from the Reselect list X). One history step. */
   const removeShape = useCallback(
-    (id: number) => {
+    async (id: number) => {
       const tool = toolRef.current;
       if (!tool) return;
       if (editStateRef.current?.editId === id) {
@@ -575,7 +582,7 @@ export function useDrawingTools({
         );
       flushToCanvas();
       syncState();
-      refreshShapes();
+      await refreshShapes();
     },
     [toolRef, flushToCanvas, syncState, refreshShapes],
   );
@@ -586,7 +593,7 @@ export function useDrawingTools({
    *  label style (number vs letter) follows the Pins tab toggle. Pins are a
    *  filled circle bbox + label (Rust kind 5). */
   const dropPin = useCallback(
-    (p: Point) => {
+    async (p: Point) => {
       const tool = toolRef.current;
       if (!tool) return;
       const s = settingsRef.current;
@@ -594,7 +601,7 @@ export function useDrawingTools({
       const r = 8 + s.strokeWidth * 3;
       let maxNum = 0;
       try {
-        for (const sh of JSON.parse(tool.get_shape_annotations()) as ShapeMeta[]) {
+        for (const sh of JSON.parse(await tool.get_shape_annotations()) as ShapeMeta[]) {
           if (sh.kind === 5 && sh.number > maxNum) maxNum = sh.number;
         }
       } catch {
@@ -607,7 +614,7 @@ export function useDrawingTools({
       );
       flushToCanvas();
       syncState();
-      refreshShapes();
+      await refreshShapes();
     },
     [toolRef, flushToCanvas, syncState, refreshShapes],
   );
@@ -624,22 +631,43 @@ export function useDrawingTools({
   useEffect(() => {
     if (prevAnnotationsRev.current === annotationsRevision) return;
     prevAnnotationsRev.current = annotationsRevision;
-    refreshShapes();
-    const editId = editStateRef.current?.editId;
-    if (editId == null) return;
-    const tool = toolRef.current;
-    let stillThere: boolean;
-    try {
-      stillThere = (JSON.parse(tool?.get_shape_annotations() ?? "[]") as ShapeMeta[])
-        .some((s) => s.id === editId);
-    } catch {
-      stillThere = false;
-    }
-    if (!stillThere) {
-      editStateRef.current = null;
-      setEditState(null);
-      tool?.set_editing_shape(-1);
-    }
+    // ADR-024 Stage 3.5. An effect callback cannot be `async` — React reads the
+    // returned Promise as its cleanup — so this is an async IIFE with a
+    // cancellation flag.
+    //
+    // THE FLAG MATTERS HERE. This fires on every undo/redo/history jump, so two
+    // revisions can be in flight at once behind the worker and land in either
+    // order. The stale one would tear down an edit overlay the newer revision
+    // had just confirmed is still valid, leaving a hidden shape with no preview
+    // — exactly the state this effect exists to prevent.
+    //
+    // `await tool?.get_shape_annotations() ?? "[]"` keeps the optional chain's
+    // short-circuit: with no tool the await yields `undefined` and `??` supplies
+    // the empty list, same as before.
+    let cancelled = false;
+    void (async () => {
+      await refreshShapes();
+      const editId = editStateRef.current?.editId;
+      if (cancelled || editId == null) return;
+      const tool = toolRef.current;
+      let stillThere: boolean;
+      try {
+        stillThere = (
+          JSON.parse((await tool?.get_shape_annotations()) ?? "[]") as ShapeMeta[]
+        ).some((s) => s.id === editId);
+      } catch {
+        stillThere = false;
+      }
+      if (cancelled) return;
+      if (!stillThere) {
+        editStateRef.current = null;
+        setEditState(null);
+        tool?.set_editing_shape(-1);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [annotationsRevision, refreshShapes, toolRef]);
 
   /** Overlay handle drags push new geometry here (canvas coords). */
@@ -684,7 +712,9 @@ export function useDrawingTools({
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        commitEdit();
+        // `void`: a DOM listener cannot await, and since Stage 3.5 this returns
+        // a Promise. Marked rather than ignored — same as the pointerdown below.
+        void commitEdit();
       } else if (e.key === "Escape") {
         e.preventDefault();
         cancelEdit();
@@ -727,7 +757,7 @@ export function useDrawingTools({
       if (target === canvasRef.current) return;
       if (target.closest("[data-draw-overlay]")) return;
       if (target.closest("[data-draw-panel]")) return;
-      commitEdit();
+      void commitEdit();
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
@@ -757,31 +787,42 @@ export function useDrawingTools({
   );
 
   const onMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+    async (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (e.button !== 0) return;
       if (!["arrow", "shapes", "crop"].includes(activeTool)) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       // Starting a new drag on empty canvas commits the pending edit first, so
       // the committed geometry is in the engine before a new one begins.
-      if (editStateRef.current) commitEdit();
+      //
+      // AWAITED, and this one is load-bearing: the comment above states the
+      // ordering as a requirement, and the hit-test two lines down reads the
+      // annotation list that `commitEdit` writes to. Fire-and-forget here would
+      // let the hit-test run against a list that does not yet contain the shape
+      // just committed — the click would miss it and start a new drag instead
+      // of re-selecting.
+      if (editStateRef.current) await commitEdit();
+      // `p` is read off the event BEFORE any await; after one, `e` is only safe
+      // for values already destructured out of it.
       const p = getCoords(e);
       // Pins tab: clicking drops a callout disc, or re-selects an existing pin.
       if (activeTool === "shapes" && penModeRef.current === "pins") {
-        const hit = toolRef.current?.shape_annotation_at(p.x, p.y) ?? -1;
+        // `await` outside the optional chain keeps the short-circuit: with no
+        // tool the await yields `undefined` and `?? -1` supplies the miss.
+        const hit = (await toolRef.current?.shape_annotation_at(p.x, p.y)) ?? -1;
         if (hit >= 0) {
-          selectShape(hit); // click an existing pin → move it
+          await selectShape(hit); // click an existing pin → move it
           return;
         }
-        dropPin(p);
+        await dropPin(p);
         return;
       }
       // Shape/arrow tools: clicking an existing live shape re-selects it for
       // editing instead of starting a brand-new rubber-band drag.
       if (activeTool === "arrow" || activeTool === "shapes") {
-        const hit = toolRef.current?.shape_annotation_at(p.x, p.y) ?? -1;
+        const hit = (await toolRef.current?.shape_annotation_at(p.x, p.y)) ?? -1;
         if (hit >= 0) {
-          selectShape(hit);
+          await selectShape(hit);
           return;
         }
       }

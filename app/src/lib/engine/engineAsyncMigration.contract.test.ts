@@ -238,7 +238,17 @@ import { join } from "node:path";
  *         document state, so a3/a7's "one capture" fix does not apply. Same
  *         test that withdrew `useTextTool` from a7.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52 and 39 lines. The
+ *     32  a8 batch 10: `useDrawingTools` 7 -> 0. Seven engine sites, but the
+ *         work is the CALL GRAPH inside the file: `commitEdit` and
+ *         `refreshShapes` are called from four and five places respectively,
+ *         and both are also exported. Two of those callers are a keydown and a
+ *         pointerDOWN listener (`void commitEdit()`), one is an effect (async
+ *         IIFE + cancellation flag), and two are ORDERING-CRITICAL — the file's
+ *         own comment says the pending edit must be committed before a new drag
+ *         begins, and `selectShape`/`onMouseDown` both read the annotation list
+ *         that `commitEdit` writes. Those are `await`, not `void`.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39 and 32 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -263,7 +273,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 39;
+const BUDGET = 32;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -442,10 +452,16 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // `selection_to_new_layer`. un-awaited is untouched at 10 for the fourth
     // batch running: what is left in that bucket is `openraster/export.ts`.
     // awaited 43 -> 56. Gate 52 - 13 = 39, and 10 + 28 + 1 = 39.
-    ).toBe(28);
+    // a8 batch 10: `useDrawingTools` 7 -> 0. All seven sat in non-async
+    // callbacks, so the whole batch came out of restructure (28 - 7 = 21).
+    // truthy untouched at 1 -- the last one is `openraster/export.ts:50`.
+    // un-awaited untouched at 10 for the FIFTH batch running: everything left
+    // in that bucket is `openraster/export.ts`, whose `exportOra` is already
+    // async. awaited 56 -> 63. Gate 39 - 7 = 32, and 10 + 21 + 1 = 32.
+    ).toBe(21);
     expect(gate.unawaited).toBe(10);
     expect(gate.truthy).toBe(1);
-    expect(gate.awaited, "cumulative converted sites").toBe(56);
+    expect(gate.awaited, "cumulative converted sites").toBe(63);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

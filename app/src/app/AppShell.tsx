@@ -1600,7 +1600,9 @@ export function AppShell() {
   // Keep the Reselect list fresh after any history mutation or photo switch
   // (undo/redo/jump/load all change the live overlays under the hood).
   useEffect(() => {
-    drawingTools.refreshShapes();
+    // `void`: async since Stage 3.5 (useDrawingTools). Both refreshes are
+    // independent list reloads, so nothing here depends on their order.
+    void drawingTools.refreshShapes();
     textTool.refreshAnnotations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp.state.history, activePhotoId]);
@@ -1629,7 +1631,7 @@ export function AppShell() {
         requestPenEdit({ id: o.id, points: shape.points.flat() });
         return;
       }
-      drawingTools.selectShape(o.id);
+      void drawingTools.selectShape(o.id);
     },
     [textTool, drawingTools, setActiveTool, setBrushMode],
   );
@@ -1651,7 +1653,7 @@ export function AppShell() {
       if (!moved) return;
       stamp.flushToCanvas();
       stamp.syncState();
-      drawingTools.refreshShapes();
+      void drawingTools.refreshShapes();
       textTool.refreshAnnotations();
       // If an editor is open on the placed object, re-open it at the new
       // geometry. Without this the move is invisible: an open TEXT editor
@@ -1661,7 +1663,7 @@ export function AppShell() {
       if (selectedObject.type === "text") {
         if (textTool.textInput) textTool.selectAnnotation(selectedObject.id);
       } else if (drawingTools.editState?.editId === selectedObject.id) {
-        drawingTools.selectShape(selectedObject.id);
+        void drawingTools.selectShape(selectedObject.id);
       } else {
         tool.set_editing_shape(-1);
       }
@@ -1683,7 +1685,7 @@ export function AppShell() {
         textTool.refreshAnnotations();
         bumpAnnotations(); // was a `text-annotations-changed` window event
       } else {
-        drawingTools.removeShape(o.id);
+        void drawingTools.removeShape(o.id);
       }
       // Either way the deleted object can't stay the Align target.
       setSelectedObject((prev) =>

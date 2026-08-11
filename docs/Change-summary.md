@@ -5020,3 +5020,64 @@ Mutation tested: **13 mutants, all 13 killed** — including all five truthy tra
 
 **Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
 Engine untouched — no `build:wasm`.
+
+## v8.9 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 10**. Gate 39 -> 32. No user-visible change.
+
+`useDrawingTools` 7 -> 0. Seven engine sites, but the work was the **call graph
+inside the file**, not the calls.
+
+| Function | Engine call | Also called from |
+|---|---|---|
+| `refreshShapes` | `get_shape_annotations` | 5 places + exported |
+| `commitEdit` | `add_shape_annotation` | 4 places + exported |
+| `selectShape` | `get_shape_annotations` | `onMouseDown`, exported |
+| `dropPin` | `get_shape_annotations` | `onMouseDown` |
+| revision effect | `get_shape_annotations` | undo / redo / history jump |
+| `onMouseDown` | `shape_annotation_at` x2 | the canvas |
+
+**Two callers had to `await`, and two had to `void` — the difference is the
+whole batch.** The file's own comment states an ordering requirement: *"Starting
+a new drag on empty canvas commits the pending edit first, so the committed
+geometry is in the engine before a new one begins."* `onMouseDown` then
+hit-tests the annotation list that `commitEdit` writes, and `selectShape` reads
+the same list one line after committing. Fire-and-forget in either place would
+race the read against the write — the click would miss the shape it just
+committed and start a new drag instead of re-selecting it. Those are `await`.
+
+The keydown listener (Enter) and the pointer**down** listener (click-away)
+cannot await at all, so those are `void commitEdit()` — same shape as
+`usePastePlacementTool` in v8.7.
+
+The revision effect became an async IIFE with a **cancellation flag**. It fires
+on every undo/redo/history jump, so two revisions can be in flight behind the
+worker and land in either order; a stale one would tear down an edit overlay the
+newer revision had just confirmed, leaving a hidden shape with no preview —
+exactly the state the effect exists to prevent.
+
+**Verified in the browser** against the production build:
+
+| Action | Result |
+|---|---|
+| Drag a rectangle, press Enter | `add_shape_annotation` x1, **`Add Shape`**, shapes 0 -> 1 |
+| Click that shape | `shape_annotation_at` x1 -> hit, **edit overlay opened**, no new shape, no history entry |
+| Drop two pins | `add_pin_annotation` x2, numbered **1 then 2** |
+| Ctrl+Z | pins removed **and** the shape list refreshed |
+| Console | no errors, no unhandled rejections |
+
+The pin numbering is the sharpest witness in this batch. `dropPin` reads the
+annotation list back to find the highest number so far; with the `await`
+dropped, `JSON.parse` receives a Promise, throws into the catch, `maxNum` stays
+0 and the second pin is also numbered **1**. Two pins numbering themselves 1 and
+2 is that conversion working, observed rather than argued.
+
+Five call sites in `AppShell` were marked `void` — they are independent list
+reloads with nothing depending on their order, but they became floating promises
+when these functions went async and the repo has no `no-floating-promises` rule
+to catch that.
+
+Mutation tested: **7 mutants, all 7 killed**.
+
+**Gates.** 467 JS tests (11 of them pin this file's behaviour), `tsc` clean,
+eslint 0 errors, production build clean. Engine untouched — no `build:wasm`.

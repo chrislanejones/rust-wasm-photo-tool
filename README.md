@@ -84,6 +84,24 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.9 — 2026-08-11
+
+**Nothing you can see.** Shapes, arrows and callout pins now wait for the
+engine's answer.
+
+Seven calls, but the work was the wiring between them rather than the calls
+themselves: committing a shape and reloading the shape list are each triggered
+from four or five places — Enter, clicking away, switching tools, undo — and two
+of those had to keep their order. Clicking an existing shape re-selects it only
+because the pending edit is committed *first*, and the check for "what did I
+click" reads the list that commit writes.
+
+The clearest proof it still works is the pins: drop two and they come out
+numbered 1 and 2. The second one only knows it is the second because it reads
+the first back from the engine.
+
+<details><summary>Older releases</summary>
+
 ### v8.8 — 2026-08-11
 
 **Nothing you can see.** The whole Select tool — wand, edge-aware, colour
@@ -98,8 +116,6 @@ All, Delete Selection, Selection to Layer.
 The live wire that follows your cursor while a lasso is open was deliberately
 left alone. It runs on every mouse-move, and it is the one place in this file
 where waiting for an answer would cost a frame.
-
-<details><summary>Older releases</summary>
 
 ### v8.7 — 2026-08-11
 
