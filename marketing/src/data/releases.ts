@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.13",
+    date: "2026-08-11",
+    headline: "The batch stamp refuses properly now",
+    entries: [
+      {
+        tag: "infra",
+        text: "The batch stamp — logo and text, applied across a whole gallery in one pass — now waits for the engine's answer.",
+      },
+      {
+        tag: "fix",
+        text: "This was the riskiest piece left. The text stamp measures your text in the engine so it can corner-align it, and it is written to refuse and skip a photo rather than guess, because guessing would put the text in the wrong corner of every image at once. That refusal was about to stop working: the check it used to spot a missing measurement would have started passing in exactly the situation it was written for, and the whole batch would have been stamped at a nonsense position instead of being skipped and reported. Rather than teach it to handle that, the measurement now simply waits — so there is nothing to miss.",
+      },
+      {
+        tag: "perf",
+        text: "Checked by running a real four-photo batch and reading back every coordinate the engine was handed: all finite, none nonsense — and five stamps of the same text cost a single measurement, because the result is remembered.",
+      },
+    ],
+  },
+  {
     version: "v8.12",
     date: "2026-08-11",
     headline: "Text waits for the answer, and doesn't drift",

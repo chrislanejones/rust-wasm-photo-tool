@@ -84,6 +84,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.13 — 2026-08-11
+
+**Nothing you can see.** The batch stamp — logo and text, applied across a whole
+gallery in one pass — now waits for the engine's answer.
+
+This was the riskiest piece left, and the reason is worth stating. The text
+stamp measures your text in the engine so it can corner-align it, and it is
+written to **refuse and skip a photo** rather than guess, because guessing would
+put the text in the wrong corner of every image at once. That refusal was about
+to stop working: the check it used to spot a missing measurement would have
+started passing in exactly the situation it was written for, and the whole batch
+would have been stamped at a nonsense position instead of being skipped and
+reported.
+
+Rather than teach it to handle that, the measurement now simply waits — so there
+is nothing to miss. Checked by running a real four-photo batch and reading back
+every coordinate the engine was handed: all finite, none nonsense.
+
+<details><summary>Older releases</summary>
+
 ### v8.12 — 2026-08-11
 
 **Nothing you can see.** The text tool now waits for the engine's answer —
@@ -98,8 +118,6 @@ drawing code they aren't running while the screen is being painted.
 
 Checked by round-trip rather than by eye: place a text, click it to re-open it,
 commit it again unchanged, and it must not move by a single pixel. It doesn't.
-
-<details><summary>Older releases</summary>
 
 ### v8.11 — 2026-08-11
 

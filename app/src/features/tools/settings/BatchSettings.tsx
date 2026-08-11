@@ -28,7 +28,7 @@ import { AIRenamePanel } from "./AIRenamePanel";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "@/components/ui/sonner";
-import { measureText } from "@/lib/engine/textMetricsCache";
+import { measureTextAwaited } from "@/lib/engine/textMetricsCache";
 
 const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
 
@@ -498,8 +498,11 @@ export function BatchSettings({
             }
             // Use the current canvas dimensions so we composite onto exactly
             // what the user sees.
-            const workW = tool.width();
-            const workH = tool.height();
+            // Throwaway engine (the one-port allowlist), so these two cannot tear —
+            // nothing else can mutate it between them. Ordinary awaits, not a capture;
+            // see docs/engine-worker-capture-sweep.md.
+            const workW = await tool.width();
+            const workH = await tool.height();
             const targetLogoW = Math.max(
               1,
               Math.floor((workW * sizePercent) / 100),
@@ -1050,14 +1053,16 @@ function TextBatchPanel({
           try {
             tool.load_image(targetBytes);
             // Measure in Rust so we can corner-align without knowing glyph metrics.
-            const m = measureText(tool, text, fontSize, bold);
-            // `tool` is live here, so a miss is unreachable today. Throwing rather
-            // than defaulting is deliberate: every available fallback (0, or a
-            // JS-measured box) would corner-align the text to the WRONG place and
-            // silently ship a batch of misplaced stamps. The enclosing catch skips
-            // this photo and reports it, which is the honest outcome. See
-            // `textMetricsCache.ts` — under Stage 3.5 a miss becomes reachable and
-            // this is where it has to be handled.
+            const m = await measureTextAwaited(tool, text, fontSize, bold);
+            // ADR-024 b1 — AWAITED, and this is the site that made the corrected b1
+            // necessary. The note here used to say a miss "becomes reachable under
+            // Stage 3.5 and this is where it has to be handled". It could not have
+            // been handled here: the sync miss path is
+            // `Array.from(tool.measure_text(...))`, and `Array.from` of a Promise is
+            // `[]` — TRUTHY — so the throw below would never fire, `m[0]` would be
+            // `undefined`, and every photo in the batch would corner-align from NaN.
+            // Awaiting REMOVES the miss instead of handling it; the throw is kept
+            // because it is still the right answer if a tool is ever absent.
             if (!m) throw new Error("text metrics unavailable — skipping this photo");
             // Corner-align the OUTER (padded) box, then inset back to the
             // text's own top-left — commit_text always anchors to the text.
@@ -1089,7 +1094,10 @@ function TextBatchPanel({
               bgPad,
               bgRadius,
             );
-            composited = new Uint8Array(tool.get_image_data());
+            // The `await` sits INSIDE the wrapper deliberately: `new Uint8Array` of a
+            // Promise is an EMPTY typed array, not a throw, and `encode_png_pixels`
+            // does not validate length against the width and height it is handed.
+            composited = new Uint8Array(await tool.get_image_data());
           } finally {
             tool.free();
           }
@@ -1183,16 +1191,19 @@ function TextBatchPanel({
                 tool.load_image(baseBytes);
               }
             }
-            const workW = tool.width();
-            const workH = tool.height();
-            const m = measureText(tool, text, fontSize, bold);
-            // `tool` is live here, so a miss is unreachable today. Throwing rather
-            // than defaulting is deliberate: every available fallback (0, or a
-            // JS-measured box) would corner-align the text to the WRONG place and
-            // silently ship a batch of misplaced stamps. The enclosing catch skips
-            // this photo and reports it, which is the honest outcome. See
-            // `textMetricsCache.ts` — under Stage 3.5 a miss becomes reachable and
-            // this is where it has to be handled.
+            // Throwaway engine — same reasoning as the logo path above.
+            const workW = await tool.width();
+            const workH = await tool.height();
+            const m = await measureTextAwaited(tool, text, fontSize, bold);
+            // ADR-024 b1 — AWAITED, and this is the site that made the corrected b1
+            // necessary. The note here used to say a miss "becomes reachable under
+            // Stage 3.5 and this is where it has to be handled". It could not have
+            // been handled here: the sync miss path is
+            // `Array.from(tool.measure_text(...))`, and `Array.from` of a Promise is
+            // `[]` — TRUTHY — so the throw below would never fire, `m[0]` would be
+            // `undefined`, and every photo in the batch would corner-align from NaN.
+            // Awaiting REMOVES the miss instead of handling it; the throw is kept
+            // because it is still the right answer if a tool is ever absent.
             if (!m) throw new Error("text metrics unavailable — skipping this photo");
             const { dx: outerDx, dy: outerDy } = computeOffset(
               position,

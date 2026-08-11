@@ -192,6 +192,35 @@ export function textInkOffsetBg(
 /** Entry count. For the contract test and the diagnostics panel — not a public
  *  API anyone should branch on. */
 /**
+ * `measureText` for callers that CAN await — today that is the batch stamp,
+ * both of whose call sites are the reason the corrected b1 exists.
+ *
+ * The sync form returns `undefined` on a miss, and `BatchSettings` handles that
+ * by THROWING and skipping the photo, deliberately: every available fallback
+ * would corner-align a whole gallery to the wrong place. That guard is correct
+ * and it is also the one Stage 3.5 would have broken — the miss path is
+ * `Array.from(tool.measure_text(...))`, and `Array.from` of a Promise is `[]`,
+ * which is TRUTHY, so `if (!m) throw` stops firing, `m[0]` is `undefined`, and
+ * the corner-align arithmetic yields `NaN` for every photo in the batch.
+ *
+ * Awaiting removes the miss rather than handling it: with a live tool this
+ * always resolves, so the throw below becomes genuinely unreachable instead of
+ * unreachable-by-luck.
+ */
+export async function measureTextAwaited(
+  tool: ImageHorseTool | null | undefined,
+  text: string,
+  fontSize: number,
+  bold: boolean,
+): Promise<readonly number[] | undefined> {
+  const key = `m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`;
+  const hit = lookup(key);
+  if (hit !== undefined) return hit;
+  if (!tool) return undefined;
+  return remember(key, Array.from(await tool.measure_text(text, fontSize, bold)));
+}
+
+/**
  * `textInkOffsetBg` for callers that CAN await — the commit path, the re-edit
  * path, and the batch stamp. **Use this one unless you are inside a render.**
  *

@@ -5280,3 +5280,58 @@ be caught by neither.
 
 **Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
 Engine untouched — no `build:wasm`.
+
+## v8.13 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 12**. Gate 26 -> 21. No user-visible change.
+
+`BatchSettings` 5 -> 0, plus **b1's last two callers**. b1 is now complete except
+its render half.
+
+| Site | Call | Note |
+|---|---|---|
+| logo path | `width` + `height` | throwaway engine — ordinary awaits |
+| text path | `width` + `height` | throwaway engine — ordinary awaits |
+| logo path | `get_image_data` | **wrapped** in `new Uint8Array(...)` |
+| + b1 | `measureTextAwaited` ×2 | the two `Array.from` NaN traps, closed |
+
+**It breaks a six-batch streak, and the direction matters.** All five came out of
+**un-awaited** (10 -> 5), which had not moved since v8.5 — `applyToAll` was
+already `async`, so these only ever needed the keyword. What remains in that
+bucket is `openraster/export.ts` alone.
+
+**The two `measureText` sites are the ones this whole b1 correction existed
+for.** Their `if (!m) throw new Error("text metrics unavailable")` is deliberate:
+every available fallback would corner-align a whole gallery to the wrong place,
+so refusing and skipping the photo is the honest outcome. Under the sync form
+that guard **could never have fired** — the miss path is
+`Array.from(tool.measure_text(...))`, and `Array.from` of a Promise is `[]`,
+which is truthy. Awaiting **removes** the miss rather than handling it; the throw
+is kept because it is still right if a tool is ever absent.
+
+The `get_image_data` site needed the `await` **inside** the wrapper for the same
+family of reason: `new Uint8Array` of a Promise is an empty typed array, not a
+throw, and `encode_png_pixels` does not validate buffer length against the width
+and height it is handed.
+
+**Verified by running a real batch** against the production build — four photos,
+reading back every coordinate the engine was actually handed:
+
+| | |
+|---|---|
+| `commit_text` calls | **5**, every `dx`/`dy` **finite** — no NaN |
+| `measure_text` engine calls | **1** for five stamps |
+| `get_image_data` | 5, awaited |
+| Console | no errors, no unhandled rejections |
+
+The `measure_text: 1` is the incidental proof that `measureTextAwaited` shares
+its key with the sync form: five stamps of the same string cost one measurement.
+That sharing is what makes it double as the prime for the render sites.
+
+**Mutation tested: 6 mutants, 6 killed — again by two gates.** The five engine
+sites die to the migration ratchet; the two b1 callers are invisible to it and
+die to `tsc` instead (TS7053 — `m[0]` on a Promise). Same split as v8.12, and
+the same caveat: a wrapped call is covered only while its result is *indexed*.
+
+**Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.

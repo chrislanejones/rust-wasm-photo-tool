@@ -257,7 +257,15 @@ import { join } from "node:path";
  *         `commitText()` mutates between the two reads on purpose (see the
  *         capture-sweep doc, "Capture 4 is withdrawn").
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32 and 26 lines. The
+ *     21  a8 batch 12: `BatchSettings` 5 -> 0, plus the LAST TWO b1 callers.
+ *         Breaks a six-batch streak: all five came out of UN-AWAITED (10 -> 5),
+ *         which had not moved since v8.5 — `applyToAll` was already async, so
+ *         these only ever needed the keyword. The two `measureText` sites moved
+ *         to a new `measureTextAwaited`, which REMOVES their miss rather than
+ *         handling it: their `if (!m) throw` could never have fired under the
+ *         sync form, because `Array.from(Promise)` is `[]` and truthy.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32, 26 and 21 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -282,7 +290,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 26;
+const BUDGET = 21;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -474,10 +482,17 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // truthy untouched at 1 (`openraster/export.ts:50`, the last one).
     // awaited 63 -> 70: SEVEN, not six -- b1's `textInkOffsetBgAwaited` adds a
     // NEW engine call site, born awaited. Gate 32 - 6 = 26, and 10 + 15 + 1 = 26.
+    // a8 batch 12: `BatchSettings` 5 -> 0. ALL FIVE came out of un-awaited
+    // (10 - 5 = 5) -- the first batch in six to touch that bucket, because
+    // `applyToAll` was already async. restructure and truthy untouched at 15
+    // and 1. awaited 70 -> 76: SIX, not five -- `measureTextAwaited` adds a
+    // NEW engine call site, born awaited, exactly as `textInkOffsetBgAwaited`
+    // did in v8.12. Gate 26 - 5 = 21, and 5 + 15 + 1 = 21.
+    // What remains in un-awaited is `openraster/export.ts` alone.
     ).toBe(15);
-    expect(gate.unawaited).toBe(10);
+    expect(gate.unawaited).toBe(5);
     expect(gate.truthy).toBe(1);
-    expect(gate.awaited, "cumulative converted sites").toBe(70);
+    expect(gate.awaited, "cumulative converted sites").toBe(76);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
