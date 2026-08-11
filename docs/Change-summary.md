@@ -5335,3 +5335,66 @@ the same caveat: a wrapped call is covered only while its result is *indexed*.
 
 **Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Engine untouched — no `build:wasm`.
+
+## v8.14 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 13 — b1 COMPLETE**. Gate 21 -> 18. No user-visible
+change.
+
+`textMetricsCache` 3 -> 0, and **not by conversion**. `cached()` is now a pure
+lookup; the engine is reached only by the new `primeTextMetrics()`, off the
+render path. This is what the file's own header specified in v7.80 and what had
+never been written.
+
+| Change | |
+|---|---|
+| `cached()` | takes no `compute` thunk — a miss returns `undefined` |
+| `primeTextMetrics()` | **new**; fills both keys the render reads, returns whether it filled |
+| `CanvasArea` | effect keyed on the text being laid out, bumps one re-render |
+| sync `textInkOffsetBg` | **deleted** — zero callers since v8.12 |
+
+**It was built last on purpose, and the ordering was the entire fix.** Four of
+the six callers could not tolerate a miss; removing the synchronous engine call
+while they still routed through here would have shipped the NaN batch. They
+moved to the awaited twins in v8.12 and v8.13. Only the two render sites remain,
+and those genuinely tolerate a miss.
+
+**The bump is the load-bearing part.** Priming without forcing a re-render
+leaves the fallback on screen permanently — correct-looking, and
+indistinguishable from working software. `primeTextMetrics` returns whether it
+actually filled anything so a warm cache costs no render.
+
+**Verified in the browser**, and the discriminator is sharp: with the sync path
+gone, a prime that was not wired would mean **zero** engine calls and a fallback
+that never lifts.
+
+| Step | `measure_text` / `text_ink_offset` |
+|---|---|
+| before opening a text input | 0 / 0 |
+| after opening | **1 / 1** |
+| after typing `PRIME` | **2 / 2** |
+
+| | |
+|---|---|
+| `transform-origin` in use | **[23.97, 10.65]** |
+| the fallback would be | [34.50, 20.45] — half the 69x41 box |
+| commit after priming | `PRIME` at `[487, 823]`, no extra engine calls |
+
+So the prime fires *and* the render re-reads it. Both halves of the
+"looks-like-working-software" failure are closed.
+
+**The cache's own contract test was rewritten, and one of its cases had gone
+vacuous.** Three cases counted engine calls made *by the sync readers*, which is
+now structurally impossible. The fourth — eviction — kept **passing** while
+proving nothing: it filled via `measureText`, which no longer stores anything,
+so "size <= 512" held at zero. It now fills through the async API and asserts
+the cache is actually full first. 10 cases, up from 9.
+
+**Gates.** 468 JS tests, `tsc` clean, eslint 0 errors and 57 warnings (the
+pre-existing baseline — an unused `eslint-disable` this batch introduced was
+removed rather than left to raise the count). App + marketing builds clean.
+Engine untouched — no `build:wasm`.
+
+⚠️ The Chrome extension dropped mid-session; this batch was verified through
+**Playwright** instead. Worth knowing there is a second browser path when the
+extension is unavailable.

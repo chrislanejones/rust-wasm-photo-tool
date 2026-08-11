@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.14",
+    date: "2026-08-11",
+    headline: "The measurement arrives before the drawing does",
+    entries: [
+      {
+        tag: "infra",
+        text: "The last piece of the text-measuring work, and the one that was written down as the plan two weeks ago and never built. Laying out the text box needs to know how wide your text is and where its ink starts — and that happens while the screen is being drawn, which is the one place that cannot wait for an answer. So it now asks just before, off to the side, and the drawing reads what was already worked out.",
+      },
+      {
+        tag: "fix",
+        text: "It was built last on purpose. Four other places also asked for those measurements and could not cope with “don't know” — the batch stamp in particular refuses and skips a photo rather than guess. Removing the old path before those four had moved would have broken them silently, so they moved first, in the two releases before this one.",
+      },
+    ],
+  },
+  {
     version: "v8.13",
     date: "2026-08-11",
     headline: "The batch stamp refuses properly now",

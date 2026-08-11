@@ -84,6 +84,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.14 — 2026-08-11
+
+**Nothing you can see.** The last piece of the text-measuring work, and the one
+that was written down as the plan two weeks ago and never built.
+
+Laying out the text box on screen needs to know how wide your text is and where
+its ink starts. That happens while the screen is being drawn, which is the one
+place that cannot wait for an answer. So it now asks for the answer *just
+before* — off to the side, in advance — and the drawing reads what was already
+worked out. When there is no answer yet it falls back to measuring the box in
+the browser, exactly as it did before any of this existed, for one frame.
+
+It was built last on purpose. Four other places also asked for those
+measurements and could not cope with "don't know" — the batch stamp in
+particular is written to refuse and skip a photo rather than guess. Removing the
+old path before those four were moved would have broken them silently. They
+moved first, in the two releases before this one.
+
+<details><summary>Older releases</summary>
+
 ### v8.13 — 2026-08-11
 
 **Nothing you can see.** The batch stamp — logo and text, applied across a whole
@@ -101,8 +121,6 @@ reported.
 Rather than teach it to handle that, the measurement now simply waits — so there
 is nothing to miss. Checked by running a real four-photo batch and reading back
 every coordinate the engine was handed: all finite, none nonsense.
-
-<details><summary>Older releases</summary>
 
 ### v8.12 — 2026-08-11
 

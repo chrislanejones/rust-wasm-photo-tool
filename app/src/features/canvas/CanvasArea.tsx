@@ -27,7 +27,11 @@ import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
-import { measureText, textInkOffset } from "@/lib/engine/textMetricsCache";
+import {
+  measureText,
+  textInkOffset,
+  primeTextMetrics,
+} from "@/lib/engine/textMetricsCache";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
@@ -757,6 +761,45 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         setPreviewMask(ov && ov.length ? ov : null);
       });
     }, [hookResult, canvasRef, previewKindCode, selectionTolerance, edgeThreshold, clearPreview]);
+
+    // ADR-024 b1 — PRIME THE TEXT-METRICS CACHE OFF THE RENDER PATH.
+    //
+    // The text overlay below lays itself out from `measureText` and
+    // `textInkOffset`, during render, where nothing can `await`. Those two read
+    // the cache and take a documented fallback on a miss (the JS-measured box).
+    // This effect is what turns that miss into a one-frame event instead of a
+    // permanent state: it fills the cache for the text being laid out, then
+    // bumps `metricsTick` so exactly one more render runs and reads the warm
+    // entry.
+    //
+    // THE BUMP IS THE WHOLE POINT. Priming without re-rendering leaves the
+    // fallback on screen forever — correct-looking, permanent, and
+    // indistinguishable from working software. `primeTextMetrics` returns
+    // whether it actually filled anything, so a warm cache costs no render.
+    const [metricsTick, setMetricsTick] = useState(0);
+    const primeText = textInput?.text || " ";
+    const primeFontSize = textInput ? (textInput.fontSize ?? textSettings?.fontSize) : undefined;
+    const primeBold =
+      textInput ? (textInput.fontWeight ?? textSettings?.fontWeight) === "bold" : false;
+    useEffect(() => {
+      if (!textInput || primeFontSize === undefined) return;
+      const tool = hookResult.toolRef.current;
+      if (!tool) return;
+      let cancelled = false;
+      void (async () => {
+        const filled = await primeTextMetrics(tool, primeText, primeFontSize, primeBold);
+        if (!cancelled && filled) setMetricsTick((t) => t + 1);
+      })();
+      return () => {
+        cancelled = true;
+      };
+      // `metricsTick` is deliberately NOT a dependency — it is the effect's own
+      // output, and depending on it would re-prime forever. (No
+      // eslint-disable needed: the rule agrees, because the setter form of
+      // `setMetricsTick` reads no state.)
+    }, [textInput, primeText, primeFontSize, primeBold, hookResult]);
+    // Read once so the layout below re-runs after a prime; the value is unused.
+    void metricsTick;
 
     // Modifier pressed/released WITHOUT moving the mouse: keep the intent,
     // cursor badge and hover preview live off keydown/keyup while the Select

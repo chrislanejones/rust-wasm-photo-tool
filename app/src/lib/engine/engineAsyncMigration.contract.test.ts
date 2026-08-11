@@ -265,7 +265,17 @@ import { join } from "node:path";
  *         handling it: their `if (!m) throw` could never have fired under the
  *         sync form, because `Array.from(Promise)` is `[]` and truthy.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32, 26 and 21 lines. The
+ *     18  b1 COMPLETE (a8 batch 13). `textMetricsCache`'s three sites are gone,
+ *         and NOT by conversion — `cached()` is now a pure lookup and the
+ *         engine is reached only by `primeTextMetrics()`, off the render path.
+ *         The sync `textInkOffsetBg` was DELETED outright: its only callers
+ *         moved to the awaited twin in v8.12, leaving a zero-reference export
+ *         whose only effect would have been to hold an unreachable engine call
+ *         in the gate. Built LAST on purpose — doing it before v8.12/v8.13 had
+ *         moved the four miss-intolerant callers would have shipped the NaN
+ *         batch. The ordering WAS the fix.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32, 26, 21 and 18 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -290,7 +300,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 21;
+const BUDGET = 18;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -489,10 +499,16 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // NEW engine call site, born awaited, exactly as `textInkOffsetBgAwaited`
     // did in v8.12. Gate 26 - 5 = 21, and 5 + 15 + 1 = 21.
     // What remains in un-awaited is `openraster/export.ts` alone.
-    ).toBe(15);
+    // b1 complete (batch 13): `textMetricsCache` 3 -> 0 by DELETION, not
+    // conversion. All three sat in non-async callbacks, so restructure
+    // 15 - 3 = 12; un-awaited and truthy untouched at 5 and 1. awaited 76 -> 78:
+    // only TWO, because the three removed sites vanish rather than becoming
+    // awaited, while `primeTextMetrics` adds two new ones born awaited.
+    // Gate 21 - 3 = 18, and 5 + 12 + 1 = 18.
+    ).toBe(12);
     expect(gate.unawaited).toBe(5);
     expect(gate.truthy).toBe(1);
-    expect(gate.awaited, "cumulative converted sites").toBe(76);
+    expect(gate.awaited, "cumulative converted sites").toBe(78);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

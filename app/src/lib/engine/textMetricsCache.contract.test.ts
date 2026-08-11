@@ -15,7 +15,9 @@ import { join } from "node:path";
 import {
   measureText,
   textInkOffset,
-  textInkOffsetBg,
+  measureTextAwaited,
+  textInkOffsetBgAwaited,
+  primeTextMetrics,
   textMetricsCacheSize,
   resetTextMetricsCache,
 } from "./textMetricsCache";
@@ -84,75 +86,104 @@ describe("the wrapped engine methods read no engine state", () => {
 });
 
 describe("the cache behaves like a memo, not a mirror", () => {
-  it("returns undefined rather than guessing when there is no engine", () => {
+  // ⚠️ REWRITTEN v8.14 (ADR-024 b1). The sync readers no longer call the engine
+  // at all — a render pass cannot await, so `cached()` is a pure lookup and the
+  // cache is filled off the render path by `primeTextMetrics` (or, for callers
+  // that can await, by the awaited twins). These tests therefore FILL through
+  // the async API and READ through the sync one.
+  //
+  // Three of them used to count engine calls made BY the sync readers, which is
+  // now structurally impossible. The eviction test is the one worth pausing on:
+  // it kept passing after the change and had become VACUOUS — it filled via
+  // `measureText`, which now stores nothing, so "size <= 512" held at zero. A
+  // check that cannot fail is not a check.
+  const fakeTool = (calls?: string[]) =>
+    ({
+      measure_text: (t: string, sz: number, b: boolean) => {
+        calls?.push(`m|${t}|${sz}|${b}`);
+        return new Uint32Array([t.length * sz, sz]);
+      },
+      text_ink_offset: (t: string, sz: number, b: boolean) => {
+        calls?.push(`i|${t}|${sz}|${b}`);
+        return new Int32Array([1, 2]);
+      },
+      text_ink_offset_bg: (
+        t: string,
+        sz: number,
+        b: boolean,
+        k: number,
+        pad: number,
+      ) => {
+        calls?.push(`b|${t}|${sz}|${b}|${k}|${pad}`);
+        return new Int32Array([k, pad]);
+      },
+    }) as unknown as Parameters<typeof primeTextMetrics>[0];
+
+  it("returns undefined rather than guessing on a miss", async () => {
     resetTextMetricsCache();
-    // A wrong number here would be laid out as if it were right. Callers all
-    // have a documented fallback; none of them wants a fabricated metric.
+    // A wrong number here would be laid out as if it were right. Both readers
+    // have a documented fallback; neither wants a fabricated metric.
     expect(measureText(null, "hello", 24, false)).toBeUndefined();
     expect(textInkOffset(undefined, "hello", 24, false)).toBeUndefined();
-    expect(textInkOffsetBg(null, "hello", 24, false, 1, 8)).toBeUndefined();
+    // ...and passing a live tool does NOT change that, which is the v8.14
+    // behaviour change: the sync readers cannot reach the engine any more.
+    expect(measureText(fakeTool(), "hello", 24, false)).toBeUndefined();
     expect(textMetricsCacheSize(), "a miss must not store anything").toBe(0);
   });
 
-  it("keys on every argument, so no two calls can collide", () => {
+  it("a primed entry is what the sync reader returns", async () => {
     resetTextMetricsCache();
     const calls: string[] = [];
-    // Minimal stand-in for the engine: records what it was asked.
-    const fake = {
-      measure_text: (t: string, s: number, b: boolean) => {
-        calls.push(`m|${t}|${s}|${b}`);
-        return new Uint32Array([t.length * s, s]);
-      },
-      text_ink_offset: (t: string, s: number, b: boolean) => {
-        calls.push(`i|${t}|${s}|${b}`);
-        return new Int32Array([1, 2]);
-      },
-      text_ink_offset_bg: (t: string, s: number, b: boolean, k: number, p: number) => {
-        calls.push(`b|${t}|${s}|${b}|${k}|${p}`);
-        return new Int32Array([k, p]);
-      },
-    } as unknown as Parameters<typeof measureText>[0];
-
-    measureText(fake, "hi", 24, false);
-    measureText(fake, "hi", 24, false); // same key -> cached
-    expect(calls.length, "second identical call must not reach the engine").toBe(1);
-
-    measureText(fake, "hi", 24, true); // bold differs
-    measureText(fake, "hi", 25, false); // size differs
-    measureText(fake, "hi ", 24, false); // text differs by a trailing space
-    expect(calls.length).toBe(4);
-
-    // The bg variant must not collide with the plain one on shared arguments.
-    textInkOffset(fake, "hi", 24, false);
-    textInkOffsetBg(fake, "hi", 24, false, 0, 0);
-    expect(calls.length).toBe(6);
-
-    // And the two bg parameters are part of the key.
-    expect(textInkOffsetBg(fake, "hi", 24, false, 2, 8)).toEqual([2, 8]);
-    expect(textInkOffsetBg(fake, "hi", 24, false, 1, 4)).toEqual([1, 4]);
+    const fake = fakeTool(calls);
+    expect(await primeTextMetrics(fake, "hi", 24, false)).toBe(true);
+    expect(calls.length, "prime fills BOTH keys the render path reads").toBe(2);
+    expect(measureText(fake, "hi", 24, false)).toEqual([2 * 24, 24]);
+    expect(textInkOffset(fake, "hi", 24, false)).toEqual([1, 2]);
+    // Priming an already-warm pair must report false, or the caller re-renders
+    // forever.
+    expect(await primeTextMetrics(fake, "hi", 24, false)).toBe(false);
+    expect(calls.length, "a warm prime must not reach the engine").toBe(2);
   });
 
-  it("separator cannot be forged out of the other arguments", () => {
+  it("keys on every argument, so no two calls can collide", async () => {
+    resetTextMetricsCache();
+    const calls: string[] = [];
+    const fake = fakeTool(calls);
+    await primeTextMetrics(fake, "hi", 24, false);
+    const base = calls.length;
+    await primeTextMetrics(fake, "hi", 24, true); // bold differs
+    await primeTextMetrics(fake, "hi", 25, false); // size differs
+    await primeTextMetrics(fake, "hi ", 24, false); // trailing space
+    expect(calls.length, "each distinct argument set is its own entry").toBe(base + 6);
+    // The bg variant keys separately from the plain one on shared arguments.
+    await textInkOffsetBgAwaited(fake, "hi", 24, false, 0, 0);
+    expect(await textInkOffsetBgAwaited(fake, "hi", 24, false, 2, 8)).toEqual([2, 8]);
+    expect(await textInkOffsetBgAwaited(fake, "hi", 24, false, 1, 4)).toEqual([1, 4]);
+  });
+
+  it("separator cannot be forged out of the other arguments", async () => {
     resetTextMetricsCache();
     const seen = new Set<string>();
     const fake = {
-      measure_text: (t: string, s: number, b: boolean) => {
-        seen.add(`${t}|${s}|${b}`);
+      measure_text: (t: string, sz: number, b: boolean) => {
+        seen.add(`${t}|${sz}|${b}`);
         return new Uint32Array([1, 1]);
       },
-    } as unknown as Parameters<typeof measureText>[0];
+    } as unknown as Parameters<typeof measureTextAwaited>[0];
     // Text containing the separator character must not alias another entry.
-    measureText(fake, "24 0 x", 1, false);
-    measureText(fake, "x", 24, false);
+    await measureTextAwaited(fake, "24 0 x", 1, false);
+    await measureTextAwaited(fake, "x", 24, false);
     expect(seen.size, "two distinct argument sets collided into one cache key").toBe(2);
   });
 
-  it("evicts oldest-first and stays bounded", () => {
+  it("evicts oldest-first and stays bounded", async () => {
     resetTextMetricsCache();
     const fake = {
       measure_text: () => new Uint32Array([1, 1]),
-    } as unknown as Parameters<typeof measureText>[0];
-    for (let i = 0; i < 600; i++) measureText(fake, `t${i}`, 24, false);
+    } as unknown as Parameters<typeof measureTextAwaited>[0];
+    for (let i = 0; i < 600; i++) await measureTextAwaited(fake, `t${i}`, 24, false);
+    // Guard against the vacuous version of this test: it must actually be full.
+    expect(textMetricsCacheSize(), "nothing was cached — the test proves nothing").toBe(512);
     expect(
       textMetricsCacheSize(),
       "unbounded growth — a long typing session would leak one entry per keystroke",

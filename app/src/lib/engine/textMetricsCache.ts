@@ -37,12 +37,17 @@
 //
 // `abandoned/scalar-mirror` is NOT rehabilitated by this. It is unnecessary.
 //
-// ── WHAT STAGE 3.5 CHANGES HERE ──────────────────────────────────────────────
-// Exactly one thing: `fill()`. Today a miss calls the engine synchronously,
-// because the engine is on this thread. Once it is behind the port, a miss
-// cannot be answered during render — the caller takes the documented fallback
-// for that frame and `primeTextMetrics()` fills the cache off the render path,
-// after which the next render hits.
+// ── WHAT STAGE 3.5 CHANGED HERE — ✅ DONE v8.14 ───────────────────────────────
+// A miss no longer calls the engine at all. `cached()` is a pure lookup: on a
+// miss the caller takes its documented fallback for that frame, and
+// `primeTextMetrics()` fills the entry off the render path so the next render
+// hits. Specified in v7.80, built in v8.14.
+//
+// It was built LAST on purpose. Four of the six callers could not tolerate a
+// miss, and removing the synchronous engine call while they were still routed
+// through here would have shipped the NaN batch described below. They moved to
+// the awaited twins first (v8.12, v8.13); only then was this safe to delete.
+// The ordering was the whole fix.
 //
 // ⚠️ CORRECTED 2026-08-11. This block used to end: "Every call site below
 // already tolerates a miss, because they all had a fallback before this module
@@ -68,16 +73,14 @@
 // the batch. A truthy trap created BY the conversion, in a JS caller, which the
 // audit cannot see by construction.
 //
-// SO THE FIX SPLITS BY WHETHER THE CALLER CAN AWAIT, not by which module the
-// call lives in:
+// SO THE FIX SPLIT BY WHETHER THE CALLER CAN AWAIT, not by which module the
+// call lives in — and all of it has now shipped:
 //   • the 2 RENDER sites keep this sync API + their fallback, primed off the
-//     render path by `primeTextMetrics()` — the original plan, correct here;
-//   • the 4 NON-render sites (commit, re-edit, both batch stamps) must AWAIT
-//     the engine instead. They are not render passes; they never needed a
-//     fallback, and a miss there is pixel drift or a skipped photo, not a
-//     dropped frame.
-// Doing step 3 of the original plan literally — "remove the synchronous engine
-// calls from the miss path" — ships the NaN batch. Do not.
+//     render path by `primeTextMetrics()` ......................... v8.14
+//   • the 4 NON-render sites (commit, re-edit, both batch stamps) AWAIT the
+//     engine through the twins below ......................... v8.12, v8.13
+// Doing step 3 of the original plan FIRST — "remove the synchronous engine
+// calls from the miss path" — would have shipped the NaN batch.
 import type { ImageHorseTool } from "stamp_tool";
 
 /** Entries, not bytes. Text can be arbitrarily long, so cap the count and let
@@ -107,18 +110,23 @@ function lookup(key: string): readonly number[] | undefined {
 }
 
 /**
- * The one seam Stage 3.5 replaces.
+ * The seam Stage 3.5 replaced — and it is now a pure cache read.
  *
- * Returns the cached value, or computes and caches it. `compute` runs ONLY on a
- * miss, so once the engine moves behind the port this is where "cannot answer
- * synchronously" gets handled — and it is the only place.
+ * ✅ b1 COMPLETE (v8.14). This used to take a `compute` thunk and call the
+ * engine on a miss. It no longer can: the two remaining callers are React
+ * render passes, and a render cannot `await`. A miss now returns `undefined`,
+ * the caller takes its documented fallback for that frame, and
+ * `primeTextMetrics()` fills the entry off the render path so the next render
+ * hits. That is exactly what this file's header specified in v7.80 and what was
+ * never built until now.
+ *
+ * The four callers that could NOT tolerate a miss — the text commit, the
+ * re-edit, and both batch stamps — no longer come through here at all; they use
+ * the awaited twins above (v8.12, v8.13). Removing the synchronous engine call
+ * before those moved would have shipped a NaN batch.
  */
-function cached(key: string, compute: () => readonly number[] | undefined) {
-  const hit = lookup(key);
-  if (hit !== undefined) return hit;
-  const value = compute();
-  if (value === undefined) return undefined;
-  return remember(key, value);
+function cached(key: string): readonly number[] | undefined {
+  return lookup(key);
 }
 
 // Keys embed the argument list verbatim. U+0000 as the separator because it
@@ -147,9 +155,11 @@ export function measureText(
   fontSize: number,
   bold: boolean,
 ): readonly number[] | undefined {
-  return cached(`m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`, () =>
-    tool ? Array.from(tool.measure_text(text, fontSize, bold)) : undefined,
-  );
+  // `tool` is no longer read — kept in the signature because every call site
+  // has it to hand and dropping it would be churn for no gain, and because
+  // `primeTextMetrics` (which does need it) is called with the same arguments.
+  void tool;
+  return cached(`m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`);
 }
 
 /** Where the first line's ink begins inside a plain (no background) tile. */
@@ -162,35 +172,18 @@ export function textInkOffset(
   // Deliberately NOT delegating to `textInkOffsetBg(..., 0, 0)`: the engine
   // exposes both and the two-arg form is what the render path calls, so it gets
   // its own key rather than depending on the delegation staying true in Rust.
-  return cached(`i${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`, () =>
-    tool ? Array.from(tool.text_ink_offset(text, fontSize, bold)) : undefined,
-  );
+  void tool;
+  return cached(`i${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`);
 }
 
-/** `textInkOffset` extended to every background kind — tail margin and padding
- *  included. Used by the commit and re-edit paths, which must agree with the
- *  overlay to the pixel or committed text lands off where it was typed. */
-export function textInkOffsetBg(
-  tool: ImageHorseTool | null | undefined,
-  text: string,
-  fontSize: number,
-  bold: boolean,
-  backgroundKind: number,
-  bgPadding: number,
-): readonly number[] | undefined {
-  return cached(
-    `b${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${backgroundKind}${SEP}${bgPadding}${SEP}${text}`,
-    () =>
-      tool
-        ? Array.from(
-            tool.text_ink_offset_bg(text, fontSize, bold, backgroundKind, bgPadding),
-          )
-        : undefined,
-  );
-}
+// `textInkOffsetBg`'s SYNCHRONOUS form was deleted in v8.14. Its only callers
+// were the text commit and re-edit paths, and both moved to
+// `textInkOffsetBgAwaited` in v8.12 — leaving a zero-reference export whose
+// only remaining effect would have been to keep an unreachable engine call in
+// the Stage 3.5 gate. `git log --all -G` shows exactly two commits ever touched
+// it (v7.80 introduced it, v8.12 orphaned it), so this is a wire that was
+// disconnected on purpose rather than one that was never connected.
 
-/** Entry count. For the contract test and the diagnostics panel — not a public
- *  API anyone should branch on. */
 /**
  * `measureText` for callers that CAN await — today that is the batch stamp,
  * both of whose call sites are the reason the corrected b1 exists.
@@ -253,6 +246,43 @@ export async function textInkOffsetBgAwaited(
     await tool.text_ink_offset_bg(text, fontSize, bold, backgroundKind, bgPadding),
   );
   return remember(key, value);
+}
+
+/**
+ * Fill the cache for the two keys the RENDER path reads, off the render path.
+ *
+ * ADR-024 b1, and the piece that was specified in this file's header in v7.80
+ * and never written. A render pass cannot `await`, so once the engine is behind
+ * the port a miss cannot be answered during render: the caller takes its
+ * documented fallback for that frame, this fills the cache, and the next render
+ * hits. Call it from an effect keyed on the text being laid out.
+ *
+ * Returns **true if it actually filled something** — the caller uses that to
+ * force exactly one re-render. Priming without re-rendering is the failure this
+ * whole mechanism is prone to: the fallback would be correct-looking and
+ * permanent, which is indistinguishable from working software.
+ */
+export async function primeTextMetrics(
+  tool: ImageHorseTool | null | undefined,
+  text: string,
+  fontSize: number,
+  bold: boolean,
+): Promise<boolean> {
+  if (!tool) return false;
+  const mKey = `m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`;
+  const iKey = `i${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`;
+  let filled = false;
+  // `store.has`, NOT `lookup` — lookup re-inserts on hit to maintain LRU order,
+  // and priming an entry the render is already using should not reorder it.
+  if (!store.has(mKey)) {
+    remember(mKey, Array.from(await tool.measure_text(text, fontSize, bold)));
+    filled = true;
+  }
+  if (!store.has(iKey)) {
+    remember(iKey, Array.from(await tool.text_ink_offset(text, fontSize, bold)));
+    filled = true;
+  }
+  return filled;
 }
 
 export function textMetricsCacheSize(): number {
