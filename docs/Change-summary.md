@@ -5081,3 +5081,71 @@ Mutation tested: **7 mutants, all 7 killed**.
 
 **Gates.** 467 JS tests (11 of them pin this file's behaviour), `tsc` clean,
 eslint 0 errors, production build clean. Engine untouched — no `build:wasm`.
+
+## v8.10 Change Summary — 2026-08-11
+
+**Docs only.** No app code changed. Gate unchanged at 32.
+
+ADR-024 Stage 3.5, item **b1** (`primeTextMetrics`) — **investigated, not
+built.** The plan for it carried its own stop condition, and the stop condition
+fired.
+
+**The claim that was the whole basis for the approach.**
+`textMetricsCache.ts`'s header ended: *"Every call site below already tolerates
+a miss, because they all had a fallback before this module existed."* It had
+never been tested. Checked, all six callers:
+
+| Call site | Kind | On a miss |
+|---|---|---|
+| `CanvasArea:2118` | render | ✅ JS-measured box centre |
+| `CanvasArea:2288` | render | ✅ `sx - bgPad` |
+| `useTextTool:251` | commit | tolerates — commits at the **uncorrected anchor** |
+| `useTextTool:368` | re-edit | tolerates — the re-edit cycle **drifts** |
+| `BatchSettings:1053` | batch | ❌ **throws by design** |
+| `BatchSettings:1188` | batch | ❌ **throws by design** |
+
+`BatchSettings` says so at both sites in its own comments — *"under Stage 3.5 a
+miss becomes reachable and this is where it has to be handled"* — and throws
+deliberately, because every available fallback would corner-align a whole batch
+of photos to the wrong place. The header simply never caught up.
+
+**And it would not have thrown.** The miss path is
+`Array.from(tool.measure_text(...))`. Once that call returns a Promise:
+
+| Expression | Value |
+|---|---|
+| `Array.from(Promise)` | `[]` |
+| `!m` | **false** — so `if (!m) throw` never fires |
+| `m[0]` | `undefined` |
+| `m[0] + bgPad * 2` | **NaN** |
+
+So the documented behaviour (skip the photo, report it) silently becomes NaN
+geometry for every photo in the batch. It is a truthy trap created *by the
+conversion*, inside a JS caller — the class `engine-call-audit.mjs` cannot see
+by construction, because it lists traps at the engine call site rather than ones
+the conversion creates upstream. Third of its kind on this arc, after
+`generateThumbnailUrl` (v8.3) and `useHistory`'s four.
+
+**The corrected shape**, split by whether the caller can await rather than by
+which module the call lives in:
+
+| Sites | Fix |
+|---|---|
+| 2 render (`CanvasArea`) | `primeTextMetrics()` + existing fallback — the original plan, correct here |
+| 4 non-render (`useTextTool` ×2, `BatchSettings` ×2) | **await the engine directly** — no miss, no drift, no skipped photos |
+
+The three sites the audit counts are the `fill()` thunks *inside* the cache; the
+work was always the six callers. Executing the plan's step 3 literally —
+*"remove the synchronous engine calls from the miss path"* — ships the NaN
+batch.
+
+**Why it was not built in the same session.** The corrected job is about twice
+the size described, across three files, and the last commit slot of a 14-commit
+window is the wrong place to start it. When it is built, the acceptance test is
+arithmetic rather than a green gate: type text, commit, and confirm the
+committed position matches the preview to the pixel. a2's own verification was
+predicted (503, 771) against actual (504, 771) — a 4px drift passes every gate
+in this repo.
+
+Recorded in `textMetricsCache.ts` (the header, corrected in place), ADR-024, and
+`docs/PARKING_LOT.md`.

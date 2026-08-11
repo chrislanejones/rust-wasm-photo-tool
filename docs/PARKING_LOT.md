@@ -1694,3 +1694,51 @@ the v8.6 check: it early-returns unless the exclude-background preference is on,
 and no control for that preference was found on the export dialog or the tool
 panels. Worth confirming that preference is still reachable from the UI at all —
 if it is not, this effect is dead code in practice and the question changes.
+
+---
+
+## b1 / `primeTextMetrics` — the precondition is false (v8.10, 2026-08-11)
+
+**Status: investigated, not built. Stop condition fired.**
+
+The Stage 3.5 plan for `textMetricsCache.ts` rests on one claim in that file's
+own header: *"Every call site below already tolerates a miss, because they all
+had a fallback before this module existed."* Nobody had tested it. It is false.
+
+| Call site | Kind | On a miss |
+|---|---|---|
+| `CanvasArea:2118` | render | ✅ JS-measured box centre |
+| `CanvasArea:2288` | render | ✅ `sx - bgPad` |
+| `useTextTool:251` | commit | tolerates — commits at the **uncorrected anchor** |
+| `useTextTool:368` | re-edit | tolerates — the re-edit cycle **drifts** |
+| `BatchSettings:1053` | batch | ❌ **throws by design**, skips the photo |
+| `BatchSettings:1188` | batch | ❌ **throws by design**, skips the photo |
+
+**And it would not even throw.** The miss path is
+`Array.from(tool.measure_text(...))`. Once that returns a Promise, `Array.from`
+yields `[]` — truthy — so `if (!m) throw` never fires, `m[0]` is `undefined`,
+and the corner-align arithmetic produces `NaN` for every photo in the batch.
+Verified in node. This is a truthy trap created *by the conversion*, inside a
+JS caller, which `engine-call-audit.mjs` cannot see by construction — it lists
+truthy traps at the engine call site, not ones the conversion creates upstream.
+
+**The corrected shape.** Split by whether the caller can await, not by module:
+
+| Sites | Fix |
+|---|---|
+| 2 render (`CanvasArea`) | `primeTextMetrics()` + existing fallback — the original plan, correct here |
+| 4 non-render (`useTextTool` ×2, `BatchSettings` ×2) | **await the engine directly** — no miss, no drift, no skipped photos |
+
+The three sites the audit counts are the `fill()` thunks *inside* the cache; the
+work was always the six callers. Executing the original step 3 literally —
+"remove the synchronous engine calls from the miss path" — ships the NaN batch.
+
+**Why it was not built in the same session.** The plan's own stop condition says
+to stop and report if this claim fails, and the corrected job is roughly twice
+the size described (two call sites plus four caller conversions, in three
+files). It wants a session with a full commit budget, not the last slot of one.
+
+**When it is built, the acceptance test is arithmetic, not a green gate.** Type
+text, commit, and confirm the committed position matches the preview to the
+pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
+4px drift passes every gate in this repo.

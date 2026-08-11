@@ -42,8 +42,42 @@
 // because the engine is on this thread. Once it is behind the port, a miss
 // cannot be answered during render — the caller takes the documented fallback
 // for that frame and `primeTextMetrics()` fills the cache off the render path,
-// after which the next render hits. Every call site below already tolerates a
-// miss, because they all had a fallback before this module existed.
+// after which the next render hits.
+//
+// ⚠️ CORRECTED 2026-08-11. This block used to end: "Every call site below
+// already tolerates a miss, because they all had a fallback before this module
+// existed." THAT IS FALSE, and it was the stated basis for the whole approach.
+// Checked, all six callers:
+//
+//   CanvasArea:2118   render   ✅ falls back to the JS-measured box centre
+//   CanvasArea:2288   render   ✅ falls back to `sx - bgPad`
+//   useTextTool:251   commit   tolerates — but commits at the UNCORRECTED
+//                              anchor, i.e. text lands off its own preview
+//   useTextTool:368   re-edit  tolerates — but the re-edit cycle DRIFTS
+//   BatchSettings:1053 batch   ❌ THROWS by design, skipping the photo
+//   BatchSettings:1188 batch   ❌ THROWS by design, skipping the photo
+//
+// BatchSettings says so itself, at both sites: "under Stage 3.5 a miss becomes
+// reachable and this is where it has to be handled." This header never caught
+// up with that.
+//
+// AND IT WOULD NOT EVEN THROW. The miss path is
+// `Array.from(tool.measure_text(...))`. Once that returns a Promise,
+// `Array.from` yields `[]` — TRUTHY — so `if (!m) throw` never fires, `m[0]` is
+// `undefined`, and the corner-align arithmetic produces NaN for every photo in
+// the batch. A truthy trap created BY the conversion, in a JS caller, which the
+// audit cannot see by construction.
+//
+// SO THE FIX SPLITS BY WHETHER THE CALLER CAN AWAIT, not by which module the
+// call lives in:
+//   • the 2 RENDER sites keep this sync API + their fallback, primed off the
+//     render path by `primeTextMetrics()` — the original plan, correct here;
+//   • the 4 NON-render sites (commit, re-edit, both batch stamps) must AWAIT
+//     the engine instead. They are not render passes; they never needed a
+//     fallback, and a miss there is pixel drift or a skipped photo, not a
+//     dropped frame.
+// Doing step 3 of the original plan literally — "remove the synchronous engine
+// calls from the miss path" — ships the NaN batch. Do not.
 import type { ImageHorseTool } from "stamp_tool";
 
 /** Entries, not bytes. Text can be arbitrarily long, so cap the count and let

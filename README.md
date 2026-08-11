@@ -84,6 +84,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.10 — 2026-08-11
+
+**Docs only.** One of the remaining pieces of the background-thread migration
+was documented as safe on the strength of a claim nobody had checked: that every
+place asking for text measurements already copes with not getting an answer.
+Two of the six do not — the batch text stamp is written to refuse rather than
+guess, on purpose, because guessing would corner-align a whole gallery of photos
+to the wrong place.
+
+Worse, it would not actually refuse. The check it uses to detect a missing
+answer would stop working in exactly the situation it was written for, and the
+batch would be stamped at a nonsense position instead of being skipped and
+reported.
+
+Nothing changed in the app. The claim is corrected where it was written, and the
+corrected plan is recorded: the two places that genuinely cannot wait keep their
+fallback, and the four that can wait should simply wait.
+
+<details><summary>Older releases</summary>
+
 ### v8.9 — 2026-08-11
 
 **Nothing you can see.** Shapes, arrows and callout pins now wait for the
@@ -99,8 +119,6 @@ click" reads the list that commit writes.
 The clearest proof it still works is the pins: drop two and they come out
 numbered 1 and 2. The second one only knows it is the second because it reads
 the first back from the engine.
-
-<details><summary>Older releases</summary>
 
 ### v8.8 — 2026-08-11
 

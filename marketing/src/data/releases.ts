@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.10",
+    date: "2026-08-11",
+    headline: "A safety claim nobody had checked",
+    entries: [
+      {
+        tag: "infra",
+        text: "One of the remaining pieces of the background-thread migration was documented as safe on the strength of a claim nobody had tested: that every place asking for text measurements already copes with not getting an answer. Two of the six do not — the batch text stamp is written to refuse rather than guess, on purpose, because guessing would corner-align a whole gallery of photos to the wrong place.",
+      },
+      {
+        tag: "fix",
+        text: "Worse, it would not actually refuse. The check it uses to spot a missing answer stops working in exactly the situation it was written for, and a whole batch would be stamped at a nonsense position instead of being skipped and reported. Nothing changed in the app: the claim is corrected where it was written, and the corrected plan recorded — the two places that genuinely cannot wait keep their fallback, and the four that can wait should simply wait.",
+      },
+    ],
+  },
+  {
     version: "v8.9",
     date: "2026-08-11",
     headline: "Shapes, arrows and pins wait for the answer",
