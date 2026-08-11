@@ -314,7 +314,7 @@ from `CanvasArea`'s `onMove` PointerEvent listener, and
 The contract test now pins the hot queue's entry condition in both directions,
 so nothing can be quietly parked in a10 again. 4/4 mutants killed.
 | `hooks/useExport.ts` | atomic capture — **fixed** v7.88 via `capture_composite()` / `capture_thumbnail()` |
-| `lib/openraster/export.ts` | thumbnail triple **fixed** v7.88; both layer-stack captures **fixed** v7.95 via `capture_layer_stack()` (7 reads → 2); the file **still interleaves `await import("jszip")` between the metadata and the layer PNGs, and still mutates mid-export** — unchanged and still open |
+| `lib/openraster/export.ts` | thumbnail triple **fixed** v7.88; both layer-stack captures **fixed** v7.95 via `capture_layer_stack()` (7 reads → 2); the file **still interleaves `await import("jszip")` between the metadata and the layer PNGs, and still mutates mid-export**. **b2 DECIDED 2026-08-11: do NOT build a pixel-carrying capture** — measured, it holds 10.84 MB at 2 layers rising +5.38 MB/layer with no ceiling, against a loop peak that is FLAT at 5.39 MB, and wasm memory never shrinks. Adopt a generation check (detect-and-fail) instead; the flatten is a SEPARATE side-effect problem, not a tear source. The six sites are now ordinary conversions — see the b2 section below |
 | `hooks/useEngineCore.ts` | `syncState`'s eleven reads are one atomic capture — **fixed** v7.90 via `capture_ui_state()`. `flushToCanvas`'s remaining reads dissolve at Stage 4 and must NOT be converted |
 
 ### ⚠️ THE GATE'S TARGET IS 5, NOT 0 (found v7.99)
@@ -417,6 +417,80 @@ was a cached-and-invalidated flag, and that would have meant inventing a
 bitten by two-publishers-one-state. `has_transparency()` stays on
 `ImageHorseTool` for a caller that genuinely wants it, now documented as
 expensive.
+
+### b2 — the OpenRaster capture decision (2026-08-11) — **DEFERRED, with numbers**
+
+**The question ADR-024 left open:** should `capture_layer_stack()` grow a variant
+that returns the layer pixel data alongside the metadata, so `exportOra` does one
+round trip instead of a stack read + N `get_layer_png(i)` + `export_png()`?
+
+**Decision: NO. Do not build the pixel-carrying capture.** It trades a bounded
+peak for an unbounded one. Measured on the production build, 1395x2078:
+
+| Layers | One capture would hold | Today's peak (the loop) |
+|---|---|---|
+| 2 | 10.84 MB | **5.39 MB** |
+| 3 | 16.21 MB | **5.39 MB** |
+| 4 | 21.59 MB | **5.39 MB** |
+| 5 | 26.97 MB | **5.39 MB** |
+
+**Today's peak is FLAT at 5.39 MB whatever the layer count** — the loop encodes
+one layer, hands it over and drops it. A capture grows **+5.38 MB per layer with
+no ceiling**, and per a11 **wasm memory never shrinks**, so one .ora export of a
+ten-layer document would permanently add ~54 MB to the tab for as long as it
+lives. "Unlimited layers" is the PAID tier's headline feature, so the worst case
+lands on a paying customer.
+
+Same family as the v7.96 lesson — **split captures by COST, not by naming** —
+and this is the first time that rule has said *don't build the capture at all*.
+
+**Second cost, easy to miss:** `get_layer_png` is not a copy. It is
+`codec::export_png(&l.buf)` — a full PNG encode per call (113 ms for the photo
+layer, 22.8 ms for the sparse one). A capture front-loads every encode into a
+single uninterruptible call: **225 ms at 2 layers, 681 ms at 4.**
+
+**Rejected alternative — hoist the awaits.** Moving `await import("jszip")` and
+the `stamp_tool` init above the reads makes the reads contiguous *today*, and is
+free. It does not survive Stage 3.5: once every engine read is itself an
+`await`, contiguity is unachievable from JS by construction.
+
+**Adopted instead — detect, do not prevent.** Read a monotonic document
+generation before the export and again after the last read; a mismatch means the
+archive would be torn, so fail the export loudly rather than write the file.
+O(1) memory, no new payload, and it converts "silently corrupt archive the user
+keeps" into "export failed, try again", which is the right trade for a file that
+leaves the app.
+
+⚠️ **The counter this needs does not exist yet, and one that looks like it does
+is the wrong one.** `OpLog::generation` (`src/ops.rs:911`) is bumped **only when
+an append drops a redo tail** — it is a persistence signal for "is the persisted
+prefix still valid", and it does not move on ordinary edits. It is also not on
+the wasm surface. `useExportDimensions`' comment that "there is no version
+counter on the engine" is correct in the sense that matters.
+
+**Fallback if detection proves insufficient:** build the whole `.ora` in Rust
+(`export_ora()` returning archive bytes) — atomic by construction under `&self`,
+one round trip. Not chosen now because it needs a zip/deflate crate that
+**`Cargo.toml` does not currently carry**, and it does not fix the flatten
+below.
+
+**THE FLATTEN IS A SEPARATE PROBLEM, and this ADR has been conflating it with
+the tear.** `flattenAllLayersInPlace` runs to completion *before* any read, so it
+cannot cause a torn archive. What it does is mutate the user's live document as a
+side effect of an export: verified, `flatten_text_annotations` calls
+`snap("Flatten")` -> `Snapshot` -> `history.rs:88 self.redo_stack.clear()`, so
+every flatten pushes an undo step **and destroys the redo stack**. That is worth
+fixing on its own terms — flatten into a copy for export rather than in place —
+and it should be tracked separately rather than bundled into the capture
+question.
+
+**What this means for the six gate sites.** They are now ORDINARY conversions,
+not a design call: add the `await`s (one of them, `:50`, is the last truthy trap
+in the codebase). The tear is pre-existing and independent. Stage 3.5 does
+*widen* it — today the `get_layer_png` loop is one uninterrupted synchronous run,
+and behind the worker it becomes N more yield points — but widening a window
+that is already open is not a reason to hold the batch. So `openraster/export.ts`
+moves out of "needs a decision" and into the ordinary queue.
 
 **The generalisable bit: before optimising a hot read, check whether anything
 reads it.** This is the second thing the migration found that was a real

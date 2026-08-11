@@ -5149,3 +5149,74 @@ in this repo.
 
 Recorded in `textMetricsCache.ts` (the header, corrected in place), ADR-024, and
 `docs/PARKING_LOT.md`.
+
+## v8.11 Change Summary — 2026-08-11
+
+**Docs only.** No app code changed. Gate unchanged at 32.
+
+ADR-024 Stage 3.5, item **b2** — the OpenRaster design call. This was the last
+open decision in the migration, and it is now **decided: do not build the
+pixel-carrying capture.**
+
+**The question.** Should `capture_layer_stack()` grow a variant returning layer
+pixel data alongside the metadata, so `exportOra` does one round trip instead of
+a stack read + N `get_layer_png(i)` + `export_png()`?
+
+**Measured on the production build, 1395x2078:**
+
+| Layers | One capture would hold | Today's peak (the loop) |
+|---|---|---|
+| 2 | 10.84 MB | **5.39 MB** |
+| 3 | 16.21 MB | **5.39 MB** |
+| 4 | 21.59 MB | **5.39 MB** |
+| 5 | 26.97 MB | **5.39 MB** |
+
+The loop's peak is **flat** — it encodes one layer, hands it over, drops it. A
+capture grows **+5.38 MB per layer with no ceiling**, and per a11 wasm memory
+never shrinks, so one export of a ten-layer document would permanently add
+~54 MB to the tab. Unlimited layers is the paid tier's feature, so the worst
+case is a paying customer.
+
+Same family as v7.96's **split captures by cost, not by naming** — and the first
+time that rule has said *don't build the capture at all*.
+
+**A second cost, easy to miss.** `get_layer_png` is not a copy; it is
+`codec::export_png(&l.buf)`, a full PNG encode per call — 113 ms for the photo
+layer against 22.8 ms for the sparse one. A capture front-loads every encode into
+one uninterruptible call: **225 ms at 2 layers, 681 ms at 4.**
+
+**Rejected alternative — hoist the awaits.** Moving the dynamic imports above the
+reads makes them contiguous today, and costs nothing. It does not survive Stage
+3.5: once every engine read is itself an `await`, contiguity is unachievable from
+JS by construction.
+
+**Adopted instead — detect, don't prevent.** Read a monotonic document generation
+before the export and after the last read; a mismatch means the archive would be
+torn, so fail loudly rather than write it. O(1) memory, and it turns "silently
+corrupt archive the user keeps" into "export failed, try again".
+
+⚠️ **The counter it needs does not exist, and one that looks like it does is the
+wrong one.** `OpLog::generation` (`src/ops.rs:911`) is bumped **only when an
+append drops a redo tail** — a persistence signal, not an edit counter — and it
+is not on the wasm surface. `useExportDimensions`' comment that there is no
+version counter on the engine is correct in the sense that matters.
+
+**Fallback if detection proves insufficient:** build the whole `.ora` in Rust,
+atomic under `&self`. Not chosen now: it needs a zip/deflate crate `Cargo.toml`
+does not carry, and it does not fix the flatten.
+
+**Two problems that had been filed as one.** `flattenAllLayersInPlace` runs to
+completion *before* any read, so it cannot tear the archive. What it does is
+mutate the live document as a side effect of exporting — verified,
+`flatten_text_annotations` calls `snap("Flatten")`, which reaches
+`history.rs:88 self.redo_stack.clear()`. Every flatten pushes an undo step **and
+destroys the redo stack.** Separable, and tracked separately from here.
+
+**Consequence for the queue.** `openraster/export.ts`'s six sites are now
+**ordinary conversions**, not a design call — one of them (`:50`) is the last
+truthy trap left in the codebase. Stage 3.5 does widen the pre-existing tear (the
+`get_layer_png` loop gains N yield points), but widening an already-open window
+is not a reason to hold the batch.
+
+**Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, builds clean. No code
+changed, so nothing to mutation-test.

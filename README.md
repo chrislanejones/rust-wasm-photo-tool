@@ -84,6 +84,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.11 — 2026-08-11
+
+**Docs only.** A decision that had been open since the background-thread work
+started: whether exporting a layered `.ora` file should ask the engine for
+everything in one go, so the file can't be assembled from two different moments.
+
+Measured, the answer is no. Reading the layers one at a time holds about 5 MB at
+its peak no matter how many layers there are. Asking for them all at once holds
+every layer simultaneously — 11 MB for two layers, 27 MB for five, and it keeps
+climbing. The browser never gives that memory back, and unlimited layers is a
+paid feature, so the worst case lands on someone paying.
+
+Instead the export will check whether the document changed underneath it and
+refuse to write a file it can no longer vouch for. A failed export you can retry
+is better than a corrupt one you keep.
+
+Also separated two things that had been filed as one problem: baking annotations
+into pixels before an export is not what could tear the file — it finishes
+first — but it does clear your redo history as a side effect of exporting, which
+is worth fixing on its own.
+
+<details><summary>Older releases</summary>
+
 ### v8.10 — 2026-08-11
 
 **Docs only.** One of the remaining pieces of the background-thread migration
@@ -101,8 +124,6 @@ reported.
 Nothing changed in the app. The claim is corrected where it was written, and the
 corrected plan is recorded: the two places that genuinely cannot wait keep their
 fallback, and the four that can wait should simply wait.
-
-<details><summary>Older releases</summary>
 
 ### v8.9 — 2026-08-11
 

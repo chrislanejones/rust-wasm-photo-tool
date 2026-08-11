@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.11",
+    date: "2026-08-11",
+    headline: "The layered-export decision, measured",
+    entries: [
+      {
+        tag: "infra",
+        text: "A decision open since the background-thread work started: whether exporting a layered .ora file should ask the engine for everything in one go, so the file can't be assembled from two different moments. Measured, the answer is no — reading the layers one at a time peaks at about 5 MB however many layers there are, while asking for them all at once holds 11 MB for two layers and 27 MB for five, climbing with no ceiling. The browser never gives that memory back, and unlimited layers is a paid feature, so the worst case lands on someone paying.",
+      },
+      {
+        tag: "fix",
+        text: "Instead the export will check whether the document changed underneath it and refuse to write a file it can no longer vouch for. A failed export you can retry beats a corrupt one you keep. Two problems were also separated that had been filed as one: baking annotations into pixels before an export cannot tear the file, because it finishes first — but it does clear your redo history as a side effect of exporting, which is worth fixing on its own.",
+      },
+    ],
+  },
+  {
     version: "v8.10",
     date: "2026-08-11",
     headline: "A safety claim nobody had checked",
