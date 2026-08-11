@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.12",
+    date: "2026-08-11",
+    headline: "Text waits for the answer, and doesn't drift",
+    entries: [
+      {
+        tag: "infra",
+        text: "The text tool now waits for the engine's answer — adding text, re-opening it to edit, clicking an existing text, and refreshing the list after an undo.",
+      },
+      {
+        tag: "fix",
+        text: "Two of those calls measure where a letter's ink actually starts inside its tile, which is what stops committed text landing a few pixels off from the preview you typed against. They now wait properly rather than accepting “don't know” for an answer — they never needed to guess, because unlike the drawing code they aren't running while the screen is being painted.",
+      },
+      {
+        tag: "fix",
+        text: "Checked by round-trip rather than by eye: place a text, click it to re-open it, then commit it again unchanged. It must not move by a single pixel, and it doesn't — placing and re-opening are exact inverses of each other, so either one being wrong would show up immediately.",
+      },
+    ],
+  },
+  {
     version: "v8.11",
     date: "2026-08-11",
     headline: "The layered-export decision, measured",

@@ -191,6 +191,41 @@ export function textInkOffsetBg(
 
 /** Entry count. For the contract test and the diagnostics panel — not a public
  *  API anyone should branch on. */
+/**
+ * `textInkOffsetBg` for callers that CAN await — the commit path, the re-edit
+ * path, and the batch stamp. **Use this one unless you are inside a render.**
+ *
+ * ADR-024 Stage 3.5, b1. The sync forms above exist because a React render pass
+ * cannot `await`; they return `undefined` on a miss and their two render callers
+ * fall back cleanly. Everywhere else a miss is NOT harmless — it commits text at
+ * the uncorrected anchor, drifts a re-edit cycle, or (in `BatchSettings`)
+ * corner-aligns a whole gallery from `NaN`. Those callers were never render
+ * passes and never needed a fallback: they can simply wait.
+ *
+ * Same store and the SAME KEY as the sync form, deliberately — a commit warms
+ * the entry the next render reads, so this doubles as the prime the render sites
+ * were always specified to get.
+ */
+export async function textInkOffsetBgAwaited(
+  tool: ImageHorseTool | null | undefined,
+  text: string,
+  fontSize: number,
+  bold: boolean,
+  backgroundKind: number,
+  bgPadding: number,
+): Promise<readonly number[] | undefined> {
+  const key = `b${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${backgroundKind}${SEP}${bgPadding}${SEP}${text}`;
+  const hit = lookup(key);
+  if (hit !== undefined) return hit;
+  if (!tool) return undefined;
+  // The one line that differs from `cached()`: the engine is awaited rather
+  // than called for an answer it may not be able to give synchronously.
+  const value = Array.from(
+    await tool.text_ink_offset_bg(text, fontSize, bold, backgroundKind, bgPadding),
+  );
+  return remember(key, value);
+}
+
 export function textMetricsCacheSize(): number {
   return store.size;
 }

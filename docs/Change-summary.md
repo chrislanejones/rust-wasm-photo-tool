@@ -5220,3 +5220,63 @@ is not a reason to hold the batch.
 
 **Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, builds clean. No code
 changed, so nothing to mutation-test.
+
+## v8.12 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 11**. Gate 32 -> 26. No user-visible change.
+
+`useTextTool` 6 -> 0, **plus b1's non-render half** — the two text-metrics
+callers that live in this file.
+
+| Site | Call | Note |
+|---|---|---|
+| `refreshAnnotations` | `get_text_annotations` | |
+| revision effect | `get_text_annotations` | async IIFE + cancellation flag |
+| `commitText` | `add_text_annotation` | |
+| `selectAnnotation` | `get_text_annotations` | |
+| `onCanvasClick` ×2 | `text_annotation_at`, `get_text_annotations` | **ordinary awaits, NOT a capture** |
+| `onCanvasHover` | — | **hot, untouched** |
+| + b1 | `textInkOffsetBgAwaited` ×2 | commit + re-edit moved off the sync cache |
+
+**b1's non-render half shipped here rather than as its own session**, because
+two of its four callers live in this file and reopening it later is how ordering
+assumptions drift. `textMetricsCache.ts` gains `textInkOffsetBgAwaited` — same
+store, same key as the sync form, so a commit warms the entry the next render
+reads. That makes it the prime the render sites were always specified to get.
+
+**The hit-test pair got ordinary awaits and explicitly not a capture.** It looks
+identical to the pen hit-test that became `capture_pen_hit` in v7.94, and it is
+a different problem: `commitText()` MUTATES between the two reads (it can
+`remove_text_annotation`), so the id is read pre-commit and the geometry
+post-commit *on purpose*. Recorded in `docs/engine-worker-capture-sweep.md` as
+"Capture 4 is withdrawn"; the comment now sits at the site too.
+
+Un-awaited, that site fails quietly rather than loudly: `hitId` would be a
+Promise, `Promise >= 0` is **false**, and clicking existing text would silently
+open a new blank box instead of editing it.
+
+**Verified by round-trip, not by eye.** Place a text, click it to re-open, commit
+again unchanged:
+
+| | |
+|---|---|
+| Committed at | `[489, 824]` from a click at `[488, 831]` |
+| Engine ink offset | `[7, 10]` — correction applied, not skipped |
+| After re-edit + re-commit | **`[489, 824]` — zero drift** |
+| Console | no errors, no unhandled rejections |
+
+The round-trip is the useful test: commit applies the ink mapping and re-edit
+applies its exact inverse, so if either `await` were missing the text would move.
+It doesn't.
+
+**Mutation tested: 8 mutants, 8 killed — but by TWO different gates, which is
+worth knowing.** The six engine sites are killed by the migration ratchet. The
+two b1 callers are **invisible to it** — the ratchet counts *engine* calls, and
+those go through a JS wrapper whose engine call is already awaited inside
+`textMetricsCache`. What kills them is `tsc`: dropping the `await` leaves a
+`Promise` being indexed (`ink[0]`), which is TS7053. So a wrapped call is covered
+only while its result is *indexed*; one that is merely truthiness-checked would
+be caught by neither.
+
+**Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
+Engine untouched — no `build:wasm`.

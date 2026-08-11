@@ -1603,7 +1603,7 @@ export function AppShell() {
     // `void`: async since Stage 3.5 (useDrawingTools). Both refreshes are
     // independent list reloads, so nothing here depends on their order.
     void drawingTools.refreshShapes();
-    textTool.refreshAnnotations();
+    void textTool.refreshAnnotations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp.state.history, activePhotoId]);
 
@@ -1617,7 +1617,7 @@ export function AppShell() {
       setSelectedObject(o);
       if (o.type === "text") {
         setActiveTool("text");
-        textTool.selectAnnotation(o.id);
+        void textTool.selectAnnotation(o.id);
         return;
       }
       // A Bézier pen path (kind 7) re-opens in the PenOverlay — switch to
@@ -1654,14 +1654,14 @@ export function AppShell() {
       stamp.flushToCanvas();
       stamp.syncState();
       void drawingTools.refreshShapes();
-      textTool.refreshAnnotations();
+      void textTool.refreshAnnotations();
       // If an editor is open on the placed object, re-open it at the new
       // geometry. Without this the move is invisible: an open TEXT editor
       // suppresses the baked tile (set_editing_text) so the aligned
       // annotation doesn't render, and an open SHAPE editor's JS overlay
       // stays at the stale position as a ghost over the moved shape.
       if (selectedObject.type === "text") {
-        if (textTool.textInput) textTool.selectAnnotation(selectedObject.id);
+        if (textTool.textInput) void textTool.selectAnnotation(selectedObject.id);
       } else if (drawingTools.editState?.editId === selectedObject.id) {
         void drawingTools.selectShape(selectedObject.id);
       } else {
@@ -1682,7 +1682,7 @@ export function AppShell() {
         stamp.toolRef.current?.remove_text_annotation(o.id);
         stamp.flushToCanvas();
         stamp.syncState();
-        textTool.refreshAnnotations();
+        void textTool.refreshAnnotations();
         bumpAnnotations(); // was a `text-annotations-changed` window event
       } else {
         void drawingTools.removeShape(o.id);

@@ -248,7 +248,16 @@ import { join } from "node:path";
  *         begins, and `selectShape`/`onMouseDown` both read the annotation list
  *         that `commitEdit` writes. Those are `await`, not `void`.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39 and 32 lines. The
+ *     26  a8 batch 11: `useTextTool` 6 -> 0, PLUS b1's non-render half. Its two
+ *         text-metrics callers (commit and re-edit) moved off the sync cache
+ *         onto a new awaited twin, `textInkOffsetBgAwaited` — they were never
+ *         render passes, so a miss was never harmless: it commits text at the
+ *         uncorrected anchor and drifts re-edit cycles. The hit-test pair in
+ *         `onCanvasClick` got ORDINARY awaits and explicitly NOT a capture —
+ *         `commitText()` mutates between the two reads on purpose (see the
+ *         capture-sweep doc, "Capture 4 is withdrawn").
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32 and 26 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -273,7 +282,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 32;
+const BUDGET = 26;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -458,10 +467,17 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // un-awaited untouched at 10 for the FIFTH batch running: everything left
     // in that bucket is `openraster/export.ts`, whose `exportOra` is already
     // async. awaited 56 -> 63. Gate 39 - 7 = 32, and 10 + 21 + 1 = 32.
-    ).toBe(21);
+    // a8 batch 11: `useTextTool` 6 -> 0. All six sat in non-async callbacks,
+    // so the whole batch came out of restructure (21 - 6 = 15). un-awaited
+    // untouched at 10 for the SIXTH batch running -- everything left in that
+    // bucket is `openraster/export.ts`, whose `exportOra` is already async.
+    // truthy untouched at 1 (`openraster/export.ts:50`, the last one).
+    // awaited 63 -> 70: SEVEN, not six -- b1's `textInkOffsetBgAwaited` adds a
+    // NEW engine call site, born awaited. Gate 32 - 6 = 26, and 10 + 15 + 1 = 26.
+    ).toBe(15);
     expect(gate.unawaited).toBe(10);
     expect(gate.truthy).toBe(1);
-    expect(gate.awaited, "cumulative converted sites").toBe(63);
+    expect(gate.awaited, "cumulative converted sites").toBe(70);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

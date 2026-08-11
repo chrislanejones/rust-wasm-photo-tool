@@ -84,6 +84,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.12 — 2026-08-11
+
+**Nothing you can see.** The text tool now waits for the engine's answer —
+adding text, re-opening it to edit, clicking an existing text, and refreshing
+the list after an undo.
+
+Two of those calls measure where a letter's ink actually starts inside its
+tile, which is what stops committed text landing a few pixels off from the
+preview you typed against. Those two now wait properly rather than accepting
+"don't know" for an answer — they never needed to guess, because unlike the
+drawing code they aren't running while the screen is being painted.
+
+Checked by round-trip rather than by eye: place a text, click it to re-open it,
+commit it again unchanged, and it must not move by a single pixel. It doesn't.
+
+<details><summary>Older releases</summary>
+
 ### v8.11 — 2026-08-11
 
 **Docs only.** A decision that had been open since the background-thread work
@@ -104,8 +121,6 @@ Also separated two things that had been filed as one problem: baking annotations
 into pixels before an export is not what could tear the file — it finishes
 first — but it does clear your redo history as a side effect of exporting, which
 is worth fixing on its own.
-
-<details><summary>Older releases</summary>
 
 ### v8.10 — 2026-08-11
 

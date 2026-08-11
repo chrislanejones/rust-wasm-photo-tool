@@ -3,7 +3,7 @@ import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { parseColorSync, warmColorParser } from "@/lib/colorParser";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
-import { textInkOffsetBg } from "@/lib/engine/textMetricsCache";
+import { textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
 
 interface TextInput {
   screenX: number;
@@ -111,14 +111,19 @@ export function useTextTool({
     null,
   );
 
-  const refreshAnnotations = useCallback(() => {
+  const refreshAnnotations = useCallback(async () => {
     const tool = toolRef.current;
     if (!tool) {
       setAnnotations([]);
       return;
     }
     try {
-      const raw = tool.get_text_annotations();
+      // The `raw` variable is doing real work here. Un-awaited it would be a
+      // Promise, `JSON.parse` would throw on "[object Promise]", the catch below
+      // would swallow it, and the annotation list would silently empty — the
+      // loud failure converted back into a quiet one by a catch written for
+      // malformed JSON.
+      const raw = await tool.get_text_annotations();
       const parsed: AnnotationMeta[] = JSON.parse(raw);
       setAnnotations(parsed);
     } catch {
@@ -143,7 +148,9 @@ export function useTextTool({
 
   // Keep annotations roughly in sync after photo loads or external mutations.
   useEffect(() => {
-    if (active) refreshAnnotations();
+    // `void`: an effect cannot await, and this is a plain list reload with
+    // nothing sequenced after it.
+    if (active) void refreshAnnotations();
   }, [active, refreshAnnotations]);
 
   // After an undo/redo/jump in the history layer, the WASM annotation vector
@@ -160,30 +167,44 @@ export function useTextTool({
     prevAnnotationsRev.current = annotationsRevision;
     const tool = toolRef.current;
     if (!tool) return;
-    let list: AnnotationMeta[] = [];
-    try {
-      list = JSON.parse(tool.get_text_annotations());
-    } catch {
-      list = [];
-    }
-    setAnnotations(list);
-    // Drop the editing input if it points at a vanished annotation.
-    if (editingAnnotationId.current !== null) {
-      const stillThere = list.some((a) => a.id === editingAnnotationId.current);
-      if (!stillThere) {
-        editingAnnotationId.current = null;
-        textInputRef.current = null;
-        setTextInput(null);
-        tool.set_editing_text(-1);
+    // ADR-024 Stage 3.5. An effect callback cannot be `async` — React reads the
+    // returned Promise as its cleanup — so this is an async IIFE with a
+    // cancellation flag. The flag is load-bearing: this fires on every
+    // undo/redo/history jump, so behind the worker two revisions can be in
+    // flight and land in either order, and a stale one would tear down the text
+    // input for an annotation the newer revision had just confirmed still
+    // exists. Same shape as `useDrawingTools`' revision effect (v8.9).
+    let cancelled = false;
+    void (async () => {
+      let list: AnnotationMeta[] = [];
+      try {
+        list = JSON.parse(await tool.get_text_annotations());
+      } catch {
+        list = [];
       }
-    }
-    // Drop stale hover.
-    setHoveredAnnotationId((prev) =>
-      prev === null || list.some((a) => a.id === prev) ? prev : null,
-    );
+      if (cancelled) return;
+      setAnnotations(list);
+      // Drop the editing input if it points at a vanished annotation.
+      if (editingAnnotationId.current !== null) {
+        const stillThere = list.some((a) => a.id === editingAnnotationId.current);
+        if (!stillThere) {
+          editingAnnotationId.current = null;
+          textInputRef.current = null;
+          setTextInput(null);
+          tool.set_editing_text(-1);
+        }
+      }
+      // Drop stale hover.
+      setHoveredAnnotationId((prev) =>
+        prev === null || list.some((a) => a.id === prev) ? prev : null,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [annotationsRevision, toolRef]);
 
-  const commitText = useCallback(() => {
+  const commitText = useCallback(async () => {
     const ti = textInputRef.current;
     if (!ti) return;
     const editingId = editingAnnotationId.current;
@@ -206,7 +227,7 @@ export function useTextTool({
           .setSelectedObject((prev) =>
             prev?.type === "text" && prev.id === editingId ? null : prev,
           );
-        refreshAnnotations();
+        await refreshAnnotations();
         flushToCanvas();
         syncState();
       }
@@ -248,7 +269,10 @@ export function useTextTool({
         const cr = canvas.getBoundingClientRect();
         const scaleX = cr.width / canvas.width || 1;
         const scaleY = cr.height / canvas.height || 1;
-        const ink = textInkOffsetBg(
+        // ADR-024 b1. The AWAITED twin, not the render-path form: this is the
+        // commit path, it can wait, and a miss here commits text at the
+        // uncorrected anchor — off its own preview.
+        const ink = await textInkOffsetBgAwaited(
           tool,
           ti.text,
           ti.fontSize,
@@ -292,7 +316,7 @@ export function useTextTool({
       );
       targetId = editingId;
     } else {
-      targetId = tool.add_text_annotation(
+      targetId = await tool.add_text_annotation(
         ti.text,
         ti.fontSize,
         r,
@@ -329,7 +353,7 @@ export function useTextTool({
         Math.max(0, Math.round(s.shadowBlur)),
       );
     }
-    refreshAnnotations();
+    await refreshAnnotations();
     flushToCanvas();
     syncState();
     // Was a `text-committed` window CustomEvent before stage 4.
@@ -348,7 +372,7 @@ export function useTextTool({
 
   /** Open the textarea on top of an existing annotation for re-editing. */
   const editAnnotation = useCallback(
-    (ann: AnnotationMeta) => {
+    async (ann: AnnotationMeta) => {
       const canvas = canvasRef.current;
       const container = containerRef.current;
       if (!canvas || !container) return;
@@ -365,7 +389,9 @@ export function useTextTool({
       let boxX = ann.x;
       let boxY = ann.y;
       if (toolRef.current) {
-        const ink = textInkOffsetBg(
+        // ADR-024 b1. Awaited twin — the exact inverse of the commit mapping,
+        // so a miss here makes re-edit cycles drift.
+        const ink = await textInkOffsetBgAwaited(
           toolRef.current,
           ann.text,
           ann.font_size,
@@ -427,23 +453,23 @@ export function useTextTool({
   /** Open an existing text annotation for editing by id (Reselect list).
    *  Reads a fresh annotation list so geometry is current. */
   const selectAnnotation = useCallback(
-    (id: number) => {
+    async (id: number) => {
       const tool = toolRef.current;
       if (!tool) return;
       let list: AnnotationMeta[];
       try {
-        list = JSON.parse(tool.get_text_annotations());
+        list = JSON.parse(await tool.get_text_annotations());
       } catch {
         list = [];
       }
       const ann = list.find((a) => a.id === id);
-      if (ann) editAnnotation(ann);
+      if (ann) await editAnnotation(ann);
     },
     [toolRef, editAnnotation],
   );
 
   const onCanvasClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+    async (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!active) return;
       const canvas = canvasRef.current;
       const container = containerRef.current;
@@ -458,29 +484,43 @@ export function useTextTool({
 
       // Hit-test existing annotations first.
       if (tool) {
-        const hitId = tool.text_annotation_at(
+        // ⚠️ ORDINARY AWAITS, NOT A CAPTURE — deliberately. This looks like the
+        // pen hit-test that became `capture_pen_hit` in v7.94 and is NOT the
+        // same problem: `commitText()` MUTATES between the two reads (it can
+        // `remove_text_annotation`), so the id is read pre-commit and the
+        // geometry post-commit ON PURPOSE, and a single atomic call would have
+        // to sit on one side of the commit or the other. `find` returning
+        // undefined is a HANDLED case — it falls through to a fresh text input,
+        // which is right for emptying a text and clicking where it used to be.
+        // See docs/engine-worker-capture-sweep.md, "Capture 4 is withdrawn".
+        //
+        // Un-awaited, `hitId` would be a Promise and `Promise >= 0` is false —
+        // no crash, just a click on existing text silently opening a NEW blank
+        // box instead of editing it.
+        const hitId = await tool.text_annotation_at(
           Math.round(canvasX),
           Math.round(canvasY),
         );
         if (hitId >= 0) {
-          if (textInputRef.current) commitText();
+          // AWAITED: the read below must see the post-commit list.
+          if (textInputRef.current) await commitText();
           // Parse fresh list so we pick up the latest geometry.
           let list: AnnotationMeta[];
           try {
-            list = JSON.parse(tool.get_text_annotations());
+            list = JSON.parse(await tool.get_text_annotations());
           } catch {
             list = [];
           }
           const ann = list.find((a) => a.id === hitId);
           if (ann) {
-            editAnnotation(ann);
+            await editAnnotation(ann);
             return;
           }
         }
       }
 
       // Else open a fresh blank text input at the click position.
-      if (textInputRef.current) commitText();
+      if (textInputRef.current) await commitText();
       const { fontSize, fontWeight, textColor } = settingsRef.current;
       const pos = {
         screenX,
@@ -576,11 +616,11 @@ export function useTextTool({
   // exists. Previously this silently stashed pendingText and nothing visible
   // happened when the user clicked a recent text in a fresh session.
   const reopenWith = useCallback(
-    (text: string) => {
+    async (text: string) => {
       const { fontSize, fontWeight, textColor } = settingsRef.current;
       const pos = lastPositionRef.current;
       if (pos) {
-        if (textInputRef.current) commitText();
+        if (textInputRef.current) await commitText();
         const next: TextInput = {
           ...pos,
           fontSize,
@@ -617,7 +657,7 @@ export function useTextTool({
         textColor,
       };
       lastPositionRef.current = fallback;
-      if (textInputRef.current) commitText();
+      if (textInputRef.current) await commitText();
       editingAnnotationId.current = null;
       const next: TextInput = { ...fallback, text };
       textInputRef.current = next;
@@ -638,7 +678,8 @@ export function useTextTool({
         flushToCanvas();
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        commitText();
+        // `void`: a keydown handler cannot await, and nothing is sequenced after.
+        void commitText();
       }
     },
     [commitText, toolRef, flushToCanvas],
@@ -681,7 +722,8 @@ export function useTextTool({
       if (target.closest("[data-text-panel]")) return;
       // 3. The text-input overlay (handles, dashed border, etc).
       if (target.closest("[data-text-overlay]")) return;
-      commitText();
+      // `void`: a DOM pointerdown listener cannot await.
+      void commitText();
     };
     document.addEventListener("pointerdown", handler);
     return () => document.removeEventListener("pointerdown", handler);
