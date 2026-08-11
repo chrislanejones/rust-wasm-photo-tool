@@ -125,7 +125,7 @@ export function useCopyRegionAction({
     try {
       // Zero-fills outside image bounds, so the rect needs no clamping. PNG
       // encoding stays in the engine too (encodeRgba → encode_png_pixels).
-      const pixels = tool.copy_region_composited(
+      const pixels = await tool.copy_region_composited(
         region.x,
         region.y,
         region.width,

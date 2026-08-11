@@ -369,7 +369,7 @@ export function useEditPersistence() {
           // rather than a property of the call sequence that a future edit
           // could quietly break. The note below still applies to everything
           // after this line.
-          const cap = decodeCapture(tool.capture_state());
+          const cap = decodeCapture(await tool.capture_state());
           const { canvasW, canvasH, canvasPng, undoStack, redoStack, layers, activeLayerId } = cap;
 
           // Serialised here rather than in the decoder: the archive wants JSON

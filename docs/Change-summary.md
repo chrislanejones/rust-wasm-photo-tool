@@ -4770,3 +4770,54 @@ removing the `getHistogram` hot entry.
 
 **Gates.** 467 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
 marketing builds clean. Engine untouched — no `build:wasm`.
+
+## v8.5 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 6**. Gate 63 -> 59. No user-visible change.
+
+| # | Site | What it serves | Bucket it left |
+|---|------|----------------|----------------|
+| 1 | `useCopyRegionAction` — `copy_region_composited` | Copy Selection | un-awaited |
+| 2 | `useEditPersistence` — `capture_state` | save, signed-in path | un-awaited |
+| 3 | `lib/editPersistence` — `capture_state` | save, local path | un-awaited |
+| 4 | `TextSettings.runOcrJob` — `export_png` | the OCR button | needs-restructure |
+
+**Chosen for being dull.** These are four of the seven files that hold exactly
+one unconverted call. Three of the four already sat inside a function that
+waits for something else, so each was one keyword; the fourth was a plain
+click handler with nothing to unpick. The other three single-call files all
+need the surrounding code rearranged first — an effect that needs a
+cancellation guard, and two mouse handlers that share a type — so they are
+queued as their own batch rather than tacked onto this one.
+
+**The gate reconciles exactly**, which is the check that a batch is what it
+claims: un-awaited 13 -> 10, needs-restructure 41 -> 40, truthy-trap unchanged
+at 9, already-awaited 32 -> 36. 10 + 40 + 9 = **59**.
+
+**Verified against the live engine** in the production build, reached through
+the React fiber tree:
+
+| Call | Result |
+|---|---|
+| `export_png()` | **5,637,638 B**, magic `89504e47` |
+| `copy_region_composited(10,10,200,150)` | **120,000 B** = 200 x 150 x 4, exact |
+| `capture_state()` | **11,338,232 B** |
+| Console | no errors, no unhandled rejections |
+
+Said plainly, because the difference matters: the three engine calls were
+exercised on the shipped bundle, but the OCR button and the save path were not
+clicked end to end. OCR is behind sign-in, and no photo became active in the
+fresh-origin session used for the check.
+
+**A control run, because the session looked wrong.** On a brand-new origin the
+landing screen keeps showing "Loading your workspace…" beside the drop zone
+after the sample gallery has loaded, with the canvas sitting at full size
+underneath. The same build minus this change does exactly the same thing, so it
+is **pre-existing and not from this release** — v8.4 `index-lUrpjKHd.js` and
+v8.5 `index-BH_kIL07.js`, same flow, same result. Worth a look on its own; it
+is logged-out, which the earlier note on this symptom said was the healthy path.
+
+Mutation tested: **4 mutants, all 4 killed** — each `await` removed in turn.
+
+**Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
+Engine untouched — no `build:wasm`.

@@ -199,7 +199,14 @@ import { join } from "node:path";
  *         composite pass runs per frame. Third cross-file hot caller found this
  *         way, after `syncOplog` and `isLogTrustworthy`.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67 and 63 lines. The
+ *     59  a8 batch 6: the four single-site files whose enclosing function was
+ *         ALREADY `async`, plus `TextSettings.runOcrJob`. Nothing clever —
+ *         `copy_region_composited` (Copy Selection), `capture_state` ×2 (both
+ *         save paths, hook and lib), `export_png` (OCR). Picked deliberately as
+ *         the batch with no restructuring in it, to leave the night's budget
+ *         for the three single-site files that DO need it.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63 and 59 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -224,7 +231,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 63;
+const BUDGET = 59;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -377,10 +384,16 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // awaited 29 -> 32) and ONE was a reclassification — `getHistogram` is
     // called by HistogramView.sample() inside a requestAnimationFrame loop, so
     // it left restructure for hot-path (42 - 1 = 41). Gate 67 - 4 = 63.
-    ).toBe(41);
-    expect(gate.unawaited).toBe(13);
+    // a8 batch 6: four single-site files. THREE sat in already-async functions
+    // (`handleCopyRegion`, and `savePhotoEdit` in both useEditPersistence and
+    // lib/editPersistence): un-awaited 13 - 3 = 10. ONE was a non-async arrow
+    // (`TextSettings.runOcrJob`, an onClick): restructure 41 - 1 = 40. truthy
+    // untouched at 9 — none of the four fed a condition. awaited 32 -> 36.
+    // Gate 63 - 4 = 59, and 10 + 40 + 9 = 59.
+    ).toBe(40);
+    expect(gate.unawaited).toBe(10);
     expect(gate.truthy).toBe(9);
-    expect(gate.awaited, "cumulative converted sites").toBe(32);
+    expect(gate.awaited, "cumulative converted sites").toBe(36);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

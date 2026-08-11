@@ -134,10 +134,10 @@ export function TextSettings({
   const [copied, setCopied] = useState(false);
   const canRunOcr = aiEnabled && !!activePhotoId && !!stampToolRef.current;
 
-  const runOcrJob = () => {
+  const runOcrJob = async () => {
     const tool = stampToolRef.current;
     if (!tool || !activePhotoId) return;
-    const png = new Uint8Array(tool.export_png());
+    const png = new Uint8Array(await tool.export_png());
     setCopied(false);
     void runOcr("ocr", activePhotoId, png);
   };

@@ -509,7 +509,7 @@ export async function savePhotoEdit(
     shapes,
     layers,
     activeLayerId,
-  } = decodeCapture(t.capture_state());
+  } = decodeCapture(await t.capture_state());
 
   await idbSet<SavedEdit>(`edit-${photoId}`, {
     canvasW,

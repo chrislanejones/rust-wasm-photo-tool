@@ -84,6 +84,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.5 — 2026-08-11
+
+**Nothing you can see.** Four more engine calls now wait for the answer before
+using it: copying a selection to the clipboard, both of the paths that save an
+edited photo, and the OCR button that pulls text out of an image.
+
+Each of the four was a single keyword, because each already sat inside code
+that waits for something else. The three remaining one-call files are not like
+that — every one of them needs the surrounding code rearranged first, which is
+a different job and is queued as its own.
+
+<details><summary>Older releases</summary>
+
 ### v8.4 — 2026-08-11
 
 **Nothing you can see.** Copy-to-clipboard and the single-photo download now
@@ -94,8 +107,6 @@ histogram under the image is redrawn from a full pass over the whole picture,
 and the code that asks for it runs once per animation frame until the bars
 settle. That one is now filed with the other frame-rate work rather than queued
 for conversion.
-
-<details><summary>Older releases</summary>
 
 ### v8.3 — 2026-08-10
 

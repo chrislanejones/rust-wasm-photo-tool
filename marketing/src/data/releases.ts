@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.5",
+    date: "2026-08-11",
+    headline: "Four more calls wait for the answer",
+    entries: [
+      {
+        tag: "infra",
+        text: "Copying a selection to the clipboard, both of the paths that save an edited photo, and the OCR button that pulls text out of an image now wait for the engine's answer before using it.",
+      },
+      {
+        tag: "infra",
+        text: "This batch was picked for being dull. Each of the four already sat inside code that waits for something else, so each was a single keyword. The three remaining files with one call left in them are not like that — every one needs the surrounding code rearranged first — so they are queued as their own batch instead.",
+      },
+    ],
+  },
+  {
     version: "v8.4",
     date: "2026-08-11",
     headline: "The histogram was doing a full pass every frame",
