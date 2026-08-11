@@ -134,6 +134,15 @@ const HOT_BY_CALLER = {
   "app/src/lib/tilesFlush.ts::syncOplog":
     "called from useEngineCore.flushToCanvas:300 — runs on every flush, and its " +
     "result is consumed synchronously by registerOplogStats",
+  // Third cross-file case (2026-08-11). `HistogramView.sample()` calls this,
+  // and `sample` runs inside a `requestAnimationFrame` retry loop
+  // (HistogramView.tsx:213/223/233) that keeps trying until a valid histogram
+  // is available for the new photo. So `calculate_histogram()` — a full pass
+  // over the composite — is on a frame path, reached from another module.
+  "app/src/app/session/useCanvasActions.ts::getHistogram":
+    "called by HistogramView.sample(), which runs inside requestAnimationFrame " +
+    "until the bars settle — a per-frame read of the whole composite",
+
   "app/src/lib/oplogPersistence.ts::isLogTrustworthy":
     "reached from useEngineCore.flushToCanvas:301 via onOplogFlush. NOTE it is " +
     "ALSO called from the async saveOplogInner, so the function cannot simply be " +

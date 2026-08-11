@@ -4720,3 +4720,53 @@ Neither was a regression.
 
 **Gates.** 467 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
 marketing builds clean. Engine untouched — no `build:wasm`.
+
+## v8.4 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 5**. Gate 67 -> 63. No user-visible change.
+
+| # | Change | Status |
+|---|--------|--------|
+| 1 | Clipboard copy (2 reads) + single-photo export (1) | **Converted** |
+| 2 | `getHistogram` — a full composite pass, per animation frame | **Reclassified, not converted** |
+| 3 | An `await` now precedes `clipboard.write` on a path that had none | **Noted in code for the flip** |
+
+**#2 — the fourth site was not work.** `useCanvasActions.getHistogram` calls
+`calculate_histogram()`, and `HistogramView.sample()` calls *that* from inside a
+`requestAnimationFrame` retry loop (`HistogramView.tsx:213/223/233`) that keeps
+trying until the bars settle for a new photo.
+
+Measured in the browser rather than argued from the name: **1024 bins,
+11,182,080 samples** — a full pass over the composite, per frame. It belongs
+with a10, not in the a8 queue.
+
+That is the **third** cross-file hot caller found this way, after `syncOplog`
+and `isLogTrustworthy` in v8.2. The enclosing-name test only ever sees a
+function's own name; every one of these was reached from another module. The
+standing move is now explicit: **when triaging a function, trace who calls it,
+not just what it is called.**
+
+**#3 — a note left for whoever turns the worker on.** The
+`exportCanvasBackground` branch of the clipboard copy previously reached
+`navigator.clipboard.write` with no `await` in front of it. It now has one.
+Today that is a microtask, so transient user activation survives; behind the
+worker it is a real round trip, and strict browsers can drop the activation. The
+other branch already awaited `encodeRgba` before the same write and works, so
+the pattern is established — but the comment says plainly that if Copy ever
+starts failing silently on Safari, this is the line.
+
+**Verified in the browser** against the production build, with the clipboard
+intercepted so nothing reached the real one:
+
+| Path | Result |
+|---|---|
+| Copy to clipboard | wrote `image/png`, **5,637,638 B** — the full-canvas branch |
+| Download JPEG | magic `ffd8ffe0`, 380,038 B, `…-revised.jpg` |
+| `calculate_histogram()` | 1024 bins, 1010 non-zero, 11,182,080 samples |
+| Console | no errors |
+
+Mutation tested: **4 mutants, all 4 killed** — the three dropped awaits, and
+removing the `getHistogram` hot entry.
+
+**Gates.** 467 JS tests, 148 Rust tests, `tsc` clean, eslint 0 errors, app +
+marketing builds clean. Engine untouched — no `build:wasm`.

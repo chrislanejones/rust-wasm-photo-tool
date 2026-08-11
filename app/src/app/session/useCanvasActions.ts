@@ -127,7 +127,15 @@ export function useCanvasActions({
         // heap, not just the PNG slice — the resulting blob is huge and the
         // clipboard write fails. Copy the slice into a fresh ArrayBuffer
         // (detached from wasm memory) before handing it to Blob.
-        const pngView = tool.export_png();
+        // ADR-024 Stage 3.5 (a8). NOTE for whoever turns the worker on: this
+        // introduces an `await` into the branch that previously reached
+        // `navigator.clipboard.write` synchronously. Today it is a microtask so
+        // transient user activation is intact; behind the worker it is a real
+        // round trip, and strict browsers can drop the activation. The OTHER
+        // branch below already awaits `encodeRgba` before the same write and
+        // works, so the pattern is established — but if Copy ever starts
+        // failing silently on Safari, this is the line.
+        const pngView = await tool.export_png();
         const pngBytes = new Uint8Array(pngView.length);
         pngBytes.set(pngView);
         blob = new Blob([pngBytes], { type: "image/png" });
@@ -135,7 +143,7 @@ export function useCanvasActions({
         // ATOMIC CAPTURE (ADR-024). Was three reads; the crop is
         // content-dependent, so they can disagree, and each getter recomputed
         // the whole composite + bbox + crop on its own.
-        const cap = tool.capture_composite_excluding_background();
+        const cap = await tool.capture_composite_excluding_background();
         const { rgba, width, height } = cap;
         cap.free();
         blob = await encodeRgba(rgba, width, height, "png", 1);
@@ -170,7 +178,7 @@ export function useCanvasActions({
       // could put one state's dimensions in the metadata of another state's
       // pixels — a wrong size recorded in the file itself, which survives
       // export and nothing downstream would question.
-      const cap = tool.capture_composite_excluding_background();
+      const cap = await tool.capture_composite_excluding_background();
       const { rgba, width, height } = cap;
       cap.free();
       exportW = width;

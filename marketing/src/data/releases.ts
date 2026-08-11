@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.4",
+    date: "2026-08-11",
+    headline: "The histogram was doing a full pass every frame",
+    entries: [
+      {
+        tag: "infra",
+        text: "Copy-to-clipboard and the single-photo download now wait for the engine's answer before using it.",
+      },
+      {
+        tag: "perf",
+        text: "The fourth call in that file turned out not to be ordinary work at all: the histogram under the image is redrawn from a full pass over the whole picture \u2014 eleven million samples \u2014 and the code that asks for it runs once per animation frame until the bars settle. It is now filed with the other frame-rate work rather than queued for a change that would have made it wait for a round trip each time.",
+      },
+    ],
+  },
+  {
     version: "v8.3",
     date: "2026-08-10",
     headline: "The export paths wait for the answer",

@@ -192,7 +192,14 @@ import { join } from "node:path";
  *         `generateThumbnail` inside a manual `new Promise` executor, where an
  *         async callee turns `if (!thumb)` into a truthy trap.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77 and 67 lines. The
+ *     63  a8 batch 5: `useCanvasActions` 4 -> 0, but only THREE are work — the
+ *         clipboard copy's two reads and the export capture. The fourth,
+ *         `getHistogram`, is a RECLASSIFICATION: `HistogramView.sample()` calls
+ *         it from inside a `requestAnimationFrame` retry loop, so a full
+ *         composite pass runs per frame. Third cross-file hot caller found this
+ *         way, after `syncOplog` and `isLogTrustworthy`.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67 and 63 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -217,7 +224,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 67;
+const BUDGET = 63;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -365,10 +372,15 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // a8 batch 4: `useExport` 4 -> 0 and `exportImage` 2 -> 0. Four sat in
     // already-async functions (un-awaited 20 - 4 = 16) and two in non-async
     // callbacks (restructure 44 - 2 = 42). awaited 23 -> 29. Gate 73 - 6 = 67.
-    ).toBe(42);
-    expect(gate.unawaited).toBe(16);
+    // a8 batch 5: `useCanvasActions` 4 -> 0. THREE were conversions (clipboard
+    // x2 + export, all in already-async functions: un-awaited 16 - 3 = 13,
+    // awaited 29 -> 32) and ONE was a reclassification — `getHistogram` is
+    // called by HistogramView.sample() inside a requestAnimationFrame loop, so
+    // it left restructure for hot-path (42 - 1 = 41). Gate 67 - 4 = 63.
+    ).toBe(41);
+    expect(gate.unawaited).toBe(13);
     expect(gate.truthy).toBe(9);
-    expect(gate.awaited, "cumulative converted sites").toBe(29);
+    expect(gate.awaited, "cumulative converted sites").toBe(32);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
@@ -542,7 +554,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
       exceptions,
       "a handler reached the hot queue without a per-move name — justify it in " +
         "HOT_BY_CALLER by reading its caller, or it belongs in a8",
-    ).toEqual(["isLogTrustworthy", "pushOverlay", "syncOplog", "update"]);
+    ).toEqual(["getHistogram", "isLogTrustworthy", "pushOverlay", "syncOplog", "update"]);
   });
 
   it("does not drag a discrete action into the hot queue on a name match", () => {

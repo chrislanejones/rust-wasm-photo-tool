@@ -84,6 +84,19 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.4 — 2026-08-11
+
+**Nothing you can see.** Copy-to-clipboard and the single-photo download now
+wait for the engine's answer before using it.
+
+The fourth call in that file turned out not to be ordinary work at all: the
+histogram under the image is redrawn from a full pass over the whole picture,
+and the code that asks for it runs once per animation frame until the bars
+settle. That one is now filed with the other frame-rate work rather than queued
+for conversion.
+
+<details><summary>Older releases</summary>
+
 ### v8.3 — 2026-08-10
 
 **Nothing you can see.** The export paths now wait for the engine's answer
@@ -93,8 +106,6 @@ whole gallery.
 Checked against the real thing rather than only by tests: PNG, JPEG and WebP
 each came back as genuinely that format, and a twelve-photo .zip built
 correctly with an edited photo among them.
-
-<details><summary>Older releases</summary>
 
 ### v8.2 — 2026-08-10
 
