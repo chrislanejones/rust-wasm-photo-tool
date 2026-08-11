@@ -81,7 +81,9 @@ export function useEffectiveTool({
   // keep drawing.
   const idle: Stamp = {
     ...stamp,
-    onMouseDown: (() => {}) as typeof stamp.onMouseDown,
+    // `async` since Stage 3.5 made the clone stamp's own onMouseDown async —
+    // this is the shared slot type, so the no-op has to match it. Still a no-op.
+    onMouseDown: (async () => {}) as typeof stamp.onMouseDown,
     onMouseMove: (() => {}) as typeof stamp.onMouseMove,
     onMouseUp: (() => {}) as typeof stamp.onMouseUp,
   };
@@ -193,11 +195,16 @@ export function useEffectiveTool({
           // Both keep the clone stamp's full surface (source point, preview),
           // with the red/batch stamp taking the press when one is pending —
           // preserved exactly as it behaved under the old `stamp` branch.
-          const combinedDown: typeof stamp.onMouseDown = (e) => {
+          // `async` + `await` on the stamp branch: since Stage 3.5 its
+          // onMouseDown is async, and dropping the promise here would make the
+          // press fire-and-forget — the caller could not sequence anything
+          // after it, and a rejection would surface as an unhandled rejection
+          // rather than at the call site. The red-stamp branch is still sync.
+          const combinedDown: typeof stamp.onMouseDown = async (e) => {
             if (redStampTool.hasPendingStamp()) {
               redStampTool.onMouseDown(e as MouseEvent<HTMLCanvasElement>);
             } else {
-              stamp.onMouseDown(e);
+              await stamp.onMouseDown(e);
             }
           };
           return { ...stamp, onMouseDown: combinedDown };

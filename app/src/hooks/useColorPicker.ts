@@ -83,12 +83,14 @@ export function useColorPicker({
   }, []);
 
   const onMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+    async (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!active || e.button !== 0) return;
       const tool = toolRef.current;
       const coords = getCanvasCoords(e);
+      // Every read off the event happens BEFORE the await, deliberately: after
+      // one, `e` is only safe for the values already destructured out of it.
       if (!tool || !coords) return;
-      const px = tool.get_pixel(coords.canvasX, coords.canvasY);
+      const px = await tool.get_pixel(coords.canvasX, coords.canvasY);
       const hex = rgbaToHex(px[0] ?? 0, px[1] ?? 0, px[2] ?? 0);
       onPickColor(hex);
     },

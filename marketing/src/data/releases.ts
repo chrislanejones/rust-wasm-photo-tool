@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.6",
+    date: "2026-08-11",
+    headline: "The check that would have stopped checking",
+    entries: [
+      {
+        tag: "infra",
+        text: "The last three files with a single engine call left in them — the export dialog's size label, the eyedropper and the clone stamp — now wait for the engine's answer. All three needed the surrounding code rearranged rather than one keyword added.",
+      },
+      {
+        tag: "fix",
+        text: "The clone stamp's call is the check for whether a source point has been set yet, and that check sits inside an `if`. Converted carelessly it would have stopped rejecting anything and the stamp would have painted from wherever the engine happened to be, with nothing thrown and nothing logged. Verified in the browser both ways round: a click with no source still does nothing, and a source-then-stamp still leaves a stroke.",
+      },
+    ],
+  },
+  {
     version: "v8.5",
     date: "2026-08-11",
     headline: "Four more calls wait for the answer",

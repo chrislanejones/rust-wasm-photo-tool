@@ -1335,8 +1335,15 @@ export function AppShell() {
     if (activeTool !== "arrow") setMoveActive(false);
   }, [activeTool]);
 
+  // `async` is carried, not needed. `effect_down` consumes no return value, so
+  // this is fire-and-forget and Stage 3.5 has no work here. It shares the
+  // `Stamp["onMouseDown"]` slot with the clone stamp's handler, which IS async
+  // now, and the alternative — a second, widened handler type — would only move
+  // the conflict to CanvasArea, whose `hookResult` prop is
+  // `ReturnType<typeof useCloneStamp>` directly. Nothing changes at runtime:
+  // React ignores the returned promise.
   const blurDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+    async (e: React.MouseEvent<HTMLCanvasElement>) => {
       const t = stamp.toolRef.current;
       if (!t || e.button !== 0) return;
       isBlurringRef.current = true;

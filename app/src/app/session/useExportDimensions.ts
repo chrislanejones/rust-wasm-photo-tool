@@ -104,9 +104,36 @@ export function useExportDimensions({ stamp, active, excludeBackground }: Option
     // and the height another. These are not a caption — they are written to the
     // Convex `shares` table (see the header), so a torn pair is persisted
     // against a public link and no later render corrects it.
-    const dims = t.export_dims_excluding_background();
-    setCropped({ w: dims.width, h: dims.height });
-    dims.free();
+    //
+    // ADR-024 Stage 3.5. An effect callback cannot be `async` — React would
+    // read the returned Promise as the cleanup function — so this is an async
+    // IIFE with an explicit cancellation flag rather than a bare `await`.
+    //
+    // THE FLAG IS LOAD-BEARING, not boilerplate. The deps below fire on every
+    // edit that can move the tight bounding box, so behind the worker a second
+    // effect can start while the first composite is still running, and the two
+    // can finish in either order. Without the guard a stale pair wins whenever
+    // the older composite lands last, and per the note above these numbers are
+    // written to the Convex `shares` table — a wrong size is persisted against
+    // a public link and no later render corrects it. Same reasoning that made
+    // the pair one call; this keeps it true across time as well as within a
+    // single read.
+    let cancelled = false;
+    void (async () => {
+      const dims = await t.export_dims_excluding_background();
+      // `free()` on BOTH paths — a cancelled effect still owns the boxed
+      // allocation, and dropping it on the floor leaks wasm memory, which never
+      // shrinks (ADR-024 a11).
+      if (cancelled) {
+        dims.free();
+        return;
+      }
+      setCropped({ w: dims.width, h: dims.height });
+      dims.free();
+    })();
+    return () => {
+      cancelled = true;
+    };
     // `undoCount`/`redoCount`/`layers.length` stand in for "the document
     // changed" — there is no version counter on the engine, and these move on
     // every edit that could change the tight bounding box. Deliberately NOT

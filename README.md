@@ -84,6 +84,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.6 — 2026-08-11
+
+**Nothing you can see.** The last three files with a single engine call left in
+them: the export dialog's size label, the eyedropper, and the clone stamp.
+
+These are the three that needed the surrounding code rearranged rather than one
+keyword added. The clone stamp's was the one worth being careful about — the
+call it makes is the check for "has a source point been set yet", and that check
+sits inside an `if`. Left half-converted it would have stopped rejecting
+anything, and the stamp would have painted from wherever the engine happened to
+be, silently. Verified in the browser both ways round: a click with no source
+still does nothing, and a source-then-stamp still leaves a stroke.
+
+<details><summary>Older releases</summary>
+
 ### v8.5 — 2026-08-11
 
 **Nothing you can see.** Four more engine calls now wait for the answer before
@@ -94,8 +109,6 @@ Each of the four was a single keyword, because each already sat inside code
 that waits for something else. The three remaining one-call files are not like
 that — every one of them needs the surrounding code rearranged first, which is
 a different job and is queued as its own.
-
-<details><summary>Older releases</summary>
 
 ### v8.4 — 2026-08-11
 

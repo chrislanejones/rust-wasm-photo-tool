@@ -100,18 +100,37 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
 
   // ── Mouse / stroke handlers ───────────────────────────────────────────────
   const onMouseDown = useCallback(
-    (e: MouseEvent<HTMLCanvasElement>) => {
+    async (e: MouseEvent<HTMLCanvasElement>) => {
       const t = toolRef.current;
       if (!t) return;
+      // Read off the event BEFORE any await — after one, `e` is only safe for
+      // the values already destructured out of it. `altKey` is checked here for
+      // the same reason.
       const { x, y } = getCanvasCoords(e);
-      if (e.altKey) {
+      const alt = e.altKey;
+      if (alt) {
         t.set_source(x, y);
         sourcePosRef.current = { x, y };
         sourceDisarmedRef.current = false; // fresh source re-arms the stamp
         syncState();
         return;
       }
-      if (!t.has_source() || sourceDisarmedRef.current) return;
+      // ADR-024 Stage 3.5 — A TRUTHY TRAP, and the reason this one keyword
+      // matters more than the others in its batch. `has_source()` returning a
+      // Promise makes `!t.has_source()` permanently FALSE, so the guard stops
+      // firing entirely and `begin_stroke` runs with no source set. Nothing
+      // throws; the stamp just paints from wherever the engine last was.
+      //
+      // A NOTE FOR WHOEVER TURNS THE WORKER ON. `isDrawingRef` is now set after
+      // an await, and `onMouseMove` returns early until it is true. Today that
+      // await is a microtask and resolves before the next mouse event, so no
+      // movement is lost. Behind the worker it is a real round trip, and the
+      // first few pointermoves of a stroke can arrive while it is still in
+      // flight — they would be dropped, which reads as a stroke that starts
+      // late rather than as an error. The guard must stay ahead of the flag
+      // (drawing without a source is worse), so if that shows up, the fix is to
+      // buffer the early moves, not to reorder these two lines.
+      if (!(await t.has_source()) || sourceDisarmedRef.current) return;
       isDrawingRef.current = true;
       t.begin_stroke(x, y);
       flushToCanvas();

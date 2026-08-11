@@ -1659,3 +1659,38 @@ a5's scope was the capture. Options, roughly in order of appeal:
 Same family as the exclude-background finding fixed in v7.88 — a getter that
 recomputes a whole-document product to answer a small question — except this
 one is on the drawing path rather than the export path.
+
+---
+
+## `useExportDimensions`' cancellation guard has no test (v8.6, 2026-08-11)
+
+**What shipped.** ADR-024 Stage 3.5 made the effect's engine read an `await`.
+An effect callback cannot be `async` — React reads the returned Promise as its
+cleanup — so it became an async IIFE with a `cancelled` flag set by the
+cleanup, and `dims.free()` on both paths.
+
+**Why the flag matters.** The deps refire on every edit that can move the tight
+bounding box. Behind the worker two composites can be in flight at once and
+finish in either order, so without the flag a stale pair wins whenever the older
+one lands last. These numbers are written to the Convex `shares` table, so a
+wrong size is persisted against a public link and no later render corrects it.
+
+**The gap.** The `await` itself is covered — the migration ratchet mutation-kills
+a dropped keyword. The **guard is not**. Delete the `if (cancelled)` branch and
+every gate stays green.
+
+**Why it was not fixed in the same session.** There is no React hook-test
+harness in this repo: no `renderHook`, no `@testing-library/react`, and the one
+existing hook test (`useEffectiveTool.test.ts`) works only because that hook is
+a pure function of its arguments. `useExportDimensions` holds `useState` +
+`useEffect` and cannot be called directly. Closing this means either adding a
+testing-library dependency — a trigger-level decision that wants an ADR and
+Dara, not a 2am call — or hand-rolling a `react-dom/client` + `act()` harness in
+jsdom, which is a first-of-its-kind piece of infrastructure for this repo and
+deserves its own session.
+
+**Also unverified in the browser.** The effect's async branch never ran during
+the v8.6 check: it early-returns unless the exclude-background preference is on,
+and no control for that preference was found on the export dialog or the tool
+panels. Worth confirming that preference is still reachable from the UI at all —
+if it is not, this effect is dead code in practice and the question changes.

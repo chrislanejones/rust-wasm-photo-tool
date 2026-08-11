@@ -4821,3 +4821,71 @@ Mutation tested: **4 mutants, all 4 killed** — each `await` removed in turn.
 
 **Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
 Engine untouched — no `build:wasm`.
+
+## v8.6 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 7**. Gate 59 -> 56. No user-visible change.
+
+The last three files holding a single unconverted engine call — and the three
+that batch 6 deliberately left alone, because none of them was a one-keyword
+change.
+
+| # | Site | Why it needed more than an `await` |
+|---|------|-----------------------------------|
+| 1 | `useExportDimensions` — `export_dims_excluding_background` | effect callbacks cannot be `async` |
+| 2 | `useColorPicker.onMouseDown` — `get_pixel` | shares a type slot with #3 |
+| 3 | `useCloneStamp.onMouseDown` — `has_source` | **truthy trap**, and shares a type slot with #2 |
+
+**#3 — the one that would have failed silently.** `if (!t.has_source() || …)`
+guards the clone stamp against starting a stroke with no source point set. A
+Promise is always truthy, so an un-awaited `has_source()` makes `!` permanently
+false: the guard stops rejecting anything and `begin_stroke` runs regardless.
+Nothing throws. The stamp simply paints from wherever the engine last was.
+
+**#2 and #3 could not be converted separately**, which is not visible from
+either file. `Stamp = ReturnType<typeof useCloneStamp>`, and `useEffectiveTool`
+routes every tool's mouse-down through that one `Stamp["onMouseDown"]` slot —
+so making either handler async alone breaks the other's cast. Converting them
+together also dragged `blurDown` along: it consumes no return value and has no
+Stage 3.5 work of its own, but it fills the same slot. It is now `async` and
+says so in a comment, because the alternative — a second, widened handler type —
+only moves the conflict to `CanvasArea`, whose prop is
+`ReturnType<typeof useCloneStamp>` directly.
+
+**#1 — a guard, not just a keyword.** React reads a returned Promise as an
+effect's cleanup function, so the read became an async IIFE with a `cancelled`
+flag and `free()` on both paths. The flag is load-bearing: the deps refire on
+every edit that can move the tight bounding box, so behind the worker two
+composites can be in flight and finish in either order, and these numbers are
+written to the Convex `shares` table — a stale pair is persisted against a
+public link and no later render corrects it.
+
+**Verified in the browser** against the production build, driving real events
+at the canvas:
+
+| Step | Result |
+|---|---|
+| Clone stamp, click with no source | **rejected** — undo stays 0, guard fires |
+| Clone stamp, Alt-click | source armed |
+| Clone stamp, click + drag | **`Stamp 1`** in history, undo 1 |
+| Eyedropper click | `get_pixel(969,1489)` -> **#59503D**, committed as brush colour |
+| `export_dims_excluding_background()` | **1365x2048** against a 1385x2068 document |
+| Console | no errors, no unhandled rejections |
+
+The clone-stamp check is the useful one: it is the same click in both
+directions, so it fails if the guard is gone *and* fails if the handler is
+broken.
+
+**Two things this release does NOT cover**, both parked:
+
+- The cancellation guard in #1 has **no test** — delete it and every gate stays
+  green. There is no React hook-test harness in this repo, and adding one is a
+  dependency decision rather than a batch.
+- #1's async branch was never reached in the browser: it early-returns unless
+  the exclude-background preference is on, and no control for that preference
+  was found on the export dialog or the tool panels.
+
+Mutation tested: **3 mutants, all 3 killed** — including the truthy trap.
+
+**Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
+Engine untouched — no `build:wasm`.

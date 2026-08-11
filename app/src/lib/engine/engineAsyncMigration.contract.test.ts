@@ -206,7 +206,19 @@ import { join } from "node:path";
  *         the batch with no restructuring in it, to leave the night's budget
  *         for the three single-site files that DO need it.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63 and 59 lines. The
+ *     56  a8 batch 7: the last three single-call files, and the three that
+ *         needed the restructuring batch 6 deliberately avoided.
+ *         `useExportDimensions`'s effect callback cannot be `async` (React
+ *         would read the Promise as its cleanup), so it became an async IIFE
+ *         with a cancellation flag — load-bearing, because its deps refire on
+ *         every bbox-moving edit and the result is persisted to the Convex
+ *         `shares` table. `useColorPicker` and `useCloneStamp` had to go
+ *         TOGETHER: `Stamp = ReturnType<typeof useCloneStamp>`, so both
+ *         handlers feed the same `Stamp["onMouseDown"]` slot and converting
+ *         either alone breaks the other's cast. `useCloneStamp`'s was also a
+ *         truthy trap — `if (!t.has_source())`.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59 and 56 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -231,7 +243,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 59;
+const BUDGET = 56;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -390,10 +402,17 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (`TextSettings.runOcrJob`, an onClick): restructure 41 - 1 = 40. truthy
     // untouched at 9 — none of the four fed a condition. awaited 32 -> 36.
     // Gate 63 - 4 = 59, and 10 + 40 + 9 = 59.
-    ).toBe(40);
+    // a8 batch 7: the three single-call files that needed restructuring. NONE
+    // sat in an already-async function, so un-awaited is untouched at 10 — the
+    // whole batch came out of the other two buckets. `useExportDimensions`'s
+    // effect and `useColorPicker.onMouseDown` were non-async callbacks
+    // (restructure 40 - 2 = 38); `useCloneStamp`'s `has_source()` fed an `if`
+    // (truthy 9 - 1 = 8). awaited 36 -> 39. Gate 59 - 3 = 56, and
+    // 10 + 38 + 8 = 56.
+    ).toBe(38);
     expect(gate.unawaited).toBe(10);
-    expect(gate.truthy).toBe(9);
-    expect(gate.awaited, "cumulative converted sites").toBe(36);
+    expect(gate.truthy).toBe(8);
+    expect(gate.awaited, "cumulative converted sites").toBe(39);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
