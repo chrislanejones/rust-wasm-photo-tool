@@ -4926,11 +4926,28 @@ The tool-switch check is the useful one: it is the exact path the trap would
 have broken, and it fails in both directions — leaking a commit when nothing is
 pending, or failing to commit when something is.
 
-**The AI buttons were not clicked.** They need the `paid` tier
-(`TIERS.paid.replicateAI` is the only `true`), and a real run spends a Replicate
-credit. Their engine call is `export_png()`, already verified byte-exact in
-v8.5. What was checked here is that both buttons carry live handlers and gate
-correctly when the tier does not allow them.
+**The AI buttons were clicked after all** — this paragraph previously said they
+were not, and that is corrected here rather than quietly edited away. They need
+the `paid` tier (`TIERS.paid.replicateAI` is the only `true`), which arrived on
+a real signed-in session shortly after the release was cut:
+
+| Path | Result |
+|---|---|
+| Remove Background (`runModel`) | `export_png()` ran once, **5,650,764 B** |
+| Remove Object (`openObjModal`) | `export_png()` ran once, same bytes; modal opened **with the image already in it** |
+| Console | no errors, no unhandled rejections |
+
+**No Replicate credit was spent, by construction rather than by luck.**
+`useAIJob.run` awaits `uploadPng(png)` *before* it calls `dispatch(...)`, and
+both sit inside one `try`. Blocking the upload `fetch` therefore makes the
+`catch` run and `dispatch` — the only thing that reaches Replicate — is never
+called. The block was scoped to `POST` requests carrying
+`Content-Type: image/png` and lifted immediately afterwards.
+
+The Remove Object result is the more interesting of the two: the modal renders
+from `objSource`, which is assigned from the awaited bytes on the line before
+the modal is raised. It opened with the image present, which is the ordering
+that would break first if the `await` were dropped.
 
 Mutation tested: **4 mutants, all 4 killed**, including both truthy traps.
 

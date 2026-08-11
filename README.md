@@ -96,6 +96,11 @@ nothing" is a check, and the check is the call that was converted here — left
 half-done it would have stopped saying no, and every tool switch would have
 added a step to your undo history for a box that was never there.
 
+Both AI buttons were then checked on a real signed-in account, with the upload
+step blocked so no credit was spent: each hands the model a full-size PNG of
+the current picture, and Remove Object opens its window with the image already
+loaded.
+
 <details><summary>Older releases</summary>
 
 ### v8.6 — 2026-08-11

@@ -34,6 +34,10 @@ export const RELEASES: Release[] = [
       },
       {
         tag: "fix",
+        text: "Both AI buttons were then checked on a real signed-in account, with the upload step blocked so no credit was spent: each hands the model a full-size PNG of the current picture, and Remove Object opens its window with the image already loaded — which is the part that breaks first if the wait is left out.",
+      },
+      {
+        tag: "fix",
         text: "Dropping a resize box and pressing Enter is a “commit”, and the same commit runs quietly every time you switch tools, on the understanding that it does nothing when no box is open. That “does nothing” is a check, and the check is the call converted here — left half-done it would have stopped saying no, and every tool switch would have added a step to your undo history for a box that was never there. Checked in the browser: six tool switches with nothing pending reached the engine zero times, and a real box still commits on the first Enter.",
       },
     ],
