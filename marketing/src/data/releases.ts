@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.8",
+    date: "2026-08-11",
+    headline: "The whole Select tool waits for the answer",
+    entries: [
+      {
+        tag: "infra",
+        text: "Wand, edge-aware, colour range, magnetic lasso and both marquees — thirteen engine calls in one file, the largest batch of this run, and five of them were checks written as “if the engine says yes”.",
+      },
+      {
+        tag: "fix",
+        text: "Every mode was then driven in a real browser, and each left the right entry in the history: Magic Wand, Edge Select, Colour Range, Magnetic Lasso, Marquee, Ellipse Marquee, Select All, Delete Selection, Selection to Layer.",
+      },
+      {
+        tag: "perf",
+        text: "The live wire that follows your cursor while a lasso is open was deliberately left alone. It runs on every mouse-move, and it is the one place in this file where waiting for an answer would cost a frame.",
+      },
+    ],
+  },
+  {
     version: "v8.7",
     date: "2026-08-11",
     headline: "The check that runs on every tool switch",

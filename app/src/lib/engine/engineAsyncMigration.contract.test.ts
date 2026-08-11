@@ -228,7 +228,17 @@ import { join } from "node:path";
  *         effect — none can await, so all three are now `void commit()`.
  *         `update` (line 95) stays hot and untouched.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56 and 52 lines. The
+ *     39  a8 batch 9: `useSelectionActions` 13 -> 0 — the biggest single batch
+ *         of the arc, and it takes the truthy-trap bucket from 6 to 1. Six
+ *         handlers went async; `handleLassoMove` (2 sites) stays HOT and
+ *         untouched, which is the whole reason this file was scoped last.
+ *         Explicitly NOT an atomic capture: the lasso branch reads
+ *         `lasso_active()`, MUTATES (`lasso_begin`/`lasso_commit`), then reads
+ *         `lasso_committed_path()` — reads of a changing engine, not one
+ *         document state, so a3/a7's "one capture" fix does not apply. Same
+ *         test that withdrew `useTextTool` from a7.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52 and 39 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -253,7 +263,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 52;
+const BUDGET = 39;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -425,10 +435,17 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // arrow click handlers (restructure 38 - 2 = 36); paste-placement's two were
     // both truthy traps on `has_paste_preview` (truthy 8 - 2 = 6).
     // awaited 39 -> 43. Gate 56 - 4 = 52, and 10 + 36 + 6 = 52.
-    ).toBe(36);
+    // a8 batch 9: `useSelectionActions` 13 -> 0. Eight sat in non-async
+    // callbacks (restructure 36 - 8 = 28) and FIVE were truthy traps
+    // (truthy 6 - 5 = 1) -- `lasso_active` x2, `lasso_begin`,
+    // `delete_selection` (through an optional chain) and
+    // `selection_to_new_layer`. un-awaited is untouched at 10 for the fourth
+    // batch running: what is left in that bucket is `openraster/export.ts`.
+    // awaited 43 -> 56. Gate 52 - 13 = 39, and 10 + 28 + 1 = 39.
+    ).toBe(28);
     expect(gate.unawaited).toBe(10);
-    expect(gate.truthy).toBe(6);
-    expect(gate.awaited, "cumulative converted sites").toBe(43);
+    expect(gate.truthy).toBe(1);
+    expect(gate.awaited, "cumulative converted sites").toBe(56);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

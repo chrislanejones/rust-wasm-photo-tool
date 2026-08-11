@@ -84,6 +84,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.8 — 2026-08-11
+
+**Nothing you can see.** The whole Select tool — wand, edge-aware, colour
+range, magnetic lasso, and both marquees — now waits for the engine's answer.
+
+Thirteen calls in one file, the largest batch of this run, and five of them
+were checks written as `if (engine says yes)`. Every mode was driven in a real
+browser afterwards and each left the right entry in the history: Magic Wand,
+Edge Select, Colour Range, Magnetic Lasso, Marquee, Ellipse Marquee, Select
+All, Delete Selection, Selection to Layer.
+
+The live wire that follows your cursor while a lasso is open was deliberately
+left alone. It runs on every mouse-move, and it is the one place in this file
+where waiting for an answer would cost a frame.
+
+<details><summary>Older releases</summary>
+
 ### v8.7 — 2026-08-11
 
 **Nothing you can see.** The two AI buttons and the layer-resize box now wait
@@ -100,8 +117,6 @@ Both AI buttons were then checked on a real signed-in account, with the upload
 step blocked so no credit was spent: each hands the model a full-size PNG of
 the current picture, and Remove Object opens its window with the image already
 loaded.
-
-<details><summary>Older releases</summary>
 
 ### v8.6 — 2026-08-11
 

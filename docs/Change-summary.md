@@ -4953,3 +4953,70 @@ Mutation tested: **4 mutants, all 4 killed**, including both truthy traps.
 
 **Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
 Engine untouched — no `build:wasm`.
+
+## v8.8 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 9**. Gate 52 -> 39. No user-visible change.
+
+`useSelectionActions` 13 -> 0 — the **largest single batch of the arc**, and it
+takes the truthy-trap bucket from 6 to **1**. Six handlers went async; the
+seventh, `handleLassoMove`, stays hot and untouched.
+
+| Handler | Engine calls | Note |
+|---|---|---|
+| `handleSelectionClick` | 6 | 2 truthy traps + the 3-way mask ternary |
+| `handleLassoClose` | 2 | 1 truthy trap |
+| `handleMarqueeCommit` | 2 | rect / ellipse ternary |
+| `handleSelectAll` | 1 | |
+| `handleDeleteSelection` | 1 | truthy trap **through an optional chain** |
+| `handleNewLayerFromSelection` | 1 | truthy trap |
+| `handleLassoMove` | **0 of 2** | **hot — per-pointermove, left alone** |
+
+**Deliberately NOT an atomic capture.** The lasso branch reads `lasso_active()`,
+then *mutates* (`lasso_begin` / `lasso_commit`), then reads
+`lasso_committed_path()`. Those describe a changing engine, not one document
+state, so a3/a7's "replace the sequence with one capture" fix does not apply —
+the same test that withdrew `useTextTool` from a7. What sits *between* the reads
+is part of the pattern.
+
+**Two mechanical things worth stealing for the remaining files:**
+
+- `await` goes on each **branch** of a ternary, not around it. Both are correct
+  at runtime, but the audit decides "awaited" from the text immediately before
+  the receiver, so `await (cond ? a.f() : b.g())` reads as three *un*-awaited
+  calls and the gate would not move.
+- The optional chain keeps its short-circuit only if the `await` sits outside
+  it: `await tool?.delete_selection()` yields `undefined` when there is no tool,
+  which stays falsy.
+
+**Every one of the thirteen was driven in a real browser** against the
+production build, and each left the right history entry:
+
+| Mode / action | Engine call | History entry |
+|---|---|---|
+| Magic wand click | `magic_wand_select` | `Magic Wand` |
+| Edge-aware click | `magic_wand_select_edges` | `Edge Select` |
+| Colour-range click | `color_range_select` | `Color Range` |
+| Lasso anchor 1 | `lasso_active` -> `lasso_begin` | session opens |
+| Lasso anchors 2-3 | `lasso_active` -> `lasso_commit` | `lasso_committed_path` x3 |
+| Lasso double-click | `lasso_close` | `Magnetic Lasso` |
+| Rectangle drag | `rect_select` | `Marquee` |
+| Ellipse drag | `ellipse_select` | `Ellipse Marquee` |
+| Select All | `select_all` | `Select All` |
+| Delete | `delete_selection` | `Delete Selection` |
+| Copy to layer | `selection_to_new_layer` | `Selection to Layer` + toast |
+| Console | — | no errors, no unhandled rejections |
+
+`selection_to_new_layer` returns a **layer id, not a boolean** — it handed back
+`3`. So the trap there is 0-vs-nonzero, and the `await` preserves it.
+
+**What the browser could NOT check, stated plainly.** The *negative* direction
+of the Delete and Copy/Cut guards is unreachable by clicking: the panel disables
+those buttons when nothing is selected, and `onDoubleClick` is only bound while
+a lasso session is open. So the guards are defence-in-depth behind UI gating,
+and the proof that they still reject is the mutation run, not a click.
+
+Mutation tested: **13 mutants, all 13 killed** — including all five truthy traps.
+
+**Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
+Engine untouched — no `build:wasm`.

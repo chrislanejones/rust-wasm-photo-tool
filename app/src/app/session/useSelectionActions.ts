@@ -71,8 +71,15 @@ export function useSelectionActions(
   // overlay, so everything downstream (overlay blit, Delete, Deselect) is
   // untouched. The lasso is the exception: a click is an ANCHOR, not a
   // selection, so it forks first and never reaches the ternary.
+  // ADR-024 Stage 3.5. NOT an atomic capture, deliberately. The lasso branch
+  // reads `lasso_active()`, then MUTATES (`lasso_begin` / `lasso_commit`), then
+  // reads `lasso_committed_path()` — so the reads describe a changing engine,
+  // not one document state, and the a3/a7 "one capture" fix does not apply.
+  // Same test that withdrew `useTextTool` from a7: what sits BETWEEN the reads
+  // is part of the pattern. The three-way mask ternary below is one call, not
+  // three reads — exactly one branch runs.
   const handleSelectionClick = useCallback(
-    (e: ReactMouseEvent<HTMLCanvasElement>) => {
+    async (e: ReactMouseEvent<HTMLCanvasElement>) => {
       const tool = stamp.toolRef.current;
       if (!tool) return;
 
@@ -93,14 +100,18 @@ export function useSelectionActions(
         // engine consumes it at `lasso_close`. Mid-session clicks are anchors,
         // never producers, so re-reading the modifier per anchor would be a
         // lie; we set combine mode once here and leave it.
-        if (!tool.lasso_active()) {
+        // Both guards are TRUTHY TRAPS: un-awaited, `!Promise` is always false,
+        // so the first would treat every click as a fresh session (restarting
+        // the loop mid-draw) and the second would carry on after a refused
+        // `lasso_begin`.
+        if (!(await tool.lasso_active())) {
           tool.set_selection_combine(mode);
           setCombineHint(mode);
-          if (!tool.lasso_begin(x, y)) return;
+          if (!(await tool.lasso_begin(x, y))) return;
         } else {
           tool.lasso_commit(x, y);
         }
-        setLassoCommitted(tool.lasso_committed_path());
+        setLassoCommitted(await tool.lasso_committed_path());
         setLassoPreview(null);
         return;
       }
@@ -110,12 +121,16 @@ export function useSelectionActions(
       // when mode != 0; mode 0 is the old replace path, byte-for-byte.
       tool.set_selection_combine(mode);
       setCombineHint(mode);
+      // `await` sits on each BRANCH rather than wrapping the ternary. Both are
+      // correct at runtime, but the audit decides "awaited" from the text
+      // immediately before the receiver, so `await (cond ? a.f() : b.g())`
+      // reads as three un-awaited calls and the gate would not move.
       const mask =
         selectionKind === "edge"
-          ? tool.magic_wand_select_edges(x, y, selectionTolerance, edgeThreshold)
+          ? await tool.magic_wand_select_edges(x, y, selectionTolerance, edgeThreshold)
           : selectionKind === "colorRange"
-            ? tool.color_range_select(x, y, selectionTolerance)
-            : tool.magic_wand_select(x, y, selectionTolerance);
+            ? await tool.color_range_select(x, y, selectionTolerance)
+            : await tool.magic_wand_select(x, y, selectionTolerance);
       setSelectionMask(mask.length ? mask : null);
     },
     [stamp, getCoords, selectionTolerance, selectionKind, edgeThreshold],
@@ -137,10 +152,11 @@ export function useSelectionActions(
   // Double-click closes the loop: the engine wires the last anchor back to the
   // first, fills the enclosed region, and hands back the SAME overlay RGBA the
   // wands produce — so from here on it's just "a selection", like any other.
-  const handleLassoClose = useCallback(() => {
+  const handleLassoClose = useCallback(async () => {
     const tool = stamp.toolRef.current;
-    if (!tool || !tool.lasso_active()) return;
-    const mask = tool.lasso_close();
+    // TRUTHY TRAP — un-awaited this closes a loop that was never open.
+    if (!tool || !(await tool.lasso_active())) return;
+    const mask = await tool.lasso_close();
     setLassoCommitted(null);
     setLassoPreview(null);
     setSelectionMask(mask.length ? mask : null);
@@ -165,10 +181,10 @@ export function useSelectionActions(
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [lassoCommitted, handleLassoCancel]);
-  const handleSelectAll = useCallback(() => {
+  const handleSelectAll = useCallback(async () => {
     const tool = stamp.toolRef.current;
     if (!tool) return;
-    const mask = tool.select_all();
+    const mask = await tool.select_all();
     // `select_all` pushes a "Select All" step (selection.rs:481) — selections
     // are undoable, Photoshop-style. Without this the engine's undo_count moves
     // and `stamp.state.undoCount` does not, so the History panel is a step
@@ -190,9 +206,13 @@ export function useSelectionActions(
     setCombineHint(0);
     setSelectionMask(null);
   }, [stamp]);
-  const handleDeleteSelection = useCallback(() => {
+  const handleDeleteSelection = useCallback(async () => {
     const tool = stamp.toolRef.current;
-    if (tool?.delete_selection()) {
+    // TRUTHY TRAP through an OPTIONAL CHAIN — the `await` has to sit outside it
+    // so the no-tool case still short-circuits: `await undefined` is `undefined`,
+    // which stays falsy, whereas an un-awaited Promise would flush and sync on
+    // a delete that never happened.
+    if (await tool?.delete_selection()) {
       stamp.flushToCanvas();
       stamp.syncState();
     }
@@ -204,10 +224,12 @@ export function useSelectionActions(
   // 0-on-nothing, JS flushes, syncs (so the Layers panel sees the new layer)
   // and drops the overlay mask.
   const handleNewLayerFromSelection = useCallback(
-    (cut: boolean) => {
+    async (cut: boolean) => {
       const tool = stamp.toolRef.current;
       if (!tool) return;
-      if (tool.selection_to_new_layer(cut)) {
+      // TRUTHY TRAP — un-awaited this toasts "cut to a new layer" and syncs the
+      // Layers panel for a layer the engine declined to make.
+      if (await tool.selection_to_new_layer(cut)) {
         stamp.flushToCanvas();
         stamp.syncState();
         toast.success(
@@ -250,13 +272,20 @@ export function useSelectionActions(
   // CanvasArea's click-vs-drag threshold keeps accidental sub-pixel drags
   // from reaching here at all.
   const handleMarqueeCommit = useCallback(
-    (
+    async (
       x0: number,
       y0: number,
       x1: number,
       y1: number,
       mods: { shiftKey: boolean; altKey: boolean },
     ) => {
+      // NOTE FOR THE WORKER FLIP. CanvasArea's mouse-up calls this WITHOUT
+      // awaiting, then immediately clears its ephemeral drag preview. Today the
+      // mask lands a microtask later, so nothing is visibly missing; behind the
+      // worker there is a real gap in which the preview is gone and the ants
+      // have not arrived. Same for the click path, which clears the preview
+      // before calling `handleSelectionClick`. If a marquee starts flickering
+      // on release, that ordering is the cause — not this call.
       const tool = stamp.toolRef.current;
       if (!tool) return;
       const mode = selectionCombineMode(mods);
@@ -267,10 +296,11 @@ export function useSelectionActions(
       // would mean the gate upstream leaked; fall back to rect rather than
       // inventing a selection.
       const kind = useToolStore.getState().selectionKind;
+      // `await` per branch, not around the ternary — see handleSelectionClick.
       const mask =
         kind === "ellipse"
-          ? tool.ellipse_select(x0, y0, x1, y1)
-          : tool.rect_select(x0, y0, x1, y1);
+          ? await tool.ellipse_select(x0, y0, x1, y1)
+          : await tool.rect_select(x0, y0, x1, y1);
       setSelectionMask(mask.length ? mask : null);
     },
     [stamp, setSelectionMask],
