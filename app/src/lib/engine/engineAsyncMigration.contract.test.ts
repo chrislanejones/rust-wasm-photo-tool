@@ -218,7 +218,17 @@ import { join } from "node:path";
  *         either alone breaks the other's cast. `useCloneStamp`'s was also a
  *         truthy trap — `if (!t.has_source())`.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59 and 56 lines. The
+ *     52  a8 batch 8: `AISettings` 2 -> 0 and `usePastePlacementTool` 2 -> 0.
+ *         Both of the paste-placement sites were TRUTHY TRAPS on the same
+ *         method (`has_paste_preview`), and the `commit` one is the worse:
+ *         `commit()` runs on EVERY tool switch on the understanding that it
+ *         no-ops when nothing is pending, so an un-awaited guard would put a
+ *         spurious `commit_paste_preview` on the engine each time. Its three
+ *         callers are a keydown listener, a pointerDOWN listener and an
+ *         effect — none can await, so all three are now `void commit()`.
+ *         `update` (line 95) stays hot and untouched.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56 and 52 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -243,7 +253,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 56;
+const BUDGET = 52;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -409,10 +419,16 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (restructure 40 - 2 = 38); `useCloneStamp`'s `has_source()` fed an `if`
     // (truthy 9 - 1 = 8). awaited 36 -> 39. Gate 59 - 3 = 56, and
     // 10 + 38 + 8 = 56.
-    ).toBe(38);
+    // a8 batch 8: `AISettings` 2 -> 0 and `usePastePlacementTool` 2 -> 0. Again
+    // NOTHING out of un-awaited (10) — three batches running, because what is
+    // left in that bucket is `openraster/export.ts`. AISettings' two were sync
+    // arrow click handlers (restructure 38 - 2 = 36); paste-placement's two were
+    // both truthy traps on `has_paste_preview` (truthy 8 - 2 = 6).
+    // awaited 39 -> 43. Gate 56 - 4 = 52, and 10 + 36 + 6 = 52.
+    ).toBe(36);
     expect(gate.unawaited).toBe(10);
-    expect(gate.truthy).toBe(8);
-    expect(gate.awaited, "cumulative converted sites").toBe(39);
+    expect(gate.truthy).toBe(6);
+    expect(gate.awaited, "cumulative converted sites").toBe(43);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

@@ -130,18 +130,21 @@ export function AISettings({
 
   const canRun = aiEnabled && !!activePhotoId && !!stampToolRef.current;
 
-  const runModel = (type: "rembg") => {
+  const runModel = async (type: "rembg") => {
     const tool = stampToolRef.current;
     if (!tool || !activePhotoId) return;
-    const png = new Uint8Array(tool.export_png());
+    const png = new Uint8Array(await tool.export_png());
     setLastType(type);
     void run(type, activePhotoId, png);
   };
 
-  const openObjModal = () => {
+  const openObjModal = async () => {
     const tool = stampToolRef.current;
+    // `setShowObjModal(true)` stays AFTER the await, deliberately: the modal
+    // reads `objSource` and would open against a stale one (or null on the
+    // first use) if it were raised before the bytes arrived.
     if (!tool || !activePhotoId) return;
-    setObjSource(new Uint8Array(tool.export_png()));
+    setObjSource(new Uint8Array(await tool.export_png()));
     setShowObjModal(true);
   };
 

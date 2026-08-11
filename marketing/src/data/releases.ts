@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.7",
+    date: "2026-08-11",
+    headline: "The check that runs on every tool switch",
+    entries: [
+      {
+        tag: "infra",
+        text: "The two AI buttons and the layer-resize box now wait for the engine's answer — four more calls converted for the background-thread move.",
+      },
+      {
+        tag: "fix",
+        text: "Dropping a resize box and pressing Enter is a “commit”, and the same commit runs quietly every time you switch tools, on the understanding that it does nothing when no box is open. That “does nothing” is a check, and the check is the call converted here — left half-done it would have stopped saying no, and every tool switch would have added a step to your undo history for a box that was never there. Checked in the browser: six tool switches with nothing pending reached the engine zero times, and a real box still commits on the first Enter.",
+      },
+    ],
+  },
+  {
     version: "v8.6",
     date: "2026-08-11",
     headline: "The check that would have stopped checking",

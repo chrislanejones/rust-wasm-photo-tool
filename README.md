@@ -84,6 +84,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.7 — 2026-08-11
+
+**Nothing you can see.** The two AI buttons and the layer-resize box now wait
+for the engine's answer.
+
+The one worth explaining: dropping a resize box and pressing Enter is a
+"commit", and the same commit runs quietly every time you switch tools, on the
+understanding that it does nothing when there is no box open. That "does
+nothing" is a check, and the check is the call that was converted here — left
+half-done it would have stopped saying no, and every tool switch would have
+added a step to your undo history for a box that was never there.
+
+<details><summary>Older releases</summary>
+
 ### v8.6 — 2026-08-11
 
 **Nothing you can see.** The last three files with a single engine call left in
@@ -96,8 +110,6 @@ sits inside an `if`. Left half-converted it would have stopped rejecting
 anything, and the stamp would have painted from wherever the engine happened to
 be, silently. Verified in the browser both ways round: a click with no source
 still does nothing, and a source-then-stamp still leaves a stroke.
-
-<details><summary>Older releases</summary>
 
 ### v8.5 — 2026-08-11
 

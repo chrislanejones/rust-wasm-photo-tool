@@ -113,13 +113,16 @@ export function usePastePlacementTool({
    * Escape, click-away-commits, tool-switch-commits) is identical to a
    * regular paste placement.
    */
-  const beginLayerResize = useCallback(() => {
+  const beginLayerResize = useCallback(async () => {
     const t = toolRef.current;
     const canvas = canvasRef.current;
     if (!t || !canvas) return;
     onCancelRef.current = null; // layer-resize cancel leaves the layer as-is
     t.begin_layer_resize_preview();
-    if (!t.has_paste_preview()) return; // no active layer — Rust no-op'd
+    // ADR-024 Stage 3.5 — TRUTHY TRAP. Un-awaited, `!Promise` is always false,
+    // so this stops rejecting the no-active-layer case and the box below gets
+    // seeded over a preview Rust never created.
+    if (!(await t.has_paste_preview())) return; // no active layer — Rust no-op'd
     // Seed the box INSET from the canvas edge rather than flush against it.
     //
     // Seeded at the full canvas, every handle sat exactly on the image border:
@@ -143,9 +146,15 @@ export function usePastePlacementTool({
   }, [toolRef, canvasRef, flushToCanvas]);
 
   const commit = useCallback(
-    (filter = 1 /* bilinear, matches resize()'s own default */) => {
+    async (filter = 1 /* bilinear, matches resize()'s own default */) => {
       const t = toolRef.current;
-      if (!t || !t.has_paste_preview()) return;
+      // ADR-024 Stage 3.5 — TRUTHY TRAP, and the worse of this file's two.
+      // `commit()` is called on EVERY tool switch (see the effect below) on the
+      // understanding that it no-ops when nothing is pending. Un-awaited, this
+      // guard stops firing and `commit_paste_preview` reaches the engine on
+      // every tool switch instead — a spurious "Paste" history step for a
+      // preview that does not exist.
+      if (!t || !(await t.has_paste_preview())) return;
       onCancelRef.current = null;
       t.commit_paste_preview(filter);
       setRect(null);
@@ -179,7 +188,10 @@ export function usePastePlacementTool({
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        commit();
+        // `void` on all three commit() calls below: a DOM listener and an
+        // effect cannot await, and since Stage 3.5 this returns a Promise.
+        // Marked rather than ignored so the next reader sees it is deliberate.
+        void commit();
       } else if (e.key === "Escape") {
         e.preventDefault();
         cancel();
@@ -199,7 +211,7 @@ export function usePastePlacementTool({
       if (!(target instanceof Element)) return;
       if (target === canvasRef.current) return;
       if (target.closest("[data-paste-overlay]")) return;
-      commit();
+      void commit();
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
@@ -210,7 +222,7 @@ export function usePastePlacementTool({
   useEffect(() => {
     if (prevToolRef.current !== activeTool) {
       prevToolRef.current = activeTool;
-      commit(); // no-op when nothing is pending
+      void commit(); // no-op when nothing is pending
     }
   }, [activeTool, commit]);
 

@@ -4889,3 +4889,50 @@ Mutation tested: **3 mutants, all 3 killed** — including the truthy trap.
 
 **Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
 Engine untouched — no `build:wasm`.
+
+## v8.7 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 8**. Gate 56 -> 52. No user-visible change.
+
+| # | Site | Shape |
+|---|------|-------|
+| 1 | `AISettings.runModel` — `export_png` | sync click handler |
+| 2 | `AISettings.openObjModal` — `export_png` | sync click handler |
+| 3 | `usePastePlacementTool.beginLayerResize` — `has_paste_preview` | **truthy trap** |
+| 4 | `usePastePlacementTool.commit` — `has_paste_preview` | **truthy trap** |
+
+**#4 is the one that mattered.** `commit()` runs on **every tool switch**, on
+the stated understanding that it no-ops when nothing is pending — and the thing
+that makes it a no-op is exactly the call being converted. Un-awaited, a Promise
+is truthy, the guard stops rejecting, and `commit_paste_preview` reaches the
+engine on every switch: a spurious history step for a preview that never
+existed. Its three callers are a keydown listener, a pointer**down** listener
+and an effect, none of which can await, so all three are now `void commit()`.
+
+`update` (the file's third engine call) stays on the hot list untouched — it is
+wired to `CanvasArea`'s `onMove` pointer listener and runs per pointermove.
+
+**Verified in the browser** against the production build:
+
+| Check | Result |
+|---|---|
+| 6 tool switches, nothing pending | **0** `commit_paste_preview` calls, undo stays 0 |
+| Resize with a live layer | box seeded, `has_paste_preview` true, overlay drawn |
+| Enter to commit | **1** call, preview cleared, `Resize Layer` in history, undo 0 -> 1 |
+| Both AI buttons | present and **wired** (real `onClick`), `disabled` at non-paid tier |
+| Console | no errors, no unhandled rejections |
+
+The tool-switch check is the useful one: it is the exact path the trap would
+have broken, and it fails in both directions — leaking a commit when nothing is
+pending, or failing to commit when something is.
+
+**The AI buttons were not clicked.** They need the `paid` tier
+(`TIERS.paid.replicateAI` is the only `true`), and a real run spends a Replicate
+credit. Their engine call is `export_png()`, already verified byte-exact in
+v8.5. What was checked here is that both buttons carry live handlers and gate
+correctly when the tier does not allow them.
+
+Mutation tested: **4 mutants, all 4 killed**, including both truthy traps.
+
+**Gates.** 467 JS tests, `tsc` clean, eslint 0 errors, production build clean.
+Engine untouched — no `build:wasm`.
