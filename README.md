@@ -84,6 +84,25 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.16 — 2026-08-11
+
+**Nothing you can see.** Four more of the app shell's engine calls now wait for
+the answer: placing an object into a grid cell, saving the working copy of a
+photo, the canvas checksum in the info panel, and the "photo only" share export.
+
+The placement one had a check that would have quietly stopped checking. It asks
+the engine "did that actually move anything?" and skips the redraw when the
+answer is no — but the question sits a line above the answer, which is enough to
+hide it from the tool that finds this class of bug. It has now been found by
+hand and fixed.
+
+**Two calls in this file are deliberately not done yet.** Both belong to the pen
+tool, and converting them means reworking how the pen overlay finishes a path —
+including what happens when you switch away mid-draw, which cannot wait for an
+answer at all. That is its own piece of work rather than the tail of this one.
+
+<details><summary>Older releases</summary>
+
 ### v8.15 — 2026-08-11
 
 **Nothing you can see.** Exporting a layered `.ora` file now waits for the
@@ -104,8 +123,6 @@ changed underneath it and refuse — decided four releases ago, not built yet.
 
 Checked by exporting a real two-layer file and taking the archive apart: both
 layers present, and the dimensions recorded inside it match the picture.
-
-<details><summary>Older releases</summary>
 
 ### v8.14 — 2026-08-11
 

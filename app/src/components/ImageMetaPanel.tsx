@@ -40,7 +40,9 @@ export interface ImageMeta {
   redoCount?: number;
   modified?: boolean;
   /** Returns the current composited canvas as PNG bytes, or null if no tool. */
-  getCanvasPng?: () => Uint8Array | null;
+  /** ADR-024 Stage 3.5: async since v8.16 — the producer reads the engine.
+   *  `recompute` below is already async, so this costs it one `await`. */
+  getCanvasPng?: () => Promise<Uint8Array | null>;
 }
 
 function Row({
@@ -159,7 +161,7 @@ export function ImageMetaPanel({
   getPngRef.current = meta.getCanvasPng;
 
   const recompute = useCallback(async () => {
-    const png = getPngRef.current?.();
+    const png = await getPngRef.current?.();
     if (!png || png.length === 0) {
       setCanvasHash(null);
       setCanvasBytes(null);

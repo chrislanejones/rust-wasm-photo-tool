@@ -1640,10 +1640,17 @@ export function AppShell() {
   // bbox in that ninth of the canvas (`align_annotation` with a cell mode); JS
   // flushes and re-syncs the live overlays afterward.
   const handlePlace = useCallback(
-    (cell: PlacementCell) => {
+    async (cell: PlacementCell) => {
       const tool = stamp.toolRef.current;
       if (!tool || !selectedObject) return;
-      const moved = tool.align_annotation(
+      // ⚠️ A TRUTHY TRAP THE AUDIT CANNOT SEE. `if (!moved)` sits a line below
+      // the call rather than around it, and the audit classifies from the text
+      // immediately at the call site — so this never appeared in the truthy
+      // bucket even while that bucket read zero. Un-awaited, `moved` is a
+      // Promise, `!moved` is false, and the guard stops firing: every placement
+      // would flush, sync and reload both overlay lists even when the engine
+      // moved nothing.
+      const moved = await tool.align_annotation(
         selectedObject.id,
         selectedObject.type === "text",
         cell,
@@ -2022,7 +2029,7 @@ export function AppShell() {
       // together: `pixels`, `tw` and `th` cross three awaits below and are then
       // written to IndexedDB as one record (`putOriginal(newFile, tw, th)`) and
       // scaled as one image. A mismatch here is persisted, not transient.
-      const cap = tool.capture_composite();
+      const cap = await tool.capture_composite();
       const { rgba: pixels, width: tw, height: th } = cap;
       cap.free();
       // encodeRgba and makeThumbnailFromPixels each hand their buffer to the
@@ -2762,9 +2769,14 @@ export function AppShell() {
             (modifiedPhotos.has(activePhotoId) ||
               hasBeenModified ||
               stamp.state.undoCount > 0),
-          getCanvasPng: () => {
+          // The `await` sits INSIDE the wrapper: `new Uint8Array` of a Promise is
+          // an EMPTY typed array, not a throw. Its consumer
+          // (`ImageMetaPanel.recompute`) guards `!png || png.length === 0` rather
+          // than `!png` alone, which is the only reason that would have degraded
+          // safely instead of hashing a zero-byte buffer.
+          getCanvasPng: async () => {
             const t = stamp.toolRef.current;
-            return t ? new Uint8Array(t.export_png()) : null;
+            return t ? new Uint8Array(await t.export_png()) : null;
           },
         }}
       />
@@ -2922,13 +2934,13 @@ export function AppShell() {
               }}
             />
             <ShareButton
-              exportPng={() => {
+              exportPng={async () => {
                 if (exportCanvasBackground) return stamp.exportBlob("png");
                 const tool = stamp.toolRef.current;
-                if (!tool) return Promise.resolve(null);
+                if (!tool) return null;
                 // ATOMIC CAPTURE (ADR-024) — one call for pixels and the
                 // cropped dimensions that describe them.
-                const cap = tool.capture_composite_excluding_background();
+                const cap = await tool.capture_composite_excluding_background();
                 const { rgba, width, height } = cap;
                 cap.free();
                 return encodeRgba(rgba, width, height, "png", 1);

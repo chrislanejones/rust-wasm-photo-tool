@@ -284,7 +284,14 @@ import { join } from "node:path";
  *         two `set_active_layer` calls in the same loop are fire-and-forget and
  *         were never in the gate — a night plan listed them as sites.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32, 26, 21, 18 and 12 lines. The
+ *      8  a8 batch 15: FOUR of `AppShell`'s six. The two PEN sites are left
+ *         deliberately — see the note below. `handlePlace` carried a truthy
+ *         trap this audit STRUCTURALLY CANNOT SEE: `if (!moved)` sits a line
+ *         BELOW the call, and classification reads the text at the call site,
+ *         so the truthy bucket read zero while this was live. "Truthy bucket
+ *         empty" is a statement about the audit, not the codebase.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32, 26, 21, 18, 12 and 8 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -309,7 +316,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 12;
+const BUDGET = 8;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -521,10 +528,16 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // Gate 18 - 6 = 12, and 1 + 11 + 0 = 12.
     // Everything left is AppShell (6) + useEngineCore (6, of which 5 are the
     // exempt floor) -- so SEVEN convertible sites remain in the whole migration.
-    ).toBe(11);
-    expect(gate.unawaited).toBe(1);
+    // a8 batch 15: four of AppShell's six. The one un-awaited site
+    // (`persistActiveCanvas`, already in an async fn) empties that bucket for
+    // good (1 -> 0); the other three were non-async callbacks
+    // (restructure 11 - 3 = 8). truthy stays 0 -- see the ledger note, it was
+    // never a true zero. awaited 84 -> 88. Gate 12 - 4 = 8, and 0 + 8 + 0 = 8.
+    // Remaining: AppShell's 2 pen sites + syncState + the 5 exempt = 8.
+    ).toBe(8);
+    expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(84);
+    expect(gate.awaited, "cumulative converted sites").toBe(88);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

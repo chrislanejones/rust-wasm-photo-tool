@@ -5454,3 +5454,70 @@ Mutation tested: **6 mutants, 6 killed.**
 
 **Gates.** 468 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Engine untouched — no `build:wasm`.
+
+## v8.16 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 15**. Gate 12 -> 8. No user-visible change.
+
+Four of `AppShell`'s six. **The two pen sites are deliberately left** — see
+below. The un-awaited bucket empties for good.
+
+| Bucket | Before | After |
+|---|---|---|
+| un-awaited | 1 | **0** |
+| restructure | 11 | 8 |
+| truthy | 0 | 0 |
+| **gate** | **12** | **8** |
+
+| Site | Call |
+|---|---|
+| `handlePlace` | `align_annotation` — **a hidden truthy trap** |
+| `persistActiveCanvas` | `capture_composite` |
+| `getCanvasPng` | `export_png`, wrapped in `new Uint8Array(...)` |
+| ShareButton `exportPng` | `capture_composite_excluding_background` |
+
+**⚠️ A truthy trap the audit structurally cannot see.** `handlePlace` reads
+`align_annotation` into `moved`, and the guard `if (!moved) return;` sits on the
+**next line** rather than around the call. The audit classifies from the text
+immediately at the call site, so this never entered the truthy bucket — **while
+that bucket was reporting zero.** Un-awaited, `moved` is a Promise, `!moved` is
+false, the guard stops firing, and every placement flushes, syncs and reloads
+both overlay lists even when the engine moved nothing.
+
+"The truthy bucket is empty" is a statement about the audit, not about the
+codebase. Worth carrying into the remaining batches: **a guard one line below
+the call is invisible to it.**
+
+**Verified in the browser:**
+
+| Path | Result |
+|---|---|
+| Place text → "Top left" | moved `[418, 615]` → **`[191, 324]`** |
+| Place again, same cell | position unchanged |
+| ShareButton `exportPng` (photo-only) | 1 call, **5,570,242 B**, magic `89504e47`, `image/png` |
+| Console | only Clerk-telemetry CORS, unrelated to this change |
+
+The placement guard's *negative* branch was not exercised: `align_annotation`
+returns true whenever an object is selected, so "engine moved nothing" is not
+reachable from that gesture. Same category as v8.8's disabled Delete button —
+the mutation run is what proves the guard still rejects.
+
+**WHY THE TWO PEN SITES WERE LEFT.** The night plan called this file "plain
+conversions, no known surprises". `handlePenCommit` and `handlePenHitTest` are
+not:
+
+- `handlePenCommit` returns the new id, which `PenOverlay.finish()` consumes to
+  keep the path selected. `finish()` has **six call sites**.
+- `PenOverlay`'s unmount cleanup calls `onCommit` directly. **A React cleanup
+  function cannot await**, so making it async turns commit-on-unmount into
+  fire-and-forget during teardown.
+- `handlePenHitTest`'s result is used synchronously inside a pointerdown
+  handler, which falls through to "drop a new anchor" if there is no hit.
+
+Converting them is a `PenOverlay` state-machine change, not an `await`. It gets
+its own batch.
+
+Mutation tested: **4 mutants, 4 killed.**
+
+**Gates.** 468 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.

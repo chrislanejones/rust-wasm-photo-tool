@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.16",
+    date: "2026-08-11",
+    headline: "The check that was hiding one line up",
+    entries: [
+      {
+        tag: "infra",
+        text: "Four more of the app shell's engine calls now wait for the answer: placing an object into a grid cell, saving the working copy of a photo, the canvas checksum in the info panel, and the “photo only” share export.",
+      },
+      {
+        tag: "fix",
+        text: "The placement one had a check that would have quietly stopped checking. It asks the engine “did that actually move anything?” and skips the redraw when the answer is no — but the question sits a line above the answer, which is enough to hide it from the tool that finds this class of bug. Found by hand and fixed; the tool's report of “none left” turns out to describe the tool, not the code.",
+      },
+      {
+        tag: "infra",
+        text: "Two calls in this file are deliberately not done yet. Both belong to the pen tool, and converting them means reworking how the pen overlay finishes a path — including what happens when you switch away mid-draw, which cannot wait for an answer at all. That is its own piece of work rather than the tail of this one.",
+      },
+    ],
+  },
+  {
     version: "v8.15",
     date: "2026-08-11",
     headline: "The last check that could stop checking",
