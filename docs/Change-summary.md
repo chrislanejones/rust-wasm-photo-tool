@@ -6005,3 +6005,86 @@ panel nobody is looking at unless it is open — ~0.9 ms per frame behind the
 worker. Recorded in PARKING_LOT.md rather than fixed here; the honest options
 (one `capture_oplog_stats()`, throttling, or only running while the panel is
 open) each change behaviour.
+
+## v8.23 Change Summary — 2026-08-12
+
+**a12 designed (`docs/engine-worker-a12-design.md`), a12.0 built.** No behaviour
+change. Three things block a12 as ADR-024 states it, each verified against the
+code rather than reasoned about — the ADR is corrected in place.
+
+### Trap 1 — the seam is downstream of construction
+
+ADR-024: *"Today it is an identity function … Stage 3 replaces the body, and no
+call site changes."* False. `attachLivePort(tool)` receives an engine that has
+already been **built and image-loaded on the main thread**, at all five sites:
+
+```ts
+const tool = new Tool(img.width, img.height);   // main thread
+tool.load_image(new Uint8Array(imageData.data));
+toolRef.current = attachLivePort(tool);          // …then handed over
+```
+
+| Option | Verdict |
+|---|---|
+| Build on both sides | ❌ two engines, **two op logs** — the one-port invariant exists to prevent this |
+| Move construction into the worker | ✅ the only route — five call sites change |
+
+The seam moves up to a `createLiveEngine({width, height, pixels})` factory.
+`BatchSettings.tsx:1051` stays local: it is a throwaway engine for a document the
+user is not editing, and the invariant already says so.
+
+### Trap 2 — a Proxy defeats every feature detection ✅ FIXED (a12.0)
+
+Four subsystems decide whether they exist by asking `typeof t.method ===
+"function"`:
+
+| Guard | Method |
+|---|---|
+| `hasPatchmatchExports` | `remove_object` |
+| `hasTilesExports` | `tiles_flush` |
+| `hasMagicEraserExports` | `magic_eraser_brush_down` |
+| `hasPersistExports` | `oplog_encoded_ops` |
+
+An open proxy answers **yes to all four on every build**, including the default
+wasm that has none of them — so a call routes into an engine that cannot serve
+it. These guards are load-bearing, not defensive.
+
+Fixed: the worker enumerates its own prototype at init and reports it; the proxy
+exposes only those names. **Deliberately not a hand-maintained list** — a
+hand-synced copy of this surface is what drifted by 31 methods and cost the
+migration ten releases of wrong numbers (v8.21). A surface the engine reports
+about itself cannot drift from the engine.
+
+### Trap 3 — the zero-copy blit cannot cross a boundary
+
+```ts
+const view = new Uint8ClampedArray(wasmMem.buffer as ArrayBuffer, ptr, len);
+```
+
+`wasmMem` is the **main thread's** memory. With the engine in a worker,
+`data_ptr()`/`data_len()` are indices into an address space this thread does not
+have. Not an awaiting problem — the operation is a pointer, not a read. Falling
+back to `get_image_data()` is a full composite copy per frame, i.e. the
+regression the arc exists to remove.
+
+So **a12.2 is mandatory and must land with a12.1**. The branch is contained in a
+`blit()` operation on the handle, not an `if (engineWorkerEnabled())` inside
+`flushToCanvas` — the contract test forbids call sites branching on the flag, and
+for good reason.
+
+### Verification
+
+8 proxy tests. 3 mutants, 3 killed + 1 equivalent correctly survived:
+
+| Mutant | Killed by |
+|---|---|
+| open the proxy (no surface gate) | the feature-detection tests |
+| drop the identity cache | the stable-identity test |
+| `has` trap always true | the `in`/enumeration test |
+
+The identity cache matters because these handlers land in React dependency
+arrays; a fresh closure per property access would make every memo downstream
+miss on every render.
+
+**Gates.** 498 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.

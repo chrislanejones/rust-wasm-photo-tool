@@ -164,7 +164,25 @@ self.onmessage = async (e: MessageEvent) => {
       await mod.default();
       tool = new mod.ImageHorseTool(d.width, d.height);
       ready = true;
-      reply({ id: 0, ok: true, value: { ready } });
+      // ADR-024 a12.0 — REPORT THE ENGINE'S OWN SURFACE.
+      //
+      // The main thread's handle is a Proxy, and a Proxy that answers every
+      // `get` with a forwarding function would break every feature detection in
+      // the app: `hasPatchmatchExports`, `hasTilesExports`,
+      // `hasMagicEraserExports` and `hasPersistExports` all ask
+      // `typeof t.someMethod === "function"`, and all four would start
+      // answering YES on a build whose wasm has no such method. Those guards
+      // are load-bearing — `useMagicEraserTool`'s tile is not itself
+      // flag-gated — so the proxy must only expose names that really exist.
+      //
+      // Enumerated from the prototype rather than from a list, so it cannot
+      // drift from the binary. That drift is not hypothetical: a hand-synced
+      // `.d.ts` missing 31 methods is what made the migration's own gate
+      // understate by 36 sites for ten releases (v8.21).
+      const surfaceNames = Object.getOwnPropertyNames(
+        Object.getPrototypeOf(tool) as object,
+      ).filter((n) => n !== "constructor");
+      reply({ id: 0, ok: true, value: { ready, surface: surfaceNames } });
       break;
     }
 

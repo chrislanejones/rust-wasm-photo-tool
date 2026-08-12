@@ -43,6 +43,17 @@ import type { ImageHorseTool } from "stamp_tool";
  * request ids, queueing, cancellation and errors — the four things the Phase 3
  * spike did not have.
  *
+ * ⚠️ **"ONE BODY TO REPLACE AND NO CALL SITE CHANGES" IS WRONG, and a12 cannot
+ * be built on it** (found 2026-08-12, `docs/engine-worker-a12-design.md`). This
+ * function receives an engine that has ALREADY been constructed and loaded with
+ * an image on the main thread — all five call sites in `useEngineCore` do
+ * `new Tool(w, h)` + `load_image(...)` and only then hand it over. A worker port
+ * cannot adopt that handle. Building on both sides is disqualified by this
+ * file's own invariant (two engines ⇒ two op logs), so CONSTRUCTION has to move
+ * into the worker, which means the seam moves up to a `createLiveEngine(...)`
+ * factory and the five sites change once. `attachLivePort` keeps its ownership
+ * role; it stops pretending to be the swap point.
+ *
  * Call this ONLY for the document being edited. A throwaway instance
  * (`lib/exportImage.ts`, `features/tools/settings/BatchSettings.tsx`) must not
  * pass through here — see the invariant above.
@@ -58,6 +69,77 @@ export function attachLivePort(tool: ImageHorseTool): ImageHorseTool {
  */
 export function detachLivePort(): void {
   /* no channel to close until Stage 3 */
+}
+
+/** The subset of `EngineWorkerClient` the proxy needs. Declared structurally so
+ *  the proxy can be tested against a fake without standing up a Worker. */
+export interface EngineCallPort {
+  call<T = unknown>(method: string, args?: unknown[], transfer?: Transferable[]): Promise<T>;
+  readonly surface: ReadonlySet<string>;
+}
+
+/**
+ * ADR-024 a12.0 — the main-thread handle for a worker-resident engine.
+ *
+ * Every method returns a Promise. That is safe for the whole app as of v8.22:
+ * Stage 3.5 and a10 converted all 113 value-consuming sites to `await`, and
+ * `await` is transparent over a plain value, so the SAME call sites work
+ * against a local engine and this proxy with no branch anywhere.
+ *
+ * ── WHY IT IS GATED ON A SURFACE, AND NOT OPEN ──────────────────────────────
+ *
+ * The naive proxy answers every `get` with a forwarding function. That would
+ * silently break four feature detections, each of which decides whether an
+ * entire subsystem is available:
+ *
+ *   hasPatchmatchExports    typeof t.remove_object === "function"
+ *   hasTilesExports         typeof t.tiles_flush === "function"
+ *   hasMagicEraserExports   typeof t.magic_eraser_brush_down === "function"
+ *   hasPersistExports       typeof t.oplog_encoded_ops === "function"
+ *
+ * All four would start answering YES on every build, including the default one
+ * whose wasm has none of those methods, and the app would route calls into an
+ * engine that cannot serve them. These guards are load-bearing rather than
+ * defensive — `useMagicEraserTool` says so in its own header, because the tile
+ * that reaches it is not itself flag-gated.
+ *
+ * So the proxy exposes ONLY names the worker reported at init, enumerated from
+ * the engine's prototype. `typeof` then answers exactly what it answers today.
+ *
+ * ⚠️ Deliberately NOT a hand-maintained list. A hand-synced copy of this
+ * surface is what drifted by 31 methods and left the migration's own gate
+ * understating by 36 call sites for ten releases (v8.21). A surface the engine
+ * reports about itself cannot drift from the engine.
+ */
+export function createEngineProxy(port: EngineCallPort): ImageHorseTool {
+  const bound = new Map<string, (...args: unknown[]) => Promise<unknown>>();
+  return new Proxy(Object.create(null) as ImageHorseTool, {
+    get(_t, prop) {
+      if (typeof prop !== "string") return undefined;
+      if (!port.surface.has(prop)) return undefined;
+      let fn = bound.get(prop);
+      if (!fn) {
+        // Cached per name so repeated `get`s return the SAME function object.
+        // `useEffectiveTool` and friends put these handlers in dependency
+        // arrays; a fresh identity per render would make every memo miss.
+        fn = (...args: unknown[]) => port.call(prop, args);
+        bound.set(prop, fn);
+      }
+      return fn;
+    },
+    has(_t, prop) {
+      return typeof prop === "string" && port.surface.has(prop);
+    },
+    // `Object.getOwnPropertyNames(Object.getPrototypeOf(handle))` is how the
+    // audit and the worker both enumerate an engine; keep it answerable here so
+    // a proxy is introspectable the same way a real handle is.
+    ownKeys() {
+      return [...port.surface];
+    },
+    getOwnPropertyDescriptor() {
+      return { enumerable: true, configurable: true };
+    },
+  });
 }
 
 /** ADR-024 Stage 3 — the switch that will one day route through the worker.

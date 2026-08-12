@@ -84,6 +84,41 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.23 — 2026-08-12
+
+**Nothing you can see. The next step of the engine move is designed, and three
+things about the plan turned out to be wrong.**
+
+The plan said this step was a small one — swap the body of a single function and
+change nothing else. Checking it against the code first found three reasons that
+cannot work, and the third is the interesting one.
+
+**The engine gets built in the wrong place.** The function that was supposed to
+be the swap point receives an engine that has already been created and loaded
+with your photo, on the main thread. A background thread can't adopt that — it
+would have to build a second one, which means two copies of your undo history,
+which is the exact thing this whole change exists to avoid. So the seam moves
+earlier, to where the engine is created.
+
+**A stand-in that forwards everything says yes to everything.** Four features in
+the app check whether the engine can do something by asking whether the method
+exists. A forwarding stand-in answers yes to all of them, on every build,
+including builds that genuinely can't do those things. The fix is small and
+better than the original: the background thread reports what it can actually do,
+and the stand-in only offers that. Which also means the list can never drift out
+of date — the same drift that caused the wrong numbers two releases ago.
+
+**And the fast path for drawing can't cross a thread boundary at all.** Drawing
+works by pointing directly at the engine's memory instead of copying it. A
+pointer into memory on one thread means nothing on another. There's no clever
+way around that, so moving the canvas across has to happen at the same time as
+everything else rather than afterwards.
+
+The first piece is built and tested: the background thread now reports its own
+capabilities, and the stand-in is limited to them.
+
+<details><summary>Older releases</summary>
+
 ### v8.22 — 2026-08-12
 
 **Every place that reads from the engine now waits for the answer.** All of it,
@@ -113,7 +148,6 @@ dangerous conversions are the ones where nothing complains.
 **Also:** the last of the mouse-move handlers are converted, so the tally that
 tracks them is at zero for the first time.
 
-<details><summary>Older releases</summary>
 
 ### v8.21 — 2026-08-12
 

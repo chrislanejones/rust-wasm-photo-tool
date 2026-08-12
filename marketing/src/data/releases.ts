@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.23",
+    date: "2026-08-12",
+    headline: "Three reasons the next step could not work the way it was planned",
+    entries: [
+      {
+        tag: "infra",
+        text: "Nothing you can see. The next step of moving the engine to a background thread was written up as a small one — swap the body of a single function, change nothing else. Checking it against the code first found three reasons that cannot work.",
+      },
+      {
+        tag: "fix",
+        text: "The engine gets built in the wrong place. The function meant to be the swap point receives an engine already created and loaded with your photo on the main thread, and a background thread cannot adopt that — it would have to build a second one, which means two copies of your undo history, the exact thing this change exists to avoid.",
+      },
+      {
+        tag: "fix",
+        text: "A stand-in that forwards everything says yes to everything. Four features check whether the engine can do something by asking whether the method exists, and a forwarding stand-in answers yes on every build, including ones that genuinely cannot. Fixed, and the fix is better than the original: the background thread now reports what it can actually do, so the list can never drift out of date — the same drift that caused the wrong numbers two releases ago.",
+      },
+      {
+        tag: "perf",
+        text: "And the fast path for drawing cannot cross a thread boundary at all. Drawing works by pointing directly at the engine's memory rather than copying it, and a pointer into one thread's memory means nothing on another. So moving the canvas across has to happen at the same time as everything else rather than afterwards.",
+      },
+    ],
+  },
+  {
     version: "v8.22",
     date: "2026-08-12",
     headline: "Every read from the engine now waits for the answer",

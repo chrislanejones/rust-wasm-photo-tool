@@ -43,6 +43,22 @@ export class EngineWorkerClient {
    *  on the architecture being right. */
   engineMs = 0;
 
+  /** ADR-024 a12.0 — the method names the worker's engine actually has,
+   *  enumerated from its prototype at init and reported back.
+   *
+   *  The main-thread handle is a Proxy, and it must NOT answer `typeof
+   *  t.anything === "function"` with a function: four live feature detections
+   *  (`hasPatchmatchExports`, `hasTilesExports`, `hasMagicEraserExports`,
+   *  `hasPersistExports`) decide whether a whole subsystem is available by
+   *  asking exactly that. Gating the proxy on this set keeps `typeof` answering
+   *  what it answers today.
+   *
+   *  Empty until `init()` resolves. Reported by the engine rather than listed
+   *  here on purpose — a hand-maintained copy of this surface is precisely what
+   *  drifted by 31 methods and cost the migration ten releases of wrong
+   *  numbers. */
+  surface: ReadonlySet<string> = new Set();
+
   async init(width: number, height: number): Promise<void> {
     if (this.worker) this.dispose();
     const w = new Worker(new URL("../../workers/engine.worker.ts", import.meta.url), {
@@ -62,6 +78,12 @@ export class EngineWorkerClient {
         if (e.data.id !== 0) return;
         clearTimeout(t);
         w.removeEventListener("message", once);
+        const v = e.data.value as { ready?: boolean; surface?: string[] } | undefined;
+        // An older worker (or a fake in a test) may not report a surface. Leave
+        // the set empty rather than inventing one: an empty surface makes the
+        // proxy expose nothing, which fails LOUDLY at the first call instead of
+        // quietly forwarding a method the engine may not have.
+        if (v?.surface) this.surface = new Set(v.surface);
         this.initialised = true;
         resolve();
       };

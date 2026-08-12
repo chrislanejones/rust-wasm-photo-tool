@@ -143,6 +143,19 @@ a12 inherits three hard requirements from a11.0 — warm the worker before the
 flip hands it work, terminate the losing instance, and do not model the flush as
 free. All three are set out under Stage 5 below.
 
+> **a12 IS DESIGNED — `docs/engine-worker-a12-design.md` (2026-08-12).** Three
+> things block the plan as this ADR states it, each verified against the code:
+>
+> | # | Trap |
+> |---|---|
+> | 1 | **The seam is downstream of construction.** `attachLivePort(tool)` receives an engine already built and image-loaded on the main thread, at all five `useEngineCore` sites. A worker port cannot adopt that handle, and building on both sides is disqualified by the one-port invariant (two op logs). Construction moves into the worker behind a `createLiveEngine(...)` factory — so *"no call site changes"* is false. |
+> | 2 | **A Proxy defeats every feature detection.** `hasPatchmatchExports`, `hasTilesExports`, `hasMagicEraserExports` and `hasPersistExports` each decide whether a subsystem exists by asking `typeof t.method === "function"`. An open proxy answers yes on every build. Fixed by having the worker report its own prototype surface at init and gating the proxy on it. |
+> | 3 | **The zero-copy blit cannot cross.** `new Uint8ClampedArray(wasmMem.buffer, ptr, len)` views the MAIN thread's wasm memory; with the engine in a worker those are indices into an address space this thread does not have. Not an awaiting problem. So **a12.2 is mandatory and must land with a12.1**, and the branch is contained in a `blit()` operation on the handle rather than an `if` inside `flushToCanvas`. |
+>
+> **a12.0 SHIPPED v8.23**: the worker reports its surface, and
+> `createEngineProxy` is gated on it. 8 tests, 3/3 mutants killed plus an
+> equivalent that survived.
+
 | **4** | **Canvas transfer.** **SCOPE CORRECTED 2026-08-08 — it is not just the `width`/`height` assignments; see "Stage 4's real scope" below.** Three subsystems had to leave the main canvas first: the rubber-band preview ✅ **v7.76**, lossy export ✅ **v7.77**, and the engine flush — which does not need converting because it *dissolves* under Option A (see "Why A" above). So the only thing left before the transfer is canvas element **identity**, which is a larger job than it sounds — see "Stage 4's real scope" below. Still flagged | nothing user-visible | **NOT by the flag alone** — see the kill-switch note |
 | **5** | **Measure, then flip.** A/B the 470 ms freeze against master. Default ON only if it is actually gone, with `ih_engine_worker=0` as the kill switch | the feature | kill switch |
 
