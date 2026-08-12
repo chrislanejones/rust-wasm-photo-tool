@@ -118,13 +118,24 @@ function hasPersistExports(t: object): t is OplogPersistWasm {
  *  `layer_count()` here — which answers 2 on that document — is precisely what
  *  made this return false for every user on defaults, leaving op-log
  *  persistence dark no matter how the flags were set. */
-function isLogTrustworthy(tool: OplogPersistWasm): boolean {
-  if (tool.oplog_is_broken()) return false;
+// ADR-024 — the v8.2 finding, finally resolved. This has TWO callers with
+// opposite constraints: `onOplogFlush` (per-frame, from `flushToCanvas`) and
+// `saveOplogInner` (already async). It could not be made async for one without
+// the other, which is why it sat in the hot bucket across three scoping passes.
+// Both now await it; the flush caller absorbs the cost by being fire-and-forget
+// itself, so the blit is still not ordered against this.
+//
+// The `typeof … === "function"` tests are feature detection on the METHOD and
+// stay synchronous — it is the CALL that is awaited. `await` goes on each
+// branch of the ternary, not around it, or the audit reads two un-awaited calls
+// and the gate does not move.
+async function isLogTrustworthy(tool: OplogPersistWasm): Promise<boolean> {
+  if (await tool.oplog_is_broken()) return false;
   const layers =
     typeof tool.content_layer_count === "function"
-      ? tool.content_layer_count()
+      ? await tool.content_layer_count()
       : typeof tool.layer_count === "function"
-        ? tool.layer_count()
+        ? await tool.layer_count()
         : 1;
   return layers <= 1;
 }
@@ -317,18 +328,22 @@ export async function flushPendingOplogSave(tool: object): Promise<void> {
 
 /** Debounced change detector — call after every engine flush (cheap: three
  *  number reads + a map lookup when inactive). */
-export function onOplogFlush(tool: object): void {
+export async function onOplogFlush(tool: object): Promise<void> {
   if (!isOplogPersistenceEnabled() || !hasPersistExports(tool)) return;
   const photoId = activePhotoId;
   if (!photoId) return;
   // The log stopped describing the document ⇒ never write it, and retire
   // whatever is already on disk (it describes a document the user no longer
   // has). Checked BEFORE oplog_active(), which is false in this case too.
-  if (!isLogTrustworthy(tool)) {
+  if (!(await isLogTrustworthy(tool))) {
     void invalidatePersistedLog(photoId, "unrecorded edit or multi-layer");
     return;
   }
-  if (!tool.oplog_active()) return; // no log yet — nothing to save
+  // ADR-024 — a TRUTHY TRAP, and one of the 36 sites no gate could see before
+  // v8.21. Un-awaited, the Promise is truthy, `!` makes it false, and this
+  // early return stops firing: every flush would fall through to schedule a
+  // save for a document with no log at all.
+  if (!(await tool.oplog_active())) return; // no log yet — nothing to save
   // A live log with ZERO ops is never persisted: it has nothing the working
   // copy doesn't already carry, and its lazily-captured base may predate
   // unlogged setup edits (the 2026-07-14 A/B: a default import's base was the
@@ -337,13 +352,17 @@ export function onOplogFlush(tool: object): void {
   // photo is already on disk, an empty live log means the engine is not
   // holding the document that log describes — retire it (stale flag only,
   // rows kept; reversible) so the working copy carries the resume.
-  if (tool.oplog_op_count() === 0) {
+  // ⚠️ `oplog_op_count()` was read TWICE here — once for this guard and again
+  // for `len` two lines down. Synchronously that was merely wasteful; awaited,
+  // the two reads can straddle a mutation and disagree, so the guard would pass
+  // on one value while the no-op comparison below used another. Read once.
+  const len = await tool.oplog_op_count();
+  if (len === 0) {
     void invalidatePersistedLog(photoId, "empty live log");
     return;
   }
-  const len = tool.oplog_op_count();
-  const gen = tool.oplog_generation();
-  const cursor = tool.oplog_cursor();
+  const gen = await tool.oplog_generation();
+  const cursor = await tool.oplog_cursor();
   // The no-op check is bound to the ENGINE, not just the photo id: a fresh log
   // on the same photo (AI result, re-load) can carry byte-identical counters,
   // and treating that as "nothing new" would silently leave the previous
@@ -389,7 +408,7 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     // Re-checked at fire time, not just when the save was scheduled: a save
     // debounced BEFORE an unrecorded edit (or a new layer) would otherwise
     // land afterwards and persist a log that is missing it.
-    if (!isLogTrustworthy(tool)) {
+    if (!(await isLogTrustworthy(tool))) {
       await invalidatePersistedLog(photoId, "unrecorded edit or multi-layer");
       return;
     }
@@ -399,13 +418,16 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     // (flushPendingOplogSave, tests) — e.g. `load_image` on a live tool drops
     // the log to None, and writing "opCount 0" for it would delete the
     // photo's chunks and leave a confidently-restorable empty manifest.
-    if (tool.oplog_op_count() === 0) {
+    // ADR-024 — read ONCE. `oplog_op_count()` was called here and again for
+    // `len` below; awaited, the two can straddle a mutation and disagree, so
+    // the guard would clear on one value while the manifest recorded another.
+    const len = await tool.oplog_op_count();
+    if (len === 0) {
       await invalidatePersistedLog(photoId, "empty live log");
       return;
     }
-    const len = tool.oplog_op_count();
-    const gen = tool.oplog_generation();
-    const cursor = tool.oplog_cursor();
+    const gen = await tool.oplog_generation();
+    const cursor = await tool.oplog_cursor();
 
     // Append ONLY against a live binding — i.e. this engine's log is provably
     // the persisted one. Anything else (fresh engine, reset document, restore
@@ -418,7 +440,7 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     const fromOp = rewrite ? 0 : prior.opCount;
 
     // ── Encode OUTSIDE the transaction ────────────────────────────────────
-    const frames = fromOp < len ? tool.oplog_encoded_ops(fromOp, len) : new Uint8Array(0);
+    const frames = fromOp < len ? await tool.oplog_encoded_ops(fromOp, len) : new Uint8Array(0);
     const chunk: OpLogChunkRecord | null =
       fromOp < len
         ? {
@@ -435,7 +457,7 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     // Keyframes due: every log-resident keyframe not yet on disk (all of
     // them on a rewrite). The base (atOp 0) is what restore replays from;
     // interior ones are future partial-replay accelerators.
-    const residentOps = Array.from(tool.oplog_mem_keyframe_ops());
+    const residentOps = Array.from(await tool.oplog_mem_keyframe_ops());
     const existing = rewrite
       ? new Set<number>()
       : new Set(
@@ -449,21 +471,21 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
     const dueKeyframes: KeyframeRecord[] = [];
     for (const atOp of residentOps) {
       if (existing.has(atOp)) continue;
-      const w = tool.oplog_keyframe_width(atOp);
-      const h = tool.oplog_keyframe_height(atOp);
+      const w = await tool.oplog_keyframe_width(atOp);
+      const h = await tool.oplog_keyframe_height(atOp);
       if (!w || !h) continue;
       // Preferred: the engine's own PNG codec — byte-exact, no browser
       // canvas transforms. Fallback: raw RGBA through the injectable JS
       // codec (older builds / tests).
       let blob: Blob;
       if (typeof tool.oplog_keyframe_png === "function") {
-        const png = tool.oplog_keyframe_png(atOp);
+        const png = await tool.oplog_keyframe_png(atOp);
         if (!png.length) continue;
         // Copy: the wasm-returned view may sit on a SharedArrayBuffer-typed
         // buffer TS won't accept as a BlobPart.
         blob = new Blob([new Uint8Array(png)], { type: "image/png" });
       } else {
-        const rgba = tool.oplog_keyframe_pixels_rgba(atOp);
+        const rgba = await tool.oplog_keyframe_pixels_rgba(atOp);
         if (rgba.length !== w * h * 4) continue;
         blob = await rgbaToBlob(rgba, w, h);
       }
@@ -472,7 +494,7 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
         branch: BRANCH,
         atOp,
         blob,
-        annotations: tool.oplog_keyframe_annotations(atOp),
+        annotations: await tool.oplog_keyframe_annotations(atOp),
         width: w,
         height: h,
         createdAt: Date.now(),
@@ -586,10 +608,10 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
     let ok: boolean;
     if (typeof tool.oplog_restore_png === "function") {
       const png = new Uint8Array(await base.blob.arrayBuffer());
-      ok = tool.oplog_restore_png(png, annotations, frames, cursor);
+      ok = await tool.oplog_restore_png(png, annotations, frames, cursor);
     } else {
       const baseRgba = await blobToRgba(base.blob, base.width, base.height);
-      ok = tool.oplog_restore(baseRgba, base.width, base.height, annotations, frames, cursor);
+      ok = await tool.oplog_restore(baseRgba, base.width, base.height, annotations, frames, cursor);
     }
     if (!ok) throw new Error("engine rejected the persisted log");
     // The engine now holds exactly the persisted log ⇒ bind it, so the next
@@ -601,7 +623,7 @@ export async function restoreOplog(tool: object, photoId: string): Promise<Oplog
       photoId,
       opCount: m.opCount,
       chunkCount: m.chunkCount,
-      generation: tool.oplog_generation(),
+      generation: await tool.oplog_generation(),
       cursor,
     };
     registerOplogPersistStats({

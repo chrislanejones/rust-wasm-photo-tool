@@ -322,7 +322,7 @@ import { join } from "node:path";
  *  DISSOLVES at Stage 4 rather than converting. There is no conversion work
  *  left in Stage 3.5, and this number cannot go lower — see
  *  `DISSOLVES_AT_STAGE_4` and the floor test below before trying. */
-const BUDGET = 29;
+const BUDGET = 5;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -364,7 +364,7 @@ interface Gate {
  *
  *  15  v8.20 — measured for the first time (2 truthy-trap, 13 needs-restructure)
  */
-const BUDGET_HOT = 12;
+const BUDGET_HOT = 0;
 
 const gate: Gate = JSON.parse(
   execFileSync("node", [join(REPO, "scripts/engine-call-audit.mjs"), "--json", REPO], {
@@ -626,11 +626,21 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     //
     // 226 -> 262 sites. Gate 5 -> 29, of which 5 are the exempt `flushToCanvas`
     // reads, so **24 convertible remain**. Hot 4 -> 12.
-    ).toBe(12);
-    expect(gate.remaining).toBe(29);
-    expect(gate.unawaited).toBe(13);
-    expect(gate.truthy).toBe(4);
-    expect(gate.awaited, "cumulative converted sites").toBe(91);
+    //
+    // ✅ v8.22 — BOTH GATES AT ZERO CONVERTIBLE, measured by the CORRECTED
+    // instrument. `oplogPersistence` (19 b + 3 hot) and `tilesFlush` (3 b + 9
+    // hot) converted, plus `patchmatch.tryRemoveObject` and
+    // `useMagicEraserTool.onMouseUp`. Gate 29 -> 5 (all exempt), hot 12 -> 0,
+    // awaited 91 -> 113.
+    //
+    // The difference from v8.19's identical-looking claim is the method list:
+    // that one was made against a shadow .d.ts missing 31 of the engine's
+    // methods. This one knows all 280.
+    ).toBe(5);
+    expect(gate.remaining).toBe(5);
+    expect(gate.unawaited).toBe(0);
+    expect(gate.truthy).toBe(0);
+    expect(gate.awaited, "cumulative converted sites").toBe(113);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

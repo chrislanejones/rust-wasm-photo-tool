@@ -5926,3 +5926,82 @@ never hand-written.
 
 **Gates.** 490 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Engine untouched — no `build:wasm`.
+
+## v8.22 Change Summary — 2026-08-12
+
+**Both gates reach zero convertible — measured by the corrected instrument.**
+Stage 3.5's b-gate is 5, all of them the exempt `flushToCanvas` reads; the a10
+hot-path bucket is 0. Awaited 91 → 113.
+
+| Gate | v8.21 | v8.22 |
+|---|---|---|
+| Stage 3.5 (bucket b) | 29 | **5** — all exempt |
+| — convertible | 24 | **0** |
+| a10 hot-path | 12 | **0** |
+| Cumulative awaited | 91 | **113** |
+
+The difference from v8.19's identical-sounding claim is the method list. That one
+was made against a shadow `.d.ts` missing 31 of the engine's methods; this one
+knows all 280.
+
+### What converted
+
+| File | Sites | Notes |
+|---|---|---|
+| `oplogPersistence.ts` | 19 b + 3 hot | `isLogTrustworthy`, `onOplogFlush`, `saveOplogInner`, `restoreOplog` |
+| `tilesFlush.ts` | 3 b + 9 hot | `tryTilesFlush` (two truthy traps), `syncOplog` |
+| `patchmatch.ts` | 1 | `tryRemoveObject` |
+| `useMagicEraserTool.ts` | 1 | `onMouseUp` — two truthy traps in one condition |
+
+`flushToCanvas` calls all three of its now-async passengers fire-and-forget
+(`void f(t).then(register…)`). It is the per-frame blit and must not be ordered
+against diagnostics or debounced persistence.
+
+**Two duplicate reads collapsed.** `oplog_op_count()` was called twice in both
+`onOplogFlush` and `saveOplogInner` — once for a guard, once for the value.
+Synchronously that was waste; awaited, the two reads can straddle a mutation and
+disagree, so the guard would clear on one value while the manifest recorded
+another.
+
+### The near-miss, which is the useful part
+
+`isLogTrustworthy` has two callers. I converted it and updated **one**.
+
+| Gate | Saw it? |
+|---|---|
+| `tsc` | **no** — `!Promise` is legal |
+| The migration ratchet | **no** — it counts ENGINE calls; this is a JS wrapper |
+| eslint | **no** — no floating-promise rule configured |
+| `oplogPersistence.test.ts` | **YES**, instantly |
+
+Third instance of the wrapped-call hole (v8.12, v8.13), and the first where the
+wrapper's result was only truthiness-checked — the case v8.12 predicted would be
+caught by **neither** gate. It was caught by a domain test asserting that a
+broken log is never written to disk. The lesson stands and is now proven: when a
+batch converts a JS wrapper, the ratchet is blind and only behaviour tests cover
+it.
+
+### Verification
+
+8 mutants, **7 killed + 1 equivalent correctly survived** — and the split is
+informative:
+
+| Mutant | Killed by |
+|---|---|
+| drop `await` on `isLogTrustworthy` (either caller) | **the persistence tests** |
+| drop `await` on `oplog_active` / `oplog_op_count` / `tiles_supported_for_document` / `remove_object` / `Array.from` | **the ratchet** |
+
+Browser, on the production build: a paint drag left one **continuous** stroke
+(undo 0 → 1, "Paint") — the evidence that awaited per-move mutations are not
+being dropped; the histogram rendered a full RGB distribution, which an
+un-awaited `sample()` would have left empty by stopping its rAF retry loop on
+attempt 1.
+
+**Gates.** 490 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.
+
+**Still open:** `syncOplog` is nine engine reads per flush for a diagnostics
+panel nobody is looking at unless it is open — ~0.9 ms per frame behind the
+worker. Recorded in PARKING_LOT.md rather than fixed here; the honest options
+(one `capture_oplog_stats()`, throttling, or only running while the panel is
+open) each change behaviour.

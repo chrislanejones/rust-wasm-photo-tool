@@ -90,12 +90,17 @@ export function isOplogUndoEnabled(): boolean {
  * changed since the last flush) so the diagnostics display can show "n/a"
  * instead of a misleading zero.
  */
-export function tryTilesFlush(tool: object): number | null {
+export async function tryTilesFlush(tool: object): Promise<number | null> {
   if (!isTilesFlushEnabled() || !hasTilesExports(tool)) return null;
-  if (!tool.tiles_supported_for_document()) return null;
-  const applied = tool.tiles_flush();
+  // ADR-024 a10/3.5. Both guards below are TRUTHY TRAPS: un-awaited, each
+  // Promise is truthy, so `!supported` and `!applied` both go false and the
+  // function would report a dirty count for documents the tile path does not
+  // handle. These were invisible to the audit until v8.21 — `tiles_*` was one
+  // of the 31 methods missing from the shadow .d.ts.
+  if (!(await tool.tiles_supported_for_document())) return null;
+  const applied = await tool.tiles_flush();
   if (!applied) return null;
-  const dirty = tool.tiles_dirty_tile_count();
+  const dirty = await tool.tiles_dirty_tile_count();
   tool.tiles_clear_dirty();
   return dirty;
 }
@@ -111,9 +116,23 @@ export function tryTilesFlush(tool: object): number | null {
  * snapshot undo with no error, and the panel showed nothing at all. Reporting it
  * loudly instead of hiding the row is the cheap insurance against that recurring.
  */
-export function syncOplog(
+// ⚠️ ADR-024 — NINE ENGINE READS, ONCE PER FLUSH, FOR A DIAGNOSTICS PANEL.
+//
+// Nothing here is user-visible: `registerOplogStats` stores the result in a
+// module variable that only `useDiagnostics` reads. But `flushToCanvas` calls
+// this on every flush, so behind the worker it is nine round trips per frame —
+// ~0.9 ms of the 16.7 ms budget spent answering a question nobody is looking at
+// unless the diagnostics window is open.
+//
+// NOT fixed here, deliberately: this batch converts, it does not redesign, and
+// the honest options (one `capture_oplog_stats()` on the Rust side, the a3/a5
+// atomic-capture pattern; or throttling to a few Hz; or only running it while
+// the panel is open) each change behaviour and deserve their own decision.
+// Recorded in PARKING_LOT.md so Stage 5's frame timeline is read with it in
+// mind rather than blamed on the architecture.
+export async function syncOplog(
   tool: object,
-): import("@/lib/resourceMonitor").OplogStats {
+): Promise<import("@/lib/resourceMonitor").OplogStats> {
   if (!hasOplogExports(tool)) {
     return {
       supported: false,
@@ -133,16 +152,16 @@ export function syncOplog(
   tool.set_oplog_undo(undoEnabled);
   return {
     supported: true,
-    active: tool.oplog_active(),
-    broken: tool.oplog_is_broken(),
-    ops: tool.oplog_op_count(),
-    cursor: tool.oplog_cursor(),
-    keyframes: tool.oplog_keyframe_count(),
+    active: await tool.oplog_active(),
+    broken: await tool.oplog_is_broken(),
+    ops: await tool.oplog_op_count(),
+    cursor: await tool.oplog_cursor(),
+    keyframes: await tool.oplog_keyframe_count(),
     undoEnabled,
     // The line that answers "why is this zero?" — see ImageHorseTool::oplog_status.
-    status: tool.oplog_status(),
-    activeLayer: tool.active_layer_name(),
-    layers: tool.layer_count(),
-    contentLayers: tool.content_layer_count(),
+    status: await tool.oplog_status(),
+    activeLayer: await tool.active_layer_name(),
+    layers: await tool.layer_count(),
+    contentLayers: await tool.content_layer_count(),
   };
 }

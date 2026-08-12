@@ -282,10 +282,10 @@ export function useSelectionActions(
   // only renders this action at all when the flag is on (SelectSettings.tsx),
   // so in practice this guard is defense-in-depth, not the only thing
   // standing between a default build and a call it can't make.
-  const handleRemoveObject = useCallback(() => {
+  const handleRemoveObject = useCallback(async () => {
     const tool = stamp.toolRef.current;
     if (!tool) return;
-    if (tryRemoveObject(tool)) {
+    if (await tryRemoveObject(tool)) {
       stamp.flushToCanvas();
       stamp.syncState();
     }

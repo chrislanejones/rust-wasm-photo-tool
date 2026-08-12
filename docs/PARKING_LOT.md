@@ -18,6 +18,20 @@ wait their turn.
   needs its own session (Silas + a roadmap entry, see
   docs/Engine-Roadmap.md).
 
+## ADR-024 — leftovers from the conversion arc
+
+- **`syncOplog` is nine engine reads per flush, for a diagnostics panel.**
+  `flushToCanvas` calls it on every flush and `registerOplogStats` stores
+  the result in a module variable that only `useDiagnostics` reads. Behind
+  the worker that is nine round trips per frame — roughly 0.9 ms of a
+  16.7 ms budget spent answering a question nobody is looking at unless the
+  diagnostics window is open. Converted faithfully in v8.22 and deliberately
+  NOT redesigned; the honest options each change behaviour: one
+  `capture_oplog_stats()` on the Rust side (the a3/a5 atomic-capture
+  pattern), throttling to a few Hz, or only running it while the panel is
+  open. **Read Stage 5's frame timeline with this in mind rather than
+  blaming the architecture.** `tryTilesFlush` has the same shape at 3 reads.
+
 ## ADR-024 — a10 blocks a12, and the ADR said otherwise
 
 - **a10 (the hot-path bucket) is a PREREQUISITE for turning

@@ -50,7 +50,13 @@ export function isPatchmatchEnabled(): boolean {
  * build lacks the export, or there was nothing selected, all of which are
  * safe no-ops (nothing on the canvas changes).
  */
-export function tryRemoveObject(tool: object): boolean {
+export async function tryRemoveObject(tool: object): Promise<boolean> {
   if (!isPatchmatchEnabled() || !hasPatchmatchExports(tool)) return false;
-  return tool.remove_object();
+  // ADR-024 — a TRUTHY TRAP one level up. Both callers gate a flush + syncState
+  // on this result, so un-awaited (a Promise, always truthy) the Magic Eraser
+  // and the Remove Object action would each report a successful removal every
+  // time they ran, including on a build with no PatchMatch export at all.
+  // `remove_object` was one of the 31 methods missing from the shadow .d.ts,
+  // so no gate could see this before v8.21.
+  return await tool.remove_object();
 }

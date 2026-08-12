@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.22",
+    date: "2026-08-12",
+    headline: "Every read from the engine now waits for the answer",
+    entries: [
+      {
+        tag: "fix",
+        text: "Thirty-six more places converted — the undo log's save and restore paths, the tile flush, the Magic Eraser's removal, the Remove Object action. Nothing you can click behaves differently. What changes is that when the engine moves to a background thread none of these will quietly start lying, and a surprising number of them would have: un-awaited, a check like “is this log still describing the document?” stops being able to answer no, because the unfinished answer itself counts as a yes.",
+      },
+      {
+        tag: "fix",
+        text: "One of them caught me out, which is the useful part. The log's trustworthiness check has two callers and I updated one. The type checker was happy — asking about an unfinished answer is legal code — and the migration's own counter was happy too, because it counts calls into the engine and this was a call into a helper. An ordinary persistence test caught it instead, asserting that a broken log never gets written to disk. The dangerous conversions are the ones where nothing complains.",
+      },
+      {
+        tag: "perf",
+        text: "The last of the mouse-move handlers are converted, so that tally is at zero for the first time. Verified the way it has to be: a paint drag leaves one continuous stroke, which is only true if every dab landed and none was discarded for arriving late.",
+      },
+    ],
+  },
+  {
     version: "v8.21",
     date: "2026-08-12",
     headline: "The measuring tape could not see 31 of the engine's own methods",

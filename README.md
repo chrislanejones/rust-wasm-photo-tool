@@ -84,6 +84,37 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.22 — 2026-08-12
+
+**Every place that reads from the engine now waits for the answer.** All of it,
+this time — measured by the tool that was fixed last release rather than the one
+that couldn't see a third of the work.
+
+Thirty-six more call sites converted, across the undo log's save and restore
+paths, the tile flush, the Magic Eraser's removal, and the Remove Object action.
+Nothing you can click behaves differently. What changes is that when the engine
+moves to a background thread, none of these will quietly start lying — and a
+surprising number of them would have. Un-awaited, a check like "is this log
+still describing the document?" stops being able to answer *no*, because the
+unfinished answer itself counts as a yes.
+
+**One of them caught me out, which is the useful part.** Converting the log's
+trustworthiness check meant updating both places that call it, and I updated
+one. The type checker was happy — asking `if (!x)` about an unfinished answer is
+perfectly legal code — and the migration's own counter was happy too, because it
+counts calls into the engine and this was a call into a helper. The thing that
+caught it was an ordinary test about persistence, asserting that a broken log
+doesn't get written to disk. It failed immediately and pointed straight at the
+line.
+
+That is worth writing down because it is the shape of the whole exercise: the
+dangerous conversions are the ones where nothing complains.
+
+**Also:** the last of the mouse-move handlers are converted, so the tally that
+tracks them is at zero for the first time.
+
+<details><summary>Older releases</summary>
+
 ### v8.21 — 2026-08-12
 
 **The tool that measures this migration could not see 31 of the engine's own
@@ -122,7 +153,6 @@ fifty-nine releases of engine work, not one of them a feature. A busy month
 looked like a dead one. It now falls back to counting everything a release
 shipped when a month has no features at all.
 
-<details><summary>Older releases</summary>
 
 ### v8.20 — 2026-08-12
 

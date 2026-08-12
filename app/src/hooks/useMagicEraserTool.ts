@@ -174,7 +174,7 @@ export function useMagicEraserTool({
     [toolRef, coords, scheduleOverlay],
   );
 
-  const onMouseUp = useCallback(() => {
+  const onMouseUp = useCallback(async () => {
     if (!painting.current) return;
     painting.current = false;
     rafTool.current = null;
@@ -183,8 +183,13 @@ export function useMagicEraserTool({
       setSelectionMask(null);
       return;
     }
-    const hadSelection = t.magic_eraser_brush_up();
-    if (hadSelection && tryRemoveObject(t)) {
+    // ADR-024 — TWO truthy traps in one condition. Un-awaited, `hadSelection`
+    // is a Promise (truthy) and so is `tryRemoveObject`'s result, so the stroke
+    // would always flush and always claim it removed something. The `&&`
+    // short-circuit is preserved: no selection ⇒ `tryRemoveObject` is never
+    // called, exactly as before.
+    const hadSelection = await t.magic_eraser_brush_up();
+    if (hadSelection && (await tryRemoveObject(t))) {
       flushToCanvas();
       syncState();
     }

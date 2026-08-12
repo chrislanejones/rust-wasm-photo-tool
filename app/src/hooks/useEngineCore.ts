@@ -396,9 +396,20 @@ export function useEngineCore(
     // linear memory directly — the view MUST be reconstructed every call
     // because the backing ArrayBuffer is replaced if WASM memory grows.
     t.recomposite();
-    registerTilesDirtyCount(tryTilesFlush(t));
-    registerOplogStats(syncOplog(t));
-    onOplogFlush(t);
+    // ADR-024 — these three are now async, and `flushToCanvas` MUST NOT await
+    // them. It is the per-frame blit, exempt from the migration precisely
+    // because putting a round trip on it is the regression this whole arc
+    // exists to avoid. All three are fire-and-forget by nature: the first two
+    // feed the diagnostics panel (a module variable nobody reads unless it is
+    // open) and the third schedules debounced persistence. Nothing on the
+    // drawing path consumes any of them.
+    //
+    // `.then(register…)` rather than `await` keeps the ORDER of the writes
+    // (each registers its own result when it arrives) without ordering the
+    // FLUSH against them.
+    void tryTilesFlush(t).then(registerTilesDirtyCount);
+    void syncOplog(t).then(registerOplogStats);
+    void onOplogFlush(t);
     const wasmMem = wasmMemoryRef.current;
     if (wasmMem) {
       const ptr = t.data_ptr();
