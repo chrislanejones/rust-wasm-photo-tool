@@ -84,6 +84,49 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.19 — 2026-08-12
+
+**The pen tool finishes a path the same way it always did, and now it waits for
+the answer first.** This is the last of ninety-one changes that have been going
+into the engine a few at a time since June, and it is the one that was left until
+the end because it could not be done the way the other ninety were.
+
+Everywhere else the change was "wait for the answer before using it". The pen is
+different in two places. Finishing a path hands back an id, and that id is what
+keeps the path selected so the colour and Background controls point at the thing
+you just drew — so the answer is the whole point, not a formality. And clicking
+on the canvas has to decide *in that instant* whether you are re-opening an
+existing path or starting a new one, which is not a decision that can wait for
+anything.
+
+So it does not wait. Clicking drops the anchor immediately, exactly as before,
+and if it turns out you clicked on a path that already existed, the anchor is
+thrown away and the path opens instead. Nothing is committed until you finish,
+so there is nothing to undo. Click-drag on that first anchor still pulls the
+curve handles out of it on the same frame, which is the thing that would have
+been lost by doing this the obvious way.
+
+The other half is a guard on finishing. Now that finishing waits, it can be asked
+to finish twice before it has finished once — hold `Enter` down and you would get
+two identical paths stacked exactly on top of each other, one undo step each,
+looking like one path until you delete it and the other is still there. It now
+finishes once.
+
+**What you should notice: nothing.** Draw a path, press `Enter`, and it commits
+once and stays selected. Click a path you drew earlier and it re-opens with no
+stray point left behind. Leave the pen mid-path and the path is still committed
+rather than lost. Twelve `Enter` presses in a row produce one path.
+
+One thing this release does **not** settle. Leaving the pen mid-path commits it
+on the way out, and that still works — but the engine currently answers
+instantly, so "on the way out" and "answered" happen in the same instant. When
+the engine moves to a background thread there will be a real gap between them.
+The reasoning for why that stays safe is written down; it has not been run yet,
+and it is the next step's job, not this one's. Recorded so a green check here
+isn't mistaken later for a question that was answered.
+
+<details><summary>Older releases</summary>
+
 ### v8.18 — 2026-08-12
 
 **Almost nothing you can see, and no behaviour changed.** Four places in the
@@ -105,7 +148,6 @@ decide in that instant whether you are re-opening an existing path or starting a
 new one. Both, plus the eight gestures that have to be tested before it can ship,
 are written down now.
 
-<details><summary>Older releases</summary>
 
 ### v8.17 — 2026-08-12
 

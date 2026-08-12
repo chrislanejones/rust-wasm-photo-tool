@@ -5695,3 +5695,84 @@ site is converted.
 
 **Gates.** 476 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Engine untouched — no `build:wasm`.
+
+## v8.19 Change Summary — 2026-08-12
+
+**The pen tool's last two engine calls, and the end of Stage 3.5.** Gate **7 → 5**,
+which is its floor: everything still counted is a per-frame blit read that
+dissolves when the canvas moves into the worker rather than converting. There is
+no conversion work left in this stage. 91 of 96 done.
+
+These two were left until last because they are not the job the other 89 were.
+
+| Site | Why an `await` alone breaks it |
+|---|---|
+| `handlePenCommit` | Its **return value is the contract.** `PenOverlay.finish()` uses the new id to keep the finished path selected. Un-awaited, that id is a Promise and the path silently deselects. |
+| `handlePenHitTest` | Consumed **inside pointerdown** to fork between "re-open the path under the cursor" and "start a new one". There was no pending state for that fork to live in. |
+
+### The unmount cleanup was never the blocker
+
+It read like one for six releases: the overlay's exit effect also commits a path
+still in flight, and a React cleanup cannot await. But it **discards** the id, so
+fire-and-forget is correct there for exactly the reason it was correct for
+`syncState` in v8.17 — nothing consumes the result, and the request is posted
+synchronously onto a FIFO port, so the op is queued ahead of anything teardown
+does next. The blocker was always `finish()`, which does consume it.
+
+### Speculate, then correct
+
+Awaiting the hit test before deciding would have cost click-drag-to-curve on the
+first anchor, because the drag is only picked up if it is armed in the
+pointerdown's own tick. So the anchor is placed optimistically and thrown away if
+a committed path turns out to be under the click. Anchors are local React state
+until commit — no engine op, no history step — so discarding one is free. A
+sequence check, bumped by every canvas click, stops a slow answer landing on
+newer state.
+
+### The guard that the new version needs and the old one could not
+
+Once `finish()` awaits, it can overlap itself. Holding `Enter` would commit the
+same anchors twice: two identical paths, one undo step each, indistinguishable on
+screen until you delete one and the other is still there. It now runs one at a
+time, releasing in a `finally` so a commit that throws cannot wedge the pen shut.
+
+### A type that was lying, and that `tsc` could not have caught
+
+`CanvasArea`'s `onPenCommit` was declared `=> void`. A function returning
+`Promise<number>` **is** assignable to a `=> void` slot, so this change would
+have typechecked while the id quietly stopped arriving and paths stopped staying
+selected. The id had always flowed through at runtime; only the type was wrong.
+The general form is worth keeping: **a `void` return is not proof that nothing is
+consumed.**
+
+### How it was proved
+
+Both guards moved into `features/canvas/penPath.ts` so they could be tested at
+all — this repo has no component-render harness. Four mutants, four killed, plus
+a deliberate equivalent mutant that correctly survived. Six of eight gesture
+cases driven in a foreground browser, including the decisive one: closing a loop
+leaves it selected, which is only possible if the awaited id came back a real
+number.
+
+⚠️ **The browser did not prove the guards, and is not claimed to have.** The port
+is an identity function today, so the re-entrancy window never opens — twelve
+`Enter` presses gave one path, but they would have anyway. The mutation run
+proves the guards; the browser proves the positive path. Both windows open for
+real at Stage 4.
+
+**Known, pre-existing:** holding `Enter` on a selected path adds one `Edit Pen
+Path` undo step per repeat. Same root cause as the text-annotation entry already
+in `PARKING_LOT.md` — the commit path always snapshots instead of skipping when
+nothing changed. Cosmetic undo-depth noise.
+
+**Gates.** 487 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.
+
+### ⚠️ What Case 6 does not prove
+
+"Switch tool mid-draw → committed" is a **no-regression** result, not proof the
+unmount path is safe behind the worker. With the flag off, the `await` resolves
+in a microtask — before React finishes teardown — so the window it is supposed to
+be dangerous in does not exist yet. Behind the worker it is a round trip. The
+safety argument (posted synchronously, FIFO port, nothing consumes the reply) is
+read from the source, never measured. That test belongs in a12 with the flag ON.

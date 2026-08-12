@@ -24,6 +24,33 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.19",
+    date: "2026-08-12",
+    headline: "The pen waits for the answer, and still draws on the first frame",
+    entries: [
+      {
+        tag: "fix",
+        text: "Finishing a pen path now waits for the engine to confirm it before keeping that path selected. It is the last of ninety-one changes of this kind, and the one left until the end, because the answer here is the whole point rather than a formality — the id that comes back is what keeps the colour and Background controls pointing at the thing you just drew.",
+      },
+      {
+        tag: "fix",
+        text: "Clicking the canvas does not wait. It drops the anchor immediately, and if it turns out you clicked a path that already existed, the anchor is thrown away and the path opens instead. Nothing is committed until you finish, so there is nothing to undo. Click-drag on that first anchor still pulls the curve handles out of it on the same frame, which is what doing this the obvious way would have cost.",
+      },
+      {
+        tag: "fix",
+        text: "Holding Enter now finishes a path once. Because finishing waits, it could be asked to finish twice before it had finished once — two identical paths stacked exactly on top of each other, one undo step each, looking like one path until you delete it and the other is still there.",
+      },
+      {
+        tag: "infra",
+        text: "That closes the stage: every engine read that hands a value back now waits for it, except five that stop crossing the boundary at all when the canvas moves into the worker. A type on the way in had been quietly declaring it returned nothing, which would have let the whole change pass its checks while paths stopped staying selected.",
+      },
+      {
+        tag: "infra",
+        text: "One thing this does not settle, written down rather than quietly counted as passed: leaving the pen mid-path commits it on the way out, and that still works — but the engine answers instantly today, so the gap this is supposed to be risky in does not exist yet. It appears when the engine moves to a background thread. The reasoning for why it stays safe is recorded; running it is the next step's job.",
+      },
+    ],
+  },
+  {
     version: "v8.18",
     date: "2026-08-12",
     headline: "Four things the code said about itself that were no longer true",

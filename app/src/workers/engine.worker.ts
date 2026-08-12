@@ -5,16 +5,16 @@
 // (Phase 0 measured that none of it is needed, and this project already tried
 // and rejected wasm threads at 8–31× slower).
 //
-// STATUS: not wired into the app. `ih_engine_worker` defaults OFF and Stage 3.5
-// is not finished — until it is, nothing can call this in anger. It exists so
-// the protocol is real and testable rather than sketched.
+// STATUS: not wired into the app. `ih_engine_worker` defaults OFF — that is now
+// the ONLY thing holding it back, because as of v8.19 Stage 3.5 is COMPLETE. It
+// exists so the protocol is real and testable rather than sketched.
 //
-// As of v8.17 that means 7 reads, not the "121 synchronous reads" this comment
-// claimed. 121 was already an undercount when it was written (the audit could
-// not see aliased calls until 2026-08-08, which put the real figure at 166),
-// and 89 have since been converted. What is left: 5 per-frame blit reads, exempt
-// because they dissolve when the canvas moves in here at Stage 4, and 2 pen
-// sites needing a state-machine change (`docs/pen-overlay-async-design.md`).
+// 91 of the 96 value-consumed reads are converted; the 5 left are the per-frame
+// blit, exempt because they dissolve when the canvas moves in here at Stage 4.
+// (This comment claimed "121 synchronous reads" — already an undercount when
+// written, since the audit could not see aliased calls until 2026-08-08, which
+// put the real figure at 166. The 2 pen sites it then listed as outstanding
+// landed in v8.19 as a state-machine change: `docs/pen-overlay-async-design.md`.)
 // `scripts/engine-call-audit.mjs` prints the numbers — do not hand-count them.
 //
 // WHAT THE PHASE 3 SPIKE LACKED, and this has:

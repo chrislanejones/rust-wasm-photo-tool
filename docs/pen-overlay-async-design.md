@@ -1,9 +1,27 @@
 # PenOverlay async redesign — the last step of ADR-024 Stage 3.5
 
-**Status:** designed, not built. Written 2026-08-12 after v8.17 (a13).
-**Blocks:** Stage 4. The Stage 3.5 gate sits at **7** and cannot go lower
-without this — see `engineAsyncMigration.contract.test.ts`, which fails if
-either site is converted with a plain `await`.
+**Status: ✅ BUILT — shipped v8.19, 2026-08-12.** Written earlier the same day
+after v8.17 (a13). The gate went **7 → 5**, its floor, and **Stage 3.5 is
+complete**. Kept as the record of why these two sites were hard and what the
+implementation actually commits to; the contract test now fails if either site
+drifts back OUT of `await`.
+
+**What changed against this design, and why** — three things:
+
+| # | Design said | Built | Why |
+|---|---|---|---|
+| 1 | guards live in `PenOverlay.tsx` | `penPath.ts` | they needed tests, and this repo has no component-render harness (vitest is `environment: "node"`, `.ts` only) — the a13 `readUiSnapshot` precedent |
+| 2 | `hitSeq` bumped inside the hit-test branch | bumped by **every** canvas pointerdown | the design's own words are "a later click superseded us"; a click that takes a different branch supersedes it just as much |
+| 3 | — | added a **liveness guard** to both AppShell handlers | not in the design, but a13's `reset()`-mid-flight hole applies verbatim: nothing calls `tool.free()`, so a commit issued against the outgoing photo resolves normally and its id is meaningless to the new one |
+
+⚠️ **One thing this design did not mention and nearly cost the change:**
+`CanvasArea`'s `onPenCommit` prop was typed `=> void`, swallowing the id. A
+function returning `Promise<number>` **is** assignable to a `=> void` slot, so
+tsc would have accepted the conversion while `typeof newId === "number"` quietly
+went false. The type was already lying before this change — the id has always
+flowed through at runtime. Fixed as part of the work. The lesson generalises:
+when tracing what shares a type (the v8.6 question), a `void` return is not
+proof that nothing is consumed.
 
 ---
 
@@ -145,6 +163,55 @@ needs real gestures.
 **Mutation targets** (each must be killed by a test above): drop the
 `finishingRef` guard; drop the `hitSeq` check; `await` before setting
 `dragRef.current`; leave the speculative anchor in place on a hit.
+
+### What the v8.19 run actually proved
+
+| Case | Result |
+|---|---|
+| Click-drag the first anchor | ✅ handles pulled symmetrically, same tick |
+| 2 anchors + `Enter` | ✅ 1 `add_bezier_annotation`, 1 undo step, stayed selected |
+| Hold `Enter` (12 repeats) | ✅ **1** `add_bezier_annotation` (id 2), not 12 |
+| Click an existing path | ✅ re-opened, exactly 2 anchors — **no stray speculative anchor** |
+| Switch tool mid-draw | ✅ committed (id 3), undo 16 → 17, `Add Pen Path` |
+| Close the loop on anchor 0 | ✅ committed (id 4), filled, **stayed selected** |
+| Two fast clicks, two paths | ⚠️ not reachable by hand — see below |
+| Switch **photo** mid-draw | ⚠️ not run (one photo in the gallery) |
+
+**The closed-loop case is the load-bearing one.** "Stayed selected" is only
+possible if the awaited id came back a real `number`; un-awaited it is a Promise,
+`typeof` is `"object"`, and the path silently deselects. That single gesture
+proves the return-value contract survived the conversion.
+
+### ⚠️ CASE 6 DOES NOT PROVE THE UNMOUNT RACE IS CLOSED
+
+The single most misreadable green check in this release. "Switch tool mid-draw →
+committed, undo 16 → 17" is a **no-regression** result and nothing more.
+
+With `ih_engine_worker` OFF, `attachLivePort` is an identity function: the
+`await` inside `handlePenCommit` resolves in a **microtask**, which lands before
+React has finished tearing the overlay down. The window the unmount path is
+supposed to be dangerous in **does not exist yet**, so a pass here cannot
+distinguish "safe" from "never exercised".
+
+Behind the worker it is a real round trip, and the cleanup's commit becomes a
+message posted by a component that is already gone. The reasoning that it is
+still safe is written down — the request is POSTED synchronously at call time and
+the port is FIFO, so the op is queued before teardown proceeds, and nothing
+consumes the reply — but that is an **argument from reading `src/ops.rs` and
+`port.ts`, not a measurement.** It has never been run against a real worker.
+
+**That test belongs in a12, with the flag ON**, alongside the cross-implementation
+matrix. Recording Case 6's pass without this caveat would leave a later reader
+believing the unmount path was cleared at Stage 3.5. It was not.
+
+⚠️ **The browser cannot prove either guard, and must not be reported as having
+done so.** The port is an identity function today, so `await` resolves in a
+microtask and the re-entrancy window never opens — 12 Enter presses produced one
+path, but they would have anyway. Likewise two hand-timed clicks always resolve
+in order. **The guards are proven by the mutation run** (`M1`–`M4` all killed,
+plus a deliberate equivalent mutant that correctly survived); the browser proves
+the positive path. Both windows open for real at Stage 4, which is precisely when
+there is no gesture evidence left to gather.
 
 > ⚠️ Do not verify this in a backgrounded tab. `document.hidden` throttles
 > timers and rAF — it cost two 45 s CDP timeouts and one misread screenshot

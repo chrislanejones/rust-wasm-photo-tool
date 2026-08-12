@@ -291,7 +291,7 @@ import { join } from "node:path";
  *         so the truthy bucket read zero while this was live. "Truthy bucket
  *         empty" is a statement about the audit, not the codebase.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32, 26, 21, 18, 12 and 8 lines. The
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32, 26, 21, 18, 12, 8 and 7 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -315,8 +315,14 @@ import { join } from "node:path";
  *  removed it. `no_multiline_engine_calls` below keeps it that way.
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
- *  been tangled twice before. */
-const BUDGET = 7;
+ *  been tangled twice before.
+ *
+ *  ✅ AT THE FLOOR. The pen redesign landed, and `BUDGET` is now equal to
+ *  `EXEMPT_TOTAL`: every site still counted here is a `flushToCanvas` read that
+ *  DISSOLVES at Stage 4 rather than converting. There is no conversion work
+ *  left in Stage 3.5, and this number cannot go lower — see
+ *  `DISSOLVES_AT_STAGE_4` and the floor test below before trying. */
+const BUDGET = 5;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -536,14 +542,17 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // Remaining: AppShell's 2 pen sites + syncState + the 5 exempt = 8.
     // a13: `syncState` -- a non-async `useCallback`, so restructure 8 - 1 = 7.
     // awaited 88 -> 89. Gate 8 - 1 = 7, and 0 + 7 + 0 = 7.
+    // The pen redesign: AppShell's last 2, both non-async callbacks, so
+    // restructure 7 - 2 = 5. awaited 89 -> 91. Gate 7 - 2 = 5, and 0 + 5 + 0 = 5.
     //
-    // THE GATE CANNOT REACH 5 BY CONVERSION. What is left is the 5 exempt sites
-    // plus AppShell's 2 pen sites, and the pen pair is NOT an `await` job -- see
-    // `the last two convertible sites are a PenOverlay redesign` below.
-    ).toBe(7);
+    // ✅ THE GATE IS AT ITS FLOOR. What is left is exactly the 5 exempt
+    // `flushToCanvas` reads, which DISSOLVE at Stage 4 rather than converting.
+    // This number does not go lower, and there is no conversion work left in
+    // Stage 3.5 -- see `DISSOLVES_AT_STAGE_4` and the two tests below.
+    ).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(89);
+    expect(gate.awaited, "cumulative converted sites").toBe(91);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
@@ -682,53 +691,64 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     expect(gate.remaining).toBeGreaterThanOrEqual(EXEMPT_TOTAL);
   });
 
-  it("the last two convertible sites are a PenOverlay redesign, not an await", () => {
-    // a13 left the gate at 7: the 5 exempt sites plus these two. They are the
-    // only things standing between Stage 3.5 and its floor, and the obvious
-    // move — slap `async`/`await` on both and watch the gate hit 5 — produces a
-    // pen tool that drops strokes. Naming them here so the next session reads
-    // this before it reads the diff.
+  it("the pen sites stay converted — they were the hardest two, not the easiest", () => {
+    // ✅ LANDED. This test used to assert the opposite: that `handlePenCommit`
+    // and `handlePenHitTest` were still UNCONVERTED, because for six releases
+    // the risk was a session reading "convertible: 2" as two afternoons of work
+    // and slapping `await` on both. It now asserts they are converted and pins
+    // them by name so a dropped `await` names the handler instead of just
+    // nudging a number.
     //
-    // `handlePenCommit` (AppShell:823, `add_bezier_annotation`)
-    //   Its return value IS the contract: `PenOverlay.finish()` uses the new id
-    //   synchronously to keep the finished path selected. Worse, the overlay's
-    //   UNMOUNT CLEANUP (`PenOverlay.tsx`, the run-once exit effect) also calls
-    //   it, to commit a path still in flight when the pen is left — and a React
-    //   cleanup function cannot await. Behind the worker that commit becomes a
-    //   message posted by a component that is already gone, racing the teardown
-    //   that follows it.
+    // WHY THEY WERE LAST, kept because it is the reason this file exists:
     //
-    // `handlePenHitTest` (AppShell:859, `capture_pen_hit`)
-    //   Called inside mousedown to decide, right there, between "re-open the
-    //   committed path under the cursor" and "drop a new anchor". Await turns
-    //   that fork into a pending state the overlay's machine does not have, and
-    //   a second click arriving while the first is in flight takes both
-    //   branches.
+    // `handlePenCommit` — its return value IS the contract. `PenOverlay.finish()`
+    //   uses the new id synchronously to keep the finished path selected, so an
+    //   un-awaited version hands it a Promise and the path you just drew stops
+    //   being selected. The fix was `finish()` going async behind a re-entrancy
+    //   guard (`runExclusive`), because an async `finish` can overlap itself and
+    //   hold-Enter would otherwise commit the same anchors twice.
     //
-    // The fix is a state machine with an explicit pending-hit-test state and a
-    // teardown-commit path that does not depend on the component surviving —
-    // design work, sized and scheduled on its own, not a conversion batch.
+    // `handlePenHitTest` — consumed inside pointerdown to fork between
+    //   "re-open the path under the cursor" and "drop a new anchor". Awaiting
+    //   before deciding costs click-drag on the first anchor, because
+    //   `dragRef.current` has to be set in the same tick as the pointerdown. The
+    //   fix was to speculate the anchor and correct after (`resolveHit`), with a
+    //   sequence check so a superseded hit cannot land on newer state.
     //
-    // ⚠️ READ `docs/pen-overlay-async-design.md` BEFORE TOUCHING EITHER. It has
-    // the full call graph (finish() has 5 callers and all 5 CAN await; the
-    // unmount cleanup discards the id and so is correctly fire-and-forget), the
-    // two guards the design turns on — a re-entrancy flag on `finish()` and a
-    // sequence check on the hit test — and the eight gesture cases that are the
-    // only things able to catch a mistake here. tsc, eslint and this ratchet
-    // cannot: every failure mode is state-machine ordering.
-    const PEN_REDESIGN = [
+    // The unmount cleanup, which read like the blocker, was not one: it discards
+    // the id, so fire-and-forget is correct there for the same reason it was
+    // correct for `syncState` in a13 — nothing consumes the result, and the
+    // request is posted synchronously onto a FIFO port.
+    //
+    // Neither guard is visible to this ratchet (both calls ARE awaited), to tsc,
+    // or to eslint. They are pinned by `PenOverlay.guards.test.ts` and by the
+    // eight gesture cases in `docs/pen-overlay-async-design.md`.
+    const PEN_SITES = [
       "app/src/app/AppShell.tsx::handlePenCommit",
       "app/src/app/AppShell.tsx::handlePenHitTest",
     ];
+    const stillUnconverted = gate.remainingHandlers.map(keyOf).filter((k) => PEN_SITES.includes(k));
+    expect(
+      stillUnconverted,
+      "a pen site is back in the gate — an `await` was dropped in AppShell. " +
+        "Read the reasoning above: these two are a state machine, not a conversion.",
+    ).toEqual([]);
+  });
+
+  it("Stage 3.5 has no conversion work left — only the Stage-4 dissolves", () => {
+    // The end state. Everything still counted is a `flushToCanvas` read that
+    // dissolves when the canvas moves into the worker; there is nothing left to
+    // convert, and a session that finds something to convert here has found a
+    // regression, not a task.
     const convertible = gate.remainingHandlers.filter(
       (r) => !(keyOf(r) in DISSOLVES_AT_STAGE_4),
     );
     expect(
-      convertible.map(keyOf).sort(),
-      "the only non-exempt sites left must still be the pen pair — if this " +
-        "fails LOW someone converted them; read the reasoning above first",
-    ).toEqual(PEN_REDESIGN);
+      convertible.map(keyOf),
+      "Stage 3.5 is complete. Anything here is a site that lost its `await`.",
+    ).toEqual([]);
   });
+
 
   it("every allowlist entry still matches something", () => {
     // Guards the allowlist itself. An entry that stops matching — because the

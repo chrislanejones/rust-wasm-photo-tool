@@ -68,19 +68,20 @@ export function detachLivePort(): void {
  *  on today would change nothing; that is deliberate, so the worker and its
  *  protocol can be built and tested before anything depends on them.
  *
- *  WHAT IS ACTUALLY LEFT (v8.17 — read from `node scripts/engine-call-audit.mjs`,
- *  never hand-counted). Of **96** value-consumed reads, **89 are converted** and
- *  **7 remain**:
+ *  WHAT IS ACTUALLY LEFT (v8.19 — read from `node scripts/engine-call-audit.mjs`,
+ *  never hand-counted). Of **96** value-consumed reads, **91 are converted** and
+ *  **5 remain**:
  *
  *    5  `useEngineCore.flushToCanvas` — the per-frame blit. EXEMPT on purpose
  *       (`DISSOLVES_AT_STAGE_4`): under Option A the canvas moves INTO the
  *       worker, so this path stops crossing the boundary rather than converting.
  *       Awaiting it would put a round trip on every frame.
- *    2  `AppShell` `handlePenCommit` / `handlePenHitTest` — NOT an `await` job.
- *       A PenOverlay state-machine change; `docs/pen-overlay-async-design.md`.
  *
- *  So the gate bottoms out at **5, not 0**, and the 2 above are the only
- *  outstanding work in Stage 3.5.
+ *  ✅ **STAGE 3.5 IS COMPLETE.** The gate is at its floor: everything still
+ *  counted dissolves at Stage 4, and there is no conversion work left. The last
+ *  two — `AppShell`'s `handlePenCommit` / `handlePenHitTest` — landed in v8.19 as
+ *  the PenOverlay state-machine change `docs/pen-overlay-async-design.md`
+ *  specified, not as awaits.
  *
  *  ⚠️ THIS PARAGRAPH WAS WRONG FROM 2026-08-08 TO v8.17. It said "the 166
  *  value-consumed reads are synchronous and Stage 3.5 has not converted them",

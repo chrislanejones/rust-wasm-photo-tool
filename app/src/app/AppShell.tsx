@@ -811,8 +811,13 @@ export function AppShell() {
   const penEditRequest = useAnnotationStore((s) => s.penEditRequest);
   const requestPenEdit = useAnnotationStore((s) => s.requestPenEdit);
   const clearPenEditRequest = useAnnotationStore((s) => s.clearPenEditRequest);
+  // ADR-024 Stage 3.5, the PenOverlay redesign (`docs/pen-overlay-async-design.md`).
+  // This is the site whose RETURN VALUE is the contract, which is why it outlived
+  // every other conversion: `PenOverlay.finish()` uses the new id to keep the
+  // path selected, so an un-awaited version hands it a Promise and the path you
+  // just drew silently stops being selected.
   const handlePenCommit = useCallback(
-    (flatPoints: number[]) => {
+    async (flatPoints: number[]) => {
       const tool = stamp.toolRef.current;
       if (!tool || flatPoints.length < 8) return; // need ≥ 2 anchors
       // Any path with a background colour fills its interior — Rust's fill_polygon
@@ -820,13 +825,21 @@ export function AppShell() {
       // both fill. (Previously this was gated on an explicit `close`, so a curve
       // or circle finished without closing never filled.)
       const fillKind = toolSettings.fillMode !== "none" ? 1 : 0;
-      const id = tool.add_bezier_annotation(
+      const id = await tool.add_bezier_annotation(
         new Float64Array(flatPoints),
         toolSettings.strokeColor,
         toolSettings.strokeWidth,
         fillKind,
         toolSettings.fillColor,
       );
+      // Liveness, a13's guard, checked AFTER the await: `reset()` nulls
+      // `toolRef.current` on a photo switch and nothing here calls `tool.free()`,
+      // so a commit issued against the OUTGOING document still resolves. FIFO
+      // puts the annotation on the photo that was open when the pen drew it —
+      // which is what we want — but the id is meaningless to the NEW document,
+      // and returning it would have the overlay call `set_editing_shape` on a
+      // photo that never had this path. Drop it and leave the new photo alone.
+      if (stamp.toolRef.current !== tool) return;
       stamp.flushToCanvas();
       stamp.syncState();
       // Hand the id back so the overlay can keep the path selected. Without it
@@ -846,7 +859,7 @@ export function AppShell() {
   // Pen re-edit (Stage 3b): hit-test → load a committed kind-7 path → reshape →
   // commit. The baked copy is hidden via set_editing_shape while editing.
   const handlePenHitTest = useCallback(
-    (ix: number, iy: number): { id: number; points: number[] } | null => {
+    async (ix: number, iy: number): Promise<{ id: number; points: number[] } | null> => {
       const tool = stamp.toolRef.current;
       if (!tool) return null;
       // ADR-024 Stage 3.5, a7 — ATOMIC CAPTURE. This was
@@ -856,8 +869,12 @@ export function AppShell() {
       // the lookup miss, this return null, and clicking a pen path do nothing
       // at all — no throw, nothing in the console. `capture_pen_hit` does both
       // under one `&self`, so there is no between.
-      const hit = tool.capture_pen_hit(ix, iy);
+      const hit = await tool.capture_pen_hit(ix, iy);
       try {
+        // Liveness (a13), inside the `try` so the capture is still freed. A hit
+        // resolved against the outgoing photo names a shape id that does not
+        // exist on the new one; loading it would hide a stranger's annotation.
+        if (stamp.toolRef.current !== tool) return null;
         // -1 covers both "nothing there" and "the topmost shape there is not a
         // pen path" — the engine keeps the topmost-then-check rule this call
         // site used to apply itself via `kind === 7`.

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Anchor, Pt } from "./penPath";
+import { serialize, deserialize, runExclusive, resolveHit } from "./penPath";
 
 // Pen-nib cursor (data-URI), mirroring CanvasArea's rotate-cursor pattern.
 /** Screen-pixel radius around the first anchor that snaps a click into closing
@@ -18,68 +20,8 @@ const PEN_CURSOR =
   ) +
   '") 3 21, crosshair';
 
-type Pt = { x: number; y: number };
-interface Anchor {
-  x: number;
-  y: number;
-  in: Pt | null;
-  out: Pt | null;
-}
 type Drag = { kind: "create" | "out" | "in" | "anchor"; index: number } | null;
 type FinishMode = "commit-close" | "commit-open" | "cancel";
-
-/** anchors → Rust cubic control sequence [a0, a0.out, a1.in, a1, …] (+ closing). */
-function serialize(anchors: Anchor[], close: boolean): number[] {
-  if (anchors.length === 0) return [];
-  const out: number[] = [];
-  const push = (p: Pt) => out.push(p.x, p.y);
-  push(anchors[0]);
-  for (let i = 1; i < anchors.length; i++) {
-    const prev = anchors[i - 1];
-    const cur = anchors[i];
-    push(prev.out ?? prev);
-    push(cur.in ?? cur);
-    push(cur);
-  }
-  if (close && anchors.length > 1) {
-    const last = anchors[anchors.length - 1];
-    const first = anchors[0];
-    push(last.out ?? last);
-    push(first.in ?? first);
-    push(first);
-  }
-  return out;
-}
-
-/** Inverse of serialize: a flat control sequence → anchors + closed flag. */
-function deserialize(flat: number[]): { anchors: Anchor[]; closed: boolean } {
-  const P: Pt[] = [];
-  for (let i = 0; i + 1 < flat.length; i += 2) P.push({ x: flat[i], y: flat[i + 1] });
-  if (P.length === 0) return { anchors: [], closed: false };
-  const k = Math.floor((P.length - 1) / 3) + 1;
-  const eq = (a: Pt, b: Pt) => Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5;
-  const anchors: Anchor[] = [];
-  for (let i = 0; i < k; i++) {
-    const ai = 3 * i;
-    if (ai >= P.length) break;
-    const anchor = P[ai];
-    const inH = i > 0 ? P[ai - 1] : null;
-    const outH = ai + 1 < P.length ? P[ai + 1] : null;
-    anchors.push({
-      x: anchor.x,
-      y: anchor.y,
-      in: inH && !eq(inH, anchor) ? inH : null,
-      out: outH && !eq(outH, anchor) ? outH : null,
-    });
-  }
-  let closed = false;
-  if (anchors.length >= 3 && eq(anchors[anchors.length - 1], anchors[0])) {
-    closed = true;
-    const repeat = anchors.pop()!;
-    anchors[0].in = repeat.in; // closing in-handle belongs to the first anchor
-  }
-  return { anchors, closed };
-}
 
 interface PenOverlayProps {
   canvasEl: HTMLCanvasElement | null;
@@ -93,9 +35,12 @@ interface PenOverlayProps {
    *  new annotation's id so the overlay can KEEP it selected — without that id
    *  a finished path went straight back to nothing selected, and the only route
    *  to its colour was the Reselect list. */
-  onCommit: (flatPoints: number[], close: boolean) => number | void;
+  onCommit: (flatPoints: number[], close: boolean) => Promise<number | void>;
   /** Hit-test an image-space point against committed kind-7 paths. */
-  onHitTest?: (imgX: number, imgY: number) => { id: number; points: number[] } | null;
+  onHitTest?: (
+    imgX: number,
+    imgY: number,
+  ) => Promise<{ id: number; points: number[] } | null>;
   /** A committed path was picked for editing (hide the baked copy). */
   onEditStart?: (id: number) => void;
   /** Commit a reshape of a committed path. */
@@ -148,6 +93,12 @@ export function PenOverlay({
   closedRef.current = closed;
   const dragRef = useRef<Drag>(null);
   const [, setTick] = useState(0);
+  /** `finish()` is async now, so it can overlap itself — see the guard in it. */
+  const finishingRef = useRef(false);
+  /** Monotonic click counter, bumped by EVERY canvas pointerdown. An in-flight
+   *  hit test compares against it and discards its own result if a later click
+   *  has landed, so a slow answer can never overwrite newer state. */
+  const hitSeqRef = useRef(0);
 
   const mapImg = useCallback(
     (cx: number, cy: number): Pt => {
@@ -169,40 +120,66 @@ export function PenOverlay({
    *  hunting for the Reselect list: the path you had just drawn was already
    *  deselected by the time you reached for a swatch. Enter and closing the
    *  loop now keep it live; Escape and clicking away still let go, so there is
-   *  still an obvious way OUT of a selection. */
+   *  still an obvious way OUT of a selection.
+   *
+   *  ── WHY THE RE-ENTRANCY GUARD (ADR-024 Stage 3.5, the pen redesign) ──
+   *
+   *  `onCommit` is awaited now, and that is the ONLY new failure mode in this
+   *  file. While this function was synchronous it could not overlap itself: the
+   *  anchors were cleared before any second call could read them. Async, the
+   *  window between issuing the commit and clearing `anchorsRef` is open to
+   *  every other caller — and there are five, two of which auto-repeat.
+   *
+   *  Hold `Enter` down and, unguarded, the second keydown finds `editingIdRef`
+   *  still null and `anchorsRef` still full, takes the create branch a second
+   *  time, and commits THE SAME ANCHORS AGAIN: two identical paths stacked
+   *  exactly on top of each other, one undo step each, indistinguishable on
+   *  screen until you delete one and the other is still there. Same shape for
+   *  `Enter` racing a pointerdown-outside.
+   *
+   *  Nothing else in the repo can catch this: the migration ratchet counts
+   *  engine calls (both commits ARE awaited), tsc sees a well-typed async
+   *  function, and eslint has no rule for it. It is a state-machine bug and
+   *  only a gesture or a mutation test finds it. */
   const finish = useCallback(
-    (mode: FinishMode, keepSelection = false) => {
-      const id = editingIdRef.current;
-      const a = anchorsRef.current;
-      let stayOn: number | null = null;
+    (mode: FinishMode, keepSelection = false) =>
+      runExclusive(finishingRef, async () => {
+        const id = editingIdRef.current;
+        const a = anchorsRef.current;
+        let stayOn: number | null = null;
 
-      if (id !== null) {
-        if (mode === "cancel" || a.length < 2) onEditCancel?.(id);
-        else {
-          onEditCommit?.(id, serialize(a, closedRef.current));
-          // The commit released the engine's editing lock, so re-take it below
-          // or the baked path reappears underneath the overlay's own preview.
-          if (keepSelection) stayOn = id;
+        if (id !== null) {
+          if (mode === "cancel" || a.length < 2) onEditCancel?.(id);
+          else {
+            onEditCommit?.(id, serialize(a, closedRef.current));
+            // The commit released the engine's editing lock, so re-take it below
+            // or the baked path reappears underneath the overlay's own preview.
+            if (keepSelection) stayOn = id;
+          }
+        } else if (mode !== "cancel" && a.length >= 2) {
+          const close = mode === "commit-close";
+          const newId = await onCommit(serialize(a, close), close);
+          // `typeof newId === "number"` is kept exactly as it was. It is correct
+          // for an awaited number, and it is also the reason a botched version of
+          // this change degrades to "the path is not kept selected" instead of
+          // corrupting anything — `typeof` a Promise is "object". A safety net,
+          // not the fix.
+          if (keepSelection && typeof newId === "number" && newId >= 0) {
+            stayOn = newId;
+            setClosed(close);
+          }
         }
-      } else if (mode !== "cancel" && a.length >= 2) {
-        const close = mode === "commit-close";
-        const newId = onCommit(serialize(a, close), close);
-        if (keepSelection && typeof newId === "number" && newId >= 0) {
-          stayOn = newId;
-          setClosed(close);
-        }
-      }
 
-      dragRef.current = null;
-      if (stayOn === null) {
-        setEditingId(null);
-        setClosed(false);
-        setAnchors([]);
-      } else {
-        onEditStart?.(stayOn); // hide the baked copy; the overlay keeps drawing it
-        setEditingId(stayOn);
-      }
-    },
+        dragRef.current = null;
+        if (stayOn === null) {
+          setEditingId(null);
+          setClosed(false);
+          setAnchors([]);
+        } else {
+          onEditStart?.(stayOn); // hide the baked copy; the overlay keeps drawing it
+          setEditingId(stayOn);
+        }
+      }),
     [onCommit, onEditCommit, onEditCancel, onEditStart],
   );
 
@@ -213,6 +190,19 @@ export function PenOverlay({
   // way out. Deliberately NOT `finish`: this runs during teardown, where the
   // setState calls in `finish` have nothing left to update. Callbacks come
   // through a ref so the effect can be a true run-once.
+  //
+  // ── "A REACT CLEANUP CANNOT AWAIT" IS NOT A BLOCKER HERE ──
+  //
+  // It reads like one, and it is why these two sites were deferred for six
+  // releases. But fire-and-forget is CORRECT in this specific place, for the
+  // reason it is correct anywhere: nothing here consumes the result. The
+  // cleanup discards the id — only `finish()` ever wanted it — so there is no
+  // value to wait for. The op itself is not at risk either: the request is
+  // POSTED synchronously at call time and the port is FIFO (one port per
+  // document, `MessagePort` is ordered — `lib/engine/port.ts`), so the commit
+  // is queued ahead of anything the teardown does next. Identical ordering to
+  // the synchronous version; only the reply is late, and nobody is listening
+  // for it. The blocker was always `finish()`, which DOES consume the id.
   const exitRef = useRef({ onCommit, onEditCommit, onEditCancel });
   exitRef.current = { onCommit, onEditCommit, onEditCancel };
   useEffect(
@@ -224,7 +214,7 @@ export function PenOverlay({
         if (a.length >= 2) cb.onEditCommit?.(id, serialize(a, closedRef.current));
         else cb.onEditCancel?.(id);
       } else if (a.length >= 2) {
-        cb.onCommit(serialize(a, closedRef.current), closedRef.current);
+        void cb.onCommit(serialize(a, closedRef.current), closedRef.current);
       }
     },
     [],
@@ -291,7 +281,9 @@ export function PenOverlay({
         // Closes the loop AND keeps it selected, so the panel's colour and
         // Background controls are pointing at the path you just drew.
         e.preventDefault();
-        finish("commit-close", true);
+        // Fire-and-forget, and the re-entrancy guard inside `finish` is what
+        // makes key REPEAT safe — holding Enter fires this many times a second.
+        void finish("commit-close", true);
       } else if (e.key === "Escape") {
         // The deliberate way OUT: bake and deselect. Since Enter now holds the
         // selection, there has to be one.
@@ -304,7 +296,7 @@ export function PenOverlay({
         // this change is meant to remove. Escape commits; Ctrl+Z is how you
         // take back a reshape you didn't want.
         e.preventDefault();
-        finish(closedRef.current ? "commit-close" : "commit-open");
+        void finish(closedRef.current ? "commit-close" : "commit-open");
       } else if (e.key === "Backspace") {
         e.preventDefault();
         setAnchors((a) => a.slice(0, -1));
@@ -374,7 +366,8 @@ export function PenOverlay({
         e.clientX <= r.right &&
         e.clientY >= r.top &&
         e.clientY <= r.bottom;
-      if (!inside) finish(editingIdRef.current !== null ? "commit-close" : "commit-open");
+      if (!inside)
+        void finish(editingIdRef.current !== null ? "commit-close" : "commit-open");
     };
     window.addEventListener("pointerdown", onDown);
     return () => window.removeEventListener("pointerdown", onDown);
@@ -413,9 +406,14 @@ export function PenOverlay({
     if (near !== nearStart) setNearStart(near);
   };
 
-  const onCanvasDown = (e: React.PointerEvent) => {
+  const onCanvasDown = async (e: React.PointerEvent) => {
     e.preventDefault();
+    // Read the pointer position BEFORE any await — after one, `e` may have been
+    // reused and the coordinates are no longer the ones that were clicked.
     const { x: ix, y: iy } = mapImg(e.clientX, e.clientY);
+    // Every canvas click supersedes a hit test still in flight, whichever branch
+    // this click ends up taking.
+    const seq = ++hitSeqRef.current;
 
     // Building a new path: close when clicking near the first anchor.
     if (editingId === null && anchors.length >= 2) {
@@ -423,24 +421,48 @@ export function PenOverlay({
       const dx = toSX(f.x) - e.clientX;
       const dy = toSY(f.y) - e.clientY;
       if (dx * dx + dy * dy < CLOSE_RADIUS_SQ) {
-        finish("commit-close", true); // closing the loop keeps it selected too
+        void finish("commit-close", true); // closing the loop keeps it selected too
         return;
       }
     }
 
     // Idle (nothing in progress): try to re-open a committed path under the click.
+    //
+    // ── WHY THIS SPECULATES INSTEAD OF AWAITING FIRST ──
+    //
+    // The obvious version is `const hit = await onHitTest(...)` before deciding
+    // anything, and it costs the gesture that makes a pen feel like a pen:
+    // click-DRAG on the first anchor to pull its handles out of it. That drag is
+    // only picked up if `dragRef.current` is set in the same tick as the
+    // pointerdown — the window listener starts firing `pointermove` immediately,
+    // and anything set a tick later has already missed the beginning of the
+    // stroke. So: act first, correct after.
+    //
+    // Placing the anchor early is free to undo. Anchors are local React state
+    // until `finish()` commits them — no engine op, no history step — so a
+    // speculative one that turns out to be wrong is dropped with a `setAnchors`
+    // and costs nothing but the frame it was visible for.
     if (anchors.length === 0 && onHitTest) {
-      const hit = onHitTest(ix, iy);
-      if (hit) {
-        const { anchors: a, closed: cl } = deserialize(hit.points);
-        if (a.length >= 2) {
-          onEditStart?.(hit.id);
-          setEditingId(hit.id);
-          setClosed(cl);
-          setAnchors(a);
-          return;
-        }
+      dragRef.current = { kind: "create", index: 0 };
+      setAnchors([{ x: ix, y: iy, in: null, out: null }]);
+      const outcome = resolveHit(await onHitTest(ix, iy), seq, hitSeqRef.current);
+      // A later click landed while this was in flight — that click owns the
+      // overlay's state now, so this answer is stale and must not be applied.
+      if (outcome.kind === "stale") return;
+      if (outcome.kind === "open") {
+        // Abandon the speculative anchor and the drag it armed; `setAnchors`
+        // below replaces it wholesale. (The pointermove handler is safe
+        // either way — it opens with `if (d.index >= a.length) return a;`.)
+        dragRef.current = null;
+        onEditStart?.(outcome.id);
+        setEditingId(outcome.id);
+        setClosed(outcome.closed);
+        setAnchors(outcome.anchors);
       }
+      // Either way this click is spent: on a miss the speculative anchor IS the
+      // new path's first anchor, which is what the fall-through below used to
+      // add. Adding it again here would give every fresh path a doubled point.
+      return;
     }
 
     // Create mode only: drop a new anchor (drag pulls its handles).
@@ -490,7 +512,7 @@ export function PenOverlay({
         // actually fires — the twin in `onCanvasDown` is shadowed by this
         // handle — so missing the flag here meant clicking the first anchor
         // still dropped you straight back to nothing selected.
-        finish("commit-close", true);
+        void finish("commit-close", true);
         return;
       }
       dragRef.current = { kind, index };

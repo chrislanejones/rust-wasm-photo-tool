@@ -20,24 +20,25 @@ wait their turn.
 
 ## UI
 
-- **PenOverlay needs a pending state — the last step of ADR-024 Stage
-  3.5.** As of v8.17 the gate sits at 7: the 5 exempt `flushToCanvas`
-  reads plus `AppShell`'s `handlePenCommit` / `handlePenHitTest`. These
-  two are **not** conversions and must not be treated as one — a
-  contract test now fails if they are. `handlePenCommit`'s return value
-  is the contract (`PenOverlay.finish()` uses the new id to keep the
-  finished path selected) *and* the overlay's unmount-cleanup effect
-  calls it to commit a path still in flight, where a React cleanup
-  cannot await. `handlePenHitTest` runs inside mousedown to fork
-  between re-opening the path under the cursor and dropping a new
-  anchor; awaiting turns that fork into a pending state the machine
-  does not have, and a second click arriving in flight takes both
-  branches. **Designed in full: `docs/pen-overlay-async-design.md`** —
-  call graph, the three pieces (fire-and-forget cleanup, a re-entrancy
-  guard on `finish()`, and a speculative-anchor hit test that keeps
-  click-drag instant), the eight gesture cases to test and the four
-  mutants to kill. Its own session, with a FOREGROUND browser — Stage 4
-  is gated on it.
+- ~~**PenOverlay needs a pending state — the last step of ADR-024 Stage
+  3.5.**~~ **DONE, v8.19.** The gate reached its floor of 5 and Stage 3.5
+  is complete; Stage 4 is no longer gated on anything but the decision to
+  flip `ih_engine_worker`. Built as designed
+  (`docs/pen-overlay-async-design.md`, now marked BUILT with the three
+  deviations and the gesture results). Two things worth carrying forward:
+  the guards live in `features/canvas/penPath.ts` because they needed
+  tests and this repo has no component-render harness; and
+  `CanvasArea`'s `onPenCommit` was typed `=> void`, which would have
+  swallowed the Promise **without tsc complaining** — a `void` return
+  slot is not proof that nothing is consumed.
+
+- **No-change re-edit commit pushes a redundant undo snapshot — now
+  visible on the pen too.** Holding `Enter` on a selected pen path adds
+  one `Edit Pen Path` step per repeat (12 presses → 1 `Add` + 11
+  `Edit`). Pre-existing and the same root cause as the text-annotation
+  entry further down: the commit path always snapshots instead of
+  skipping when nothing changed. Cosmetic undo-depth noise, not data
+  loss; measured during v8.19's browser run.
 
 - **Three modal primitives** (`ui/dialog`, `Modal`, `SmallDialog`) —
   converging on `ui/dialog`. (Carried over from CLAUDE.md known debt;

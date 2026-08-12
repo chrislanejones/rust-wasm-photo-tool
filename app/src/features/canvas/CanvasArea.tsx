@@ -232,9 +232,22 @@ interface Props {
   /** Live Background fill for the pen preview (shares toolSettings fill). */
   penFillMode?: "none" | "solid" | "gradient" | "pixelate";
   penFillColor?: string;
-  onPenCommit?: (flatPoints: number[], close: boolean) => void;
+  /** Returns the new annotation's id — `PenOverlay.finish()` needs it to keep
+   *  the finished path selected.
+   *
+   *  ⚠️ This return type was `void` until the Stage-3.5 pen redesign, and that
+   *  was the one place tsc could NOT have caught the conversion: a function
+   *  returning `Promise<number>` is assignable to a slot declared `=> void`, so
+   *  making `handlePenCommit` async would have typechecked here while the
+   *  overlay's `typeof newId === "number"` quietly went false and stopped
+   *  keeping paths selected. The id has always flowed through at runtime; only
+   *  the type was lying. Keep it honest. */
+  onPenCommit?: (flatPoints: number[], close: boolean) => Promise<number | void>;
   /** Pen edit: hit-test a committed path, then load/commit/cancel a reshape. */
-  onPenHitTest?: (imgX: number, imgY: number) => { id: number; points: number[] } | null;
+  onPenHitTest?: (
+    imgX: number,
+    imgY: number,
+  ) => Promise<{ id: number; points: number[] } | null>;
   onPenEditStart?: (id: number) => void;
   onPenEditCommit?: (id: number, flatPoints: number[]) => void;
   onPenEditCancel?: (id: number) => void;
@@ -1539,7 +1552,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             strokeWidth={penStrokeWidth ?? 3}
             fillMode={penFillMode}
             fillColor={penFillColor}
-            onCommit={onPenCommit ?? (() => {})}
+            onCommit={onPenCommit ?? (async () => {})}
             onHitTest={onPenHitTest}
             onEditStart={onPenEditStart}
             onEditCommit={onPenEditCommit}
