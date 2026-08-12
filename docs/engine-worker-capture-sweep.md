@@ -108,7 +108,7 @@ problem. What sits between the reads is part of the pattern.**
 | `app/session/useSelectionActions.ts` | 11 | **HOT PATH** — per-pointermove; a10, last, with its own reasoning |
 | `lib/openraster/export.ts` | 11 | **CAPTURES 1–2**, plus the rest needs a **DECISION**: the file mutates the live document mid-export (`set_active_layer` + `flatten_text_annotations`) between its reads. Pre-existing, not introduced by 3.5 |
 | `app/AppShell.tsx` | 8 | **CAPTURE 3**, remainder ordinary single reads |
-| `hooks/useEngineCore.ts` | 8 | Mostly `flushToCanvas` (`width`/`height`/`data_ptr`/`data_len`/`get_image_data`) — **DISSOLVES at Stage 4, do not convert**; remainder ordinary |
+| `hooks/useEngineCore.ts` | 8 | **CLEARED to the floor, v8.17.** `syncState` converted (a13); what is left is the 5 `flushToCanvas` reads (`width`/`height`/`data_ptr`/`data_len`/`get_image_data`) — **DISSOLVES at Stage 4, do not convert** |
 | `hooks/useTextTool.ts` | 7 | **CAPTURE 4**, remainder ordinary |
 | `hooks/useDrawingTools.ts` | 6 | Mutation sequences (`set_editing_shape` + one edit). Ordinary/hot |
 | `features/tools/settings/BatchSettings.tsx` | 5 | Two throwaway-engine captures (above); ordinary |

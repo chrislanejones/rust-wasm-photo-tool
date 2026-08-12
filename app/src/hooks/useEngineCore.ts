@@ -18,7 +18,7 @@
 // shape includes the source.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject, MouseEvent } from "react";
-import type { ImageHorseTool } from "stamp_tool";
+import type { ImageHorseTool, UiStateCapture } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
 import { onOplogFlush } from "@/lib/oplogPersistence";
 import { checkBuildSkew } from "@/lib/pwa/skew";
@@ -112,6 +112,80 @@ const INITIAL_STATE: CloneStampState = {
   exportQuality: 75,
 };
 
+/** The ten values `capture_ui_state()` carries, copied out of wasm memory. */
+export type UiSnapshot = {
+  has_source: boolean;
+  undo_count: number;
+  redo_count: number;
+  history_labels: string;
+  zoom: number;
+  width: number;
+  height: number;
+  layers_json: string;
+  active_layer_id: number;
+  export_quality: number;
+};
+
+/** The minimum of the engine surface this needs — so a test can supply a fake
+ *  without standing up a wasm module. */
+type UiStateSource = { capture_ui_state: () => UiStateCapture | Promise<UiStateCapture> };
+
+/**
+ * The atomic UI capture, with the liveness guard that makes it safe to await.
+ *
+ * ADR-024 Stage 3.5, a13. Lifted out of `syncState` for one reason: the guard
+ * below is the entire risk of making that call async, and inside a `useCallback`
+ * closed over a ref it had no test. Here it does.
+ *
+ * ── THE GUARD ──
+ * `reset()` nulls `toolRef.current` on a photo switch, and it does NOT free the
+ * engine — nothing in this codebase calls `tool.free()`. So a capture issued
+ * against the OUTGOING document still resolves, happily, carrying that
+ * document's width, history and layer list. Without the check, that stale
+ * snapshot lands on top of the `INITIAL_STATE` that `reset` just wrote, and the
+ * editor shows the previous photo's dimensions and undo stack underneath the
+ * new one. Nothing throws; it self-corrects on the next mutation. That is the
+ * profile of an intermittent nobody files.
+ *
+ * The check is engine IDENTITY, not a counter. `t` is the thing the capture was
+ * issued against, so comparing it answers the real question — "is this still
+ * the live document?" — with no second piece of state to keep in sync.
+ * `OpLog::generation` was considered for this in b2 and rejected: it bumps only
+ * when a redo tail is dropped, not on edits, and it is not on the wasm surface.
+ *
+ * @param stillLive re-checked AFTER the await, never before — checking early
+ *   tests the wrong moment and always passes.
+ * @returns the copied fields, or null if the document was replaced mid-flight.
+ */
+export async function readUiSnapshot(
+  t: UiStateSource,
+  stillLive: () => boolean,
+): Promise<UiSnapshot | null> {
+  const ui = await t.capture_ui_state();
+  try {
+    if (!stillLive()) return null;
+    // Read each field once, then free — the capture is a boxed wasm allocation
+    // and every property access crosses the boundary.
+    return {
+      has_source: ui.has_source,
+      undo_count: ui.undo_count,
+      redo_count: ui.redo_count,
+      history_labels: ui.history_labels,
+      zoom: ui.zoom,
+      width: ui.width,
+      height: ui.height,
+      layers_json: ui.layers_json,
+      active_layer_id: ui.active_layer_id,
+      export_quality: ui.export_quality,
+    };
+  } finally {
+    // BOTH paths free. The stale path is the one that matters: it is the new
+    // path a13 added, it runs exactly when the app is busy switching photos,
+    // and a leak there would be per-photo-switch and invisible.
+    ui.free();
+  }
+}
+
 /** The engine context + public core surface. Domain hooks (useHistory,
  *  useLayers, useExport, useTransforms) and the clone-stamp residual receive
  *  this whole object; the facade re-exposes the public members. */
@@ -125,7 +199,11 @@ export interface EngineCore {
   sourceDisarmedRef: RefObject<boolean>;
   /** True while a clone-stamp stroke is in flight. */
   isDrawingRef: RefObject<boolean>;
-  syncState: () => void;
+  // Async since a13, and deliberately NOT awaited by its 74 callers — the
+  // reasoning is at the implementation. Returned as a Promise rather than
+  // swallowed inside so a caller that ever does need to sequence on it can,
+  // and so tests can await the mirror instead of polling it.
+  syncState: () => Promise<void>;
   flushToCanvas: () => void;
   getCanvasCoords: (
     e: MouseEvent<HTMLCanvasElement> | globalThis.MouseEvent,
@@ -201,7 +279,7 @@ export function useEngineCore(
     setState(INITIAL_STATE);
   }, [canvasRef]);
 
-  const syncState = useCallback(() => {
+  const syncState = useCallback(async () => {
     const t = toolRef.current;
     if (!t) return;
     // ATOMIC CAPTURE (ADR-024). This used to be eleven separate engine reads
@@ -215,7 +293,30 @@ export function useEngineCore(
     //
     // `syncState` runs after essentially every mutation (74 call sites), so
     // this is also eleven boundary crossings per edit reduced to one.
-    const ui = t.capture_ui_state();
+    //
+    // ── ADR-024 Stage 3.5, a13: FIRE-AND-FORGET, NOT AWAITED BY ITS CALLERS ──
+    //
+    // This is async, and all 74 call sites still call it without `await`. That
+    // is the decision, not an oversight, and the reasoning is worth keeping
+    // because the opposite reading looks more rigorous than it is.
+    //
+    // Nothing consumes a return value — the only effect is `setState`, which
+    // React defers anyway, so no caller can observe "the mirror is refreshed"
+    // synchronously TODAY either. Awaiting would therefore buy no caller a
+    // guarantee it does not already have, while turning 44 non-async handlers
+    // into async ones and rippling through their shared type slots (the v8.6
+    // shape) for nothing.
+    //
+    // What makes that safe is FIFO, which is the port's stated invariant
+    // (`lib/engine/port.ts`): one port per document, and a `MessagePort` is
+    // ordered. A mutation queued after this capture lands after it, so the
+    // snapshot always describes the document as of the moment of the call —
+    // which is exactly the ordering the synchronous version had.
+    //
+    // The one thing FIFO does NOT cover is the document being replaced while a
+    // capture is in flight — see `readUiSnapshot`'s liveness guard.
+    const snap = await readUiSnapshot(t, () => toolRef.current === t);
+    if (!snap) return; // stale capture, discarded
     const {
       has_source,
       undo_count,
@@ -227,8 +328,7 @@ export function useEngineCore(
       layers_json,
       active_layer_id,
       export_quality,
-    } = ui;
-    ui.free();
+    } = snap;
 
     const history: HistoryEntry[] = history_labels
       .split("|")

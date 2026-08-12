@@ -84,6 +84,31 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.17 — 2026-08-12
+
+**Nothing you can see.** The readout that mirrors the open document — image size,
+zoom, the undo and redo counts, the layer list — now waits for the engine's
+answer. It runs after almost every edit you make, which makes it the
+most-travelled call of the lot, and the last one of these that was a
+straightforward conversion.
+
+It needed a guard, and the guard is the interesting part. Switching photos puts
+the old document down, but the old engine is still alive underneath, so a reply
+that was already on its way still arrives — carrying the previous photo's size
+and undo history. It would land on top of the photo you just opened. Nothing
+would break and nothing would be logged; the numbers beside your new photo would
+simply be the old photo's until your next edit corrected them. Every reply is now
+checked against the document that asked for it, and dropped if you have moved on.
+
+**The remaining two are not this kind of work.** Both belong to the pen tool. One
+hands back the id of the path you just finished so it stays selected; the other
+decides, on mousedown, whether you are re-opening an existing path or starting a
+new one. Neither can simply wait — the pen overlay has to learn a waiting state
+first, and one of them runs while the overlay is being torn down, where waiting
+is not available at all. That is a design job, not the tail of this one.
+
+<details><summary>Older releases</summary>
+
 ### v8.16 — 2026-08-11
 
 **Nothing you can see.** Four more of the app shell's engine calls now wait for
@@ -100,8 +125,6 @@ hand and fixed.
 tool, and converting them means reworking how the pen overlay finishes a path —
 including what happens when you switch away mid-draw, which cannot wait for an
 answer at all. That is its own piece of work rather than the tail of this one.
-
-<details><summary>Older releases</summary>
 
 ### v8.15 — 2026-08-11
 

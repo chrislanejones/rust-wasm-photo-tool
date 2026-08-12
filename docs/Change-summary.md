@@ -5521,3 +5521,119 @@ Mutation tested: **4 mutants, 4 killed.**
 
 **Gates.** 468 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Engine untouched — no `build:wasm`.
+
+## v8.17 Change Summary — 2026-08-12
+
+ADR-024 Stage 3.5, **a13**. Gate 8 -> 7. No user-visible change.
+
+`useEngineCore`'s `syncState` — the one call that publishes the whole document
+mirror to React, and the most-travelled site in the migration at **74 callers**.
+
+| Bucket | Before | After |
+|---|---|---|
+| un-awaited | 0 | 0 |
+| restructure | 8 | 7 |
+| truthy | 0 | 0 |
+| **gate** | **8** | **7** |
+| of which exempt (`DISSOLVES_AT_STAGE_4`) | 5 | 5 |
+| **convertible** | **3** | **2** |
+
+### The 74 callers do not await, and that is the decision
+
+`syncState` is now `async` and every one of its 74 call sites still calls it
+without `await`. The alternative was examined and rejected:
+
+| | Await at all 74 | Fire-and-forget (**shipped**) |
+|---|---|---|
+| Handlers that must become `async` | **44** | 0 |
+| Shared type slots disturbed | the v8.6 shape, across 5 hook files | none |
+| Guarantee bought for any caller | **none** | none |
+
+Nothing consumes a return value — the only effect is `setState`, which React
+defers regardless, so no caller can observe "the mirror is refreshed"
+synchronously **today** either. Awaiting would buy no caller a guarantee it does
+not already have, at the cost of 44 handlers and their callers.
+
+What makes that safe is **FIFO**, already the port's stated invariant
+(`lib/engine/port.ts`): one port per document, and a `MessagePort` is ordered. A
+mutation queued after a capture lands after it, so the snapshot always describes
+the document as of the moment of the call — exactly the ordering the synchronous
+version had.
+
+### The liveness guard, which FIFO does not cover
+
+`reset()` nulls `toolRef.current` on a photo switch, and **nothing in this
+codebase calls `tool.free()`** — so the outgoing engine is still a live wasm
+object. Its capture resolves normally, carrying the old photo's width, history
+and layer list, and lands on top of the `INITIAL_STATE` that `reset` just wrote.
+
+No throw, nothing in the console, self-corrects on the next edit. That is the
+profile of an intermittent nobody files.
+
+The capture moved into an exported `readUiSnapshot(t, stillLive)` for one
+reason: inside a `useCallback` closed over a ref, the guard had **no test**.
+It compares engine identity rather than a counter — `t` is the thing the capture
+was issued against, so it answers the real question with no second piece of state
+to keep in sync. (`OpLog::generation` was considered for this in b2 and rejected:
+it bumps only when a redo tail is dropped.)
+
+**Mutation-tested, and only compiling mutants counted** — a `tsc` failure proves
+nothing about the tests:
+
+| Mutant | Verdict |
+|---|---|
+| guard neutered (called, result ignored) | **killed** — 2 tests |
+| guard hoisted above the `await` | **killed** — 2 tests |
+| `free()` only on the success path | **killed** — 1 test |
+| braces added around the guard body (equivalent, control) | survived, as it must |
+
+The hoist mutant is the one that matters: every other test in the file passes
+with the guard checked before the await, because they decide liveness once and
+never change it.
+
+### A latent defect found in `engineOwnership.contract.test.ts`
+
+Its "routes every live engine through attachLivePort" check matched
+`toolRef\.current\s*=\s*([^;]+);` — no `(?!=)`. The liveness guard's
+`toolRef.current === t` is the first code in the repo to compare against the live
+handle, and it failed the suite with **`unrouted assignment: toolRef.current = ==
+t)`**: the regex took the first `=` of `===` and captured the rest of the line.
+
+The sibling check one test above already had `=[^=]` for exactly this reason.
+Nothing had exercised the difference in the eight months both existed. Fixed, and
+confirmed not vacuous — the scanner still sees all 6 real assignments and ignores
+the 1 comparison.
+
+### ⚠️ The gate cannot reach 5 by conversion
+
+What remains is the 5 exempt sites plus `AppShell`'s 2 pen sites, and **the pen
+pair is not an `await` job**:
+
+| Site | Why not |
+|---|---|
+| `handlePenCommit` (`add_bezier_annotation`) | Its return value **is** the contract — `PenOverlay.finish()` uses the new id synchronously to keep the path selected. Worse, the overlay's **unmount cleanup** also calls it, to commit a path still in flight when the pen is left, and a React cleanup cannot await. |
+| `handlePenHitTest` (`capture_pen_hit`) | Called inside mousedown to decide, right there, between re-opening the path under the cursor and dropping a new anchor. Await turns that fork into a pending state the overlay's machine does not have; a second click arriving in flight takes both branches. |
+
+Both are now named in a contract test that fails if someone converts them. The
+fix is a state machine with an explicit pending-hit-test state and a
+teardown-commit path that does not depend on the component surviving — sized and
+scheduled on its own.
+
+**Verified in the browser** (production build, port 4318, served hash
+`index-BvPfh9br.js` confirmed against the build):
+
+| Path | Result |
+|---|---|
+| Boot, 24 sample photos, editor live | mirror `1395×2078` |
+| Rotate 90° | mirror **and** canvas `2078×1395` → `1395×2078`, in agreement |
+| Undo | restored, redo correctly re-enabled (`undo_count`/`redo_count` ride the same capture) |
+| Rotate then photo-switch, same tick | no stale dimensions |
+| Burst: 2× (mutate + switch), no waiting | **0 unhandled rejections, 0 errors**, mirror/canvas agree |
+
+Note for the next session: the tab was `document.hidden`, which throttles timers
+and rAF. Two long probe scripts hit the 45 s CDP timeout and one screenshot
+caught a mid-flight state that looked like a mirror/canvas mismatch and was not.
+One action per tool call, reading state on the next call, works around it.
+
+**Gates.** 476 JS tests (7 new), `tsc` clean, eslint 0 errors, production build
+clean. Engine untouched — no `build:wasm`.

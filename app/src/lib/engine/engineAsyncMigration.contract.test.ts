@@ -316,7 +316,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 8;
+const BUDGET = 7;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -534,10 +534,16 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // (restructure 11 - 3 = 8). truthy stays 0 -- see the ledger note, it was
     // never a true zero. awaited 84 -> 88. Gate 12 - 4 = 8, and 0 + 8 + 0 = 8.
     // Remaining: AppShell's 2 pen sites + syncState + the 5 exempt = 8.
-    ).toBe(8);
+    // a13: `syncState` -- a non-async `useCallback`, so restructure 8 - 1 = 7.
+    // awaited 88 -> 89. Gate 8 - 1 = 7, and 0 + 7 + 0 = 7.
+    //
+    // THE GATE CANNOT REACH 5 BY CONVERSION. What is left is the 5 exempt sites
+    // plus AppShell's 2 pen sites, and the pen pair is NOT an `await` job -- see
+    // `the last two convertible sites are a PenOverlay redesign` below.
+    ).toBe(7);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(88);
+    expect(gate.awaited, "cumulative converted sites").toBe(89);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
@@ -674,6 +680,46 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     const convertible = gate.remaining - EXEMPT_TOTAL;
     expect(convertible, "convertible work left in Stage 3.5").toBe(BUDGET - EXEMPT_TOTAL);
     expect(gate.remaining).toBeGreaterThanOrEqual(EXEMPT_TOTAL);
+  });
+
+  it("the last two convertible sites are a PenOverlay redesign, not an await", () => {
+    // a13 left the gate at 7: the 5 exempt sites plus these two. They are the
+    // only things standing between Stage 3.5 and its floor, and the obvious
+    // move — slap `async`/`await` on both and watch the gate hit 5 — produces a
+    // pen tool that drops strokes. Naming them here so the next session reads
+    // this before it reads the diff.
+    //
+    // `handlePenCommit` (AppShell:823, `add_bezier_annotation`)
+    //   Its return value IS the contract: `PenOverlay.finish()` uses the new id
+    //   synchronously to keep the finished path selected. Worse, the overlay's
+    //   UNMOUNT CLEANUP (`PenOverlay.tsx`, the run-once exit effect) also calls
+    //   it, to commit a path still in flight when the pen is left — and a React
+    //   cleanup function cannot await. Behind the worker that commit becomes a
+    //   message posted by a component that is already gone, racing the teardown
+    //   that follows it.
+    //
+    // `handlePenHitTest` (AppShell:859, `capture_pen_hit`)
+    //   Called inside mousedown to decide, right there, between "re-open the
+    //   committed path under the cursor" and "drop a new anchor". Await turns
+    //   that fork into a pending state the overlay's machine does not have, and
+    //   a second click arriving while the first is in flight takes both
+    //   branches.
+    //
+    // The fix is a state machine with an explicit pending-hit-test state and a
+    // teardown-commit path that does not depend on the component surviving —
+    // design work, sized and scheduled on its own, not a conversion batch.
+    const PEN_REDESIGN = [
+      "app/src/app/AppShell.tsx::handlePenCommit",
+      "app/src/app/AppShell.tsx::handlePenHitTest",
+    ];
+    const convertible = gate.remainingHandlers.filter(
+      (r) => !(keyOf(r) in DISSOLVES_AT_STAGE_4),
+    );
+    expect(
+      convertible.map(keyOf).sort(),
+      "the only non-exempt sites left must still be the pen pair — if this " +
+        "fails LOW someone converted them; read the reasoning above first",
+    ).toEqual(PEN_REDESIGN);
   });
 
   it("every allowlist entry still matches something", () => {

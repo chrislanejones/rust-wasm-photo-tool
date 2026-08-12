@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.17",
+    date: "2026-08-12",
+    headline: "The readout that waits for the answer",
+    entries: [
+      {
+        tag: "infra",
+        text: "The readout that mirrors the open document — image size, zoom, the undo and redo counts, the layer list — now waits for the engine's answer. It runs after almost every edit you make, which makes it the most-travelled call of the lot, and the last one of these that was a straightforward conversion.",
+      },
+      {
+        tag: "fix",
+        text: "It needed a guard. Switching photos puts the old document down, but the old engine is still alive underneath, so a reply already on its way still arrives — carrying the previous photo's size and undo history, landing on top of the photo you just opened. Nothing would break and nothing would be logged; the numbers beside your new photo would simply be the old photo's until your next edit corrected them. Every reply is now checked against the document that asked for it, and dropped if you have moved on.",
+      },
+      {
+        tag: "infra",
+        text: "The remaining two are not this kind of work. Both belong to the pen tool: one hands back the id of the path you just finished so it stays selected, the other decides on mousedown whether you are re-opening an existing path or starting a new one. Neither can simply wait — the overlay has to learn a waiting state first, and one of them runs while the overlay is being torn down, where waiting is not available at all.",
+      },
+    ],
+  },
+  {
     version: "v8.16",
     date: "2026-08-11",
     headline: "The check that was hiding one line up",

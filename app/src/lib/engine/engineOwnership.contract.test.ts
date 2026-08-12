@@ -48,7 +48,17 @@ describe("only useEngineCore owns the live engine handle", () => {
   it("routes every live engine it creates through attachLivePort", () => {
     const src = code(join(SRC, "hooks/useEngineCore.ts"));
     // Each `toolRef.current = <expr>` must be null (reset) or the port call.
-    const assigns = [...src.matchAll(/toolRef\.current\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
+    //
+    // `(?!=)` matters — without it this reads a COMPARISON as an assignment.
+    // a13's liveness guard (`() => toolRef.current === t`) was the first code in
+    // the repo to compare against the live handle, and it failed this test with
+    // "unrouted assignment: toolRef.current = == t)": the regex matched the
+    // first `=` of `===` and captured the rest of the line. The sibling check
+    // above already had `=[^=]` for exactly this reason; this one did not, and
+    // nothing had exercised the difference in the eight months it existed.
+    const assigns = [...src.matchAll(/toolRef\.current\s*=(?!=)\s*([^;]+);/g)].map((m) =>
+      m[1].trim(),
+    );
     expect(assigns.length, "expected the known assignment sites").toBeGreaterThan(0);
     for (const a of assigns) {
       expect(a, `unrouted assignment: toolRef.current = ${a}`)

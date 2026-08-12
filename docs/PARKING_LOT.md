@@ -20,6 +20,22 @@ wait their turn.
 
 ## UI
 
+- **PenOverlay needs a pending state — the last step of ADR-024 Stage
+  3.5.** As of v8.17 the gate sits at 7: the 5 exempt `flushToCanvas`
+  reads plus `AppShell`'s `handlePenCommit` / `handlePenHitTest`. These
+  two are **not** conversions and must not be treated as one — a
+  contract test now fails if they are. `handlePenCommit`'s return value
+  is the contract (`PenOverlay.finish()` uses the new id to keep the
+  finished path selected) *and* the overlay's unmount-cleanup effect
+  calls it to commit a path still in flight, where a React cleanup
+  cannot await. `handlePenHitTest` runs inside mousedown to fork
+  between re-opening the path under the cursor and dropping a new
+  anchor; awaiting turns that fork into a pending state the machine
+  does not have, and a second click arriving in flight takes both
+  branches. Needs: an explicit pending-hit-test state with input
+  lockout, and a teardown-commit path that does not depend on the
+  component surviving. Its own session — Stage 4 is gated on it.
+
 - **Three modal primitives** (`ui/dialog`, `Modal`, `SmallDialog`) —
   converging on `ui/dialog`. (Carried over from CLAUDE.md known debt;
   v7.1 did the first convergence pass.)
