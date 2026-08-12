@@ -64,18 +64,38 @@ export function detachLivePort(): void {
  *
  *  Read fresh each call, like every other flag in this repo, so a tab can be
  *  flipped without a rebuild. OFF by default and there is no path that turns it
- *  on yet: `attachLivePort` above still returns the tool directly, because the
- *  **166** value-consumed reads are synchronous and Stage 3.5 has not converted
- *  them. Turning this on today would change nothing; that is deliberate, so the
- *  worker and its protocol can be built and tested before anything depends on
- *  them.
+ *  on yet: `attachLivePort` above still returns the tool directly. Turning this
+ *  on today would change nothing; that is deliberate, so the worker and its
+ *  protocol can be built and tested before anything depends on them.
  *
- *  (That figure said 121 until 2026-08-08. The audit matched engine calls by
+ *  WHAT IS ACTUALLY LEFT (v8.17 — read from `node scripts/engine-call-audit.mjs`,
+ *  never hand-counted). Of **96** value-consumed reads, **89 are converted** and
+ *  **7 remain**:
+ *
+ *    5  `useEngineCore.flushToCanvas` — the per-frame blit. EXEMPT on purpose
+ *       (`DISSOLVES_AT_STAGE_4`): under Option A the canvas moves INTO the
+ *       worker, so this path stops crossing the boundary rather than converting.
+ *       Awaiting it would put a round trip on every frame.
+ *    2  `AppShell` `handlePenCommit` / `handlePenHitTest` — NOT an `await` job.
+ *       A PenOverlay state-machine change; `docs/pen-overlay-async-design.md`.
+ *
+ *  So the gate bottoms out at **5, not 0**, and the 2 above are the only
+ *  outstanding work in Stage 3.5.
+ *
+ *  ⚠️ THIS PARAGRAPH WAS WRONG FROM 2026-08-08 TO v8.17. It said "the 166
+ *  value-consumed reads are synchronous and Stage 3.5 has not converted them",
+ *  and stayed there while 89 of them were converted over ten releases — the
+ *  count also fell 166 → 96 as atomic captures collapsed several reads into one
+ *  call each, so both halves of the sentence drifted. It is the file that
+ *  explains WHY the flag is off, so a stale reason here is worse than no reason.
+ *  Re-run the audit and correct this line whenever the gate moves.
+ *
+ *  (The 166 itself said 121 until 2026-08-08. The audit matched engine calls by
  *  receiver name and knew only three literal names, so every aliased call —
  *  `const t = toolRef.current; t.width()`, the dominant shape here — was
- *  invisible: 93 of 292 sites, a third of the work. Do not hand-edit this
- *  number; `node scripts/engine-call-audit.mjs` prints it, and
- *  `engineAsyncMigration.contract.test.ts` pins it.)
+ *  invisible: 93 of 292 sites, a third of the work. Do not hand-edit these
+ *  numbers; the audit prints them, and
+ *  `engineAsyncMigration.contract.test.ts` pins them.)
  *
  *  Stage 5 flips the default, and only on a measured frame timeline showing the
  *  main thread idle during a 12MP sharpen — not on the architecture being

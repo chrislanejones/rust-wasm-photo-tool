@@ -47,7 +47,7 @@ async function flattenAllLayersInPlace(tool: ImageHorseTool): Promise<boolean> {
     const id = layers[i]?.id;
     if (id === undefined) continue;
     tool.set_active_layer(id);
-    // ADR-024 Stage 3.5 — THE LAST TRUTHY TRAP IN THE CODEBASE. Un-awaited, a
+    // ADR-024 Stage 3.5 — a truthy trap. Un-awaited, a
     // Promise is always truthy, so `flattenedAny` would be true after the first
     // layer regardless. The caller surfaces that as "annotations were baked into
     // pixels, and your redo history was cleared" — a notice the user would get
@@ -55,6 +55,13 @@ async function flattenAllLayersInPlace(tool: ImageHorseTool): Promise<boolean> {
     //
     // `set_active_layer` above is deliberately NOT awaited: it consumes no
     // return value, so it is fire-and-forget and has never been in the gate.
+    //
+    // ⚠️ This said "THE LAST TRUTHY TRAP IN THE CODEBASE" when it shipped in
+    // v8.15. It was not. v8.16 found another in `AppShell.handlePlace`, where
+    // the guard sits one line BELOW the call — a shape the audit classifies
+    // from the text at the call site and therefore cannot see, so the bucket
+    // was reporting zero while a live trap sat in it. "No traps left" is a
+    // statement about the instrument, never about the code.
     if (await tool.flatten_text_annotations()) flattenedAny = true;
   }
 

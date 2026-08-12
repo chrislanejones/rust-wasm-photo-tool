@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.18",
+    date: "2026-08-12",
+    headline: "Four things the code said about itself that were no longer true",
+    entries: [
+      {
+        tag: "fix",
+        text: "Four places in the codebase described how far the engine-in-a-worker migration had got, and all four had drifted. One had been wrong for ten releases while the number it quoted fell by 89. The one that matters is the description under the “Engine in a Worker” switch in Features, because that is the one a person actually reads. They now all say the same thing, and it is the true one.",
+      },
+      {
+        tag: "fix",
+        text: "A fifth called itself “the last truthy trap in the codebase” when it shipped — and was disproved the next day by another one hiding a line below its own call. It now records that instead: “none left” is a statement about the tool doing the looking, not about the code.",
+      },
+      {
+        tag: "infra",
+        text: "The pen tool's last two engine calls are now designed rather than just deferred. They are the only thing standing between this migration and the end of its current stage, and they are not the “make it wait for the answer” job the other 89 were — so the design, the eight gestures that have to be tested, and the four ways to prove those tests actually work are written down before anyone starts.",
+      },
+    ],
+  },
+  {
     version: "v8.17",
     date: "2026-08-12",
     headline: "The readout that waits for the answer",

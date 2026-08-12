@@ -5637,3 +5637,61 @@ One action per tool call, reading state on the next call, works around it.
 
 **Gates.** 476 JS tests (7 new), `tsc` clean, eslint 0 errors, production build
 clean. Engine untouched — no `build:wasm`.
+
+## v8.18 Change Summary — 2026-08-12
+
+**No behaviour change. Four stale claims corrected, and the pen redesign
+designed.** A follow-up to v8.17 rather than a new step: the gate is unmoved at
+**7**, and no engine call was converted.
+
+### The four stale claims
+
+Each of these existed to explain *why* the engine-worker flag is off. A stale
+reason in that position is worse than no reason — it is the
+"justification that quietly stopped being true" failure this repo has now hit
+three times.
+
+| File | Said | Reality |
+|---|---|---|
+| `lib/engine/port.ts` | "the **166** value-consumed reads are synchronous and Stage 3.5 has not converted them" | 96 value-consumed, **89 converted**, 7 left |
+| `lib/featureFlags.ts` | "the **166** synchronous engine reads have not been converted" — **user-visible**, under the Engine-in-a-Worker switch in Features | same |
+| `lib/engine/workerClient.ts` | "the **121** synchronous reads have not been converted" | 121 was itself the pre-2026-08-08 undercount |
+| `workers/engine.worker.ts` | "the **121** synchronous reads have not been converted yet" | same |
+
+`port.ts` was wrong for **ten releases** — it kept saying 166 while 89 of them
+were converted underneath it. Both halves of the sentence had drifted: the count
+also fell 166 → 96 as atomic captures collapsed several reads into one call each.
+All four now carry the same numbers, sourced from
+`scripts/engine-call-audit.mjs`, and a note to re-read them whenever the gate
+moves.
+
+### A fifth, and the better lesson
+
+`lib/openraster/export.ts` labelled its `flatten_text_annotations` trap
+**"THE LAST TRUTHY TRAP IN THE CODEBASE"** when it shipped in v8.15. v8.16
+disproved it the next day, finding another in `AppShell.handlePlace` where the
+guard sits one line *below* the call — a shape the audit classifies from the text
+at the call site and therefore cannot see. The comment now records that instead:
+**"no traps left" is a statement about the instrument, never about the code.**
+
+### `docs/pen-overlay-async-design.md` — new
+
+The last 2 sites in Stage 3.5, designed. Previously they were only *deferred*,
+with the reason recorded twice but no plan attached.
+
+| Piece | Decision |
+|---|---|
+| Unmount cleanup calls `onCommit` | **Already correct as fire-and-forget** — it discards the id, and `postMessage` is issued synchronously, so FIFO puts the op ahead of anything `reset()` does. "A cleanup cannot await" reads like the blocker and is not. |
+| `finish()` | Goes `async`, **plus a re-entrancy guard**. All five of its callers can await (checked, not assumed). Without the guard, holding `Enter` commits the same anchors twice — two identical paths, two undo steps. |
+| `onHitTest` in `onCanvasDown` | **Speculate, then correct.** Awaiting before acting would cost click-drag-to-curve on the first anchor, because `dragRef` must be set in the pointerdown tick. Instead drop the anchor optimistically, await, and discard it if the hit test finds a path — anchors are local React state until commit, so discarding is free. A sequence check handles two fast clicks. |
+
+Also documented: the eight gesture cases that are the only things able to catch a
+mistake here (`tsc`, eslint and the ratchet all cannot — every failure mode is
+state-machine ordering), the four mutants to kill, and a warning not to verify it
+in a backgrounded tab.
+
+Linked from `docs/PARKING_LOT.md` and from the contract test that fails if either
+site is converted.
+
+**Gates.** 476 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.

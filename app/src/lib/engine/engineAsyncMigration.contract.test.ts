@@ -708,6 +708,14 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // The fix is a state machine with an explicit pending-hit-test state and a
     // teardown-commit path that does not depend on the component surviving —
     // design work, sized and scheduled on its own, not a conversion batch.
+    //
+    // ⚠️ READ `docs/pen-overlay-async-design.md` BEFORE TOUCHING EITHER. It has
+    // the full call graph (finish() has 5 callers and all 5 CAN await; the
+    // unmount cleanup discards the id and so is correctly fire-and-forget), the
+    // two guards the design turns on — a re-entrancy flag on `finish()` and a
+    // sequence check on the hit test — and the eight gesture cases that are the
+    // only things able to catch a mistake here. tsc, eslint and this ratchet
+    // cannot: every failure mode is state-machine ordering.
     const PEN_REDESIGN = [
       "app/src/app/AppShell.tsx::handlePenCommit",
       "app/src/app/AppShell.tsx::handlePenHitTest",

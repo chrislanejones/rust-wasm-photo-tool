@@ -32,9 +32,12 @@ wait their turn.
   between re-opening the path under the cursor and dropping a new
   anchor; awaiting turns that fork into a pending state the machine
   does not have, and a second click arriving in flight takes both
-  branches. Needs: an explicit pending-hit-test state with input
-  lockout, and a teardown-commit path that does not depend on the
-  component surviving. Its own session — Stage 4 is gated on it.
+  branches. **Designed in full: `docs/pen-overlay-async-design.md`** —
+  call graph, the three pieces (fire-and-forget cleanup, a re-entrancy
+  guard on `finish()`, and a speculative-anchor hit test that keeps
+  click-drag instant), the eight gesture cases to test and the four
+  mutants to kill. Its own session, with a FOREGROUND browser — Stage 4
+  is gated on it.
 
 - **Three modal primitives** (`ui/dialog`, `Modal`, `SmallDialog`) —
   converging on `ui/dialog`. (Carried over from CLAUDE.md known debt;

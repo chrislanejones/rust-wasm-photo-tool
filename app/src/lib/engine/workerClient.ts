@@ -1,9 +1,14 @@
 // ADR-024 Stage 3 — the main-thread half of the engine port.
 //
 // One client, one worker, one queue. `lib/engine/port.ts` is where this gets
-// swapped in; today it is not, because `ih_engine_worker` defaults OFF and the
-// 166 synchronous reads have not been converted (Stage 3.5). That count comes
-// from `scripts/engine-call-audit.mjs`; do not hand-edit it.
+// swapped in; today it is not, because `ih_engine_worker` defaults OFF and
+// Stage 3.5 is not finished. As of v8.17 that means 7 reads, not the 166 this
+// comment claimed for ten releases while 89 of them were converted: 5 are the
+// per-frame blit, exempt because they dissolve at Stage 4, and 2 are the pen
+// sites, which need a state-machine change rather than an await
+// (`docs/pen-overlay-async-design.md`). Counts come from
+// `scripts/engine-call-audit.mjs`; do not hand-edit them, and re-read them
+// here whenever the gate moves — port.ts carries the same numbers.
 //
 // WHY NOT COMLINK, when the codec worker uses it. Comlink is the right tool
 // there: `codec.worker.ts` holds no state, each call builds its own

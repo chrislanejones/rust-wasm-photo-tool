@@ -84,6 +84,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.18 — 2026-08-12
+
+**Almost nothing you can see, and no behaviour changed.** Four places in the
+codebase described how far the engine-in-a-worker migration had got, and all
+four had drifted. One had been wrong for ten releases while the number it quoted
+fell by 89. The one that matters is the description under the "Engine in a
+Worker" switch in Features, because that is the one a person actually reads.
+
+They now all say the same thing, and it is the true one: 89 of 96 conversions
+are done and 7 are left — 5 of those deliberately exempt, because they dissolve
+when the canvas moves into the worker rather than needing conversion at all, and
+the last 2 belonging to the pen tool.
+
+**The pen tool's two are now designed rather than just deferred.** They are the
+only thing standing between this migration and the end of its current stage, and
+they are not the "make it wait for the answer" job the other 89 were: finishing a
+pen path hands back an id that keeps the path selected, and clicking has to
+decide in that instant whether you are re-opening an existing path or starting a
+new one. Both, plus the eight gestures that have to be tested before it can ship,
+are written down now.
+
+<details><summary>Older releases</summary>
+
 ### v8.17 — 2026-08-12
 
 **Nothing you can see.** The readout that mirrors the open document — image size,
@@ -106,8 +129,6 @@ decides, on mousedown, whether you are re-opening an existing path or starting a
 new one. Neither can simply wait — the pen overlay has to learn a waiting state
 first, and one of them runs while the overlay is being torn down, where waiting
 is not available at all. That is a design job, not the tail of this one.
-
-<details><summary>Older releases</summary>
 
 ### v8.16 — 2026-08-11
 
