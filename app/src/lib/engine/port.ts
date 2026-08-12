@@ -2,9 +2,13 @@
 //
 // WHAT THIS IS FOR. Stage 3 moves the engine into a Worker, at which point
 // every call has to travel over a message queue instead of a function call.
-// This module is the single named place where that swap happens. Today it is
-// an identity function: `attachLivePort(tool)` returns the tool. Stage 3
-// replaces the body, and no call site changes.
+// This module is the single named place where that swap happens. It is
+// `createLiveEngine()` — NOT `attachLivePort()`, which this header claimed
+// until v8.24 and which could never have worked: by the time `attachLivePort`
+// is reached the engine has already been built and image-loaded on the main
+// thread, and a worker cannot adopt that handle. Construction is the thing that
+// moves, so the five load paths call the factory and it decides where the
+// engine lives. `docs/engine-worker-a12-design.md`.
 //
 // THE INVARIANT, corrected. ADR-024 states it as "every mutation reaches the
 // engine through a single message queue". That is one word wrong, and the wrong
@@ -33,6 +37,8 @@
 // ownership eroding — `engineOwnership.contract.test.ts` is the other half of
 // this stage and the more important one.
 import type { ImageHorseTool } from "stamp_tool";
+import { EngineWorkerClient } from "./workerClient";
+import { NEVER_FORWARD } from "./engineSurface";
 
 /**
  * Hand a freshly-constructed engine to the live document's port.
@@ -63,12 +69,101 @@ export function attachLivePort(tool: ImageHorseTool): ImageHorseTool {
 }
 
 /**
- * Release the live document's port. Identity today; Stage 3 tears down the
- * worker's channel here. Paired with `attachLivePort` so the two halves of the
- * lifecycle are visible in one file rather than implied by an assignment.
+ * Release the live document's port. Tears down the worker's channel when there
+ * is one. Paired with `attachLivePort` / `createLiveEngine` so the two halves of
+ * the lifecycle are visible in one file rather than implied by an assignment.
  */
 export function detachLivePort(): void {
-  /* no channel to close until Stage 3 */
+  // ⚠️ wasm memory NEVER SHRINKS (a11.0, ~75 MB observed during a flip window),
+  // so an engine instance that is dropped without being terminated raises the
+  // tab's floor for the rest of the session. Disposing here is not tidiness.
+  livePort?.dispose();
+  livePort = null;
+}
+
+/** The one worker client for the live document. Module-scoped because the
+ *  invariant at the top of this file is ONE PORT PER DOCUMENT — a second client
+ *  would be a second queue, and `OpLog::append` records arrival order. */
+let livePort: EngineWorkerClient | null = null;
+
+/** The live worker client, for callers that need the port itself rather than
+ *  the engine handle (a12.2 hands it the transferred `OffscreenCanvas`).
+ *  Null whenever the flag is off — there is no worker to talk to. */
+export function liveEnginePort(): EngineWorkerClient | null {
+  return livePort;
+}
+
+/**
+ * ADR-024 a12.1 — build the live document's engine, wherever it is going to
+ * live. **This is the real swap point**, and `attachLivePort` never was.
+ *
+ * ── WHY THE SEAM MOVED ──────────────────────────────────────────────────────
+ *
+ * `attachLivePort(tool)` receives an engine that has ALREADY been constructed
+ * and loaded with an image on the main thread; every one of its call sites does
+ * `new Tool(w, h)` + `load_image(...)` first. A worker-resident engine cannot
+ * adopt that handle, and building one on each side is disqualified by this
+ * file's own invariant — two engines are two op logs. So construction is what
+ * has to move, and this factory is where the decision is made. See
+ * `docs/engine-worker-a12-design.md`.
+ *
+ * The boundary is deliberately narrow: **create the engine and load its base
+ * image, nothing else.** Callers that then apply an artboard border, rebuild a
+ * layer stack or replay an op log keep doing that through the returned handle,
+ * because those are ordinary engine calls and every one of them is already
+ * awaited (Stage 3.5 + a10, v8.22). Widening this to swallow their differences
+ * would put five load paths' logic behind one flag branch, which is exactly the
+ * divergence `engineAsyncMigration.contract.test.ts` forbids.
+ *
+ * `Tool` is passed in rather than imported here so the local path keeps using
+ * the module the caller already initialised — the same instance whose
+ * `memory` it hands to `registerWasmMemory` for the zero-copy blit.
+ *
+ * ⚠️ WITH THE FLAG ON, THE LOCAL BRANCH NEVER RUNS, which is the point: no
+ * second `ImageHorseTool`, no second op log, no doubled image memory.
+ */
+export async function createLiveEngine(spec: {
+  Tool: new (width: number, height: number) => ImageHorseTool;
+  width: number;
+  height: number;
+  /** Base image RGBA. Omitted for the 1×1 placeholder an op-log restore
+   *  replaces wholesale. */
+  pixels?: Uint8Array;
+}): Promise<ImageHorseTool> {
+  const { Tool, width, height, pixels } = spec;
+
+  if (!engineWorkerEnabled()) {
+    const tool = new Tool(width, height);
+    if (pixels) tool.load_image(pixels);
+    return attachLivePort(tool);
+  }
+
+  // One document, one port: replace any previous worker rather than accumulate.
+  livePort?.dispose();
+  const port = new EngineWorkerClient();
+  livePort = port;
+  await port.init(width, height);
+  if (pixels) {
+    // ⚠️ DELIBERATELY NOT TRANSFERRED, and the reason is a silent-corruption
+    // hazard rather than a preference.
+    //
+    // Transferring DETACHES the buffer on this side, and a detached
+    // `ArrayBuffer` reads as ZERO-LENGTH — no throw, no warning. Two of the
+    // three callers that supply pixels hand over a VIEW of a buffer they do not
+    // own: `loadImageFromPixels` does `new Uint8Array(pixels.buffer)` over its
+    // caller's array (four call sites in `useImageSession`), and
+    // `restoreFromSaved` wraps `canvasRgba.buffer` from the PNG decode. Only
+    // `loadImage`'s `new Uint8Array(imageData.data)` is a genuine copy.
+    // Transferring here would quietly empty an array the caller still holds.
+    //
+    // And the saving is illusory: without a transfer `postMessage` structured-
+    // clones the array, which is one copy; copying defensively and then
+    // transferring is also one copy. Same cost, no hazard. If Stage 5's
+    // measurement ever shows this matters, the fix is an explicit opt-in from a
+    // call site that can prove its buffer is dead — not a blanket transfer here.
+    await port.call("load_image", [pixels]);
+  }
+  return createEngineProxy(port);
 }
 
 /** The subset of `EngineWorkerClient` the proxy needs. Declared structurally so
@@ -110,12 +205,34 @@ export interface EngineCallPort {
  * surface is what drifted by 31 methods and left the migration's own gate
  * understating by 36 call sites for ten releases (v8.21). A surface the engine
  * reports about itself cannot drift from the engine.
+ *
+ * ── THE TYPE DECISION, MADE ON PURPOSE ──────────────────────────────────────
+ *
+ * `ImageHorseTool.width()` is declared `(): number`; this returns
+ * `Promise<number>`. Runtime is fine — all 113 value-consuming sites await, and
+ * `await` over a plain value is a no-op — but the DECLARED type stops being
+ * true, so the choice is which lie to tell and where.
+ *
+ *   cast at the seam (CHOSEN)  one file is wrong, loudly, with this comment
+ *   `PromisifiedTool` mapped   honest, but rewrites the type at ~260 call sites
+ *                              that the gate already proves await
+ *   union the return type      honest, non-breaking, worst to USE — every
+ *                              caller would have to handle both shapes forever
+ *
+ * The cast wins because the dishonesty is CONTAINED and ANNOTATED, and because
+ * the alternative that is honest at the type level (the mapped type) would
+ * churn every call site to restate something the migration already established.
+ * Revisit at Stage 5, when the flag's default flips and "sometimes a Promise"
+ * stops being the exception.
  */
+
+
 export function createEngineProxy(port: EngineCallPort): ImageHorseTool {
   const bound = new Map<string, (...args: unknown[]) => Promise<unknown>>();
   return new Proxy(Object.create(null) as ImageHorseTool, {
     get(_t, prop) {
       if (typeof prop !== "string") return undefined;
+      if (NEVER_FORWARD.has(prop)) return undefined;
       if (!port.surface.has(prop)) return undefined;
       let fn = bound.get(prop);
       if (!fn) {
@@ -128,13 +245,13 @@ export function createEngineProxy(port: EngineCallPort): ImageHorseTool {
       return fn;
     },
     has(_t, prop) {
-      return typeof prop === "string" && port.surface.has(prop);
+      return typeof prop === "string" && !NEVER_FORWARD.has(prop) && port.surface.has(prop);
     },
     // `Object.getOwnPropertyNames(Object.getPrototypeOf(handle))` is how the
     // audit and the worker both enumerate an engine; keep it answerable here so
     // a proxy is introspectable the same way a real handle is.
     ownKeys() {
-      return [...port.surface];
+      return [...port.surface].filter((k) => !NEVER_FORWARD.has(k));
     },
     getOwnPropertyDescriptor() {
       return { enumerable: true, configurable: true };

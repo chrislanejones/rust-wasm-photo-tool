@@ -6088,3 +6088,140 @@ miss on every render.
 
 **Gates.** 498 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Engine untouched — no `build:wasm`.
+
+## v8.24 Change Summary — 2026-08-12
+
+**a12.1 — engine construction routed through `createLiveEngine()`.** Behind the
+flag; the local path is unchanged. No user-visible change.
+
+### The seam moved
+
+`attachLivePort(tool)` could never have been the swap point: it receives an
+engine already built and image-loaded on the main thread. Construction is what
+has to move, so the five load paths now call a factory that decides where the
+engine lives.
+
+| Site | Shape |
+|---|---|
+| `loadImage` | create + load |
+| `loadImageFromPixels` (artboard) | create + load, then `set_artboard_border` + `clear_history` **here** |
+| `loadImageFromPixels` (plain) | create + load |
+| `applyRestored` | **reuses** the live engine; only boot creates a 1×1 placeholder |
+| `restoreFromSaved` | create + load, then layer-stack rebuild + history injection **here** |
+
+The factory's boundary is deliberately narrow — **create the engine and load its
+base image, nothing else**. The artboard border, the layer stack and the op-log
+replay stay at their call sites as ordinary awaited engine calls. Folding them in
+would put five load paths' logic behind one flag branch, which is the divergence
+the contract test forbids.
+
+`new Tool(` and `attachLivePort` are now both **zero** in `useEngineCore`.
+
+### The build had never actually built the worker
+
+Bringing `workerClient` into the production graph broke `pnpm run build`
+immediately:
+
+> `Invalid value "iife" for option "worker.format" — UMD and IIFE output formats
+> are not supported for code-splitting builds`
+
+`engine.worker.ts` does `await import("stamp_tool")`, and a dynamic import forces
+code-splitting, which IIFE cannot express. It had never surfaced because nothing
+imported the client — the worker was dead-code-eliminated before the bundler had
+to emit it. **The engine worker has never been buildable.**
+
+Fixed with `worker: { format: "es" }`, which is what both workers already assume:
+`codecWorkerClient` and `workerClient` each construct theirs with
+`{ type: "module" }`. The codec worker survived on IIFE only because it has no
+dynamic import, so its single-chunk output happened to be valid as a module
+script too.
+
+| | Before | After |
+|---|---|---|
+| Main bundle | 2,732.88 kB | **2,738.49 kB** (+5.6 kB) |
+| `engine.worker` chunk | never emitted | **1.5 kB** |
+| `codec.worker` chunk | 4.9 kB | 4.9 kB |
+| Fetched at runtime, flag OFF | — | **0** — verified in the browser |
+
+### A guard with no test, found by breaking it
+
+Mutation testing the factory: **M3 (don't dispose the previous worker) and M4
+(`detachLivePort` stops disposing) both SURVIVED.** Nothing covered the shutdown
+path.
+
+That matters because wasm memory never shrinks — a11.0 measured ~75 MB across a
+flip window — so an engine dropped without `terminate()` raises the tab's floor
+for the rest of the session, silently. Tests added against a fake Worker; both
+mutants now die.
+
+Final: **5 mutants, 4 killed + 1 equivalent correctly survived.** M1 first came
+back as a COMPILE ERROR rather than a kill (`|| true` made TypeScript treat the
+rest as unreachable and stop narrowing) and was re-run as a branch inversion that
+compiles — a `tsc` failure is not a kill.
+
+### Verification
+
+Browser, production build, flag OFF: app boots and restores the photo through the
+factory; a paint drag lands (`undo` 0 → 1, "Paint"); the live handle's
+constructor is the real engine, **not** a proxy; and the `engine.worker` chunk
+was fetched **0** times.
+
+**Gates.** 505 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.
+
+### Three more a12.0 corrections, from re-checking the plan against the code
+
+**`free` was on the reported surface.** The worker enumerated its prototype and
+filtered only `constructor`. `free` destroys the engine — forwarded through the
+proxy, any caller could drop the worker's document while the main thread still
+held a handle it believed was live, and every later call would reject against a
+freed pointer. Nothing calls `tool.free()` today (a13 verified it, and it is why
+`readUiSnapshot` needs a liveness guard at all), so this was latent. Latent is
+when to close it. Both halves now share `engineSurface.ts` — one rule, one place,
+tested — rather than the same filter written twice and free to drift.
+
+**The pixel buffer must NOT be transferred.** The first cut did
+`port.call("load_image", [pixels], [pixels.buffer])`. A transferred
+`ArrayBuffer` is detached on the sender and reads as **zero-length** — no throw,
+no warning. Two of the three callers hand over a **view** of a buffer they do not
+own:
+
+| Site | Buffer |
+|---|---|
+| `loadImage` | `new Uint8Array(imageData.data)` — a real copy, safe |
+| `loadImageFromPixels` | `new Uint8Array(pixels.buffer)` — a **view** of its caller's array (4 call sites in `useImageSession`) |
+| `restoreFromSaved` | wraps `canvasRgba.buffer` from the PNG decode |
+
+The saving was illusory anyway: without a transfer `postMessage`
+structured-clones the array — one copy; copying defensively and then
+transferring is also one copy. Same cost, no hazard.
+
+**My own test for that was VACUOUS, and the mutation run is what said so.** The
+fake Worker's `postMessage` ignored its transfer list, so "the caller's buffer is
+not detached" passed whether or not the code transferred. Re-adding the transfer
+survived the whole suite. The fake now emulates real transfer semantics with
+`structuredClone(buf, { transfer })`, and the mutant dies.
+
+**The type decision, made rather than defaulted.** `ImageHorseTool.width()` is
+declared `(): number`; the proxy returns `Promise<number>`. Runtime is fine — all
+113 value-consuming sites await, and `await` over a plain value is a no-op — but
+the declared type stops being true.
+
+| Option | Trade |
+|---|---|
+| **Cast at the seam (chosen)** | one file is wrong, loudly, with the reason written there |
+| `PromisifiedTool` mapped type | honest, but rewrites the type at ~260 call sites the gate already proves await |
+| Union the return type | honest, non-breaking, worst to use — every caller handles both shapes forever |
+
+Revisit at Stage 5, when the default flips and "sometimes a Promise" stops being
+the exception.
+
+**Mutation, final:** 5 mutants for the factory (4 killed + 1 equivalent) and 5
+for the surface/proxy (4 killed + 1 equivalent). Two needed re-running because a
+`tsc` failure is not a kill.
+
+### Next
+
+a12.2 is where the flag goes ON for the first time: `transferControlToOffscreen`
+plus a `blit()` on both implementations. Nothing before it proves anything about
+the worker path.

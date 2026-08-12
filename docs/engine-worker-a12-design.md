@@ -133,7 +133,21 @@ after it. The canvas transfers, and the blit happens worker-side against the
 for good reason: *"every such branch is a place the two implementations can
 diverge."* So `flushToCanvas` must not grow an `if (engineWorkerEnabled())`.
 
-Give the handle a `blit()` operation instead — local implementation does today's
+> ⚠️ **RESOLVED 2026-08-12 — `blit()` is a MODULE FUNCTION in `port.ts`, not a
+> method on the handle.** The obvious reading of "give the handle a `blit()`" does
+> not survive a12.0: the proxy is **surface-gated to real engine methods**, so a
+> synthetic `blit` is not reachable through it, and giving the LOCAL path one
+> would mean wrapping the raw engine — which costs the identity property a13's
+> liveness guard (`toolRef.current === t`) depends on, and which
+> `createLiveEngine.test.ts` now pins.
+>
+> The contract test's own allowlist supplies the answer: `lib/engine/port.ts`
+> *"owns the flag — this is where the local/worker choice belongs."* So a
+> `blitLiveEngine(tool, canvas)` exported from `port.ts` branches internally, and
+> `flushToCanvas` calls it with no branch of its own. Same containment, no
+> wrapper, no proxy on the local path.
+
+Give the port a `blit` operation instead — local implementation does today's
 zero-copy path, worker implementation posts a message — and `flushToCanvas`
 becomes:
 
@@ -144,11 +158,29 @@ t.recomposite();
 void tryTilesFlush(t).then(registerTilesDirtyCount);
 void syncOplog(t).then(registerOplogStats);
 void onOplogFlush(t);
-t.blit();            // <- the only thing that differs, and it differs in ONE place
+blitLiveEngine(t, canvas);   // <- from port.ts; the ONLY thing that differs,
+                             //    and it differs inside port.ts, not here
 ```
 
 The 5 exempt sites disappear from the gate at that point, which is what
 `DISSOLVES_AT_STAGE_4` has always predicted.
+
+### Two concrete prerequisites, checked 2026-08-12
+
+**The worker does not capture its wasm memory yet.** `engine.worker.ts:165` does
+`await mod.default()` and discards the result. The main thread keeps
+`wasmMemoryRef` precisely because the zero-copy blit needs
+`memory.buffer` — the worker will need the same handle for the same reason, so
+the init path has to keep it. Without it the worker-side blit falls back to
+`get_image_data()`, i.e. a full composite copy per frame, which is the
+regression this step exists to avoid.
+
+**`registerWasmMemory(...)` is main-thread only.** With the flag on, the main
+thread still loads the wasm module (all five load paths call `init()` for the
+`Tool` constructor and the memory handle) even though it will never build an
+engine. That is wasted module memory, not a correctness problem, and it is
+a12.2 cleanup rather than a12.1's — the `Tool` constructor is still needed by
+the local branch, and the local branch is still the default.
 
 ---
 

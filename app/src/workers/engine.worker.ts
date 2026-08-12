@@ -30,6 +30,7 @@
 // give correct results with no ordering promise between concurrent calls.
 import type { ImageHorseTool } from "stamp_tool";
 import { staleCanvasReason, NO_CANVAS } from "@/lib/engine/canvasGeneration";
+import { engineSurfaceOf } from "@/lib/engine/engineSurface";
 
 export interface EngineRequest {
   /** Monotonic per-port. Echoed back so a reply cannot be mismatched. */
@@ -179,9 +180,17 @@ self.onmessage = async (e: MessageEvent) => {
       // drift from the binary. That drift is not hypothetical: a hand-synced
       // `.d.ts` missing 31 methods is what made the migration's own gate
       // understate by 36 sites for ten releases (v8.21).
-      const surfaceNames = Object.getOwnPropertyNames(
-        Object.getPrototypeOf(tool) as object,
-      ).filter((n) => n !== "constructor");
+      // ⚠️ FILTER `free` AS WELL AS `constructor`. A wasm-bindgen prototype
+      // carries both, and `free` is the dangerous one: forwarded through the
+      // proxy it would let any caller destroy the worker's engine while the
+      // main thread still holds a handle it believes is live — every
+      // subsequent call would reject against a freed pointer.
+      //
+      // Nothing calls `tool.free()` today (a13 verified that, and it is the
+      // reason `readUiSnapshot` needs a liveness guard at all), so this is
+      // latent rather than live. Latent is exactly when to close it: the
+      // lifecycle belongs to `dispose`, which the worker already handles.
+      const surfaceNames = engineSurfaceOf(Object.getPrototypeOf(tool) as object);
       reply({ id: 0, ok: true, value: { ready, surface: surfaceNames } });
       break;
     }

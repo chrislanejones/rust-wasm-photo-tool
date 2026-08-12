@@ -18,6 +18,7 @@
 // discovered later and somewhere else.
 import { describe, it, expect, vi } from "vitest";
 import { createEngineProxy, type EngineCallPort } from "./port";
+import { engineSurfaceOf, NEVER_FORWARD } from "./engineSurface";
 
 /** A port with a fixed surface and a spy on `call`. */
 function fakePort(names: string[]) {
@@ -70,6 +71,27 @@ describe("createEngineProxy — the surface gate", () => {
     }
   });
 
+  it("never exposes `free` — the lifecycle is the port's, not a caller's", () => {
+    // The worker filters `free` out of the reported surface. Forwarded, it would
+    // let any caller destroy the worker's engine while the main thread still
+    // holds a handle it believes is live, and every later call would reject
+    // against a freed pointer. Nothing calls `tool.free()` today (a13), which is
+    // exactly when to close it.
+    //
+    // Belt and braces: even if a surface arrived WITH `free` in it, the proxy
+    // exposing it would be a bug — so assert on the proxy, not just the worker.
+    const withFree = createEngineProxy(fakePort(["width", "free"]).port) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(typeof withFree.width).toBe("function");
+    expect(
+      withFree.free,
+      "`free` reached the proxy — the worker's surface filter is the only thing " +
+        "stopping a caller from freeing the live engine",
+    ).toBeUndefined();
+  });
+
   it("an EMPTY surface exposes nothing — fails loudly, never silently forwards", () => {
     // `workerClient` leaves the set empty when a worker reports no surface (an
     // older build, or a fake). Exposing everything in that case would be the
@@ -116,5 +138,41 @@ describe("createEngineProxy — the surface gate", () => {
     const r = t.width();
     expect(r).toBeInstanceOf(Promise);
     await r;
+  });
+});
+
+describe("engineSurfaceOf — the rule both sides share", () => {
+  // The worker computes the reported surface with this, and the proxy refuses
+  // `NEVER_FORWARD` with it. One rule, one place: written twice, the two copies
+  // are free to drift, which is the exact failure this sub-step exists to stop.
+  class FakeEngine {
+    width() {
+      return 1;
+    }
+    load_image() {}
+    free() {}
+  }
+
+  it("drops `free` and `constructor`, keeps the real methods", () => {
+    const names = engineSurfaceOf(FakeEngine.prototype);
+    expect(names.sort()).toEqual(["load_image", "width"]);
+  });
+
+  it("drops `free` even though it IS a function on the prototype", () => {
+    // The filter is not "is it callable" — `free` is perfectly callable. It is
+    // excluded because the LIFECYCLE is the port's, not a caller's.
+    expect(typeof FakeEngine.prototype.free).toBe("function");
+    expect(engineSurfaceOf(FakeEngine.prototype)).not.toContain("free");
+  });
+
+  it("drops non-function properties", () => {
+    const proto = Object.create(null) as Record<string, unknown>;
+    proto.width = () => 1;
+    proto.someValue = 42;
+    expect(engineSurfaceOf(proto)).toEqual(["width"]);
+  });
+
+  it("NEVER_FORWARD names both halves agree on", () => {
+    expect([...NEVER_FORWARD].sort()).toEqual(["constructor", "free"]);
   });
 });

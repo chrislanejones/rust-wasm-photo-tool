@@ -84,6 +84,43 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.24 — 2026-08-12
+
+**Nothing you can see.** The engine is now created in one place instead of five,
+which is what has to be true before it can be created somewhere else entirely.
+
+Opening a photo, pasting one, getting one back from an AI tool, restoring one
+from its edit history — each of those built the engine itself, and each would
+have needed its own answer for "what if the engine lives on another thread". They
+now all go through one function that makes that decision once. Behind the scenes
+only; the switch is still off and the local path does exactly what it did
+before, verified by drawing on a photo and watching the stroke land.
+
+**Two things this turned up.** The first is that the code for talking to a
+background thread had never actually been part of the app — it was written,
+tested against a stand-in, and then removed by the bundler because nothing
+imported it. The moment something did, the build failed outright: the app was
+configured to package background workers in a format that can't handle a worker
+which loads code on demand, and the engine worker does exactly that. It has
+never been able to build. Now it can.
+
+The second is a guard with no test behind it. Moving the engine somewhere else
+means shutting down the previous one, because the memory it holds is never given
+back — a forgotten instance makes the tab permanently heavier. The shutdown was
+written correctly and nothing checked it, which I found by deliberately breaking
+it and watching every test still pass. There are tests now.
+
+**And one I had written wrong.** Handing a photo's pixels to another thread can
+either copy them or hand over ownership. Handing over is faster — except the
+original then reads as empty, silently, and two of the three places that pass
+pixels are passing a window onto memory the caller still owns. It copies now,
+which costs nothing extra: the alternative was already a copy in disguise. The
+test I wrote to prove that was itself broken — the stand-in for the other thread
+ignored the hand-over entirely, so the test passed either way. Deliberately
+breaking the code is what exposed the test, not the code.
+
+<details><summary>Older releases</summary>
+
 ### v8.23 — 2026-08-12
 
 **Nothing you can see. The next step of the engine move is designed, and three
@@ -117,7 +154,6 @@ everything else rather than afterwards.
 The first piece is built and tested: the background thread now reports its own
 capabilities, and the stand-in is limited to them.
 
-<details><summary>Older releases</summary>
 
 ### v8.22 — 2026-08-12
 

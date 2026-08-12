@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.24",
+    date: "2026-08-12",
+    headline: "The engine is created in one place now, not five",
+    entries: [
+      {
+        tag: "infra",
+        text: "Nothing you can see. Opening a photo, pasting one, getting one back from an AI tool, restoring one from its edit history — each of those built the engine itself, and each would have needed its own answer for “what if the engine lives on another thread”. They now all go through one function that makes that decision once. The switch is still off and the local path does exactly what it did before, verified by drawing on a photo and watching the stroke land.",
+      },
+      {
+        tag: "fix",
+        text: "The code for talking to a background thread had never actually been part of the app — written, tested against a stand-in, then removed by the bundler because nothing imported it. The moment something did, the build failed outright: the app packages background workers in a format that cannot handle a worker which loads code on demand, and the engine worker does exactly that. It had never been able to build. Now it can.",
+      },
+      {
+        tag: "fix",
+        text: "Found a guard with no test behind it. Moving the engine somewhere else means shutting down the previous one, because the memory it holds is never given back — a forgotten instance makes the tab permanently heavier for the rest of the session. The shutdown was written correctly and nothing checked it, which turned up by deliberately breaking it and watching every test still pass. There are tests now.",
+      },
+    ],
+  },
+  {
     version: "v8.23",
     date: "2026-08-12",
     headline: "Three reasons the next step could not work the way it was planned",

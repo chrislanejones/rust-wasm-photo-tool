@@ -28,7 +28,7 @@ import {
   registerWasmMemory,
 } from "@/lib/resourceMonitor";
 import { restoreLayerStack } from "@/lib/restoreLayerStack";
-import { attachLivePort, detachLivePort } from "@/lib/engine/port";
+import { createLiveEngine, detachLivePort } from "@/lib/engine/port";
 import { syncOplog, tryTilesFlush } from "@/lib/tilesFlush";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
@@ -487,12 +487,20 @@ export function useEngineCore(
         const ctx = canvas.getContext("2d", { desynchronized: true })!;
         ctx.drawImage(img, 0, 0);
         const imageData = ctx.getImageData(0, 0, img.width, img.height);
-        const tool = new Tool(img.width, img.height);
-        tool.load_image(new Uint8Array(imageData.data));
-        toolRef.current = attachLivePort(tool);
-        sourcePosRef.current = null;
-        URL.revokeObjectURL(url);
-        syncState();
+        // ADR-024 a12.1 — construction goes through the factory, which decides
+        // whether the engine lives here or in the worker. `img.onload` cannot be
+        // async, so this is `void`-ed; everything after it moved inside.
+        void createLiveEngine({
+          Tool,
+          width: img.width,
+          height: img.height,
+          pixels: new Uint8Array(imageData.data),
+        }).then((tool) => {
+          toolRef.current = tool;
+          sourcePosRef.current = null;
+          URL.revokeObjectURL(url);
+          syncState();
+        });
       };
       img.src = url;
     },
@@ -541,8 +549,11 @@ export function useEngineCore(
         // Rust method as the live border keeps the result uniform on every load
         // path (fresh import, gallery switch, AI result). The flush blits the
         // composite; the canvas is sized from the tool's resulting dimensions.
-        const tool = new Tool(width, height);
-        tool.load_image(src);
+        // ADR-024 a12.1 — the factory creates and loads; the artboard border
+        // and the history clear below stay HERE as ordinary engine calls,
+        // because they are this load path's own logic. Folding them into the
+        // factory would put five load paths behind one flag branch.
+        const tool = await createLiveEngine({ Tool, width, height, pixels: src });
         tool.set_artboard_border(
           artboard.pad,
           artboard.r,
@@ -557,7 +568,7 @@ export function useEngineCore(
         // reads as modified, lighting the gallery "edited" dot and dotting
         // each photo you switch past.
         tool.clear_history();
-        toolRef.current = attachLivePort(tool);
+        toolRef.current = tool;
         // ADR-024 Stage 3.5 (a8). The READS are awaited here; the
         // `canvas.width =` ASSIGNMENTS are a separate problem that Stage 4 owns
         // — after `transferControlToOffscreen()` they throw on the main thread
@@ -574,9 +585,7 @@ export function useEngineCore(
         const ctx = canvas.getContext("2d", { desynchronized: true })!;
         const clamped = new Uint8ClampedArray(pixels.buffer as ArrayBuffer);
         ctx.putImageData(new ImageData(clamped, width, height), 0, 0);
-        const tool = new Tool(width, height);
-        tool.load_image(src);
-        toolRef.current = attachLivePort(tool);
+        toolRef.current = await createLiveEngine({ Tool, width, height, pixels: src });
       }
       sourcePosRef.current = null;
       syncState();
@@ -611,9 +620,15 @@ export function useEngineCore(
       void checkBuildSkew("engine-init");
       // Reuse the live engine on a gallery switch; create one on boot —
       // oplog_restore replaces the document (dimensions included) wholesale.
-      const tool = toolRef.current ?? new Tool(1, 1);
+      // ADR-024 a12.1 — the one site that REUSES rather than builds. Keep that:
+      // on a gallery switch the live engine (local handle or worker proxy) is
+      // already the right one, and `oplog_restore` replaces the document
+      // wholesale. Only the boot case needs a placeholder, and it goes through
+      // the factory so a worker gets one too.
+      const tool =
+        toolRef.current ?? (await createLiveEngine({ Tool, width: 1, height: 1 }));
       if ((await restoreOplog(tool, photoId)) !== "restored") return false;
-      toolRef.current = attachLivePort(tool);
+      toolRef.current = tool;
       sourcePosRef.current = null;
       flushToCanvas(); // resizes the canvas to the restored dimensions
       syncState();
@@ -649,8 +664,14 @@ export function useEngineCore(
       const { rgba: canvasRgba } = await decodePngToRgba(saved.canvasPng);
 
       // Construct a fresh tool at the saved dimensions and load the canvas
-      const tool = new Tool(saved.canvasW, saved.canvasH);
-      tool.load_image(new Uint8Array(canvasRgba.buffer as ArrayBuffer)); // clears history
+      // ADR-024 a12.1 — factory creates and loads (which clears history); the
+      // layer-stack rebuild and history injection below stay here.
+      const tool = await createLiveEngine({
+        Tool,
+        width: saved.canvasW,
+        height: saved.canvasH,
+        pixels: new Uint8Array(canvasRgba.buffer as ArrayBuffer),
+      });
 
       // Rebuild the full layer stack (archive v5+) BEFORE injecting history —
       // begin_layer_restore clears history, so it must run first. Each layer's
@@ -733,7 +754,7 @@ export function useEngineCore(
         }
       }
 
-      toolRef.current = attachLivePort(tool);
+      toolRef.current = tool;
       sourcePosRef.current = null;
 
       const canvas = canvasRef.current;

@@ -159,6 +159,25 @@ const swPlugins = (): PluginOption[] => {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), wasm(), topLevelAwait(), ...swPlugins()],
+
+  // ADR-024 a12.1 — MODULE workers, not IIFE.
+  //
+  // Vite's default `worker.format` is `"iife"`, and that only worked here
+  // because nothing in the production graph imported the engine worker: it was
+  // dead-code-eliminated before the bundler had to emit it. The moment
+  // `lib/engine/port.ts` started importing `workerClient`, the build broke with
+  //
+  //   Invalid value "iife" for option "worker.format" —
+  //   UMD and IIFE output formats are not supported for code-splitting builds
+  //
+  // because `engine.worker.ts` does `await import("stamp_tool")`, and a dynamic
+  // import forces code-splitting, which IIFE cannot express.
+  //
+  // `"es"` is what both workers already assume: `codecWorkerClient.ts` and
+  // `workerClient.ts` each construct theirs with `{ type: "module" }`. The
+  // codec worker survived on IIFE only because it has no dynamic import, so its
+  // single-chunk output happened to be valid as a module script too.
+  worker: { format: "es" },
   define: {
     // Statically folded (same mechanism as import.meta.env guards): in "off"
     // builds every SW branch is dead code and the minifier drops it — the

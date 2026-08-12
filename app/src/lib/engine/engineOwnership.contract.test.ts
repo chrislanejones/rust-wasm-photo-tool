@@ -45,7 +45,7 @@ describe("only useEngineCore owns the live engine handle", () => {
       .toEqual(["hooks/useEngineCore.ts"]);
   });
 
-  it("routes every live engine it creates through attachLivePort", () => {
+  it("never assigns a raw engine — every live handle comes from the factory", () => {
     const src = code(join(SRC, "hooks/useEngineCore.ts"));
     // Each `toolRef.current = <expr>` must be null (reset) or the port call.
     //
@@ -60,9 +60,23 @@ describe("only useEngineCore owns the live engine handle", () => {
       m[1].trim(),
     );
     expect(assigns.length, "expected the known assignment sites").toBeGreaterThan(0);
+    // ⚠️ v8.24 — THE ROUTE CHANGED, AND SO DID WHAT THIS CAN CHECK.
+    //
+    // This used to require `attachLivePort(...)` literally. That function could
+    // never have been the swap point: it receives an engine already built and
+    // image-loaded on the main thread, and a worker cannot adopt that handle
+    // (`docs/engine-worker-a12-design.md`). Construction moved into
+    // `createLiveEngine()`, so the assignments now read `= tool` where `tool`
+    // came from an awaited factory call.
+    //
+    // A name check on the right-hand side would therefore be worthless — `tool`
+    // is just an identifier. What still has teeth is the OTHER test below:
+    // nothing outside the declared owners may call `new Tool(...)` at all, so an
+    // unrouted handle cannot exist to be assigned. This one keeps the weaker but
+    // still real guarantee that no assignment is a bare construction.
     for (const a of assigns) {
-      expect(a, `unrouted assignment: toolRef.current = ${a}`)
-        .toMatch(/^(null|attachLivePort\(.*\))$/);
+      expect(a, `an engine constructed inline at the assignment: toolRef.current = ${a}`)
+        .not.toMatch(/new\s+(?:mod\.)?(?:ImageHorseTool|Tool)\s*\(/);
     }
   });
 });
@@ -99,6 +113,8 @@ const LIVE_ENGINE_OWNERS: Record<string, string> = {
     "the main-thread engine — today's only live document owner",
   "workers/engine.worker.ts":
     "ADR-024 Stage 3 — the same live document behind the port; unreachable while ih_engine_worker is off",
+  "lib/engine/port.ts":
+    "ADR-024 a12.1 — `createLiveEngine()` is the swap point: it builds the local engine when the flag is off and asks the worker to build one when it is on. The construction that used to sit in useEngineCore's five load paths now happens here, once.",
 };
 
 describe("throwaway engines are declared, not incidental", () => {
