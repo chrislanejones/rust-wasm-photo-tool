@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.20",
+    date: "2026-08-12",
+    headline: "The counter said done, and it was not counting everything",
+    entries: [
+      {
+        tag: "infra",
+        text: "Nothing changed in the app. The engine has been moving to a background thread in stages since June, and the next stage was recorded as ready to start. It is not — this release is the correction and the evidence for it.",
+      },
+      {
+        tag: "fix",
+        text: "The migration tracks how many places still read from the engine in a way that would break on a background thread, and that counter hit its floor last release. It was never counting one category: the calls that run on every mouse-move, deliberately left until last. Fifteen of those eighteen still read the old way, and all fifteen would fail quietly — the lasso's “am I drawing?” check unable to say no, the eyedropper reading colour out of nothing, the brush thinking every mouse-move changed the picture.",
+      },
+      {
+        tag: "perf",
+        text: "The obvious worry — that waiting on a background thread every mouse-move would make drawing laggy — was measured back at the start and is not true. The round trip is a tenth of a millisecond, about half a percent of one frame. So this is work, not a redesign. The real catch is different: a mouse-move handler that waits can be handed the next mouse-move before it has finished the last one, which is the same trap the pen tool hit two releases ago.",
+      },
+    ],
+  },
+  {
     version: "v8.19",
     date: "2026-08-12",
     headline: "The pen waits for the answer, and still draws on the first frame",

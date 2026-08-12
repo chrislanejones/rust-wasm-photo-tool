@@ -18,6 +18,28 @@ wait their turn.
   needs its own session (Silas + a roadmap entry, see
   docs/Engine-Roadmap.md).
 
+## ADR-024 — a10 blocks a12, and the ADR said otherwise
+
+- **a10 (the hot-path bucket) is a PREREQUISITE for turning
+  `ih_engine_worker` on, and ADR-024 line 84 claimed Stage 4 was "gated on
+  Stage 3.5 alone".** Found 2026-08-12 opening a12; the ADR is corrected in
+  place. The migration ratchet counts value-consumed sites only, so a gate
+  at its floor of 5 says nothing about category C — and **15 of its 18 sites
+  consume a value synchronously.** Flip the flag today and `lasso_active()`
+  returns a Promise (`!Promise` is false, the guard stops firing),
+  `get_pixel_region` is indexed and yields `undefined`, and
+  `if (changed)` in `usePaintTool` is true on every pointermove.
+  a12.1's wiring can be built behind the flag but **cannot be verified** —
+  all three a12.3 gates need the flag ON, and the cross-implementation
+  matrix dies on the first lasso drag.
+  **Latency is NOT the objection** — `docs/engine-worker-feasibility.md`
+  measured a 0.100 ms median round trip (0.6% of a frame) and says so in its
+  headline. The real work is that an async per-move handler can overlap
+  itself (the v8.19 `finish()` shape), plus three sites needing restructure
+  rather than an await: `get_pixel_region` (indexed), `usePaintTool`'s
+  ternary, and `isLogTrustworthy` (a second already-async caller, the v8.2
+  finding).
+
 ## UI
 
 - ~~**PenOverlay needs a pending state — the last step of ADR-024 Stage

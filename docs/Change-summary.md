@@ -5776,3 +5776,82 @@ in a microtask — before React finishes teardown — so the window it is suppos
 be dangerous in does not exist yet. Behind the worker it is a round trip. The
 safety argument (posted synchronously, FIFO port, nothing consumes the reply) is
 read from the source, never measured. That test belongs in a12 with the flag ON.
+
+## v8.20 Change Summary — 2026-08-12
+
+**No code changed. a12 was opened, and it is blocked — this records why, with
+the evidence.** Found by checking the plan against the repo before starting,
+which is the arc's own rule and the fourth time this week it has paid.
+
+### ADR-024 contradicted itself, and the newer half was wrong
+
+| Where | Claim |
+|---|---|
+| line 71, Stage 3.5 row | *101 fire-and-forget, 162 value-consumed, **27 hot-path**. Until **these** are done the Stage 3 flag can never be turned on* |
+| line 84 (written when a11 closed) | *the transfer is now gated on **Stage 3.5 alone*** |
+
+Both cannot hold. The second dropped the hot-path bucket, and the 2026-08-12
+plan inherited it.
+
+### The gate never counted category C
+
+`engineAsyncMigration.contract.test.ts` ratchets on value-consumed sites only.
+"Gate 5, Stage 3.5 complete" is a statement about buckets **a** and **b**.
+Category C is untouched — and **15 of its 18 sites consume a value
+synchronously**:
+
+| Site | What breaks with the flag on |
+|---|---|
+| `AppShell:1398` `effect_move` | `if (t.effect_move(…))` — a Promise is truthy, so it flushes on **every** move |
+| `useSelectionActions:145` `lasso_active` | `!tool.lasso_active()` — the guard stops firing |
+| `useColorPicker:70` `get_pixel_region` | assigned then **indexed** — `undefined` |
+| `usePaintTool:138/140/141` | one ternary into `const changed`; `if (changed)` always true |
+| `useTextTool:746` `text_annotation_at` | `id >= 0` — false for a Promise |
+| `oplogPersistence:125/127`, `tilesFlush:145/146` | `layers <= 1`; object handed to `registerOplogStats` |
+
+Only three are safe — `continue_stroke`, `set_move_preview`,
+`set_paste_preview_rect`, all bare statements.
+
+Every one fails **quietly**. The ratchet does not count them, `tsc` cannot tell
+a Promise from a value once it reaches a truthiness check, and the app keeps
+running.
+
+### Why a12.1 was not built anyway
+
+Its wiring can be built behind the flag, but not verified: all three a12.3
+acceptance gates require the flag ON, and the cross-implementation matrix dies
+on the first lasso drag. Untestable-by-construction code is the "green gates ≠
+code that runs" trap, so it was not written.
+
+### The latency objection is already answered — do not re-litigate it
+
+The instinct is that awaiting a per-pointermove read is unaffordable. That is
+why v7.97 pulled six of these back out of the a8 queue. But it was measured at
+feasibility time:
+
+| Measurement | Result |
+|---|---|
+| Fixed round trip, empty payload (50 pings) | **0.100 ms** median, 0.300 ms p95 |
+| As a share of one 60 fps frame | **0.6%** |
+
+`docs/engine-worker-feasibility.md`'s own headline is *"latency is not the
+obstacle. The obstacle is 117 synchronous reads."* Category (c) is listed there
+as *"answered below: not a problem."* This figure is **not** the struck row —
+the withdrawn one is the 48 MB transferable overhead further down the same
+table.
+
+### What the real a10 work is
+
+Not latency. An async per-move handler can **overlap itself** — the exact shape
+v8.19 hit in `finish()`: two pointermoves in flight, the second resolving first,
+preview state applied out of order. All 15 need the `hitSeq`/`runExclusive`
+treatment or an explicit drop-stale rule. Three need more than an `await`:
+`get_pixel_region` is indexed at the call site, `usePaintTool`'s three are one
+ternary, and `isLogTrustworthy` has a second already-async caller
+(`saveOplogInner`) so it cannot just be made async for the flush caller — the
+v8.2 finding, unchanged.
+
+**Order corrected: a10 before a12.**
+
+**Gates.** 487 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.

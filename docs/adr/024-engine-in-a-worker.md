@@ -83,6 +83,62 @@ which repairs the runtime kill switch, v7.92) all shipped. a11.0 validated the
 approach. a11.4 folded into a12. **Stage 4's prerequisites are 1 ✅ 2 ✅ 3 ✅, and
 the transfer is now gated on Stage 3.5 alone.**
 
+> ⚠️ **THAT LAST SENTENCE IS WRONG, AND IT IS THE MOST EXPENSIVE STALE CLAIM IN
+> THIS FILE (found 2026-08-12, opening a12).** Stage 4 is **not** gated on Stage
+> 3.5 alone. The Stage 3.5 row above states the real condition — *"101
+> fire-and-forget, 162 value-consumed, 27 hot-path. Until **these** are done the
+> Stage 3 flag can never be turned on"* — and "these" included the hot-path
+> bucket. When a11 closed, this line was written as though it did not.
+>
+> **The gate does not count category C.** `engineAsyncMigration.contract.test.ts`
+> ratchets on value-consumed sites only, so "gate 5, Stage 3.5 complete" is a
+> statement about buckets a and b. Category C is untouched, and **15 of its 18
+> sites consume a value synchronously**:
+>
+> | Site | Shape |
+> |---|---|
+> | `AppShell:1398` `effect_move` | `if (t.effect_move(x, y))` — Promise is truthy, so it flushes on **every** move |
+> | `useSelectionActions:145` `lasso_active` | `!tool.lasso_active()` — guard stops firing |
+> | `useSelectionActions:147` `lasso_path_to` | a Promise into `setLassoPreview` |
+> | `useColorPicker:70` `get_pixel_region` | assigned, then INDEXED — `undefined` |
+> | `usePaintTool:138/140/141` | ternary into `const changed`; `if (changed)` always true |
+> | `useTextTool:746` `text_annotation_at` | `id >= 0` — false for a Promise |
+> | `CanvasArea:766` `selection_preview`, `useMagicEraserTool:98` `selection_overlay`, `useCanvasActions:37` `calculate_histogram` | assigned / returned |
+> | `oplogPersistence:125/127`, `tilesFlush:145/146` | `layers <= 1`; object handed to `registerOplogStats` |
+>
+> Only 3 are safe (`continue_stroke`, `set_move_preview`,
+> `set_paste_preview_rect` — bare statements).
+>
+> **THE LATENCY OBJECTION IS ALREADY ANSWERED — do not re-litigate it.** The
+> instinct is that awaiting a per-pointermove read is unaffordable, and that is
+> why v7.97 pulled six of these back OUT of the a8 queue. But
+> `docs/engine-worker-feasibility.md` measured it: a fixed round trip is
+> **0.100 ms median, 0.300 ms p95 — 0.6% of one 60 fps frame** (50 pings), and
+> its own headline is *"latency is not the obstacle. The obstacle is 117
+> synchronous reads."* Category (c) is listed there with the note *"answered
+> below: not a problem."* So a10 is affordable, and it is closer to a conversion
+> batch than to a redesign.
+>
+> (That figure is sound and is NOT the struck row. The same table's *"messaging
+> overhead carrying a 48 MB transferable — 0.5 ms"* was withdrawn as unsound;
+> the empty-payload ping measurement above it stands. Re-measure before leaning
+> on it hard, but do not treat the whole table as tainted.)
+>
+> **What is NOT answered, and is the real a10 work:** an async per-move handler
+> can overlap itself, which is exactly the shape v8.19 hit in `finish()` — two
+> pointermoves in flight, the second resolving first, and preview state applied
+> out of order. Every one of these 15 needs the `hitSeq`/`runExclusive`
+> treatment or an explicit drop-stale rule. Three also need more than an `await`:
+> `get_pixel_region` is INDEXED at the call site, `usePaintTool`'s three are one
+> ternary assigned to `const changed`, and `isLogTrustworthy` has a second,
+> already-async caller (`saveOplogInner`) so it cannot simply be made async for
+> the flush caller — the v8.2 finding, unchanged.
+>
+> Practical consequence: a12.1's wiring can be *built* behind the flag, but it
+> cannot be *verified*, because a12.3's three acceptance gates all require the
+> flag ON and the second dies on the first lasso drag. **a10's design comes
+> before a12.**
+
 a12 inherits three hard requirements from a11.0 — warm the worker before the
 flip hands it work, terminate the losing instance, and do not model the flush as
 free. All three are set out under Stage 5 below.
@@ -323,6 +379,10 @@ This ADR states two things that cannot both be true:
 
 - **Stage 3.5**: *"Until these are done the Stage 3 flag can never be turned
   on"* — the gate must reach 0, and Stage 4 is now gated on Stage 3.5 alone.
+  **⚠️ CORRECTED 2026-08-12: "Stage 3.5 alone" is false — the hot-path bucket
+  (category C, 18 sites, 15 of them consuming a value synchronously) is not
+  counted by the gate and breaks the moment the flag goes on. See the boxed
+  correction under "a11 IS COMPLETE" above.**
 - **The triage row above**: *"`flushToCanvas`'s remaining reads dissolve at
   Stage 4 and must NOT be converted."*
 

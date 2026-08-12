@@ -84,6 +84,43 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.20 — 2026-08-12
+
+**Nothing changed in the app. A plan did.** The engine has been moving to a
+background thread in stages since June, and the last stage — actually running it
+there — was recorded as ready to start. It is not, and this release is the
+correction plus the evidence for it.
+
+The migration has a counter that tracks how many places still read from the
+engine in a way that would break on a background thread. That counter reached
+its floor last release, which read as "done". It isn't done: the counter was
+never counting one category of call — the ones that run on every mouse-move,
+deliberately left until last. **Fifteen of those eighteen still read a value the
+old way**, and every one of them would break quietly rather than loudly. The
+lasso's "am I drawing?" check would stop being able to say no. The eyedropper
+would read colour out of nothing. The paintbrush would think every mouse-move
+changed the picture.
+
+None of that would have shown up in a test. The counter doesn't count them, the
+type checker can't see the difference, and the app would keep running — just
+wrongly.
+
+**The good news, and it was already written down.** The obvious worry about
+fixing this is that waiting for a background thread on every mouse-move would
+make drawing feel laggy. That was measured a long time ago and it isn't true:
+the round trip is a tenth of a millisecond, about half a percent of one frame.
+The original feasibility study says so in its own headline. So this is work, but
+it is not a redesign — with one real catch, which is that a mouse-move handler
+that waits can be asked to handle the next mouse-move before it has finished the
+last one. That's the same trap the pen tool hit two releases ago, and it now has
+a known fix.
+
+No version of this was going to be found by running the app. It was found by
+checking the plan against the code before starting, which is the only reason
+it's a paragraph instead of a bug report.
+
+<details><summary>Older releases</summary>
+
 ### v8.19 — 2026-08-12
 
 **The pen tool finishes a path the same way it always did, and now it waits for
@@ -125,7 +162,6 @@ The reasoning for why that stays safe is written down; it has not been run yet,
 and it is the next step's job, not this one's. Recorded so a green check here
 isn't mistaken later for a question that was answered.
 
-<details><summary>Older releases</summary>
 
 ### v8.18 — 2026-08-12
 
