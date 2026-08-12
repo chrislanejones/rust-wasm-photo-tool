@@ -52,18 +52,66 @@ const ts = (() => {
   );
 })();
 const DTS = join(ROOT, "app/src/hooks/stamp_tool.d.ts");
+const PKG_DTS = join(ROOT, "pkg/stamp_tool.d.ts");
 const SRC = join(ROOT, "app/src");
 
 // --- engine surface -------------------------------------------------------
-const dts = readFileSync(DTS, "utf8");
-const methods = new Set(
-  [...dts.matchAll(/^\s{4}([a-z_][a-z0-9_]*)\s*\(/gim)].map((m) => m[1]),
-);
-// getters/readonly props are reads too
-for (const m of dts.matchAll(/^\s{4}(?:readonly\s+)?([a-z_][a-z0-9_]*)\s*:/gim)) {
-  methods.add(m[1]);
+//
+// ⚠️ FIXED 2026-08-12 — THE NINTH BLIND SPOT, AND IT WAS IN THE INPUT.
+//
+// This read ONLY `app/src/hooks/stamp_tool.d.ts`, the hand-synced SHADOW file
+// that ambiently overrides `pkg/`'s generated types. A method missing from the
+// shadow is not "unclassified" — it is INVISIBLE, because the receiver test
+// below is gated on `methods.has(name)`. The shadow declared **0 of the
+// engine's 17 `oplog_*` methods**, so 26 live call sites across
+// `lib/oplogPersistence.ts` and `lib/tilesFlush.ts` were never counted in any
+// bucket. Every gate number this script has ever printed was understated by
+// them, including "the floor is 5".
+//
+// Same family as the alias undercount (93 sites), the comment-stripping fix and
+// the multi-line receiver — the classification was fine and the INPUT was
+// wrong. It is the input that keeps being wrong.
+//
+// Now the union of both files, because neither alone is sufficient: `pkg/` is
+// the real surface but is gitignored and absent on a fresh clone or in CI
+// before `build:wasm`, while the shadow is always present and always drifting.
+// When they disagree the delta is PRINTED rather than silently resolved —
+// a hand-synced file that has drifted is exactly what this cost us.
+function declaredIn(text) {
+  const out = new Set(
+    [...text.matchAll(/^\s{2,4}([a-z_][a-z0-9_]*)\s*\(/gim)].map((m) => m[1]),
+  );
+  // getters/readonly props are reads too
+  for (const m of text.matchAll(/^\s{2,4}(?:readonly\s+)?([a-z_][a-z0-9_]*)\s*:/gim)) {
+    out.add(m[1]);
+  }
+  out.delete("constructor");
+  return out;
 }
-methods.delete("constructor");
+
+/** Just the `ImageHorseTool` class body.
+ *
+ *  `pkg/stamp_tool.d.ts` also declares `interface InitOutput`, ~300 raw
+ *  wasm-bindgen exports (`readonly imagehorsetool_lasso_active: …`). Those are
+ *  not methods anyone calls on the handle, and folding them into the method set
+ *  would let a coincidental name match classify an unrelated call as an engine
+ *  read. Slice to the class or the fix trades one wrong number for another. */
+function classBodyOf(text) {
+  const start = text.indexOf("export class ImageHorseTool {");
+  if (start < 0) return "";
+  const end = text.indexOf("\n}", start);
+  return end < 0 ? text.slice(start) : text.slice(start, end);
+}
+
+const shadowMethods = declaredIn(readFileSync(DTS, "utf8"));
+let pkgMethods = new Set();
+try {
+  pkgMethods = declaredIn(classBodyOf(readFileSync(PKG_DTS, "utf8")));
+} catch {
+  // pkg/ not built — the shadow is all we have. Reported below.
+}
+const methods = new Set([...shadowMethods, ...pkgMethods]);
+const shadowMissing = [...pkgMethods].filter((m) => !shadowMethods.has(m));
 
 // --- files ----------------------------------------------------------------
 function walk(dir, out = []) {
@@ -576,6 +624,27 @@ if (process.argv.includes("--json")) {
       hotHandlers: rows
         .filter((r) => r.category === "c-hot-path")
         .map((r) => `${r.file}:${r.line} ${r.handler}`),
+
+      // --- THE a10 GATE ---------------------------------------------------
+      // Added 2026-08-12, and the reason is a hole this script had all along:
+      // the awaited axis is computed for EVERY consumed row regardless of
+      // category (see the note where `awaited` is assigned), but only category
+      // `b` was ever exported with it. So a10's sites could be measured and
+      // never were, and "gate 5, Stage 3.5 complete" was read as "the flag can
+      // go on" while 15 hot sites still read a value synchronously.
+      //
+      // `awaited === "n/a"` means the row is fire-and-forget — those need no
+      // conversion and are excluded, which is what separates the 15 from the 18.
+      hotConsumed: rows.filter((r) => r.category === "c-hot-path" && r.awaited !== "n/a")
+        .length,
+      hotRemaining: rows.filter(
+        (r) => r.category === "c-hot-path" && r.awaited !== "n/a" && r.awaited !== "awaited",
+      ).length,
+      hotRemainingHandlers: rows
+        .filter(
+          (r) => r.category === "c-hot-path" && r.awaited !== "n/a" && r.awaited !== "awaited",
+        )
+        .map((r) => `${r.file}:${r.line} ${r.handler} [${r.awaited}]`),
     }),
   );
   process.exit(0);

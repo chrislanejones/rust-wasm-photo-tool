@@ -738,7 +738,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     // kind, off-canvas, or mid-drag) — leaving any previous preview cleared.
     const schedulePreview = useCallback(() => {
       if (previewRafRef.current != null) return;
-      previewRafRef.current = requestAnimationFrame(() => {
+      previewRafRef.current = requestAnimationFrame(async () => {
         previewRafRef.current = null;
         const pt = lastHoverRef.current;
         const tool = hookResult.toolRef.current;
@@ -763,7 +763,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         const pixel = py * canvas.width + px;
         if (pixel === previewPixelRef.current) return; // same pixel — no rework
         previewPixelRef.current = pixel;
-        const ov = tool.selection_preview(
+        // ADR-024 a10 — awaited, and drop-stale via the pixel it was issued
+        // for. `previewPixelRef` was already the coalescing key; re-reading it
+        // AFTER the await turns it into the staleness check for free. Without
+        // it, two previews in flight can resolve out of order and paint the
+        // older cursor position over the newer one. A pure read, so discarding
+        // the loser costs nothing.
+        const issuedFor = pixel;
+        const ov = await tool.selection_preview(
           pt.x,
           pt.y,
           previewKindCode,
@@ -771,6 +778,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           edgeThreshold,
           intent,
         );
+        if (previewPixelRef.current !== issuedFor) return; // superseded
         setPreviewMask(ov && ov.length ? ov : null);
       });
     }, [hookResult, canvasRef, previewKindCode, selectionTolerance, edgeThreshold, clearPreview]);

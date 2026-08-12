@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import Footer from "../components/Footer";
 import { COMMITS } from "../data/commits";
-import { RELEASES, type Tag } from "../data/releases";
+import { RELEASES, type Tag, type Release } from "../data/releases";
 
 // Two datasets, deliberately kept apart:
 //   RELEASES — the log itself, and the month counts
@@ -47,14 +47,26 @@ function monthStats(key: string) {
   // than a flat top-N: a month carrying 70+ features across 35 releases had
   // more than two lines' worth to say. Quiet months aren't padded to match —
   // they simply have less to show.
-  const cap = (tags.feature ?? 0) >= 15 ? 8 : 4;
+  //
+  // ⚠️ A MONTH CAN SHIP A LOT AND SCORE ZERO. This ranked releases by how many
+  // `feature`-tagged entries they carried and dropped everything else, which is
+  // right for a feature month and wrong for an engineering one. August 2026
+  // shipped **59 releases and 150 entries — and not one tagged `feature`**
+  // (50 infra, 61 fix, 16 perf, 16 ui, 7 rust), because the whole month went
+  // into the engine-worker migration. The card rendered with an empty
+  // highlights list: a busy month looking like a dead one.
+  //
+  // So the ranking falls back to total entries when a month has no
+  // feature-tagged work at all. Still derived, still not a written-up summary —
+  // only the yardstick changes, and only when the first one measures nothing.
+  const monthHasFeatures = rs.some((r) => r.entries.some((e) => e.tag === "feature"));
+  const score = (r: Release) =>
+    monthHasFeatures ? r.entries.filter((e) => e.tag === "feature").length : r.entries.length;
+  // Same reasoning for the cap: a 59-release month earns the wide card even
+  // though its feature count is 0.
+  const cap = (tags.feature ?? 0) >= 15 || rs.length >= 20 ? 8 : 4;
   const perks = rs
-    .map((r) => ({
-      h: r.headline,
-      v: r.version,
-      date: r.date,
-      f: r.entries.filter((e) => e.tag === "feature").length,
-    }))
+    .map((r) => ({ h: r.headline, v: r.version, date: r.date, f: score(r) }))
     .filter((x) => x.f > 0)
     .sort((a, b) => b.f - a.f || (a.date < b.date ? 1 : -1))
     .slice(0, cap);

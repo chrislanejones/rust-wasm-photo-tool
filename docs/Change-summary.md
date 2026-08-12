@@ -5855,3 +5855,74 @@ v8.2 finding, unchanged.
 
 **Gates.** 487 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Engine untouched — no `build:wasm`.
+
+## v8.21 Change Summary — 2026-08-12
+
+**THE NINTH BLIND SPOT, AND THE MOST EXPENSIVE: the audit's method list came
+from a hand-synced copy that had drifted by 31 methods.** Stage 3.5 is not
+complete. v8.19 said it was.
+
+### What happened
+
+`scripts/engine-call-audit.mjs` decides "is this an engine call" by asking
+whether the method name is in a set read from `app/src/hooks/stamp_tool.d.ts` —
+the shadow file that ambiently overrides `pkg/`'s generated types. A name absent
+from that set is not misclassified, it is **invisible**: the receiver test is
+gated on `methods.has(name)`.
+
+| | Shadow | Real class |
+|---|---|---|
+| Members declared | 249 | **280** |
+
+The 31 missing: all 17 `oplog_*`, plus `remove_object`, `active_layer_name`,
+`composite_hash_hex`, `preview_crop`, `set_oplog_undo`, the three
+`magic_eraser_brush_*` and the four `tiles_*`.
+
+### What it cost
+
+| Measure | Reported | True |
+|---|---|---|
+| Total call sites | 226 | **262** |
+| Stage 3.5 gate | 5 — "the floor" | **29** |
+| — of which exempt (`flushToCanvas`) | 5 | 5 |
+| — **convertible** | 0 | **24** |
+| a10 hot-path | 4 | **12** |
+| Converted | 91 | 91 |
+
+Same family as the alias undercount (93 sites), comment-stripping, and the
+multi-line receiver: the classifier was fine, **the input was wrong**. Fixed by
+unioning the shadow with `pkg/`'s `ImageHorseTool` class body — scoped to the
+class so `InitOutput`'s ~300 raw wasm exports cannot invent methods — with the
+drift printed rather than silently resolved. `pkg/` is gitignored and absent on
+a fresh clone, which is why the shadow existed; the union keeps working either
+way.
+
+### a10 — the hot-path bucket now has a gate, and 11 sites are converted
+
+The awaited axis was computed for every consumed row regardless of category, but
+only bucket **b** was ever exported with it. Category **c** could be measured and
+never was. `BUDGET_HOT` now ratchets it, with no exempt floor.
+
+**15 → 12** by measurement, then **11 converted**. Each needed a decision, not a
+keystroke, because two pointermoves can now be in flight at once:
+
+| Treatment | Sites | Why |
+|---|---|---|
+| **Drop-stale** | lasso live wire, eyedropper magnifier, text hover, Magic Eraser overlay, selection preview | pure reads — a superseded frame is worthless, discarding it costs nothing |
+| **Await, never drop** | paintbrush ×3, blur brush | **mutations** — dropping a late one drops PAINT. FIFO keeps them in mouse order |
+| **Ripple** | histogram | `if (sample())` on a Promise is permanently true, so its rAF retry loop would stop on attempt 1 |
+
+The two shapes are the point. `usePaintTool` and `handleLassoMove` look
+identical and need opposite handling.
+
+### Trail Log — August rendered empty
+
+The month card ranks highlights by feature-tagged entries per release. August
+shipped **59 releases and 150 entries with zero tagged `feature`** — the whole
+month went into this migration. A busy month looked like a dead one. The ranking
+now falls back to total entries when a month has no features at all, and the
+wide card is earned by release count as well as feature count. Still derived,
+never hand-written.
+
+**Gates.** 490 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.

@@ -322,7 +322,7 @@ import { join } from "node:path";
  *  DISSOLVES at Stage 4 rather than converting. There is no conversion work
  *  left in Stage 3.5, and this number cannot go lower — see
  *  `DISSOLVES_AT_STAGE_4` and the floor test below before trying. */
-const BUDGET = 5;
+const BUDGET = 29;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -339,7 +339,32 @@ interface Gate {
   truthySites: string[];
   remainingHandlers: string[];
   hotHandlers: string[];
+  /** a10 — the hot-path bucket, measured for the first time in v8.21. */
+  hotConsumed: number;
+  hotRemaining: number;
+  hotRemainingHandlers: string[];
 }
+
+/** ADR-024 a10 — the SECOND gate, and the one whose absence nearly shipped a
+ *  broken flag.
+ *
+ *  `BUDGET` above counts category **b** only. The audit computes the awaited
+ *  axis for every consumed row regardless of category, but until v8.21 only
+ *  bucket b was exported with it — so category **c** could be measured and
+ *  never was. The consequence was concrete: v8.19 left the b-gate at its floor,
+ *  ADR-024 said Stage 4 was "gated on Stage 3.5 alone", and **15 hot-path sites
+ *  still read a value synchronously**. Turning `ih_engine_worker` on would have
+ *  made `!lasso_active()` permanently false, handed `get_pixel_region` a Promise
+ *  to index, and flushed on every pointermove — none of it visible to any gate,
+ *  to `tsc`, or to eslint.
+ *
+ *  Lower this by exactly the batch size as each a10 file lands. **The target is
+ *  0, and unlike `BUDGET` there is no exempt floor** — every one of these
+ *  crosses the boundary and none dissolves at Stage 4.
+ *
+ *  15  v8.20 — measured for the first time (2 truthy-trap, 13 needs-restructure)
+ */
+const BUDGET_HOT = 12;
 
 const gate: Gate = JSON.parse(
   execFileSync("node", [join(REPO, "scripts/engine-call-audit.mjs"), "--json", REPO], {
@@ -397,6 +422,41 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
         `Lower BUDGET in this file to ${gate.remaining} so the progress is recorded.\n` +
         `When it reaches 0, Stage 3.5's structural gate is met.`,
     ).toBeGreaterThanOrEqual(BUDGET);
+  });
+
+  it("the a10 measurement is not vacuous", () => {
+    // Same non-vacuity guard as the one above, and for the same reason: this
+    // axis existed in the audit for months and exported nothing, so a 0 here
+    // must be provably "converted" and not "never looked".
+    expect(
+      gate.hotConsumed,
+      "no value-consuming hot-path sites found at all — the audit's category-c " +
+        "export is broken, not the code",
+    ).toBeGreaterThan(0);
+    expect(gate.hotRemaining).toBeLessThanOrEqual(gate.hotConsumed);
+  });
+
+  it(`has no more than ${BUDGET_HOT} unconverted hot-path calls`, () => {
+    // THE a10 GATE. Fails UP when a new synchronous per-move read appears —
+    // the shape that would silently break the worker flag.
+    expect(
+      gate.hotRemaining,
+      `Unconverted HOT-PATH engine calls went UP (${gate.hotRemaining} > ${BUDGET_HOT}).\n` +
+        `A per-move handler gained a synchronous value-consuming call. These are the\n` +
+        `sites that break SILENTLY behind the worker — a Promise is truthy, so guards\n` +
+        `stop firing and previews read undefined.\n` +
+        gate.hotRemainingHandlers.map((h) => `  ${h}`).join("\n"),
+    ).toBeLessThanOrEqual(BUDGET_HOT);
+  });
+
+  it("the a10 budget is not stale", () => {
+    expect(
+      gate.hotRemaining,
+      `Hot-path conversions are down to ${gate.hotRemaining} but BUDGET_HOT still says ` +
+        `${BUDGET_HOT}.\nLower BUDGET_HOT to ${gate.hotRemaining} so the progress is ` +
+        `recorded.\nWhen it reaches 0 — and there is no exempt floor here — a10 is done ` +
+        `and the flag can be turned on.`,
+    ).toBeGreaterThanOrEqual(BUDGET_HOT);
   });
 
   it("the bucket split matches the AST, not a pattern guess", () => {
@@ -545,13 +605,31 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // The pen redesign: AppShell's last 2, both non-async callbacks, so
     // restructure 7 - 2 = 5. awaited 89 -> 91. Gate 7 - 2 = 5, and 0 + 5 + 0 = 5.
     //
-    // ✅ THE GATE IS AT ITS FLOOR. What is left is exactly the 5 exempt
-    // `flushToCanvas` reads, which DISSOLVE at Stage 4 rather than converting.
-    // This number does not go lower, and there is no conversion work left in
-    // Stage 3.5 -- see `DISSOLVES_AT_STAGE_4` and the two tests below.
-    ).toBe(5);
-    expect(gate.unawaited).toBe(0);
-    expect(gate.truthy).toBe(0);
+    // 🚨 v8.21 — THE FLOOR WAS NOT THE FLOOR, AND STAGE 3.5 IS NOT COMPLETE.
+    // The audit read its method list from `app/src/hooks/stamp_tool.d.ts`, the
+    // hand-synced SHADOW of `pkg/`. That file declares 249 members; the real
+    // class declares 280. **31 engine methods were missing from it** — all 17
+    // `oplog_*`, plus `remove_object`, `active_layer_name`, the three
+    // `magic_eraser_brush_*`, the four `tiles_*`, `composite_hash_hex`,
+    // `preview_crop` and friends. A method the list does not contain is not
+    // "unclassified", it is INVISIBLE: the receiver test is gated on
+    // `methods.has(name)`. So 36 live call sites were never counted in any
+    // bucket, and every gate number this file has ever recorded was understated
+    // by them — including "the floor is 5", which shipped in v8.19 as
+    // "STAGE 3.5 IS COMPLETE".
+    //
+    // Same family as the alias undercount (93 sites), comment-stripping and the
+    // multi-line receiver: the classifier was fine, the INPUT was wrong. Fixed
+    // by unioning the shadow with `pkg/`'s ImageHorseTool class body (scoped to
+    // the class so `InitOutput`'s ~300 raw wasm exports cannot invent methods),
+    // and the drift is printed rather than silently resolved.
+    //
+    // 226 -> 262 sites. Gate 5 -> 29, of which 5 are the exempt `flushToCanvas`
+    // reads, so **24 convertible remain**. Hot 4 -> 12.
+    ).toBe(12);
+    expect(gate.remaining).toBe(29);
+    expect(gate.unawaited).toBe(13);
+    expect(gate.truthy).toBe(4);
     expect(gate.awaited, "cumulative converted sites").toBe(91);
   });
 
@@ -735,18 +813,21 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     ).toEqual([]);
   });
 
-  it("Stage 3.5 has no conversion work left — only the Stage-4 dissolves", () => {
-    // The end state. Everything still counted is a `flushToCanvas` read that
-    // dissolves when the canvas moves into the worker; there is nothing left to
-    // convert, and a session that finds something to convert here has found a
-    // regression, not a task.
+  it("the Stage-4 exempt reads are still the only thing that cannot be converted", () => {
+    // 🚨 REPLACES "Stage 3.5 has no conversion work left", which asserted an
+    // empty list and passed for exactly one release — v8.19 — because the audit
+    // could not see 36 of the call sites. It is not an end-state test any more;
+    // it is a ratchet on what is left, so the same claim cannot be made again
+    // without the number backing it.
     const convertible = gate.remainingHandlers.filter(
       (r) => !(keyOf(r) in DISSOLVES_AT_STAGE_4),
     );
     expect(
-      convertible.map(keyOf),
-      "Stage 3.5 is complete. Anything here is a site that lost its `await`.",
-    ).toEqual([]);
+      convertible.length,
+      `${convertible.length} convertible sites remain in Stage 3.5 (BUDGET ${BUDGET} ` +
+        `minus ${EXEMPT_TOTAL} exempt). Lower BUDGET as they land.\n` +
+        convertible.map((c) => `  ${c}`).join("\n"),
+    ).toBe(BUDGET - EXEMPT_TOTAL);
   });
 
 

@@ -84,6 +84,46 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.21 — 2026-08-12
+
+**The tool that measures this migration could not see 31 of the engine's own
+methods.** Nothing about the app changed. What changed is that the number
+everyone has been steering by was wrong, and now it isn't.
+
+Every release since June has quoted a count of how many places still talk to the
+engine in a way that won't survive moving it to a background thread. Two releases
+ago that count reached what was called its floor, and the note said the stage was
+finished. It wasn't. The counter reads the engine's method list out of a
+hand-maintained file that sits alongside the real generated one, and that file
+had drifted: it listed 249 methods where the engine has 280. A method missing
+from that list isn't counted wrong — it's **invisible**, because the check that
+decides "is this an engine call at all" starts by asking whether the name is on
+the list.
+
+Thirty-one methods were missing, including every single one belonging to the undo
+log. Thirty-six live call sites had never been counted in any bucket, in any
+release. The real number is **29, not 5**.
+
+This is the fourth time in this project that a number turned out to be a
+statement about the instrument rather than the code, and the fix is the same each
+time: make the instrument read from the source of truth instead of a copy, and
+print it loudly when the two disagree.
+
+**Eleven of the mouse-move sites are now converted** — the lasso's live wire, the
+paintbrush, the blur brush, the eyedropper's magnifier, the text hover, the
+Magic Eraser overlay, the selection preview and the histogram. Each needed a
+decision rather than a keystroke, because two mouse-moves can now be in flight at
+once: a preview that arrives late should be thrown away, and a paint dab that
+arrives late absolutely should not.
+
+**Also:** the Trail Log's August card was rendering empty. It ranks a month's
+highlights by how many features each release carried, and August carried none —
+fifty-nine releases of engine work, not one of them a feature. A busy month
+looked like a dead one. It now falls back to counting everything a release
+shipped when a month has no features at all.
+
+<details><summary>Older releases</summary>
+
 ### v8.20 — 2026-08-12
 
 **Nothing changed in the app. A plan did.** The engine has been moving to a
@@ -119,7 +159,6 @@ No version of this was going to be found by running the app. It was found by
 checking the plan against the code before starting, which is the only reason
 it's a paragraph instead of a bug report.
 
-<details><summary>Older releases</summary>
 
 ### v8.19 — 2026-08-12
 

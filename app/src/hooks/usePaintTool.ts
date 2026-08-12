@@ -129,16 +129,37 @@ export function usePaintTool({
   );
 
   const onMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+    async (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!painting.current) return;
       const t = toolRef.current;
       if (!t) return;
       const { x, y } = coords(e);
+      // ── ADR-024 a10 — AWAITED, AND DELIBERATELY NOT DROP-STALE ───────────
+      //
+      // The mirror image of `handleLassoMove`. These three are MUTATIONS: each
+      // one paints into the document. Two pointermoves can now be in flight at
+      // once, but discarding the late one would discard PAINT — a stroke with
+      // holes in it, worse than any preview glitch. Every call must land, and
+      // it does: one port, FIFO, so the dabs are applied in the order the
+      // mouse made them no matter what order their answers come back in.
+      //
+      // The flush needs no staleness check either, because `flushToCanvas`
+      // draws whatever the engine holds NOW, not the state this call returned.
+      // A late `changed` therefore causes at worst one redundant redraw.
+      //
+      // Un-awaited, `changed` would be a Promise — truthy — so `if (changed)`
+      // would flush on every pointermove including the ones that painted
+      // nothing. Cheap-looking, and it would have quietly put the per-frame
+      // blit back on the hot path the rest of this arc exists to keep it off.
+      //
+      // `await` sits on each BRANCH of the ternary, not around it: the audit
+      // reads the text immediately before the receiver, so `await (c ? a() :
+      // b())` counts as three un-awaited calls and the gate would not move.
       const changed = maskMode
-        ? t.mask_paint_move(x, y)
+        ? await t.mask_paint_move(x, y)
         : erase
-          ? t.erase_move(x, y)
-          : t.paint_move(x, y);
+          ? await t.erase_move(x, y)
+          : await t.paint_move(x, y);
       if (changed) flushToCanvas();
     },
     [toolRef, coords, erase, maskMode, flushToCanvas],

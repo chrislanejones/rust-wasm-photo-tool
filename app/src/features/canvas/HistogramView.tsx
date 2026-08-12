@@ -7,7 +7,7 @@ const LEN = BIN * 4;
 type HistMode = "rgb" | "luma";
 
 interface Props {
-  getHistogram: () => Uint32Array | null;
+  getHistogram: () => Promise<Uint32Array | null>;
   signature: string;
   photoKey: string;
   active: boolean;
@@ -160,8 +160,8 @@ export function HistogramView({
     draw();
   }, [draw]);
 
-  const sample = useCallback(() => {
-    const raw = getHistogram();
+  const sample = useCallback(async () => {
+    const raw = await getHistogram();
     if (!raw || raw.length < LEN) return false;
 
     let total = 0;
@@ -207,10 +207,17 @@ export function HistogramView({
     let attempts = 0;
     const maxAttempts = 240;
 
-    const tryOnce = () => {
+    // ADR-024 a10 — `sample()` awaits the engine now, so this must too.
+    // `if (sample())` on a Promise is permanently TRUE: the loop would succeed
+    // on attempt 1, never retry, and the histogram would sit empty for every
+    // photo whose composite was not ready on the first frame. Re-check
+    // `cancelled` AFTER the await, not only before it — the effect can tear
+    // down while the engine call is in flight.
+    const tryOnce = async () => {
       if (cancelled) return;
 
-      if (sample()) {
+      if (await sample()) {
+        if (cancelled) return;
         setEmpty(false);
         cancelAnim();
         if (reduce) settle();

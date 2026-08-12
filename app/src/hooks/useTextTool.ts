@@ -729,10 +729,18 @@ export function useTextTool({
     return () => document.removeEventListener("pointerdown", handler);
   }, [textInput, commitText]);
 
+  /** ADR-024 a10 — drops a hover result whose mouse-move has been superseded. */
+  const hoverSeq = useRef(0);
+
   /** Move-cursor hover over the canvas: highlight the annotation under the
-   *  pointer (and only while the text tool is active). */
+   *  pointer (and only while the text tool is active).
+   *
+   *  ADR-024 a10: a pure hit-test read, so DROP-STALE. Un-awaited, `id` is a
+   *  Promise and `id >= 0` is `false` for it, so `next` would be `null` on
+   *  every move — the hover highlight would simply never appear again, which
+   *  reads as "that feature was removed" rather than as a bug. */
   const onCanvasHover = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+    async (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!active) {
         if (hoveredAnnotationId !== null) setHoveredAnnotationId(null);
         return;
@@ -743,7 +751,9 @@ export function useTextTool({
       const cr = canvas.getBoundingClientRect();
       const cx = ((e.clientX - cr.left) * canvas.width) / cr.width;
       const cy = ((e.clientY - cr.top) * canvas.height) / cr.height;
-      const id = tool.text_annotation_at(Math.round(cx), Math.round(cy));
+      const seq = ++hoverSeq.current;
+      const id = await tool.text_annotation_at(Math.round(cx), Math.round(cy));
+      if (seq !== hoverSeq.current) return; // a later move owns the highlight
       const next = id >= 0 ? id : null;
       if (next !== hoveredAnnotationId) setHoveredAnnotationId(next);
     },

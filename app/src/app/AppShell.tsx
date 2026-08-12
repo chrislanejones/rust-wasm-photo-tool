@@ -1389,13 +1389,19 @@ export function AppShell() {
     ],
   );
 
+  // ADR-024 a10. A MUTATION plus a "did anything change" bool, so it awaits and
+  // does NOT drop-stale — the same reasoning as `usePaintTool.onMouseMove`:
+  // every dab of the blur brush must land, and FIFO puts them in mouse order
+  // whatever order the answers arrive in. Un-awaited, the Promise is truthy and
+  // the guard flushes the whole canvas on every pointermove including the ones
+  // that blurred nothing.
   const blurMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+    async (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!isBlurringRef.current) return;
       const t = stamp.toolRef.current;
       if (!t) return;
       const { x, y } = getCoords(e);
-      if (t.effect_move(x, y)) stamp.flushToCanvas();
+      if (await t.effect_move(x, y)) stamp.flushToCanvas();
     },
     [stamp, getCoords],
   );

@@ -93,9 +93,20 @@ export function useMagicEraserTool({
 
   const coords = useCanvasCoords(canvasRef);
 
+  /** ADR-024 a10 — drops an overlay whose frame has been superseded. */
+  const overlaySeq = useRef(0);
+
+  // ADR-024 a10. Hot by CALLER: `scheduleOverlay` runs this inside a
+  // `requestAnimationFrame`, once per frame while painting a mask. A pure read
+  // feeding one `setState`, so DROP-STALE — an overlay frame that lost its race
+  // is worthless. Un-awaited, `mask` is a Promise, `mask.length` is `undefined`
+  // and therefore falsy, so the mask would be cleared to `null` on every frame:
+  // the Magic Eraser's selection would simply stop appearing.
   const pushOverlay = useCallback(
-    (t: MagicEraserWasmExports) => {
-      const mask = t.selection_overlay();
+    async (t: MagicEraserWasmExports) => {
+      const seq = ++overlaySeq.current;
+      const mask = await t.selection_overlay();
+      if (seq !== overlaySeq.current) return;
       setSelectionMask(mask.length ? mask : null);
     },
     [setSelectionMask],

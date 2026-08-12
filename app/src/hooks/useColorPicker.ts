@@ -59,15 +59,31 @@ export function useColorPicker({
     [canvasRef, containerRef],
   );
 
+  // ── ADR-024 a10 ─────────────────────────────────────────────────────────
+  //
+  // `get_pixel_region` is a pure read feeding the magnifier, so this is the
+  // DROP-STALE shape (like `handleLassoMove`, unlike `usePaintTool`): a
+  // superseded magnifier frame is worthless and skipping it costs nothing.
+  //
+  // Un-awaited this fails in the quietest way of any site in a10. `pixels`
+  // would be a Promise, `pixels[centerIdx]` would be `undefined`, and the
+  // `?? 0` right below turns that into 0 — so the magnifier would show a
+  // confident, perfectly rendered BLACK swatch over every part of the image.
+  // No throw, no NaN, nothing in the console. `tsc` cannot help either: it is
+  // indexing an object, which is legal.
+  const pickSeq = useRef(0);
+
   const onMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+    async (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!active) return;
       const tool = toolRef.current;
       const coords = getCanvasCoords(e);
       if (!tool || !coords) return;
       const { canvasX, canvasY, screenX, screenY } = coords;
       lastPos.current = { canvasX, canvasY };
-      const pixels = tool.get_pixel_region(canvasX, canvasY, RADIUS);
+      const seq = ++pickSeq.current;
+      const pixels = await tool.get_pixel_region(canvasX, canvasY, RADIUS);
+      if (seq !== pickSeq.current) return; // a later move owns the magnifier
       const side = 2 * RADIUS + 1;
       const centerIdx = (Math.floor(side / 2) * side + Math.floor(side / 2)) * 4;
       const r = pixels[centerIdx] ?? 0;

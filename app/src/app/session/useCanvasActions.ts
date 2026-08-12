@@ -32,9 +32,18 @@ export function useCanvasActions({
 
   // Histogram bins straight from Rust (`calculate_histogram` over the composite
   // buffer) — replaces HistogramView's old per-resample canvas sampling loop.
-  const getHistogram = useCallback((): Uint32Array | null => {
+  // ADR-024 a10. Hot by CALLER, not by name — `HistogramView.sample()` runs it
+  // inside a `requestAnimationFrame` retry loop, and it is a full composite
+  // pass (measured: 1024 bins over 11,182,080 samples). That is why it sits in
+  // category C despite the discrete-sounding name.
+  //
+  // Awaiting it forces `sample()` and the retry loop to await too — see
+  // `HistogramView`, where `if (sample())` on a Promise would be permanently
+  // true and stop the loop on its first attempt, leaving the histogram frozen
+  // at whatever it had.
+  const getHistogram = useCallback(async (): Promise<Uint32Array | null> => {
     const tool = stamp.toolRef.current;
-    return tool ? tool.calculate_histogram() : null;
+    return tool ? await tool.calculate_histogram() : null;
   }, [stamp]);
 
   const handleZoomIn = useCallback(() => {

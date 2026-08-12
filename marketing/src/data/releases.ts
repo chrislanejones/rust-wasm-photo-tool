@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.21",
+    date: "2026-08-12",
+    headline: "The measuring tape could not see 31 of the engine's own methods",
+    entries: [
+      {
+        tag: "fix",
+        text: "Nothing about the app changed; the number everyone has been steering by did. The tool that counts how much of the engine migration is left reads the engine's method list out of a hand-maintained file sitting next to the real generated one — and that file had drifted, listing 249 methods where the engine has 280. A method missing from it is not counted wrong, it is invisible. Thirty-six call sites had never been counted in any release. The real figure is 29, not 5.",
+      },
+      {
+        tag: "infra",
+        text: "Fourth time in this project a number has turned out to be a statement about the instrument rather than the code, and the fix is the same each time: read from the source of truth instead of a copy, and say so loudly when the two disagree.",
+      },
+      {
+        tag: "perf",
+        text: "Eleven of the mouse-move sites are converted — the lasso's live wire, the paintbrush, the blur brush, the eyedropper magnifier, the text hover, the Magic Eraser overlay, the selection preview and the histogram. Each needed a decision rather than a keystroke, because two mouse-moves can now be in flight at once: a preview that arrives late should be thrown away, and a paint dab that arrives late absolutely should not.",
+      },
+      {
+        tag: "ui",
+        text: "The Trail Log's August card was rendering empty. It ranks a month's highlights by how many features each release carried, and August carried none — fifty-nine releases of engine work, not one of them a feature. A busy month looked like a dead one. It now counts everything a release shipped when a month has no features at all.",
+      },
+    ],
+  },
+  {
     version: "v8.20",
     date: "2026-08-12",
     headline: "The counter said done, and it was not counting everything",

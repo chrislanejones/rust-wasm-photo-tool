@@ -91,7 +91,7 @@ interface Props {
   };
   // ── Histogram ──
   /** Pulls the per-channel histogram from Rust (no canvas sampling). */
-  getHistogram: () => Uint32Array | null;
+  getHistogram: () => Promise<Uint32Array | null>;
   /** Changes when the active image content changes → triggers a resample. */
   histogramSignature: string;
   /** Active photo id — when it changes the histogram bars fall down, then rise

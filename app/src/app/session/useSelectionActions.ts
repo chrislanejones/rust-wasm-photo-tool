@@ -12,7 +12,7 @@
 // Before v7.47 a drag swept a marquee in EVERY non-lasso kind, so wand-click
 // and rect-drag were both live at once. There is no arming toggle — picking
 // the tool is the arming, and picking the mode is the gesture.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject, MouseEvent as ReactMouseEvent } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
@@ -136,15 +136,42 @@ export function useSelectionActions(
     [stamp, getCoords, selectionTolerance, selectionKind, edgeThreshold],
   );
 
+  /** ADR-024 a10 — drops a preview whose mouse-move has been superseded. */
+  const lassoMoveSeq = useRef(0);
+
   // The live wire, recomputed on every mouse-move while a session is open. This
   // is the interactive path: the engine bounds its search to a window around the
   // segment, which is what keeps it inside a frame budget on a big image.
+  //
+  // ── ADR-024 a10 — WHY THIS AWAITS, AND WHY IT DROPS ──────────────────────
+  //
+  // Both reads were synchronous until v8.21, and both would have broken
+  // SILENTLY behind the worker. `!tool.lasso_active()` is the sharper one: a
+  // Promise is truthy, so `!Promise` is `false` and the guard stops refusing —
+  // the live wire would keep drawing after the lasso had been committed or
+  // cancelled. `lasso_path_to`'s result went straight into `setLassoPreview`,
+  // so React would have been handed a Promise to render.
+  //
+  // DROP-STALE, not run-exclusive. Two pointermoves can now be in flight at
+  // once and the second can resolve first, which would snap the preview
+  // backwards to an older cursor position. A superseded preview is worthless,
+  // so the newest wins and the rest are discarded. That is only safe because
+  // `lasso_path_to` is a PURE READ — `&self`, and its own doc says "does not
+  // mutate the session". Dropping a MUTATION here would lose input; see
+  // `usePaintTool`, where the same shape needs the opposite treatment.
+  //
+  // The coordinates are read BEFORE the first await, while `e` is still the
+  // event this call was made for.
   const handleLassoMove = useCallback(
-    (e: ReactMouseEvent<HTMLCanvasElement>) => {
+    async (e: ReactMouseEvent<HTMLCanvasElement>) => {
       const tool = stamp.toolRef.current;
-      if (!tool || selectionKind !== "lasso" || !tool.lasso_active()) return;
+      if (!tool || selectionKind !== "lasso") return;
       const { x, y } = getCoords(e);
-      setLassoPreview(tool.lasso_path_to(x, y));
+      const seq = ++lassoMoveSeq.current;
+      if (!(await tool.lasso_active())) return;
+      const path = await tool.lasso_path_to(x, y);
+      if (seq !== lassoMoveSeq.current) return; // a later move owns the preview
+      setLassoPreview(path);
     },
     [stamp, getCoords, selectionKind],
   );
