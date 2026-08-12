@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.15",
+    date: "2026-08-11",
+    headline: "The last check that could stop checking",
+    entries: [
+      {
+        tag: "infra",
+        text: "Exporting a layered .ora file now waits for the engine's answer — the last six of these conversions, and the last of a particular kind of bug with them.",
+      },
+      {
+        tag: "fix",
+        text: "That kind: a check written as “if the engine says yes”. Left half-converted it stops being a check at all and always says yes. This one decided whether your live text and shapes had been baked into pixels for the export — and baking them clears your redo history, so the app tells you when it happens. Broken, it would have told you that on every .ora export, including ones where nothing was baked. There are now none of these left anywhere in the app.",
+      },
+      {
+        tag: "infra",
+        text: "What this release does not do is make the export atomic. The file is still assembled across several moments, and this change slightly widens that window rather than closing it — closing it needs the export to notice the picture changed underneath it and refuse, which was decided four releases ago and is not built yet. Checked by exporting a real two-layer file and taking the archive apart: both layers present, and the dimensions recorded inside it match the picture.",
+      },
+    ],
+  },
+  {
     version: "v8.14",
     date: "2026-08-11",
     headline: "The measurement arrives before the drawing does",

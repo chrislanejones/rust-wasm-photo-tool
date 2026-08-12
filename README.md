@@ -84,6 +84,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.15 — 2026-08-11
+
+**Nothing you can see.** Exporting a layered `.ora` file now waits for the
+engine's answer — the last six of these conversions, and the last of a
+particular kind of bug with them.
+
+That kind: a check written as *"if the engine says yes"*. Left half-converted it
+stops being a check at all and always says yes. This one decided whether your
+live text and shapes had been baked into pixels for the export — and baking them
+clears your redo history, so the app tells you when it happens. Broken, it would
+have told you that on **every** `.ora` export, including ones where nothing was
+baked at all. There are now none of these left anywhere in the app.
+
+**What this release does not do** is make the export atomic. The file is still
+assembled across several moments, and this change slightly widens that window
+rather than closing it. Closing it needs the export to notice the picture
+changed underneath it and refuse — decided four releases ago, not built yet.
+
+Checked by exporting a real two-layer file and taking the archive apart: both
+layers present, and the dimensions recorded inside it match the picture.
+
+<details><summary>Older releases</summary>
+
 ### v8.14 — 2026-08-11
 
 **Nothing you can see.** The last piece of the text-measuring work, and the one
@@ -101,8 +124,6 @@ measurements and could not cope with "don't know" — the batch stamp in
 particular is written to refuse and skip a photo rather than guess. Removing the
 old path before those four were moved would have broken them silently. They
 moved first, in the two releases before this one.
-
-<details><summary>Older releases</summary>
 
 ### v8.13 — 2026-08-11
 

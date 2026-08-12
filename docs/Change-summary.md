@@ -5398,3 +5398,59 @@ Engine untouched — no `build:wasm`.
 ⚠️ The Chrome extension dropped mid-session; this batch was verified through
 **Playwright** instead. Worth knowing there is a second browser path when the
 extension is unavailable.
+
+## v8.15 Change Summary — 2026-08-11
+
+ADR-024 Stage 3.5, **a8 batch 14**. Gate 18 -> 12. No user-visible change.
+
+`openraster/export.ts` 6 -> 0. **The truthy-trap bucket reaches ZERO**, and the
+un-awaited bucket empties with it.
+
+| Bucket | Before | After |
+|---|---|---|
+| un-awaited | 5 | **0** |
+| truthy trap | 1 | **0** |
+| restructure | 12 | 11 |
+| **gate** | **18** | **12** |
+
+**The last truthy trap in the codebase** was `flatten_text_annotations`. It
+reports whether a layer actually had live annotations to bake; un-awaited, a
+Promise is truthy, so `flattenedAny` would be true after the first layer
+regardless. The caller surfaces that as *"annotations were baked into pixels and
+your redo history was cleared"* — a notice the user would have received on every
+`.ora` export of a document with no annotations at all.
+
+**`set_active_layer` was NOT converted, deliberately.** A night plan listed it
+among this file's sites; it is fire-and-forget (no return value consumed) and
+has never been in the gate. Converting it would have added two awaits inside the
+loop that mutates the document, for nothing.
+
+**This does NOT make `exportOra` atomic, and Stage 3.5 widens the gap.** Today
+the `get_layer_png` loop is one uninterrupted synchronous run; behind the worker
+every iteration becomes a yield point, so the window grows from the three
+dynamic imports to three + N. The design call (b2, v8.11) already rejected a
+pixel-carrying capture on measured memory grounds and adopted detect-don't-
+prevent instead — a monotonic document generation, which does not exist yet.
+Saying so plainly here rather than letting "six conversions" read as "the export
+is now safe".
+
+**Verified by exporting a real `.ora` and taking the archive apart:**
+
+| | |
+|---|---|
+| Archive | **11,477,892 B**, magic `504b0304` |
+| `mimetype` | `image/openraster`, STORE'd, first entry |
+| Layer PNGs | **both present** — `data/layer0.png` 73,366 B, `data/layer1.png` 5,638,714 B |
+| `stack.xml` | `w="1395" h="2078"` — **matches the engine exactly** |
+| Layer refs | 2 `src=` entries for 2 engine layers |
+| `mergedimage.png` / thumbnail | 5,650,764 B / 113,817 B |
+
+Both layer PNGs being present is the specific check worth keeping: it is the
+`layer_count` vs `content_layer_count` distinction a mutant survived on in an
+earlier batch. The two layer sizes also match the figures measured independently
+during the b2 investigation, which is a free cross-check on the whole path.
+
+Mutation tested: **6 mutants, 6 killed.**
+
+**Gates.** 468 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.

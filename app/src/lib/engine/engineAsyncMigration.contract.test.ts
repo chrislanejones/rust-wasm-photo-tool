@@ -275,7 +275,16 @@ import { join } from "node:path";
  *         moved the four miss-intolerant callers would have shipped the NaN
  *         batch. The ordering WAS the fix.
  *
- *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32, 26, 21 and 18 lines. The
+ *     12  a8 batch 14: `openraster/export.ts` 6 -> 0. **The truthy-trap bucket
+ *         reaches ZERO** — `flatten_text_annotations` was the last one, and
+ *         un-awaited it would have reported "annotations were baked and your
+ *         redo history cleared" on every .ora export, because a Promise is
+ *         truthy after the first layer. Ordinary conversions: the design call
+ *         (b2, v8.11) had already rejected a pixel-carrying capture. NOTE the
+ *         two `set_active_layer` calls in the same loop are fire-and-forget and
+ *         were never in the gate — a night plan listed them as sites.
+ *
+ *  Work: the 138, 125, 117, 115, 103, 94, 93, 92, 87, 76, 74, 77, 67, 63, 59, 56, 52, 39, 32, 26, 21, 18 and 12 lines. The
  *  rest is the measurement catching up — in BOTH directions, and the upward
  *  moves matter just as much: a8 could not have been scoped off 74.
  *
@@ -300,7 +309,7 @@ import { join } from "node:path";
  *  Measured both sides with the same audit against a worktree at HEAD, which is
  *  the only way to tell a real delta from a measurement change — the two had
  *  been tangled twice before. */
-const BUDGET = 18;
+const BUDGET = 12;
 
 const REPO = join(process.cwd(), "..");
 const SRC = join(process.cwd(), "src");
@@ -505,10 +514,17 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // only TWO, because the three removed sites vanish rather than becoming
     // awaited, while `primeTextMetrics` adds two new ones born awaited.
     // Gate 21 - 3 = 18, and 5 + 12 + 1 = 18.
-    ).toBe(12);
-    expect(gate.unawaited).toBe(5);
-    expect(gate.truthy).toBe(1);
-    expect(gate.awaited, "cumulative converted sites").toBe(78);
+    // a8 batch 14: `openraster/export.ts` 6 -> 0. FIVE were un-awaited (5 -> 0,
+    // emptying that bucket -- `exportOra` was already async) and ONE was the
+    // last truthy trap (1 -> 0). `flattenAllLayersInPlace` was a plain sync
+    // function, so restructure 12 - 1 = 11. awaited 78 -> 84.
+    // Gate 18 - 6 = 12, and 1 + 11 + 0 = 12.
+    // Everything left is AppShell (6) + useEngineCore (6, of which 5 are the
+    // exempt floor) -- so SEVEN convertible sites remain in the whole migration.
+    ).toBe(11);
+    expect(gate.unawaited).toBe(1);
+    expect(gate.truthy).toBe(0);
+    expect(gate.awaited, "cumulative converted sites").toBe(84);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

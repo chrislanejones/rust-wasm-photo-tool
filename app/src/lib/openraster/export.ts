@@ -18,7 +18,7 @@ const THUMBNAIL_MAX_PX = 256;
  * untouched. Returns true if anything was actually flattened, so the caller
  * can surface a notice.
  */
-function flattenAllLayersInPlace(tool: ImageHorseTool): boolean {
+async function flattenAllLayersInPlace(tool: ImageHorseTool): Promise<boolean> {
   // ATOMIC CAPTURE (ADR-024, a7). Was `active_layer_id()` + `layer_count()` +
   // `get_layers()` — three reads describing one layer stack, consumed together:
   // the list and count pick the layers to visit, the id says which layer to put
@@ -29,7 +29,7 @@ function flattenAllLayersInPlace(tool: ImageHorseTool): boolean {
   // `capture_layer_stack` and NOT `capture_ui_state`: the latter answers
   // `has_transparency` by compositing the whole document and scanning every
   // pixel, which this needs none of.
-  const stack = tool.capture_layer_stack();
+  const stack = await tool.capture_layer_stack();
   const originalActiveId = stack.active_layer_id;
   const n = stack.layer_count;
   const layers: LayerInfo[] = JSON.parse(stack.layers_json);
@@ -47,7 +47,15 @@ function flattenAllLayersInPlace(tool: ImageHorseTool): boolean {
     const id = layers[i]?.id;
     if (id === undefined) continue;
     tool.set_active_layer(id);
-    if (tool.flatten_text_annotations()) flattenedAny = true;
+    // ADR-024 Stage 3.5 — THE LAST TRUTHY TRAP IN THE CODEBASE. Un-awaited, a
+    // Promise is always truthy, so `flattenedAny` would be true after the first
+    // layer regardless. The caller surfaces that as "annotations were baked into
+    // pixels, and your redo history was cleared" — a notice the user would get
+    // on every .ora export of a document with no live annotations at all.
+    //
+    // `set_active_layer` above is deliberately NOT awaited: it consumes no
+    // return value, so it is fire-and-forget and has never been in the gate.
+    if (await tool.flatten_text_annotations()) flattenedAny = true;
   }
 
   tool.set_active_layer(originalActiveId);
@@ -63,7 +71,7 @@ export interface ExportOraResult {
 }
 
 export async function exportOra(tool: ImageHorseTool): Promise<ExportOraResult> {
-  const flattenedAnnotations = flattenAllLayersInPlace(tool);
+  const flattenedAnnotations = await flattenAllLayersInPlace(tool);
 
   // ATOMIC CAPTURE (ADR-024, a7). Was `layer_count()` + `width()` + `height()`
   // + `get_layers()` — four reads that become one `stack.xml`, so they have to
@@ -73,11 +81,27 @@ export async function exportOra(tool: ImageHorseTool): Promise<ExportOraResult> 
   //
   // ⚠️ This does NOT make `exportOra` atomic. The `await import("jszip")` below
   // still separates these four from `get_layer_png(i)` and `export_png()`, and
-  // `flattenAllLayersInPlace` above mutates the live document mid-export. Both
-  // are pre-existing, both are triaged in ADR-024, and both stay open — closing
-  // them needs one capture that carries the layer PNGs too, which is a design
-  // decision about what the engine owns rather than a conversion.
-  const stack = tool.capture_layer_stack();
+  // `flattenAllLayersInPlace` above mutates the live document mid-export.
+  //
+  // ⚠️ STAGE 3.5 WIDENS THE FIRST OF THOSE. Today the `get_layer_png` loop below
+  // is one uninterrupted synchronous run; behind the worker every iteration is a
+  // yield point, so the window grows from the three dynamic imports to three + N.
+  // Converting these six does not make `exportOra` atomic and must not be read
+  // as having done so.
+  //
+  // ✅ THE DESIGN CALL WAS MADE — v8.11, and it was NO. A capture carrying the
+  // layer PNGs holds 10.84 MB at two layers and +5.38 MB per layer with no
+  // ceiling, against a loop peak that is FLAT at 5.39 MB; wasm memory never
+  // shrinks and unlimited layers is the paid tier's feature. The adopted answer
+  // is detect-don't-prevent: a monotonic document generation read before and
+  // after, failing the export rather than writing a torn archive. That counter
+  // does not exist yet (`OpLog::generation` is NOT it — it bumps only when an
+  // append drops a redo tail). See ADR-024 "b2".
+  //
+  // The mid-export mutation is a SEPARATE problem: `flattenAllLayersInPlace`
+  // completes before any read here, so it cannot tear the archive. What it does
+  // is clear the user's redo stack as a side effect of exporting.
+  const stack = await tool.capture_layer_stack();
   const n = stack.layer_count;
   const width = stack.width;
   const height = stack.height;
@@ -99,7 +123,7 @@ export async function exportOra(tool: ImageHorseTool): Promise<ExportOraResult> 
   for (let i = n - 1; i >= 0; i--) {
     const info = layers[i];
     const src = `data/layer${i}.png`;
-    zip.file(src, tool.get_layer_png(i));
+    zip.file(src, await tool.get_layer_png(i));
     if (info?.active) activeIndexTopFirst = layerMetas.length;
     layerMetas.push({
       name: info?.name || `Layer ${i}`,
@@ -119,7 +143,7 @@ export async function exportOra(tool: ImageHorseTool): Promise<ExportOraResult> 
     }),
   );
 
-  zip.file("mergedimage.png", tool.export_png());
+  zip.file("mergedimage.png", await tool.export_png());
 
   // Thumbnail — Rust-side resize + encode (no OffscreenCanvas round trip).
   const mod = await import("stamp_tool");
@@ -132,7 +156,7 @@ export async function exportOra(tool: ImageHorseTool): Promise<ExportOraResult> 
   // import and the init above). Behind the worker it is the likeliest place in
   // the file for something to land mid-read. One call closes it; the
   // pre-existing interleaving elsewhere here is untouched and still open.
-  const thumb = tool.capture_thumbnail(THUMBNAIL_MAX_PX);
+  const thumb = await tool.capture_thumbnail(THUMBNAIL_MAX_PX);
   const { rgba: tdata, width: tw, height: th } = thumb;
   thumb.free();
   zip.file("Thumbnails/thumbnail.png", mod.encode_png_pixels(tdata, tw, th));
