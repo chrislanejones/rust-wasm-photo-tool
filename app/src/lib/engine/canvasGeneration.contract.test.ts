@@ -207,11 +207,36 @@ describe("the worker cannot gain a canvas without the staleness check", () => {
       expect(s).toContain("staleCanvasReason"); // the slot is ready
       return;
     }
+    // ⚠️ FIRED FOR REAL AT a12.2, AND THE ORIGINAL WAS TOO WEAK TO CATCH IT.
+    // "the file contains staleCanvasReason" was already true from the queued-
+    // call path, so a12.2's `blit()` — which calls `getContext` and did NOT
+    // consult the rule — passed this untouched. The worker kept the old
+    // OffscreenCanvas after its element was released and painted into it.
+    //
+    // So the assertion is now positional: every DRAWING path must have the
+    // check ahead of it, the same shape the queued-call test uses.
+    const flat = s.replace(/\s+/g, " ");
     expect(
-      s,
-      "engine.worker.ts now draws to a canvas. Every such path must consult " +
-        "staleCanvasReason() with the call's canvasGeneration first, or the " +
-        "worker will paint into a detached surface and nothing will throw.",
-    ).toContain("staleCanvasReason");
+      flat,
+      "the blit must refuse a draw aimed at a surface that is no longer live",
+    ).toMatch(/staleCanvasReason\(surfaceGeneration, canvasGeneration\)[^;]*\) return;/);
+
+    const guard = s.indexOf("staleCanvasReason(surfaceGeneration");
+    const draw = s.indexOf("putImageData");
+    expect(guard, "the blit's staleness guard is missing").toBeGreaterThan(-1);
+    expect(draw, "expected a drawing call to guard").toBeGreaterThan(-1);
+    expect(guard, "staleness must be decided BEFORE anything is drawn").toBeLessThan(draw);
+  });
+
+  it("RELEASES the surface when the element goes, rather than holding a dead one", () => {
+    // The other half, and the one that actually bit. `surface = d.canvas ?? surface`
+    // keeps the previous OffscreenCanvas when a release message carries no
+    // canvas — so the worker still holds a handle to an element React has
+    // discarded. Painting into it throws nothing and shows nothing.
+    const flat = src().replace(/\s+/g, " ");
+    expect(
+      flat,
+      "a NO_CANVAS release must null the surface, not keep the old one",
+    ).toMatch(/generation === NO_CANVAS\) \{ surface = null;/);
   });
 });

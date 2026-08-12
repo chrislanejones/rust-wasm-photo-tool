@@ -84,6 +84,45 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.25 — 2026-08-12
+
+**The engine ran on a background thread for the first time, and drew the photo
+from there.** Off by default. This is the step the last two months of small,
+invisible changes were for.
+
+The picture you see is now proof rather than an assumption: once the canvas is
+handed to the background thread, the main thread physically cannot draw to it —
+the browser refuses. So a photo appearing on screen can only have been painted
+by the other thread. It appears.
+
+**Turning it on immediately found two bugs, both of the kind that show nothing.**
+
+The first: the canvas is created when the editor opens, but the background
+thread is not started until you open a photo. Handing the canvas over at the
+moment it appears therefore never happened — there was nothing to hand it to
+yet — so the other thread drew into nowhere and the screen stayed empty. It now
+holds the canvas until there is somewhere to send it, so the order stops
+mattering.
+
+The second is worse and older. When the canvas is replaced — which happens when
+you cross into Batch — the background thread was told the new one had arrived
+but kept a handle to the old one as well. It would have carried on painting into
+a canvas that no longer exists: nothing thrown, nothing logged, just a blank
+picture from an ordinary action. That is precisely the failure the last release
+but one built a safety net for, and the net had a hole in it: the check it ran
+was satisfied by the file merely *mentioning* the rule, so the new drawing code
+sailed past it. Both the code and the check are fixed.
+
+**What is not yet proven, stated plainly.** The most important test — that the
+undo history comes out byte-for-byte identical on both threads — did not run. The
+operations I could drive from a console are not the ones the history records, so
+the comparison would have been empty against empty, which proves nothing. The
+picture comparison did pass: an eighteen-step sequence of drawing, undoing and
+redoing produced identical images, identical dimensions and identical history
+labels on both. The switch stays off until the missing test has actually run.
+
+<details><summary>Older releases</summary>
+
 ### v8.24 — 2026-08-12
 
 **Nothing you can see.** The engine is now created in one place instead of five,
@@ -119,7 +158,6 @@ test I wrote to prove that was itself broken — the stand-in for the other thre
 ignored the hand-over entirely, so the test passed either way. Deliberately
 breaking the code is what exposed the test, not the code.
 
-<details><summary>Older releases</summary>
 
 ### v8.23 — 2026-08-12
 

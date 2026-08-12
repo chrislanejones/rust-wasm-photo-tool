@@ -743,10 +743,24 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
   // every edit above them, and a stale allowlist entry that silently stops
   // matching is worse than no allowlist.
   const DISSOLVES_AT_STAGE_4: Record<string, string> = {
-    "app/src/hooks/useEngineCore.ts::flushToCanvas":
-      "the per-frame blit. Under Option A the canvas moves INTO the worker, so " +
-      "this path stops crossing the boundary at all — it dissolves rather than " +
-      "converting. Converting it instead adds a round trip per frame.",
+    // ✅ a12.2 — IT DISSOLVED, exactly as predicted, and this entry now names a
+    // different function because the operation MOVED rather than converted.
+    //
+    // The boundary-crossing version of these five reads no longer exists: with
+    // the canvas transferred, `engine.worker.ts`'s `blit()` does them against
+    // its OWN memory and nothing crosses. What is left here is the LOCAL
+    // implementation inside `blitLiveEngine`, which by construction never
+    // crosses a boundary either — it runs only when the flag is off, on the
+    // same thread as the engine it reads.
+    //
+    // So the floor of 5 is now permanent rather than pending. It is not work
+    // waiting for a later stage; it is the local path, and the local path has
+    // nothing to await.
+    "app/src/lib/engine/port.ts::blitLiveEngine":
+      "the LOCAL per-frame blit (a12.2). Same thread as its engine, so there is " +
+      "nothing to cross and nothing to await. The worker's copy of these five " +
+      "reads lives in engine.worker.ts, which is out of the audit's scope for " +
+      "the same reason — it is the far side of the boundary, not a crossing.",
   };
   const EXEMPT_TOTAL = 5;
 

@@ -159,6 +159,23 @@ export class EngineWorkerClient {
     );
   }
 
+  /**
+   * ADR-024 a12.2 — ask the worker to draw the composite onto its canvas.
+   *
+   * Fire-and-forget: no request id, no reply, nothing awaited. `flushToCanvas`
+   * is the per-frame path, and putting a round trip on it is the regression
+   * this arc exists to remove — a11.0 measured the flush at 22 ms and it is not
+   * free even in-worker.
+   *
+   * Not a `call()`: that machinery exists to match replies to requests and to
+   * order MUTATIONS, and a blit is neither. Sending it outside the queue also
+   * means it cannot be delayed behind pending work — the picture should be as
+   * fresh as possible, not consistent with a particular op.
+   */
+  blit(): void {
+    this.worker?.postMessage({ kind: "blit" });
+  }
+
   /** Withdraw a queued call. No effect once it has entered the engine — wasm
    *  is synchronous once entered, so this bounds the queue, not the operation. */
   cancel(id: number): void {

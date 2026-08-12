@@ -83,6 +83,7 @@ import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
 import { useExportDimensions } from "./session/useExportDimensions";
 import { useCanvasIdentity } from "@/lib/engine/canvasIdentity";
+import { transferCanvasToPort, releaseCanvasFromPort } from "@/lib/engine/port";
 import { useImageSession } from "./session/useImageSession";
 import { useColorPicker } from "@/hooks/useColorPicker";
 import { MagnifierOverlay } from "@/components/MagnifierOverlay";
@@ -266,7 +267,19 @@ export function AppShell() {
   // yet: a11.2 carries this generation into the worker protocol so a draw
   // aimed at a discarded element is REFUSED rather than performed into a
   // detached surface. See lib/engine/canvasIdentity.ts.
-  const { attach: attachCanvas } = useCanvasIdentity<HTMLCanvasElement>(canvasRef);
+  //
+  // ADR-024 a12.2 — THE TRANSFER HAPPENS HERE, on mount, and the release on
+  // unmount. Both are no-ops with the flag off (`port.ts` owns that test), so
+  // the local path never transfers and never loses its 2D context.
+  //
+  // This is what a11.1 and a11.2 were built for: the generation exists so the
+  // worker can REFUSE a draw aimed at an element React has discarded, instead
+  // of painting into a detached surface while the user watches a blank canvas.
+  // Releasing on unmount is the half that makes the refusal fire.
+  const { attach: attachCanvas } = useCanvasIdentity<HTMLCanvasElement>(canvasRef, {
+    onMount: (el, generation) => transferCanvasToPort(el, generation),
+    onUnmount: () => releaseCanvasFromPort(),
+  });
   // The arrow/shapes/crop rubber-band surface. Lives here only because
   // `useDrawingTools` (which draws on it) and `CanvasArea` (which mounts it)
   // both hang off this component; it carries no logic.

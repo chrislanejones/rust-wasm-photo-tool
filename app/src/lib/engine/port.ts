@@ -39,6 +39,7 @@
 import type { ImageHorseTool } from "stamp_tool";
 import { EngineWorkerClient } from "./workerClient";
 import { NEVER_FORWARD } from "./engineSurface";
+import { NO_CANVAS } from "./canvasGeneration";
 
 /**
  * Hand a freshly-constructed engine to the live document's port.
@@ -163,7 +164,183 @@ export async function createLiveEngine(spec: {
     // call site that can prove its buffer is dead — not a blanket transfer here.
     await port.call("load_image", [pixels]);
   }
+  // The canvas almost always mounted before this point — hand it over now.
+  attachPendingCanvas();
   return createEngineProxy(port);
+}
+
+/**
+ * ADR-024 a12.2 — draw the engine's composite onto the live canvas.
+ *
+ * **The branch lives HERE, not at the call site.**
+ * `engineAsyncMigration.contract.test.ts` allows exactly two modules to read
+ * `ih_engine_worker`, and this is the one that owns the local/worker choice:
+ * *"every such branch is a place the two implementations can quietly diverge."*
+ * So `flushToCanvas` calls this and contains no flag test of its own.
+ *
+ * ⚠️ NOT a method on the engine handle, which is the obvious design and does not
+ * work. The worker handle is a Proxy gated to the engine's REAL method surface
+ * (a12.0), so a synthetic `blit` is unreachable through it; and giving the local
+ * path one would mean wrapping the raw engine, which costs the identity
+ * property a13's liveness guard (`toolRef.current === t`) depends on.
+ *
+ * LOCAL: today's zero-copy path, unchanged and still synchronous — it is the
+ * per-frame blit and the five reads it makes are the ones `DISSOLVES_AT_STAGE_4`
+ * always said would dissolve rather than convert.
+ *
+ * WORKER: one fire-and-forget message. The engine, its memory and the
+ * `OffscreenCanvas` are all on that side, so nothing crosses.
+ */
+export function blitLiveEngine(
+  tool: ImageHorseTool,
+  canvas: HTMLCanvasElement,
+  wasmMemory: WebAssembly.Memory | null,
+  backbufferRef: { current: ImageData | null },
+): void {
+  if (engineWorkerEnabled()) {
+    // The canvas was transferred to the worker; this thread cannot draw to it
+    // and must not try — `getContext("2d")` throws `InvalidStateError` on a
+    // transferred element.
+    livePort?.blit();
+    return;
+  }
+
+  const w = tool.width() as unknown as number;
+  const h = tool.height() as unknown as number;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+  const ctx = canvas.getContext("2d", { desynchronized: true })!;
+  tool.recomposite();
+  if (wasmMemory) {
+    const ptr = tool.data_ptr() as unknown as number;
+    const len = tool.data_len() as unknown as number;
+    // Rebuilt every call: a `memory.grow()` replaces the backing ArrayBuffer and
+    // detaches every earlier view. Copied into a private backbuffer before
+    // `putImageData` — handing it an ImageData backed by live wasm memory is the
+    // Firefox "garbage after 5-8 strokes" bug.
+    const view = new Uint8ClampedArray(wasmMemory.buffer as ArrayBuffer, ptr, len);
+    let back = backbufferRef.current;
+    if (!back || back.width !== w || back.height !== h) {
+      back = new ImageData(w, h);
+      backbufferRef.current = back;
+    }
+    if (view.length === back.data.length) {
+      back.data.set(view);
+      ctx.putImageData(back, 0, 0);
+      return;
+    }
+  }
+  const composed = tool.get_image_data() as unknown as Uint8Array;
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(composed), w, h), 0, 0);
+}
+
+/**
+ * ADR-024 a12.2 — the three remaining main-thread canvas writes, as OPERATIONS.
+ *
+ * After `transferControlToOffscreen()` the main thread cannot get a 2D context
+ * from the element and any `width`/`height` ASSIGNMENT throws
+ * `InvalidStateError` (verified, OPEN-B). Every one of these was doing exactly
+ * that, unconditionally, from five load paths.
+ *
+ * They are functions here rather than an exported `mainThreadOwnsCanvas()`
+ * predicate on purpose. A predicate is just the flag wearing a different name,
+ * and the contract test's rule — *"every such branch is a place the two
+ * implementations can quietly diverge"* — is about the branch, not the spelling.
+ * Callers ask for the OUTCOME; where it happens is this module's business.
+ *
+ * Under the worker each is a no-op because the worker's `blit()` sizes and
+ * paints its own surface: the picture arrives on the next flush instead of
+ * being pre-painted here.
+ */
+export function clearLiveCanvas(canvas: HTMLCanvasElement): void {
+  if (engineWorkerEnabled()) return;
+  const ctx = canvas.getContext("2d");
+  ctx?.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
+export function sizeLiveCanvas(canvas: HTMLCanvasElement, w: number, h: number): void {
+  if (engineWorkerEnabled()) return;
+  canvas.width = w;
+  canvas.height = h;
+}
+
+/** Paint incoming pixels straight to the display canvas so a freshly-opened
+ *  photo appears before the engine has composited anything. Local only — under
+ *  the worker the first `blit()` does it, one frame later. */
+export function previewLiveCanvas(
+  canvas: HTMLCanvasElement,
+  pixels: Uint8ClampedArray,
+  w: number,
+  h: number,
+): void {
+  if (engineWorkerEnabled()) return;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d", { desynchronized: true })!;
+  ctx.putImageData(new ImageData(pixels as unknown as ImageDataArray, w, h), 0, 0);
+}
+
+/**
+ * ADR-024 a12.2 — hand a newly-mounted canvas to the worker.
+ *
+ * One-way and permanent for that ELEMENT: after
+ * `transferControlToOffscreen()` the main thread can no longer get a 2D context
+ * from it, and `width`/`height` ASSIGNMENTS throw `InvalidStateError` (verified,
+ * OPEN-B — reads, `getBoundingClientRect`, styles and events all keep working,
+ * which is why zoom and pan survive). That is why a11.3 keys the element on
+ * `canvasSurfaceKey()`: flipping the flag remounts a FRESH element that was
+ * never transferred, so the runtime kill switch still works.
+ *
+ * No-op with the flag off, so the local path never transfers and never loses
+ * its context.
+ */
+export function transferCanvasToPort(canvas: HTMLCanvasElement, generation: number): void {
+  if (!engineWorkerEnabled()) return;
+  pendingCanvas = { el: canvas, generation };
+  attachPendingCanvas();
+}
+
+/** The mounted element waiting to be handed over, if the port did not exist yet.
+ *
+ *  ⚠️ THE TWO EVENTS RACE, AND THE CANVAS ALWAYS WINS. The element mounts when
+ *  the editor renders; the port is not created until a photo is OPENED. So a
+ *  transfer-on-mount alone never fires — `livePort` is null every time — and the
+ *  worker ends up drawing to nothing while the user looks at an untouched
+ *  300x150 canvas. Observed directly the first time the flag was turned on.
+ *
+ *  Holding the element and completing the handover when the port appears makes
+ *  the order irrelevant, which is the only version that can be correct: neither
+ *  event owns the other. */
+let pendingCanvas: { el: HTMLCanvasElement; generation: number } | null = null;
+
+function attachPendingCanvas(): void {
+  const port = livePort;
+  if (!port || !pendingCanvas) return;
+  const { el, generation } = pendingCanvas;
+  // Cleared either way: `transferControlToOffscreen()` may be called ONCE per
+  // element, so a retry could only ever throw again.
+  pendingCanvas = null;
+  try {
+    port.setCanvas(generation, el.transferControlToOffscreen());
+  } catch {
+    // Already transferred — React re-invokes a callback ref whenever the
+    // callback's identity changes, and this component re-renders constantly.
+    // The worker still holds the surface; only the generation needs updating.
+    port.setCanvas(generation);
+  }
+}
+
+/** ADR-024 a12.2 — tell the worker the live element is gone, so every
+ *  canvas-targeted call becomes stale rather than painting into a detached
+ *  surface. This is the half a11.2's rejection rule was built for. */
+export function releaseCanvasFromPort(): void {
+  if (!engineWorkerEnabled()) return;
+  pendingCanvas = null;
+  livePort?.setCanvas(NO_CANVAS);
 }
 
 /** The subset of `EngineWorkerClient` the proxy needs. Declared structurally so

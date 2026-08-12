@@ -61,6 +61,10 @@ export interface EngineReply {
 
 let tool: ImageHorseTool | null = null;
 let ready = false;
+/** This worker's own wasm linear memory — the zero-copy blit views it. */
+let wasmMemory: WebAssembly.Memory | null = null;
+/** Reused ImageData backbuffer, same reasoning as the main thread's. */
+let backbuffer: ImageData | null = null;
 
 // ADR-024 a11.2 — which canvas element this worker believes is live.
 //
@@ -73,6 +77,10 @@ let ready = false;
 // matching a default.
 let canvasGeneration: number = NO_CANVAS;
 let surface: OffscreenCanvas | null = null;
+/** The generation `surface` arrived with. `blit()` compares it against the live
+ *  generation, which is how a draw aimed at a discarded element is refused
+ *  rather than performed into a detached surface. */
+let surfaceGeneration: number = NO_CANVAS;
 
 /** Requests accepted but not yet executed, oldest first. */
 const queue: EngineRequest[] = [];
@@ -151,18 +159,88 @@ async function drain() {
   }
 }
 
+/**
+ * ADR-024 a12.2 — the blit, worker-side.
+ *
+ * This is the operation that could not be converted and had to MOVE. On the
+ * main thread it reads `data_ptr()`/`data_len()` and views the engine's linear
+ * memory directly; those are indices into an address space, not values, so
+ * there is no awaiting them across a boundary. With the canvas transferred here
+ * the same code runs against THIS thread's memory and never crosses anything.
+ *
+ * Fire-and-forget by design: no reply, no request id. The caller
+ * (`flushToCanvas`) is the per-frame path and must not be ordered against the
+ * draw — that round trip is the regression the whole arc exists to remove.
+ *
+ * ⚠️ NOT ROUTED THROUGH THE QUEUE, deliberately. `drain()` exists to make
+ * MUTATIONS arrive in postMessage order, which is what the op log's correctness
+ * rests on. A blit mutates nothing; queueing it behind pending work would delay
+ * the picture without buying any ordering guarantee. It does mean a blit can
+ * overtake a queued mutation and draw a frame that is one op stale — which is
+ * exactly what the main thread does today, since `flushToCanvas` paints
+ * whatever the engine holds at the moment it runs.
+ */
+function blit(): void {
+  if (!tool || !surface) return;
+  // ADR-024 a11.2's rule, applied to the draw half it was built for. The blit
+  // carries no request id, so the thing being checked is the SURFACE: is the
+  // canvas we hold still the live one? After a remount it is not, and painting
+  // into it is invisible.
+  if (staleCanvasReason(surfaceGeneration, canvasGeneration) !== null) return;
+  const w = tool.width();
+  const h = tool.height();
+  if (surface.width !== w || surface.height !== h) {
+    surface.width = w;
+    surface.height = h;
+  }
+  const ctx = surface.getContext("2d");
+  if (!ctx) return;
+  tool.recomposite();
+
+  if (wasmMemory) {
+    const ptr = tool.data_ptr();
+    const len = tool.data_len();
+    // The view MUST be rebuilt every call: a `memory.grow()` replaces the
+    // backing ArrayBuffer and detaches every earlier view of it. Copy into a
+    // private backbuffer before handing it to `putImageData`, for the same
+    // reason the main thread does — a desynchronized present reading live wasm
+    // memory is the Firefox "garbage after 5-8 strokes" bug.
+    const view = new Uint8ClampedArray(wasmMemory.buffer as ArrayBuffer, ptr, len);
+    if (!backbuffer || backbuffer.width !== w || backbuffer.height !== h) {
+      backbuffer = new ImageData(w, h);
+    }
+    if (view.length === backbuffer.data.length) {
+      backbuffer.data.set(view);
+      ctx.putImageData(backbuffer, 0, 0);
+      return;
+    }
+  }
+  // Fallback: copy the composite out of the engine. Correct but allocates a
+  // full frame; reaching it every frame means `wasmMemory` was lost.
+  const composed = tool.get_image_data();
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(composed), w, h), 0, 0);
+}
+
 self.onmessage = async (e: MessageEvent) => {
   const d = e.data as
     | { kind: "init"; width: number; height: number }
     | { kind: "cancel"; id: number }
     | { kind: "canvas"; generation: number; canvas?: OffscreenCanvas }
+    | { kind: "blit" }
     | { kind: "dispose" }
     | ({ kind: "call" } & EngineRequest);
 
   switch (d.kind) {
     case "init": {
       const mod = await import("stamp_tool");
-      await mod.default();
+      // ADR-024 a12.2 — KEEP THE MEMORY HANDLE. `mod.default()`'s exports carry
+      // the `WebAssembly.Memory` this worker's engine lives in, and the blit
+      // below views it directly. Discarding it (as this did until v8.25) leaves
+      // only `get_image_data()`, which copies the whole composite out of wasm on
+      // every frame — the regression Option A exists to remove. The main thread
+      // keeps the same handle for the same reason (`wasmMemoryRef`).
+      const exports = (await mod.default()) as unknown as { memory: WebAssembly.Memory };
+      wasmMemory = exports.memory;
       tool = new mod.ImageHorseTool(d.width, d.height);
       ready = true;
       // ADR-024 a12.0 — REPORT THE ENGINE'S OWN SURFACE.
@@ -200,8 +278,23 @@ self.onmessage = async (e: MessageEvent) => {
       // is absent and only the generation moves, which is deliberate: the rule
       // and its protocol slot exist before the thing they protect, so the
       // transfer cannot land without them.
-      surface = d.canvas ?? surface;
+      // ⚠️ DROP THE SURFACE ON RELEASE. `?? surface` alone keeps the OLD
+      // OffscreenCanvas after the element it belonged to is gone, and a later
+      // blit paints into it — no throw, and the user watches a blank canvas
+      // from an ordinary action. That is the exact failure a11 exists to close,
+      // and it survived into a12.2's first cut.
+      if (d.generation === NO_CANVAS) {
+        surface = null;
+        surfaceGeneration = NO_CANVAS;
+      } else if (d.canvas) {
+        surface = d.canvas;
+        surfaceGeneration = d.generation;
+      }
       canvasGeneration = d.generation;
+      break;
+
+    case "blit":
+      blit();
       break;
 
     case "cancel":

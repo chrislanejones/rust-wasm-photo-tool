@@ -6225,3 +6225,95 @@ for the surface/proxy (4 killed + 1 equivalent). Two needed re-running because a
 a12.2 is where the flag goes ON for the first time: `transferControlToOffscreen`
 plus a `blit()` on both implementations. Nothing before it proves anything about
 the worker path.
+
+## v8.25 Change Summary — 2026-08-12
+
+**a12.2 — the engine ran in the worker and painted the canvas, for the first
+time in the arc.** Flag still OFF by default.
+
+### The blit moved rather than converted
+
+| | Local | Worker |
+|---|---|---|
+| `recomposite` + zero-copy view | main thread | **worker, against its own memory** |
+| canvas sizing | `canvas.width = w` | worker sizes its `OffscreenCanvas` |
+| crossing the boundary | — | **one fire-and-forget message** |
+
+`flushToCanvas` calls `blitLiveEngine(...)` from `port.ts` and contains no flag
+test. `blit()` is a MODULE FUNCTION, not a method on the handle: the proxy is
+surface-gated to real engine methods so a synthetic `blit` is unreachable
+through it, and giving the local path one would mean wrapping the raw engine,
+costing the identity property a13's liveness guard depends on.
+
+**The proof is structural.** After `transferControlToOffscreen()` the main thread
+cannot get a 2D context from that element — verified, `getContext` throws
+`InvalidStateError`. So the photo appearing on screen can only have been painted
+by the worker.
+
+### Two bugs, both found by turning the flag on
+
+**1. The canvas and the port race, and the canvas always wins.** The element
+mounts when the editor renders; the port is not created until a photo is opened.
+So transfer-on-mount never fired — `livePort` was null every time — and the
+worker drew into nothing while an untouched 300×150 canvas sat on screen. The
+element is now held until the port exists, so neither event owns the other.
+
+**2. The worker kept a dead `OffscreenCanvas`.** `surface = d.canvas ?? surface`
+retains the previous surface when a release message carries no canvas, so after a
+remount the worker held a handle to an element React had discarded and would keep
+painting into it. No throw, no log, blank canvas from an ordinary action — the
+exact failure a11 exists to close, reproduced inside a12.2's first cut.
+
+**The a11.2 structural guard should have caught #2 and did not.** It asserted the
+worker file *contains* `staleCanvasReason`, which was already true from the
+queued-call path — so `blit()`, which calls `getContext` and consulted nothing,
+passed it untouched. It is now positional (the guard must precede the draw) and
+checks the release path nulls the surface.
+
+### A scoping correction the audit needed
+
+The worker's `blit()` gave `engine.worker.ts` its first LITERAL `tool.method()`
+calls — before that it only invoked methods dynamically (`fn.apply`), which the
+receiver regex cannot see. Those five reads are same-thread by construction and
+can never cross, so the worker is now out of the audit's scope. Not a loophole:
+it was never in scope, it was merely never detectable.
+
+`DISSOLVES_AT_STAGE_4` moved with the operation — from
+`useEngineCore::flushToCanvas` to `port.ts::blitLiveEngine` — and the stale-entry
+guard caught the old key the moment it stopped matching.
+
+| Gate | Before | After |
+|---|---|---|
+| Stage 3.5 | 5 (exempt) | **5** — same five, now the LOCAL blit |
+| a10 hot-path | 0 | 0 |
+
+### a12.3 — the three gates, individually
+
+| Gate | Result |
+|---|---|
+| **1 — tool switches under the flag** | ⚠️ **PARTIAL.** Hash routing did not remount the element (`sameElement: true`), so the stale-generation path was never exercised. The rejection was NOT observed firing. |
+| **2 — cross-implementation equivalence** | ✅ **PASS.** Identical restored baseline (`7584617b36c5686d`), then an 18-step mixed sequence of draws, undos, redos and a rotate produced identical composite (`5e2595589426517b`), dimensions, undo/redo counts and history labels. |
+| **3 — op-log byte equivalence** | ❌ **NOT RUN.** |
+
+**Gate 3 is not a pass and must not be recorded as one.** The op log reported
+`armed — base captured, no ops yet` and stayed at `opCount: 0` through
+annotations, rotations and adjustments — none of the operations reachable from a
+console are ones it records. Comparing the encoded log gave `"empty" === "empty"`,
+which is exactly the soft pass the plan warned about. It needs a document with a
+live, recording log, driven through real tool gestures.
+
+**Do not flip the default until gate 3 has actually run.**
+
+### Verification
+
+Flag ON: worker fetched, wasm loaded worker-side, engine handle is the proxy
+(`width()` returns a Promise), canvas transferred, photo painted, 1950×1548.
+Flag OFF, same origin: canvas NOT transferred, sized locally, photo painted —
+and the "Loading your workspace…" overlay appears in BOTH modes, confirming it as
+the pre-existing hang rather than anything a12.2 introduced.
+
+Test data was run with `ih_oplog_persist=0` so none of it touched the stored
+photo; verified restored afterwards (undo 0, zero annotations).
+
+**Gates.** 512 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
+clean. Engine untouched — no `build:wasm`.

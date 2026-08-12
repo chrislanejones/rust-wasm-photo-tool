@@ -28,7 +28,14 @@ import {
   registerWasmMemory,
 } from "@/lib/resourceMonitor";
 import { restoreLayerStack } from "@/lib/restoreLayerStack";
-import { createLiveEngine, detachLivePort } from "@/lib/engine/port";
+import {
+  blitLiveEngine,
+  clearLiveCanvas,
+  createLiveEngine,
+  detachLivePort,
+  previewLiveCanvas,
+  sizeLiveCanvas,
+} from "@/lib/engine/port";
 import { syncOplog, tryTilesFlush } from "@/lib/tilesFlush";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
@@ -270,12 +277,9 @@ export function useEngineCore(
     isDrawingRef.current = false;
     sourceDisarmedRef.current = false;
     const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-      canvas.width = 0;
-      canvas.height = 0;
-    }
+    // ADR-024 a12.2 — via the port: after `transferControlToOffscreen()` this
+    // thread cannot get a 2D context and a width assignment throws.
+    if (canvas) clearLiveCanvas(canvas);
     setState(INITIAL_STATE);
   }, [canvasRef]);
 
@@ -383,64 +387,20 @@ export function useEngineCore(
     const t = toolRef.current;
     const canvas = canvasRef.current;
     if (!t || !canvas) return;
-    const w = t.width();
-    const h = t.height();
-    // Resize canvas if dimensions changed (e.g. after rotate_90_cw)
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
-    const ctx = canvas.getContext("2d", { desynchronized: true })!;
-    // Rebuild the Rust-side composite of all visible layers (pixels + overlays
-    // + opacity) into its cache, then blit it. The zero-copy path views WASM
-    // linear memory directly — the view MUST be reconstructed every call
-    // because the backing ArrayBuffer is replaced if WASM memory grows.
-    t.recomposite();
-    // ADR-024 — these three are now async, and `flushToCanvas` MUST NOT await
-    // them. It is the per-frame blit, exempt from the migration precisely
-    // because putting a round trip on it is the regression this whole arc
-    // exists to avoid. All three are fire-and-forget by nature: the first two
-    // feed the diagnostics panel (a module variable nobody reads unless it is
-    // open) and the third schedules debounced persistence. Nothing on the
-    // drawing path consumes any of them.
+    // ADR-024 a12.2 — the five reads that used to live here are GONE, which is
+    // what `DISSOLVES_AT_STAGE_4` predicted from the beginning: `width`,
+    // `height`, `data_ptr`, `data_len` and the `get_image_data` fallback were
+    // exempt from Stage 3.5 because the operation MOVES rather than converts.
+    // `data_ptr()` is an index into an address space, not a value, so no amount
+    // of awaiting makes it cross a thread.
     //
-    // `.then(register…)` rather than `await` keeps the ORDER of the writes
-    // (each registers its own result when it arrives) without ordering the
-    // FLUSH against them.
-    void tryTilesFlush(t).then(registerTilesDirtyCount);
-    void syncOplog(t).then(registerOplogStats);
+    // The local/worker choice is inside `blitLiveEngine`, not here. The contract
+    // test allows exactly two modules to read the flag, and a call site that
+    // branches on it has re-exposed the choice Stage 3.5 exists to hide.
+    tryTilesFlush(t).then(registerTilesDirtyCount).catch(() => {});
+    syncOplog(t).then(registerOplogStats).catch(() => {});
     void onOplogFlush(t);
-    const wasmMem = wasmMemoryRef.current;
-    if (wasmMem) {
-      const ptr = t.data_ptr();
-      const len = t.data_len();
-      // View WASM linear memory, then COPY into a stable JS-owned backbuffer.
-      // Handing putImageData an ImageData backed by the live WASM heap is the
-      // root of the Firefox "garbage after ~5-8 strokes" bug: a later
-      // memory.grow() detaches the shared ArrayBuffer and the desynchronized
-      // present reads it stale. Copying into a private (reused) buffer is safe
-      // in every browser. The view is rebuilt each call against the current
-      // (post-grow) buffer.
-      const view = new Uint8ClampedArray(wasmMem.buffer as ArrayBuffer, ptr, len);
-      let back = backbufferRef.current;
-      if (!back || back.width !== w || back.height !== h) {
-        back = new ImageData(w, h);
-        backbufferRef.current = back;
-      }
-      if (view.length === back.data.length) {
-        back.data.set(view);
-        ctx.putImageData(back, 0, 0);
-        return;
-      }
-      // Length mismatch (shouldn't happen) — fall through to the safe copy.
-    }
-    // Fallback (no WASM memory handle): copy the composite out of Rust.
-    const composed = t.get_image_data();
-    ctx.putImageData(
-      new ImageData(new Uint8ClampedArray(composed), w, h),
-      0,
-      0,
-    );
+    blitLiveEngine(t, canvas, wasmMemoryRef.current, backbufferRef);
   }, [canvasRef]);
 
   const getCanvasCoords = useCallback(
@@ -482,11 +442,17 @@ export function useEngineCore(
       img.onload = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d", { desynchronized: true })!;
+        // ADR-024 a12.2 — DECODE ON A PRIVATE SURFACE, not the display canvas.
+        // This used the visible canvas as scratch: size it, draw the raw image,
+        // read it back. That throws once the element is transferred, and it was
+        // never a good idea anyway — it flashes the undecorated image on screen
+        // before the engine has composited anything. An OffscreenCanvas is
+        // never transferred, so this path is identical under both modes.
+        const scratch = new OffscreenCanvas(img.width, img.height);
+        const ctx = scratch.getContext("2d", { willReadFrequently: true })!;
         ctx.drawImage(img, 0, 0);
         const imageData = ctx.getImageData(0, 0, img.width, img.height);
+        sizeLiveCanvas(canvas, img.width, img.height);
         // ADR-024 a12.1 — construction goes through the factory, which decides
         // whether the engine lives here or in the worker. `img.onload` cannot be
         // async, so this is `void`-ed; everything after it moved inside.
@@ -574,17 +540,17 @@ export function useEngineCore(
         // — after `transferControlToOffscreen()` they throw on the main thread
         // (see "Stage 4's real scope"). Orthogonal: awaiting the read neither
         // fixes nor worsens the assignment.
-        canvas.width = await tool.width();
-        canvas.height = await tool.height();
+        sizeLiveCanvas(canvas, await tool.width(), await tool.height());
         // No raw putImageData here (the composite differs from the photo
         // pixels), so paint the layer composite straight away.
         flushToCanvas();
       } else {
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d", { desynchronized: true })!;
-        const clamped = new Uint8ClampedArray(pixels.buffer as ArrayBuffer);
-        ctx.putImageData(new ImageData(clamped, width, height), 0, 0);
+        previewLiveCanvas(
+          canvas,
+          new Uint8ClampedArray(pixels.buffer as ArrayBuffer),
+          width,
+          height,
+        );
         toolRef.current = await createLiveEngine({ Tool, width, height, pixels: src });
       }
       sourcePosRef.current = null;
@@ -759,8 +725,7 @@ export function useEngineCore(
 
       const canvas = canvasRef.current;
       if (canvas) {
-        canvas.width = saved.canvasW;
-        canvas.height = saved.canvasH;
+        sizeLiveCanvas(canvas, saved.canvasW, saved.canvasH);
       }
 
       // Re-create live text annotations (non-destructive overlay layer).

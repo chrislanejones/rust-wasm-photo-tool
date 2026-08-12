@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.25",
+    date: "2026-08-12",
+    headline: "The engine ran on a background thread, and drew the photo from there",
+    entries: [
+      {
+        tag: "perf",
+        text: "Off by default, but it ran: the engine worked on a background thread and painted the picture from there. The proof is structural rather than a claim — once the canvas is handed over, the main thread physically cannot draw to it, the browser refuses. So a photo appearing on screen can only have been painted by the other thread. It appears.",
+      },
+      {
+        tag: "fix",
+        text: "Turning it on immediately found two bugs, both of the kind that show nothing. The canvas is created when the editor opens, but the background thread is not started until you open a photo — so handing the canvas over at the moment it appeared never happened, and the other thread drew into nowhere. It now waits until there is somewhere to send it.",
+      },
+      {
+        tag: "fix",
+        text: "The second is worse and older. When the canvas is replaced — which happens crossing into Batch — the background thread kept a handle to the old one as well, and would have carried on painting into a canvas that no longer exists. Nothing thrown, nothing logged, just a blank picture from an ordinary action. That is the exact failure an earlier release built a safety net for, and the net had a hole: its check was satisfied by the file merely mentioning the rule. Both are fixed.",
+      },
+      {
+        tag: "infra",
+        text: "What is not yet proven, stated plainly: the most important test — that the undo history comes out byte-for-byte identical on both threads — did not run. The operations reachable from a console are not the ones the history records, so the comparison would have been empty against empty, which proves nothing. The picture comparison did pass, on an eighteen-step sequence of drawing, undoing and redoing. The switch stays off until the missing test has actually run.",
+      },
+    ],
+  },
+  {
     version: "v8.24",
     date: "2026-08-12",
     headline: "The engine is created in one place now, not five",

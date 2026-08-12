@@ -114,12 +114,34 @@ const methods = new Set([...shadowMethods, ...pkgMethods]);
 const shadowMissing = [...pkgMethods].filter((m) => !shadowMethods.has(m));
 
 // --- files ----------------------------------------------------------------
+// ⚠️ THE WORKER IS THE OTHER SIDE OF THE BOUNDARY — excluded from the scan
+// (a12.2, 2026-08-12).
+//
+// This gate measures calls that will have to CROSS a thread boundary once the
+// engine moves, so each one must become async. `workers/engine.worker.ts` owns
+// the engine on the far side: its `tool.width()` is a same-thread call into an
+// object it constructed itself, and it can never cross anything. Counting those
+// would be counting the destination as if it were the journey.
+//
+// It became visible exactly when a12.2's `blit()` gave the worker its first
+// LITERAL `tool.method()` calls — before that it only ever invoked methods
+// dynamically (`fn.apply(tool, args)`), which the receiver regex cannot see. So
+// the exclusion is new information, not a loophole: the worker was never in
+// scope, it was merely never detectable.
+const OUT_OF_SCOPE = /[\\/]workers[\\/]engine\.worker\.ts$/;
+
 function walk(dir, out = []) {
   for (const e of readdirSync(dir)) {
     const p = join(dir, e);
     const s = statSync(p);
     if (s.isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx)$/.test(e) && !/\.test\.tsx?$/.test(e) && !e.endsWith(".d.ts")) out.push(p);
+    else if (
+      /\.(ts|tsx)$/.test(e) &&
+      !/\.test\.tsx?$/.test(e) &&
+      !e.endsWith(".d.ts") &&
+      !OUT_OF_SCOPE.test(p)
+    )
+      out.push(p);
   }
   return out;
 }
