@@ -28,6 +28,47 @@ import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
 import { setEngineDocument } from "@/lib/engineDocument";
 import { whenStrokeIdle } from "@/lib/strokeGate";
+import { getOplogStats, type OplogStats } from "@/lib/resourceMonitor";
+
+/**
+ * How long the idle debounce waits before archiving — v8.35, and the number is
+ * chosen by WHAT ELSE could save this document.
+ *
+ * Op-RECORDED edits (paint, eraser, pens, transforms) survive any refresh via
+ * log replay; for them the archive is belt-and-braces and 2.5 s of idle is
+ * fine. UNRECORDED edits — clone stamp, emoji, Magic Eraser, every edit on a
+ * document whose log is inactive or broken — have NO other savior: the
+ * unload-time flush cannot help behind the worker, because its
+ * `capture_state()` is an await across the port during page teardown and the
+ * continuation never runs. Measured on production: stamp → refresh within the
+ * debounce window → undo 4 → 3, the stroke gone, logged in or out (Chris's
+ * report, reproduced).
+ *
+ * So when the log is not recording, the archive IS the persistence and it gets
+ * written almost immediately after the stroke. `null` stats (no flush yet) and
+ * unsupported builds take the fast path too — the failure cost is one extra
+ * IDB write, against silent data loss.
+ *
+ * Exported for the unit test; the real fix — recording these edits in the op
+ * log — is filed as ADR-024-F4.
+ */
+export function autosaveDelayMs(stats: OplogStats | null, undoCount: number): number {
+  // ⚠️ "The log is ACTIVE" is NOT the safety condition, and the first cut of
+  // this function keyed on it and still lost the stroke. A fresh document's
+  // log stays active — recording paint happily — while a clone stroke passes
+  // it by entirely: measured undo 1, ops 0, `oplog_active: true`, stroke gone
+  // on refresh. The condition that matters is COVERAGE: does the log hold at
+  // least as many ops as the engine holds undo entries? `ops < undoCount`
+  // means an unrecorded edit exists somewhere in this document's history, and
+  // from that moment the archive is the only thing that can restore it.
+  //
+  // Stats lag one flush at worst (they are published by `syncOplog` after each
+  // flush, and every stroke end flushes); a stale-low `ops` fails toward the
+  // fast lane, which costs one extra IDB write. The slow lane requires proof.
+  const logCoversDocument =
+    !!stats && stats.supported && stats.active && !stats.broken && stats.ops >= undoCount;
+  return logCoversDocument ? 2500 : 300;
+}
 
 type Preferences = ReturnType<typeof usePreferences>[0];
 type EditPersistence = ReturnType<typeof useEditPersistence>;
@@ -209,7 +250,7 @@ export function useImageSession({
     if (!activePhotoId || !dirtyRef.current) return;
     const t = window.setTimeout(
       () => void whenStrokeIdle().then(() => flushRef.current()),
-      2500,
+      autosaveDelayMs(getOplogStats(), stamp.state.undoCount),
     );
     return () => window.clearTimeout(t);
   }, [activePhotoId, stamp.state.undoCount, hasBeenModified]);

@@ -84,6 +84,33 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.35 — 2026-08-13
+
+**Clone stamp, emoji and Magic Eraser edits survive a quick refresh now.**
+Chris mapped it precisely: paint, eraser, pens and resize survived a reload;
+clone stamp, emoji and Magic Eraser vanished — signed in or not. The pattern
+behind his list: the survivors are recorded in the op log and replay on
+restore. The casualties are not — they exist only as pixels, and pixels are
+saved by an autosave that waits 2.5 seconds after your last edit. Refresh
+before it fires and the work is gone. The old engine had a last-chance save at
+page close; on the background thread that save silently stopped working,
+because it asks the engine a question during teardown and the answer arrives
+after the page is dead.
+
+Reproduced exactly: stamp, refresh within the window, stroke gone — undo count
+4 before, 3 after.
+
+The fix: the app now notices when a document holds edits the log does not
+cover — the engine's undo count says one thing, the log's op count another —
+and in that state the autosave fires 300 milliseconds after the stroke instead
+of 2500. The first version of this keyed on "is the log recording" and still
+lost the stroke, because a log can be recording and simply not contain the
+stamp; the shipped version demands coverage, not activity. Same reproduction
+after: the stroke survives.
+
+Recording these tools in the op log properly — so they replay like paint does —
+is filed as the real fix.
+
 ### v8.34 — 2026-08-13
 
 **The brush follows the cursor. Actually, this time.** This morning's fix

@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.35",
+    date: "2026-08-13",
+    headline: "Clone stamp, emoji and Magic Eraser survive a quick refresh",
+    entries: [
+      {
+        tag: "fix",
+        text: "Paint and pens replay from the edit log on reload; clone stamp, emoji and Magic Eraser exist only as pixels, saved by an autosave that waited 2.5 seconds. Refresh before it fired and the work was gone — the old last-chance save at page close silently stopped working on the background thread. Reproduced: stamp, refresh, stroke gone.",
+      },
+      {
+        tag: "fix",
+        text: "The app now notices when a document holds edits the log does not cover and saves 300 milliseconds after the stroke instead. Demanding coverage matters: the first attempt checked whether the log was recording, and a log can be recording and still not contain the stamp.",
+      },
+      {
+        tag: "infra",
+        text: "The real fix — recording these tools in the log so they replay like paint — is filed with a number.",
+      },
+    ],
+  },
+  {
     version: "v8.34",
     date: "2026-08-13",
     headline: "The brush follows the cursor. Actually, this time",

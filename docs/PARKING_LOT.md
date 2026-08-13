@@ -1898,3 +1898,17 @@ pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
   `useEditPersistence.ts:390` — read that comment first; it explains why the
   capture must complete before any await used to matter, and the same argument
   needs restating for the in-worker version. Its own session.
+
+- **ADR-024-F4 — record clone stamp / emoji / Magic Eraser in the op log
+  (filed v8.35).** They are the unrecorded edits behind the fast-refresh data
+  loss; v8.35's coverage-keyed 300 ms autosave is the mitigation, replay is the
+  fix. Clone op is deterministic from (source, path, params). Emoji needs a
+  pixels-vs-codepoint decision — b2's no-pixel-carrying rule applies. Engine
+  work, own session, `rust-wasm-loop` gates.
+
+- **ADR-024-F5 — worker blit is full-frame (filed v8.35).** The local path had
+  dirty-tile flushes (`ih_tiles_flush`); the worker's `blit()` recomposites the
+  whole document every frame. This is the likely residue behind "brush still a
+  little slow" and "stamp slower than paint" after the v8.34 backpressure fix.
+  Port the tile path into the worker blit; measure before/after with the
+  hardware-rate stroke protocol.

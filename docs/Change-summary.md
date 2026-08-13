@@ -7014,3 +7014,43 @@ of gates measured input at real-device rates. Every future hot-path probe here
 drives events at hardware speed, not automation speed.
 
 **Gates.** 535 tests, `tsc` clean, eslint 0 errors, build clean.
+
+---
+
+## v8.35 Change Summary — 2026-08-13
+
+**Unrecorded edits survive a fast refresh.** Chris's tool-by-tool map made the
+diagnosis: paint / eraser / pens / resize survive reloads (op-recorded, log
+replay); clone stamp / emoji / Magic Eraser vanish (unrecorded — pixels only),
+signed in or not.
+
+### The mechanism, measured
+
+| Fact | Evidence |
+|---|---|
+| clone strokes are NOT in the op log | stroke: undo +1, `oplog_op_count` unchanged |
+| an ACTIVE log can miss them | fresh doc: undo 1, ops 0, `oplog_active: true` |
+| the unload-time archive flush is dead behind the worker | its `capture_state()` is an await across the port during page teardown — the continuation never runs |
+| so the loss window is the whole 2.5 s debounce | stamp → refresh at 900 ms → **undo 4 → 3, stroke gone** (reproduced, production) |
+
+### The fix — `autosaveDelayMs(stats, undoCount)`
+
+When the log does not COVER the document (`ops < undoCount`, or inactive /
+broken / unsupported / no stats yet), the idle debounce drops **2500 → 300 ms**:
+the archive is that document's only persistence and it gets written at stroke
+end. ⚠️ The first cut keyed on `stats.active` and STILL lost the stroke — a log
+can be recording and simply not contain the stamp. Coverage, not activity.
+Unit-tested including that exact measured state (undo 1, ops 0, active true).
+
+Same 900 ms reproduction after the fix: **undo 1 → 1, stroke survives.**
+
+### Filed
+
+**ADR-024-F4** — record clone stamp / emoji / Magic Eraser in the op log so
+they replay like paint (engine work; the clone op is replayable from source +
+path + params; emoji needs a design decision on pixels-vs-codepoint per b2's
+no-pixel-carrying rule). **F5** — the residual brush/stamp feel gap: the worker
+blit recomposites full-frame; the local path had dirty-tile flushes. Both are
+their own sessions.
+
+**Gates.** 538 tests (+3), `tsc` clean, eslint 0 errors, build clean.
