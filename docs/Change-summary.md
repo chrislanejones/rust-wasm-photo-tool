@@ -6317,3 +6317,80 @@ photo; verified restored afterwards (undo 0, zero annotations).
 
 **Gates.** 512 JS tests, `tsc` clean, eslint 0 errors, app + marketing builds
 clean. Engine untouched — no `build:wasm`.
+
+## v8.26 Change Summary — 2026-08-12
+
+**a12.3 gate 3 — RUN, AND IT PASSED.** The central assumption of the entire arc
+now has evidence behind it. No code changed.
+
+`OpLog::append` records arrival order, no `Op` carries a sequence number, and a
+`MessagePort` is FIFO — so postMessage order *is* append order. That had only
+ever been argued from reading `src/ops.rs`.
+
+### Why v8.25 measured nothing
+
+The log sat at `opCount: 0`. One line in `lib.rs` explains it:
+
+> `oplog_sync_annotations` — *"Diff the engine's annotation lists against the
+> log's and record the difference as ops. **Runs at every `recomposite()`**"*
+
+The probe never recomposited. Adding `recomposite()` after each mutation turns
+the log from `armed — base captured, no ops yet` into `recording`. The recorded
+set is `Stroke`, `FillRegion`, `Blur`, `Levels`, `Crop`, `Text*`, `Shape*` — and
+notably **not** `rotate_90_cw` or the `adjust_*` family, which is exactly what
+v8.25's probe was made of.
+
+### The instrument was checked before the result was believed
+
+| Same 8 adds | oplog SHA-256 |
+|---|---|
+| forward order | `c4df040e…` |
+| reverse order | `5be868f9…` |
+| **order-sensitive** | ✅ **yes** |
+
+A fingerprint that cannot tell two orderings apart cannot certify that ordering
+was preserved. This is what makes the equality below mean something.
+
+### Sequential pass — necessary, not sufficient
+
+15 interleaved steps, each awaited:
+
+| | LOCAL | WORKER |
+|---|---|---|
+| ops / bytes | 9 / 1047 | 9 / 1047 |
+| oplog SHA | `c4df040e…` | `c4df040e…` |
+| composite | `a9e9b732e2e9a0ee` | same |
+
+⚠️ Awaiting each call makes postMessage order trivially equal to call order.
+This tests the plumbing, not the queue.
+
+### Concurrent burst — the actual gate
+
+**16 mutations issued with no await between them**, all in flight at once, then
+6 edits against ids from the first burst:
+
+| | LOCAL | WORKER |
+|---|---|---|
+| ids returned | `1..16` in order | **`1..16` in order** |
+| ops / bytes | 7 / 910 | 7 / 910 |
+| **oplog SHA-256** | `ea77112d…` | **`ea77112d…`** |
+| composite | `f3ee448a03b34669` | same |
+
+The worker drained 16 concurrent requests in post order and produced a
+**byte-identical** log.
+
+### a12.3 now stands
+
+| Gate | Result |
+|---|---|
+| 1 — tool switches | ⚠️ **PARTIAL** — hash routing never remounts the element, so the stale-generation path is still unexercised |
+| 2 — cross-implementation equivalence | ✅ PASS |
+| 3 — op-log byte equivalence | ✅ **PASS** |
+
+Stage 5 is no longer blocked on gate 3. It is blocked on **gate 1's remount
+case** and on the frame-timeline measurement.
+
+Test data ran with `ih_oplog_persist=0`; photo verified restored afterwards
+(undo 0, zero annotations, defaults back).
+
+**Gates.** 512 JS tests, `tsc` clean, eslint 0 errors, builds clean.

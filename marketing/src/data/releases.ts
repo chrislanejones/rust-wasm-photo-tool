@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.26",
+    date: "2026-08-12",
+    headline: "The test that could have said no said yes",
+    entries: [
+      {
+        tag: "infra",
+        text: "No code changed; this is the missing proof from the last release. Moving the engine to a background thread rests on one assumption: that when the app fires off a batch of edits, they arrive in the order they were sent. If they do not, your undo history stops matching what you did — not with an error, just quietly wrong. That assumption had never been tested, only read off the source and believed. It now holds: sixteen edits fired at once, with no waiting in between, produced a recorded history byte-for-byte identical to the same sixteen run the ordinary way.",
+      },
+      {
+        tag: "fix",
+        text: "The last release could not run this test at all. The history only records an edit when the picture is next redrawn, and the test never redrew it — so it was comparing an empty history against an empty history and calling that a match. The fix was one line; noticing was the work.",
+      },
+      {
+        tag: "infra",
+        text: "And the test was tested first. Running the same eight edits in reverse order produces a completely different fingerprint, which is what makes “identical” mean anything — a measurement that cannot tell two orders apart cannot prove the order was kept. One check is still outstanding before the switch can be turned on: what happens when the canvas is replaced mid-session.",
+      },
+    ],
+  },
+  {
     version: "v8.25",
     date: "2026-08-12",
     headline: "The engine ran on a background thread, and drew the photo from there",

@@ -84,6 +84,38 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.26 — 2026-08-12
+
+**The test that could have said no said yes.** No code changed; this is the
+missing proof from the last release.
+
+Moving the engine to a background thread rests on one assumption: that when the
+app fires off a batch of edits, they arrive in the order they were sent. If they
+don't, your undo history stops matching what you did — not with an error, just
+quietly wrong. The whole design was chosen because of that assumption, and it had
+never actually been tested. It had only been read off the source code and
+believed.
+
+It now holds. Sixteen edits were fired at the background thread at once, with no
+waiting in between, and the recorded history came back **byte-for-byte identical**
+to the same sixteen run the ordinary way.
+
+**Why the last release couldn't run it.** The history only records an edit when
+the picture is next redrawn, and the test never redrew it — so it was comparing
+an empty history against an empty history and calling it a match. The fix was one
+line; noticing was the work.
+
+**And the test was tested first.** Running the same eight edits in reverse order
+produces a completely different fingerprint. Without checking that, "identical"
+would have been meaningless — a measurement that can't tell two orders apart
+can't prove the order was kept.
+
+One check is still outstanding before the switch can be turned on for real: what
+happens when the canvas is replaced mid-session. That one hasn't been exercised
+yet, and it's said so here rather than being counted as done.
+
+<details><summary>Older releases</summary>
+
 ### v8.25 — 2026-08-12
 
 **The engine ran on a background thread for the first time, and drew the photo
@@ -121,7 +153,6 @@ picture comparison did pass: an eighteen-step sequence of drawing, undoing and
 redoing produced identical images, identical dimensions and identical history
 labels on both. The switch stays off until the missing test has actually run.
 
-<details><summary>Older releases</summary>
 
 ### v8.24 — 2026-08-12
 

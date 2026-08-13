@@ -1,6 +1,7 @@
 # a12 — the transfer. Design, and three things that block the stated plan
 
-**Status:** designed, not built. Written 2026-08-12 after v8.22, opening a12.
+**Status: ✅ BUILT — a12.0 v8.23, a12.1 v8.24, a12.2 v8.25, gate 3 v8.26.**
+Written 2026-08-12 after v8.22, opening a12.
 **Prerequisites:** ✅ Stage 3.5 complete (gate 5, all exempt) · ✅ a10 complete
 (hot-path 0) · ✅ a11 complete.
 
@@ -216,6 +217,77 @@ proves anything about the worker path.
 ⚠️ Give gate 3 a sequence long enough and interleaved enough to expose an
 ordering difference. A short linear sequence would pass under almost any
 implementation and prove nothing.
+
+## a12.3 gate 3 — RUN, AND IT PASSED (2026-08-12, v8.26)
+
+**The central assumption of the whole arc now has evidence behind it.**
+`OpLog::append` records arrival order, no `Op` carries a sequence number, and a
+`MessagePort` is FIFO — so postMessage order *is* append order. That had only
+ever been argued from reading `src/ops.rs`. It has now been run against a real
+worker.
+
+### Why the first attempt measured nothing
+
+v8.25 reported gate 3 as NOT RUN because the log stayed at `opCount: 0` through
+annotations, rotations and adjustments. The reason is one line in `lib.rs`:
+
+> `oplog_sync_annotations` — *"Diff the engine's annotation lists against the
+> log's and record the difference as ops. **Runs at every `recomposite()`**"*
+
+The probe never recomposited, so nothing was ever recorded. Adding
+`recomposite()` after each mutation turns the log from `armed — base captured,
+no ops yet` into `recording`. The recorded set is `Stroke`, `FillRegion`,
+`Blur`, `Levels`, `Crop`, `Text*` and `Shape*` — **not** `rotate_90_cw` or the
+`adjust_*` family, which is why those produced nothing.
+
+### The instrument was checked before the result was believed
+
+| Check | Result |
+|---|---|
+| Same 8 adds in FORWARD order | `c4df040e…` |
+| Same 8 adds in REVERSE order | `5be868f9…` |
+| **Order-sensitive?** | ✅ **yes** — a reordering changes the bytes |
+
+Without this the equality would have been worthless: a fingerprint that cannot
+tell two orderings apart cannot certify that ordering was preserved.
+
+### The sequential pass — necessary, not sufficient
+
+15 interleaved steps (adds, an edit, a remove, undos, redos), each awaited:
+
+| | LOCAL | WORKER |
+|---|---|---|
+| ops | 9 | 9 |
+| bytes | 1047 | 1047 |
+| oplog SHA-256 | `c4df040e…` | `c4df040e…` |
+| composite | `a9e9b732e2e9a0ee` | same |
+
+⚠️ **This proves less than it looks.** Awaiting each call makes postMessage
+order trivially equal to call order. It tests the plumbing, not the queue.
+
+### The concurrent burst — this is the actual gate
+
+**16 mutations issued with NO await between them**, so all 16 messages are in
+flight simultaneously, then a second burst of 6 edits against ids from the
+first:
+
+| | LOCAL | WORKER |
+|---|---|---|
+| ids returned | `1..16` in order | **`1..16` in order** |
+| ops | 7 | 7 |
+| bytes | 910 | 910 |
+| **oplog SHA-256** | `ea77112d…` | **`ea77112d…`** |
+| first 32 bytes | identical | identical |
+| composite | `f3ee448a03b34669` | same |
+
+The worker's queue drained 16 concurrent requests in post order and produced a
+**byte-identical** log. That is the claim, tested the way it can fail.
+
+### Verdict
+
+**PASS.** a12.3's three gates now stand at: 1 partial, 2 pass, 3 **pass**.
+Stage 5 is no longer blocked on gate 3 — it is blocked on gate 1's remount case
+and on the measurement.
 
 ## Notes carried in
 
