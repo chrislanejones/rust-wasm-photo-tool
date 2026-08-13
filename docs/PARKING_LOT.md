@@ -1886,3 +1886,15 @@ files). It wants a session with a full commit budget, not the last slot of one.
 text, commit, and confirm the committed position matches the preview to the
 pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
 4px drift passes every gate in this repo.
+
+- **ADR-024-F3 — build the autosave archive INSIDE the worker (filed v8.33,
+  2026-08-13).** Signed-in autosave's `capture_state()` hands 29.5 MB of raw
+  document across the port and keeps the engine busy for hundreds of
+  milliseconds; v8.33's stroke gate schedules AROUND that cost, F3 removes it.
+  Encode the SavedEdit archive in the worker — the PNG encode it already does —
+  and return ~1–2 MB. Also shrinks the engine-busy window so a stroke starting
+  just after a capture begins stalls far less. Touches `useEditPersistence`'s
+  capture/`encodeArchive` seam and the detach-safety reasoning at
+  `useEditPersistence.ts:390` — read that comment first; it explains why the
+  capture must complete before any await used to matter, and the same argument
+  needs restating for the in-worker version. Its own session.

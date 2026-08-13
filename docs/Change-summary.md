@@ -6888,3 +6888,65 @@ proved in v8.29. Open, deliberate, written down.
 crate untouched. The arc: 2026-07-27 → 2026-08-13, eighteen dark releases,
 five defects found by driving the real thing, zero found by the gates that
 were supposed to.
+
+---
+
+## v8.33 Change Summary — 2026-08-13
+
+**The signed-in brush regression, found by Chris within hours of a14, fixed the
+same day** — plus the stale-comment sweep that was already staged.
+
+### The report, and the diagnosis chain
+
+"The brush is slow when logged in." Reproduction found the OPPOSITE logged out —
+the worker brush measured **better** than the old local path (median frame gap
+16.7 ms vs 36 ms, a clean 60 fps vs ~27). So the bug lived in the one
+intersection no run had ever driven: **worker × signed-in**.
+
+The chain, each link measured:
+
+| Link | Evidence |
+|---|---|
+| signed-in autosave calls `capture_state()` — the whole document | `useEditPersistence.ts`, gated on `isAuthenticated`; demo never runs it |
+| that capture is huge | **29.5 MB** on a 2078² photo with strokes |
+| behind the worker it occupies the FIFO port | a probe issued behind it: **406.9 ms** round trip vs a 0.3 ms baseline |
+| the debounce fires it into the next stroke | keys on `undoCount` → arms at STROKE END → fires 2.5 s later, where the next stroke begins |
+| frames stay smooth throughout | median gap 16.7 ms even during the capture — the bug is **ink latency**, not jank, which is why a frame-gap instrument missed it first |
+
+### The fix — scheduling, not machinery
+
+`lib/strokeGate.ts`: a plain counter. The canvas's mousedown opens it (one
+choke point covers every tool), **window** pointerup closes it (tools continue
+strokes outside the canvas), and the autosave debounce awaits `whenStrokeIdle()`
+before touching the engine. The failure costs are asymmetric and the design
+follows them: a gate stuck open would starve autosave (user data, no backup), so
+a 15 s failsafe presumes an over-held stroke abandoned, and the wait itself is
+bounded — a stuck stroke can delay a save, never starve it.
+
+**Mutation-tested**: stripping the `whenStrokeIdle()` from the debounce turns
+the wiring guard red. 8 new tests, including the non-vacuous one — the gate
+observed WAITING while a stroke is active.
+
+Second prong, honestly labelled: the worker now **transfers** reply buffers
+over 256 KB instead of structured-cloning them (its `.slice()` copy is dead
+after post — the detach hazard that forbids transferring caller buffers does
+not apply). At a 10 MB matched-size A/B this measured **neutral** — the
+in-worker capture computation dominates at that size — so it ships as a
+removed copy, not a claimed speedup.
+
+### Also in this release: the comment sweep
+
+Three places still described the pre-a14 world: `engine.worker.ts` ("STATUS:
+not wired into the app"), `workerClient.ts` ("today it is not swapped in"), and
+`docs/adr/INDEX.md` ("Accepted — staged"). All now say what is true; ADR-024's
+index row records how the arc ended.
+
+### Filed, not fixed
+
+**ADR-024-F3** (PARKING_LOT): the real fix for autosave weight is building the
+archive INSIDE the worker — encode there, return ~1–2 MB instead of 29.5 MB raw
+— which also shrinks the engine-busy window the gate now schedules around. Its
+own session.
+
+**Gates.** 535 tests (45 files, +8), `tsc` clean, eslint 0 errors, both builds
+clean.

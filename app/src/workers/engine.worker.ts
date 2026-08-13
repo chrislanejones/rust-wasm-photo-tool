@@ -5,17 +5,16 @@
 // (Phase 0 measured that none of it is needed, and this project already tried
 // and rejected wasm threads at 8–31× slower).
 //
-// STATUS: not wired into the app. `ih_engine_worker` defaults OFF — that is now
-// the ONLY thing holding it back, because as of v8.19 Stage 3.5 is COMPLETE. It
-// exists so the protocol is real and testable rather than sketched.
+// STATUS: THE DEFAULT ENGINE since v8.32 (a14, 2026-08-13). Every document
+// opens here unless `ih_engine_worker=0` opts the tab out; the composite is
+// drawn from this thread onto the transferred OffscreenCanvas, and the main
+// thread's measured blocking per heavy operation went from 129–137 ms to 0.
 //
-// 91 of the 96 value-consumed reads are converted; the 5 left are the per-frame
-// blit, exempt because they dissolve when the canvas moves in here at Stage 4.
-// (This comment claimed "121 synchronous reads" — already an undercount when
-// written, since the audit could not see aliased calls until 2026-08-08, which
-// put the real figure at 166. The 2 pen sites it then listed as outstanding
-// landed in v8.19 as a state-machine change: `docs/pen-overlay-async-design.md`.)
-// `scripts/engine-call-audit.mjs` prints the numbers — do not hand-count them.
+// (This header read "not wired into the app" for eighteen releases while the
+// arc shipped dark — accurate the whole time, then wrong the morning the
+// default flipped. The conversion-count history it carried lives in ADR-024's
+// ledger; `scripts/engine-call-audit.mjs` prints the numbers, never hand-count
+// them.)
 //
 // WHAT THE PHASE 3 SPIKE LACKED, and this has:
 //   request ids     concurrent calls cannot take each other's answers
@@ -160,9 +159,20 @@ async function drain() {
         // postMessage of a Uint8Array backed by wasm memory would either clone
         // the whole heap or detach memory the engine still owns.
         const safe = ArrayBuffer.isView(value)
-          ? (value as unknown as { slice: () => unknown }).slice()
+          ? (value as unknown as { slice: () => Uint8Array }).slice()
           : value;
-        reply({ id: req.id, ok: true, value: safe, ms: performance.now() - t0 });
+        // v8.33 — TRANSFER large replies instead of cloning them. The `.slice()`
+        // above is a fresh buffer this worker owns and never touches again, so
+        // detach-on-sender — the hazard that forbids transferring CALLER buffers
+        // in `createLiveEngine` — costs nothing here. The case that matters:
+        // signed-in autosave's `capture_state` reply is 29.5 MB, and cloning it
+        // was part of the port congestion behind the brush report. Thresholded
+        // so small scalars keep the cheap path.
+        const transfer: Transferable[] =
+          ArrayBuffer.isView(safe) && (safe as Uint8Array).byteLength > 262_144
+            ? [(safe as Uint8Array).buffer as ArrayBuffer]
+            : [];
+        reply({ id: req.id, ok: true, value: safe, ms: performance.now() - t0 }, transfer);
       } catch (err) {
         // A Rust panic arrives here as a thrown JS error. Replying with it is
         // what stops a caller awaiting forever — the failure mode the spike

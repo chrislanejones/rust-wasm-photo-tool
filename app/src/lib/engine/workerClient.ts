@@ -1,14 +1,15 @@
-// ADR-024 Stage 3 — the main-thread half of the engine port.
+// ADR-024 — the main-thread half of the engine port. THE DEFAULT since v8.32.
 //
-// One client, one worker, one queue. `lib/engine/port.ts` is where this gets
-// swapped in; today it is not, because `ih_engine_worker` defaults OFF — but as
-// of v8.19 that is the only reason left: STAGE 3.5 IS COMPLETE. 91 of the 96
-// value-consumed reads are converted and the 5 remaining are the per-frame blit,
-// exempt because they dissolve at Stage 4 rather than converting. (This comment
-// claimed 166 for ten releases while 89 were converted underneath it; the pen
-// pair it then listed as outstanding landed in v8.19.) Counts come from
-// `scripts/engine-call-audit.mjs`; do not hand-edit them, and re-read them
-// here whenever the gate moves — port.ts carries the same numbers.
+// One client, one worker, one queue. `lib/engine/port.ts` swaps this in via
+// `createLiveEngine` for every document unless `ih_engine_worker=0` opts the
+// tab out (a14, 2026-08-13). One worker per tab, documents replaced inside it
+// with `reinit` — the surface transfers once per element, so the worker that
+// holds it is never rebuilt (v8.28).
+//
+// (Until v8.32 this header said the client was "not swapped in" because the
+// flag defaulted OFF — true for eighteen releases while the arc shipped dark,
+// and the kind of claim that rots the moment a default flips. The conversion
+// history it used to carry lives in ADR-024's ledger, where it has dates.)
 //
 // WHY NOT COMLINK, when the codec worker uses it. Comlink is the right tool
 // there: `codec.worker.ts` holds no state, each call builds its own

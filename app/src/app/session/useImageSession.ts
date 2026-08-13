@@ -27,6 +27,7 @@ import { clearGalleryManifest } from "@/lib/galleryManifest";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
 import { setEngineDocument } from "@/lib/engineDocument";
+import { whenStrokeIdle } from "@/lib/strokeGate";
 
 type Preferences = ReturnType<typeof usePreferences>[0];
 type EditPersistence = ReturnType<typeof useEditPersistence>;
@@ -192,9 +193,24 @@ export function useImageSession({
 
   // Idle debounce. Keyed on the engine's undo count + the modified flag, so it
   // re-arms on every recordable edit and fires once the user pauses.
+  //
+  // ⚠️ `whenStrokeIdle()` BEFORE the flush (v8.33). The undo count bumps at
+  // STROKE END, so this timer fires 2.5 s later — which is exactly where the
+  // user's NEXT stroke tends to begin. Signed-in, the flush calls
+  // `capture_state()` (29.5 MB measured), and behind the worker port that
+  // occupies the FIFO queue: a `paint_move` issued behind it measured a
+  // **406.9 ms** round trip against a 0.3 ms baseline — the "brush is slow
+  // when logged in" report, hours after a14. Waiting for the pointer to be up
+  // costs autosave nothing (the data is no fresher mid-stroke) and returns the
+  // brush to the 60 fps the worker measurably delivers logged-out. The wait is
+  // bounded inside the gate — a stuck stroke can only delay a save, never
+  // starve it.
   useEffect(() => {
     if (!activePhotoId || !dirtyRef.current) return;
-    const t = window.setTimeout(() => void flushRef.current(), 2500);
+    const t = window.setTimeout(
+      () => void whenStrokeIdle().then(() => flushRef.current()),
+      2500,
+    );
     return () => window.clearTimeout(t);
   }, [activePhotoId, stamp.state.undoCount, hasBeenModified]);
 

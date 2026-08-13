@@ -84,6 +84,34 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.33 — 2026-08-13
+
+**The brush follows the cursor again when signed in.** Hours after the
+background engine became the default, Chris found the brush lagging — but only
+signed in. The cause: signed-in accounts autosave to the cloud 2.5 seconds
+after each edit, and that autosave asks the engine for the entire document —
+29.5 MB on a photo with strokes. On the background thread, that answer travels
+through a queue that answers strictly in order, and brush strokes issued behind
+it waited for all of it: a call that normally takes a third of a millisecond
+measured at **407 ms** when stuck behind an autosave. Two and a half seconds
+after your last stroke is exactly when your next stroke begins, so nearly every
+stroke collided. Demo mode never runs the cloud save, which is why every
+logged-out measurement sailed through at 60 fps.
+
+The fix is scheduling, not machinery: autosave now waits until the pointer is
+up before reading the document. The data is no fresher mid-stroke, so waiting
+costs nothing — and a stuck stroke can only delay a save briefly, never starve
+it, because losing an autosave is the one failure this app never accepts. Large
+answers from the engine are also handed over rather than copied now, which
+removes a 29.5 MB duplication on every cloud save.
+
+Also in this release: three places still described the background engine as
+switched off and waiting — the worker's own header said "not wired into the
+app." Accurate for eighteen releases, wrong the morning the default flipped.
+They now say what is true.
+
+<details><summary>Older releases</summary>
+
 ### v8.32 — 2026-08-13
 
 **Heavy operations no longer freeze the interface.** The engine now runs on a
@@ -109,8 +137,6 @@ One honest note: the cloud save-and-restore path has been exercised against the
 same machinery but never driven end to end behind the background engine — it
 needs a signed-in session. Everything it depends on is the code every other
 path proved.
-
-<details><summary>Older releases</summary>
 
 ### v8.31 — 2026-08-13
 

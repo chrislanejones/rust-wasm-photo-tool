@@ -41,6 +41,7 @@ import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
 import type { GridKind } from "@/lib/preferences";
 import { selectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
+import { strokeDown, strokeUp } from "@/lib/strokeGate";
 
 const EMPTY_SEGMENTS = new Float32Array(0);
 
@@ -499,6 +500,18 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     //
     // Falls back to the forwarded ref so the component still works standalone.
     const attachCanvas = externalAttachCanvas ?? ref;
+
+    // Stroke gate close half (v8.33): the pointer coming up ANYWHERE ends the
+    // stroke — tools continue drags outside the canvas via window listeners, so
+    // closing on canvas mouseleave would be wrong. `strokeUp` tolerates ups
+    // with no matching down (every button click on the page fires this), so
+    // one unconditional listener is correct. Both CanvasArea instances mount
+    // one each across the Batch boundary; depth is guarded, double-close is a
+    // no-op.
+    useEffect(() => {
+      window.addEventListener("pointerup", strokeUp);
+      return () => window.removeEventListener("pointerup", strokeUp);
+    }, []);
 
     // ADR-024 a11.3 — read ONCE per render, used by both the <canvas> key and
     // the re-blit effect's deps. Two separate calls could in principle straddle
@@ -1271,6 +1284,16 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             baseMouseDown?.(e);
           }
         : baseMouseDown;
+    // Stroke gate (v8.33): tell autosave ink may be flowing. Opens here — the
+    // one place every tool's press passes through — and closes on WINDOW
+    // pointerup (effect above), because tools keep strokes alive outside the
+    // canvas. Signed-in autosave's 29.5 MB `capture_state` queueing ahead of
+    // `paint_move` behind the worker port is why this exists; `lib/strokeGate`
+    // has the measurements.
+    const gatedMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+      strokeDown();
+      wrappedMouseDown?.(e);
+    };
     const baseMouseMove = isPanning ? handlePanMouseMove : onMouseMove;
     // Text-tool hover highlight runs alongside the regular mousemove.
     const hoverMouseMove = isTextTool
@@ -1412,7 +1435,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             transformOrigin: "center center",
             cursor: panCursor,
           }}
-          onMouseDown={wrappedMouseDown}
+          onMouseDown={gatedMouseDown}
           onMouseMove={wrappedMouseMove}
           onMouseUp={wrappedMouseUp}
           onMouseLeave={wrappedMouseLeave}

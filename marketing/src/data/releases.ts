@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.33",
+    date: "2026-08-13",
+    headline: "The brush follows the cursor again when signed in",
+    entries: [
+      {
+        tag: "fix",
+        text: "Signed-in accounts autosave to the cloud 2.5 seconds after each edit, and that autosave reads the entire document — 29.5 MB with strokes on it. On the background thread that answer blocked the queue brush strokes travel through, right as the next stroke began: a call that takes a third of a millisecond measured at 407 ms stuck behind it. Autosave now waits until the pointer is up. The data is no fresher mid-stroke, so waiting costs nothing.",
+      },
+      {
+        tag: "perf",
+        text: "Measured while chasing it: the background-thread brush is smoother than the old one ever was — a clean 60 fps logged out, against about 27 before.",
+      },
+      {
+        tag: "infra",
+        text: "Also: three places still described the background engine as switched off and waiting. Accurate for eighteen releases, wrong the morning the default flipped. They now say what is true.",
+      },
+    ],
+  },
+  {
     version: "v8.32",
     date: "2026-08-13",
     headline: "Heavy operations no longer freeze the interface",
