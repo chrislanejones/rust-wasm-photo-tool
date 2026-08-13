@@ -84,6 +84,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.29 — 2026-08-13
+
+**Everything the background thread had never been asked to do.** The engine can
+run on a background thread, switched off by default. Last release was the first
+time it had ever been driven end to end in a browser, and it found two faults in
+one sitting. That is an argument about arithmetic, not about those two faults:
+most of the app had still never run that way.
+
+So this release ran it. Every export format, saving and reloading, undo and redo
+twenty-two deep, layers added and duplicated and deleted and reordered and
+hidden, rotate, text, the pen, the Magic Eraser, and the batch editor —
+all with the background thread doing the work.
+
+Nothing broke. No release notes are needed for what changed in the app, because
+nothing did: this is a record of what was checked, kept where the next person
+can find it. The background engine is still switched off by default.
+
+One thing is worth writing down. Partway through, reloading appeared to lose two
+edits — which would have been the worst kind of bug this project can have. It
+turned out the test itself caused it, by reaching past the app to the engine
+underneath, and the app had already said so in plain words in the console. A
+clean re-run restored correctly. The tools were right and the tester was wrong,
+which is the good version of that morning.
+
+<details><summary>Older releases</summary>
+
 ### v8.28 — 2026-08-13
 
 **The background thread was drawing to a canvas nobody could see.** The engine
@@ -115,8 +141,6 @@ blocks the main thread for **119 ms** today. On the background thread it blocks
 it for **0 ms**. The longest single gap between frames falls from 191 ms to
 25 ms — one dropped frame instead of eleven. The work still takes about the same
 time; the difference is that the window keeps responding while it happens.
-
-<details><summary>Older releases</summary>
 
 ### v8.27 — 2026-08-12
 

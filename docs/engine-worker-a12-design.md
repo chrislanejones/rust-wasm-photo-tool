@@ -369,3 +369,99 @@ real thing rather than reasoning about the part you meant to test.
 **PASS.** a12.3's three gates stand at 1 **pass**, 2 pass, 3 pass. a13 is
 measured (ADR-024, Stage 5). a14 — the default flip — is deliberately NOT taken
 in the same session; the reasoning is in ADR-024.
+
+## The coverage run — 2026-08-13 (v8.29)
+
+**Why this exists.** ADR-024 held a14 on *coverage*, not on doubt about the
+numbers: *"The measurement is not in doubt; the amount of the path that had
+never actually been executed is."* v8.28 was the first end-to-end run of the
+worker path in a browser and it found two defects on the ordinary path. This is
+the run that reduces the unknown — every capture, every guard, and the app's
+real surface, driven through the UI with `ih_engine_worker=1`.
+
+**Instrument.** `page.addInitScript` wraps `window.Worker` before boot and
+correlates each outgoing `{id, method}` with its reply, so every value that
+crosses the boundary is recorded as it arrives. Production build, Playwright
+page (visible by construction — the extension's tab is `document.hidden`).
+
+### The seven capture structs — all seven, by feature, with values
+
+The fifth trap shape (ADR-024) is that a boxed wasm-bindgen struct cannot cross
+`postMessage`. v8.28 fixed the mechanism; this confirms each one individually,
+by exercising the feature that calls it rather than by unit test.
+
+| Method | Reached by | Value observed |
+|---|---|---|
+| `capture_ui_state` | any edit (`syncState`) | 10/10 fields — `1365×2048`, zoom 1, quality 75, `layers_json` 203 B |
+| `export_dims_excluding_background` | export dimension readout | `{width: 1365, height: 2048}` |
+| `capture_composite_excluding_background` | export, photo-only | `rgba` **11,182,080** B = 1365×2048×4 exactly |
+| `capture_composite` | export, include-canvas | `rgba` **11,182,080** B |
+| `capture_layer_stack` | export `.ora` | `layer_count: 2`, `active_layer_id: 1`, dims |
+| `capture_thumbnail` | `.ora` thumbnail | `171×256`, `rgba` **175,104** B = 171×256×4 exactly |
+| `capture_pen_hit` | click a committed pen path | `{id: 1, points: Float64Array(20)}` — a real hit |
+
+Every one carried `capture: true` (it went through `captureMarshal`), and every
+one produced a correct FILE, not just a correct length: the JPEG decodes at
+1365×2048, the PNG at 2048×1365 after a rotate, and the `.ora` is a complete
+archive — `mimetype: image/openraster`, `stack.xml`, two layer PNGs, a merged
+image, and a thumbnail at exactly the captured 171×256.
+
+### The four feature-detection guards — ON vs OFF
+
+| Guard | Method | flag ON | flag OFF |
+|---|---|---|---|
+| `hasPersistExports` | `oplog_encoded_ops` | true | true |
+| `hasTilesExports` | `tiles_flush` | true | true |
+| `hasMagicEraserExports` | `magic_eraser_brush_down` | true | true |
+| `hasPatchmatchExports` | `remove_object` | true | true |
+| *(control)* | `definitely_not_a_real_method` | **false** | **false** |
+
+⚠️ **The control row is the one that matters.** Four `true`s prove nothing on
+their own — a naive proxy answering every `get` with a function produces exactly
+that. The absent method answering `false` is what shows the surface gate is
+live. All four are genuinely in the binary (`strings` on the wasm, and
+`features = tiles,patchmatch` in both `package.json` and `netlify.toml`), so
+`true` is the correct answer rather than a convenient one.
+
+### The breadth pass
+
+| Path | Result |
+|---|---|
+| Export JPEG / PNG / WebP | clean — files decode at the document's dimensions |
+| Export `.ora` | clean — complete archive |
+| Download All (12 photos, 46 MB zip) | clean — 12 valid JPEGs. **Runs on throwaway engines**, so it never touches the port at all |
+| Boot restore / reload restore | clean — rotated document restored at `1230×1630` |
+| Undo/redo depth | 22 ops → unwind to 0 → redo to 22, exact |
+| Layers | add 2→3, duplicate 3→4, delete 4→3, reorder `[2,1,4]→[2,4,1]`, visibility both ways |
+| Transforms | Rotate 90° `1365×2048 → 2048×1365`, readout and canvas agree; export matches |
+| Text | committed with real metrics — `tile_w: 162, tile_h: 44` (the b1 path, behind the worker) |
+| Pen | draw, commit, re-edit hit-test |
+| Magic Eraser / PatchMatch | brush down/move all `true`, fill committed (undo +1) |
+| Batch | entered, edited, returned, edited again |
+| Cloud sign-in → save → restore | **NOT REACHED** — requires entering credentials |
+
+**Zero failed engine calls across the entire run**, and no console errors beyond
+Clerk's development-keys notice.
+
+### ⚠️ The near-miss worth recording
+
+Midway through, a reload appeared to **lose two UI-driven edits** — undo 11 → 9,
+dimensions reverted. That is a data-loss signature and it was nearly written up
+as a third defect.
+
+It was the probe's fault. Driving mutations straight at the engine handle
+(`window.__eng.adjust_brightness(...)`) bypasses the app's op-log recording, and
+the app had already said so, in the console, in plain words:
+
+```
+[oplog-persist] log no longer describes photo … (unrecorded edit or multi-layer)
+— persisted log marked stale; resume falls back to the working copy
+```
+
+Once the log is stale, resume falls back to the working copy — which is exactly
+the older state that appeared to be "lost edits". A clean-room re-run (storage
+wiped, fresh photo, UI-only edits) restored correctly at `1230×1630`.
+
+The lesson generalises past this session: **a probe that reaches under the app
+can manufacture the very class of bug it is looking for**, and the giveaway was
+already in the console. Drive the UI when testing persistence.

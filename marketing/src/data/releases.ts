@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.29",
+    date: "2026-08-13",
+    headline: "Everything the background thread had never been asked to do",
+    entries: [
+      {
+        tag: "infra",
+        text: "The engine can run on a background thread, switched off by default. Last release was the first time it had ever been driven end to end, and it found two faults in one sitting — so this release drove the rest of the app that way too.",
+      },
+      {
+        tag: "fix",
+        text: "Every export format, saving and reloading, undo and redo twenty-two deep, layers added and duplicated and deleted and reordered and hidden, rotate, text, the pen, the Magic Eraser and the batch editor — all with the background thread doing the work. Nothing broke.",
+      },
+      {
+        tag: "infra",
+        text: "Partway through, reloading appeared to lose two edits. The test itself caused it by reaching past the app to the engine underneath, and the app had already said so in the console. A clean re-run restored correctly.",
+      },
+    ],
+  },
+  {
     version: "v8.28",
     date: "2026-08-13",
     headline: "The background thread was drawing to a canvas nobody could see",

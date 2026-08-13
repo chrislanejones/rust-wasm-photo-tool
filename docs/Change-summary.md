@@ -6592,3 +6592,84 @@ shipped dark; another few cost nothing.
 
 **Gates.** 525 JS tests (44 files, +13), `tsc` clean, eslint 0 errors, production
 build clean. Rust crate untouched.
+
+---
+
+## v8.29 Change Summary — 2026-08-13
+
+**No app code changed.** This release records a coverage run: the worker path
+driven across the app's real surface with `ih_engine_worker=1`, on the
+production build, through the UI. Full detail in
+`docs/engine-worker-a12-design.md` ("The coverage run"); ADR-024's Stage 5
+section carries the summary table.
+
+### Why
+
+ADR-024 held a14 (the default flip) on **coverage**, in its own words: *"The
+measurement is not in doubt; the amount of the path that had never actually been
+executed is."* v8.28 found two defects the first time the path ran end to end.
+The argument for waiting was arithmetic — one browser session, two invisible
+defects, and most of the app still never run that way. So the app was run that
+way.
+
+### The seven capture structs — each through its own feature
+
+| Method | Reached by | Observed |
+|---|---|---|
+| `capture_ui_state` | any edit | 10/10 fields real |
+| `export_dims_excluding_background` | export readout | `{1365, 2048}` |
+| `capture_composite_excluding_background` | export, photo-only | `rgba` 11,182,080 B = 1365×2048×4 |
+| `capture_composite` | export, include-canvas | `rgba` 11,182,080 B |
+| `capture_layer_stack` | `.ora` export | `layer_count: 2` + dims |
+| `capture_thumbnail` | `.ora` thumbnail | `171×256`, 175,104 B = 171×256×4 |
+| `capture_pen_hit` | click a committed pen path | `{id: 1, points: Float64Array(20)}` |
+
+Each produced a correct FILE, not just a correct length: the JPEG decodes at
+1365×2048, the PNG at 2048×1365 after a rotate, and the `.ora` is a complete
+archive whose thumbnail is exactly the captured 171×256.
+
+### The four guards — and the control that makes them mean something
+
+All four (`hasPersistExports`, `hasTilesExports`, `hasMagicEraserExports`,
+`hasPatchmatchExports`) answer identically with the flag ON and OFF. **The
+load-bearing row is the fifth**: an absent method answers `false` on both. Four
+`true`s prove nothing alone — a naive proxy answering every `get` with a
+function produces exactly that. All four methods are genuinely in the binary.
+
+### Breadth
+
+Exports (JPEG, PNG, WebP, `.ora`, 12-photo zip), boot and reload restore,
+undo/redo 22 deep and back, layers (add / duplicate / delete / reorder /
+visibility), rotate with the export matching, text with real metrics, pen
+draw-commit-reedit, Magic Eraser, batch in and out with editing on both sides.
+
+**Zero failed engine calls across the whole run.** No console errors.
+
+**Not reached:** cloud sign-in → save → restore. It needs credentials entered,
+which this run would not do.
+
+### ⚠️ A near-miss worth keeping
+
+A reload appeared to lose two UI-driven edits — undo 11 → 9, dimensions
+reverted. That is a data-loss signature and was nearly filed as a third defect.
+
+The probe caused it. Driving mutations straight at the engine handle bypasses the
+app's op-log recording, and the app had already said so in the console:
+
+```
+[oplog-persist] log no longer describes photo … (unrecorded edit or multi-layer)
+— persisted log marked stale; resume falls back to the working copy
+```
+
+A clean-room re-run — storage wiped, fresh photo, UI-only edits — restored
+correctly at `1230×1630`. **A probe that reaches under the app can manufacture
+the exact class of bug it is hunting**, and the tell was already on screen.
+
+### Where this leaves a14
+
+The coverage objection is answered; the cloud path and the mid-session
+kill-switch gap (PARKING_LOT.md) are not. The default stays OFF — flipping it is
+still a decision, now with evidence under it.
+
+**Gates.** 525 tests, `tsc` clean, eslint 0 errors, both builds clean. No app
+code changed.

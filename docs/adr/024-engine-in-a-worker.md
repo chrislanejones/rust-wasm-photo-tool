@@ -885,6 +885,25 @@ of the path that had never actually been executed is. Eighteen releases have
 shipped dark. a14 is a decision for a rested morning, not the night the floor
 moved.
 
+### ✅ THE COVERAGE OBJECTION IS NOW ANSWERED — 2026-08-13 (v8.29)
+
+The paragraph above names *coverage* as the blocker, so coverage was measured
+rather than argued. Full record in `docs/engine-worker-a12-design.md`.
+
+| Checked, flag ON, production build | Result |
+|---|---|
+| All **7** capture structs, each through its own feature | real values; `rgba` lengths exact to `w×h×4`; correct FILES out (JPEG, PNG, `.ora`) |
+| All **4** feature-detection guards, ON vs OFF | identical — plus an absent-method control answering `false`, which is the half that proves the surface gate is live |
+| Exports (JPEG/PNG/WebP/`.ora`/zip), persistence, undo depth 22, layers, transforms, text, pen, Magic Eraser, batch | clean |
+| Failed engine calls across the whole run | **0** |
+| Cloud sign-in → save → restore | **not reached** — needs credentials |
+
+**What this does and does not settle.** It settles that the worker path runs the
+app's real surface without breaking, which is what the objection asked for. It
+does not settle the cloud path, and it does not retire the mid-session kill
+switch gap in PARKING_LOT.md. a14 remains a decision, not a formality — but it
+is now a decision with evidence under it rather than the memory of two defects.
+
 The flag follows the house pattern — `ih_tiles_flush`, `ih_oplog_undo`,
 `ih_patchmatch` all shipped this way and all still carry a kill switch.
 
