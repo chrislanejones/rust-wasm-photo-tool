@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.27",
+    date: "2026-08-12",
+    headline: "A bug that was never a bug",
+    entries: [
+      {
+        tag: "fix",
+        text: "For a week the app appeared to hang on “Loading your workspace…” whenever it was opened for testing, and it was blamed in turn on signing in, on the cloud sync, and on how many photos were stored. All three were wrong. A browser gives an inactive tab no animation frames at all — none, not merely fewer; measured here as zero in nearly four seconds. Every animation runs on those frames, so in a tab nobody is looking at they all stop partway through.",
+      },
+      {
+        tag: "fix",
+        text: "The startup screen begins fading out and stops fading, so it sits there forever. The tool sidebar begins sliding in and stops off the left edge of the screen, which is why clicking a tool appeared to do nothing — the button was not where it looked. Instrumenting every step of startup showed it finishing in about two seconds. Nothing was hanging; a picture had frozen over the top of a working editor.",
+      },
+      {
+        tag: "infra",
+        text: "Also: when the background thread declines to draw — because the canvas it was given has been replaced — it now says so instead of quietly doing nothing. A silent refusal and a refusal that never happens look identical, which is exactly the confusion above, one layer down.",
+      },
+    ],
+  },
+  {
     version: "v8.26",
     date: "2026-08-12",
     headline: "The test that could have said no said yes",

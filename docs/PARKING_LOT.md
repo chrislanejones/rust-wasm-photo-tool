@@ -18,6 +18,30 @@ wait their turn.
   needs its own session (Silas + a roadmap entry, see
   docs/Engine-Roadmap.md).
 
+## ADR-024 — a12.3 gate 1, and why it cannot be automated here
+
+- **✅ "Loading your workspace…" is SOLVED — and it was never a bug.**
+  A **backgrounded tab gets ZERO `requestAnimationFrame` callbacks**
+  (measured: 0 frames in 3,856 ms with `document.hidden === true`), and
+  framer-motion drives every entrance and exit off rAF. So they all freeze
+  mid-flight: the splash's exit never completes and the node stays mounted,
+  and the tool sidebar's entrance parks it **off-screen at `left: -44`** —
+  which is why automated clicks on the tool rail silently miss.
+  Instrumenting all six steps of AppShell's boot showed it completing in
+  ~2 s, `setBooting(false)` included, while the splash was still on screen.
+  It is not sign-in, not Convex, not gallery size, not storage; those were
+  all guesses and all wrong.
+
+- **a12.3 gate 1 therefore cannot be run from an automated hidden tab.**
+  The only thing that remounts the canvas is crossing the **Batch** boundary
+  (a11.1 measured this), that needs a real click on the tool rail, and the
+  rail is off-screen. Three routes were tried and all failed for this one
+  reason: hash routing (`#/batch` does not change `activeTool`), a direct
+  click, and flipping the flag to force a11.3's keyed remount.
+  **What it needs: a foregrounded window.** Everything else about gate 1 is
+  ready — the rejection now REPORTS rather than returning silently, and a
+  contract test requires both the guard and the report.
+
 ## ADR-024 — leftovers from the conversion arc
 
 - **`syncOplog` is nine engine reads per flush, for a diagnostics panel.**

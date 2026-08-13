@@ -219,7 +219,19 @@ describe("the worker cannot gain a canvas without the staleness check", () => {
     expect(
       flat,
       "the blit must refuse a draw aimed at a surface that is no longer live",
-    ).toMatch(/staleCanvasReason\(surfaceGeneration, canvasGeneration\)[^;]*\) return;/);
+    ).toMatch(/staleCanvasReason\(surfaceGeneration, canvasGeneration\)/);
+
+    // ⚠️ AND IT MUST REPORT, not just return. This file's own thesis is that
+    // silence IS the failure: a refusal nobody can see produces exactly the
+    // blank canvas it exists to prevent, and "a check with no traffic proves
+    // nothing by passing". a12.2's first cut refused silently, which also made
+    // a12.3's gate 1 unobservable — the rejection could only be inferred from
+    // the picture not breaking, which is not evidence.
+    expect(
+      flat,
+      "a refused blit must say so — an invisible refusal is indistinguishable " +
+        "from a refusal that never happens",
+    ).toMatch(/blit refused/);
 
     const guard = s.indexOf("staleCanvasReason(surfaceGeneration");
     const draw = s.indexOf("putImageData");

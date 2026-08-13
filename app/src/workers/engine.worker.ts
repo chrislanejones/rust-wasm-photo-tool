@@ -186,7 +186,16 @@ function blit(): void {
   // carries no request id, so the thing being checked is the SURFACE: is the
   // canvas we hold still the live one? After a remount it is not, and painting
   // into it is invisible.
-  if (staleCanvasReason(surfaceGeneration, canvasGeneration) !== null) return;
+  const stale = staleCanvasReason(surfaceGeneration, canvasGeneration);
+  if (stale !== null) {
+    // a11.2's own rule, applied to itself: REPORT, never ignore. A refusal
+    // nobody can see produces the same blank canvas as the bug it prevents —
+    // "a check with no traffic proves nothing by passing". This is also the
+    // only way a12.3's gate 1 can OBSERVE the rejection firing rather than
+    // infer it from the picture not breaking.
+    console.warn(`[engine-worker] blit refused: ${stale}`);
+    return;
+  }
   const w = tool.width();
   const h = tool.height();
   if (surface.width !== w || surface.height !== h) {

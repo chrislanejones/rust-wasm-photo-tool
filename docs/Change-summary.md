@@ -6394,3 +6394,61 @@ Test data ran with `ih_oplog_persist=0`; photo verified restored afterwards
 (undo 0, zero annotations, defaults back).
 
 **Gates.** 512 JS tests, `tsc` clean, eslint 0 errors, builds clean.
+
+## v8.27 Change Summary — 2026-08-12
+
+**"Loading your workspace…" is SOLVED, and it was never an app bug.** Plus the
+worker's blit refusal now reports instead of returning silently.
+
+### The hang: zero animation frames
+
+| Measurement | Value |
+|---|---|
+| `document.hidden` | `true` |
+| **rAF callbacks in 3,856 ms** | **0** |
+
+A backgrounded tab gets **no** `requestAnimationFrame` callbacks at all — not
+throttled, none. framer-motion drives every entrance and exit off rAF, so they
+freeze mid-flight:
+
+| Symptom | Actual cause |
+|---|---|
+| splash never disappears | its `AnimatePresence` EXIT never completes, so the node stays mounted |
+| tool clicks silently miss | the sidebar's entrance is frozen at **`left: -44`**, off-screen |
+| "no photo goes active" | it does — the editor underneath is fully alive |
+
+**Proof the app is fine:** instrumenting all six steps of AppShell's boot showed
+every one completing in ~2 s, `setBooting(false)` included. `booting` is already
+false while the splash is still on screen.
+
+Previously blamed on sign-in, Convex and gallery size across three sessions —
+all wrong. Timer throttling was also ruled out by measurement (50 ms → 536 ms,
+900 ms → 992 ms; the boot's final `setTimeout(≤900)` fires fine).
+
+**A hypothesis raised and reverted:** AppShell's boot effect returns early when
+`photos.length > 0` *without* clearing `booting`. That path is real, but the
+logs show the full boot running, so it was not the cause — and it is likely
+unreachable, since `photos` starts empty. Reverted rather than shipped; recorded
+as untested rather than as a fix.
+
+### a12.3 gate 1 — still PARTIAL, now for a known reason
+
+The only thing that remounts the canvas is crossing the **Batch** boundary
+(a11.1). That needs a real click on the tool rail, and the rail is off-screen in
+a hidden tab. Three routes tried, all blocked by the same cause: hash routing
+(`#/batch` does not change `activeTool`), a direct click, and flipping the flag
+to force a11.3's keyed remount.
+
+**It needs a foregrounded window.** Everything else is ready.
+
+### The refusal now reports
+
+`blit()` refused a stale surface with a bare `return`, which contradicts
+a11.2's own doctrine — *"Only an error turns it into something a person or a
+test can see"*. It now logs the reason, and the contract test requires **both**
+the guard and the report, so deleting either fails.
+
+That silence is the same failure as the section above, one layer down: an
+invisible refusal and a refusal that never happens are indistinguishable.
+
+**Gates.** 512 JS tests, `tsc` clean, eslint 0 errors, builds clean.

@@ -84,6 +84,33 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.27 — 2026-08-12
+
+**A bug that was never a bug.** For a week the app appeared to hang on
+"Loading your workspace…" whenever it was opened for testing. It was blamed on
+signing in, then on the cloud sync, then on how many photos were stored. All
+three were wrong, and this release retires the question.
+
+A browser gives an inactive tab no animation frames at all — none, not merely
+fewer. Measured here: zero in nearly four seconds. Every animation in the app
+runs on those frames, so in a tab nobody is looking at they all stop partway
+through. The startup screen begins fading out and stops fading, so it sits there
+forever. The tool sidebar begins sliding in and stops **off the left edge of the
+screen**, which is why clicking a tool appeared to do nothing — the button was
+not where it looked.
+
+The app itself was fine the whole time. Instrumenting every step of startup
+showed it finishing in about two seconds, including the step that dismisses the
+splash. Nothing was hanging; a picture had frozen over the top of a working
+editor.
+
+**Also in this release:** when the background thread declines to draw — because
+the canvas it was given has been replaced — it now says so instead of quietly
+doing nothing. A silent refusal and a refusal that never happens look identical,
+which is exactly the confusion above, one layer down.
+
+<details><summary>Older releases</summary>
+
 ### v8.26 — 2026-08-12
 
 **The test that could have said no said yes.** No code changed; this is the
@@ -114,7 +141,6 @@ One check is still outstanding before the switch can be turned on for real: what
 happens when the canvas is replaced mid-session. That one hasn't been exercised
 yet, and it's said so here rather than being counted as done.
 
-<details><summary>Older releases</summary>
 
 ### v8.25 — 2026-08-12
 
