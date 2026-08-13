@@ -302,3 +302,70 @@ and on the measurement.
 - **`syncOplog` is 9 reads per flush** for a diagnostics panel (PARKING_LOT.md).
   Behind the worker that is ~0.9 ms/frame of pure overhead. Decide it before
   Stage 5's measurement, or it will be misread as the architecture's cost.
+
+## a12.3 gate 1 — RUN, AND IT PASSED (2026-08-13, v8.28)
+
+**The gate needed a foregrounded window and finally got one.** v8.27 recorded
+three blocked routes and the reason: a backgrounded tab gets zero rAF callbacks,
+so the tool rail parks off-screen and clicks miss. The instrument that worked is
+a Playwright-driven page, which is visible by construction — `document.hidden`
+was `false` on the first check, against `true` in the Chrome extension's tab.
+
+### Gate 1 is two requirements, and the second is the one that gets skipped
+
+| requirement | result |
+|---|---|
+| the canvas never blanks | **PASS** — 8 Batch crossings, generations `1,0,2,0,3,0,4,0,5,0,6,0,7,0,8` |
+| the rejection is OBSERVED firing | **PASS** — forced, logged, and controlled |
+
+The generation sequence is the whole handshake, visible: every mount transfers a
+fresh element, every unmount releases with `NO_CANVAS`, and blits keep flowing
+throughout (23 → 36 across the crossings).
+
+**The rejection does not fire in ordinary use, and that is structural rather
+than lucky.** The unmount path sets `surface = null`, and `blit()` returns at
+`if (!tool || !surface)` — above the staleness check. So the check can only fire
+when the worker still HOLDS a surface whose generation has been superseded,
+which the ordinary lifecycle never produces. It was forced exactly as the plan
+required, by posting a `canvas` message with a generation the surface does not
+carry:
+
+```
+[engine-worker] blit refused: stale canvas: work targets generation 1, live generation is 999
+```
+
+And then controlled, because a refusal is indistinguishable from a dead draw
+path unless you show the same call working:
+
+| | pixels changed |
+|---|---|
+| document rotated 90°, blit sent, generation **stale** | **0** |
+| same blit, generation **restored** | **1,135,280** |
+
+### The PenOverlay unmount race — also PASS
+
+v8.19 recorded that its green check did not cover this: with the flag off
+`finish()`'s await is a microtask that resolves before React tears down, so the
+dangerous window does not exist. Behind the worker it is a round trip. Three pen
+anchors, then a tool switch with the path still open: **undo 0 → 1**, committed
+exactly once, no errors. The re-entrancy guard holds.
+
+### What the gate found that the gate was not looking for
+
+Two defects, both fixed in v8.28, both invisible to the entire test suite:
+
+1. **Every load past the first left a blank canvas.** The worker holding the
+   `OffscreenCanvas` was disposed and rebuilt per document; an element yields a
+   surface exactly once. A green test asserted this behaviour.
+2. **Capture structs arrived as `{ __wbg_ptr }`.** See ADR-024, "The fifth trap
+   shape".
+
+Neither is a remount problem. Both sat upstream of the gate, on the path
+ordinary use takes every time — which is the argument for running a gate on the
+real thing rather than reasoning about the part you meant to test.
+
+### Verdict
+
+**PASS.** a12.3's three gates stand at 1 **pass**, 2 pass, 3 pass. a13 is
+measured (ADR-024, Stage 5). a14 — the default flip — is deliberately NOT taken
+in the same session; the reasoning is in ADR-024.

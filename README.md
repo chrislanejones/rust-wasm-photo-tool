@@ -84,6 +84,40 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.28 — 2026-08-13
+
+**The background thread was drawing to a canvas nobody could see.** The engine
+has been able to run on a background thread since v8.25, switched off by
+default. This is the first time the whole of it was driven in a real browser
+with the switch on, and it found two faults. Both are fixed. It stays off by
+default.
+
+**Opening a second photo left the canvas blank.** A canvas can be handed to a
+background thread exactly once — after that the handover cannot be repeated for
+that canvas, ever. The app was building a fresh background thread for every
+photo, which destroyed the thread holding the canvas and left the replacement
+with nothing to draw on. The photo loaded, the thumbnail was right, the file
+size was right, and the picture was simply absent. Nothing appeared in the
+console. Counted during a reload: the discarded thread had been given the canvas
+and no work at all; the live one had been given 339 pieces of work and no
+canvas. The thread is now kept and the photo swapped inside it.
+
+**The readouts stopped counting.** The engine answers some questions in bundles
+— width, height, undo count, layer list, all gathered in one go so they cannot
+disagree with each other. A bundle is a handle into the engine's memory, and a
+handle means nothing on the other side of a thread boundary; what arrived was an
+empty shell. So the undo counter, the image dimensions and the layer list froze
+at whatever they said when the photo opened, and stayed there for the rest of
+the session. Bundles are now unpacked before they cross.
+
+**And the reason for all of it, measured.** On a 4.3-megapixel photo, sharpening
+blocks the main thread for **119 ms** today. On the background thread it blocks
+it for **0 ms**. The longest single gap between frames falls from 191 ms to
+25 ms — one dropped frame instead of eleven. The work still takes about the same
+time; the difference is that the window keeps responding while it happens.
+
+<details><summary>Older releases</summary>
+
 ### v8.27 — 2026-08-12
 
 **A bug that was never a bug.** For a week the app appeared to hang on
@@ -108,8 +142,6 @@ editor.
 the canvas it was given has been replaced — it now says so instead of quietly
 doing nothing. A silent refusal and a refusal that never happens look identical,
 which is exactly the confusion above, one layer down.
-
-<details><summary>Older releases</summary>
 
 ### v8.26 — 2026-08-12
 

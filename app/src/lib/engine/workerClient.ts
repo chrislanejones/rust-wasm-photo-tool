@@ -20,6 +20,7 @@
 // written down here rather than delegated.
 import type { EngineReply, EngineRequest } from "@/workers/engine.worker";
 import { NO_CANVAS } from "./canvasGeneration";
+import { rehydrateCapture } from "./captureMarshal";
 
 /** How long a single engine call may take before the caller is told it hung.
  *  A 12MP sharpen measured ~470 ms; 30 s is "the worker died", not "slow". */
@@ -59,6 +60,36 @@ export class EngineWorkerClient {
    *  numbers. */
   surface: ReadonlySet<string> = new Set();
 
+  /**
+   * ADR-024 a12.5 — replace the DOCUMENT without replacing the worker.
+   *
+   * The worker owns the `OffscreenCanvas`, and an element yields one exactly
+   * once. Tearing the worker down to load a second photo therefore strands the
+   * canvas for the rest of that element's life — a blank editor with a correct
+   * thumbnail and nothing in the console. `createLiveEngine` calls this instead
+   * of building a second client; the whole reasoning is on the worker's
+   * `reinit` case.
+   *
+   * Pending calls belong to the outgoing document and are rejected here, for
+   * the same reason `dispose` rejects them: a caller awaiting a reply that can
+   * never come is worse than a caller told the document changed.
+   */
+  async reinit(width: number, height: number): Promise<void> {
+    const w = this.worker;
+    if (!w) return this.init(width, height);
+    this.failAll("engine document replaced");
+    await this.handshake(w, { kind: "reinit", width, height });
+  }
+
+  /** ADR-024 a12.5 — drop the document, keep the worker and its surface.
+   *  Paired with `reset()` on the main thread, which wants a blank canvas and a
+   *  released engine but must not destroy a surface it cannot re-acquire. */
+  releaseEngine(): void {
+    this.failAll("engine released");
+    this.initialised = false;
+    this.worker?.postMessage({ kind: "release" });
+  }
+
   async init(width: number, height: number): Promise<void> {
     if (this.worker) this.dispose();
     const w = new Worker(new URL("../../workers/engine.worker.ts", import.meta.url), {
@@ -72,12 +103,23 @@ export class EngineWorkerClient {
     w.onmessageerror = () => this.failAll("engine worker sent an unreadable message");
     this.worker = w;
 
-    await new Promise<void>((resolve, reject) => {
+    await this.handshake(w, { kind: "init", width, height });
+  }
+
+  /** The `id: 0` handshake, shared by `init` and `reinit` — one reply, one
+   *  timeout, one place that decides the client is usable. Two copies of this
+   *  would be two places for `initialised` to drift from the truth. */
+  private handshake(w: Worker, msg: Record<string, unknown>): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       const t = setTimeout(() => reject(new Error("engine worker did not start")), 10_000);
       const once = (e: MessageEvent<EngineReply>) => {
         if (e.data.id !== 0) return;
         clearTimeout(t);
         w.removeEventListener("message", once);
+        if (!e.data.ok) {
+          reject(new Error(e.data.error ?? "engine worker failed to start"));
+          return;
+        }
         const v = e.data.value as { ready?: boolean; surface?: string[] } | undefined;
         // An older worker (or a fake in a test) may not report a surface. Leave
         // the set empty rather than inventing one: an empty surface makes the
@@ -88,7 +130,7 @@ export class EngineWorkerClient {
         resolve();
       };
       w.addEventListener("message", once);
-      w.postMessage({ kind: "init", width, height });
+      w.postMessage(msg);
     });
   }
 
@@ -189,7 +231,11 @@ export class EngineWorkerClient {
     clearTimeout(p.timer);
     this.pending.delete(r.id);
     if (typeof r.ms === "number") this.engineMs += r.ms;
-    if (r.ok) p.resolve(r.value);
+    // ADR-024 a12.4 — a flattened capture gets its shape back here, including
+    // the no-op `free()` its twelve call sites all call. Doing it at the seam is
+    // what keeps those call sites identical across the two implementations;
+    // `lib/engine/captureMarshal.ts` has the full reasoning.
+    if (r.ok) p.resolve(r.capture ? rehydrateCapture(r.value) : r.value);
     else p.reject(new Error(`${p.method}: ${r.error ?? "unknown engine error"}`));
   }
 

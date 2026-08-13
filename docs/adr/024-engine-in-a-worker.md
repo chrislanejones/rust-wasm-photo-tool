@@ -462,6 +462,41 @@ A fourth, from this stage: **a `void` return slot silently swallows a Promise.**
 blind spot — a *type-system* one, which is worse, because the type gate is the
 thing everyone trusts.
 
+### The fifth trap shape — found 2026-08-13, v8.28, and the most expensive one
+
+**A method that returns a boxed wasm-bindgen struct cannot cross the boundary
+at all**, and every gate in this arc was blind to it because every gate asks
+*whether* a value is consumed, never *what kind* of value it is.
+
+Seven methods return one: `capture_ui_state`, `capture_composite`,
+`capture_composite_excluding_background`, `capture_thumbnail`,
+`capture_layer_stack`, `capture_pen_hit`, `export_dims_excluding_background`.
+Their fields are prototype accessors; structured clone keeps own data properties
+and drops the prototype. What arrived on the main thread was `{ __wbg_ptr }` —
+every field `undefined`, no `free()`. `readUiSnapshot` threw in its `finally` on
+every call, and `syncState` awaits it after essentially every mutation, so React's
+mirror of the engine was dead behind the flag with one unhandled rejection per
+edit as the only trace.
+
+**The part worth remembering is where these objects came from.** The
+atomic-capture work — a3 through a6 and b1, the signature technique of this
+migration — deliberately collapsed clusters of scalar reads into single
+struct-returning calls, so that a document state could not tear behind the
+worker. It was right to do. But every one of those conversions moved a call site
+OFF the audit's list and ONTO a list nobody was keeping. **The gate counted down
+while the real problem grew**, and reached its floor of 5 in a state that could
+not work.
+
+That is the same shape as the 166-that-was-121 and as `DISSOLVES_AT_STAGE_4`: not
+a wrong number, a question nobody was asking. The lesson for the next migration
+behind a flag is narrow and repeatable — **a ratchet measures the thing it
+counts, and a technique that removes items from it may be creating a second
+category rather than finishing the first.**
+
+The rule now lives in `lib/engine/captureMarshal.ts`, shared by both halves of
+the port for the reason `engineSurface.ts` gives, with a structural test that
+fails the moment the engine grows another struct-returning method.
+
 The contract test that pinned both sites as unconverted has been flipped: it now
 fails if either drifts back OUT of `await`, and a second test asserts nothing
 non-exempt remains. Same principle as `DISSOLVES_AT_STAGE_4` — a gate that only
@@ -816,6 +851,39 @@ Stage 5's gate is the pre-mortem's last line: *"Nobody measured after. The
 freeze moved rather than disappeared."* The flip does not happen on the
 strength of the architecture being correct; it happens on a measured frame
 timeline showing the main thread idle during a 12-megapixel sharpen.
+
+### ✅ a13 — MEASURED 2026-08-13 (v8.28). The gate is met.
+
+Unsharp mask, `amount 1.5`, on the production build at **2078×2078 (4.3 MP)** —
+`makeWorkingCopy` caps an import at 2048 on the long edge, so that IS the
+ceiling and the "12-megapixel sharpen" above cannot occur. Warmed before every
+measurement (a11.0's cold-call trap produced a phantom 1.9× regression once).
+Three runs each; main thread sampled with rAF gaps and a `longtask` observer.
+
+| | local (flag 0) | worker (flag 1) |
+|---|---|---|
+| operation | 179.7 / 185.6 / 187.2 ms | 176.6 / 184.5 / 193.7 ms |
+| median frame gap | 16.6–16.7 ms | 16.7 ms |
+| **longest frame gap** | **189.7 / 191.2 / 200.9 ms** | **20.9 / 24.9 / 29.3 ms** |
+| **long tasks** | **1, 1, 1** | **0, 0, 0** |
+| **total blocking time** | **129 / 135 / 137 ms** | **0 / 0 / 0 ms** |
+
+**The freeze did not move; it went away.** Throughput is a wash — the operation
+costs about the same on either side, sometimes marginally more in the worker —
+which is the expected result and not the point. Also settled: the **470 ms**
+figure quoted through this arc was wrong (it came from a 4000×3000 document that
+`makeWorkingCopy` will not produce), and **latency was never the obstacle** —
+0.100 ms round trip, 0.6% of a frame. The cost of this arc was structural
+throughout: atomicity, ordering, canvas identity, and object lifetime.
+
+⚠️ **THE DEFAULT WAS NOT FLIPPED ON THE STRENGTH OF THIS.** a13 passes and would
+support a14. It was held because the same session — the first end-to-end run of
+the worker path in a real browser — found two defects that four green gates,
+512 tests, `tsc` and eslint had all passed over (see "The fifth trap shape"
+below and v8.28's Change Summary). The measurement is not in doubt; the amount
+of the path that had never actually been executed is. Eighteen releases have
+shipped dark. a14 is a decision for a rested morning, not the night the floor
+moved.
 
 The flag follows the house pattern — `ih_tiles_flush`, `ih_oplog_undo`,
 `ih_patchmatch` all shipped this way and all still carry a kill switch.

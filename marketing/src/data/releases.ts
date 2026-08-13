@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.28",
+    date: "2026-08-13",
+    headline: "The background thread was drawing to a canvas nobody could see",
+    entries: [
+      {
+        tag: "fix",
+        text: "Opening a second photo left the canvas blank. A canvas can be handed to a background thread exactly once, and the app was building a new thread for every photo — destroying the one that held the canvas. The thread is now kept and the photo swapped inside it.",
+      },
+      {
+        tag: "fix",
+        text: "The undo counter, image dimensions and layer list stopped updating. The engine answers those in one bundle so they cannot disagree, and a bundle is a handle into the engine's memory, which means nothing on the other side of a thread. Bundles are now unpacked before they cross.",
+      },
+      {
+        tag: "perf",
+        text: "Measured: sharpening a 4.3-megapixel photo blocks the main thread for 119 ms today and 0 ms on the background thread. Longest gap between frames drops from 191 ms to 25 ms — one dropped frame instead of eleven.",
+      },
+      {
+        tag: "infra",
+        text: "The background engine still ships switched off. Two faults this size, found the first time it was driven end to end in a browser, are a reason to let it sit before turning it on.",
+      },
+    ],
+  },
+  {
     version: "v8.27",
     date: "2026-08-12",
     headline: "A bug that was never a bug",

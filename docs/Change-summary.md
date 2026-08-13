@@ -6452,3 +6452,143 @@ That silence is the same failure as the section above, one layer down: an
 invisible refusal and a refusal that never happens are indistinguishable.
 
 **Gates.** 512 JS tests, `tsc` clean, eslint 0 errors, builds clean.
+
+---
+
+## v8.28 Change Summary — 2026-08-13
+
+**The first end-to-end run of the worker path in a real browser.** ADR-024's
+a12 has been building since 2026-08-12: the engine constructed inside a Worker,
+the canvas transferred to it, the composite drawn from that thread. Gates 2 and
+3 had passed and gate 1 was blocked on needing a foregrounded window. This
+session got one, ran gate 1, and found two defects that four green gates, 512
+tests, `tsc` and eslint had all passed over.
+
+Both are fixed. **`ih_engine_worker` still defaults OFF.**
+
+### Defect 1 — every load past the first left a blank canvas
+
+`transferControlToOffscreen()` may be called **once per element**, permanently.
+`createLiveEngine` disposed the live worker and built a new one on every load,
+so the worker holding the only `OffscreenCanvas` that element will ever yield
+was terminated, and its replacement was never given a surface. `blit()` then
+returned at `if (!surface)` — silently, by design, because that early return
+sits above the reporting path added in v8.27.
+
+Measured on the boot-restore path:
+
+| worker | terminated | canvas handover | blits | engine calls |
+|---|---|---|---|---|
+| #1 | **yes** | generation 1, with the surface | 0 | 0 |
+| #2 (live) | no | **never** | 22 | 339 |
+
+The engine is per-DOCUMENT; the surface is per-ELEMENT. The two lifetimes were
+conflated. The worker is now kept for the life of the tab and the document is
+replaced inside it (`reinit`), with `release` for the teardown that `reset()`
+wants. The wasm-memory concern that motivated the old behaviour is met better
+this way: the outgoing document is freed inside the worker and its linear memory
+reused, instead of a whole second instance being allocated.
+
+⚠️ **A green test asserted the broken behaviour.** `"terminates the previous
+worker when a new document is opened"` pinned exactly the disposal that caused
+this, on correct-sounding wasm-memory grounds. It has been inverted, and the
+reasoning is written into the test so the next reader sees why.
+
+### Defect 2 — capture structs arrived empty
+
+Seven engine methods return a boxed wasm-bindgen struct: `capture_ui_state`,
+`capture_composite`, `capture_composite_excluding_background`,
+`capture_thumbnail`, `capture_layer_stack`, `capture_pen_hit`,
+`export_dims_excluding_background`.
+
+Their fields are PROTOTYPE ACCESSORS. `postMessage` structured-clones own data
+properties and drops the prototype, so the main thread received:
+
+```
+{ __wbg_ptr: 1114112 }
+```
+
+Every field `undefined`, no `free()`. `readUiSnapshot` reads ten fields and then
+calls `ui.free()` in a `finally`, so it **threw on every call** — and `syncState`
+awaits it after essentially every mutation (74 call sites). Behind the flag,
+React's mirror of the engine was dead: undo count, history, dimensions and layer
+list frozen at their load-time values, with one unhandled rejection per edit as
+the only trace.
+
+`lib/engine/captureMarshal.ts` now flattens a capture in the worker — reading
+each field exactly once, because `getter_with_clone` copies the whole value out
+of wasm on every access — frees it there, and rebuilds it on the main thread
+with a no-op `free()`. All twelve `cap.free()` call sites are unchanged, which
+is the point of fixing it at the seam.
+
+**Why the migration's own gate could not see it.** `engine-call-audit.mjs`
+classifies call sites by whether a value is CONSUMED — never by what KIND of
+value, because until the engine moved threads that could not matter. The sharper
+part: this arc BUILT the objects that cannot cross. The atomic-capture work
+(a3–a6, b1) deliberately collapsed clusters of scalar reads into single
+struct-returning calls so a document state could not tear behind the worker.
+Every one of those conversions moved a call site off the audit's list and onto
+this one. The gate counted down while the real problem grew.
+
+### a12.3 gate 1 — PASS, both halves
+
+Run against the production build at 4.3 MP, `ih_engine_worker=1`.
+
+| requirement | result |
+|---|---|
+| canvas never blanks across the Batch boundary | **PASS** — 8 crossings, generations `1,0,2,0,3,0,4,0,5,0,6,0,7,0,8`, every mount transferred, every unmount released with `NO_CANVAS`, picture intact throughout |
+| stale-generation rejection OBSERVED firing | **PASS** — see below |
+| PenOverlay unmount race (flag ON) | **PASS** — pen path committed exactly once on a mid-draw tool switch, undo 0 → 1, no errors |
+
+The rejection does not fire in ordinary use — the release path nulls the surface
+and `blit()` returns above the check — so it was forced, as the plan required:
+
+```
+[engine-worker] blit refused: stale canvas: work targets generation 1, live generation is 999
+```
+
+With a behavioural control, because a refusal nobody can distinguish from a dead
+draw path proves nothing:
+
+| | pixels changed |
+|---|---|
+| document rotated 90°, blit sent, generation **stale** | **0** |
+| same blit, generation **restored** | **1,135,280** |
+
+### a13 — the frame timeline
+
+The gate was never operation duration. It is whether the main thread stays free
+while the operation runs. Unsharp mask, `amount 1.5`, 2078×2078 (4.3 MP),
+production build, warmed before every measurement. Three runs each.
+
+| | local (flag 0) | worker (flag 1) |
+|---|---|---|
+| operation | 179.7 / 185.6 / 187.2 ms | 176.6 / 184.5 / 193.7 ms |
+| median frame gap | 16.6–16.7 ms | 16.7 ms |
+| **longest frame gap** | **189.7 / 191.2 / 200.9 ms** | **20.9 / 24.9 / 29.3 ms** |
+| **long tasks** | **1, 1, 1** | **0, 0, 0** |
+| **total blocking time** | **129 / 135 / 137 ms** | **0 / 0 / 0 ms** |
+
+The freeze did not move. It went away. Throughput is a wash — the operation
+costs about the same either way, sometimes slightly more — and that was never
+the point.
+
+Two corrections carried in from the plan, both confirmed here:
+
+- **The 470 ms figure was wrong**, as suspected. `makeWorkingCopy` caps an
+  import at 2048 on the long edge, so the ceiling is 4.3 MP and the real cost is
+  ~180 ms. Do not quote 470 ms.
+- **Latency was never the obstacle.** Round trip is 0.100 ms median, 0.6% of a
+  frame. The whole cost of this arc was structural: atomicity, ordering, canvas
+  identity, and now object lifetime across a thread.
+
+### Not done, on purpose
+
+**The default is not flipped.** a13 passes cleanly and would support it. Two
+defects of this size, found the first time the path was driven end to end, are
+an argument for letting the code sit live-but-dark for a few days rather than
+shipping a default on the same night they were fixed. Eighteen releases have
+shipped dark; another few cost nothing.
+
+**Gates.** 525 JS tests (44 files, +13), `tsc` clean, eslint 0 errors, production
+build clean. Rust crate untouched.

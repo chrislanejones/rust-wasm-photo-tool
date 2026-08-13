@@ -4,6 +4,52 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## ADR-024 — found during a12.3 gate 1 (2026-08-13, v8.28)
+
+- **The runtime kill switch is incomplete MID-SESSION, and the code claims
+  otherwise.** `port.ts` and `canvasSurfaceKey.contract.test.ts` both state that
+  `ih_engine_worker=0` restores the main-thread path immediately, because a11.3
+  keys the `<canvas>` on the mode so a flip remounts a fresh, never-transferred
+  element. The ELEMENT half is real. The ENGINE half was never addressed:
+  `toolRef.current` still holds the worker Proxy, so on the next render
+  `blitLiveEngine` takes its LOCAL branch against it, `tool.width()` returns a
+  Promise, and the blit dies with
+
+  ```
+  IndexSizeError: Failed to construct 'ImageData': The source width is zero or not a number.
+  ```
+
+  Observed in the browser on the production build (v8.28). **The switch works
+  correctly on reload**, which is how every other flag here is used
+  (`ih_tiles_flush`, `ih_oplog_undo`, `ih_patchmatch`), and the flag is off by
+  default, so nothing user-facing is exposed. What is wrong is the stronger
+  claim in the comments. Either fix it — rebuild the engine locally from the
+  worker's document on a mode change, which is real work: pixels and op log both
+  have to cross — or downgrade the claim to "takes effect on reload". Do not
+  leave both halves as they are; a guardrail that cannot fire is the pattern
+  this repo keeps getting bitten by.
+
+- **Eight contract tests anchor their source-walk on `process.cwd()`, so they
+  read NOTHING when the suite is launched from the repo root.** Measured:
+
+  | launched from | `process.cwd()` | files the walk sees |
+  |---|---|---|
+  | repo root (`pnpm test`) | repo root | **0** |
+  | `app/` | `app` | 236 |
+
+  `<repo>/src` is the Rust crate and contains no `.ts`, so `walk()` returns an
+  empty list and every assertion over it passes vacuously — no error, no skip.
+  Affected: `engineAsyncMigration`, `canvasSurfaceKey`, `canvasGeneration`,
+  `engineOwnership`, `canvasIdentity`, `textMetricsCache`, `batchExportPlan`,
+  `toolSurfaces`, `deletePhotoOriginals`.
+
+  ⚠️ **This did not mask anything today** — the suite passes identically from
+  either directory (525 tests), and none of these guards models the worker's
+  wire format, so none of them could have caught the v8.28 defects. It is a
+  latent weakness, not the cause of anything. The fix is one line per file:
+  anchor on `fileURLToPath(new URL(".", import.meta.url))` the way
+  `captureMarshal.contract.test.ts` now does.
+
 ## Engine
 
 - **Layers clip to canvas bounds at commit.** Layer buffers are

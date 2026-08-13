@@ -16,15 +16,19 @@
 //                  is precisely what `port.ts`'s ONE PORT PER DOCUMENT invariant
 //                  exists to prevent.
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { createLiveEngine, detachLivePort, liveEnginePort } from "./port";
+import { createLiveEngine, detachLivePort, disposeLivePort, liveEnginePort } from "./port";
 import type { ImageHorseTool } from "stamp_tool";
 
 /** A Worker stand-in that completes the init handshake and records termination.
  *  Enough of the protocol for `EngineWorkerClient.init()` to resolve. */
 function fakeWorkerClass() {
-  const instances: { terminated: boolean }[] = [];
+  const instances: { terminated: boolean; sent: { kind?: string }[] }[] = [];
   class FakeWorker {
     terminated = false;
+    /** Every message the client posted, so a test can assert the LIFECYCLE and
+     *  not just its side effects — `reinit` vs a second construction is the
+     *  whole difference between a live canvas and a blank one. */
+    sent: { kind?: string }[] = [];
     onmessage: ((e: { data: unknown }) => void) | null = null;
     onerror: (() => void) | null = null;
     onmessageerror: (() => void) | null = null;
@@ -46,7 +50,10 @@ function fakeWorkerClass() {
       // `structuredClone` with a transfer list detaches the originals, which is
       // exactly what the real `postMessage` does.
       if (transfer?.length) structuredClone(transfer[0], { transfer });
-      if (msg?.kind === "init") {
+      this.sent.push(msg);
+      // `reinit` shares the `id: 0` handshake with `init` — same reply shape,
+      // same one-shot listener, so the fake answers both the same way.
+      if (msg?.kind === "init" || msg?.kind === "reinit") {
         queueMicrotask(() => {
           const e = {
             data: { id: 0, ok: true, value: { ready: true, surface: ["load_image", "width"] } },
@@ -100,7 +107,11 @@ function setFlag(on: boolean) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  detachLivePort();
+  // FULL teardown between tests, not `detachLivePort`. The live port is module
+  // state that outlives a test, and since a12.5 `detachLivePort` deliberately
+  // KEEPS the worker — so using it here would leak a fake worker into the next
+  // test, which would then silently exercise reuse instead of construction.
+  disposeLivePort();
 });
 
 describe("createLiveEngine — flag OFF (today's path)", () => {
@@ -168,11 +179,22 @@ describe("createLiveEngine — flag ON", () => {
 });
 
 describe("worker lifecycle — the wasm-memory guard", () => {
-  it("terminates the previous worker when a new document is opened", async () => {
-    // ⚠️ wasm memory NEVER SHRINKS (a11.0 measured ~75 MB across a flip
-    // window). An engine dropped without `terminate()` raises the tab's floor
-    // for the rest of the session, and nothing surfaces it — the tab is simply
-    // heavier from then on.
+  it("REUSES the worker for a second document — the canvas cannot be re-transferred", async () => {
+    // ⚠️ THIS TEST ASSERTED THE OPPOSITE UNTIL v8.28, and the opposite is the
+    // bug. It required the previous worker to be terminated on every load, on
+    // wasm-memory grounds. But the worker owns the `OffscreenCanvas`, and
+    // `transferControlToOffscreen()` may be called ONCE per element — so
+    // terminating it destroyed the only surface that element will ever yield and
+    // the replacement drew nowhere.
+    //
+    // Measured in the browser on the boot-restore path: worker #1 received the
+    // canvas and ZERO calls; worker #2 received 339 calls, 22 blits and no
+    // canvas. The user saw a blank editor with a correct thumbnail and an empty
+    // console. A green test said this was right.
+    //
+    // The memory concern was real and is now met properly: `reinit` frees the
+    // outgoing document inside the worker, so its linear memory is REUSED by the
+    // incoming one instead of a whole second instance being allocated.
     setFlag(true);
     const { FakeWorker, instances } = fakeWorkerClass();
     vi.stubGlobal("Worker", FakeWorker);
@@ -181,12 +203,18 @@ describe("worker lifecycle — the wasm-memory guard", () => {
     await createLiveEngine({ Tool, width: 4, height: 4 });
     await createLiveEngine({ Tool, width: 8, height: 8 });
 
-    expect(instances).toHaveLength(2);
-    expect(instances[0].terminated, "the FIRST worker was leaked").toBe(true);
-    expect(instances[1].terminated).toBe(false);
+    expect(instances, "a second worker was built; the first held the canvas").toHaveLength(1);
+    expect(instances[0].terminated, "the worker holding the surface was killed").toBe(false);
+    // The second document arrived as a reinit, at its own dimensions.
+    expect(instances[0].sent.filter((m) => m.kind === "reinit")).toEqual([
+      { kind: "reinit", width: 8, height: 8 },
+    ]);
   });
 
-  it("detachLivePort terminates the live worker and clears the port", async () => {
+  it("detachLivePort releases the document but keeps the worker and its surface", async () => {
+    // `reset()` (gallery emptied) wants the engine gone and the canvas blank. It
+    // must NOT take the surface with it: the element is still mounted and will
+    // never yield a second `OffscreenCanvas`.
     setFlag(true);
     const { FakeWorker, instances } = fakeWorkerClass();
     vi.stubGlobal("Worker", FakeWorker);
@@ -197,8 +225,42 @@ describe("worker lifecycle — the wasm-memory guard", () => {
 
     detachLivePort();
 
-    expect(instances[0].terminated, "detach left the worker running").toBe(true);
-    expect(liveEnginePort(), "detach left a stale port behind").toBeNull();
+    expect(instances[0].terminated, "detach destroyed the irreplaceable surface").toBe(false);
+    expect(instances[0].sent.some((m) => m.kind === "release")).toBe(true);
+    expect(liveEnginePort(), "the worker still owns the canvas; the port must stay").not.toBeNull();
+  });
+
+  it("disposeLivePort is the real teardown — it terminates and forgets", async () => {
+    // The other half of the split. Destroying the worker is only correct when
+    // the surface is going away too: the flag being switched off remounts the
+    // <canvas> on a new key, so a fresh element is coming either way.
+    setFlag(true);
+    const { FakeWorker, instances } = fakeWorkerClass();
+    vi.stubGlobal("Worker", FakeWorker);
+    const { Tool } = fakeToolClass();
+
+    await createLiveEngine({ Tool, width: 4, height: 4 });
+    disposeLivePort();
+
+    expect(instances[0].terminated).toBe(true);
+    expect(liveEnginePort()).toBeNull();
+  });
+
+  it("terminates the worker when the flag goes OFF mid-session", async () => {
+    // Stage 5 lists this as a hard requirement of the flip: wasm memory never
+    // shrinks, so a worker left running for a document nobody is editing raises
+    // the tab's floor permanently (~75 MB observed in a11.0).
+    setFlag(true);
+    const { FakeWorker, instances } = fakeWorkerClass();
+    vi.stubGlobal("Worker", FakeWorker);
+    const { Tool } = fakeToolClass();
+    await createLiveEngine({ Tool, width: 4, height: 4 });
+
+    setFlag(false);
+    await createLiveEngine({ Tool, width: 4, height: 4 });
+
+    expect(instances[0].terminated, "the losing instance was left running").toBe(true);
+    expect(liveEnginePort()).toBeNull();
   });
 
   it("does NOT transfer the pixel buffer — it would detach the caller's", async () => {

@@ -31,6 +31,7 @@
 import type { ImageHorseTool } from "stamp_tool";
 import { staleCanvasReason, NO_CANVAS } from "@/lib/engine/canvasGeneration";
 import { engineSurfaceOf } from "@/lib/engine/engineSurface";
+import { isCaptureStruct, marshalCapture } from "@/lib/engine/captureMarshal";
 
 export interface EngineRequest {
   /** Monotonic per-port. Echoed back so a reply cannot be mismatched. */
@@ -55,6 +56,11 @@ export interface EngineReply {
   ok: boolean;
   value?: unknown;
   error?: string;
+  /** ADR-024 a12.4 — `value` is a FLATTENED capture struct, not a plain return.
+   *  The client rebuilds the field object and gives it back its no-op `free()`;
+   *  the real allocation was released in the worker. Absent for every ordinary
+   *  return, which is nearly all of them. */
+  capture?: boolean;
   /** Wall-clock ms spent inside the engine, for Stage 5's measurement. */
   ms?: number;
 }
@@ -134,13 +140,28 @@ async function drain() {
       const t0 = performance.now();
       try {
         const value = (fn as (...a: unknown[]) => unknown).apply(tool, req.args);
+        // ADR-024 a12.4 — a boxed capture cannot travel as itself. Its fields
+        // are PROTOTYPE ACCESSORS and structured clone keeps only own data
+        // properties, so the far side used to receive `{ __wbg_ptr }` and
+        // nothing else: every field `undefined`, no `free`, and `syncState`
+        // throwing after every mutation. Flatten it here, where the allocation
+        // lives and can actually be released. `lib/engine/captureMarshal.ts`.
+        if (isCaptureStruct(value)) {
+          reply({
+            id: req.id,
+            ok: true,
+            value: marshalCapture(value as object),
+            capture: true,
+            ms: performance.now() - t0,
+          });
+          continue;
+        }
         // A returned view into wasm memory must be COPIED before it leaves:
         // postMessage of a Uint8Array backed by wasm memory would either clone
         // the whole heap or detach memory the engine still owns.
-        const safe =
-          value instanceof Uint8Array || value instanceof Uint32Array
-            ? value.slice()
-            : value;
+        const safe = ArrayBuffer.isView(value)
+          ? (value as unknown as { slice: () => unknown }).slice()
+          : value;
         reply({ id: req.id, ok: true, value: safe, ms: performance.now() - t0 });
       } catch (err) {
         // A Rust panic arrives here as a thrown JS error. Replying with it is
@@ -230,9 +251,15 @@ function blit(): void {
   ctx.putImageData(new ImageData(new Uint8ClampedArray(composed), w, h), 0, 0);
 }
 
+/** The wasm module, kept so a `reinit` can build a second engine without
+ *  re-importing. `import()` caches, so this is clarity rather than speed. */
+let mod: typeof import("stamp_tool") | null = null;
+
 self.onmessage = async (e: MessageEvent) => {
   const d = e.data as
     | { kind: "init"; width: number; height: number }
+    | { kind: "reinit"; width: number; height: number }
+    | { kind: "release" }
     | { kind: "cancel"; id: number }
     | { kind: "canvas"; generation: number; canvas?: OffscreenCanvas }
     | { kind: "blit" }
@@ -241,7 +268,7 @@ self.onmessage = async (e: MessageEvent) => {
 
   switch (d.kind) {
     case "init": {
-      const mod = await import("stamp_tool");
+      mod = await import("stamp_tool");
       // ADR-024 a12.2 — KEEP THE MEMORY HANDLE. `mod.default()`'s exports carry
       // the `WebAssembly.Memory` this worker's engine lives in, and the blit
       // below views it directly. Discarding it (as this did until v8.25) leaves
@@ -279,6 +306,67 @@ self.onmessage = async (e: MessageEvent) => {
       // lifecycle belongs to `dispose`, which the worker already handles.
       const surfaceNames = engineSurfaceOf(Object.getPrototypeOf(tool) as object);
       reply({ id: 0, ok: true, value: { ready, surface: surfaceNames } });
+      break;
+    }
+
+    // ADR-024 a12.5 — a NEW DOCUMENT IN THE SAME WORKER.
+    //
+    // ⚠️ THE SURFACE IS DELIBERATELY UNTOUCHED, and that is the whole point of
+    // this message existing. `transferControlToOffscreen()` may be called ONCE
+    // per element, ever. Until v8.28 every load past the first built a fresh
+    // `EngineWorkerClient` and disposed the old one — which terminated the
+    // worker holding the only `OffscreenCanvas` that element will ever yield.
+    // The replacement worker was never handed a surface, so `blit()` returned
+    // at `if (!surface)` and the user watched a blank canvas with the photo
+    // loaded, the thumbnail correct and nothing in the console.
+    //
+    // Measured on the boot-restore path: worker #1 received the canvas and ZERO
+    // calls, worker #2 received 339 calls and 22 blits and no canvas at all.
+    //
+    // The engine is per-DOCUMENT; the surface is per-ELEMENT. Rebuilding the
+    // first must not destroy the second, so the document is replaced in place.
+    case "reinit": {
+      if (!mod) {
+        reply({ id: 0, ok: false, error: "reinit before init" });
+        break;
+      }
+      // Free the outgoing document rather than leaking it: this worker's linear
+      // memory is reused by the incoming one, which is strictly better than the
+      // old behaviour of stranding a whole instance (wasm memory never shrinks —
+      // ~75 MB observed in a11.0).
+      tool?.free();
+      // Anything still queued belongs to the document that just went away.
+      queue.length = 0;
+      cancelled.clear();
+      backbuffer = null;
+      tool = new mod.ImageHorseTool(d.width, d.height);
+      ready = true;
+      reply({
+        id: 0,
+        ok: true,
+        value: { ready, surface: engineSurfaceOf(Object.getPrototypeOf(tool) as object) },
+      });
+      break;
+    }
+
+    // ADR-024 a12.5 — drop the DOCUMENT, keep the surface.
+    //
+    // `reset()` (gallery emptied) wants the picture gone and the engine
+    // released. Disposing the worker would do both and would also throw away
+    // the irreplaceable canvas, so the surface is cleared here instead — which
+    // is what `clearLiveCanvas` does on the local path and cannot do on this
+    // one, because a transferred element has no 2D context on the main thread.
+    case "release": {
+      tool?.free();
+      tool = null;
+      ready = false;
+      queue.length = 0;
+      cancelled.clear();
+      backbuffer = null;
+      if (surface) {
+        const ctx = surface.getContext("2d");
+        ctx?.clearRect(0, 0, surface.width, surface.height);
+      }
       break;
     }
 

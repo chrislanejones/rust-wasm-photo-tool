@@ -76,10 +76,35 @@ export function attachLivePort(tool: ImageHorseTool): ImageHorseTool {
  */
 export function detachLivePort(): void {
   // ⚠️ wasm memory NEVER SHRINKS (a11.0, ~75 MB observed during a flip window),
-  // so an engine instance that is dropped without being terminated raises the
-  // tab's floor for the rest of the session. Disposing here is not tidiness.
+  // so an engine instance that is dropped without being reclaimed raises the
+  // tab's floor for the rest of the session. Releasing here is not tidiness.
+  //
+  // ADR-024 a12.5 — RELEASE THE DOCUMENT, KEEP THE WORKER. This used to
+  // `dispose()`, and disposing takes the `OffscreenCanvas` with it: an element
+  // yields one exactly once, so the next load had no surface to draw to and the
+  // editor went blank. Freeing the engine inside the worker reclaims the same
+  // memory — the worker's linear memory is reused by the next document — without
+  // destroying something that cannot be rebuilt. `releaseEngine` also clears the
+  // surface, which is the half `clearLiveCanvas` cannot do from this thread.
+  livePort?.releaseEngine();
+}
+
+/**
+ * ADR-024 a12.5 — the REAL teardown: terminate the worker and forget it.
+ *
+ * Separate from `detachLivePort` because the two are genuinely different
+ * events, and conflating them is what produced the blank canvas. Releasing a
+ * document is routine and must preserve the surface; destroying the worker is
+ * final and is only correct when the surface is going away too — the flag being
+ * turned off (the element remounts on the new key, so a fresh one is coming), or
+ * a test tearing down module state.
+ */
+export function disposeLivePort(): void {
   livePort?.dispose();
   livePort = null;
+  // The held element belonged to the worker that just died; a later port must
+  // not be handed a canvas that was already transferred to a dead one.
+  pendingCanvas = null;
 }
 
 /** The one worker client for the live document. Module-scoped because the
@@ -134,16 +159,39 @@ export async function createLiveEngine(spec: {
   const { Tool, width, height, pixels } = spec;
 
   if (!engineWorkerEnabled()) {
+    // ADR-024 a12.5 — TERMINATE THE LOSING INSTANCE. Reaching the local branch
+    // with a live worker means the flag went off mid-session, and a worker left
+    // running holds a whole wasm instance for a document nobody is editing —
+    // wasm memory never shrinks, so that is a permanent rise in the tab's floor
+    // (~75 MB observed in a11.0), not a temporary one. Stage 5 lists this as a
+    // hard requirement of the flip; it belongs here, where the choice is made.
+    disposeLivePort();
     const tool = new Tool(width, height);
     if (pixels) tool.load_image(pixels);
     return attachLivePort(tool);
   }
 
-  // One document, one port: replace any previous worker rather than accumulate.
-  livePort?.dispose();
-  const port = new EngineWorkerClient();
-  livePort = port;
-  await port.init(width, height);
+  // ADR-024 a12.5 — ONE WORKER PER TAB, one document at a time inside it.
+  //
+  // ⚠️ REUSED, NOT REBUILT, and the reason is not efficiency. The worker holds
+  // the `OffscreenCanvas`, and `transferControlToOffscreen()` may be called ONCE
+  // per element — so disposing the worker to load a second photo destroys the
+  // only surface that element will ever yield, and the replacement worker draws
+  // nowhere. That shipped as a blank canvas on every load past the first, with a
+  // correct thumbnail and an empty console (measured: the discarded worker got
+  // the canvas and zero calls; the live one got 339 calls and no canvas).
+  //
+  // The invariant at the top of this file is unaffected: it demands ONE PORT PER
+  // DOCUMENT, and one port serving documents in sequence is still one queue and
+  // still FIFO. Reuse also removes a 715 ms cold start from every photo switch.
+  let port = livePort;
+  if (port) {
+    await port.reinit(width, height);
+  } else {
+    port = new EngineWorkerClient();
+    livePort = port;
+    await port.init(width, height);
+  }
   if (pixels) {
     // ⚠️ DELIBERATELY NOT TRANSFERRED, and the reason is a silent-corruption
     // hazard rather than a preference.
