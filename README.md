@@ -84,6 +84,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.31 — 2026-08-13
+
+**The ledger, closed out.** No app code changed. The background-engine project's
+decision record still described work as mid-flight that finished days ago, so
+its table now says what actually happened, with the numbers that ended up
+mattering: heavy operations used to block the interface for about 130
+milliseconds and now block it for zero, and the speed of talking to a
+background thread — the thing everyone worries about first — was never the
+problem at a tenth of a millisecond per round trip.
+
+One number had never been measured: the first heavy operation of a fresh
+session, on the theory that a background thread starts cold and the first
+action would pay double. Measured on both paths, it does not — 231 ms against
+206, inside each other's ordinary variation. Starting up warms the thread as a
+side effect of loading the photo, so no special handling is needed, and that is
+now written down instead of assumed.
+
+The one remaining decision — turning the background engine on by default — has
+its full pre-flight written in the decision record, so making it is a
+twenty-minute job instead of an archaeology dig. It stays off today.
+
+<details><summary>Older releases</summary>
+
 ### v8.30 — 2026-08-13
 
 **The off switch took the app with it.** The engine can run on a background
@@ -113,8 +136,6 @@ that promise creeps back in.
 runner happened to be started. Started from the wrong place, they read no files
 and passed while checking nothing. They now resolve relative to themselves.
 Verified by planting a real violation and confirming they catch it either way.
-
-<details><summary>Older releases</summary>
 
 ### v8.29 — 2026-08-13
 

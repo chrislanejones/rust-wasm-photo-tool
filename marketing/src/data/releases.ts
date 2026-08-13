@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.31",
+    date: "2026-08-13",
+    headline: "The ledger, closed out",
+    entries: [
+      {
+        tag: "infra",
+        text: "No app code changed. The background-engine project's decision record still described finished work as mid-flight; its table now says what happened, with the numbers that mattered — about 130 ms of interface blocking down to zero.",
+      },
+      {
+        tag: "perf",
+        text: "One number had never been measured: the first heavy operation of a fresh session, on the theory a background thread starts cold. It does not — 231 ms against 206, inside each other's ordinary variation. Loading the photo warms it as a side effect.",
+      },
+      {
+        tag: "infra",
+        text: "The one remaining decision — on by default — now has its full pre-flight written down, so making it is a twenty-minute job. It stays off today.",
+      },
+    ],
+  },
+  {
     version: "v8.30",
     date: "2026-08-13",
     headline: "The off switch took the app with it",

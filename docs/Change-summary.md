@@ -6774,3 +6774,60 @@ Both in PARKING_LOT.md.
 
 **Gates.** 527 tests (+2), `tsc` clean, eslint 0 errors, both builds clean. Rust
 crate untouched.
+
+---
+
+## v8.31 Change Summary — 2026-08-13
+
+**Docs only — the ADR-024 close-out, plus the one number nobody had measured.**
+No app code changed.
+
+### The stage table tells the truth now
+
+Stages 4 and 5 of ADR-024 still read as mid-flight ("Still flagged", "A/B the
+470 ms freeze against master"). Both rows now record what happened, carrying the
+three corrections the arc earned:
+
+- **The 470 ms figure is retired.** It came from a 4000×3000 document
+  `makeWorkingCopy` will never produce; the ceiling is 2078² and the real cost
+  was ~180 ms.
+- **The result was never operation time** — throughput is a wash. It is
+  **total blocking time 129–137 ms → 0** and **long tasks 1 → 0**.
+- **Latency was never the obstacle** — 0.100 ms round trip, 0.6% of a frame.
+  The arc's whole cost was structural: atomicity, ordering, canvas identity,
+  object lifetime.
+
+### The cold-start requirement, measured instead of carried forward
+
+a11.0's flip requirement — *"warm the worker before handing it work"* (715.4 ms
+cold vs 392.1 warm) — had no code behind it, and the plan's own rule for that
+case is that a missing requirement is a finding, not a thing to flip around. So
+it was measured. The 715 ms lived in the mid-session flip window, **which v8.30
+deleted**: the flag now takes effect on next load, where `init` + `load_image` +
+the boot flushes warm the instance before any user-triggered work.
+
+| First sharpen of a fresh session, 2078², never warmed | cold | warm scatter |
+|---|---|---|
+| worker (flag 1) | **231.3 ms** | 182–215 ms |
+| local (flag 0) | **206.5 ms** | 199–253 ms |
+
+Each path's cold call sits inside the other's ordinary variation. **The
+requirement is retired by design, with a number rather than an argument.**
+
+### a14's pre-flight, written down
+
+The ADR now carries everything the flip needs in one section: the three a11.0
+requirements statused against real code, the four details that make the flip
+more than a one-character change (the storage-throw fallback must stay OFF; the
+missing-flag contract test inverts and must be rewritten, not deleted; the dev
+panel's displayed default; release notes that say the effect, not the
+architecture), and the cloud path named as deliberately open. The two parked
+follow-ups now have numbers: **ADR-024-F1** (live mode migration) and
+**ADR-024-F2** (per-tab constant).
+
+**a14 itself was deliberately not taken tonight.** The ADR's own line — *"a
+decision for a rested morning, not the night the floor moved"* — and the floor
+moved twice yesterday.
+
+**Gates.** 527 tests, `tsc` clean, eslint 0 errors, both builds clean. No app
+code changed.

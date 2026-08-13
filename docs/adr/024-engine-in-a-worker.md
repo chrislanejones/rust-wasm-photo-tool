@@ -156,8 +156,8 @@ free. All three are set out under Stage 5 below.
 > `createEngineProxy` is gated on it. 8 tests, 3/3 mutants killed plus an
 > equivalent that survived.
 
-| **4** | **Canvas transfer.** **SCOPE CORRECTED 2026-08-08 — it is not just the `width`/`height` assignments; see "Stage 4's real scope" below.** Three subsystems had to leave the main canvas first: the rubber-band preview ✅ **v7.76**, lossy export ✅ **v7.77**, and the engine flush — which does not need converting because it *dissolves* under Option A (see "Why A" above). So the only thing left before the transfer is canvas element **identity**, which is a larger job than it sounds — see "Stage 4's real scope" below. Still flagged | nothing user-visible | **NOT by the flag alone** — see the kill-switch note |
-| **5** | **Measure, then flip.** A/B the 470 ms freeze against master. Default ON only if it is actually gone, with `ih_engine_worker=0` as the kill switch | the feature | kill switch |
+| **4** | **Canvas transfer.** ✅ **DONE 2026-08-13 (v8.25–v8.30).** Identity (a11.1), the generation guard (a11.2), the keyed element (a11.3), construction in the worker (a12.1), the transfer and in-worker blit (a12.2). All three a12.3 gates **pass** — gate 1 with the rejection observed firing and behaviourally controlled (0 px stale vs 1,135,280 restored). The first end-to-end run found two defects no gate could see — capture structs arriving as `{__wbg_ptr}` and the worker being rebuilt per document, stranding the once-per-element surface — both fixed (v8.28), plus the kill-switch overclaim that took the whole app down on a mid-session flip, fixed by branching on where the engine LIVES (v8.30) | nothing user-visible | `ih_engine_worker=0`, honest since v8.30 about taking effect on next load |
+| **5** | **Measure, then flip.** a13 ✅ **MEASURED 2026-08-13** — and NOT against "the 470 ms freeze", which came from a 4000×3000 document `makeWorkingCopy` will never produce (ceiling is 2078², real cost ~180 ms). The result is not operation time — throughput is a wash — it is **total blocking time 129–137 ms → 0** and **long tasks 1 → 0** (longest frame gap 191 → 25 ms). The freeze did not move; it went away. Latency was never the obstacle: 0.100 ms round trip, 0.6% of a frame — the arc's whole cost was structural (atomicity, ordering, canvas identity, object lifetime). a14 ⏸ **OPEN, deliberately** — nothing technical remains under it; see "a14 pre-flight" below | the feature | kill switch (next-load) |
 
 **Why 3.5 exists.** It was not in the original list, and its absence is the
 kind of gap this ADR's own pre-mortem warns about: Stage 3 ships a worker, Stage
@@ -903,6 +903,47 @@ app's real surface without breaking, which is what the objection asked for. It
 does not settle the cloud path, and it does not retire the mid-session kill
 switch gap in PARKING_LOT.md. a14 remains a decision, not a formality — but it
 is now a decision with evidence under it rather than the memory of two defects.
+
+### a14 pre-flight — written 2026-08-13 (v8.31), so the flip is a 20-minute job
+
+The kill-switch gap closed in v8.30. This section exists so that taking a14
+requires reading ONE place, not re-deriving a week.
+
+**The three flip requirements, statused against the code that exists:**
+
+| Requirement (a11.0) | Status |
+|---|---|
+| Warm the worker before the flip hands it work (715.4 cold vs 392.1 warm) | ✅ **RETIRED BY DESIGN, and measured rather than assumed.** The 715 ms cold call lived in the mid-session flip window, which v8.30 deleted — the flag now takes effect on next load, and on a fresh load `init` + `load_image` + the boot flushes warm the instance before any user-triggered work. Measured 2026-08-13, first sharpen of a fresh session, 2078², never warmed: **worker 231.3 ms vs local 206.5 ms**, each inside the other's warm scatter (182–215 vs 199–253). No warm-up code exists and none is needed |
+| Terminate the losing instance (~75 MB per leak) | ✅ **DONE v8.30** — `createLiveEngine`'s local branch calls `disposeLivePort()`; pinned by `createLiveEngine.test.ts` ("terminates the worker when the flag goes OFF mid-session") |
+| Treat the 22 ms flush as real | ✅ **ACCOUNTED, a13** — the flush is in-worker and fire-and-forget; the main thread's measured blocking time behind the flag is 0 ms across three runs |
+
+**⚠️ The flip is NOT a one-character change.** `engineWorkerEnabled()` becoming
+opt-out (`!== "0"`) drags four decided-but-undone details with it:
+
+1. **The storage-throw fallback must stay OFF.** Today a throwing `localStorage`
+   reads as off. Under opt-out the tempting rewrite makes it ON — but a
+   partitioned context that cannot READ the kill switch cannot SET it either,
+   and a user who cannot reach storage must never be stranded on a path whose
+   escape hatch is unreachable. Keep the `catch` returning `false`.
+2. **`canvasSurfaceKey.contract.test.ts` inverts.** "treats anything other than
+   `"1"` as off, including a missing flag" pins opt-IN semantics; under opt-out
+   a missing flag means ON. Rewrite the test to pin the new default — do not
+   delete it, and mutation-test the rewrite.
+3. **`lib/featureFlags.ts`** lists the flag in the dev panel; its displayed
+   default must match reality.
+4. **Release notes say the effect, not the architecture**: heavy operations no
+   longer freeze the interface. Do not quote 470 ms anywhere — the real number
+   was ~180 ms of blocking, and it is now 0.
+
+**After flipping:** verify the deploy BY CONTENT (both hosts' SPA fallback 200s
+a fake filename), then watch a real first load on the production URL with the
+default on — a real photo, an edit, an export.
+
+**Open, deliberately, and named so taking a14 says so out loud:** the CLOUD path
+(sign-in → save → restore) has never run behind the worker. It needs credentials
+entered, which no automated run will do. a14 can be taken with it open — the
+capture marshalling it depends on is the same code every other path exercised —
+but the release notes should not claim the cloud path was driven.
 
 The flag follows the house pattern — `ih_tiles_flush`, `ih_oplog_undo`,
 `ih_patchmatch` all shipped this way and all still carry a kill switch.

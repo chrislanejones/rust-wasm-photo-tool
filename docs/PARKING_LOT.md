@@ -27,8 +27,9 @@ wait their turn.
   `ih_patchmatch`. A mid-session flip is inert — the app keeps working, the
   canvas stops updating until reload. Verified in the browser both directions.
 
-- **Live mode migration — the feature that was NOT built (successor to the
-  above).** Making a flip take effect immediately means moving the document
+- **ADR-024-F1 — Live mode migration, the feature that was NOT built (successor
+  to the above).** Numbered 2026-08-13 so it stops living only in a `port.ts`
+  comment. Making a flip take effect immediately means moving the document
   between threads: pull the composite (or working copy) and the op log out of
   the worker, construct a local `Tool`, load the pixels, restore the log, and
   swap `toolRef.current` atomically. `capture_state()` and `oplog_encoded_ops`
@@ -36,8 +37,8 @@ wait their turn.
   session, and ⚠️ **if any part of it starts to look like a persisted-format
   change, it needs an ADR plus the `dexie-migration` skill** — not a night job.
 
-- **Alternative to the above, cheaper and worth considering first: make the mode
-  a per-tab CONSTANT.** Read `ih_engine_worker` once and have
+- **ADR-024-F2 — the cheaper alternative, worth considering before F1: make the
+  mode a per-tab CONSTANT.** Read `ih_engine_worker` once and have
   `createLiveEngine`, `canvasSurfaceKey` and the canvas helpers all use that
   snapshot. A mid-session flip then does literally nothing until reload — true
   by construction rather than by careful branching, and it retires a11.3's
