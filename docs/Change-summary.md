@@ -6950,3 +6950,67 @@ own session.
 
 **Gates.** 535 tests (45 files, +8), `tsc` clean, eslint 0 errors, both builds
 clean.
+
+---
+
+## v8.34 Change Summary — 2026-08-13
+
+**The real brush bug. v8.33 fixed a genuine mechanism and missed the dominant
+one; Chris's follow-up — "also slow logged out" — killed the signed-in theory
+in four words.**
+
+### Why every measurement had missed it
+
+The v8.33 verification drove the mouse at **~25 events/s** (Playwright's paced
+`mouse.move`) and measured a clean 60 fps. A real mouse delivers **120–420
+events/s**. Re-measured at 420 Hz on the v8.33 production build:
+
+| 1.4 s stroke, 600 events | v8.33 |
+|---|---|
+| worker messages | 3,407 (5.7/event) |
+| **ink behind at mouse-up** | **16,997 ms** |
+| frame rate throughout | 60 fps — invisible to every frame instrument |
+
+### The mechanism — lost backpressure
+
+The old synchronous `paint_move` BLOCKED the main thread, so the browser
+coalesced pointer events down to the engine's service rate. Nobody designed
+that; it was load-bearing anyway. The worker handler yields instead of
+blocking, so every event queued a `paint_move` plus a flush burst
+(`tryTilesFlush` + `syncOplog` + `onOplogFlush` + blit-with-recomposite),
+arrivals outran service, and the queue grew for the whole stroke.
+
+### The fix — backpressure made explicit (`usePaintTool`, `useCloneStamp`)
+
+- **One move in flight; latest coordinates win.** Unsent positions are
+  overwritten, sent ones never dropped. Safe by construction: `paint_move`
+  draws the SEGMENT from the last landed point (`paint_stroke_to`,
+  src/paint.rs:787), so coalescing loses curve detail between samples, never
+  continuity — and it reproduces exactly the input density the blocking path
+  always produced. The comment that forbade "drop-stale" feared holes; holes
+  were never possible.
+- **One flush per animation frame.** The blit paints whatever the engine holds
+  now; flushing per mouse event was pure queue traffic.
+- Stroke end resets the rAF gate (a tab hidden mid-stroke never fires rAF) and
+  flushes directly, so the committed stroke is always published.
+- Clone stamp had the same per-move flush; same fix. Magic Eraser was already
+  rAF-capped.
+
+### Same protocol, after
+
+| 600 events @ 422 Hz | v8.33 | **v8.34** |
+|---|---|---|
+| worker messages | 3,407 | **1,398** |
+| **ink behind at mouse-up** | **16,997 ms** | **258 ms** |
+| stroke committed | — | undo 0 → 1 ✓ |
+
+The 420 Hz sine stroke renders continuous and hole-free.
+
+### The lesson, bluntly
+
+An async boundary does not just add latency — it **removes the accidental flow
+control that synchronous code gets for free**, and nothing in eighteen releases
+of gates measured input at real-device rates. Every future hot-path probe here
+drives events at hardware speed, not automation speed.
+
+**Gates.** 535 tests, `tsc` clean, eslint 0 errors, build clean.

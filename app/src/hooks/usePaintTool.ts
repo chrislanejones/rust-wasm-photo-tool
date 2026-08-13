@@ -128,46 +128,92 @@ export function usePaintTool({
     ],
   );
 
+  // ── v8.34 — EXPLICIT BACKPRESSURE: one move in flight, latest wins ────────
+  //
+  // The comment this replaces said "deliberately not drop-stale: discarding
+  // the late one would discard PAINT — a stroke with holes in it." That fear
+  // is right for dropping a SENT call and wrong for coalescing UNSENT ones,
+  // and the difference put the shipped brush seventeen seconds behind the
+  // cursor. `paint_move` draws the SEGMENT from the last landed point
+  // (`paint_stroke_to(lx, ly, x, y)` — src/paint.rs:787), so skipping
+  // intermediate coordinates loses curve detail between samples, never
+  // continuity. It is also exactly the input the engine has always received:
+  // the old synchronous handler BLOCKED the main thread, so the browser
+  // coalesced pointer events to the engine's service rate for us.
+  //
+  // The worker handler yields instead of blocking, so that accidental
+  // backpressure vanished: at a real mouse's event rate (~120–420 Hz measured)
+  // every move queued a `paint_move` plus a flush burst, arrivals outran
+  // service, and a 1.4 s stroke banked **17.0 s** of queue (measured, v8.33
+  // production build). Frames stayed at 60 fps throughout — the failure is
+  // ink LATENCY, invisible to every frame-gap instrument this arc used.
+  //
+  // So the backpressure is now explicit:
+  //   • at most ONE move call in flight; while it runs, the newest
+  //     coordinates overwrite `pendingMove` (latest wins, unsent ones only)
+  //   • the flush is scheduled at most once per animation frame — the blit
+  //     draws whatever the engine holds NOW, so per-move flushes only added
+  //     queue traffic (5.7 messages per event, measured)
+  //
+  // Mode flags are read per iteration but cannot change mid-drag —
+  // `painting.current` gates entry and a mode switch requires the pointer.
+  const moveInFlight = useRef(false);
+  const pendingMove = useRef<{ x: number; y: number } | null>(null);
+  const flushQueued = useRef(false);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushQueued.current) return;
+    flushQueued.current = true;
+    requestAnimationFrame(() => {
+      flushQueued.current = false;
+      flushToCanvas();
+    });
+  }, [flushToCanvas]);
+
   const onMouseMove = useCallback(
-    async (e: React.MouseEvent<HTMLCanvasElement>) => {
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!painting.current) return;
-      const t = toolRef.current;
-      if (!t) return;
-      const { x, y } = coords(e);
-      // ── ADR-024 a10 — AWAITED, AND DELIBERATELY NOT DROP-STALE ───────────
-      //
-      // The mirror image of `handleLassoMove`. These three are MUTATIONS: each
-      // one paints into the document. Two pointermoves can now be in flight at
-      // once, but discarding the late one would discard PAINT — a stroke with
-      // holes in it, worse than any preview glitch. Every call must land, and
-      // it does: one port, FIFO, so the dabs are applied in the order the
-      // mouse made them no matter what order their answers come back in.
-      //
-      // The flush needs no staleness check either, because `flushToCanvas`
-      // draws whatever the engine holds NOW, not the state this call returned.
-      // A late `changed` therefore causes at worst one redundant redraw.
-      //
-      // Un-awaited, `changed` would be a Promise — truthy — so `if (changed)`
-      // would flush on every pointermove including the ones that painted
-      // nothing. Cheap-looking, and it would have quietly put the per-frame
-      // blit back on the hot path the rest of this arc exists to keep it off.
-      //
-      // `await` sits on each BRANCH of the ternary, not around it: the audit
-      // reads the text immediately before the receiver, so `await (c ? a() :
-      // b())` counts as three un-awaited calls and the gate would not move.
-      const changed = maskMode
-        ? await t.mask_paint_move(x, y)
-        : erase
-          ? await t.erase_move(x, y)
-          : await t.paint_move(x, y);
-      if (changed) flushToCanvas();
+      if (!toolRef.current) return;
+      pendingMove.current = coords(e);
+      if (moveInFlight.current) return; // coalesce: newest coords already stored
+      moveInFlight.current = true;
+      void (async () => {
+        try {
+          while (pendingMove.current) {
+            const { x, y } = pendingMove.current;
+            pendingMove.current = null;
+            const t = toolRef.current;
+            if (!t) break;
+            // `await` on each BRANCH of the ternary, not around it: the audit
+            // reads the text immediately before the receiver, so a wrapped
+            // await would count as three un-awaited calls and move the gate.
+            const changed = maskMode
+              ? await t.mask_paint_move(x, y)
+              : erase
+                ? await t.erase_move(x, y)
+                : await t.paint_move(x, y);
+            if (changed) scheduleFlush();
+          }
+        } finally {
+          moveInFlight.current = false;
+        }
+      })();
     },
-    [toolRef, coords, erase, maskMode, flushToCanvas],
+    [toolRef, coords, erase, maskMode, scheduleFlush],
   );
 
   const onMouseUp = useCallback(() => {
     if (!painting.current) return;
     painting.current = false;
+    // v8.34 — stroke-end handoff for the coalescer above. An UNSENT pending
+    // move is discarded (its segment would land after `*_up()` committed the
+    // stroke; `paint_last` is cleared by then so it would no-op anyway), and
+    // the rAF flush gate is reset so a tab hidden mid-stroke — where rAF never
+    // fires and the gate would stay latched — cannot wedge every later flush.
+    // FIFO does the rest: this `*_up()` posts AFTER any move already in
+    // flight, so the last landed segment is inside the committed stroke.
+    pendingMove.current = null;
+    flushQueued.current = false;
     const t = toolRef.current;
     if (maskMode) t?.mask_paint_up();
     else if (erase) t?.erase_up();

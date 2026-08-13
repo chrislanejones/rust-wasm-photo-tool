@@ -7,7 +7,7 @@
 // file keeps returning the same 62-key surface it always has — so none of the
 // importers change during the split. What genuinely belongs to the clone
 // stamp (mouse handlers, source arming/disarming) stays here at the bottom.
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import type { RefObject, MouseEvent } from "react";
 import { useEngineCore } from "./useEngineCore";
 import { useHistory } from "./useHistory";
@@ -138,6 +138,23 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [toolRef, sourcePosRef, sourceDisarmedRef, isDrawingRef, getCanvasCoords, flushToCanvas, syncState],
   );
 
+  // v8.34 — ONE FLUSH PER FRAME during a stroke. `continue_stroke` is cheap
+  // fire-and-forget, but `flushToCanvas` per move asked the worker for a full
+  // recomposite per pointer EVENT — at a real mouse's 120–420 Hz that floods
+  // the worker's event loop and every port reply queues behind it (the brush
+  // measured 17 s of ink lag from the same shape; usePaintTool has the full
+  // account). The blit draws whatever the engine holds NOW, so flushing faster
+  // than the display can show was pure queue traffic.
+  const stampFlushQueued = useRef(false);
+  const scheduleStampFlush = useCallback(() => {
+    if (stampFlushQueued.current) return;
+    stampFlushQueued.current = true;
+    requestAnimationFrame(() => {
+      stampFlushQueued.current = false;
+      flushToCanvas();
+    });
+  }, [flushToCanvas]);
+
   const onMouseMove = useCallback(
     (e: MouseEvent<HTMLCanvasElement>) => {
       if (!isDrawingRef.current) return;
@@ -145,17 +162,22 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       if (!t) return;
       const { x, y } = getCanvasCoords(e);
       t.continue_stroke(x, y);
-      flushToCanvas();
+      scheduleStampFlush();
     },
-    [toolRef, isDrawingRef, getCanvasCoords, flushToCanvas],
+    [toolRef, isDrawingRef, getCanvasCoords, scheduleStampFlush],
   );
 
   const onMouseUp = useCallback(() => {
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
+    // Reset the rAF gate (a tab hidden mid-stroke never fires rAF and would
+    // latch it), and flush directly so the committed stroke is published even
+    // if the scheduled frame never came.
+    stampFlushQueued.current = false;
     toolRef.current?.end_stroke();
+    flushToCanvas();
     syncState();
-  }, [toolRef, isDrawingRef, syncState]);
+  }, [toolRef, isDrawingRef, flushToCanvas, syncState]);
 
   /**
    * Clone-stamp teardown — called when the Stamp tool is deactivated or its

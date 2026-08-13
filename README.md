@@ -84,6 +84,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.34 — 2026-08-13
+
+**The brush follows the cursor. Actually, this time.** This morning's fix
+helped the wrong bottleneck — autosave collisions were real, but the brush was
+still seconds behind, and then the report got sharper: slow logged out too.
+That killed the signed-in theory and exposed the real one.
+
+The old main-thread brush had accidental flow control: painting blocked the
+page, so the browser delivered pointer positions only as fast as the engine
+could absorb them. The background engine never blocks — so every position a
+real mouse produces, up to hundreds per second, became queued work. Test
+automation moves a polite 25 times a second and sailed through; a real hand
+does not. Measured at a real mouse's rate: a **1.4-second stroke left the ink
+17 seconds behind the cursor.**
+
+The flow control is now explicit instead of accidental: one paint operation in
+flight at a time, the newest cursor position replaces any waiting one, and the
+picture refreshes once per displayed frame instead of once per mouse twitch.
+No stroke detail is lost — the engine draws the connecting segment between
+landed points, which is exactly the input the blocking version always fed it.
+Same stroke, same protocol, after: ink **0.26 seconds** behind at release, and
+level with the cursor during the stroke. The clone stamp had the same flaw and
+got the same fix.
+
+<details><summary>Older releases</summary>
+
 ### v8.33 — 2026-08-13
 
 **The brush follows the cursor again when signed in.** Hours after the
@@ -109,8 +135,6 @@ Also in this release: three places still described the background engine as
 switched off and waiting — the worker's own header said "not wired into the
 app." Accurate for eighteen releases, wrong the morning the default flipped.
 They now say what is true.
-
-<details><summary>Older releases</summary>
 
 ### v8.32 — 2026-08-13
 

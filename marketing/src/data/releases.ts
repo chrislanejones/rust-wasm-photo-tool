@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.34",
+    date: "2026-08-13",
+    headline: "The brush follows the cursor. Actually, this time",
+    entries: [
+      {
+        tag: "fix",
+        text: "The morning's fix helped the wrong bottleneck. The real one: the old blocking brush had accidental flow control — the browser delivered pointer positions only as fast as the engine could absorb them. The background engine never blocks, so a real mouse's hundreds of positions per second became queued work: a 1.4-second stroke measured 17 seconds of ink lag.",
+      },
+      {
+        tag: "fix",
+        text: "Flow control is now explicit: one paint operation in flight, the newest position replaces any waiting one, one screen refresh per frame. Same stroke after: 0.26 seconds behind at release, level with the cursor during. No detail lost — the engine draws the segment between landed points, the same input the blocking version always fed it. Clone stamp had the same flaw, same fix.",
+      },
+      {
+        tag: "infra",
+        text: "Why every gate missed it: test automation moves a polite 25 times a second; a hand does not. Hot-path checks here now drive events at hardware rates.",
+      },
+    ],
+  },
+  {
     version: "v8.33",
     date: "2026-08-13",
     headline: "The brush follows the cursor again when signed in",
