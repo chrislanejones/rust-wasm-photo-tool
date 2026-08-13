@@ -114,13 +114,14 @@ const THROWAWAY_ENGINES: Record<string, string> = {
 // cost somebody a deliberate edit here.
 //
 // Exactly one of these is live at a time — `ih_engine_worker` decides which,
-// and it is OFF. Two simultaneous live engines would be two ports, which is
-// precisely what the ONE PORT PER DOCUMENT invariant forbids.
+// and since a14 (v8.32) it defaults ON: the worker owns the live document
+// unless `=0` opts a tab out. Two simultaneous live engines would be two
+// ports, which is precisely what the ONE PORT PER DOCUMENT invariant forbids.
 const LIVE_ENGINE_OWNERS: Record<string, string> = {
   "hooks/useEngineCore.ts":
-    "the main-thread engine — today's only live document owner",
+    "the main-thread engine — the kill-switch (`ih_engine_worker=0`) fallback since a14",
   "workers/engine.worker.ts":
-    "ADR-024 Stage 3 — the same live document behind the port; unreachable while ih_engine_worker is off",
+    "ADR-024 Stage 3 — the same live document behind the port; the DEFAULT owner since a14 (v8.32)",
   "lib/engine/port.ts":
     "ADR-024 a12.1 — `createLiveEngine()` is the swap point: it builds the local engine when the flag is off and asks the worker to build one when it is on. The construction that used to sit in useEngineCore's five load paths now happens here, once.",
 };

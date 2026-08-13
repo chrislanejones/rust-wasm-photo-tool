@@ -514,13 +514,25 @@ export function createEngineProxy(port: EngineCallPort): ImageHorseTool {
   });
 }
 
-/** ADR-024 Stage 3 — the switch that will one day route through the worker.
+/** ADR-024 a14 — the worker is the DEFAULT; `ih_engine_worker=0` is the kill
+ *  switch (2026-08-13, v8.32).
  *
- *  Read fresh each call, like every other flag in this repo, so a tab can be
- *  flipped without a rebuild. OFF by default and there is no path that turns it
- *  on yet: `attachLivePort` above still returns the tool directly. Turning this
- *  on today would change nothing; that is deliberate, so the worker and its
- *  protocol can be built and tested before anything depends on them.
+ *  Opt-out, matching `ih_tiles_flush` / `ih_oplog_undo` / `ih_patchmatch`, and
+ *  like them it takes effect on the NEXT LOAD — a mid-session flip is inert
+ *  since v8.30, because `blitLiveEngine` branches on where the engine lives,
+ *  not on this value.
+ *
+ *  ⚠️ THE `catch` MUST KEEP RETURNING `false`. Under opt-out the tempting
+ *  rewrite is "storage unreadable → default → true", and it is wrong: a
+ *  partitioned context that cannot READ the kill switch cannot SET it either,
+ *  and a user must never be stranded on the path whose escape hatch is
+ *  unreachable. Storage broken → local engine, yesterday's behaviour.
+ *
+ *  The flip shipped on the evidence, all of it in this ADR's Stage 5 section:
+ *  a13's frame timeline (blocking 129–137 ms → 0, long tasks 1 → 0), the v8.29
+ *  coverage run (7/7 captures, 4/4 guards, 0 failed calls), and the fresh-load
+ *  cold-start measurement (worker 231 ms vs local 207 — the 715 ms cold call
+ *  died with the flip window that produced it).
  *
  *  WHAT IS ACTUALLY LEFT (v8.19 — read from `node scripts/engine-call-audit.mjs`,
  *  never hand-counted). Of **96** value-consumed reads, **91 are converted** and
@@ -552,15 +564,18 @@ export function createEngineProxy(port: EngineCallPort): ImageHorseTool {
  *  numbers; the audit prints them, and
  *  `engineAsyncMigration.contract.test.ts` pins them.)
  *
- *  Stage 5 flips the default, and only on a measured frame timeline showing the
- *  main thread idle during a 12MP sharpen — not on the architecture being
- *  correct. `ih_engine_worker=0` is then the kill switch, matching
- *  `ih_tiles_flush` / `ih_oplog_undo` / `ih_patchmatch`. */
+ *  (Stage 5's gate — "a measured frame timeline showing the main thread idle" —
+ *  was met 2026-08-13 and the numbers live in ADR-024's Stage 5 section. The
+ *  paragraph that used to stand here promised the flip would happen only on
+ *  that evidence; it did.) */
 export function engineWorkerEnabled(): boolean {
   try {
-    return localStorage.getItem("ih_engine_worker") === "1";
+    // Opt-out since v8.32 (a14): anything other than an explicit "0" is ON.
+    return localStorage.getItem("ih_engine_worker") !== "0";
   } catch {
-    // Storage can throw in a partitioned/blocked context; treat as off.
+    // Storage can throw in a partitioned/blocked context; treat as OFF — a
+    // context that cannot read the kill switch cannot set it either, and
+    // nobody gets stranded on a path whose escape hatch is unreachable.
     return false;
   }
 }

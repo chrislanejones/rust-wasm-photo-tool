@@ -85,19 +85,28 @@ describe("canvasSurfaceKey", () => {
     expect(canvasSurfaceKey()).toBe(canvasSurfaceKey());
   });
 
-  it("treats anything other than \"1\" as off, including a missing flag", () => {
-    withFlag(null);
-    const missing = canvasSurfaceKey();
-    withFlag("0");
-    expect(canvasSurfaceKey()).toBe(missing);
-    withFlag("true"); // not the house convention — must not enable
-    expect(canvasSurfaceKey()).toBe(missing);
+  it("defaults ON: a missing flag means the worker, and only \"0\" opts out", () => {
+    // ⚠️ INVERTED at a14 (v8.32) — this test used to pin opt-IN ("anything
+    // other than '1' is off") and would have silently blessed a botched flip.
+    // The flag is now a KILL SWITCH, matching ih_tiles_flush / ih_oplog_undo /
+    // ih_patchmatch: absent or junk → ON, an explicit "0" → OFF.
+    withFlag("1");
+    const on = canvasSurfaceKey();
+    withFlag(null); // the default user, who has never heard of the flag
+    expect(canvasSurfaceKey()).toBe(on);
+    withFlag("true"); // junk is not an opt-out
+    expect(canvasSurfaceKey()).toBe(on);
+    withFlag("0"); // the one spelling that kills it
+    expect(canvasSurfaceKey()).not.toBe(on);
   });
 
-  it("survives storage throwing, without changing key identity", () => {
-    // Partitioned or blocked storage throws on getItem. `engineWorkerEnabled`
-    // already treats that as off; the key must agree, or a privacy-mode tab
-    // would remount its canvas on every render.
+  it("survives storage throwing, and falls back to OFF — deliberately", () => {
+    // Partitioned or blocked storage throws on getItem. Under a default-ON flag
+    // the tempting fallback is ON ("unreadable → default"), and it is wrong: a
+    // context that cannot READ the kill switch cannot SET it either, so ON
+    // would strand that user on the one path whose escape hatch is unreachable.
+    // Broken storage → local engine, the pre-a14 behaviour. This assertion is
+    // the a14 pre-flight's decision #1, pinned.
     vi.stubGlobal("localStorage", {
       getItem: () => {
         throw new Error("blocked");

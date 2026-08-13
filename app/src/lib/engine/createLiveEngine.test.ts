@@ -101,7 +101,10 @@ function fakeToolClass() {
  *  node run is off by default. Stub it to drive the ON branch. */
 function setFlag(on: boolean) {
   vi.stubGlobal("localStorage", {
-    getItem: (k: string) => (k === "ih_engine_worker" && on ? "1" : null),
+    // "0" for off, not null — since a14 the flag is OPT-OUT, so a missing key
+    // means ON and a null-returning stub would silently drive the worker branch
+    // in every "flag OFF" test below.
+    getItem: (k: string) => (k === "ih_engine_worker" ? (on ? "1" : "0") : null),
   });
 }
 

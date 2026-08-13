@@ -108,10 +108,10 @@ export const FEATURE_FLAGS: FeatureFlag[] = [
   },
   {
     key: "ih_engine_worker",
-    label: "Engine in a Worker (ADR-024 Stage 3)",
-    kind: "optin",
+    label: "Engine in a Worker (ADR-024)",
+    kind: "kill",
     isOn: engineWorkerEnabled,
-    effect: "Builds the engine worker and its request/queue/cancel/error protocol. Turning it ON currently changes NOTHING — attachLivePort still hands back the tool directly. Stage 3.5 is COMPLETE: 91 of the 96 value-consumed engine reads are converted and the 5 left are the per-frame blit reads that dissolve at Stage 4 rather than converting. Stage 5 flips the default, on a measured frame timeline.",
+    effect: "The engine runs on a background thread and draws the photo from there — heavy operations no longer block the interface (measured: 129–137 ms of blocking per sharpen down to 0). Off falls back to the main-thread engine: slower under load, never wrong. Takes effect on the next load, like every kill switch here.",
     source: "lib/engine/port.ts",
   },
   {

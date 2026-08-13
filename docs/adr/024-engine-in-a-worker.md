@@ -1,6 +1,8 @@
 # ADR-024 — Moving the engine into a Web Worker
 
-**Status: ACCEPTED 2026-08-07 — Option A, staged.**
+**Status: ACCEPTED 2026-08-07 — Option A, staged. COMPLETE 2026-08-13 (v8.32):
+the default is ON, `ih_engine_worker=0` is the kill switch, effective on next
+load.** Open 2026-07-27 → 2026-08-13.
 Date: 2026-07-27 (findings), decided 2026-08-07. Supersedes nothing.
 Measurements in `docs/engine-worker-feasibility.md`,
 `docs/engine-worker-open-b-finding.md`, `docs/engine-worker-open-d-finding.md`.
@@ -157,7 +159,7 @@ free. All three are set out under Stage 5 below.
 > equivalent that survived.
 
 | **4** | **Canvas transfer.** ✅ **DONE 2026-08-13 (v8.25–v8.30).** Identity (a11.1), the generation guard (a11.2), the keyed element (a11.3), construction in the worker (a12.1), the transfer and in-worker blit (a12.2). All three a12.3 gates **pass** — gate 1 with the rejection observed firing and behaviourally controlled (0 px stale vs 1,135,280 restored). The first end-to-end run found two defects no gate could see — capture structs arriving as `{__wbg_ptr}` and the worker being rebuilt per document, stranding the once-per-element surface — both fixed (v8.28), plus the kill-switch overclaim that took the whole app down on a mid-session flip, fixed by branching on where the engine LIVES (v8.30) | nothing user-visible | `ih_engine_worker=0`, honest since v8.30 about taking effect on next load |
-| **5** | **Measure, then flip.** a13 ✅ **MEASURED 2026-08-13** — and NOT against "the 470 ms freeze", which came from a 4000×3000 document `makeWorkingCopy` will never produce (ceiling is 2078², real cost ~180 ms). The result is not operation time — throughput is a wash — it is **total blocking time 129–137 ms → 0** and **long tasks 1 → 0** (longest frame gap 191 → 25 ms). The freeze did not move; it went away. Latency was never the obstacle: 0.100 ms round trip, 0.6% of a frame — the arc's whole cost was structural (atomicity, ordering, canvas identity, object lifetime). a14 ⏸ **OPEN, deliberately** — nothing technical remains under it; see "a14 pre-flight" below | the feature | kill switch (next-load) |
+| **5** | **Measure, then flip.** a13 ✅ **MEASURED 2026-08-13** — and NOT against "the 470 ms freeze", which came from a 4000×3000 document `makeWorkingCopy` will never produce (ceiling is 2078², real cost ~180 ms). The result is not operation time — throughput is a wash — it is **total blocking time 129–137 ms → 0** and **long tasks 1 → 0** (longest frame gap 191 → 25 ms). The freeze did not move; it went away. Latency was never the obstacle: 0.100 ms round trip, 0.6% of a frame — the arc's whole cost was structural (atomicity, ordering, canvas identity, object lifetime). a14 ✅ **TAKEN 2026-08-13 (v8.32)** — default ON via opt-out (`!== "0"`), authorised by Chris on the rested morning the pre-mortem asked for; all four pre-flight details done (storage-throw stays OFF, the missing-flag test inverted + mutation-tested, dev-panel entry rewritten to `kind: "kill"`, notes say the effect) | the feature | `ih_engine_worker=0`, next load |
 
 **Why 3.5 exists.** It was not in the original list, and its absence is the
 kind of gap this ADR's own pre-mortem warns about: Stage 3 ships a worker, Stage
@@ -905,6 +907,16 @@ switch gap in PARKING_LOT.md. a14 remains a decision, not a formality — but it
 is now a decision with evidence under it rather than the memory of two defects.
 
 ### a14 pre-flight — written 2026-08-13 (v8.31), so the flip is a 20-minute job
+
+> ✅ **TAKEN 2026-08-13, v8.32, on Chris's explicit go.** Every item below was
+> executed as written: the flip is `!== "0"` with the `catch` still returning
+> `false`; the missing-flag contract test was inverted and mutation-tested
+> (reverting the flip turns it red); `featureFlags.ts` moved the entry to
+> `kind: "kill"` with honest text; the notes say the effect. Verified before
+> shipping: a clean-storage default user lands on the worker (the canvas
+> refuses a 2D context — the transfer fingerprint), and `=0` + reload lands on
+> the local engine with the photo restored. The cloud path remains the named
+> open gap, exactly as this section said it would be.
 
 The kill-switch gap closed in v8.30. This section exists so that taking a14
 requires reading ONE place, not re-deriving a week.

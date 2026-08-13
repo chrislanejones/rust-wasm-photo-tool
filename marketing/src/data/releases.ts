@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.32",
+    date: "2026-08-13",
+    headline: "Heavy operations no longer freeze the interface",
+    entries: [
+      {
+        tag: "perf",
+        text: "The engine now runs on a background thread by default, and draws the photo from there. Sharpening a large photo used to lock the page for about 130 milliseconds; it now blocks the interface for zero. The work takes as long as it ever did — the app just stays responsive while it happens.",
+      },
+      {
+        tag: "rust",
+        text: "Eighteen releases of groundwork shipped dark before this switch was thrown: every engine read made safe to wait for, related answers bundled so they cannot describe two different moments, and the canvas moved to the background thread so drawing never crosses back.",
+      },
+      {
+        tag: "infra",
+        text: "The escape hatch: set ih_engine_worker to 0 and reload to put the engine back on the main thread. Takes effect on the next load, like every kill switch here.",
+      },
+    ],
+  },
+  {
     version: "v8.31",
     date: "2026-08-13",
     headline: "The ledger, closed out",

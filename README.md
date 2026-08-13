@@ -84,6 +84,34 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.32 — 2026-08-13
+
+**Heavy operations no longer freeze the interface.** The engine now runs on a
+background thread by default, and draws the photo from there. Sharpening a large
+photo used to lock the page for around 130 milliseconds — clicks queued, the
+cursor stuck, eleven dropped frames. The same operation now blocks the interface
+for **zero** milliseconds and drops one frame. The work takes as long as it ever
+did; the difference is that the app stays responsive while it happens.
+
+This has been building since late July, dark, across eighteen releases: every
+read the interface makes of the engine was made safe to wait for, the questions
+that must be answered together were bundled so an answer can't describe two
+different moments, and the canvas itself moved to the background thread so
+drawing never crosses back. It was driven end to end in a real browser — every
+export format, saving and reloading, deep undo, layers, text, the pen, the
+eraser, the batch editor — before any of it was turned on.
+
+If anything misbehaves, `localStorage.setItem("ih_engine_worker", "0")` and a
+reload puts the engine back on the main thread. Same escape hatch as every
+other feature here; takes effect on the next load.
+
+One honest note: the cloud save-and-restore path has been exercised against the
+same machinery but never driven end to end behind the background engine — it
+needs a signed-in session. Everything it depends on is the code every other
+path proved.
+
+<details><summary>Older releases</summary>
+
 ### v8.31 — 2026-08-13
 
 **The ledger, closed out.** No app code changed. The background-engine project's
@@ -104,8 +132,6 @@ now written down instead of assumed.
 The one remaining decision — turning the background engine on by default — has
 its full pre-flight written in the decision record, so making it is a
 twenty-minute job instead of an archaeology dig. It stays off today.
-
-<details><summary>Older releases</summary>
 
 ### v8.30 — 2026-08-13
 

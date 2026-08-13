@@ -6831,3 +6831,60 @@ moved twice yesterday.
 
 **Gates.** 527 tests, `tsc` clean, eslint 0 errors, both builds clean. No app
 code changed.
+
+---
+
+## v8.32 Change Summary — 2026-08-13
+
+**a14. The engine runs on a background thread by default.** ADR-024, open since
+2026-07-27, is complete. Taken on Chris's explicit go, on the rested morning the
+pre-mortem asked for.
+
+### The change
+
+`engineWorkerEnabled()` is opt-out: anything other than an explicit `"0"` is ON,
+matching `ih_tiles_flush` / `ih_oplog_undo` / `ih_patchmatch`. Takes effect on
+the next load. The four pre-flight details, each done as specified in the ADR:
+
+| Detail | Done |
+|---|---|
+| storage-throw fallback | **stays OFF** — a context that cannot read the kill switch cannot set it; nobody gets stranded on a path whose escape hatch is unreachable. Pinned by test |
+| missing-flag contract test | **inverted** to pin opt-out, and mutation-tested — reverting the flip turns it red |
+| dev panel (`featureFlags.ts`) | entry moved to `kind: "kill"`; its text had been three releases stale ("turning it ON currently changes NOTHING") and now says what is true |
+| release notes | say the effect: heavy operations no longer freeze the interface. 470 ms appears nowhere |
+
+Also corrected in passing: `engineOwnership.contract.test.ts`'s owner ledger and
+`port.ts`'s flag header still described the pre-a12 world.
+
+### What a user gets
+
+| | main thread (old default) | worker (new default) |
+|---|---|---|
+| blocking per heavy op | **129–137 ms** | **0 ms** |
+| long tasks | 1 | 0 |
+| longest frame gap | 191–201 ms | 21–29 ms |
+| operation time | ~184 ms | ~185 ms |
+| first op of a fresh session | 206.5 ms | 231.3 ms (inside each other's scatter) |
+
+### Verified before shipping
+
+- **The default user** (clean storage, no flag): worker owns the canvas — the
+  element refuses a 2D context, which is the transfer fingerprint. App boots,
+  photo loads, edits register.
+- **The kill switch**: `=0` + reload → local engine owns the canvas, photo
+  restored, zero errors.
+- 527 tests, `tsc` clean, eslint 0 errors, production build clean. The whole
+  suite passes with the default flipped — nothing else in the app depended on
+  the ambient default.
+
+### The named open gap
+
+The cloud path (sign-in → save → restore) has never been driven end to end
+behind the worker; it needs credentials. Its machinery — the capture
+marshalling, the port, the restore path — is the same code every other path
+proved in v8.29. Open, deliberate, written down.
+
+**Gates.** 527 tests, `tsc` clean, eslint 0 errors, both builds clean. Rust
+crate untouched. The arc: 2026-07-27 → 2026-08-13, eighteen dark releases,
+five defects found by driving the real thing, zero found by the gates that
+were supposed to.
