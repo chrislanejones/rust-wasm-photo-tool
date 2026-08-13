@@ -16,6 +16,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createCanvasIdentity, assignRef } from "./canvasIdentity";
 
 /** Stands in for an HTMLCanvasElement — only identity matters. */
@@ -176,7 +177,14 @@ describe("ownership — the counter must outlive what it counts", () => {
   // A generation that resets on remount is worse than none: a11.2 would treat
   // every fresh element as "generation 1" and be unable to tell a live handle
   // from a dead one, which is precisely the check it exists to perform.
-  const SRC = join(process.cwd(), "src");
+// ⚠️ ANCHORED ON THIS FILE, NEVER ON THE LAUNCH DIRECTORY (v8.30). A source-walking
+// guard that resolves relative to the launch directory reads ZERO files when
+// vitest is started from the repo root — `<repo>/src` is the Rust crate and has
+// no `.ts` in it — so `walk()` returns an empty list and every assertion over it
+// passes VACUOUSLY. Verified by planting a real violation: from the repo root
+// the guard stayed green; from `app/` it caught it.
+const APP_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+  const SRC = join(APP_ROOT, "src");
 
   function walk(dir: string, out: string[] = []): string[] {
     for (const e of readdirSync(dir)) {

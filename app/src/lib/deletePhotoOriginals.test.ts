@@ -368,7 +368,13 @@ describe("confirmDeleteAll actually collects", () => {
   it("calls collectDeletedPhotoOriginals with an empty surviving set", async () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
-    const src = readFileSync(join(process.cwd(), "src/app/AppShell.tsx"), "utf8");
+    const { fileURLToPath } = await import("node:url");
+    // ⚠️ ANCHORED ON THIS FILE, NEVER ON THE LAUNCH DIRECTORY (v8.30). Resolving
+    // source paths against `process.cwd()` makes a guard's reach depend on where
+    // vitest was started — from the repo root this one threw ENOENT and the
+    // walk-based guards elsewhere read zero files and passed vacuously.
+    const APP_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+    const src = readFileSync(join(APP_ROOT, "src/app/AppShell.tsx"), "utf8");
 
     const start = src.indexOf("const confirmDeleteAll");
     expect(start, "confirmDeleteAll not found — was it renamed?").toBeGreaterThan(-1);

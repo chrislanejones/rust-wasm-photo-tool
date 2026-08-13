@@ -6673,3 +6673,104 @@ still a decision, now with evidence under it.
 
 **Gates.** 525 tests, `tsc` clean, eslint 0 errors, both builds clean. No app
 code changed.
+
+---
+
+## v8.30 Change Summary — 2026-08-13
+
+**The mid-session kill-switch gap, closed — and it was worse than the parking
+lot said.** This is the last technical item under a14. `ih_engine_worker`
+remains OFF by default.
+
+### The measurement that changed the plan
+
+PARKING_LOT.md (written v8.28) recorded that flipping `ih_engine_worker=0`
+mid-session made "the blit die with `IndexSizeError`". Re-measured on the
+production build before touching anything:
+
+| Mid-session flip | Documented | **Actual** |
+|---|---|---|
+| worker → local (`=0`, the escape hatch) | the blit dies | **`#root` empty, 0 children — the entire app unmounted** |
+| local → worker (`=1`) | not documented | app survives, canvas **blank** until reload |
+
+The throw happens **inside render**, so React tore down the tree rather than
+skipping a frame. The next click in the reproduction timed out against a dead
+page. That matters more than it did yesterday: with the default ON, `=0` stops
+being a developer convenience and becomes *the escape hatch* — the thing someone
+reaches for when something is already wrong.
+
+### The cause, in one sentence
+
+`blitLiveEngine` believed the FLAG, which can change at any moment, about a
+document whose ENGINE cannot follow it.
+
+A live handle is built by whichever mode was active when the document opened,
+and nothing migrates it afterwards. So the flag and the thing being drawn can
+disagree, and when they do the flag is the wrong one to trust: the local path
+ran against the worker Proxy, `tool.width()` returned a **Promise**, and
+`new ImageData` got `NaN`.
+
+### The fix
+
+`blitLiveEngine` now branches on `livePort` — where the engine actually lives.
+That cannot be stale, because it *is* the thing that owns the engine:
+`createLiveEngine` disposes it on the local branch and sets it on the worker
+branch, so the two can never disagree about the document in front of you. It is
+also a net deletion of a flag read.
+
+Both directions verified in the browser on the production build:
+
+| | before | after |
+|---|---|---|
+| flip `=0` mid-session, then use the UI | `#root` empty, next click times out | **app alive**, 35 buttons, readouts intact, edits still register |
+| flip, then reload | — | **local engine, canvas draws, 0 errors** |
+
+### The claim, corrected in all three places
+
+`port.ts`, `canvasSurfaceKey.contract.test.ts` and `CanvasArea.tsx` all said the
+main-thread path was "available again immediately". The ELEMENT half was true —
+a11.3 keys the `<canvas>` so a flip remounts a fresh, never-transferred node.
+The ENGINE half was never built.
+
+> **`ih_engine_worker` takes effect on the NEXT LOAD**, like `ih_tiles_flush`,
+> `ih_oplog_undo` and `ih_patchmatch`. A mid-session flip is inert: the app keeps
+> working, the canvas stops updating until reload.
+
+⚠️ The old header cited the guardrail-that-cannot-fire pattern as the thing it
+was avoiding, while being an instance of it.
+
+**Mutation-tested.** Restoring the pre-v8.30 flag branch turns both new guards
+red; restoring the fix turns them green. A check that cannot fail is not a check.
+
+### Nine guards that could read nothing
+
+Nine contract tests resolved source paths against `process.cwd()`, so their
+reach depended on where vitest was started. Proven rather than assumed, by
+planting a real violation (a component reading the flag directly):
+
+| Launched from | Caught the violation? |
+|---|---|
+| repo root, single file by path | **NO — passed green** |
+| `app/` | yes |
+
+They now anchor on `fileURLToPath(new URL(..., import.meta.url))` and catch it
+from either. ⚠️ **Two corrections to how this was written up in PARKING_LOT.md:**
+it is **nine** files, not eight; and the exposure was narrower than stated —
+there is **no `test` script in the root `package.json` at all**, so `pnpm test`
+from the repo root was never the project's test command. The vacuity was real
+but reachable only by running a single test file by path from the wrong
+directory.
+
+### Where a14 stands
+
+Nothing technical is left under it. Gates pass, the measurement is in, the
+coverage objection was answered in v8.29, and the escape hatch now does what the
+code says it does. What remains is a judgement call about a default.
+
+Parked, deliberately: **live mode migration** (making a flip take effect
+immediately — pixels and op log both have to cross, and it needs its own
+session), and a cheaper alternative, **making the mode a per-tab constant**.
+Both in PARKING_LOT.md.
+
+**Gates.** 527 tests (+2), `tsc` clean, eslint 0 errors, both builds clean. Rust
+crate untouched.

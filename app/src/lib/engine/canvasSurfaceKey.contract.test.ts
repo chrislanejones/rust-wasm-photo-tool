@@ -1,20 +1,49 @@
-// ADR-024 a11.3 — the runtime kill switch, and why the canvas is keyed.
+// ADR-024 a11.3 — the kill switch, and why the canvas is keyed.
 //
-// THE PROPERTY. `ih_engine_worker=0` is specified as a RUNTIME kill switch.
-// After `transferControlToOffscreen()` a canvas can never return its 2D
-// context, so flipping the flag mid-session cannot restore the main-thread path
-// on the element that was transferred. Keying the <canvas> on the mode means a
-// flip remounts it, and the new node was never transferred.
+// THE PROPERTY. After `transferControlToOffscreen()` a canvas can never return
+// its 2D context, so a flip that kept the same element would strand the user on
+// a surface nothing can draw to. Keying the <canvas> on the mode means a flip
+// remounts it, and the new node was never transferred.
 //
-// A kill switch that only works on reload is the guardrail-that-cannot-fire
-// pattern, and this repo has shipped that shape before. Hence a test rather
-// than a comment.
+// ⚠️ **THIS HEADER CLAIMED THE SWITCH WORKED MID-SESSION, AND IT DID NOT
+// (corrected v8.30).** It called `ih_engine_worker=0` a RUNTIME kill switch and
+// cited the guardrail-that-cannot-fire pattern as the thing being avoided —
+// while being an instance of it. The element half is real; the ENGINE half was
+// never built, because nothing migrates `toolRef.current` on a flip. Measured on
+// the production build: flipping to `0` mid-session ran the local blit against
+// the worker Proxy, `tool.width()` returned a Promise, `new ImageData` threw
+// `IndexSizeError` inside render, and React unmounted the tree — `#root` empty,
+// the whole app gone.
+//
+// The truthful property, which the tests below now pin:
+//
+//   1. the key still differs by mode, so a flip cannot strand a transferred
+//      element (that part always worked), and
+//   2. a worker-resident document is NEVER drawn down the local path, whatever
+//      the flag says — `blitLiveEngine` branches on where the engine lives.
+//
+// `ih_engine_worker` therefore takes effect on the NEXT LOAD, like every other
+// flag here. That is a fine kill switch; a comment promising more is not.
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { canvasSurfaceKey } from "./port";
+import { fileURLToPath } from "node:url";
+import {
+  blitLiveEngine,
+  canvasSurfaceKey,
+  createLiveEngine,
+  disposeLivePort,
+} from "./port";
+import type { ImageHorseTool } from "stamp_tool";
 
-const SRC = join(process.cwd(), "src");
+// ⚠️ ANCHORED ON THIS FILE, NEVER ON THE LAUNCH DIRECTORY (v8.30). A source-walking
+// guard that resolves relative to the launch directory reads ZERO files when
+// vitest is started from the repo root — `<repo>/src` is the Rust crate and has
+// no `.ts` in it — so `walk()` returns an empty list and every assertion over it
+// passes VACUOUSLY. Verified by planting a real violation: from the repo root
+// the guard stayed green; from `app/` it caught it.
+const APP_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+const SRC = join(APP_ROOT, "src");
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir)) {
     const p = join(dir, e);
@@ -147,5 +176,125 @@ describe("the canvas is actually keyed on it", () => {
       "the flag belongs in port.ts. Callers take the opaque key instead — a " +
         "component that knows which engine is live can diverge from the other one.",
     ).toEqual([]);
+  });
+});
+
+// ── The half the old header was missing ──────────────────────────────────────
+//
+// Keying the element was never enough on its own. The ENGINE does not follow a
+// mid-session flip, so the question that decides whether the app survives is
+// not "what does the flag say?" but "where does this document actually live?".
+//
+// This is the regression guard for the crash: flipping to `0` while a
+// worker-resident document is open used to run the LOCAL blit against the
+// worker Proxy — `tool.width()` returned a Promise, `new ImageData` threw
+// `IndexSizeError` inside render, and React unmounted the whole tree.
+describe("a worker-resident document is never drawn down the local path", () => {
+  /** Enough of a Worker for `EngineWorkerClient.init()` to resolve, plus a
+   *  record of the fire-and-forget blits the port sends. */
+  function fakeWorkerClass() {
+    const blits: number[] = [];
+    class FakeWorker {
+      onmessage: ((e: { data: unknown }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessageerror: (() => void) | null = null;
+      private listeners: ((e: { data: unknown }) => void)[] = [];
+      addEventListener(_t: string, fn: (e: { data: unknown }) => void) {
+        this.listeners.push(fn);
+      }
+      removeEventListener(_t: string, fn: (e: { data: unknown }) => void) {
+        this.listeners = this.listeners.filter((l) => l !== fn);
+      }
+      postMessage(msg: { kind?: string; id?: number }) {
+        if (msg?.kind === "blit") blits.push(1);
+        if (msg?.kind === "init" || msg?.kind === "reinit") {
+          queueMicrotask(() => {
+            const e = { data: { id: 0, ok: true, value: { ready: true, surface: ["width"] } } };
+            for (const l of [...this.listeners]) l(e);
+          });
+        }
+      }
+      terminate() {}
+    }
+    return { FakeWorker, blits };
+  }
+
+  /** A handle that FAILS LOUDLY if the local blit ever touches it. The real
+   *  failure was quieter than this — a Promise coerced to `NaN` — but a throw
+   *  is what makes the test say which line was wrong. */
+  const boobyTrappedTool = {
+    width: () => {
+      throw new Error("local blit path touched a worker-resident engine");
+    },
+    height: () => {
+      throw new Error("local blit path touched a worker-resident engine");
+    },
+    recomposite: () => {
+      throw new Error("local blit path touched a worker-resident engine");
+    },
+  } as unknown as ImageHorseTool;
+
+  const deadCanvas = {
+    width: 0,
+    height: 0,
+    getContext: () => {
+      // Exactly what a transferred element does.
+      throw new Error("InvalidStateError: canvas has transferred its control");
+    },
+  } as unknown as HTMLCanvasElement;
+
+  afterEach(() => {
+    disposeLivePort();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps drawing through the worker after the flag is flipped OFF mid-session", async () => {
+    withFlag("1");
+    const { FakeWorker, blits } = fakeWorkerClass();
+    vi.stubGlobal("Worker", FakeWorker);
+    const Tool = class {} as unknown as new (w: number, h: number) => ImageHorseTool;
+    await createLiveEngine({ Tool, width: 4, height: 4 });
+
+    // The user reaches for the escape hatch. The engine does NOT move.
+    withFlag("0");
+
+    expect(() =>
+      blitLiveEngine(boobyTrappedTool, deadCanvas, null, { current: null }),
+    ).not.toThrow();
+    // and it went where the document actually is
+    expect(blits.length).toBe(1);
+  });
+
+  it("uses the local path when there is no worker, whatever the flag says", async () => {
+    // The mirror image, and the reason this branches on the PORT rather than
+    // simply always calling the port: a local document flipped to `=1`
+    // mid-session must not post into the void and freeze the canvas.
+    withFlag("1"); // flag says worker...
+    disposeLivePort(); // ...but no worker exists
+    let touched = 0;
+    const localTool = {
+      width: () => {
+        touched++;
+        return 2;
+      },
+      height: () => 2,
+      recomposite: () => {},
+      get_image_data: () => new Uint8Array(2 * 2 * 4),
+    } as unknown as ImageHorseTool;
+    const ctx = { putImageData: () => {} };
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ctx,
+    } as unknown as HTMLCanvasElement;
+
+    try {
+      blitLiveEngine(localTool, canvas, null, { current: null });
+    } catch {
+      // `ImageData` is not a global in vitest's node environment, so the local
+      // path cannot finish here. Reaching it at all is the assertion — the
+      // question is which branch was taken, not whether node can paint.
+    }
+    expect(touched, "the local blit path was not taken").toBeGreaterThan(0);
   });
 });

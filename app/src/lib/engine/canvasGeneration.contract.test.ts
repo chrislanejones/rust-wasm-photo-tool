@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { staleCanvasReason, NO_CANVAS } from "./canvasGeneration";
 import { EngineWorkerClient } from "./workerClient";
 
@@ -153,7 +154,14 @@ describe("the client carries the generation", () => {
 // ── the guard that arms at a12 ─────────────────────────────────────────────
 
 describe("the worker cannot gain a canvas without the staleness check", () => {
-  const WORKER = join(process.cwd(), "src/workers/engine.worker.ts");
+// ⚠️ ANCHORED ON THIS FILE, NEVER ON THE LAUNCH DIRECTORY (v8.30). A source-walking
+// guard that resolves relative to the launch directory reads ZERO files when
+// vitest is started from the repo root — `<repo>/src` is the Rust crate and has
+// no `.ts` in it — so `walk()` returns an empty list and every assertion over it
+// passes VACUOUSLY. Verified by planting a real violation: from the repo root
+// the guard stayed green; from `app/` it caught it.
+const APP_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+  const WORKER = join(APP_ROOT, "src/workers/engine.worker.ts");
   const src = () =>
     readFileSync(WORKER, "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")

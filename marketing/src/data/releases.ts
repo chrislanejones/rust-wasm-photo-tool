@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.30",
+    date: "2026-08-13",
+    headline: "The off switch took the app with it",
+    entries: [
+      {
+        tag: "fix",
+        text: "The switch that turns the background engine off was documented as working immediately. It did not: flipping it while a photo was open closed the whole editor — not a blank canvas, an empty page.",
+      },
+      {
+        tag: "fix",
+        text: "The drawing code asked the setting where to draw instead of asking where the photo actually was. It now asks where the photo is, which is a question that cannot be answered wrongly.",
+      },
+      {
+        tag: "infra",
+        text: "The switch takes effect the next time the app loads, like every other switch here. Flipping it mid-session is now harmless. Three comments that promised more have been corrected, and a test fails if that promise creeps back.",
+      },
+      {
+        tag: "infra",
+        text: "Nine internal checks resolved file paths relative to wherever the test runner was started, so from the wrong place they read no files and passed while checking nothing. Fixed and verified by planting a real violation.",
+      },
+    ],
+  },
+  {
     version: "v8.29",
     date: "2026-08-13",
     headline: "Everything the background thread had never been asked to do",

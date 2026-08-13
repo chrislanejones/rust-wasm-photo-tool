@@ -6,28 +6,45 @@ wait their turn.
 
 ## ADR-024 — found during a12.3 gate 1 (2026-08-13, v8.28)
 
-- **The runtime kill switch is incomplete MID-SESSION, and the code claims
-  otherwise.** `port.ts` and `canvasSurfaceKey.contract.test.ts` both state that
-  `ih_engine_worker=0` restores the main-thread path immediately, because a11.3
-  keys the `<canvas>` on the mode so a flip remounts a fresh, never-transferred
-  element. The ELEMENT half is real. The ENGINE half was never addressed:
-  `toolRef.current` still holds the worker Proxy, so on the next render
-  `blitLiveEngine` takes its LOCAL branch against it, `tool.width()` returns a
-  Promise, and the blit dies with
+- **✅ CLOSED in v8.30 — the mid-session kill-switch gap, and it was worse than
+  this entry said.** The entry (written v8.28) recorded that flipping
+  `ih_engine_worker=0` mid-session made "the blit die with `IndexSizeError`".
+  Re-measured on the production build before fixing: the throw happens **inside
+  render**, so React unmounted the entire tree — **`#root` empty, 0 children,
+  the whole app gone**, not a blank canvas. The reverse flip (`=1` on a local
+  document) posted into a null port and froze the canvas.
 
-  ```
-  IndexSizeError: Failed to construct 'ImageData': The source width is zero or not a number.
-  ```
+  Root cause was one line: `blitLiveEngine` believed the FLAG, which can change
+  at any moment, about a document whose ENGINE cannot follow it. It now branches
+  on `livePort` — where the engine actually lives — which cannot be stale
+  because it is the thing that owns the engine. Both directions are safe, the
+  three comments that overclaimed are corrected, and
+  `canvasSurfaceKey.contract.test.ts` pins it (mutation-tested: restoring the
+  flag branch turns both new guards red).
 
-  Observed in the browser on the production build (v8.28). **The switch works
-  correctly on reload**, which is how every other flag here is used
-  (`ih_tiles_flush`, `ih_oplog_undo`, `ih_patchmatch`), and the flag is off by
-  default, so nothing user-facing is exposed. What is wrong is the stronger
-  claim in the comments. Either fix it — rebuild the engine locally from the
-  worker's document on a mode change, which is real work: pixels and op log both
-  have to cross — or downgrade the claim to "takes effect on reload". Do not
-  leave both halves as they are; a guardrail that cannot fire is the pattern
-  this repo keeps getting bitten by.
+  **The honest behaviour, now stated everywhere:** `ih_engine_worker` takes
+  effect on the NEXT LOAD, like `ih_tiles_flush` / `ih_oplog_undo` /
+  `ih_patchmatch`. A mid-session flip is inert — the app keeps working, the
+  canvas stops updating until reload. Verified in the browser both directions.
+
+- **Live mode migration — the feature that was NOT built (successor to the
+  above).** Making a flip take effect immediately means moving the document
+  between threads: pull the composite (or working copy) and the op log out of
+  the worker, construct a local `Tool`, load the pixels, restore the log, and
+  swap `toolRef.current` atomically. `capture_state()` and `oplog_encoded_ops`
+  already exist and do most of it. This is a genuine feature with its own
+  session, and ⚠️ **if any part of it starts to look like a persisted-format
+  change, it needs an ADR plus the `dexie-migration` skill** — not a night job.
+
+- **Alternative to the above, cheaper and worth considering first: make the mode
+  a per-tab CONSTANT.** Read `ih_engine_worker` once and have
+  `createLiveEngine`, `canvasSurfaceKey` and the canvas helpers all use that
+  snapshot. A mid-session flip then does literally nothing until reload — true
+  by construction rather than by careful branching, and it retires a11.3's
+  keyed remount as unnecessary. Rejected for v8.30 only because it changes what
+  the existing flag-driven tests can drive (they stub `localStorage` after
+  import) and reverses an a11.3 design decision, which deserves an ADR note
+  rather than a one-commit night.
 
 - **Eight contract tests anchor their source-walk on `process.cwd()`, so they
   read NOTHING when the suite is launched from the repo root.** Measured:

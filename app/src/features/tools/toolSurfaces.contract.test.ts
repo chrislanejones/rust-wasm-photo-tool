@@ -112,6 +112,12 @@ describe("no surface keeps its own copy of the tool table", () => {
   it("only toolGroups.ts names the five group labels", async () => {
     const { readdirSync, statSync, readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    // ⚠️ ANCHORED ON THIS FILE, NEVER ON THE LAUNCH DIRECTORY (v8.30). Started
+    // from the repo root, `join(process.cwd(), "src")` is the RUST crate: the
+    // walk finds no `.ts`, the offender list is empty, and this passes while
+    // checking nothing. Proven by planting a violation.
+    const APP_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
     const LABELS = TOOL_GROUPS.map((g) => g.label);
     const walk = (dir: string, out: string[] = []): string[] => {
@@ -124,7 +130,7 @@ describe("no surface keeps its own copy of the tool table", () => {
     };
 
     const offenders: string[] = [];
-    for (const file of walk(join(process.cwd(), "src"))) {
+    for (const file of walk(join(APP_ROOT, "src"))) {
       if (file.endsWith("toolGroups.ts")) continue;
       const src = readFileSync(file, "utf8");
       const found = LABELS.filter((l) => new RegExp(`["'\`]${l}["'\`]`).test(src));

@@ -84,6 +84,38 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.30 — 2026-08-13
+
+**The off switch took the app with it.** The engine can run on a background
+thread, switched off by default. The switch that turns it off was documented as
+working immediately, mid-session. It did not, and finding out what it actually
+did was worse than expected: flipping it while a photo was open **closed the
+whole editor** — not a blank canvas, an empty page.
+
+The cause is one wrong belief. The switch is a setting, and a setting can change
+at any moment; the engine cannot follow it, because the photo you have open was
+handed to whichever side was chosen when it loaded, and nothing moves it
+afterwards. The drawing code asked the setting where to draw instead of asking
+where the photo actually was, so it tried to draw a background-thread photo on
+the main thread, got nonsense for the image size, and threw an error in the
+middle of drawing the page. React responded by removing the page.
+
+It now asks where the photo is. That question cannot be answered wrongly,
+because the thing being asked is the thing that owns the photo.
+
+**What the switch does, stated properly:** it takes effect the next time the app
+loads — the same as every other switch here. Flipping it mid-session is now
+harmless: the app keeps working, the picture stops updating until you reload.
+Three comments that promised more have been corrected, and a test now fails if
+that promise creeps back in.
+
+**Also:** nine internal checks resolved file paths relative to wherever the test
+runner happened to be started. Started from the wrong place, they read no files
+and passed while checking nothing. They now resolve relative to themselves.
+Verified by planting a real violation and confirming they catch it either way.
+
+<details><summary>Older releases</summary>
+
 ### v8.29 — 2026-08-13
 
 **Everything the background thread had never been asked to do.** The engine can
@@ -107,8 +139,6 @@ turned out the test itself caused it, by reaching past the app to the engine
 underneath, and the app had already said so in plain words in the console. A
 clean re-run restored correctly. The tools were right and the tester was wrong,
 which is the good version of that morning.
-
-<details><summary>Older releases</summary>
 
 ### v8.28 — 2026-08-13
 

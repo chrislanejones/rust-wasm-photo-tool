@@ -32,6 +32,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { resolveExportSource } from "./batchExportPlan";
 
 /** Stand-in for a stored archive. The real `SavedEdit` carries canvas PNG plus
@@ -123,7 +124,14 @@ describe("batch export decides from storage, not session state", () => {
 describe("no session-state gate has been re-added upstream", () => {
   // Comments stripped: this file and AppShell both DISCUSS the old gate by
   // name, and a guard satisfied by its own documentation guards nothing.
-  const source = readFileSync(join(process.cwd(), "src/app/AppShell.tsx"), "utf8")
+// ⚠️ ANCHORED ON THIS FILE, NEVER ON THE LAUNCH DIRECTORY (v8.30). A source-walking
+// guard that resolves relative to the launch directory reads ZERO files when
+// vitest is started from the repo root — `<repo>/src` is the Rust crate and has
+// no `.ts` in it — so `walk()` returns an empty list and every assertion over it
+// passes VACUOUSLY. Verified by planting a real violation: from the repo root
+// the guard stayed green; from `app/` it caught it.
+const APP_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+  const source = readFileSync(join(APP_ROOT, "src/app/AppShell.tsx"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/.*$/gm, "");
 

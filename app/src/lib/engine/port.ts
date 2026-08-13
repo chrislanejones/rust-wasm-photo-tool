@@ -238,6 +238,36 @@ export async function createLiveEngine(spec: {
  *
  * WORKER: one fire-and-forget message. The engine, its memory and the
  * `OffscreenCanvas` are all on that side, so nothing crosses.
+ *
+ * ── ⚠️ THIS BRANCHES ON WHERE THE ENGINE LIVES, NOT ON THE FLAG (v8.30) ──────
+ *
+ * The flag can change at any moment; the ENGINE cannot follow it. A live handle
+ * was built by whichever mode was active when the document was opened, and
+ * nothing migrates it afterwards. So `engineWorkerEnabled()` and the thing this
+ * function is pointed at can disagree, and when they do the flag is the wrong
+ * one to believe — reading it here is how a stale flag reaches a live document.
+ *
+ * Both directions were measured on the production build, and the first is why
+ * this changed:
+ *
+ *   worker → local (`=0`)  the local path ran against the worker Proxy, so
+ *                          `tool.width()` returned a **Promise**, `new ImageData`
+ *                          got `NaN` and threw `IndexSizeError` — inside render.
+ *                          React unmounted the whole tree: **`#root` empty, the
+ *                          entire app gone**, not merely a blank canvas.
+ *   local → worker (`=1`)  `livePort` was null, the message went nowhere, and
+ *                          the canvas froze.
+ *
+ * `livePort` answers the real question — *is this document worker-resident?* —
+ * and it cannot be stale, because it IS the thing that owns the engine.
+ * `createLiveEngine` disposes it on the local branch and sets it on the worker
+ * branch, so the two can never disagree about the document in front of us.
+ *
+ * The consequence is deliberate and is now what the kill switch promises: a
+ * mid-session flip does not crash and does not migrate. It takes effect on the
+ * NEXT LOAD, exactly like `ih_tiles_flush`, `ih_oplog_undo` and `ih_patchmatch`.
+ * Live migration (pulling pixels and the op log across on a flip) is real work
+ * and is parked, not forgotten — see PARKING_LOT.md.
  */
 export function blitLiveEngine(
   tool: ImageHorseTool,
@@ -245,11 +275,11 @@ export function blitLiveEngine(
   wasmMemory: WebAssembly.Memory | null,
   backbufferRef: { current: ImageData | null },
 ): void {
-  if (engineWorkerEnabled()) {
-    // The canvas was transferred to the worker; this thread cannot draw to it
-    // and must not try — `getContext("2d")` throws `InvalidStateError` on a
-    // transferred element.
-    livePort?.blit();
+  if (livePort) {
+    // Worker-resident document. The canvas was transferred, so this thread
+    // cannot draw to it and must not try — `getContext("2d")` throws
+    // `InvalidStateError` on a transferred element.
+    livePort.blit();
     return;
   }
 
@@ -537,19 +567,35 @@ export function engineWorkerEnabled(): boolean {
 
 /** ADR-024 Stage 4, step a11.3 — the React key for the main `<canvas>`.
  *
- *  WHAT THIS REPAIRS. `ih_engine_worker=0` is specified as a RUNTIME kill
- *  switch, and after `transferControlToOffscreen()` that promise cannot be kept
- *  on a transferred element: nothing can give a canvas its 2D context back.
- *  Flipping the flag mid-session would leave the user on a surface the main
- *  thread can no longer draw to — a kill switch that only works on reload,
- *  which is the guardrail-that-cannot-fire pattern this repo has been bitten by
- *  before.
- *
- *  Keying the element on the mode makes the flip remount it. A remounted
- *  `<canvas>` is a NEW DOM node that was never transferred, so the main-thread
- *  path is available again immediately. Losing the bitmap on a remount is
+ *  WHAT THIS REPAIRS. After `transferControlToOffscreen()` nothing can give a
+ *  canvas its 2D context back, so a flip that kept the same element would leave
+ *  the user on a surface the main thread can never draw to. Keying the element
+ *  on the mode makes the flip remount it, and a remounted `<canvas>` is a NEW
+ *  DOM node that was never transferred. Losing the bitmap on a remount is
  *  already normal and already recovered from — the engine owns the pixels and
  *  `CanvasArea` re-blits on mount.
+ *
+ *  ⚠️ **THIS DOES NOT MAKE THE FLIP TAKE EFFECT IMMEDIATELY, AND THIS COMMENT
+ *  CLAIMED IT DID UNTIL v8.30.** It said the main-thread path was "available
+ *  again immediately". The ELEMENT half was true; the ENGINE half was never
+ *  built. `toolRef.current` still holds whatever `createLiveEngine` produced at
+ *  load — a worker Proxy — and nothing migrates it. Measured on the production
+ *  build, flipping to `0` mid-session took **the entire app down**: the local
+ *  blit ran against the Proxy, `tool.width()` returned a Promise, `new
+ *  ImageData` threw `IndexSizeError` inside render, and React unmounted the
+ *  tree, leaving `#root` empty.
+ *
+ *  `blitLiveEngine` now branches on where the engine LIVES rather than on the
+ *  flag, so that crash is gone. What remains is the honest behaviour, and it is
+ *  the same as every other flag in this repo: **`ih_engine_worker` takes effect
+ *  on the NEXT LOAD.** A mid-session flip remounts this element, the worker
+ *  keeps the surface it was given, and the canvas stops updating until reload —
+ *  inert and recoverable, rather than immediate.
+ *
+ *  A kill switch that only works on reload is fine and is the house pattern
+ *  (`ih_tiles_flush`, `ih_oplog_undo`, `ih_patchmatch`). A kill switch whose
+ *  comment promises more than it does is the guardrail-that-cannot-fire pattern,
+ *  which is what this actually was.
  *
  *  ⚠️ THIS DELIBERATELY CHANGES WHEN THE CANVAS REMOUNTS, which is the opposite
  *  of a11.1's stop condition — and correctly so, because here the remount IS

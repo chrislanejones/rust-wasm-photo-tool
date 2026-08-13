@@ -27,6 +27,7 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** Lower this by exactly the batch size as each of a3–a10 lands. Gate is 0.
  *
@@ -324,8 +325,15 @@ import { join } from "node:path";
  *  `DISSOLVES_AT_STAGE_4` and the floor test below before trying. */
 const BUDGET = 5;
 
-const REPO = join(process.cwd(), "..");
-const SRC = join(process.cwd(), "src");
+// ⚠️ ANCHORED ON THIS FILE, NEVER ON THE LAUNCH DIRECTORY (v8.30). A source-walking
+// guard that resolves relative to the launch directory reads ZERO files when
+// vitest is started from the repo root — `<repo>/src` is the Rust crate and has
+// no `.ts` in it — so `walk()` returns an empty list and every assertion over it
+// passes VACUOUSLY. Verified by planting a real violation: from the repo root
+// the guard stayed green; from `app/` it caught it.
+const APP_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+const REPO = join(APP_ROOT, "..");
+const SRC = join(APP_ROOT, "src");
 
 interface Gate {
   total: number;

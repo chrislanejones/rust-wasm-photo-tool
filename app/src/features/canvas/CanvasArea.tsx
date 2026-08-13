@@ -1385,10 +1385,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // `ih_engine_worker` mid-session REMOUNTS this element.
           //
           // After `transferControlToOffscreen()` a canvas can never return its
-          // 2D context, so a runtime kill switch cannot restore the main-thread
-          // path on the element it killed. A remount sidesteps that: the new
-          // node was never transferred. Losing the bitmap is already normal —
-          // the engine owns the pixels and the effect above re-blits on mount.
+          // 2D context, so a flip that kept the same element would strand the
+          // user on a surface nothing can draw to. A remount sidesteps that: the
+          // new node was never transferred. Losing the bitmap is already normal
+          // — the engine owns the pixels and the effect above re-blits on mount.
+          //
+          // ⚠️ The remount is the ELEMENT half only. The ENGINE does not follow
+          // a mid-session flip — `toolRef.current` still holds what
+          // `createLiveEngine` built at load — so `ih_engine_worker` takes
+          // effect on the NEXT LOAD, not immediately. `port.ts` has the measured
+          // detail; the short version is that believing otherwise took the whole
+          // app down until v8.30.
           //
           // The token comes from `port.ts`, not from the flag. A component
           // reading `engineWorkerEnabled()` would be a call site branching on
