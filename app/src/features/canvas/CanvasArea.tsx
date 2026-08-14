@@ -33,6 +33,7 @@ import {
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
 import { useGuidesStore } from "@/stores/useGuidesStore";
+import { useTextBoxStore, MIN_WRAP_WIDTH } from "@/stores/useTextBoxStore";
 import { useToolStore } from "@/stores/useToolStore";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
 import type { ResolvedSubTool } from "@/features/tools/toolGroups";
@@ -1384,6 +1385,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const imageGuides = useGuidesStore((s) => s.guides);
     const guidesLocked = useGuidesStore((s) => s.guidesLocked);
     const selectedGuideId = useGuidesStore((s) => s.selectedGuideId);
+    const textWrapWidth = useTextBoxStore((s) => s.wrapWidth);
+    const setTextWrapWidth = useTextBoxStore((s) => s.setWrapWidth);
     const selectGuide = useGuidesStore((s) => s.selectGuide);
     const moveGuide = useGuidesStore((s) => s.moveGuide);
 
@@ -2189,9 +2192,38 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const mctx = offscreen.getContext("2d")!;
           const fs = effFontSize * scaleX;
           mctx.font = `${effFontWeight} ${fs}px 'Liberation Sans', Arial, sans-serif`;
-          const lines = (textInput.text || " ").split("\n");
+          // ── v8.40 — the preview wraps the SAME WAY the engine does ────────
+          // Greedy, and a paragraph that already fits is kept verbatim: that
+          // mirrors `text::wrap` in Rust line for line, so what the user drags
+          // out here is what gets committed. Same font family and size on both
+          // sides, so the break points agree.
+          const wrapContentW =
+            textWrapWidth > 0
+              ? textWrapWidth * scaleX - 2 * Math.ceil(effFontSize * 0.25) * scaleX
+              : 0;
+          const wrapPara = (para: string): string[] => {
+            if (wrapContentW <= 0 || mctx.measureText(para).width <= wrapContentW) return [para];
+            const out: string[] = [];
+            let line = "";
+            for (const word of para.split(/\s+/).filter(Boolean)) {
+              const candidate = line ? `${line} ${word}` : word;
+              if (mctx.measureText(candidate).width <= wrapContentW || !line) {
+                line = candidate;
+              } else {
+                out.push(line);
+                line = word;
+              }
+            }
+            out.push(line);
+            return out;
+          };
+          const lines = (textInput.text || " ").split("\n").flatMap(wrapPara);
           const rawW = Math.max(60, ...lines.map((l) => mctx.measureText(l || " ").width));
-          const boxW = Math.ceil(rawW + fs * 0.6);
+          // A wrapped box is the width the user DRAGGED, not the width of the
+          // longest line — otherwise the box would snap inwards to the text
+          // the moment they let go, and the handle would feel broken.
+          const boxW =
+            textWrapWidth > 0 ? Math.ceil(textWrapWidth * scaleX) : Math.ceil(rawW + fs * 0.6);
           const boxH = Math.ceil(lines.length * fs * 1.3 + fs * 0.3);
 
           const rotation = textInput.rotation ?? 0;
@@ -2275,6 +2307,47 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               if (startDist > 4) {
                 const newFs = Math.round(Math.max(8, Math.min(120, startFs * (dist / startDist))));
                 onTextFontSizeChange?.(newFs);
+              }
+            };
+            const onUp = () => {
+              window.removeEventListener("pointermove", onMove);
+              window.removeEventListener("pointerup", onUp);
+            };
+            window.addEventListener("pointermove", onMove);
+            window.addEventListener("pointerup", onUp);
+          };
+
+          // ── v8.40 — the SIX box handles: they resize the BOX, not the type.
+          //
+          // Chris, for long-winded writers: corners make the bounding box
+          // bigger and the text REFLOWS inside it at the same font size. Six
+          // because six is what can mean anything here — 4 corners + E + W all
+          // set a width; N/S would set a height the layout derives from the
+          // wrapped line count, so they would be handles that do nothing.
+          //
+          // `side === "w"` drags the LEFT edge, so the box grows leftward and
+          // the anchor moves with it — otherwise grabbing the left handle
+          // would silently drag the text rightwards across the canvas.
+          const handleBoxResizePointerDown = (
+            e: React.PointerEvent,
+            side: "e" | "w",
+          ) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const startX = e.clientX;
+            // An unwrapped box starts from whatever it currently measures, so
+            // the first drag continues from the box the user can see rather
+            // than jumping to some default.
+            const startW = textWrapWidth > 0 ? textWrapWidth : boxW / (scaleX || 1);
+            const startCx = textInput.canvasX;
+            const onMove = (me: PointerEvent) => {
+              const dx = (me.clientX - startX) / (scaleX || 1);
+              const next = Math.max(MIN_WRAP_WIDTH, side === "e" ? startW + dx : startW - dx);
+              setTextWrapWidth(next);
+              if (side === "w") {
+                // Keep the RIGHT edge stationary: the anchor moves by exactly
+                // the width the box gained.
+                onTextPositionChange?.(startCx + (startW - next), textInput.canvasY);
               }
             };
             const onUp = () => {
@@ -2678,6 +2751,33 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                       </g>
                     );
                   })()}
+                  {/* The six BOX handles — on the border, so they read as
+                      "grab the box" against the font handle floating out on
+                      its stem. Corners take the diagonal cursors even though
+                      only width changes: that is what every editor does, and
+                      a corner showing `ew-resize` reads as broken. */}
+                  {[
+                    { id: "nw", x: sx, y: sy, side: "w" as const, cursor: "nwse-resize" },
+                    { id: "ne", x: sx + boxW, y: sy, side: "e" as const, cursor: "nesw-resize" },
+                    { id: "w", x: sx, y: sy + boxH / 2, side: "w" as const, cursor: "ew-resize" },
+                    { id: "e", x: sx + boxW, y: sy + boxH / 2, side: "e" as const, cursor: "ew-resize" },
+                    { id: "sw", x: sx, y: sy + boxH, side: "w" as const, cursor: "nesw-resize" },
+                    { id: "se", x: sx + boxW, y: sy + boxH, side: "e" as const, cursor: "nwse-resize" },
+                  ].map((h) => (
+                    <rect
+                      key={h.id}
+                      x={ctr.left + h.x - HS / 2}
+                      y={ctr.top + h.y - HS / 2}
+                      width={HS}
+                      height={HS}
+                      fill="white"
+                      stroke="rgba(0,0,0,0.5)"
+                      strokeWidth={1}
+                      rx={1}
+                      style={{ cursor: h.cursor, pointerEvents: "all" }}
+                      onPointerDown={(e) => handleBoxResizePointerDown(e, h.side)}
+                    />
+                  ))}
                   {/* Font-size handle: horizontal stem + SQUARE on the LEFT edge.
                       Square = resize, circle = move/rotate — see the v8.37
                       comment at handleFontSizePointerDown for why this is the

@@ -247,8 +247,9 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{}}}",
+            "{{\"id\":{},\"wrap_width\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{}}}",
             a.id,
+            a.wrap_width,
             json_escape(&a.text),
             a.x, a.y,
             a.font_size,

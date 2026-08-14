@@ -810,6 +810,13 @@ declare module "stamp_tool" {
     ): boolean;
     /** Set/clear the soft drop shadow on a text annotation; rebuilds its tile.
      *  on_box/on_text choose the silhouette; shared color/alpha/offset/blur. */
+    /** Set a text annotation's reflow width in px (0 = don't wrap) and rebuild
+     *  its tile. Returns false if `id` isn't on the active layer. v8.40.
+     *
+     *  ⚠️ Hand-synced shadow of the wasm-bindgen signature — this file
+     *  ambiently SHADOWS pkg's generated types, so a drift here type-checks
+     *  and dies at runtime. */
+    set_text_wrap_width(id: number, wrap_width: number): boolean;
     set_text_shadow(
       id: number,
       on_box: boolean,

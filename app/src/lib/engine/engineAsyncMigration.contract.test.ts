@@ -641,6 +641,11 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // `useMagicEraserTool.onMouseUp`. Gate 29 -> 5 (all exempt), hot 12 -> 0,
     // awaited 91 -> 113.
     //
+    // v8.40 — 113 -> 114: `useTextTool.commitText` awaits the new
+    // `set_text_wrap_width`. A NEW awaited site, not a conversion; the gate
+    // numbers (5 exempt / 0 unawaited / 0 truthy) are unchanged, which is the
+    // point of updating this deliberately rather than loosening the assertion.
+    //
     // The difference from v8.19's identical-looking claim is the method list:
     // that one was made against a shadow .d.ts missing 31 of the engine's
     // methods. This one knows all 280.
@@ -648,7 +653,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(113);
+    expect(gate.awaited, "cumulative converted sites").toBe(114);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

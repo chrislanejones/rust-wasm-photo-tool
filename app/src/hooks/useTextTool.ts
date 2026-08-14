@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTextBoxStore } from "@/stores/useTextBoxStore";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { parseColorSync, warmColorParser } from "@/lib/colorParser";
@@ -27,6 +28,9 @@ interface AnnotationMeta {
   x: number;
   y: number;
   font_size: number;
+  /** Reflow width in canvas px; 0 = don't wrap. Absent on annotations from
+   *  before v8.40, hence optional. */
+  wrap_width?: number;
   r: number;
   g: number;
   b: number;
@@ -208,6 +212,13 @@ export function useTextTool({
     const ti = textInputRef.current;
     if (!ti) return;
     const editingId = editingAnnotationId.current;
+    // ⚠️ Read the reflow width HERE, synchronously, for the same reason `ti`
+    // and `editingId` are captured here: everything below this line is behind
+    // an `await`, and clicking the canvas to commit ALSO opens a new text
+    // input, which resets the width. Reading it at the point of use lost the
+    // drag every time (committed annotation came back `wrap_width: 0` while a
+    // direct engine call proved the setter itself worked).
+    const wrapWidthAtCommit = useTextBoxStore.getState().wrapWidth;
     textInputRef.current = null;
     editingAnnotationId.current = null;
     setTextInput(null);
@@ -336,6 +347,15 @@ export function useTextTool({
         bgTail,
       );
     }
+    // v8.40 — carry the box's reflow width onto the committed annotation.
+    // A separate call rather than another argument on the two entry points
+    // above: it maps 1:1 onto the engine's `Op::TextWrap`, and those
+    // signatures are already 19 arguments long. Rust no-ops when the width is
+    // unchanged, so this is free on every ordinary commit.
+    if (targetId !== null && typeof tool.set_text_wrap_width === "function") {
+      await tool.set_text_wrap_width(targetId, wrapWidthAtCommit);
+    }
+
     // Apply / sync the soft drop shadow on the committed annotation (Rust no-ops
     // when unchanged, so this is cheap to call on every commit).
     if (targetId !== null && targetId >= 0) {
@@ -431,6 +451,11 @@ export function useTextTool({
         textColor: next.textColor,
       };
       editingAnnotationId.current = ann.id;
+      // v8.40 — reopen the box at the width it was committed with, so dragging
+      // a corner CONTINUES the previous reflow instead of resetting it. The
+      // engine is the source of truth for the width (annotations JSON); this
+      // slice only mirrors it for the editing session.
+      useTextBoxStore.getState().setWrapWidth(ann.wrap_width ?? 0);
       textInputRef.current = next;
       setTextInput(next);
       // Suppress this annotation's baked tile while the textarea overlay is
@@ -535,6 +560,8 @@ export function useTextTool({
       lastPositionRef.current = pos;
       const next: TextInput = { ...pos, text: pendingText };
       editingAnnotationId.current = null;
+      // New text sizes its box to itself until a handle says otherwise.
+      useTextBoxStore.getState().clearWrapWidth();
       textInputRef.current = next;
       setTextInput(next);
       if (pendingText) setPendingText("");
