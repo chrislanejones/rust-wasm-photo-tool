@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.40",
+    date: "2026-08-14",
+    headline: "Text boxes resize, and the words rearrange to fit",
+    entries: [
+      {
+        tag: "feature",
+        text: "Six handles — four corners and two sides — make a text box wider or narrower, and the text re-wraps inside it at the same size. For anyone who writes more than a few words: set the column you want and keep typing. The font-size handle is still there on its own stem, and still the only thing that changes the size.",
+      },
+      {
+        tag: "rust",
+        text: "Widen a box you narrowed earlier and the text flows back out. That works because the app stores what you typed, not where the lines happened to break — the breaks are recomputed by the engine every time, never baked in.",
+      },
+      {
+        tag: "infra",
+        text: "Adding this changed the format the app saves edits in. The change was built so files written by every previous version still load, so nobody loses the undo history attached to their photos — proven by tests that fail if that promise is ever broken.",
+      },
+    ],
+  },
+  {
     version: "v8.39",
     date: "2026-08-14",
     headline: "The Layers panel matches every other panel",

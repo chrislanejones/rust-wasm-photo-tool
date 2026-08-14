@@ -7225,3 +7225,70 @@ transparent hole through the photo** → Done exits and the section disappears.
 
 **Gates.** vitest 546, tsc clean, eslint 0 errors, build clean. No engine
 change (wasm byte-identical to v8.37).
+
+---
+
+## v8.40 Change Summary — 2026-08-14
+
+**Text reflow: the six box handles.** Chris asked twice; v8.37 filed it as
+needing an ADR + a migration because the width has to be persisted. Built with
+the migration done properly.
+
+### The feature
+
+| Piece | Where |
+|---|---|
+| word breaker | Rust `text::wrap` — greedy, idempotent, emits `\n` so `measure`/`render_text`/the tile builder need no changes at all |
+| storage | `wrap_width` on `TextParams`/`TextAnnotation`; the stored text stays the AUTHOR's, wrapping applies at tile build |
+| handles | six on the border (4 corners + E + W) — the six that can mean anything when height derives from the wrapped line count |
+| state | `useTextBoxStore` (Zustand): CanvasArea drags it, `useTextTool` commits it, AppShell owns neither |
+
+Because the raw text is what's stored, widening a box re-flows it instead of
+being stuck with newlines baked in at the old width.
+
+### The migration — v2 logs are MIGRATED, not rejected
+
+`USE_OPLOG_PERSISTENCE` ships **ON**, so rejecting old logs (what v1→v2 did)
+would have cost every user their cross-reload undo history. The change was
+shaped to make migration possible:
+
+| Mechanism | Effect |
+|---|---|
+| `wrap_width` is `#[serde(skip)]` | `TextParams`' wire layout is **byte-identical to v2** — a real field would shift every byte after it in already-persisted `TextAdd`/`TextEdit` payloads |
+| width rides an **appended** `Op::TextWrap` variant | postcard indexes variants positionally; appending cannot disturb what is on disk |
+| `encode_annotations` gains a **trailing** tuple element | a v3 blob is a strict prefix-extension of a v2 one |
+| `decode_op` accepts v2+v3; `decode_annotations` falls back to the 3-tuple | old data decodes, widths default to 0 = "don't wrap" — exactly what a v2 document meant |
+
+No frozen mirror of the 13-variant enum to transcribe and get subtly wrong.
+**6 migration tests**, and mutation-tested: removing `#[serde(skip)]` or
+re-rejecting v2 each turns one red.
+
+### Two bugs found by driving it, not by gates
+
+1. **The breaker ate whitespace** — the first `wrap()` deleted indentation and
+   trailing spaces. Its own unit test caught it; the fix (emit a paragraph that
+   already fits verbatim) also makes idempotence hold by construction.
+2. **The wrap was lost at commit** — committed annotations came back
+   `wrap_width: 0` while a direct engine call proved the setter worked.
+   `commitText` read the store AFTER several awaits, and clicking away to
+   commit also opens a new input that resets it. Captured synchronously at the
+   top now, the way that function already treats `ti`/`editingId`.
+
+### Verified in the browser (real drags, 150–200 events)
+
+| Step | Result |
+|---|---|
+| narrow drag | box 719 → 289 px, height 39 → 101, **font unchanged at 24 px** |
+| commit | `wrap_width: 299`, tile 281×106, pixels baked wrapped |
+| re-edit | reopens at 299 — and the raw text contains **no newlines** |
+| widen | 299 → 599, 3 lines → 2, still 24 px — **re-flows** |
+
+**Gates.** cargo 226 (+6 migration, +10 wrap), vitest 553, tsc clean, eslint 0
+errors, builds clean. wasm 777,589 → 785,803 B (+8,214: the word breaker).
+The `engineAsyncMigration` ledger moved 113 → 114 (a new awaited site, not a
+conversion) — updated deliberately rather than loosened.
+
+### Filed
+
+**ADR-024-F7** — the layer-JSON restore path doesn't carry the wrap width yet;
+the op-log path does.

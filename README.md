@@ -84,6 +84,25 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.40 — 2026-08-14
+
+**Text boxes resize, and the words rearrange to fit.** Six handles — the four
+corners and the two sides — now make the text box wider or narrower, and the
+text re-wraps inside it at the same size. It's for anyone who writes more than
+a few words: set the column you want, keep typing. The handle that changes the
+font size is still there, on its own stem to the left, and it's still the only
+thing that changes the font size.
+
+Widen a box you narrowed earlier and the text flows back out again. That works
+because the app stores what you typed, not where the lines happened to break —
+so the breaks are always recomputed, never baked in.
+
+Older saved work keeps working. Adding this meant changing the format the app
+saves edits in, and the change was built so files written by every previous
+version still load — nobody loses the undo history attached to their photos.
+
+<details><summary>Older releases</summary>
+
 ### v8.39 — 2026-08-14
 
 **The Layers panel now looks and behaves like every other tool panel — and two
@@ -101,8 +120,6 @@ could never appear at all. They now live on the Paint panel, where the strokes
 actually happen: choose Hide or Reveal, paint, then Done. The Layers panel
 keeps Paint mask, Invert, Apply and Remove — the four that don't care which
 tool you're holding.
-
-<details><summary>Older releases</summary>
 
 ### v8.38 — 2026-08-14
 
