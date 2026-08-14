@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.38",
+    date: "2026-08-14",
+    headline: "Layers become a targeted thing",
+    entries: [
+      {
+        tag: "feature",
+        text: "The move/resize tab is now the Layers tool: pick a layer from a dropdown and everything below — Move, Resize, the mask controls — acts on that one layer. Verified at the engine level: the dropdown's value is the engine's active layer, both directions.",
+      },
+      {
+        tag: "ui",
+        text: "The mask buttons used to repeat on every row of the Review panel's layer list. They now exist once, in the tool, acting on the selected layer; rows show a small badge when a layer carries a mask, and a gear next to the layer count routes to the tool.",
+      },
+      {
+        tag: "infra",
+        text: "Before building any of it: does painting actually land on the layer you selected? Proven with a hidden layer — a stroke vanishes with its layer and returns with it, and the engine's per-layer pixel counts agree. Already true; now the UI shows the selection.",
+      },
+    ],
+  },
+  {
     version: "v8.37",
     date: "2026-08-14",
     headline: "Two handles that do what they look like they do",

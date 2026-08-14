@@ -7147,3 +7147,40 @@ for the overlay to draw. The commit path needed zero changes.
 
 **Gates.** vitest 546, cargo 211 (+2), tsc clean, eslint 0 errors, builds
 clean. wasm 775,604 → 777,589 B (+1,985: alpha-bbox scan + crop copy).
+
+---
+
+## v8.38 Change Summary — 2026-08-14
+
+**The Layers tool: one selection, everything targets it.** Second half of the
+2026-08-14 night session (worktree `night/2026-08-14-text-layers`).
+
+### 3a first — the load-bearing probe (no engine work needed)
+
+| Question | Verdict | Evidence |
+|---|---|---|
+| does paint target the active layer? | **YES, already** | stroke hidden/shown WITH its layer, both directions; engine per-layer pixel counts (red 2,836 px stayed on its layer, blue 2,076 px on the other) |
+| selection = engine `active_layer_id`? | **YES** | `capture_layer_stack` read directly, both directions |
+| op-log format risk? | none for this work — the log is single-content-layer by design (ADR-016), out of scope on multi-layer docs | `Op` enum carries no layer id except `LayerMove` |
+
+Two fake bugs were manufactured by the probe itself (documented in
+SESSION_LOG): the layer row's geometric centre is the **"Move up"** button, so
+robot clicks "selecting" a row were reordering the stack — an opaque photo
+restacked above a hidden layer reads exactly like content loss. That
+fat-finger surface is itself evidence for this release's change.
+
+### What shipped
+
+| Piece | Detail |
+|---|---|
+| the tab | "Resize Layer" → **"Layers"** (lucide-layers); id `resize-layer` unchanged (known-debt rule) |
+| dropdown | drives `active_layer_id` via the same `setActiveLayer` the rows use; value-verified against the engine both directions |
+| mask controls | MOVED (same handlers) from per-row buttons to one set acting on the selection: Add / Edit / hide-reveal (while editing) / Invert / Apply / Remove — each exercised from the new home with `hasMask` observed flipping |
+| Review rows | zero mask buttons left (eye / reorder / merge / duplicate / delete stay); passive Aperture badge on masked layers |
+| the gear | Review → Layers section head → `activateSubTool("edit/resize-layer")` |
+
+Finding: `subToolByKey` keys are namespaced `group/id` — a bare id returns
+undefined and the guard makes it a SILENT no-op; only the browser caught it.
+
+**Gates.** vitest 546, cargo 211, tsc clean, eslint 0 errors, builds clean.
+No engine change in this release (wasm byte-identical to v8.37).

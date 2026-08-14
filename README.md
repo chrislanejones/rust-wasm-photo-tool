@@ -84,6 +84,24 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.38 — 2026-08-14
+
+**Layers become a targeted thing.** The Edit tab that moved and resized
+layers is now the Layers tool: pick a layer from a dropdown, and everything
+below it — Move, Resize, and the mask controls — acts on that one layer. The
+mask buttons used to repeat on every row of the Review panel's layer list;
+they now exist once, in the tool, and the rows just show a small badge when a
+layer carries a mask. A gear next to the layer count is the signpost to where
+they went.
+
+Before building any of it, the load-bearing question got answered with a
+hidden layer: does painting actually land on the layer you selected? It does
+— a stroke painted on one layer disappears when that layer is hidden and
+returns when it's shown, and the engine's own per-layer pixel counts agree.
+That was already true; now the UI finally makes the selection visible.
+
+<details><summary>Older releases</summary>
+
 ### v8.37 — 2026-08-14
 
 **Two handles that finally do what they look like they do.** Text first: the
@@ -104,8 +122,6 @@ around the layer's actual pixels — and the overlay draws exactly that. A
 2-pixel nudge moves 2 pixels. Dragging scales your content, not the invisible
 padding around it. And the move/resize tab wears the layers icon it should
 have had.
-
-<details><summary>Older releases</summary>
 
 ### v8.36 — 2026-08-13
 
