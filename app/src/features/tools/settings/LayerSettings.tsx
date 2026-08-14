@@ -11,8 +11,6 @@ import {
   Contrast,
   Check,
   X,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ActionTile } from "@/components/ui/action-tile";
@@ -22,6 +20,19 @@ import { CanvasResize } from "@/components/CanvasResize";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { cn } from "@/lib/utils";
 import type { LayerInfo } from "@/hooks/useEngineCore";
+
+/** The house section separator (Select / Paint / Shapes all use this exact
+ *  rule + padding above a SectionHeader). Named rather than inlined so the
+ *  three sections below cannot drift apart from each other. */
+const SECTION_SEP = "border-t border-theme-sidebar-border pt-3";
+/** Mask sits INSIDE the Move/Resize section (same selected layer), so it takes
+ *  the separator without the section-level `sep` gate — it is always stacked
+ *  under something. */
+const MASK_SECTION_SEP = SECTION_SEP;
+
+/** The mask's brush-value choice (Hide/Reveal) lives in PaintSettings, not
+ *  here — see the Paint mask tile below for why it cannot render on this
+ *  panel at all. */
 
 /** Mask handlers — the SAME shape ReviewPanel takes, because these are the
  *  same handlers: v8.38 moved the mask controls here (once, acting on the
@@ -137,7 +148,7 @@ export function LayerSettings({
   const show = (v: NonNullable<LayerSettingsProps["section"]>) =>
     section === undefined || section === v;
   /** The separator rule only earns its keep when sections are stacked. */
-  const sep = section === undefined ? "pt-3 border-t border-theme-sidebar-border" : "";
+  const sep = section === undefined ? SECTION_SEP : "";
 
   return (
     <div className="space-y-6 -mt-2">
@@ -168,7 +179,11 @@ export function LayerSettings({
             per-control layer picker anywhere. Options listed top→bottom to
             match the visual stack. */}
         {layers && layers.length > 0 && onSelectLayer && (
-          <div className="relative">
+          <div className="space-y-2">
+            <label className="text-2xs text-theme-muted-foreground">
+              Layer
+            </label>
+            <div className="relative">
             <select
               value={activeLayer?.id ?? ""}
               disabled={disabled}
@@ -185,6 +200,7 @@ export function LayerSettings({
               ))}
             </select>
             <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+            </div>
           </div>
         )}
         <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
@@ -209,7 +225,7 @@ export function LayerSettings({
             "none of those mask buttons will be on each layer"): same
             handlers, new home, wired to the dropdown's selection. */}
         {mask && activeLayer && (
-          <div className="space-y-2 pt-2">
+          <div className={cn("space-y-2", MASK_SECTION_SEP)}>
             <SectionHeader
               title="Layer Mask"
               info={
@@ -221,66 +237,58 @@ export function LayerSettings({
                 </>
               }
             />
+            {/* Primitive choice follows the button-variant SSOT, not what
+                each control happens to look like: TOGGLES are `ToolButton
+                stacked` / `ToolButtonGroup stacked` and carry `active`;
+                one-shot ACTIONS are `ActionTile`, which never does. The
+                first cut of this section used plain ToolButtons for the
+                actions, which read as four permanently-unlit toggles. */}
             {!activeLayer.hasMask ? (
-              <ActionTile
-                icon={Aperture}
-                label="Add mask"
-                disabled={disabled}
-                onClick={() => mask.onAdd(activeLayer.id)}
-              />
+              <div className="grid gap-2 [grid-auto-rows:1fr]">
+                <ActionTile
+                  icon={Aperture}
+                  label="Add mask"
+                  disabled={disabled}
+                  onClick={() => mask.onAdd(activeLayer.id)}
+                />
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
-                <ToolButton
-                  active={mask.editing}
+                {/* One-shot, NOT a toggle — it starts an activity that lives
+                    on another panel. `onToggleEdit` switches the app to the
+                    Paint brush, which unmounts this panel and (by AppShell's
+                    own effect) clears `mask.editing`, so an `active` state
+                    here could never light and the Hide/Reveal pair could
+                    never render. Those live in the Paint panel now; this tile
+                    is the way in. */}
+                <ActionTile
+                  icon={Aperture}
+                  label="Paint mask"
                   disabled={disabled}
                   onClick={() => mask.onToggleEdit(activeLayer.id)}
-                  title={mask.editing ? "Stop editing mask" : "Edit layer mask"}
-                >
-                  <Aperture /> {mask.editing ? "Editing" : "Edit"}
-                </ToolButton>
-                <ToolButton
+                  title="Paint this layer's mask with the brush"
+                />
+                <ActionTile
+                  icon={Contrast}
+                  label="Invert"
                   disabled={disabled}
                   onClick={() => mask.onInvert(activeLayer.id)}
                   title="Invert mask"
-                >
-                  <Contrast /> Invert
-                </ToolButton>
-                {/* Brush value only means something while the mask is being
-                    painted — same visibility rule the row bar had. */}
-                {mask.editing && (
-                  <>
-                    <ToolButton
-                      active={mask.value < 128}
-                      disabled={disabled}
-                      onClick={() => mask.onSetValue(0)}
-                      title="Brush hides (paint black)"
-                    >
-                      <EyeOff /> Hide
-                    </ToolButton>
-                    <ToolButton
-                      active={mask.value >= 128}
-                      disabled={disabled}
-                      onClick={() => mask.onSetValue(255)}
-                      title="Brush reveals (paint white)"
-                    >
-                      <Eye /> Reveal
-                    </ToolButton>
-                  </>
-                )}
-                <ToolButton
+                />
+                <ActionTile
+                  icon={Check}
+                  label="Apply"
                   disabled={disabled}
                   onClick={() => mask.onApply(activeLayer.id)}
                   title="Apply mask (bake in, permanent)"
-                >
-                  <Check /> Apply
-                </ToolButton>
-                <ToolButton
+                />
+                <ActionTile
+                  icon={X}
+                  label="Remove"
                   disabled={disabled}
                   onClick={() => mask.onRemove(activeLayer.id)}
                   title="Remove mask"
-                >
-                  <X /> Remove
-                </ToolButton>
+                />
               </div>
             )}
           </div>

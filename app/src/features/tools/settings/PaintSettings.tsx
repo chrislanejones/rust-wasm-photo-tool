@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Brush, Droplets, PenTool, Blend } from "lucide-react";
+import { Brush, Droplets, PenTool, Blend, Check, Eye, EyeOff } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import type { BrushMode } from "@/stores/useToolStore";
 import { useToolStore } from "@/stores/useToolStore";
@@ -10,6 +10,8 @@ import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
+import { ActionTile } from "@/components/ui/action-tile";
+import { SectionHeader } from "@/components/ui/section-header";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 
 const BRUSH_SIZE_PRESETS = [4, 8, 16, 32] as const;
@@ -35,6 +37,13 @@ const STABILIZER_LEVELS = [
 ] as const;
 
 const PEN_WIDTH_PRESETS = [2, 4, 8, 16] as const;
+
+/** Mask brush value as an exclusive choice — 0 = hide (black), 255 = reveal
+ *  (white). Module-level so the group isn't handed a fresh array each render. */
+const MASK_BRUSH_OPTIONS = [
+  { id: "hide", label: "Hide", icon: EyeOff },
+  { id: "reveal", label: "Reveal", icon: Eye },
+] as const;
 
 /** Paint's sub-mode union — the store (`useToolStore.BrushMode`) is the
  *  canonical definition; this alias keeps the panel's public prop names. */
@@ -110,6 +119,13 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
   const setSmartBrush = useToolStore((s) => s.setSmartBrush);
   const smartBrushStrength = useToolStore((s) => s.smartBrushStrength);
   const setSmartBrushStrength = useToolStore((s) => s.setSmartBrushStrength);
+  // Mask painting — read straight from the store for the same reason Smart
+  // Brush is: it is a MODE the app is in, not a brush dimension, and routing
+  // it through props would mean threading it from AppShell for one section.
+  const maskEditing = useToolStore((s) => s.maskEditing);
+  const setMaskEditing = useToolStore((s) => s.setMaskEditing);
+  const maskPaintValue = useToolStore((s) => s.maskPaintValue);
+  const setMaskPaintValue = useToolStore((s) => s.setMaskPaintValue);
 
   const handleModeChange = (m: PaintMode) => {
     setInternalMode(m);
@@ -216,6 +232,51 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                         onChange={setSmartBrushStrength}
                       />
                     )}
+                  </div>
+                )}
+
+                {/* ── Painting a layer mask ──────────────────────────────
+                    Mask editing is a BRUSH activity, so its live controls
+                    belong on the brush's panel — this is where the strokes
+                    are actually made, and it is the only panel that can
+                    show them at all: `maskEditing` is force-cleared
+                    whenever the active tool stops being the brush
+                    (AppShell), so the Layers tool's own panel can never
+                    render them. v8.38 moved the mask buttons off the layer
+                    ROWS into the Layers tool; this is the half of that move
+                    that has to live here instead, and without it Hide/
+                    Reveal would be unreachable UI. */}
+                {maskEditing && (
+                  <div className="space-y-2 border-t border-theme-sidebar-border pt-3">
+                    <SectionHeader
+                      title="Painting Layer Mask"
+                      info={
+                        <>
+                          Strokes hit the active layer&rsquo;s mask, not its
+                          pixels. <strong className="font-semibold text-theme-foreground">Hide</strong>{" "}
+                          paints black (the layer disappears there),{" "}
+                          <strong className="font-semibold text-theme-foreground">Reveal</strong>{" "}
+                          paints white. Invert, Apply and Remove live in the
+                          Layers tool.
+                        </>
+                      }
+                    />
+                    <ToolButtonGroup
+                      label="Brush paints"
+                      columns={2}
+                      stacked
+                      value={maskPaintValue < 128 ? "hide" : "reveal"}
+                      onChange={(v) => setMaskPaintValue(v === "hide" ? 0 : 255)}
+                      options={MASK_BRUSH_OPTIONS}
+                    />
+                    <div className="grid gap-2 [grid-auto-rows:1fr]">
+                      <ActionTile
+                        icon={Check}
+                        label="Done painting mask"
+                        onClick={() => setMaskEditing(false)}
+                        title="Stop painting the mask (strokes go back to pixels)"
+                      />
+                    </div>
                   </div>
                 )}
               </>
