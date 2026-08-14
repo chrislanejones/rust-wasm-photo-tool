@@ -2238,19 +2238,33 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const ARC_GAP = 4;
           const ARC_R = 6;
 
-          const handles = [
-            { id: "nw", hx: sx,         hy: sy,          cursor: "nw-resize" },
-            { id: "n",  hx: sx + boxW/2, hy: sy,          cursor: "n-resize"  },
-            { id: "ne", hx: sx + boxW,   hy: sy,          cursor: "ne-resize" },
-            { id: "e",  hx: sx + boxW,   hy: sy + boxH/2, cursor: "e-resize"  },
-            { id: "se", hx: sx + boxW,   hy: sy + boxH,   cursor: "se-resize" },
-            { id: "s",  hx: sx + boxW/2, hy: sy + boxH,   cursor: "s-resize"  },
-            { id: "sw", hx: sx,          hy: sy + boxH,   cursor: "sw-resize" },
-            { id: "w",  hx: sx,          hy: sy + boxH/2, cursor: "w-resize"  },
-          ];
+          // ── v8.37 — ONE handle changes the font size, and it is not a corner.
+          //
+          // Until now EIGHT box handles (corners + edges) all ran the same
+          // drag: proportional font scaling from the box centre. Chris's
+          // report: "corners need to be reserved for changing the size of the
+          // bounding box, not the font size inside the box." The dedicated
+          // font-size affordance is the square-on-a-stem on the LEFT edge
+          // below (square = resize, circle = move/rotate — the overlay's
+          // existing handle language).
+          //
+          // The corner/edge squares are REMOVED, not re-purposed, because
+          // today there is NO box to resize: `boxW`/`boxH` are DERIVED from
+          // the measured text every render, text wraps only at manual
+          // newlines, and no wrap width exists anywhere in the model. Making
+          // corners resize a real box means reflow, and reflow needs a stored
+          // wrap width — a persisted-format change to the text annotation
+          // (TextParams + the annotation encode in ops.rs + everything in
+          // IndexedDB that holds one), i.e. an ADR plus the dexie-migration
+          // procedure, not a handler swap. Filed in PARKING_LOT with the two
+          // candidate designs. Until that lands, a rendered corner handle
+          // would promise a behaviour the model cannot express — so none is
+          // rendered, and the dashed border alone delineates the derived box.
 
-          // Resize handle drag — scales font size proportionally from box centre
-          const handleResizePointerDown = (e: React.PointerEvent) => {
+          // Font-size handle drag — scales font size proportionally with the
+          // pointer's distance from the box centre (the same feel the old
+          // eight handles had, now living on exactly one handle).
+          const handleFontSizePointerDown = (e: React.PointerEvent) => {
             e.stopPropagation();
             e.preventDefault();
             const startFs = effFontSize;
@@ -2664,21 +2678,51 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                       </g>
                     );
                   })()}
-                  {/* Resize handles */}
-                  {handles.map((h) => (
-                    <rect
-                      key={h.id}
-                      x={ctr.left + h.hx - HS / 2}
-                      y={ctr.top + h.hy - HS / 2}
-                      width={HS} height={HS}
-                      fill="white"
-                      stroke="rgba(0,0,0,0.4)"
-                      strokeWidth={1}
-                      rx={1}
-                      style={{ cursor: h.cursor, pointerEvents: "all" }}
-                      onPointerDown={handleResizePointerDown}
-                    />
-                  ))}
+                  {/* Font-size handle: horizontal stem + SQUARE on the LEFT edge.
+                      Square = resize, circle = move/rotate — see the v8.37
+                      comment at handleFontSizePointerDown for why this is the
+                      only size handle and the corners render nothing. */}
+                  {(() => {
+                    const leftEdge = ctr.left + sx;
+                    const midY = ctr.top + sy + boxH / 2;
+                    const stemRight = leftEdge - STEM_GAP;
+                    const stemLeft = stemRight - STEM_LEN;
+                    const sqCx = stemLeft - DOT_OFFSET;
+                    const filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.35))";
+                    return (
+                      <g
+                        style={{ cursor: "ew-resize", pointerEvents: "all", filter }}
+                        onPointerDown={handleFontSizePointerDown}
+                      >
+                        {/* Invisible fat hit target */}
+                        <rect
+                          x={sqCx - HS / 2 - 2}
+                          y={midY - 8}
+                          width={leftEdge - (sqCx - HS / 2 - 2)}
+                          height={16}
+                          fill="transparent"
+                        />
+                        <line
+                          x1={stemRight}
+                          y1={midY}
+                          x2={stemLeft}
+                          y2={midY}
+                          stroke="white"
+                          strokeWidth={2}
+                        />
+                        <rect
+                          x={sqCx - HS / 2}
+                          y={midY - HS / 2}
+                          width={HS}
+                          height={HS}
+                          fill="white"
+                          stroke="rgba(0,0,0,0.5)"
+                          strokeWidth={1}
+                          rx={1}
+                        />
+                      </g>
+                    );
+                  })()}
                 </g>
               </svg>
             </>

@@ -1972,3 +1972,22 @@ pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
   wiring. Its own session: handle rendering, hit zones, cursor feedback,
   and a QC pass on text reflow. ⚠️ Was reported "filed" on 08-13 but never
   actually written here — this entry corrects that.
+
+- **Text reflow — corners resizing a REAL bounding box (filed from the
+  2026-08-14 night session, Task 1).** The handle rearrangement shipped (left
+  square-on-stem = font size; the eight font-scaling box handles removed), but
+  corners cannot resize a box tonight because THERE IS NO BOX: `boxW`/`boxH`
+  in the CanvasArea text overlay are derived from measured text each render,
+  text wraps only at manual newlines, and no wrap width exists in the model.
+  Two candidate designs, different costs:
+  1. **Stored wrap width** (the real fix): `width` on the text annotation →
+     TextParams, the annotation encode/decode in `ops.rs`, engine line-breaker
+     (`ab_glyph` is already in the crate; `measure_text` exists via
+     textMetricsCache) — a persisted-format change ⇒ **ADR + dexie-migration
+     skill, not a night job**. Any new struct-returning measurement API must
+     go through `lib/engine/captureMarshal.ts` or its contract test fails.
+  2. **Commit-time newline baking** (cheap, lossy): corner drag computes a
+     wrap width for the SESSION only, text is committed with hard newlines
+     inserted. No format change — but one-way: widening the box on re-edit
+     cannot tell user newlines from baked ones. Chris would notice. Decide
+     awake, not at 1am.

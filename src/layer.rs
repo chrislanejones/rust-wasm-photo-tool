@@ -972,33 +972,81 @@ impl ImageHorseTool {
     }
 
     /// "Resize Layer" — begin a placement preview seeded from the ACTIVE
-    /// layer's own current pixels, initially shown at full canvas size.
+    /// layer's own current pixels, box hugging the layer's CONTENT BOUNDS
+    /// (the tightest rect of non-transparent pixels). Returns that rect as
+    /// `[x, y, w, h]` so JS can seed its overlay at the SAME rect — empty on
+    /// no-op (no active layer, or a fully transparent one).
+    ///
+    /// v8.37 — this used to seed the ENGINE at the full canvas while JS drew
+    /// its box at an 8%-inset "cosmetic" rect it never told the engine about
+    /// (`beginLayerResize`'s old inset block). Measured on a 420×320 artboard
+    /// doc: box at (26,26,368,268), engine at (0,0,420,320), content at
+    /// (10,10,400,300) — three different answers, and a 2 px handle nudge
+    /// snapped the whole layer 26 px inward per edge because the first
+    /// `set_paste_preview_rect` call was the first time the engine heard the
+    /// overlay's rect. One rect, decided HERE, returned to the caller, ends
+    /// that class of bug; it also makes the box bound the CONTENT (what the
+    /// user is resizing), not the buffer's transparent padding.
+    ///
     /// Reuses the exact `set_paste_preview_rect`/`cancel_paste_preview`/
-    /// `commit_paste_preview` flow built for paste placement: drag the same
-    /// bounding-box handles to scale/move the layer's content, Escape cancels
-    /// with the layer untouched, committing resamples+replaces the layer's
-    /// buffer and pushes one history snapshot. No-op if there's no active
-    /// layer.
-    pub fn begin_layer_resize_preview(&mut self) {
+    /// `commit_paste_preview` flow built for paste placement. The commit's
+    /// `is_layer_source` branch already clears the whole buffer and pastes
+    /// the resampled snapshot at the dest rect, so a cropped snapshot needs
+    /// no commit changes.
+    pub fn begin_layer_resize_preview(&mut self) -> Vec<i32> {
         if self.active >= self.layers.len() {
-            return;
+            return Vec::new();
         }
-        let (w, h) = (self.width, self.height);
-        let pixels = self.layers[self.active].buf.data.clone();
+        let buf = &self.layers[self.active].buf;
+        let (bw_full, bh_full) = (buf.width as usize, buf.height as usize);
+        // Tightest non-transparent rect. One pass, alpha channel only.
+        let (mut x0, mut y0, mut x1, mut y1) = (usize::MAX, usize::MAX, 0usize, 0usize);
+        for y in 0..bh_full {
+            let row = &buf.data[y * bw_full * 4..(y + 1) * bw_full * 4];
+            for x in 0..bw_full {
+                if row[x * 4 + 3] != 0 {
+                    if x < x0 {
+                        x0 = x;
+                    }
+                    if x > x1 {
+                        x1 = x;
+                    }
+                    if y < y0 {
+                        y0 = y;
+                    }
+                    y1 = y;
+                }
+            }
+        }
+        if x0 == usize::MAX {
+            return Vec::new(); // fully transparent — nothing to resize
+        }
+        let (bx, by) = (x0 as u32, y0 as u32);
+        let (bw, bh) = ((x1 - x0 + 1) as u32, (y1 - y0 + 1) as u32);
+        // Snapshot ONLY the content region — dragging then scales the content,
+        // not the invisible padding around it.
+        let mut pixels = vec![0u8; (bw as usize) * (bh as usize) * 4];
+        for row in 0..bh as usize {
+            let src_off = ((y0 + row) * bw_full + x0) * 4;
+            let dst_off = row * (bw as usize) * 4;
+            pixels[dst_off..dst_off + (bw as usize) * 4]
+                .copy_from_slice(&buf.data[src_off..src_off + (bw as usize) * 4]);
+        }
         self.paste_preview = Some(PastePreview {
             pixels,
-            src_w: w,
-            src_h: h,
-            dest_x: 0,
-            dest_y: 0,
-            dest_w: w,
-            dest_h: h,
-            init_x: 0,
-            init_y: 0,
-            init_w: w,
-            init_h: h,
+            src_w: bw,
+            src_h: bh,
+            dest_x: bx as i32,
+            dest_y: by as i32,
+            dest_w: bw,
+            dest_h: bh,
+            init_x: bx as i32,
+            init_y: by as i32,
+            init_w: bw,
+            init_h: bh,
             is_layer_source: true,
         });
+        vec![bx as i32, by as i32, bw as i32, bh as i32]
     }
 
     /// Update the live placement rect (called every move/resize drag frame).

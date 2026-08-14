@@ -4926,6 +4926,57 @@ mod layer_persistence_tests {
         assert!(!t.has_paste_preview());
     }
 
+    // v8.37 — the box must hug the CONTENT, and the caller must be told where
+    // that is. The old seeding gave three different answers at open (engine:
+    // full canvas; JS overlay: 8%-inset cosmetic rect; content: neither), and
+    // a 2 px handle nudge snapped the layer 26 px inward per edge on a
+    // 420×320 doc because the first set_paste_preview_rect was the first time
+    // the engine heard the overlay's rect.
+    #[test]
+    fn layer_resize_preview_seeds_at_content_bounds_and_returns_them() {
+        let mut t = ImageHorseTool::new(20, 20);
+        // Transparent buffer with an opaque 6×4 block at (3, 5).
+        let mut px_data = solid(20, 20, [0, 0, 0, 0]);
+        for y in 5..9 {
+            for x in 3..9 {
+                let o = (y * 20 + x) * 4;
+                px_data[o..o + 4].copy_from_slice(&[200, 100, 50, 255]);
+            }
+        }
+        t.load_image(&px_data);
+        let rect = t.begin_layer_resize_preview();
+        assert_eq!(rect, vec![3, 5, 6, 4], "returned rect = content bounds");
+        let p = t.paste_preview.as_ref().unwrap();
+        assert_eq!(
+            (p.dest_x, p.dest_y, p.dest_w, p.dest_h),
+            (3, 5, 6, 4),
+            "engine preview rect = the SAME rect the caller was told"
+        );
+        assert_eq!(
+            (p.src_w, p.src_h),
+            (6, 4),
+            "snapshot is the cropped content, not the padded buffer"
+        );
+        assert_eq!(
+            &p.pixels[0..4],
+            &[200, 100, 50, 255],
+            "snapshot starts at the content's own top-left pixel"
+        );
+        // Commit at a moved rect: content lands there, everywhere else clear.
+        t.set_paste_preview_rect(10, 10, 6, 4);
+        t.commit_paste_preview(0);
+        assert_eq!(px(&t, 10, 10), [200, 100, 50, 255], "content at new rect");
+        assert_eq!(px(&t, 3, 5), [0, 0, 0, 0], "old location cleared");
+    }
+
+    #[test]
+    fn layer_resize_preview_noops_on_a_fully_transparent_layer() {
+        let mut t = ImageHorseTool::new(8, 8);
+        t.load_image(&solid(8, 8, [0, 0, 0, 0]));
+        assert_eq!(t.begin_layer_resize_preview(), Vec::<i32>::new());
+        assert!(!t.has_paste_preview(), "nothing to resize — no preview");
+    }
+
     #[test]
     fn restore_text_annotation_attaches_to_active_layer() {
         let mut t = ImageHorseTool::new(32, 32);

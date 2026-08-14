@@ -922,12 +922,17 @@ declare module "stamp_tool" {
      *  for a `begin_layer_resize_preview` preview) snapshot. */
     commit_paste_preview(filter: number): void;
     /** "Resize Layer" — begin a placement preview seeded from the ACTIVE layer's
-     *  own current pixels (full canvas size initially) instead of externally
-     *  pasted bytes. Reuses the exact same set_paste_preview_rect/
-     *  cancel_paste_preview/commit_paste_preview flow as paste placement; while
-     *  live, the active layer is hidden from the composite (its own content is
-     *  the drag preview) so nothing doubles up. No-op if there's no active layer. */
-    begin_layer_resize_preview(): void;
+     *  own current pixels, box hugging the layer's CONTENT BOUNDS (tightest
+     *  non-transparent rect). Returns that rect as an Int32Array `[x, y, w, h]`
+     *  so the caller seeds its overlay at the SAME rect — empty on no-op (no
+     *  active layer, or fully transparent). v8.37: replaced the full-canvas
+     *  seed + JS-side cosmetic inset that gave the engine and the overlay two
+     *  different rects (the first drag then snapped the layer to the overlay's).
+     *  Reuses the exact same set_paste_preview_rect/cancel_paste_preview/
+     *  commit_paste_preview flow as paste placement; while live, the active
+     *  layer is hidden from the composite (its own content is the drag preview)
+     *  so nothing doubles up. */
+    begin_layer_resize_preview(): Int32Array;
 
     // ── Layer persistence (serialize / restore) ──
     /** PNG of one layer's raw pixels (no compositing, no overlays). */

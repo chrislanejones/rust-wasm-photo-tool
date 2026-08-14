@@ -118,29 +118,27 @@ export function usePastePlacementTool({
     const canvas = canvasRef.current;
     if (!t || !canvas) return;
     onCancelRef.current = null; // layer-resize cancel leaves the layer as-is
-    t.begin_layer_resize_preview();
-    // ADR-024 Stage 3.5 — TRUTHY TRAP. Un-awaited, `!Promise` is always false,
-    // so this stops rejecting the no-active-layer case and the box below gets
-    // seeded over a preview Rust never created.
-    if (!(await t.has_paste_preview())) return; // no active layer — Rust no-op'd
-    // Seed the box INSET from the canvas edge rather than flush against it.
+    // v8.37 — the ENGINE decides the seed rect and this overlay draws THAT.
     //
-    // Seeded at the full canvas, every handle sat exactly on the image border:
-    // nothing moved at the moment of click, the handles were the hardest pixels
-    // on the canvas to find, and the tool read as a dead button. A regular
-    // paste never had this problem because it seeds at the pasted content's own
-    // size, comfortably inside the canvas — which is why resizing by other
-    // means always "worked".
-    //
-    // The inset is cosmetic only: the preview still holds the layer's full
-    // pixels, and dragging a handle back out restores the original framing. It
-    // costs one visible gesture to undo and buys the tool announcing itself.
-    const inset = Math.round(Math.min(canvas.width, canvas.height) * 0.08);
+    // The engine seeds the preview at the active layer's CONTENT BOUNDS (the
+    // tightest non-transparent rect) and returns it; empty means no active
+    // layer or a fully transparent one. This replaced a "cosmetic" 8%-inset
+    // rect that was set here without ever telling the engine — measured on a
+    // 420×320 doc: overlay box at (26,26,368,268), engine rect at
+    // (0,0,420,320), photo content at (10,10,400,300), and a 2 px handle
+    // nudge snapped the whole layer 26 px inward per edge, because the first
+    // drag's set_paste_preview_rect was the first time the engine heard the
+    // overlay's rect ("resize is wonky, the bounding box not in correct
+    // place" — Chris, 2026-08-13). One rect, one owner. The old inset's
+    // discoverability goal (handles off the image border) now only applies
+    // to full-bleed layers, where the border IS the truth.
+    const seeded = await t.begin_layer_resize_preview();
+    if (!seeded || seeded.length !== 4) return;
     setRect({
-      x: inset,
-      y: inset,
-      width: Math.max(1, canvas.width - inset * 2),
-      height: Math.max(1, canvas.height - inset * 2),
+      x: seeded[0],
+      y: seeded[1],
+      width: Math.max(1, seeded[2]),
+      height: Math.max(1, seeded[3]),
     });
     flushToCanvas();
   }, [toolRef, canvasRef, flushToCanvas]);
