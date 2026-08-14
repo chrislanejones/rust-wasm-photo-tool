@@ -7184,3 +7184,44 @@ undefined and the guard makes it a SILENT no-op; only the browser caught it.
 
 **Gates.** vitest 546, cargo 211, tsc clean, eslint 0 errors, builds clean.
 No engine change in this release (wasm byte-identical to v8.37).
+
+---
+
+## v8.39 Change Summary — 2026-08-14
+
+**Layers panel matched to the house button system — and the reachability bug
+that pass uncovered.** Follow-up to v8.38, same night.
+
+### Consistency pass (the ask)
+
+| Control | Kind | Was | Now |
+|---|---|---|---|
+| Invert / Apply / Remove | one-shot | plain `ToolButton` — read as three permanently-unlit toggles | **`ActionTile`** |
+| Hide / Reveal | pick-one-of-2 | two loose `ToolButton`s | **`ToolButtonGroup stacked`** |
+| section break | — | bare `pt-2` | shared `border-t … pt-3`, named `SECTION_SEP` so all three sections cannot drift |
+| layer dropdown | — | bare `<select>` | `text-2xs` label above, matching TextSettings |
+
+The SSOT is unambiguous (`docs` + the button-variant rule): toggles are
+`ToolButton stacked` / `ToolButtonGroup` and carry `active`; one-shot actions
+are `ActionTile`, which never does.
+
+### 🚨 The defect the pass found — two v8.38 controls were unreachable
+
+`AppShell` force-clears `maskEditing` whenever `activeTool !== "brush"`, and
+the Layers tool is `arrow`. So on the panel v8.38 shipped, `mask.editing` was
+**always false**: the Edit toggle could never light and the Hide/Reveal pair
+could never render at all. Their old home worked only because the Review panel
+survives tool switches — a TOOL panel cannot host a control belonging to a
+different tool's activity.
+
+| Surface | Owns |
+|---|---|
+| **Paint panel** (new section, `maskEditing` only) | Hide / Reveal + Done — read straight from `useToolStore`, the same pattern Smart Brush already uses there (zero prop wiring, AppShell untouched) |
+| **Layers panel** | Paint mask (the way in) + Invert / Apply / Remove — the four that are tool-independent |
+
+Verified end-to-end in the browser: Add mask → lands on Paint with "Painting
+Layer Mask" → Hide/Reveal toggles exclusively → **a Hide stroke punches a
+transparent hole through the photo** → Done exits and the section disappears.
+
+**Gates.** vitest 546, tsc clean, eslint 0 errors, build clean. No engine
+change (wasm byte-identical to v8.37).

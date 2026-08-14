@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.39",
+    date: "2026-08-14",
+    headline: "The Layers panel matches every other panel",
+    entries: [
+      {
+        tag: "ui",
+        text: "The mask actions were built as toggle-style buttons that could never light up, so they read as disabled. They are the same one-shot tiles the rest of the app uses now, the section divider matches, and the layer dropdown gets the label its neighbours have.",
+      },
+      {
+        tag: "fix",
+        text: "That pass turned up something worse: two mask controls moved into the Layers tool yesterday belong to the brush, and the app switches mask painting off the moment you leave the brush — so on that panel they could never appear at all. Hide/Reveal and Done now live on the Paint panel, where the strokes actually happen; Layers keeps Paint mask, Invert, Apply and Remove.",
+      },
+    ],
+  },
+  {
     version: "v8.38",
     date: "2026-08-14",
     headline: "Layers become a targeted thing",

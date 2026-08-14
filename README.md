@@ -84,6 +84,26 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.39 — 2026-08-14
+
+**The Layers panel now looks and behaves like every other tool panel — and two
+of its buttons work again.** The consistency pass came first: the mask actions
+were built as toggle-style buttons that could never light up, so they read as
+disabled. They're the same one-shot tiles the rest of the app uses now, the
+section divider matches, and the layer dropdown gets the label its neighbours
+have.
+
+That pass turned up something worse. Yesterday's release moved the mask
+controls into the Layers tool, but two of them — the paint toggle and the
+hide/reveal choice — belong to the *brush*, and the app switches off mask
+painting the moment you leave the brush. Living on the Layers panel, they
+could never appear at all. They now live on the Paint panel, where the strokes
+actually happen: choose Hide or Reveal, paint, then Done. The Layers panel
+keeps Paint mask, Invert, Apply and Remove — the four that don't care which
+tool you're holding.
+
+<details><summary>Older releases</summary>
+
 ### v8.38 — 2026-08-14
 
 **Layers become a targeted thing.** The Edit tab that moved and resized
@@ -99,8 +119,6 @@ hidden layer: does painting actually land on the layer you selected? It does
 — a stroke painted on one layer disappears when that layer is hidden and
 returns when it's shown, and the engine's own per-layer pixel counts agree.
 That was already true; now the UI finally makes the selection visible.
-
-<details><summary>Older releases</summary>
 
 ### v8.37 — 2026-08-14
 
