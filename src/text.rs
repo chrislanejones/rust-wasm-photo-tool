@@ -214,6 +214,84 @@ pub fn render_stamp_label(
     rotate_pixels(&pixels, canvas_w, canvas_h, angle_deg)
 }
 
+/// The horizontal padding `measure`/`render_text` add on EACH side of the
+/// glyph ink. Callers converting a user-facing box width into a content width
+/// must subtract twice this — exported so the conversion cannot drift from the
+/// layout it is compensating for.
+pub fn side_padding(font_size: f32) -> f32 {
+    (font_size * 0.25).ceil()
+}
+
+/// Greedy word-wrap: re-break `text` so no line's ink exceeds `max_w` px,
+/// preserving the author's own newlines as hard breaks.
+///
+/// Returns a plain `\n`-delimited string, which is the ONLY reason this
+/// feature is cheap: `measure`, `render_text` and the tile builder all already
+/// split on `\n`, so wrapping is a pre-pass rather than a second layout engine.
+/// Nothing downstream needs to know wrapping happened.
+///
+/// `max_w` is the CONTENT width (glyph ink), not the padded box — see
+/// [`side_padding`]. A non-positive `max_w` returns the text unchanged, which
+/// is what `wrap_width == 0` (the pre-v8.40 default, and every restored v2
+/// annotation) means: no wrapping, size the box to the text.
+///
+/// Greedy, not Knuth-Plass: this has to agree EXACTLY with what the overlay
+/// previews and what replay rebuilds, and "obvious and reproducible" beats
+/// "optimal" for that. A single word longer than `max_w` is left overlong on
+/// its own line rather than broken mid-word — hyphenation is a typographic
+/// decision, and silently splitting a URL or a name would be worse than one
+/// line sticking out.
+pub fn wrap(text: &str, font_size: f32, bold: bool, max_w: f32) -> String {
+    // `<= 0.0` rather than `!(max_w > 0.0)`: clippy rightly objects to negated
+    // comparisons on partially-ordered floats. NaN falls through to the
+    // no-wrap branch either way, which is the safe answer for a bad width.
+    if max_w.is_nan() || max_w <= 0.0 || text.is_empty() {
+        return text.to_string();
+    }
+    let font_bytes = if bold { FONT_BOLD } else { FONT_REGULAR };
+    let font = FontRef::try_from_slice(font_bytes)
+        .unwrap_or_else(|_| FontRef::try_from_slice(FONT_REGULAR).expect("regular font"));
+    let scale = PxScale::from(font_size);
+
+    let mut out = String::with_capacity(text.len() + 16);
+    for (i, para) in text.split('\n').enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        // A paragraph that already fits is emitted VERBATIM — no re-spacing,
+        // no lost indentation, no trimmed trailing space. This is what makes
+        // the function idempotent by construction (every line it emits fits,
+        // so a second pass copies them through) and what keeps it from
+        // rewriting text the user never asked it to touch. The unit test for
+        // "   " caught the earlier version silently deleting whitespace.
+        if line_width(para, &font, scale) <= max_w {
+            out.push_str(para);
+            continue;
+        }
+        // Only a paragraph that genuinely must break gets its inter-word runs
+        // normalised to single spaces — that is inherent to re-breaking, and
+        // the alternative (carrying original runs across a break) puts stray
+        // leading spaces at the start of wrapped lines.
+        let mut line = String::new();
+        for word in para.split_whitespace() {
+            let candidate = if line.is_empty() {
+                word.to_string()
+            } else {
+                format!("{line} {word}")
+            };
+            if line_width(&candidate, &font, scale) <= max_w || line.is_empty() {
+                line = candidate;
+            } else {
+                out.push_str(&line);
+                out.push('\n');
+                line = word.to_string();
+            }
+        }
+        out.push_str(&line);
+    }
+    out
+}
+
 /// Returns the (width, height) in pixels that `render_text` would produce,
 /// without allocating a full pixel buffer. Used by the JS UI to size the
 /// text-input bounding box before the user commits.
@@ -314,5 +392,111 @@ pub(crate) fn rotate_pixels(data: &[u8], w: u32, h: u32, angle_deg: f32) -> Rend
         pixels: out,
         width: new_w,
         height: new_h,
+    }
+}
+
+#[cfg(test)]
+mod wrap_tests {
+    use super::*;
+
+    /// Ink width of one already-broken line, the same way `wrap` measures it.
+    fn w(line: &str, size: f32) -> f32 {
+        let font = FontRef::try_from_slice(FONT_REGULAR).unwrap();
+        line_width(line, &font, PxScale::from(size))
+    }
+
+    #[test]
+    fn zero_width_is_a_no_op_the_pre_wrap_default() {
+        let t = "the quick brown fox jumps over the lazy dog";
+        assert_eq!(wrap(t, 24.0, false, 0.0), t, "wrap_width 0 = do not wrap");
+        assert_eq!(wrap(t, 24.0, false, -5.0), t, "negative is also inert");
+    }
+
+    #[test]
+    fn breaks_only_where_it_must_and_every_line_fits() {
+        let t = "the quick brown fox jumps over the lazy dog";
+        let max = 120.0;
+        let out = wrap(t, 24.0, false, max);
+        assert!(out.contains('\n'), "long text at a narrow width must break");
+        for line in out.split('\n') {
+            // A single overlong WORD is the one allowed exception.
+            let single_word = !line.trim().contains(' ');
+            assert!(
+                w(line, 24.0) <= max || single_word,
+                "line {line:?} is {} px, over the {max} px limit",
+                w(line, 24.0)
+            );
+        }
+        // No words invented or lost.
+        assert_eq!(
+            out.split_whitespace().collect::<Vec<_>>(),
+            t.split_whitespace().collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn a_word_longer_than_the_box_is_left_whole_not_hyphenated() {
+        let t = "antidisestablishmentarianism";
+        let out = wrap(t, 32.0, false, 20.0);
+        assert_eq!(out, t, "never split mid-word — a URL or name would break");
+    }
+
+    #[test]
+    fn authors_own_newlines_stay_hard_breaks() {
+        let t = "line one\nline two";
+        // Wide enough that no automatic break is needed.
+        let out = wrap(t, 16.0, false, 10_000.0);
+        assert_eq!(out, t, "hard breaks survive, and none are added");
+        assert_eq!(out.matches('\n').count(), 1);
+    }
+
+    #[test]
+    fn wrapping_is_idempotent_rewrapping_its_own_output_changes_nothing() {
+        // Load-bearing: the overlay previews wrapped text and the engine
+        // re-wraps on every rebuild. A non-idempotent breaker would creep the
+        // layout on each keystroke.
+        let t = "the quick brown fox jumps over the lazy dog and keeps running";
+        let once = wrap(t, 20.0, false, 150.0);
+        let twice = wrap(&once, 20.0, false, 150.0);
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn empty_and_whitespace_do_not_panic() {
+        assert_eq!(wrap("", 24.0, false, 100.0), "");
+        assert_eq!(wrap("   ", 24.0, false, 100.0), "   ");
+        assert_eq!(wrap("\n\n", 24.0, false, 100.0), "\n\n");
+    }
+
+    #[test]
+    fn text_that_already_fits_is_returned_byte_for_byte() {
+        // The whitespace-eating bug the test above caught: wrapping must not
+        // rewrite text it did not need to break.
+        for t in ["  indented", "trailing  ", "a  double  space", "plain"] {
+            assert_eq!(wrap(t, 16.0, false, 5_000.0), t, "mangled {t:?}");
+        }
+    }
+
+    #[test]
+    fn a_wider_box_yields_fewer_lines_the_whole_point_of_reflow() {
+        let t = "the quick brown fox jumps over the lazy dog";
+        let narrow = wrap(t, 24.0, false, 100.0).matches('\n').count();
+        let wide = wrap(t, 24.0, false, 400.0).matches('\n').count();
+        assert!(narrow > wide, "narrow={narrow} wide={wide}");
+    }
+
+    #[test]
+    fn side_padding_matches_what_measure_actually_adds() {
+        // measure() adds `(font_size * 0.25).ceil()` per side; if that drifts,
+        // every box-width -> content-width conversion silently misaligns.
+        let size = 24.0;
+        let (boxed, _) = measure("x", size, false);
+        let ink = w("x", size).max(8.0);
+        let derived = (boxed as f32 - ink).ceil() / 2.0;
+        assert!(
+            (derived - side_padding(size)).abs() <= 1.0,
+            "side_padding {} vs derived {derived}",
+            side_padding(size)
+        );
     }
 }

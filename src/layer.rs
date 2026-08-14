@@ -1456,6 +1456,11 @@ impl ImageHorseTool {
         let ann = build_text_annotation(
             id,
             text,
+            // ⚠️ The layer-JSON restore path does not carry a reflow width yet, so a
+            // text annotation rebuilt from it comes back unwrapped. Filed as
+            // ADR-024-F7; the op-log path (which DOES carry it, via
+            // Op::TextWrap) is the one the resume actually uses.
+            0,
             font_size,
             r,
             g,

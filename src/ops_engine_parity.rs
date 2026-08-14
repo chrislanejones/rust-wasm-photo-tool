@@ -250,6 +250,7 @@ fn text_add_replay_matches_live_annotation() {
     apply(
         &Op::TextAdd(TextParams {
             id,
+            wrap_width: 0,
             text: "Parity!".into(),
             x: 14,
             y: 22,
@@ -540,6 +541,7 @@ fn persist_restore_keeps_base_annotations_live() {
     // must still apply — proving base annotations round-trip as live lists,
     // not baked pixels.
     let text = TextParams {
+        wrap_width: 0,
         id: 1,
         text: "base".into(),
         x: 6,
@@ -571,6 +573,7 @@ fn persist_restore_keeps_base_annotations_live() {
     let base_ann = crate::ops::encode_annotations(std::slice::from_ref(&text), &[], None);
     let base_px = seed_pixels(64, 48);
     let edited = TextParams {
+        wrap_width: 0,
         text: "edited".into(),
         bold: true,
         ..text

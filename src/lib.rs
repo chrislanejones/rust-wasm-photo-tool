@@ -1428,10 +1428,39 @@ impl ImageHorseTool {
             }
             for a in &layer.text_annotations {
                 let params = crate::ops::TextParams::from_annotation(a);
+                // ⚠️ `TextParams::wrap_width` is `#[serde(skip)]` (it has to be —
+                // see the field's comment), so `TextAdd`/`TextEdit` physically
+                // CANNOT carry a reflow width. Every wrap change therefore needs
+                // its own `TextWrap` op, or replay rebuilds the text unwrapped,
+                // the composite hash diverges, and the log marks itself broken —
+                // silently falling the user back to snapshot undo.
                 match log_doc.texts.iter().find(|t| t.id == a.id) {
-                    None => pending.push(crate::ops::Op::TextAdd(params)),
-                    Some(t) if *t != params => pending.push(crate::ops::Op::TextEdit(params)),
-                    _ => {}
+                    None => {
+                        let wrap = params.wrap_width;
+                        pending.push(crate::ops::Op::TextAdd(params));
+                        if wrap != 0 {
+                            pending.push(crate::ops::Op::TextWrap {
+                                id: a.id,
+                                wrap_width: wrap,
+                            });
+                        }
+                    }
+                    Some(t) => {
+                        if t.wrap_width != params.wrap_width {
+                            pending.push(crate::ops::Op::TextWrap {
+                                id: a.id,
+                                wrap_width: params.wrap_width,
+                            });
+                        }
+                        // Compare everything EXCEPT the wrap, which the branch
+                        // above already accounted for — otherwise a wrap-only
+                        // drag would also emit a redundant TextEdit.
+                        let mut without_wrap = t.clone();
+                        without_wrap.wrap_width = params.wrap_width;
+                        if without_wrap != params {
+                            pending.push(crate::ops::Op::TextEdit(params));
+                        }
+                    }
                 }
             }
             for ls in &log_doc.shapes {
@@ -1701,6 +1730,7 @@ impl ImageHorseTool {
                 build_text_annotation(
                     t.id,
                     &t.text,
+                    t.wrap_width,
                     t.font_size,
                     t.r,
                     t.g,
@@ -2491,6 +2521,9 @@ impl ImageHorseTool {
         let ann = build_text_annotation(
             id,
             text,
+            // Snapshot pushes carry raw params, not a live annotation; wrapping is
+            // re-derived when the snapshot is restored through the normal path.
+            0,
             font_size,
             r,
             g,
@@ -2558,6 +2591,9 @@ impl ImageHorseTool {
         let ann = build_text_annotation(
             id,
             text,
+            // Snapshot pushes carry raw params, not a live annotation; wrapping is
+            // re-derived when the snapshot is restored through the normal path.
+            0,
             font_size,
             r,
             g,
@@ -2877,6 +2913,11 @@ impl ImageHorseTool {
                     build_text_annotation(
                         a.id,
                         &a.text,
+                        // The reflow width is a canvas-space measurement, so it
+                        // scales with the image exactly like the font does —
+                        // otherwise resizing a photo would re-break every
+                        // wrapped caption at the wrong width.
+                        (a.wrap_width as f64 * s_uniform) as u32,
                         // Never round a glyph out of existence.
                         ((a.font_size as f64 * s_uniform) as f32).max(1.0),
                         a.r,

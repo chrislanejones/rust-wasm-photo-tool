@@ -61,7 +61,27 @@ use serde::{Deserialize, Serialize};
 /// is REJECTED, not migrated. Safe: op-log persistence ships behind
 /// `ih_oplog_persist` (OFF), the log is derived state, and a rejected restore
 /// falls back to the snapshot/archive path with the image intact.
-pub const OP_FORMAT_VERSION: u8 = 2;
+///
+/// **3** — v8.40, text reflow: text annotations gained a `wrap_width`. Unlike
+/// the v1→v2 step this is **MIGRATED, NOT REJECTED**, and the whole shape of
+/// the change is chosen to make that possible:
+///
+///   * Every pre-existing [`Op`] variant and every existing struct keeps its
+///     exact v2 byte layout. The wrap width rides in an APPENDED variant
+///     ([`Op::TextWrap`]) — postcard indexes enum variants positionally, so
+///     appending cannot disturb the ones already on disk. `decode_op`
+///     therefore accepts v2 and v3 bytes through the same code path, with no
+///     frozen mirror of the enum to transcribe (and get subtly wrong).
+///   * `encode_annotations` gained a trailing tuple element, so v3 blobs are
+///     a strict prefix-extension of v2 ones. `decode_annotations` tries the
+///     4-tuple and falls back to the 3-tuple, defaulting the wrap widths.
+///
+/// ⚠️ That claim is not decoration — `v2_blobs_still_decode_under_v3` and
+/// `v2_op_bytes_still_decode_under_v3` pin it. `ih_oplog_persist` now ships
+/// **ON** (`USE_OPLOG_PERSISTENCE = true`), so a rejected log would have cost
+/// every user their cross-reload undo history; that is why this step migrates
+/// instead of rejecting.
+pub const OP_FORMAT_VERSION: u8 = 3;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -148,6 +168,19 @@ pub struct TextParams {
     pub shadow_dx: i32,
     pub shadow_dy: i32,
     pub shadow_blur: u32,
+    /// Reflow width in px (0 = don't wrap — size the box to the text). v8.40.
+    ///
+    /// ⚠️ `#[serde(skip)]` is LOAD-BEARING, not an optimisation. postcard
+    /// writes struct fields positionally with no names and no length prefix,
+    /// so a real field here would shift every byte after it in the
+    /// `Op::TextAdd` / `Op::TextEdit` payloads already persisted in users'
+    /// IndexedDB — silently mis-decoding their documents. Skipped, the wire
+    /// layout of `TextParams` is byte-identical to v2, and the width travels
+    /// beside it instead: as the trailing element of `encode_annotations`, and
+    /// as [`Op::TextWrap`] in the log. Deserialises to 0, which is exactly
+    /// what every pre-v8.40 annotation meant.
+    #[serde(skip)]
+    pub wrap_width: u32,
 }
 
 /// Full-fidelity serializable mirror of the engine's `ShapeAnnotation` —
@@ -189,6 +222,7 @@ impl TextParams {
     pub(crate) fn from_annotation(a: &crate::annotations::TextAnnotation) -> Self {
         TextParams {
             id: a.id,
+            wrap_width: a.wrap_width,
             text: a.text.clone(),
             x: a.x,
             y: a.y,
@@ -328,6 +362,19 @@ pub enum Op {
     /// Replace an existing shape annotation's full state (re-selected and
     /// edited live shapes/arrows/pen paths).
     ShapeEdit(ShapeParams),
+    /// Set a text annotation's wrap width in px (0 = don't wrap, size the box
+    /// to the text). v8.40.
+    ///
+    /// ⚠️ MUST STAY LAST. postcard encodes an enum as `varint(variant index)
+    /// ++ payload`, so this variant's index is what makes v2 op bytes decode
+    /// unchanged under v3 — inserting anything above it would renumber the
+    /// variants already written to users' disks and silently mis-decode them.
+    /// Append new variants; never insert.
+    ///
+    /// Carried as its own op rather than a field on [`TextParams`] for the
+    /// same reason: a new field would move every byte after it in `TextAdd`
+    /// and `TextEdit` payloads that are already persisted.
+    TextWrap { id: u32, wrap_width: u32 },
 }
 
 impl Op {
@@ -349,6 +396,10 @@ impl Op {
             Op::ShapeEdit(_) => "Edit Shape",
             Op::ShapeRemove { .. } => "Delete Shape",
             Op::LayerMove { .. } => "Move Layer",
+            // Same label as an edit: to the user, dragging the box wider IS
+            // editing the text, and a separate "Wrap Text" entry would make
+            // one gesture read as two history steps.
+            Op::TextWrap { .. } => "Edit Text",
         }
     }
 }
@@ -394,9 +445,13 @@ pub fn encode_op(op: &Op) -> Vec<u8> {
 }
 
 /// Decode an op, validating the leading version byte first.
+///
+/// Accepts **2 and 3**: v3 only APPENDED an enum variant, so every byte
+/// sequence a v2 writer could produce means exactly the same thing here. v1 is
+/// still rejected (its structs differ). See [`OP_FORMAT_VERSION`].
 pub fn decode_op(bytes: &[u8]) -> Result<Op, OpError> {
     let (&ver, body) = bytes.split_first().ok_or(OpError::Empty)?;
-    if ver != OP_FORMAT_VERSION {
+    if ver != OP_FORMAT_VERSION && ver != 2 {
         return Err(OpError::UnsupportedVersion(ver));
     }
     postcard::from_bytes(body).map_err(|_| OpError::Decode)
@@ -453,7 +508,11 @@ pub fn encode_annotations(
 ) -> Vec<u8> {
     let mut out = Vec::with_capacity(16);
     out.push(OP_FORMAT_VERSION);
-    if let Ok(body) = postcard::to_allocvec(&(texts, shapes, canvas)) {
+    // v3 appends the per-text wrap widths as a trailing tuple element, making
+    // a v3 blob a strict prefix-extension of a v2 one — which is exactly what
+    // lets `decode_annotations` read both. Parallel to `texts` by index.
+    let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
+    if let Ok(body) = postcard::to_allocvec(&(texts, shapes, canvas, &wraps)) {
         out.extend_from_slice(&body);
     }
     out
@@ -472,10 +531,27 @@ pub fn decode_annotations(
     bytes: &[u8],
 ) -> Result<(Vec<TextParams>, Vec<ShapeParams>, Option<CanvasParams>), OpError> {
     let (&ver, body) = bytes.split_first().ok_or(OpError::Empty)?;
-    if ver != OP_FORMAT_VERSION {
+    if ver != OP_FORMAT_VERSION && ver != 2 {
         return Err(OpError::UnsupportedVersion(ver));
     }
-    postcard::from_bytes(body).map_err(|_| OpError::Decode)
+    // v3 first (the 4-tuple with wrap widths); a v2 blob simply runs out of
+    // bytes at the 4th element, so fall back and default every width to 0 —
+    // "don't wrap", which is precisely what a v2 document meant.
+    type V3 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+    );
+    if let Ok((mut texts, shapes, canvas, wraps)) = postcard::from_bytes::<V3>(body) {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        return Ok((texts, shapes, canvas));
+    }
+    type V2 = (Vec<TextParams>, Vec<ShapeParams>, Option<CanvasParams>);
+    let (texts, shapes, canvas) = postcard::from_bytes::<V2>(body).map_err(|_| OpError::Decode)?;
+    Ok((texts, shapes, canvas))
 }
 
 // ── The replay document ─────────────────────────────────────────────────────
@@ -815,6 +891,11 @@ pub fn apply(op: &Op, doc: &mut Document) {
         Op::TextRemove { id } => {
             doc.texts.retain(|t| t.id != *id);
         }
+        Op::TextWrap { id, wrap_width } => {
+            if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
+                t.wrap_width = *wrap_width;
+            }
+        }
         Op::ShapeAdd(p) => {
             doc.shapes.push(p.clone());
         }
@@ -1132,6 +1213,7 @@ mod tests {
     fn test_text(id: u32) -> TextParams {
         TextParams {
             id,
+            wrap_width: 0,
             text: "hi".into(),
             x: 3,
             y: 4,
@@ -1231,6 +1313,7 @@ mod tests {
             },
             Op::TextAdd(test_text(1)),
             Op::TextEdit(TextParams {
+                wrap_width: 0,
                 text: "bye".into(),
                 bold: false,
                 rotation_deg: 0.0,
@@ -1516,6 +1599,7 @@ mod tests {
         assert_ne!(baseline, with_text, "text visibly changed the composite");
         apply(
             &Op::TextEdit(TextParams {
+                wrap_width: 0,
                 text: "edited".into(),
                 ..test_text(1)
             }),
@@ -1765,5 +1849,154 @@ mod tests {
             log.document().composite_hash(),
             "keyframed rebuild composites identically to the live document"
         );
+    }
+}
+
+#[cfg(test)]
+mod v2_migration_tests {
+    //! The v2 → v3 promise, pinned: **old data must still decode**.
+    //!
+    //! `USE_OPLOG_PERSISTENCE` ships ON, so a rejected log costs every user
+    //! their cross-reload undo history. v3 was shaped to make migration
+    //! possible (append-only variant, `#[serde(skip)]` on the new field,
+    //! trailing tuple element) — these tests are what stop that shape from
+    //! being "simplified" back into a breaking change.
+    use super::*;
+
+    fn a_text(id: u32) -> TextParams {
+        TextParams {
+            id,
+            wrap_width: 0,
+            text: "hello".into(),
+            x: 1,
+            y: 2,
+            font_size: 16.0,
+            r: 1,
+            g: 2,
+            b: 3,
+            bold: true,
+            rotation_deg: 0.0,
+            background_kind: 0,
+            bg_r: 0,
+            bg_g: 0,
+            bg_b: 0,
+            bg_a: 0,
+            bg_padding: 0,
+            bg_corner_radius: 0,
+            bg_tail: 0,
+            shadow_box: false,
+            shadow_text: false,
+            shadow_r: 0,
+            shadow_g: 0,
+            shadow_b: 0,
+            shadow_a: 0,
+            shadow_dx: 0,
+            shadow_dy: 0,
+            shadow_blur: 0,
+        }
+    }
+
+    /// A v2 writer emitted `[2] ++ postcard((texts, shapes, canvas))` — the
+    /// 3-tuple, with no wrap widths. Reconstructed here byte-for-byte.
+    fn v2_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
+        let mut out = vec![2u8];
+        let shapes: Vec<ShapeParams> = Vec::new();
+        let canvas: Option<CanvasParams> = None;
+        out.extend_from_slice(&postcard::to_allocvec(&(texts, &shapes, &canvas)).unwrap());
+        out
+    }
+
+    #[test]
+    fn v2_blobs_still_decode_under_v3() {
+        let texts = vec![a_text(7)];
+        let (got, shapes, canvas) = decode_annotations(&v2_annotation_blob(&texts))
+            .expect("a v2 annotation blob must still decode — users' logs depend on it");
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].text, "hello");
+        assert_eq!(got[0].id, 7);
+        assert_eq!(got[0].wrap_width, 0, "a v2 document meant 'do not wrap'");
+        assert!(shapes.is_empty());
+        assert!(canvas.is_none());
+    }
+
+    #[test]
+    fn v3_blobs_round_trip_the_wrap_width() {
+        let mut t = a_text(9);
+        t.wrap_width = 240;
+        let blob = encode_annotations(&[t], &[], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (got, _, _) = decode_annotations(&blob).unwrap();
+        assert_eq!(got[0].wrap_width, 240, "v3 carries the width");
+    }
+
+    #[test]
+    fn v2_op_bytes_still_decode_under_v3() {
+        // Appending `TextWrap` must not renumber the variants already on disk.
+        // A v2 writer produced these exact bytes for each op below.
+        for op in [
+            Op::TextAdd(a_text(1)),
+            Op::TextEdit(a_text(2)),
+            Op::TextRemove { id: 3 },
+            Op::LayerMove {
+                layer: 1,
+                dx: 4,
+                dy: 5,
+            },
+            Op::Crop {
+                rect: Rect {
+                    x: 0,
+                    y: 0,
+                    w: 8,
+                    h: 8,
+                },
+            },
+        ] {
+            let mut v2_bytes = vec![2u8];
+            v2_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap());
+            let decoded = decode_op(&v2_bytes)
+                .unwrap_or_else(|e| panic!("v2 bytes for {:?} rejected: {e:?}", op.label()));
+            assert_eq!(decoded, op, "v2 op must mean the same thing under v3");
+        }
+    }
+
+    #[test]
+    fn text_params_wire_layout_is_unchanged_by_the_new_field() {
+        // The `#[serde(skip)]` guarantee, measured: two TextParams differing
+        // ONLY in wrap_width must serialize to identical bytes. If this fails,
+        // every persisted TextAdd/TextEdit payload has shifted.
+        let a = a_text(4);
+        let mut b = a_text(4);
+        b.wrap_width = 512;
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(),
+            postcard::to_allocvec(&b).unwrap(),
+            "wrap_width must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn v1_is_still_rejected_not_silently_migrated() {
+        let mut v1 = vec![1u8];
+        v1.extend_from_slice(&postcard::to_allocvec(&(vec![a_text(1)],)).unwrap());
+        assert!(matches!(
+            decode_annotations(&v1),
+            Err(OpError::UnsupportedVersion(1))
+        ));
+    }
+
+    #[test]
+    fn text_wrap_op_applies_to_the_right_annotation() {
+        let mut doc = Document::new(32, 32);
+        doc.texts.push(a_text(1));
+        doc.texts.push(a_text(2));
+        apply(
+            &Op::TextWrap {
+                id: 2,
+                wrap_width: 180,
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.texts[0].wrap_width, 0, "untouched");
+        assert_eq!(doc.texts[1].wrap_width, 180);
     }
 }

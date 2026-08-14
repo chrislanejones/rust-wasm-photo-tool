@@ -20,6 +20,11 @@ use wasm_bindgen::prelude::*;
 #[derive(Clone)]
 pub struct TextAnnotation {
     pub id: u32,
+    /// Reflow width in px; 0 = don't wrap (size the box to the text). The
+    /// stored `text` is always the AUTHOR's text — wrapping is applied when
+    /// the tile is built, so widening the box re-flows instead of being stuck
+    /// with baked-in breaks. v8.40.
+    pub wrap_width: u32,
     pub text: String,
     pub x: i32, // unrotated top-left in canvas coords
     pub y: i32,
@@ -111,6 +116,21 @@ pub struct ShapeAnnotation {
     /// Mosaic block size in px for `fill_kind == 3` (pixelate). 0 → default 16.
     pub fill_block: u32,
 }
+/// Apply the reflow width to `text`, ready for a tile build. Every path that
+/// rasterises text goes through this so wrapping cannot be applied in one
+/// place and silently skipped in another (`update_text_annotation` builds its
+/// tile directly rather than via `build_text_annotation`, and that asymmetry
+/// is exactly how a "widening the box does nothing on edit" bug would ship).
+///
+/// `wrap_width` is the BOX width; the breaker gets the content width.
+pub(crate) fn wrap_for_tile(text: &str, wrap_width: u32, font_size: f32, bold: bool) -> String {
+    if wrap_width == 0 {
+        return text.to_string();
+    }
+    let content_w = wrap_width as f32 - 2.0 * crate::text::side_padding(font_size);
+    crate::text::wrap(text, font_size, bold, content_w)
+}
+
 /// Build a complete TextAnnotation (config + pre-rendered tile) ready to
 /// either push onto the live overlay list or onto a history snapshot's
 /// annotation vector. Centralizes the tile-rebuild logic so add/update
@@ -119,6 +139,10 @@ pub struct ShapeAnnotation {
 pub(crate) fn build_text_annotation(
     id: u32,
     text: &str,
+    // px; 0 = no wrapping. This is the BOX width the user drags, so the
+    // content width handed to the breaker subtracts the layout's own side
+    // padding — see `text::side_padding`.
+    wrap_width: u32,
     font_size: f32,
     r: u8,
     g: u8,
@@ -145,8 +169,13 @@ pub(crate) fn build_text_annotation(
     shadow_dy: i32,
     shadow_blur: u32,
 ) -> TextAnnotation {
+    // The tile renders WRAPPED text; the annotation stores the author's RAW
+    // text. Keeping the raw text is what makes reflow reversible: drag the box
+    // wider and the breaks are recomputed, rather than being stuck with
+    // newlines baked in at the old width.
+    let wrapped = wrap_for_tile(text, wrap_width, font_size, bold);
     let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
-        text,
+        &wrapped,
         font_size,
         r,
         g,
@@ -173,6 +202,7 @@ pub(crate) fn build_text_annotation(
     );
     TextAnnotation {
         id,
+        wrap_width,
         text: text.to_string(),
         x,
         y,
@@ -1182,6 +1212,7 @@ impl ImageHorseTool {
         let ann = build_text_annotation(
             id,
             text,
+            0, // new text starts unwrapped; the box is sized to it
             font_size,
             r,
             g,
@@ -1243,6 +1274,10 @@ impl ImageHorseTool {
             return false;
         };
         self.snap("Edit Text");
+        // Preserve the existing reflow width across a text/background edit —
+        // same reasoning as the shadow below. Without this, typing in a box
+        // the user had dragged narrower would silently un-wrap it.
+        let wrap_width = self.layers[self.active].text_annotations[idx].wrap_width;
         // Preserve the existing drop shadow across a text/background edit.
         let sh = {
             let a = &self.layers[self.active].text_annotations[idx];
@@ -1258,8 +1293,9 @@ impl ImageHorseTool {
                 a.shadow_blur,
             )
         };
+        let wrapped = wrap_for_tile(text, wrap_width, font_size, bold);
         let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
-            text,
+            &wrapped,
             font_size,
             r,
             g,
@@ -1315,6 +1351,68 @@ impl ImageHorseTool {
     /// colour / offset / blur are shared. Both toggles false (or `alpha` 0)
     /// clears it. Pushes a "Text Shadow" snapshot. Returns true if found.
     #[allow(clippy::too_many_arguments)]
+    /// Set a text annotation's reflow width in px (0 = don't wrap) and rebuild
+    /// its tile. Returns false if `id` isn't on the active layer.
+    ///
+    /// A dedicated setter rather than another parameter on
+    /// `update_text_annotation`: the box drag changes ONE thing, the existing
+    /// entry point already takes 19 arguments, and this maps 1:1 onto the
+    /// `Op::TextWrap` the recorder emits. Snaps history so a drag is undoable
+    /// on its own, matching how `set_text_shadow` treats a styling change.
+    pub fn set_text_wrap_width(&mut self, id: u32, wrap_width: u32) -> bool {
+        let Some(idx) = self.layers[self.active]
+            .text_annotations
+            .iter()
+            .position(|a| a.id == id)
+        else {
+            return false;
+        };
+        if self.layers[self.active].text_annotations[idx].wrap_width == wrap_width {
+            return true; // no-op: don't snap history for a drag that landed where it started
+        }
+        self.snap("Edit Text");
+        let (text, fs, bold) = {
+            let a = &self.layers[self.active].text_annotations[idx];
+            (a.text.clone(), a.font_size, a.bold)
+        };
+        let a = &mut self.layers[self.active].text_annotations[idx];
+        // Rebuild through the same builder every other path uses, so the tile,
+        // its offsets and the background geometry all stay consistent.
+        let rebuilt = build_text_annotation(
+            a.id,
+            &text,
+            wrap_width,
+            fs,
+            a.r,
+            a.g,
+            a.b,
+            bold,
+            a.x,
+            a.y,
+            a.rotation_deg,
+            a.background_kind,
+            a.bg_r,
+            a.bg_g,
+            a.bg_b,
+            a.bg_a,
+            a.bg_padding,
+            a.bg_corner_radius,
+            a.bg_tail,
+            a.shadow_box,
+            a.shadow_text,
+            a.shadow_r,
+            a.shadow_g,
+            a.shadow_b,
+            a.shadow_a,
+            a.shadow_dx,
+            a.shadow_dy,
+            a.shadow_blur,
+        );
+        self.layers[self.active].text_annotations[idx] = rebuilt;
+        self.recomposite();
+        true
+    }
+
     pub fn set_text_shadow(
         &mut self,
         id: u32,
@@ -1354,6 +1452,7 @@ impl ImageHorseTool {
         self.snap("Text Shadow");
         // Rebuild the tile with the new shadow, reusing the annotation's current
         // text / background config.
+        let wrap_w = self.layers[self.active].text_annotations[idx].wrap_width;
         let (text, fs, r, g, b, bold, rot, bk, br, bgc, bb, ba, bpad, brad, btail) = {
             let a = &self.layers[self.active].text_annotations[idx];
             (
@@ -1374,9 +1473,12 @@ impl ImageHorseTool {
                 a.bg_tail,
             )
         };
+        // Wrapped for the same reason as every other tile build — a shadow
+        // edit must not silently re-lay-out the text unwrapped.
+        let wrapped = wrap_for_tile(&text, wrap_w, fs, bold);
         let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
-            &text, fs, r, g, b, bold, rot, bk, br, bgc, bb, ba, bpad, brad, btail, on_box, on_text,
-            c[0], c[1], c[2], alpha, dx, dy, blur,
+            &wrapped, fs, r, g, b, bold, rot, bk, br, bgc, bb, ba, bpad, brad, btail, on_box,
+            on_text, c[0], c[1], c[2], alpha, dx, dy, blur,
         );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.shadow_box = on_box;
