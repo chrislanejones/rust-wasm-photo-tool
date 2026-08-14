@@ -492,12 +492,17 @@ const editGroup: ToolGroupDefinition = {
       keywords: ["colour picker", "color picker", "eyedropper", "sample", "pick"],
     },
     {
+      // Label went "Resize Layer" -> "Layers" in v8.38 when the panel grew
+      // the layer dropdown + the mask controls (moved from Review's per-row
+      // buttons) — it stopped being only a resize tile. The ID stays
+      // `resize-layer` on purpose: ids get renamed during the registry
+      // migration only (CLAUDE.md known-debt rule).
       id: "resize-layer",
-      label: "Resize Layer",
-      description: "Move and scale the active layer",
+      label: "Layers",
+      description: "Pick a layer, then move, scale or mask it",
       icon: Layers,
       tool: "arrow",
-      keywords: ["resize layer", "move layer", "scale layer", "reposition"],
+      keywords: ["layers", "resize layer", "move layer", "scale layer", "reposition", "layer mask"],
     },
     {
       id: "canvas-size",

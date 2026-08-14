@@ -6,6 +6,13 @@ import {
   Minus,
   Lock,
   LockOpen,
+  ChevronDown,
+  Aperture,
+  Contrast,
+  Check,
+  X,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ActionTile } from "@/components/ui/action-tile";
@@ -14,6 +21,23 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { CanvasResize } from "@/components/CanvasResize";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { cn } from "@/lib/utils";
+import type { LayerInfo } from "@/hooks/useEngineCore";
+
+/** Mask handlers — the SAME shape ReviewPanel takes, because these are the
+ *  same handlers: v8.38 moved the mask controls here (once, acting on the
+ *  selected layer) instead of repeating them on every layer row. */
+export interface LayerMaskControls {
+  /** Whether brush strokes currently paint the active layer's mask. */
+  editing: boolean;
+  /** Grey laid down while painting the mask: 0 = hide, 255 = reveal. */
+  value: number;
+  onAdd: (id: number) => void;
+  onRemove: (id: number) => void;
+  onApply: (id: number) => void;
+  onInvert: (id: number) => void;
+  onToggleEdit: (id: number) => void;
+  onSetValue: (v: number) => void;
+}
 
 interface LayerSettingsProps {
   disabled: boolean;
@@ -24,6 +48,14 @@ interface LayerSettingsProps {
    *  paste placement) around the active layer's own content; drag the handles
    *  then Enter/click-away to bake the scale, Escape to cancel. */
   onResizeLayer?: () => void;
+  /** Layer stack, bottom → top (same array ReviewPanel gets). Optional so the
+   *  guides/canvas sections can render without layer wiring. */
+  layers?: LayerInfo[];
+  /** Selects the layer every control in this panel then acts on — drives the
+   *  engine's `active_layer_id`, nothing else (verified pure, 2026-08-14). */
+  onSelectLayer?: (id: number) => void;
+  /** Mask controls for the SELECTED layer — one set, not per-row. */
+  mask?: LayerMaskControls;
   /** Live canvas (image) dimensions — used to evenly distribute new guides. */
   imgW: number;
   imgH: number;
@@ -56,6 +88,9 @@ export function LayerSettings({
   moveActive,
   onToggleMove,
   onResizeLayer,
+  layers,
+  onSelectLayer,
+  mask,
   imgW,
   imgH,
   canvasWidth,
@@ -65,6 +100,7 @@ export function LayerSettings({
   canRemoveCanvas,
   section,
 }: LayerSettingsProps) {
+  const activeLayer = layers?.find((l) => l.active);
   // Guide state lives in the dedicated Zustand slice (shared with the canvas
   // overlay), so we read it directly rather than prop-drilling.
   const guides = useGuidesStore((s) => s.guides);
@@ -112,10 +148,11 @@ export function LayerSettings({
           title="Move or Resize Layer"
           info={
             <>
+              Pick a layer, then every control below acts on it.{" "}
               <strong className="font-semibold text-theme-foreground">
                 Move
               </strong>{" "}
-              drags the active layer&rsquo;s content on the canvas.{" "}
+              drags its content on the canvas.{" "}
               <strong className="font-semibold text-theme-foreground">
                 Resize
               </strong>{" "}
@@ -125,6 +162,31 @@ export function LayerSettings({
             </>
           }
         />
+        {/* Layer dropdown — ONE selection, every control to the right/below
+            reads it (v8.38). Drives the engine's active_layer_id through the
+            same setActiveLayer the Review panel rows use; there is no
+            per-control layer picker anywhere. Options listed top→bottom to
+            match the visual stack. */}
+        {layers && layers.length > 0 && onSelectLayer && (
+          <div className="relative">
+            <select
+              value={activeLayer?.id ?? ""}
+              disabled={disabled}
+              onChange={(e) => onSelectLayer(Number(e.target.value))}
+              className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+              title="Layer these controls act on"
+            >
+              {[...layers].reverse().map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                  {l.visible ? "" : " (hidden)"}
+                  {l.hasMask ? " · masked" : ""}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
           <ToolButton
             stacked
@@ -141,6 +203,88 @@ export function LayerSettings({
             onClick={onResizeLayer}
           />
         </div>
+
+        {/* ── Layer mask — ONE set of controls, for the selected layer.
+            Moved here from the per-row buttons in Review → Layers (v8.38,
+            "none of those mask buttons will be on each layer"): same
+            handlers, new home, wired to the dropdown's selection. */}
+        {mask && activeLayer && (
+          <div className="space-y-2 pt-2">
+            <SectionHeader
+              title="Layer Mask"
+              info={
+                <>
+                  Non-destructive hide/reveal for the selected layer. While
+                  editing, the Paint brush paints the mask — black hides,
+                  white reveals. Apply bakes it in permanently; Remove
+                  discards it.
+                </>
+              }
+            />
+            {!activeLayer.hasMask ? (
+              <ActionTile
+                icon={Aperture}
+                label="Add mask"
+                disabled={disabled}
+                onClick={() => mask.onAdd(activeLayer.id)}
+              />
+            ) : (
+              <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
+                <ToolButton
+                  active={mask.editing}
+                  disabled={disabled}
+                  onClick={() => mask.onToggleEdit(activeLayer.id)}
+                  title={mask.editing ? "Stop editing mask" : "Edit layer mask"}
+                >
+                  <Aperture /> {mask.editing ? "Editing" : "Edit"}
+                </ToolButton>
+                <ToolButton
+                  disabled={disabled}
+                  onClick={() => mask.onInvert(activeLayer.id)}
+                  title="Invert mask"
+                >
+                  <Contrast /> Invert
+                </ToolButton>
+                {/* Brush value only means something while the mask is being
+                    painted — same visibility rule the row bar had. */}
+                {mask.editing && (
+                  <>
+                    <ToolButton
+                      active={mask.value < 128}
+                      disabled={disabled}
+                      onClick={() => mask.onSetValue(0)}
+                      title="Brush hides (paint black)"
+                    >
+                      <EyeOff /> Hide
+                    </ToolButton>
+                    <ToolButton
+                      active={mask.value >= 128}
+                      disabled={disabled}
+                      onClick={() => mask.onSetValue(255)}
+                      title="Brush reveals (paint white)"
+                    >
+                      <Eye /> Reveal
+                    </ToolButton>
+                  </>
+                )}
+                <ToolButton
+                  disabled={disabled}
+                  onClick={() => mask.onApply(activeLayer.id)}
+                  title="Apply mask (bake in, permanent)"
+                >
+                  <Check /> Apply
+                </ToolButton>
+                <ToolButton
+                  disabled={disabled}
+                  onClick={() => mask.onRemove(activeLayer.id)}
+                  title="Remove mask"
+                >
+                  <X /> Remove
+                </ToolButton>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       )}
 

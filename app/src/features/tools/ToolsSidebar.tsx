@@ -22,7 +22,8 @@ import { SubtoolRow } from "./SubtoolRow";
 import { useActiveSubTool } from "./activateSubTool";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
-import { LayerSettings } from "./settings/LayerSettings";
+import { LayerSettings, type LayerMaskControls } from "./settings/LayerSettings";
+import type { LayerInfo } from "@/hooks/useEngineCore";
 import { SelectSettings } from "./settings/SelectSettings";
 import type { SelectionControls } from "./settings/SelectSettings";
 import type { PlacementCell } from "@/components/PlacementGrid";
@@ -53,6 +54,11 @@ interface ToolsSidebarProps {
   /** Move-layer toggle — Layer Settings tool. */
   moveActive?: boolean;
   onToggleMove?: () => void;
+  /** Layer stack + selection + mask controls for the Layers panel (v8.38) —
+   *  the same data/handlers ReviewPanel gets, one selection driving all. */
+  layers?: LayerInfo[];
+  onSelectLayer?: (id: number) => void;
+  layerMask?: LayerMaskControls;
   /** Embedded mode: render the inner content as a plain flex column (no fixed
    *  positioning / panel chrome / slide animation) so it can fill the compact
    *  master bar's content area instead of floating as its own panel. */
@@ -154,6 +160,9 @@ export function ToolsSidebar({
   selection,
   moveActive,
   onToggleMove,
+  layers,
+  onSelectLayer,
+  layerMask,
   embedded = false,
   onExport,
   canExport,
@@ -369,6 +378,9 @@ export function ToolsSidebar({
             moveActive={moveActive ?? false}
             onToggleMove={onToggleMove ?? (() => {})}
             onResizeLayer={onResizeLayer}
+            layers={layers}
+            onSelectLayer={onSelectLayer}
+            mask={layerMask}
             imgW={imageWidth}
             imgH={imageHeight}
             canvasWidth={imageWidth}

@@ -3130,6 +3130,18 @@ export function AppShell() {
             }}
             moveActive={moveActive}
             onToggleMove={handleToggleMove}
+            layers={stamp.state.layers}
+            onSelectLayer={stamp.setActiveLayer}
+            layerMask={{
+              editing: maskEditing,
+              value: maskPaintValue,
+              onAdd: handleAddMask,
+              onRemove: stamp.removeLayerMask,
+              onApply: stamp.applyLayerMask,
+              onInvert: stamp.invertLayerMask,
+              onToggleEdit: handleToggleMaskEdit,
+              onSetValue: setMaskPaintValue,
+            }}
             toolSettings={toolSettings}
             onToolSettingsChange={handleToolSettingsChange}
             shapesMode={shapesMode}
@@ -3575,16 +3587,6 @@ export function AppShell() {
             onMoveLayer={stamp.moveLayer}
             onMergeDown={stamp.mergeDown}
             onFlattenAll={stamp.flattenAll}
-            mask={{
-              editing: maskEditing,
-              value: maskPaintValue,
-              onAdd: handleAddMask,
-              onRemove: stamp.removeLayerMask,
-              onApply: stamp.applyLayerMask,
-              onInvert: stamp.invertLayerMask,
-              onToggleEdit: handleToggleMaskEdit,
-              onSetValue: setMaskPaintValue,
-            }}
             getHistogram={getHistogram}
             histogramSignature={`${activePhotoId ?? ""}:${stamp.state.undoCount}:${stamp.state.redoCount}:${stamp.state.width}x${stamp.state.height}:${isImageLoading ? "loading" : "ready"}`}
             histogramPhotoKey={activePhotoId ?? ""}

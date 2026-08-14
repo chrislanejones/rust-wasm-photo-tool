@@ -3,10 +3,8 @@ import { motion } from "framer-motion";
 import {
   Aperture,
   ChartArea,
-  Check,
   ChevronDown,
   ChevronUp,
-  Contrast,
   Copy,
   Eye,
   EyeOff,
@@ -15,11 +13,17 @@ import {
   Layers2,
   MousePointerSquareDashed,
   Plus,
+  Settings,
   Redo2,
   Undo2,
   X,
 } from "lucide-react";
 import { HistogramView } from "./HistogramView";
+// Cross-feature import with precedent (CanvasArea, routing do the same):
+// `activateSubTool` is deliberately callable from anywhere — "the rail, the
+// router and the command palette" — and now this gear.
+import { activateSubTool } from "@/features/tools/activateSubTool";
+import { subToolByKey } from "@/features/tools/toolGroups";
 import { slideFromRight } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
@@ -75,20 +79,6 @@ interface Props {
   onMoveLayer: (id: number, newIndex: number) => void;
   onMergeDown: (id: number) => void;
   onFlattenAll: () => void;
-  // ── Layer masks (non-destructive) ──
-  mask: {
-    /** Whether brush strokes currently paint the active layer's mask. */
-    editing: boolean;
-    /** Grey laid down while painting the mask: 0 = hide, 255 = reveal. */
-    value: number;
-    onAdd: (id: number) => void;
-    onRemove: (id: number) => void;
-    onApply: (id: number) => void;
-    onInvert: (id: number) => void;
-    /** Toggle Edit-mask mode for a layer (adds a mask first if it has none). */
-    onToggleEdit: (id: number) => void;
-    onSetValue: (v: number) => void;
-  };
   // ── Histogram ──
   /** Pulls the per-channel histogram from Rust (no canvas sampling). */
   getHistogram: () => Promise<Uint32Array | null>;
@@ -148,7 +138,6 @@ export function ReviewPanel({
   onMoveLayer,
   onMergeDown,
   onFlattenAll,
-  mask,
   getHistogram,
   histogramSignature,
   histogramPhotoKey,
@@ -339,6 +328,21 @@ export function ReviewPanel({
                 >
                   {layers.length}
                 </TinyNumberBox>
+                {/* v8.38 — the signpost to where the mask buttons went: the
+                    Layers tool (Edit → Layers). Same store-driven activation
+                    the rail and command palette use; hand-built route strings
+                    bounce. */}
+                <Button size="tiny"
+                  onClick={() => {
+                    // Keys are namespaced `group/id` — the bare id is a
+                    // silent undefined (caught in the browser, 2026-08-14).
+                    const t = subToolByKey("edit/resize-layer");
+                    if (t) activateSubTool(t);
+                  }}
+                  title="Open the Layers tool (move, resize, mask)"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="tiny"
                   onClick={onAddLayer}
                   disabled={!canAddLayer}
@@ -473,30 +477,18 @@ export function ReviewPanel({
                         >
                           <Layers2 />
                         </Button>
-                        <Button
-                          size="xs"
-                          title={
-                            layer.hasMask
-                              ? mask.editing && layer.active
-                                ? "Stop editing mask"
-                                : "Edit layer mask"
-                              : "Add layer mask"
-                          }
-                          className={
-                            layer.hasMask && mask.editing && layer.active
-                              ? "text-theme-accent"
-                              : layer.hasMask
-                                ? "text-theme-foreground"
-                                : undefined
-                          }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (layer.hasMask) mask.onToggleEdit(layer.id);
-                            else mask.onAdd(layer.id);
-                          }}
-                        >
-                          <Aperture />
-                        </Button>
+                        {/* v8.38 — the per-row mask button moved to the Layers
+                            tool panel (Edit → Layers), one set of controls
+                            acting on the selected layer. A masked layer still
+                            announces itself here without offering a control. */}
+                        {layer.hasMask && (
+                          <span
+                            className="text-theme-muted-foreground"
+                            title="Has a layer mask — edit it in the Layers tool (gear above)"
+                          >
+                            <Aperture className="h-3.5 w-3.5" />
+                          </span>
+                        )}
                         <Button
                           size="xs"
                           title="Duplicate layer"
@@ -544,65 +536,10 @@ export function ReviewPanel({
                         </div>
                       )}
 
-                      {/* Mask controls — only for the active, masked layer. While
-                          editing, the Paint brush paints this mask (black hides,
-                          white reveals). */}
-                      {layer.active && layer.hasMask && (
-                        <div
-                          className="layer-mask-bar"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {mask.editing && (
-                            <>
-                              <Button
-                                size="xs"
-                                title="Brush hides (paint black)"
-                                className={
-                                  mask.value < 128
-                                    ? "text-theme-accent"
-                                    : undefined
-                                }
-                                onClick={() => mask.onSetValue(0)}
-                              >
-                                <EyeOff />
-                              </Button>
-                              <Button
-                                size="xs"
-                                title="Brush reveals (paint white)"
-                                className={
-                                  mask.value >= 128
-                                    ? "text-theme-accent"
-                                    : undefined
-                                }
-                                onClick={() => mask.onSetValue(255)}
-                              >
-                                <Eye />
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            size="xs"
-                            title="Invert mask"
-                            onClick={() => mask.onInvert(layer.id)}
-                          >
-                            <Contrast />
-                          </Button>
-                          <Button
-                            size="xs"
-                            title="Apply mask (bake in, permanent)"
-                            onClick={() => mask.onApply(layer.id)}
-                          >
-                            <Check />
-                          </Button>
-                          <Button
-                            size="xs"
-                            title="Remove mask"
-                            onClick={() => mask.onRemove(layer.id)}
-                          >
-                            <X />
-                          </Button>
-                        </div>
-                      )}
+                      {/* The mask-control bar that lived here moved to the
+                          Layers tool panel in v8.38 — same handlers, one
+                          home, acting on the selected layer (the gear in the
+                          section head is the signpost). */}
                     </li>
                   );
                 })}
