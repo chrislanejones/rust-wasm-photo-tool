@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.37",
+    date: "2026-08-14",
+    headline: "Two handles that do what they look like they do",
+    entries: [
+      {
+        tag: "ui",
+        text: "The text box had eight handles and every one changed the font size. Now one does — a square on a stem, left of the box. Corners are reserved for resizing the box itself, which needs text reflow the model can't store yet; that work is scoped and filed rather than faked.",
+      },
+      {
+        tag: "fix",
+        text: "The layer resize box drew itself 26 pixels inside the canvas while the engine believed it was the full canvas — a 2-pixel nudge snapped the whole layer 26 pixels inward. The engine now decides the rectangle: the tightest box around the layer's actual pixels, and the overlay draws exactly that. Dragging scales your content, not the invisible padding around it.",
+      },
+      {
+        tag: "ui",
+        text: "The move/resize tab wears the layers icon.",
+      },
+    ],
+  },
+  {
     version: "v8.36",
     date: "2026-08-13",
     headline: "The refresh fix, finished",

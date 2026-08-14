@@ -84,6 +84,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.37 — 2026-08-14
+
+**Two handles that finally do what they look like they do.** Text first: the
+box around text you're editing had eight handles, and every one of them
+changed the font size. Now one handle does that — a square on a stem, left of
+the box — and it's the only one, because it's the only resize the text model
+can actually perform. Making corners resize the box itself means reflowing
+text to a new width, and the model has no wrap width to store yet; that work
+is scoped and filed rather than faked. Corners that promise nothing beat
+corners that lie.
+
+Then the layer resize box, from a report that it "wasn't in the correct
+place." Measured: the box drew itself 26 pixels inside the canvas while the
+engine believed the box was the full canvas — so a 2-pixel nudge on a handle
+snapped your whole layer 26 pixels inward, and the box never sat on the thing
+it claimed to bound. Now the engine decides the rectangle — the tightest box
+around the layer's actual pixels — and the overlay draws exactly that. A
+2-pixel nudge moves 2 pixels. Dragging scales your content, not the invisible
+padding around it. And the move/resize tab wears the layers icon it should
+have had.
+
+<details><summary>Older releases</summary>
+
 ### v8.36 — 2026-08-13
 
 **The refresh fix, finished.** Yesterday's v8.35 made the app save your clone
@@ -106,8 +129,6 @@ survives the reload.
 Verified the way it failed: paint, stamp, refresh inside one second — both
 strokes present, undo live, on both engine modes. This bug predates the
 background engine; it just finally got tested this hard.
-
-<details><summary>Older releases</summary>
 
 ### v8.35 — 2026-08-13
 

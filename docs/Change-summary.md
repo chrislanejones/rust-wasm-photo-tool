@@ -7098,3 +7098,52 @@ size, corners = box).
 **Gates.** 546 tests (+8), cargo 209 (+1), `tsc` clean, eslint 0 errors, build
 clean. wasm 774,688 → 775,604 B (+916: the Canvas-aware scope predicate
 inlined at three sites).
+
+---
+
+## v8.37 Change Summary — 2026-08-14
+
+**Two overlay affordances corrected: the text box's handles, and the layer
+resize box.** Night session in worktree `night/2026-08-14-text-layers`.
+
+### Text handles (Task 1)
+
+| Fact | Detail |
+|---|---|
+| before | EIGHT handles (corners + edges), all scaling the FONT |
+| after | ONE font-size handle — square-on-stem, LEFT edge (square = resize, circle = move/rotate) |
+| corners | removed, not re-purposed — there is NO box to resize |
+
+The text model has no wrap width: `boxW`/`boxH` are derived from measured
+text each render, wrapping happens only at manual newlines. Corners that
+resize a real box mean REFLOW, and reflow needs a stored width — a
+persisted-format change (TextParams + annotation encode + IndexedDB) ⇒ ADR +
+dexie-migration, filed in PARKING_LOT with a cheaper lossy alternative
+(commit-time newline baking) for an awake decision.
+
+### Layer resize box (Task 2b) — measured, then fixed
+
+| Quantity | Before | After |
+|---|---|---|
+| box seed (420×320 artboard) | (26,26,368,268) — JS-only cosmetic inset | **(10,10,400,300) = content bounds** |
+| engine seed | (0,0,420,320) — never told the overlay's rect | the SAME rect (engine returns it) |
+| 2 px handle nudge | layer snaps **26 px inward per edge** | moves 2 px |
+| zoom dependence | constant in doc px (26→31.5 px on screen at 1.21×) | — |
+
+Not a coordinate-transform bug — the zoom matrix proved the overlay math
+correct. The seed rects simply disagreed, and the first
+`set_paste_preview_rect` of a drag was the first time the engine heard the
+overlay's rect. `begin_layer_resize_preview` now seeds from the active
+layer's content bounds (alpha bbox), snapshots only that region — dragging
+scales the content, not its transparent padding — and returns `[x,y,w,h]`
+for the overlay to draw. The commit path needed zero changes.
+
+### Also
+
+- resize-layer tab icon: `Move` → `Layers` (lucide), single ADR-023
+  definition site verified.
+- Move toggle + resize drags exercised with a real mouse; text
+  grow/shrink driven with 240–300-event floods.
+
+**Gates.** vitest 546, cargo 211 (+2), tsc clean, eslint 0 errors, builds
+clean. wasm 775,604 → 777,589 B (+1,985: alpha-bbox scan + crop copy).
