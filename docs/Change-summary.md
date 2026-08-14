@@ -7054,3 +7054,47 @@ blit recomposites full-frame; the local path had dirty-tile flushes. Both are
 their own sessions.
 
 **Gates.** 538 tests (+3), `tsc` clean, eslint 0 errors, build clean.
+
+---
+
+## v8.36 Change Summary — 2026-08-13
+
+**The refresh fix, finished — restore no longer prefers a log that is missing
+your edit.** v8.35 fixed the SAVE side (fast archive for unrecorded edits);
+the loss survived on the RESTORE side: the op log looked clean, restore
+replayed it, and clone stamp / emoji / Magic Eraser were never in it.
+Pre-existing on both engine modes — not a worker regression.
+
+### The four links, closed
+
+| Link | Fix | Proof |
+|---|---|---|
+| detector never implemented ("unrecorded edit" was a comment) | coverage check: `undo_count > oplog_cursor` ⇒ log untrustworthy | 4 unit tests incl. the measured stamp state |
+| detection LOST A RACE to a save already in flight | per-photo **invalidation epoch** — bumped synchronously on every signal; the save re-checks before its transaction (aborts, writes nothing) and after it (re-marks `stale: true`) | **6/6 mutations killed** (3 TS, 3 Rust) |
+| armed debounce fired pointlessly after invalidation | untrustworthy flush disarms the timer | covered by the race tests |
+| restore landed at **undo 0** | `undo_count`/`redo_count`/`history_labels` gated the log-cursor path on `layers.len() == 1` — counts the artboard Canvas; `try_oplog_undo` itself uses Canvas-aware `oplog_in_scope()`. Three sites fixed | new parity test `restored_artboard_document_reports_its_log_depth_not_zero` |
+
+The undo-0 find is ADR-016's bug shape surviving in the counts: recording went
+Canvas-aware; the depth reporting never did. Every artboard resume ever has
+shown undo 0.
+
+### Acceptance — the exact loss reproduction
+
+| Mode | paint + stamp + 900 ms refresh |
+|---|---|
+| worker (default) | **both strokes survive**, undo live, tool restored |
+| local (`ih_engine_worker=0`) | **identical pass** |
+
+Console caught the fix live: `log no longer describes photo … — persisted log
+marked stale; resume falls back to the working copy`, right after the stamp.
+
+### Still filed
+
+**F4** (record these tools in the engine log — the real fix; F6's mitigations
+then become belt and braces), **F5** (dirty-tile worker blits — the stamp/brush
+feel gap), and the text-tool bounding-box handle split (left handle = font
+size, corners = box).
+
+**Gates.** 546 tests (+8), cargo 209 (+1), `tsc` clean, eslint 0 errors, build
+clean. wasm 774,688 → 775,604 B (+916: the Canvas-aware scope predicate
+inlined at three sites).

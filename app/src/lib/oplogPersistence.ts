@@ -56,6 +56,9 @@ export interface OplogPersistWasm {
   oplog_is_broken(): boolean;
   oplog_op_count(): number;
   oplog_cursor(): number;
+  /** Undo depth — the coverage check in `isLogTrustworthy` compares it to the
+   *  cursor, because an unrecorded edit grows undo without growing the log. */
+  undo_count(): number;
   oplog_generation(): number;
   oplog_encoded_ops(from: number, to: number): Uint8Array;
   oplog_mem_keyframe_ops(): Uint32Array;
@@ -129,7 +132,7 @@ function hasPersistExports(t: object): t is OplogPersistWasm {
 // stay synchronous — it is the CALL that is awaited. `await` goes on each
 // branch of the ternary, not around it, or the audit reads two un-awaited calls
 // and the gate does not move.
-async function isLogTrustworthy(tool: OplogPersistWasm): Promise<boolean> {
+export async function isLogTrustworthy(tool: OplogPersistWasm): Promise<boolean> {
   if (await tool.oplog_is_broken()) return false;
   const layers =
     typeof tool.content_layer_count === "function"
@@ -137,7 +140,43 @@ async function isLogTrustworthy(tool: OplogPersistWasm): Promise<boolean> {
       : typeof tool.layer_count === "function"
         ? await tool.layer_count()
         : 1;
-  return layers <= 1;
+  if (layers > 1) return false;
+  // ── THE COVERAGE CHECK (v8.36) — the "unrecorded edit" half, implemented ──
+  //
+  // The invalidation reason has said "unrecorded edit or multi-layer" since
+  // this file existed, and until v8.36 only the multi-layer half was ever
+  // tested. The engine's `oplog_broken` flag — which the header above leaned
+  // on — is set by exactly two events (`lib.rs`: a snapshot-restore undo, and
+  // a layer-structure change with a non-empty log). Committing the unrecorded
+  // edit itself sets NOTHING: `end_stroke` pushes a history snapshot and never
+  // touches the log. So a clone stamp / emoji / Magic Eraser on a single-layer
+  // photo left the log "trustworthy", persisted, and preferred at restore —
+  // which replayed the document WITHOUT those edits. Measured on v8.35, both
+  // engine modes: paint (undo 1, ops 1) + stamp (undo 2, ops 1) → refresh →
+  // the stamp gone. Deterministic, any timing — Chris's "refresh deletes all
+  // of those".
+  //
+  // The fix counts instead of enumerating: every committed edit grows the
+  // undo stack, but only RECORDED edits advance the log's cursor, so
+  // `undo_count > cursor` is arithmetic proof an unrecorded edit exists. The
+  // invalidation this triggers is session-sticky (the `invalidated` set), so
+  // one detection retires the log and resume uses the working-copy archive —
+  // which the v8.35 fast lane keeps fresh for exactly these documents. The
+  // two fixes compose.
+  //
+  // Known one-sided gap, accepted: the history cap (50–1000 snapshots) trims
+  // oldest entries, so on very long sessions `undo_count` can sit BELOW the
+  // cursor and mask a later unrecorded edit until the next detection signal.
+  // The error direction of every other imbalance is a false INVALIDATION,
+  // which costs the log optimization and never data. The complete fix — the
+  // engine marking the log at its own history-push choke point — is
+  // ADR-024-F4's session.
+  if (typeof tool.undo_count === "function") {
+    const undo = await tool.undo_count();
+    const cursor = await tool.oplog_cursor();
+    if (undo > cursor) return false;
+  }
+  return true;
 }
 
 /** Build-time flag, with the DevTools key as a per-profile KILL switch.
@@ -261,6 +300,25 @@ let inFlight: Promise<void> | null = null;
 /** Photos whose persisted log this session has already marked stale — keeps
  *  the invalidation to one manifest read + one write per photo, per session. */
 const invalidated = new Set<string>();
+/** Per-photo count of invalidation SIGNALS, bumped synchronously on every
+ *  call to `invalidatePersistedLog` — including ones the `invalidated` set
+ *  deduplicates away, because the signal is what matters here, not the DB
+ *  round-trip.
+ *
+ *  This exists for exactly one reader: a save that is already past its
+ *  fire-time trustworthiness check. That check and the transaction it
+ *  licenses are separated by the whole encode span — port round-trips for
+ *  ops and keyframes, a PNG encode — and an unrecorded edit committing
+ *  inside that span invalidates the log AFTER the save judged it clean.
+ *  Without this counter the save's transaction then lands LAST, overwrites
+ *  the stale mark with `stale: false`, and deletes the photo from
+ *  `invalidated` — which is precisely the measured F6 loss: manifest clean
+ *  at refresh, restore replays a log missing the stamp, archive ignored.
+ *  (Membership in `invalidated` alone can't be the check: a photo validly
+ *  re-enters health — fresh log after a reload — and a save must then be
+ *  able to clear it. Only signals newer than THIS save's check disqualify
+ *  THIS save.) */
+const invalidationEpochs = new Map<string, number>();
 
 /** The binding, IFF it still describes this engine + this photo. */
 function boundTo(tool: object, photoId: string): Binding | null {
@@ -275,6 +333,11 @@ function boundTo(tool: object, photoId: string): Binding | null {
  *  place (reversible, inspectable) and are reclaimed by the next healthy save
  *  or by `deletePhoto`'s cascade. */
 async function invalidatePersistedLog(photoId: string, reason: string): Promise<void> {
+  // Signal FIRST, synchronously, before the dedup check: an in-flight save
+  // compares epochs to decide whether it may commit, and a signal that only
+  // registered when it happened to be the first one would let every later
+  // one race that save unseen.
+  invalidationEpochs.set(photoId, (invalidationEpochs.get(photoId) ?? 0) + 1);
   if (invalidated.has(photoId)) return;
   invalidated.add(photoId); // claim first: at most one DB round-trip per photo
   if (bound?.photoId === photoId) bound = null;
@@ -335,7 +398,16 @@ export async function onOplogFlush(tool: object): Promise<void> {
   // The log stopped describing the document ⇒ never write it, and retire
   // whatever is already on disk (it describes a document the user no longer
   // has). Checked BEFORE oplog_active(), which is false in this case too.
+  // A still-debouncing save is disarmed too — it was scheduled when the log
+  // was healthy and would only fire to be turned away (the epoch gate in
+  // `saveOplogInner` refuses it regardless; this just cancels the pointless
+  // wakeup). The armed timer is always this photo's: `setActiveOplogPhoto`
+  // clears it on every photo switch.
   if (!(await isLogTrustworthy(tool))) {
+    if (debounceTimer != null) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
     void invalidatePersistedLog(photoId, "unrecorded edit or multi-layer");
     return;
   }
@@ -405,6 +477,12 @@ export async function saveOplogNow(tool: object, photoId: string): Promise<void>
 async function saveOplogInner(tool: object, photoId: string): Promise<void> {
   if (!hasPersistExports(tool)) return;
   {
+    // Everything this save learns about the log's health is dated from HERE.
+    // An invalidation signal arriving after this line — however the rest of
+    // the function interleaves with it — disqualifies this save from writing
+    // a clean manifest or clearing the photo's invalidated claim.
+    const epochAtCheck = invalidationEpochs.get(photoId) ?? 0;
+    const raced = () => (invalidationEpochs.get(photoId) ?? 0) !== epochAtCheck;
     // Re-checked at fire time, not just when the save was scheduled: a save
     // debounced BEFORE an unrecorded edit (or a new layer) would otherwise
     // land afterwards and persist a log that is missing it.
@@ -516,6 +594,18 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
       updatedAt: Date.now(),
     };
 
+    // ── THE RACE GATE (F6) — checked as late as a check can be ────────────
+    // The trustworthiness check above ran BEFORE the encode span (port
+    // round-trips, PNG encode). An unrecorded edit committing inside that
+    // span already invalidated this log — its stale mark either landed on
+    // the manifest (which the transaction below would overwrite clean) or
+    // no-opped because no manifest exists yet (which the transaction below
+    // would then create, clean). Both endings persist a log that is missing
+    // the user's newest edit and prefer it at restore. Abort instead: the
+    // invalidation's own bookkeeping (set + DB mark, when one exists) is
+    // already correct, and the working-copy archive carries the resume.
+    if (raced()) return;
+
     // ── ONE transaction: chunks + keyframes + manifest ────────────────────
     await db.transaction("rw", db.opLogs, db.keyframes, db.oplogManifests, async () => {
       if (rewrite) {
@@ -526,6 +616,17 @@ async function saveOplogInner(tool: object, photoId: string): Promise<void> {
       if (dueKeyframes.length) await db.keyframes.bulkPut(dueKeyframes);
       await db.oplogManifests.put(manifest);
     });
+
+    // The narrower tail of the same race: a signal that arrived while the
+    // transaction itself was in flight. The invalidation's manifest write
+    // may have run before ours (and been overwritten) or found no manifest
+    // and skipped — so re-mark explicitly, on the manifest this save just
+    // wrote and therefore knows exists. Idempotent with the invalidation's
+    // own write, whichever order IndexedDB ran them in.
+    if (raced()) {
+      await db.oplogManifests.put({ ...manifest, stale: true, updatedAt: Date.now() });
+      return;
+    }
 
     // The engine's live log IS the persisted log now — bind, so the next save
     // may append its delta instead of rewriting.
@@ -653,6 +754,7 @@ export function __resetOplogPersistenceForTests(): void {
   activePhotoId = null;
   bound = null;
   invalidated.clear();
+  invalidationEpochs.clear();
   if (debounceTimer != null) clearTimeout(debounceTimer);
   debounceTimer = null;
   inFlight = null;

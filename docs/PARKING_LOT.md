@@ -1912,3 +1912,63 @@ pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
   little slow" and "stamp slower than paint" after the v8.34 backpressure fix.
   Port the tile path into the worker blit; measure before/after with the
   hardware-rate stroke protocol.
+
+- **✅ ADR-024-F6 CLOSED in v8.36 (same night, 2026-08-13 ~23:00) — all four
+  links fixed, mutation-tested, acceptance-passed on BOTH engine modes.**
+  What shipped, link by link: (2) the coverage check
+  (`undo_count > oplog_cursor` ⇒ untrustworthy) committed with its 4 unit
+  tests; (3) the race closed with a per-photo **invalidation epoch** —
+  bumped synchronously on EVERY signal (dedup included), captured by
+  `saveOplogInner` at its fire-time check, re-checked before the transaction
+  (abort: nothing written at all) and after it (re-mark `stale: true` on the
+  manifest the save itself just wrote — the only writer that provably can,
+  since a dedup'd signal writes nothing and a racing one can be overwritten).
+  Plus: an untrustworthy flush now DISARMS the pending debounce. 6/6
+  mutations killed (3 TS gates, 3 Rust sites). (4) undo-0 root cause found:
+  `undo_count`/`redo_count`/`history_labels` gated the log-cursor path on
+  `layers.len() == 1` — the pre-ADR-016 predicate that counts the artboard
+  Canvas — while `try_oplog_undo` uses Canvas-aware `oplog_in_scope()`; a
+  restored artboard doc (hist deliberately cleared) reported 0 with the log
+  ready to rewind. All three sites now use `oplog_in_scope()`, pinned by
+  `restored_artboard_document_reports_its_log_depth_not_zero`. Acceptance:
+  paint + stamp + 900 ms refresh → BOTH strokes survive, undo live, on
+  worker AND `=0` (was: stamp gone, deterministic). wasm 774,688 → 775,604
+  (+916 B, the inlined scope predicate ×3). The REAL fix remains **F4**
+  (record these ops in the engine); F6's mitigations then become belt and
+  braces. Original diagnosis kept below for the record:
+  1. Clone stamp / emoji / Magic Eraser never touch the op log (`end_stroke`
+     pushes history only; engine `oplog_broken` is set ONLY by snapshot-restore
+     undo and layer changes — `lib.rs:702,1386` — never by the unrecorded edit
+     itself, despite `oplog_is_broken`'s doc comment claiming otherwise).
+  2. `isLogTrustworthy` tested only broken + multi-layer; its reason string
+     said "unrecorded edit or multi-layer" from day one — the first half was
+     never implemented. **A coverage check (`undo_count > oplog_cursor` ⇒
+     untrustworthy) is now written, unit-tested and mutation-tested, SITTING
+     UNCOMMITTED in the working tree** (`oplogPersistence.ts` + tests).
+  3. **The check fires but LOSES A RACE**: the 2 s-debounced `saveOplogNow`
+     armed by an earlier RECORDED edit rewrites the manifest `stale: false`
+     after the invalidation marked it. The save path never consults the
+     session `invalidated` set. IDB inspected at loss time: manifest
+     `stale: false`, opCount 1 — while the **edits archive held undoStack
+     length 2, both strokes, perfectly saved.** The data is written; restore
+     discards it.
+  4. Restore trusts the clean-looking log AND lands at undo 0 (not even the
+     log's 1 replayed op) — the replay/undo-rebuild itself needs a look.
+  The session's work: make `saveOplogInner` honor/re-check invalidation
+  atomically (abort if `invalidated.has(photoId)` or re-verify trustworthiness
+  inside the save), find why replay landed at undo 0, then the acceptance:
+  paint + stamp + refresh at 900 ms survives on BOTH modes (the exact scripted
+  repro is in session notes / memory). Vivek-lane; persisted-format wise this
+  is flag-and-logic only, no schema change. The REAL fix remains F4 (record
+  the ops in the engine).
+
+- **Text tool — split the bounding-box handle semantics (Chris, 2026-08-13,
+  re-confirmed 08-14).** His spec: add a NEW handle on the LEFT edge of the
+  text bounding box that resizes the TEXT (font size); the CORNER handles are
+  then reserved for actually making the BOX bigger (reflow area), not scaling
+  the glyphs. "Use rust when you can" — the text metrics/layout already live
+  in the engine (`build_text_annotation`, primeTextMetrics twins), so the
+  size math and hit-testing belong engine-side; the JS keeps only the drag
+  wiring. Its own session: handle rendering, hit zones, cursor feedback,
+  and a QC pass on text reflow. ⚠️ Was reported "filed" on 08-13 but never
+  actually written here — this entry corrects that.

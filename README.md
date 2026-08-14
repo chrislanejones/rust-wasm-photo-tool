@@ -84,6 +84,31 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.36 — 2026-08-13
+
+**The refresh fix, finished.** Yesterday's v8.35 made the app save your clone
+stamp, emoji and Magic Eraser work almost immediately — and the save worked.
+The loss was on the other side: on reload, the app preferred replaying its
+edit log over the saved pixels, and those tools were never in the log. Two
+holes closed:
+
+The app now counts. Every edit deepens undo; only recorded edits grow the log.
+When undo says more happened than the log holds, the log stops being trusted
+for that document and the saved pixels carry the reload. A save that was
+already mid-write when the mismatch appeared can no longer slip through and
+mark that log clean behind its back — that race was real, measured, and is
+now closed on both sides of the write.
+
+Second: reopening a photo used to show undo as unavailable even when history
+was right there — the count ignored documents with an artboard. Undo depth now
+survives the reload.
+
+Verified the way it failed: paint, stamp, refresh inside one second — both
+strokes present, undo live, on both engine modes. This bug predates the
+background engine; it just finally got tested this hard.
+
+<details><summary>Older releases</summary>
+
 ### v8.35 — 2026-08-13
 
 **Clone stamp, emoji and Magic Eraser edits survive a quick refresh now.**
@@ -134,8 +159,6 @@ landed points, which is exactly the input the blocking version always fed it.
 Same stroke, same protocol, after: ink **0.26 seconds** behind at release, and
 level with the cursor during the stroke. The clone stamp had the same flaw and
 got the same fix.
-
-<details><summary>Older releases</summary>
 
 ### v8.33 — 2026-08-13
 

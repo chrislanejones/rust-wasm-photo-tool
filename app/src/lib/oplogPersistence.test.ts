@@ -13,6 +13,7 @@ import {
   setActiveOplogPhoto,
   setOplogCodecs,
   type OplogPersistWasm,
+  isLogTrustworthy,
 } from "@/lib/oplogPersistence";
 
 // Verification switch on (build flag stays OFF — kill-switch default).
@@ -651,5 +652,182 @@ describe("engine-PNG surface (preferred path)", () => {
     expect(Array.from(png)).toEqual([137, 80, 78, 71, 0, 42]);
     expect(Array.from(frames)).toEqual([1, 0, 0, 0, 10, 1, 0, 0, 0, 11]);
     expect(cursor).toBe(2);
+  });
+});
+
+// ── v8.36 — the coverage check: the "unrecorded edit" half, finally real ────
+//
+// The invalidation reason said "unrecorded edit or multi-layer" from day one;
+// only multi-layer was ever tested. The engine's broken flag is set by
+// snapshot-restore undo and layer changes — never by committing the
+// unrecorded edit itself — so a clone stamp left the log trustworthy and
+// restore replayed the document without it (measured: paint undo 1 ops 1,
+// stamp undo 2 ops 1, refresh, stamp gone; both engine modes).
+describe("isLogTrustworthy counts coverage, not just breakage", () => {
+  function fakeFor(over: Partial<Record<string, unknown>>) {
+    return {
+      oplog_is_broken: () => false,
+      content_layer_count: () => 1,
+      undo_count: () => 1,
+      oplog_cursor: () => 1,
+      ...over,
+    } as unknown as OplogPersistWasm;
+  }
+
+  it("trusts a log whose cursor covers the undo stack", async () => {
+    expect(await isLogTrustworthy(fakeFor({}))).toBe(true);
+    // history cap can trim undo below the cursor — still covered
+    expect(await isLogTrustworthy(fakeFor({ undo_count: () => 0, oplog_cursor: () => 4 }))).toBe(true);
+  });
+
+  it("refuses the measured clone-stamp state: undo grew, cursor did not", async () => {
+    // paint (recorded) + stamp (unrecorded): undo 2, cursor 1 — the exact
+    // state that survived as "trustworthy" through v8.35 and lost the stamp.
+    expect(await isLogTrustworthy(fakeFor({ undo_count: () => 2, oplog_cursor: () => 1 }))).toBe(false);
+  });
+
+  it("still refuses broken and multi-layer logs", async () => {
+    expect(await isLogTrustworthy(fakeFor({ oplog_is_broken: () => true }))).toBe(false);
+    expect(await isLogTrustworthy(fakeFor({ content_layer_count: () => 2 }))).toBe(false);
+  });
+
+  it("tolerates an engine without undo_count — feature detection, not a crash", async () => {
+    expect(await isLogTrustworthy(fakeFor({ undo_count: undefined }))).toBe(true);
+  });
+});
+
+// ── v8.36 — the F6 save-race: invalidation vs a save already in flight ──────
+//
+// The fire-time trustworthiness check and the transaction it licenses are
+// separated by the whole encode span. An unrecorded edit committing inside
+// that span invalidates the log AFTER the save judged it clean — and before
+// the epoch gate, the save's transaction landed LAST, overwrote the stale
+// mark with `stale: false`, and deleted the photo from the session's
+// invalidated set. Measured on production: manifest clean at refresh, restore
+// replayed a log missing the stamp, the archive (which held both strokes)
+// never consulted.
+class RacingTool extends FakeTool {
+  undoCount = 0;
+  onEncode: (() => Promise<void>) | null = null;
+
+  undo_count(): number {
+    return this.undoCount;
+  }
+  override oplog_encoded_ops(from: number, to: number): Uint8Array {
+    const bytes = super.oplog_encoded_ops(from, to);
+    const hook = this.onEncode;
+    if (!hook) return bytes;
+    // The save AWAITS this call, so returning a promise parks it exactly
+    // where the real save parks: mid-encode, health check already passed.
+    return (async () => {
+      await hook();
+      return bytes;
+    })() as unknown as Uint8Array;
+  }
+}
+
+describe("the F6 save-race: a mid-save invalidation wins", () => {
+  it("first save aborts when the stamp lands mid-encode — no clean manifest is born", async () => {
+    await seedPhoto("p1");
+    setActiveOplogPhoto("p1");
+    const t = new RacingTool();
+    t.push(10); // recorded paint: undo 1, cursor 1 — trustworthy
+    t.undoCount = 1;
+    t.onEncode = async () => {
+      // The clone stamp commits while the save is encoding: undo grows,
+      // the log does not. The flush detects it and invalidates.
+      t.undoCount = 2;
+      await onOplogFlush(t);
+    };
+
+    await saveOplogNow(t, "p1");
+    await new Promise((r) => setTimeout(r, 20)); // let the floated invalidation write settle
+
+    // The save must NOT have created a clean manifest for a log that is
+    // already missing an edit — and the PRE-transaction gate means it never
+    // opens the transaction at all: no manifest, no chunk rows, nothing to
+    // reclaim later.
+    expect(await db.oplogManifests.get("p1")).toBeUndefined();
+    expect(await db.opLogs.count()).toBe(0);
+    expect(await restoreOplog(new FakeTool(), "p1")).toBe("none");
+  });
+
+  it("the measured loss shape: existing clean manifest, stamp mid-save — stale mark survives", async () => {
+    await seedPhoto("p1");
+    setActiveOplogPhoto("p1");
+    const t = new RacingTool();
+    t.push(10);
+    t.undoCount = 1;
+    await saveOplogNow(t, "p1"); // paint persisted clean — the pre-race state
+    expect((await db.oplogManifests.get("p1"))!.stale).toBe(false);
+
+    t.push(11); // more recorded work → a second save has a reason to run
+    t.undoCount = 2;
+    t.onEncode = async () => {
+      t.undoCount = 3; // the stamp: undo 3, cursor 2
+      await onOplogFlush(t);
+    };
+    await saveOplogNow(t, "p1");
+    await new Promise((r) => setTimeout(r, 20));
+
+    const m = (await db.oplogManifests.get("p1"))!;
+    expect(m.stale).toBe(true);
+    expect(await restoreOplog(new FakeTool(), "p1")).toBe("none");
+  });
+
+  it("a signal during the transaction itself is re-marked after commit (dedup path)", async () => {
+    await seedPhoto("p1");
+    setActiveOplogPhoto("p1");
+    // The photo was invalidated EARLIER this session, so it sits in the
+    // dedup set: the next signal bumps the epoch but writes NOTHING to the
+    // DB. Only the save's own post-transaction re-mark can fix the manifest
+    // it just wrote — this is the window the pre-transaction gate cannot
+    // cover and the invalidation's floated write cannot either.
+    const broken = new RacingTool();
+    broken.push(10);
+    broken.undoCount = 2; // unrecorded edit → invalidates, set now holds p1
+    await onOplogFlush(broken);
+    await new Promise((r) => setTimeout(r, 20));
+
+    // The document heals (fresh log after a reload) and a save runs — but an
+    // unrecorded edit lands from INSIDE the save's transaction (first put):
+    // the epoch bump is synchronous, the dedup check swallows the DB write.
+    const t = new RacingTool();
+    t.push(20, 21);
+    t.undoCount = 2;
+    const original = db.opLogs.put.bind(db.opLogs);
+    const spy = vi.spyOn(db.opLogs, "put").mockImplementationOnce((c) => {
+      t.undoCount = 3;
+      void onOplogFlush(t);
+      return original(c);
+    });
+
+    await saveOplogNow(t, "p1");
+    spy.mockRestore();
+    await new Promise((r) => setTimeout(r, 20));
+
+    const m = (await db.oplogManifests.get("p1"))!;
+    expect(m.stale).toBe(true);
+    expect(await restoreOplog(new FakeTool(), "p1")).toBe("none");
+  });
+
+  it("no race, no regression: a clean save still clears an old invalidation claim", async () => {
+    await seedPhoto("p1");
+    setActiveOplogPhoto("p1");
+    const t = new RacingTool();
+    t.push(10);
+    t.undoCount = 2; // unrecorded edit present → flush invalidates
+    await onOplogFlush(t);
+    await new Promise((r) => setTimeout(r, 20));
+
+    // The document heals: a reload built a fresh log that covers everything.
+    const healed = new RacingTool();
+    healed.push(20, 21);
+    healed.undoCount = 2;
+    await saveOplogNow(healed, "p1");
+
+    const m = (await db.oplogManifests.get("p1"))!;
+    expect(m.stale).toBe(false);
+    expect(m.opCount).toBe(2);
   });
 });

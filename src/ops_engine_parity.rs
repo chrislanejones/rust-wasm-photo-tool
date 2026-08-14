@@ -751,6 +751,44 @@ fn history_labels_synthesize_from_ops_after_restore() {
     );
 }
 
+#[test]
+fn restored_artboard_document_reports_its_log_depth_not_zero() {
+    // F6's fourth link (2026-08-13): restore replayed the log, then
+    // `undo_count()` reported 0 — its gate was `layers.len() == 1`, which the
+    // rebuilt artboard Canvas fails (2 layers), so the count fell through to
+    // the deliberately-cleared snapshot stack while `try_oplog_undo` stood
+    // ready to rewind. ADR-016 made recording Canvas-aware; the COUNTS kept
+    // the stale predicate. This is the DEFAULT document shape, so every
+    // artboard resume showed undo 0.
+    let (mut t, _px) = artboard_tool(64, 48, 12);
+    t.set_oplog_undo(true);
+    stroke(&mut t, (16.0, 16.0), (60.0, 40.0), "#ff0000");
+    stroke(&mut t, (20.0, 50.0), (70.0, 20.0), "#0044ff");
+    let total = t.oplog_op_count() as u32;
+    assert_eq!(total, 2);
+
+    let base_png = t.oplog_keyframe_png(0);
+    let base_ann = t.oplog_keyframe_annotations(0);
+    let frames = t.oplog_encoded_ops(0, total);
+
+    // Reload at cursor 1: one op behind the tip — both directions populated.
+    let mut t2 = ImageHorseTool::new(64, 48);
+    t2.set_oplog_undo(true);
+    assert!(t2.oplog_restore_png(&base_png, &base_ann, &frames, 1));
+    assert_eq!(t2.layer_count(), 2, "the artboard Canvas was rebuilt");
+    assert_eq!(t2.undo_count(), 1, "undo depth = the log cursor, not 0");
+    assert_eq!(t2.redo_count(), 1, "redo depth = ops past the cursor");
+    assert_eq!(
+        t2.history_labels(),
+        "undo:Paint|current:Current State|redo:Paint",
+        "the History panel synthesizes from the ops on an artboard too"
+    );
+    // The reported depth is real: undo actually rewinds.
+    assert!(t2.undo());
+    assert_eq!(t2.undo_count(), 0);
+    assert_eq!(t2.redo_count(), 2);
+}
+
 // ── ADR-016: the Canvas is metadata, so the DEFAULT document is in scope ────
 //
 // `canvasArtboard` is ON by default, so `load_image_artboard` — Canvas fill +

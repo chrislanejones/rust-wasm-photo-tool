@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.36",
+    date: "2026-08-13",
+    headline: "The refresh fix, finished",
+    entries: [
+      {
+        tag: "fix",
+        text: "v8.35 fixed the save; the loss survived on the restore side. On reload the app preferred replaying its edit log over the saved pixels — and clone stamp, emoji and Magic Eraser were never in the log. The app now counts: every edit deepens undo, only recorded edits grow the log, and a mismatch means the saved pixels carry the reload.",
+      },
+      {
+        tag: "fix",
+        text: "The detection could lose a race to a save already mid-write, which then marked the discredited log clean behind its back. Closed on both sides of the write and mutation-tested — six of six deliberately broken variants caught.",
+      },
+      {
+        tag: "rust",
+        text: "Reopening a photo showed undo as unavailable even when history was right there: the depth counter still counted the artboard as a disqualifying layer, a rule the recorder itself dropped back in the artboard rework. Undo depth now survives the reload.",
+      },
+      {
+        tag: "infra",
+        text: "Verified the way it failed: paint, stamp, refresh inside one second — both strokes present, undo live, on both engine modes. The bug predates the background engine; it just finally got tested this hard.",
+      },
+    ],
+  },
+  {
     version: "v8.35",
     date: "2026-08-13",
     headline: "Clone stamp, emoji and Magic Eraser survive a quick refresh",

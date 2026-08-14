@@ -2223,8 +2223,17 @@ impl ImageHorseTool {
         // With op-log undo enabled, the log can rewind deeper than the
         // (count/byte-capped) snapshot stack — report the larger so the UI
         // doesn't disable undo while log steps remain.
+        //
+        // The gate mirrors `try_oplog_undo`'s own: `oplog_in_scope()`, which
+        // is Canvas-aware (exactly one CONTENT layer, and it is active —
+        // ADR-016). This was `layers.len() == 1` until v8.36, which counted
+        // the artboard Canvas as a disqualifying layer — so after an op-log
+        // RESTORE of any artboard document (`hist` deliberately cleared, the
+        // log holding the real history) this reported **undo 0** while
+        // `try_oplog_undo` stood ready to rewind. The F6 repro measured it:
+        // restore replayed 1 op, landed at undo 0.
         #[cfg(feature = "tiles")]
-        if self.oplog_use_for_undo && !self.oplog_broken && self.layers.len() == 1 {
+        if self.oplog_use_for_undo && !self.oplog_broken && self.oplog_in_scope() {
             if let Some(log) = self.oplog.as_ref() {
                 return self.hist.undo_count().max(log.cursor());
             }
@@ -2233,8 +2242,9 @@ impl ImageHorseTool {
     }
 
     pub fn redo_count(&self) -> usize {
+        // Canvas-aware scope, mirroring `try_oplog_redo` — see `undo_count`.
         #[cfg(feature = "tiles")]
-        if self.oplog_use_for_undo && !self.oplog_broken && self.layers.len() == 1 {
+        if self.oplog_use_for_undo && !self.oplog_broken && self.oplog_in_scope() {
             if let Some(log) = self.oplog.as_ref() {
                 return self.hist.redo_count().max(log.len() - log.cursor());
             }
@@ -2251,7 +2261,9 @@ impl ImageHorseTool {
         #[cfg(feature = "tiles")]
         if self.oplog_use_for_undo
             && !self.oplog_broken
-            && self.layers.len() == 1
+            // Canvas-aware scope (see `undo_count`) — an artboard document's
+            // restored History panel was empty under `layers.len() == 1`.
+            && self.oplog_in_scope()
             && self.hist.undo_count() == 0
             && self.hist.redo_count() == 0
         {
