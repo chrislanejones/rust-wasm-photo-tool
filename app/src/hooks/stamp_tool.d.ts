@@ -817,6 +817,13 @@ declare module "stamp_tool" {
      *  ambiently SHADOWS pkg's generated types, so a drift here type-checks
      *  and dies at runtime. */
     set_text_wrap_width(id: number, wrap_width: number): boolean;
+    /** Set a text annotation's BOX HEIGHT in px (0 = size the box to the text)
+     *  and rebuild its tile. Returns false if `id` isn't on the active layer.
+     *  The vertical twin of `set_text_wrap_width`. v8.41.
+     *
+     *  ⚠️ Same hand-sync warning as above — this file ambiently SHADOWS pkg's
+     *  generated types, so a drift here type-checks and dies at runtime. */
+    set_text_box_height(id: number, box_height: number): boolean;
     set_text_shadow(
       id: number,
       on_box: boolean,

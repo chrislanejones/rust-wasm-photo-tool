@@ -383,6 +383,14 @@ pub(crate) fn tail_margin(background_kind: u8) -> u32 {
 pub(crate) fn build_annotation_tile(
     text: &str,
     font_size: f32,
+    // Minimum BOX height in px; 0 = size the box to the text, which is what
+    // every annotation written before v8.41 means. When it exceeds the
+    // rendered text's own height the block is grown and the text centred in it
+    // (`text::grow_to_box_height`) BEFORE anything else looks at the
+    // dimensions — so the background rect, the bubble tail, the shadow and the
+    // rotation bounds all follow the box for free, with no second place to
+    // keep in step.
+    box_height: u32,
     r: u8,
     g: u8,
     b: u8,
@@ -406,7 +414,10 @@ pub(crate) fn build_annotation_tile(
     shadow_dy: i32,
     shadow_blur: u32,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
-    let rendered = crate::text::render_text(text, font_size, r, g, b, bold);
+    let rendered = crate::text::grow_to_box_height(
+        crate::text::render_text(text, font_size, r, g, b, bold),
+        box_height,
+    );
     let raw_w = rendered.width;
     let raw_h = rendered.height;
 
@@ -668,6 +679,13 @@ pub(crate) fn annotation_ink_offset(
     } else {
         (tail_margin(background_kind) + bg_padding) as i32
     };
+    // ⚠️ `box_height` is deliberately NOT a parameter here. The box grows
+    // BELOW the text (`text::grow_to_box_height` keeps it top-aligned), so a
+    // taller box moves no glyph and the ink offset is genuinely independent of
+    // it. Pinned by the sweep in `ink_offset_matches_tile_geometry`, which
+    // varies the height and asserts this answer does not move — if the layout
+    // ever goes centred, that test fails first and this comment is the reason
+    // why.
     (ink_x + margin, ink_y + margin)
 }
 
@@ -1461,6 +1479,10 @@ impl ImageHorseTool {
             // ADR-024-F7; the op-log path (which DOES carry it, via
             // Op::TextWrap) is the one the resume actually uses.
             0,
+            // Same gap on the second axis (v8.41): no box height in layer JSON,
+            // so a restore through here comes back sized to its text.
+            // Op::TextBoxHeight carries it on the path that matters.
+            0,
             font_size,
             r,
             g,
@@ -1553,30 +1575,71 @@ mod tests {
     /// the predicted offset. Covers plain / rect / bubble across paddings
     /// and font sizes so the overlay's anchor mapping can't silently drift
     /// from `build_annotation_tile`.
+    ///
+    /// v8.41 added `box_height` to the tile builder, so the sweep covers it:
+    /// 0 (box sized to the text), a height SHORTER than the text (a minimum,
+    /// not a clip — must change nothing), and heights taller than it. The
+    /// prediction does NOT take a height, and that is the property under test
+    /// — the box grows below top-aligned text, so the ink must not move.
     #[test]
     fn ink_offset_matches_tile_geometry() {
         for &kind in &[0u8, 1, 2] {
             for &pad in &[0u32, 8, 24] {
                 for &fs in &[16.0f32, 24.0, 54.0] {
                     for &bold in &[false, true] {
-                        let (tile, w, h, off_x, off_y) = build_annotation_tile(
-                            "Hg", fs, 255, 255, 255, bold, 0.0, kind, 0, 0, 0,
-                            0, // bg_a = 0: transparent bg, geometry unchanged
-                            pad, 6, 135, false, false, 0, 0, 0, 0, 0, 0, 0,
-                        );
-                        assert_eq!((off_x, off_y), (0, 0), "unrotated tile offset");
-                        let ink =
-                            crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink");
-                        let want = annotation_ink_offset("Hg", fs, bold, kind, pad);
-                        assert_eq!(
-                            (ink.0 as i32, ink.1 as i32),
-                            want,
-                            "kind={kind} pad={pad} fs={fs} bold={bold}"
-                        );
+                        for &box_h in &[0u32, 4, 90, 240] {
+                            let (tile, w, h, off_x, off_y) = build_annotation_tile(
+                                "Hg", fs, box_h, 255, 255, 255, bold, 0.0, kind, 0, 0, 0,
+                                0, // bg_a = 0: transparent bg, geometry unchanged
+                                pad, 6, 135, false, false, 0, 0, 0, 0, 0, 0, 0,
+                            );
+                            assert_eq!((off_x, off_y), (0, 0), "unrotated tile offset");
+                            let ink = crate::utils::ink_bounds(&tile, w, h)
+                                .expect("tile has visible ink");
+                            let want = annotation_ink_offset("Hg", fs, bold, kind, pad);
+                            assert_eq!(
+                                (ink.0 as i32, ink.1 as i32),
+                                want,
+                                "kind={kind} pad={pad} fs={fs} bold={bold} box_h={box_h}"
+                            );
+                        }
                     }
                 }
             }
         }
+    }
+
+    /// A box TALLER than its text grows the tile to exactly that height and
+    /// leaves the text at the top; a box shorter than the text (or 0) leaves
+    /// the tile exactly as it was. Pinned on the no-background fast path,
+    /// where the tile height IS the box height with nothing else added.
+    #[test]
+    fn box_height_grows_the_tile_downwards_and_leaves_the_text_at_the_top() {
+        let plain = |box_h: u32| {
+            let (tile, w, h, _, _) = build_annotation_tile(
+                "Hg", 24.0, box_h, 255, 255, 255, false, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, false, false,
+                0, 0, 0, 0, 0, 0, 0,
+            );
+            let ink = crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink");
+            (w, h, ink.1)
+        };
+        let (nat_w, nat_h, nat_ink_y) = plain(0);
+        assert_eq!(
+            plain(nat_h - 1),
+            (nat_w, nat_h, nat_ink_y),
+            "a shorter box is a floor, not a clip"
+        );
+        assert_eq!(
+            plain(nat_h),
+            (nat_w, nat_h, nat_ink_y),
+            "an exact box changes nothing"
+        );
+        let tall = nat_h + 100;
+        assert_eq!(
+            plain(tall),
+            (nat_w, tall, nat_ink_y),
+            "a taller box IS the tile height, and the text stays put at the top"
+        );
     }
 
     /// Bubble margin = ceil(TAIL_LEN) + ceil(TAIL_HALF); other kinds 0.

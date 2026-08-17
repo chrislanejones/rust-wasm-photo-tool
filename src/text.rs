@@ -222,6 +222,44 @@ pub fn side_padding(font_size: f32) -> f32 {
     (font_size * 0.25).ceil()
 }
 
+/// Grow a rendered text block to `box_height`, keeping the text TOP-ALIGNED
+/// and adding the surplus below it. v8.41, when the text box gained a real
+/// height so the six handles resize both axes instead of only the width.
+///
+/// **Top-aligned, not centred**, and the reason is the handles rather than the
+/// typography. Centring reads better in a speech bubble, but it makes the box
+/// grow half as fast as the pointer: with the text pinned to the middle,
+/// dragging the top edge up by N only lifts the edge by N/2 unless the anchor
+/// is also walked, and the type slides under the cursor while you resize.
+/// Top-aligned, the text is glued to the box's top-left exactly the way
+/// `wrap_width` already glues it to the left — so every handle moves its own
+/// edge 1:1, the opposite edge stays put, and vertical resizing behaves
+/// identically to the horizontal resizing that shipped in v8.40. Consistency
+/// with the axis that already worked beat prettier default centring.
+///
+/// It also keeps the anchor mapping honest for free: the box's top IS the
+/// text's top, so `annotation_ink_offset` needs no vertical correction and
+/// there is no second estimate of "how tall is this text really" to drift
+/// against the engine's.
+///
+/// A no-op — same buffer, no copy — when the box is not taller than the text.
+/// That covers `box_height == 0`, which is what every annotation written
+/// before v8.41 means, so those keep their exact previous layout, and it makes
+/// the height a MINIMUM rather than a clip: a box dragged shorter than its own
+/// text simply has no effect instead of cropping words away.
+pub fn grow_to_box_height(rendered: RenderedText, box_height: u32) -> RenderedText {
+    if box_height <= rendered.height {
+        return rendered;
+    }
+    let mut pixels = vec![0u8; rendered.width as usize * 4 * box_height as usize];
+    pixels[..rendered.pixels.len()].copy_from_slice(&rendered.pixels);
+    RenderedText {
+        pixels,
+        width: rendered.width,
+        height: box_height,
+    }
+}
+
 /// Greedy word-wrap: re-break `text` so no line's ink exceeds `max_w` px,
 /// preserving the author's own newlines as hard breaks.
 ///

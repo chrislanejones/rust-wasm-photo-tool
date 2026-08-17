@@ -84,6 +84,49 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.41 — 2026-08-17
+
+**The brushes keep up now.** Clone stamp and blur used to fall behind the
+cursor and then catch up in a rush after you let go — worst at the big brush
+sizes, where a single clone-stamp stroke could bank almost eleven seconds of
+backlog. Both are fixed. A stroke now keeps one request in flight and drops
+the positions it has already been overtaken by, so the work matches the stroke
+instead of queueing up behind it.
+
+| Tool | Before | After |
+|---|---|---|
+| Clone stamp, 200 px brush | 10,754 ms | **142 ms** |
+| Blur, default 32 px | 2,509 ms | **492 ms** |
+
+Pixelate and redact run through the same path as blur, so they got the same
+fix.
+
+**Text boxes resize up and down.** v8.40 gave the box a width; the four corner
+handles now set a height too. Text sits at the top of the box, and the box
+never shrinks below the words inside it.
+
+**Pick another shape and the one you just drew stays put.** Drawing a circle
+and then clicking Rectangle used to retype the circle you had already placed.
+The shape is fixed at the moment you finish drawing it.
+
+**Guides have a colour.** Cyan by default, ten to pick from, and the choice is
+remembered between sessions.
+
+Older saved work keeps working. This release changes the format the app saves
+edits in for the second time in a week, and again it was built so files
+written by every previous version still load.
+
+Two repairs behind the scenes, both the same shape — a check that only ever ran
+one way, and so reported on that one way rather than on the code. The
+regression test guarding an old save-data bug had been broken since late July:
+it looked for a button that had been renamed, found nothing, and timed out
+instead of checking anything, dark for about eighteen releases. And a new
+engine test was never registered as a build target, so it failed to compile in
+the configuration the push check uses. Both are fixed, and the release checks
+now run as a script instead of a list somebody has to remember.
+
+<details><summary>Older releases</summary>
+
 ### v8.40 — 2026-08-14
 
 **Text boxes resize, and the words rearrange to fit.** Six handles — the four
@@ -100,8 +143,6 @@ so the breaks are always recomputed, never baked in.
 Older saved work keeps working. Adding this meant changing the format the app
 saves edits in, and the change was built so files written by every previous
 version still load — nobody loses the undo history attached to their photos.
-
-<details><summary>Older releases</summary>
 
 ### v8.39 — 2026-08-14
 

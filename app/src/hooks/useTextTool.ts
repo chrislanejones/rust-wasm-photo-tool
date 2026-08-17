@@ -31,6 +31,9 @@ interface AnnotationMeta {
   /** Reflow width in canvas px; 0 = don't wrap. Absent on annotations from
    *  before v8.40, hence optional. */
   wrap_width?: number;
+  /** Box height in canvas px; 0 = size the box to the text. Absent on
+   *  annotations from before v8.41, hence optional. */
+  box_height?: number;
   r: number;
   g: number;
   b: number;
@@ -219,6 +222,8 @@ export function useTextTool({
     // drag every time (committed annotation came back `wrap_width: 0` while a
     // direct engine call proved the setter itself worked).
     const wrapWidthAtCommit = useTextBoxStore.getState().wrapWidth;
+    // Same capture, same reason, for the vertical axis (v8.41).
+    const boxHeightAtCommit = useTextBoxStore.getState().boxHeight;
     textInputRef.current = null;
     editingAnnotationId.current = null;
     setTextInput(null);
@@ -355,6 +360,12 @@ export function useTextTool({
     if (targetId !== null && typeof tool.set_text_wrap_width === "function") {
       await tool.set_text_wrap_width(targetId, wrapWidthAtCommit);
     }
+    // v8.41 — and the box's HEIGHT, by the identical argument. Kept adjacent
+    // to the width on purpose: the two are one box, and the failure mode of
+    // this pair is one of them being added and the other quietly forgotten.
+    if (targetId !== null && typeof tool.set_text_box_height === "function") {
+      await tool.set_text_box_height(targetId, boxHeightAtCommit);
+    }
 
     // Apply / sync the soft drop shadow on the committed annotation (Rust no-ops
     // when unchanged, so this is cheap to call on every commit).
@@ -456,6 +467,10 @@ export function useTextTool({
       // engine is the source of truth for the width (annotations JSON); this
       // slice only mirrors it for the editing session.
       useTextBoxStore.getState().setWrapWidth(ann.wrap_width ?? 0);
+      // v8.41 — and at the height, same reasoning. `?? 0` is load-bearing for
+      // both: an annotation written before its axis existed has no field, and
+      // 0 is exactly what it meant ("size the box to the text").
+      useTextBoxStore.getState().setBoxHeight(ann.box_height ?? 0);
       textInputRef.current = next;
       setTextInput(next);
       // Suppress this annotation's baked tile while the textarea overlay is

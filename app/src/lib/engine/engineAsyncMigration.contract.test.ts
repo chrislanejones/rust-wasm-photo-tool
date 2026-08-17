@@ -646,6 +646,11 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // numbers (5 exempt / 0 unawaited / 0 truthy) are unchanged, which is the
     // point of updating this deliberately rather than loosening the assertion.
     //
+    // v8.41 — 114 -> 115: the same commit path awaits `set_text_box_height`,
+    // the vertical twin added when the six box handles started resizing both
+    // axes. Born awaited, sitting one line below its width counterpart, and
+    // the gate numbers are again unchanged.
+    //
     // The difference from v8.19's identical-looking claim is the method list:
     // that one was made against a shadow .d.ts missing 31 of the engine's
     // methods. This one knows all 280.
@@ -653,7 +658,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(114);
+    expect(gate.awaited, "cumulative converted sites").toBe(115);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

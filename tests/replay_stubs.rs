@@ -99,6 +99,7 @@ fn text_add_parity() {
     let fx = fixture("gradient_128");
     let ops = [Op::TextAdd(TextParams {
         wrap_width: 0,
+        box_height: 0,
         id: 1,
         text: "hi".into(),
         x: 10,
@@ -138,6 +139,7 @@ fn text_rotated_with_background_parity() {
     let fx = fixture("solid_64");
     let ops = [Op::TextAdd(TextParams {
         wrap_width: 0,
+        box_height: 0,
         id: 3,
         text: "ok".into(),
         x: 8,

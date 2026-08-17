@@ -4,6 +4,108 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
+
+Found while smoke-testing v8.41's box height; **it is v8.40's bug, not v8.41's,
+and that is measured rather than assumed.**
+
+| Build | before reload | after reload |
+|---|---|---|
+| master, v8.40 code, untouched | `wrap_width` **340** | **0** |
+| v8.41 (this work) | `wrap_width` 178, `box_height` 365 | **0 / 0** |
+
+The control build is what makes this reportable: master was stashed to, rebuilt,
+served on its own port, and driven through the same steps. v8.40's headline
+feature — drag the box, the words rearrange — is undone by a refresh.
+
+**Where it is NOT.** The engine and the codec both carry the box correctly:
+`tests/oplog_v3_resume.rs` drives the real `oplog_restore` entry point and gets
+`wrap_width` and `box_height` back, including from bytes written by a v3 writer.
+So the loss is above the engine, in which resume path actually runs.
+
+**The likely mechanism, unconfirmed.** `useImageSession` prefers
+`restoreFromOplog` and falls through to the archive path (`loadFromSaved` →
+`restoreLayerStack` → `restore_text_annotation`) when it returns false. That
+fallback hardcodes **0** for both box axes — layer JSON has never carried them,
+which is filed as ADR-024-F7. On the origin measured, `opLogs` and `keyframes`
+were both EMPTY, so the archive path is the one that ran. That is consistent
+with the observation but does not prove it is the only way to get here; the next
+session should instrument which branch fires before fixing either.
+
+⚠️ Note the trap this nearly set: driving the v8.41 build against a
+master-written database looked like a migration fixture and was not one — with
+no op log in that origin, only the archive path was exercised. **An absent
+fixture reads exactly like a passing one.**
+
+## The v8.34 brush fix was never applied to the other brushes (2026-08-14) — clone stamp AND blur NOW FIXED
+
+Diagnosed during the shapes/text-box session ("all of the brushes are still too
+slow on the live website"); the clone stamp and then blur/pixelate/redact were
+fixed the same day at Chris's request.
+
+v8.34 fixed the paint brush by changing the INPUT pipeline, not the engine: at
+most one engine call in flight, newest-position-wins on the unsent ones, and one
+flush per animation frame. That took a 1.4 s stroke from **17.0 s** of banked
+ink lag to **0.26 s**. The cause it removed was structural, not specific to
+paint — the pre-worker engine BLOCKED the main thread, so the browser coalesced
+pointer events down to the engine's service rate for free; a worker yields
+instead, so a real mouse's 120–420 Hz now reaches the port unthrottled and the
+FIFO fills with obsolete cursor positions.
+
+| Tool | In-flight gate | Newest-wins | Flush per rAF | State |
+|---|---|---|---|---|
+| Paint / eraser / mask (`usePaintTool`) | yes | yes | yes | **fixed v8.34** (inline original) |
+| Clone stamp (`useCloneStamp`) | yes | yes | yes | **✅ FIXED v8.41** via `lib/strokeCoalescer.ts` |
+| Blur / pixelate / redact (`AppShell.blurMove`) | yes | yes | yes | **✅ FIXED v8.41** via `lib/strokeCoalescer.ts` |
+
+**The shared scheduler now EXISTS**: `app/src/lib/strokeCoalescer.ts`, the
+v8.34 trio extracted as a plain testable factory (`strokeCoalescer.test.ts`
+pins one-in-flight, newest-wins, one-flush-per-rAF, the hidden-tab rAF-gate
+reset, and recovery from a rejected/timed-out port call). The clone stamp is
+its first consumer.
+
+**Clone stamp fix, measured** (production builds, served on fresh ports, 600
+`dispatchEvent` mousemoves spin-paced at 420 Hz over a 1,426 ms stroke, drain =
+time for a call posted at mouseup to clear the port FIFO):
+
+| Brush | Before drain | After drain |
+|---|---|---|
+| 200 px | **10,754 ms** | **142 ms** |
+| 20 px (default) | 165 ms | — (bounded by construction) |
+
+**Blur fix, measured** (same probe, default 32 px size — the panel's max is
+128, so the before-number scales up from here):
+
+| Metric | Before | After |
+|---|---|---|
+| Drain after a 1,426 ms stroke | **2,509 ms** | **492 ms** |
+| Scaling | linear with stroke length | **constant** stroke-end cost |
+
+The queue only grows when per-move cost × event rate exceeds 100% duty — clone
+at the default 20 px costs ~0.27 ms/move and kept up, at 200 px ~20 ms/move and
+banked ~11 s; blur at its default 32 px already costs ~6.6 ms/move (275% duty),
+which is why it lagged at EVERY size. Blur's after-residual (~0.5 s) is one
+in-flight move + the stroke-end flush/sync — bounded, not accumulating. The old
+handler also flushed per changed move with NO rAF gate, so its before-number
+includes that traffic. `blurUp` additionally gained the stroke-end direct flush
+paint and clone both have (op-log publish + the hidden-tab rAF latch).
+Engine-verified for both fixes: the coalesced stroke changes the composite
+hash, history label lands ("Stamp 1" / "Blur"), undo removes it, redo restores
+byte-exactly. Pixelate and redact share blurMove (mode picked at `effect_down`),
+so all three modes are covered by the one fix.
+
+**Still owed:**
+- **Paint migration**: `usePaintTool` keeps the measured-good inline original
+  the coalescer was extracted from; move it onto `lib/strokeCoalescer.ts` and
+  delete the copy, so the two cannot drift. Mechanical, but re-measure with the
+  420 Hz flood after — paint is the one with the 17 s history.
+
+⚠️ Probe lessons, hard-won twice now: verify against the SERVED production
+bundle; drive floods with `dispatchEvent` at hardware rates (`page.mouse` paces
+~25 Hz and reports everything clean); and **a hidden tab throttles `setTimeout`
+to ~1/s — pace probes with spin-waits or MessageChannel yields, never timers**,
+or the flood itself crawls and reads as a >30 s backlog that does not exist.
+
 ## ADR-024 — found during a12.3 gate 1 (2026-08-13, v8.28)
 
 - **✅ CLOSED in v8.30 — the mid-session kill-switch gap, and it was worse than

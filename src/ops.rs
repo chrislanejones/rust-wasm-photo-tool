@@ -81,7 +81,25 @@ use serde::{Deserialize, Serialize};
 /// **ON** (`USE_OPLOG_PERSISTENCE = true`), so a rejected log would have cost
 /// every user their cross-reload undo history; that is why this step migrates
 /// instead of rejecting.
-pub const OP_FORMAT_VERSION: u8 = 3;
+///
+/// **4** — v8.41, the text box's second axis: text annotations gained a
+/// `box_height` to go with the `wrap_width`. Built to the v3 recipe, clause
+/// for clause, because the recipe is what makes the step migratable:
+///
+///   * `box_height` is `#[serde(skip)]` on [`TextParams`], so the struct's
+///     wire layout is still byte-identical to v2's.
+///   * The height rides in an APPENDED variant ([`Op::TextBoxHeight`]), placed
+///     after `TextWrap` so no existing variant is renumbered.
+///   * `encode_annotations` gained a FIFTH tuple element, keeping v4 blobs a
+///     strict prefix-extension of v3 ones (which are one of v2's).
+///     `decode_annotations` tries 5, then 4, then 3 elements.
+///
+/// So v2, v3 and v4 all decode through one path, and a v2 or v3 document
+/// simply comes back with `box_height == 0` — "size the box to the text",
+/// which is exactly what it meant. Pinned by `v3_blobs_still_decode_under_v4`
+/// and `v2_blobs_still_decode_under_v3` (unchanged, and still passing under
+/// v4 — that it did not need editing IS the prefix-extension property).
+pub const OP_FORMAT_VERSION: u8 = 4;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -181,6 +199,14 @@ pub struct TextParams {
     /// what every pre-v8.40 annotation meant.
     #[serde(skip)]
     pub wrap_width: u32,
+    /// Box height in px (0 = size the box to the text). v8.41.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
+    /// on `wrap_width` above — read that comment, it applies word for word.
+    /// The height travels beside the struct instead: as the fifth element of
+    /// `encode_annotations`, and as [`Op::TextBoxHeight`] in the log.
+    #[serde(skip)]
+    pub box_height: u32,
 }
 
 /// Full-fidelity serializable mirror of the engine's `ShapeAnnotation` —
@@ -223,6 +249,7 @@ impl TextParams {
         TextParams {
             id: a.id,
             wrap_width: a.wrap_width,
+            box_height: a.box_height,
             text: a.text.clone(),
             x: a.x,
             y: a.y,
@@ -375,6 +402,14 @@ pub enum Op {
     /// same reason: a new field would move every byte after it in `TextAdd`
     /// and `TextEdit` payloads that are already persisted.
     TextWrap { id: u32, wrap_width: u32 },
+    /// v8.41 — the text box's HEIGHT, the second axis of the same box.
+    ///
+    /// Appended after [`Op::TextWrap`] for exactly the reason stated there:
+    /// postcard indexes variants positionally, so appending is invisible to
+    /// every op already on a user's disk while inserting would renumber them
+    /// all. Same argument for carrying it here instead of as a `TextParams`
+    /// field.
+    TextBoxHeight { id: u32, box_height: u32 },
 }
 
 impl Op {
@@ -400,6 +435,7 @@ impl Op {
             // editing the text, and a separate "Wrap Text" entry would make
             // one gesture read as two history steps.
             Op::TextWrap { .. } => "Edit Text",
+            Op::TextBoxHeight { .. } => "Edit Text",
         }
     }
 }
@@ -446,12 +482,24 @@ pub fn encode_op(op: &Op) -> Vec<u8> {
 
 /// Decode an op, validating the leading version byte first.
 ///
-/// Accepts **2 and 3**: v3 only APPENDED an enum variant, so every byte
-/// sequence a v2 writer could produce means exactly the same thing here. v1 is
-/// still rejected (its structs differ). See [`OP_FORMAT_VERSION`].
+/// Accepts **everything from 2 up to [`OP_FORMAT_VERSION`]**: every step since
+/// v2 has only APPENDED enum variants, so a byte sequence any of those writers
+/// could produce means exactly the same thing here. v1 is still rejected (its
+/// structs differ).
+///
+/// ⚠️ Written as a RANGE on purpose. It used to read
+/// `ver != OP_FORMAT_VERSION && ver != 2`, which described "2 and the current
+/// version" — correct on the day it was written and quietly wrong the moment
+/// v4 landed, because v3 stopped being the current version and every v3 op
+/// frame in a user's IndexedDB started coming back `UnsupportedVersion(3)`.
+/// (`v3_op_bytes_still_decode_under_v4` is what caught it.) Enumerating the
+/// accepted versions one by one is a list somebody has to remember to extend;
+/// the range extends itself, and the append-only rule stated on
+/// [`OP_FORMAT_VERSION`] is what makes it sound. A future step that is NOT
+/// append-only must narrow this deliberately, not inherit it.
 pub fn decode_op(bytes: &[u8]) -> Result<Op, OpError> {
     let (&ver, body) = bytes.split_first().ok_or(OpError::Empty)?;
-    if ver != OP_FORMAT_VERSION && ver != 2 {
+    if !(2..=OP_FORMAT_VERSION).contains(&ver) {
         return Err(OpError::UnsupportedVersion(ver));
     }
     postcard::from_bytes(body).map_err(|_| OpError::Decode)
@@ -511,8 +559,10 @@ pub fn encode_annotations(
     // v3 appends the per-text wrap widths as a trailing tuple element, making
     // a v3 blob a strict prefix-extension of a v2 one — which is exactly what
     // lets `decode_annotations` read both. Parallel to `texts` by index.
+    // v4 appends the box heights the same way, one element further out.
     let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
-    if let Ok(body) = postcard::to_allocvec(&(texts, shapes, canvas, &wraps)) {
+    let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
+    if let Ok(body) = postcard::to_allocvec(&(texts, shapes, canvas, &wraps, &heights)) {
         out.extend_from_slice(&body);
     }
     out
@@ -531,12 +581,32 @@ pub fn decode_annotations(
     bytes: &[u8],
 ) -> Result<(Vec<TextParams>, Vec<ShapeParams>, Option<CanvasParams>), OpError> {
     let (&ver, body) = bytes.split_first().ok_or(OpError::Empty)?;
-    if ver != OP_FORMAT_VERSION && ver != 2 {
+    // Same range, same reasoning, as `decode_op` — read the ⚠️ there before
+    // changing either. Every version from 2 up is a strict prefix-extension of
+    // the one before it, which is what the narrowing ladder below relies on.
+    if !(2..=OP_FORMAT_VERSION).contains(&ver) {
         return Err(OpError::UnsupportedVersion(ver));
     }
-    // v3 first (the 4-tuple with wrap widths); a v2 blob simply runs out of
-    // bytes at the 4th element, so fall back and default every width to 0 —
-    // "don't wrap", which is precisely what a v2 document meant.
+    // Widest tuple first, narrowing on failure. Each older blob simply runs
+    // out of bytes at the element it never wrote, so the fallback fires and
+    // the missing values default to 0 — "size the box to the text" on both
+    // axes, which is precisely what a v2 or v3 document meant.
+    type V4 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+        Vec<u32>,
+    );
+    if let Ok((mut texts, shapes, canvas, wraps, heights)) = postcard::from_bytes::<V4>(body) {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        for (t, h) in texts.iter_mut().zip(heights) {
+            t.box_height = h;
+        }
+        return Ok((texts, shapes, canvas));
+    }
     type V3 = (
         Vec<TextParams>,
         Vec<ShapeParams>,
@@ -695,6 +765,7 @@ fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
     crate::layer::build_annotation_tile(
         &t.text,
         t.font_size,
+        t.box_height,
         t.r,
         t.g,
         t.b,
@@ -894,6 +965,11 @@ pub fn apply(op: &Op, doc: &mut Document) {
         Op::TextWrap { id, wrap_width } => {
             if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
                 t.wrap_width = *wrap_width;
+            }
+        }
+        Op::TextBoxHeight { id, box_height } => {
+            if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
+                t.box_height = *box_height;
             }
         }
         Op::ShapeAdd(p) => {
@@ -1214,6 +1290,7 @@ mod tests {
         TextParams {
             id,
             wrap_width: 0,
+            box_height: 0,
             text: "hi".into(),
             x: 3,
             y: 4,
@@ -1314,6 +1391,7 @@ mod tests {
             Op::TextAdd(test_text(1)),
             Op::TextEdit(TextParams {
                 wrap_width: 0,
+                box_height: 0,
                 text: "bye".into(),
                 bold: false,
                 rotation_deg: 0.0,
@@ -1600,6 +1678,7 @@ mod tests {
         apply(
             &Op::TextEdit(TextParams {
                 wrap_width: 0,
+                box_height: 0,
                 text: "edited".into(),
                 ..test_text(1)
             }),
@@ -1867,6 +1946,7 @@ mod v2_migration_tests {
         TextParams {
             id,
             wrap_width: 0,
+            box_height: 0,
             text: "hello".into(),
             x: 1,
             y: 2,
@@ -1998,5 +2078,105 @@ mod v2_migration_tests {
         );
         assert_eq!(doc.texts[0].wrap_width, 0, "untouched");
         assert_eq!(doc.texts[1].wrap_width, 180);
+    }
+
+    // ── v4: the box's second axis ──────────────────────────────────────────
+    // Same four guarantees v3 had to prove, restated for `box_height`. They are
+    // separate tests rather than extra asserts on the v3 ones deliberately: if
+    // a later change breaks only the height, the failure should say so.
+
+    /// A v3 writer emitted `[3] ++ postcard((texts, shapes, canvas, wraps))` —
+    /// the 4-tuple, with no box heights. Reconstructed here byte-for-byte.
+    fn v3_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
+        let mut out = vec![3u8];
+        let shapes: Vec<ShapeParams> = Vec::new();
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
+        out.extend_from_slice(&postcard::to_allocvec(&(texts, &shapes, &canvas, &wraps)).unwrap());
+        out
+    }
+
+    #[test]
+    fn v3_blobs_still_decode_under_v4() {
+        // The load-bearing one. `ih_oplog_persist` ships ON, so every user who
+        // has opened the app since v8.40 has v3 blobs in IndexedDB; rejecting
+        // them would drop their cross-reload undo history.
+        let mut t = a_text(7);
+        t.wrap_width = 240;
+        let (got, shapes, canvas) = decode_annotations(&v3_annotation_blob(&[t]))
+            .expect("a v3 annotation blob must still decode — users' logs depend on it");
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].id, 7);
+        assert_eq!(got[0].wrap_width, 240, "the v3 width survives the step");
+        assert_eq!(
+            got[0].box_height, 0,
+            "a v3 document meant 'size the box to the text'"
+        );
+        assert!(shapes.is_empty());
+        assert!(canvas.is_none());
+    }
+
+    #[test]
+    fn v4_blobs_round_trip_both_box_axes() {
+        let mut t = a_text(9);
+        t.wrap_width = 240;
+        t.box_height = 310;
+        let blob = encode_annotations(&[t], &[], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (got, _, _) = decode_annotations(&blob).unwrap();
+        assert_eq!(got[0].wrap_width, 240);
+        assert_eq!(got[0].box_height, 310, "v4 carries the height");
+    }
+
+    #[test]
+    fn v3_op_bytes_still_decode_under_v4() {
+        // Appending `TextBoxHeight` must not renumber the variants already on
+        // disk — `TextWrap` is the one appended last before it, so it is the
+        // one that would break first.
+        for op in [
+            Op::TextAdd(a_text(1)),
+            Op::TextRemove { id: 3 },
+            Op::TextWrap {
+                id: 5,
+                wrap_width: 200,
+            },
+        ] {
+            let mut v3_bytes = vec![3u8];
+            v3_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap());
+            let decoded = decode_op(&v3_bytes)
+                .unwrap_or_else(|e| panic!("v3 bytes for {:?} rejected: {e:?}", op.label()));
+            assert_eq!(decoded, op, "v3 op must mean the same thing under v4");
+        }
+    }
+
+    #[test]
+    fn text_params_wire_layout_is_unchanged_by_the_box_height_field() {
+        // Same measurement as `..._by_the_new_field` above, for the second
+        // skipped field. A regression here shifts every persisted
+        // TextAdd/TextEdit payload.
+        let a = a_text(4);
+        let mut b = a_text(4);
+        b.box_height = 512;
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(),
+            postcard::to_allocvec(&b).unwrap(),
+            "box_height must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn text_box_height_op_applies_to_the_right_annotation() {
+        let mut doc = Document::new(32, 32);
+        doc.texts.push(a_text(1));
+        doc.texts.push(a_text(2));
+        apply(
+            &Op::TextBoxHeight {
+                id: 2,
+                box_height: 310,
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.texts[0].box_height, 0, "untouched");
+        assert_eq!(doc.texts[1].box_height, 310);
     }
 }

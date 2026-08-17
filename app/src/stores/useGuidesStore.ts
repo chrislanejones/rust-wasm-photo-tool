@@ -12,8 +12,34 @@
 // clears them on activePhotoId change). Persisting per-photo guide sets is a
 // follow-up; deliberately NOT wired through the idb persist middleware yet.
 import { create } from "zustand";
+import { DEFAULT_GUIDE_COLOR } from "@/lib/colors";
 
 export type GuideAxis = "h" | "v";
+
+// The guide color is a PREFERENCE, not per-photo state: it survives
+// clearGuides/photo switches and persists across sessions. It lives here (with
+// its own localStorage key) rather than in lib/preferences.ts so this slice
+// stays self-contained and no prefs plumbing runs through AppShell. Guarded:
+// vitest runs in a node environment with no localStorage.
+const COLOR_LS_KEY = "image-horse-guide-color";
+
+function loadGuideColor(): string {
+  try {
+    if (typeof localStorage === "undefined") return DEFAULT_GUIDE_COLOR;
+    const raw = localStorage.getItem(COLOR_LS_KEY);
+    return raw && /^#([0-9a-fA-F]{3,8})$/.test(raw) ? raw : DEFAULT_GUIDE_COLOR;
+  } catch {
+    return DEFAULT_GUIDE_COLOR;
+  }
+}
+
+function saveGuideColor(color: string): void {
+  try {
+    localStorage.setItem(COLOR_LS_KEY, color);
+  } catch {
+    // localStorage may be unavailable (private mode / quota); ignore.
+  }
+}
 
 export interface Guide {
   id: string;
@@ -28,6 +54,8 @@ interface GuidesState {
   guides: Guide[];
   guidesLocked: boolean;
   selectedGuideId: string | null;
+  /** Stroke color for ALL guides (selection is signalled by width, not hue). */
+  guideColor: string;
   /** Monotonic id source (no Math.random / Date.now). */
   _counter: number;
 
@@ -40,12 +68,14 @@ interface GuidesState {
   moveGuide: (id: string, pos: number) => void;
   selectGuide: (id: string | null) => void;
   toggleGuidesLock: () => void;
+  setGuideColor: (color: string) => void;
 }
 
 export const useGuidesStore = create<GuidesState>()((set) => ({
   guides: [],
   guidesLocked: false,
   selectedGuideId: null,
+  guideColor: loadGuideColor(),
   _counter: 0,
 
   addGuide: (axis, imgW, imgH) =>
@@ -82,4 +112,9 @@ export const useGuidesStore = create<GuidesState>()((set) => ({
   selectGuide: (id) => set({ selectedGuideId: id }),
 
   toggleGuidesLock: () => set((s) => ({ guidesLocked: !s.guidesLocked })),
+
+  setGuideColor: (color) => {
+    saveGuideColor(color);
+    set({ guideColor: color });
+  },
 }));

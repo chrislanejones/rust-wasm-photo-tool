@@ -7292,3 +7292,161 @@ conversion) — updated deliberately rather than loosened.
 
 **ADR-024-F7** — the layer-JSON restore path doesn't carry the wrap width yet;
 the op-log path does.
+
+## v8.41 Change Summary — 2026-08-17
+
+Three asks and a pre-session leftover: the brushes that still lagged on the
+live site, a text box that resized in one axis only, a shape that retyped
+itself when you picked the next one, and the guide-colour work already sitting
+in the tree.
+
+### The brush arc, finished
+
+v8.34 established the law and fixed only paint: moving the engine into a worker
+removed the accidental flow control the blocking engine gave for free. Clone
+stamp and blur were still on the old shape.
+
+| Tool | Before drain | After drain | Notes |
+|---|---|---|---|
+| Clone stamp, brush 200 | **10,754 ms** | **142 ms** | default 20 px never lagged (~0.27 ms/move, 11% duty) |
+| Clone stamp, brush 20 | 165 ms | bounded | — |
+| Blur, DEFAULT 32 px | **2,509 ms** | **492 ms** | ~6.6 ms/move = **275% duty — blur lagged at every size** |
+
+The fix is now one place: `app/src/lib/strokeCoalescer.ts` — one call in
+flight, newest-position-wins on unsent moves, one flush per rAF. A plain
+testable factory with 9 vitest tests pinning the semantics, including the
+hidden-tab rAF gate and recovery from a timed-out port call. `blurUp` also
+gained the stroke-end direct flush that paint and clone already had. Pixelate
+and redact share `blurMove`, so one fix covers three modes.
+
+**The law generalised:** the queue only grows when per-move cost × event rate
+exceeds 100% duty. That is why clone felt fine at small brushes and awful at
+big ones, and why blur felt slow at every size.
+
+Probe method, production builds on fresh ports: 600 `dispatchEvent` mousemoves
+spin-paced at 420 Hz over a 1,426 ms stroke; drain is the time for a call
+posted at mouseup to clear the port FIFO. Engine-verified both ways — composite
+hash changes, the history label lands, undo removes and redo restores
+byte-exact.
+
+**Owed:** paint is still on its inline copy of the coalescer. Migrating it onto
+the shared module is the next step.
+
+### Text box height — op-log v3 → v4 (ADR-033)
+
+`TextAnnotation.box_height` is a MINIMUM height with the text **top-aligned**.
+Centring was built first and reversed before shipping: it halves the top
+handle's tracking speed and forces a second JS estimate of natural height,
+worth about 0.1 × font_size of anchor drift. Four corner handles move both
+axes, W and E stay width-only, and there is no height-only handle — the honest
+cost of having six.
+
+Format v3 → v4 by v8.40's recipe: `#[serde(skip)]`, an APPENDED
+`Op::TextBoxHeight`, a fifth tuple element on `encode_annotations`. Migrated,
+never rejected. No Dexie `.version()` bump — only opaque byte-field content
+changed, following ADR-031's precedent.
+
+**The pre-mortem that nearly shipped.** `decode_op` read
+`ver != OP_FORMAT_VERSION && ver != 2` — correct while 3 was current, and
+silently dropping v3 the moment 4 landed. Every v3 op frame in every user's
+IndexedDB would have come back `UnsupportedVersion(3)` with `ih_oplog_persist`
+ON. Caught by `v3_op_bytes_still_decode_under_v4`; the guard is now a range,
+`2..=OP_FORMAT_VERSION`. `tests/oplog_v3_resume.rs` drives the real
+`oplog_restore` with v3-writer bytes and is mutation-verified — reverting the
+range kills exactly one of its three tests.
+
+wasm 785,803 → 790,179 B (**+4,376, +0.56%**).
+
+### Shapes stay the shape you drew
+
+A freshly drawn shape read its type live from the panel, the same way it reads
+its colour, so picking the next shape retyped the pending one. Type is pinned
+at mouse-up in `DrawEditState.drawnShape` and resolved through one shared
+`pendingShapeType()` used by both the overlay renderer and `commitEdit`, so the
+preview and the pixels cannot disagree.
+
+### Guide colour
+
+Guides take a colour: cyan by default — the Photoshop convention — with ten in
+the list. It is a preference, not per-photo state, so it survives clearing the
+guides and switching photos, and persists across sessions under its own
+localStorage key rather than routing prefs plumbing through AppShell.
+Selection is still signalled by line width, not hue.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| cargo fmt / clippy -D warnings | clean / 0 |
+| cargo test --features tiles | **317 passed, 0 failed** |
+| tsc --noEmit | clean |
+| vitest | **573 passed** (49 files) |
+| pnpm lint | **0 errors** (57 warnings, known backlog) |
+| production build | OK |
+
+### Filed, not fixed
+
+**A dragged text box does not survive a page reload.** Pre-existing and
+control-verified: master at v8.40, untouched and built on its own port, loses
+`wrap_width` 340 → 0 the same way. The engine and the codec are fine; the loss
+is above the engine, most likely the archive fallback that hardcodes 0
+(ADR-024-F7). Instrument which resume path actually runs before fixing it.
+
+A related trap worth recording: driving the new build against a master-written
+database looked like a migration fixture and was not — that origin's op-log
+stores were EMPTY, so only the archive path ever ran. **An absent fixture reads
+exactly like a passing one.**
+
+### QC — and a guard that had been dark for 18 releases
+
+`imagehorse-qc` ran against the production build in logged-out demo mode.
+Sections 1, 2 and 4 pass; section 3 is covered only for the surfaces this
+release touched, and section 5 (visual polish, contrast) is not automatable and
+was not run.
+
+| Section | Result |
+|---|---|
+| §1 boot + demo mode | **PASS** — engine initialises logged-out, wasm 200, zero app console errors |
+| §2 clone stamp | **PASS** — stroke records, undo removes, redo restores **byte-exact** |
+| §2 blur brush | **PASS** — stroke records, undo removes |
+| §2 shapes | **PASS** — picking another shape leaves the drawn one alone |
+| §2 text | **PASS** — commits onto the canvas, undo removes |
+| §2 export | **PASS** — real image bytes out of the share dialog |
+| §4 persistence | **PASS** — paint stroke + Canvas survive reload; guide colour survives reload |
+| §5 visual / contrast | **NOT RUN** — needs a visible window |
+
+The QC pass is now a spec — `e2e/qc-v841.spec.ts` — rather than a checklist
+somebody has to remember to follow.
+
+**The finding.** `e2e/oplog-canvas-restore.spec.ts` — the permanent regression
+guard for the 2026-07-14 op-log data loss — selected the brush as
+`button "Paint"`. The five-group toolbar (v7.51, 2026-07-26) renamed it to
+`Create › Brush`, and the spec was last touched at v7.33 (2026-07-14). From
+v7.51 on the locator matched nothing, so the test spent 120 s finding no button
+and died on the timeout without ever asserting anything. It had been dark for
+about 18 releases — including every release that has touched the op log, and
+including this one, which moves the format to v4. Fixed by reaching the tool the
+way the UI now exposes it. Both its tests pass again, so the paint-stroke
+resume path is genuinely covered under v4.
+
+A gate that cannot run is worse than no gate: the suite still *looked* like it
+covered the data loss.
+
+**And a second one, caught by the push hook.** `tests/oplog_v3_resume.rs` was
+written as a new file but never registered as a `[[test]]` target in
+`Cargo.toml`. Targets that need the op log declare
+`required-features = ["tiles"]`; an unregistered file does not, so
+`cargo clippy --all-targets` — which the pre-push hook runs **without**
+`--features tiles` — compiled it featureless, where `stamp_tool::ops`,
+`postcard` and `oplog_restore` do not exist. Eight compile errors, and the
+push was refused.
+
+`cargo test --features tiles` passed the whole time, which is exactly why the
+session that wrote the file never saw it: the gate that was run was the one
+configuration where the file is fine. Registered now, and both configurations
+are green — featureless clippy clean, 317 tests under `tiles`.
+
+Twice in one release, the same shape: **a gate that only ever runs one
+configuration reports on that configuration, not on the code.** The first was
+a spec whose selector had rotted; the second was a build configuration nobody
+ran. Neither was visible to the gates the session actually ran.

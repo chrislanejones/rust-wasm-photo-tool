@@ -8,6 +8,7 @@ const PALETTE = {
   yellow: "#eab308",
   green:  "#22c55e",
   teal:   "#14b8a6",
+  cyan:   "#22d3ee",
   blue:   "#3b82f6",
   violet: "#8b5cf6",
   purple: "#a855f7",
@@ -19,3 +20,10 @@ const p = PALETTE;
 export const TEXT_COLORS = [
   p.white, p.red, p.orange, p.yellow, p.green, p.blue, p.violet, p.pink, p.black,
 ] as const;
+
+/** Cyan first — the Photoshop guide convention and the pre-picker default. */
+export const GUIDE_COLORS = [
+  p.cyan, p.red, p.orange, p.yellow, p.green, p.blue, p.violet, p.pink, p.white, p.black,
+] as const;
+
+export const DEFAULT_GUIDE_COLOR = p.cyan;

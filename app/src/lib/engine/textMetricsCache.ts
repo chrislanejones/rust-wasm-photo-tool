@@ -236,6 +236,12 @@ export async function textInkOffsetBgAwaited(
   backgroundKind: number,
   bgPadding: number,
 ): Promise<readonly number[] | undefined> {
+  // No `boxHeight` here, and that is a decision rather than an omission: the
+  // v8.41 box grows BELOW top-aligned text, so a taller box moves no glyph and
+  // this offset — and therefore this cache key — is genuinely independent of
+  // it. If the layout ever goes centred, the height becomes part of the answer
+  // and MUST join the key, or every re-edit of a resized box serves a stale
+  // offset and the text walks up the canvas a little further each time.
   const key = `b${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${backgroundKind}${SEP}${bgPadding}${SEP}${text}`;
   const hit = lookup(key);
   if (hit !== undefined) return hit;

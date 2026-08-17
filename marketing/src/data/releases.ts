@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.41",
+    date: "2026-08-17",
+    headline: "The brushes keep up",
+    entries: [
+      {
+        tag: "perf",
+        text: "Clone stamp and blur used to fall behind the cursor and then catch up in a rush after you let go — worst at the big brush sizes, where a single clone-stamp stroke could bank almost eleven seconds of backlog. A stroke now keeps one request in flight and drops the positions it has already been overtaken by. Clone stamp at a 200 px brush went from 10,754 ms to 142 ms; blur at its default size from 2,509 ms to 492 ms. Pixelate and redact run through the same path as blur, so they got the same fix.",
+      },
+      {
+        tag: "feature",
+        text: "Text boxes resize up and down. v8.40 gave the box a width; the four corner handles now set a height as well. Text sits at the top of the box, and the box never shrinks below the words inside it.",
+      },
+      {
+        tag: "fix",
+        text: "Pick another shape and the one you just drew stays put. Drawing a circle and then clicking Rectangle used to retype the circle you had already placed. The shape is fixed at the moment you finish drawing it.",
+      },
+      {
+        tag: "ui",
+        text: "Guides have a colour — cyan by default, ten to pick from, and the choice is remembered between sessions.",
+      },
+      {
+        tag: "infra",
+        text: "The save format moved again, for the second time in a week. As before, files written by every previous version still load. A guard that would have silently dropped last week's saves the moment this one landed was caught by a test before it shipped.",
+      },
+      {
+        tag: "fix",
+        text: "Two checks were repaired, both the same shape: a check that only ever ran one way reports on that one way, not on the code. The regression test guarding an old save-data bug had looked for a button that got renamed — it found nothing and timed out instead of checking anything, dark for about eighteen releases. And a new engine test was never registered as a build target, so it would not compile in the configuration the push check uses. Both fixed, and the release checks are now a script rather than a list somebody has to remember.",
+      },
+    ],
+  },
+  {
     version: "v8.40",
     date: "2026-08-14",
     headline: "Text boxes resize, and the words rearrange to fit",

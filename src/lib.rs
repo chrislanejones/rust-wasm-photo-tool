@@ -1428,20 +1428,31 @@ impl ImageHorseTool {
             }
             for a in &layer.text_annotations {
                 let params = crate::ops::TextParams::from_annotation(a);
-                // ⚠️ `TextParams::wrap_width` is `#[serde(skip)]` (it has to be —
-                // see the field's comment), so `TextAdd`/`TextEdit` physically
-                // CANNOT carry a reflow width. Every wrap change therefore needs
-                // its own `TextWrap` op, or replay rebuilds the text unwrapped,
-                // the composite hash diverges, and the log marks itself broken —
-                // silently falling the user back to snapshot undo.
+                // ⚠️ `TextParams::wrap_width` and `TextParams::box_height` are
+                // both `#[serde(skip)]` (they have to be — see the fields'
+                // comments), so `TextAdd`/`TextEdit` physically CANNOT carry
+                // either box dimension. Every box change therefore needs its
+                // own `TextWrap` / `TextBoxHeight` op, or replay rebuilds the
+                // text unboxed, the composite hash diverges, and the log marks
+                // itself broken — silently falling the user back to snapshot
+                // undo. The two axes are handled identically; keep them that
+                // way, because one of them being forgotten is the failure this
+                // comment exists to prevent.
                 match log_doc.texts.iter().find(|t| t.id == a.id) {
                     None => {
                         let wrap = params.wrap_width;
+                        let box_h = params.box_height;
                         pending.push(crate::ops::Op::TextAdd(params));
                         if wrap != 0 {
                             pending.push(crate::ops::Op::TextWrap {
                                 id: a.id,
                                 wrap_width: wrap,
+                            });
+                        }
+                        if box_h != 0 {
+                            pending.push(crate::ops::Op::TextBoxHeight {
+                                id: a.id,
+                                box_height: box_h,
                             });
                         }
                     }
@@ -1452,12 +1463,22 @@ impl ImageHorseTool {
                                 wrap_width: params.wrap_width,
                             });
                         }
-                        // Compare everything EXCEPT the wrap, which the branch
-                        // above already accounted for — otherwise a wrap-only
-                        // drag would also emit a redundant TextEdit.
-                        let mut without_wrap = t.clone();
-                        without_wrap.wrap_width = params.wrap_width;
-                        if without_wrap != params {
+                        if t.box_height != params.box_height {
+                            pending.push(crate::ops::Op::TextBoxHeight {
+                                id: a.id,
+                                box_height: params.box_height,
+                            });
+                        }
+                        // Compare everything EXCEPT the two box dimensions,
+                        // which the branches above already accounted for —
+                        // otherwise a box-only drag would also emit a redundant
+                        // TextEdit (and `TextParams` derives PartialEq over the
+                        // real fields, `#[serde(skip)]` or not, so they DO
+                        // count here).
+                        let mut without_box = t.clone();
+                        without_box.wrap_width = params.wrap_width;
+                        without_box.box_height = params.box_height;
+                        if without_box != params {
                             pending.push(crate::ops::Op::TextEdit(params));
                         }
                     }
@@ -1731,6 +1752,7 @@ impl ImageHorseTool {
                     t.id,
                     &t.text,
                     t.wrap_width,
+                    t.box_height,
                     t.font_size,
                     t.r,
                     t.g,
@@ -2524,6 +2546,7 @@ impl ImageHorseTool {
             // Snapshot pushes carry raw params, not a live annotation; wrapping is
             // re-derived when the snapshot is restored through the normal path.
             0,
+            0, // …and so is the box height, for the same reason
             font_size,
             r,
             g,
@@ -2594,6 +2617,7 @@ impl ImageHorseTool {
             // Snapshot pushes carry raw params, not a live annotation; wrapping is
             // re-derived when the snapshot is restored through the normal path.
             0,
+            0, // …and so is the box height, for the same reason
             font_size,
             r,
             g,
@@ -2918,6 +2942,11 @@ impl ImageHorseTool {
                         // otherwise resizing a photo would re-break every
                         // wrapped caption at the wrong width.
                         (a.wrap_width as f64 * s_uniform) as u32,
+                        // Both box axes are canvas-space measurements, so both
+                        // scale with the image. Leaving the height unscaled
+                        // would let a resize pull the type off-centre inside
+                        // its own background.
+                        (a.box_height as f64 * s_uniform) as u32,
                         // Never round a glyph out of existence.
                         ((a.font_size as f64 * s_uniform) as f32).max(1.0),
                         a.r,
@@ -3489,6 +3518,7 @@ impl ImageHorseTool {
         let (tile_pixels, tile_w, tile_h, off_x, off_y) = build_annotation_tile(
             text,
             font_size,
+            0, // no box: this path draws to a caller-chosen anchor, not a box
             r,
             g,
             b,

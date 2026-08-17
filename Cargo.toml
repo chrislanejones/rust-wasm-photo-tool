@@ -99,6 +99,17 @@ required-features = ["tiles"]
 name = "replay_stubs"
 required-features = ["tiles"]
 
+# Added v8.41. Registering the target is NOT optional bookkeeping: an
+# unregistered test file is still picked up by `cargo clippy --all-targets`
+# (which the pre-push hook runs WITHOUT `--features tiles`), so it gets
+# compiled featureless, and `stamp_tool::ops` / `postcard` / `oplog_restore`
+# do not exist there. `cargo test --features tiles` passes either way, which
+# is why the gap survived the session that wrote the file — the push hook
+# caught it.
+[[test]]
+name = "oplog_v3_resume"
+required-features = ["tiles"]
+
 # Release tuning for the WASM build. wasm-pack builds in release by default;
 # LTO + a single codegen unit let the optimizer inline across modules (pairs
 # with SIMD in .cargo/config.toml). Slower to compile, faster at runtime.

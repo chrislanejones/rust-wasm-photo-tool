@@ -16,7 +16,8 @@
 // Engine-side guarantees — undo, reload, export — are pinned separately in
 // `tests/shape_recolour.rs`.
 import { describe, it, expect } from "vitest";
-import { panelStylePatch } from "./useDrawingTools";
+import { panelStylePatch, pendingShapeType } from "./useDrawingTools";
+import type { DrawEditState } from "./useDrawingTools";
 import type { ToolSettings } from "@/lib/types";
 
 /** A settings object shaped like the Shapes panel's defaults. */
@@ -143,5 +144,42 @@ describe("panelStylePatch", () => {
     const green = settings({ strokeColor: "#00ff00" });
     expect(panelStylePatch(red, green)).toEqual({ strokeColor: "#00ff00" });
     expect(panelStylePatch(green, red)).toEqual({ strokeColor: "#ff0000" });
+  });
+});
+
+// ── pendingShapeType ────────────────────────────────────────────────────────
+// Chris, 2026-08-14: "clicking another shape should not change the last shape
+// created on the canvas, let it just allow a new shape to be added — if I add
+// a circle, then click square, it turns circle into a square."
+//
+// A freshly drawn shape used to read its TYPE live from the panel, exactly the
+// way it reads its colour, so choosing the next shape retyped the current one.
+// Type is not like colour: a colour click edits the thing in front of you, a
+// shape click chooses what you are about to draw next. `panelStylePatch`
+// already refused to carry `shape` across to a RESELECTED shape (see the test
+// above); this pins the same rule for a NEW one, and pins that the overlay and
+// the commit ask the same function so the preview cannot lie about what will
+// be committed.
+describe("pendingShapeType", () => {
+  it("REGRESSION: a new shape keeps the type it was drawn as, whatever the panel says", () => {
+    const drawnCircle = { drawnShape: "circle" as const };
+    expect(pendingShapeType(drawnCircle, "rect")).toBe("circle");
+  });
+
+  it("a reselected shape keeps its own type over both the panel and drawnShape", () => {
+    const reselected = {
+      style: { shape: "line" as const } as NonNullable<DrawEditState["style"]>,
+      drawnShape: "circle" as const,
+    };
+    expect(pendingShapeType(reselected, "rect")).toBe("line");
+  });
+
+  it("falls back to the panel when nothing is pending — that is what picks the NEXT shape", () => {
+    expect(pendingShapeType(null, "handCircle")).toBe("handCircle");
+    expect(pendingShapeType(undefined, "circle")).toBe("circle");
+  });
+
+  it("defaults to rect when neither the edit nor the panel names a shape", () => {
+    expect(pendingShapeType(null, undefined)).toBe("rect");
   });
 });

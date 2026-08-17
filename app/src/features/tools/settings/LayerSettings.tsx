@@ -17,6 +17,8 @@ import { ActionTile } from "@/components/ui/action-tile";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { SectionHeader } from "@/components/ui/section-header";
 import { CanvasResize } from "@/components/CanvasResize";
+import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
+import { GUIDE_COLORS } from "@/lib/colors";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { cn } from "@/lib/utils";
 import type { LayerInfo } from "@/hooks/useEngineCore";
@@ -122,6 +124,8 @@ export function LayerSettings({
   const clearGuides = useGuidesStore((s) => s.clearGuides);
   const selectGuide = useGuidesStore((s) => s.selectGuide);
   const toggleGuidesLock = useGuidesStore((s) => s.toggleGuidesLock);
+  const guideColor = useGuidesStore((s) => s.guideColor);
+  const setGuideColor = useGuidesStore((s) => s.setGuideColor);
 
   // Delete / Backspace removes the selected guide — but only when a guide is
   // selected AND the user isn't typing in a field (don't hijack the key).
@@ -345,6 +349,13 @@ export function LayerSettings({
             {guidesLocked ? <Lock /> : <LockOpen />} Lock
           </ToolButton>
         </div>
+
+        <ColorSwatchGrid
+          label="Guide Color"
+          colors={GUIDE_COLORS}
+          value={guideColor}
+          onChange={setGuideColor}
+        />
 
         {guides.length > 0 && (
           <>

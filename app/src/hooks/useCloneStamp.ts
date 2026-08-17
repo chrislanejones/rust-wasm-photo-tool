@@ -9,6 +9,8 @@
 // stamp (mouse handlers, source arming/disarming) stays here at the bottom.
 import { useCallback, useRef } from "react";
 import type { RefObject, MouseEvent } from "react";
+import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
+import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import { useEngineCore } from "./useEngineCore";
 import { useHistory } from "./useHistory";
 import { useLayers } from "./useLayers";
@@ -138,46 +140,67 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     [toolRef, sourcePosRef, sourceDisarmedRef, isDrawingRef, getCanvasCoords, flushToCanvas, syncState],
   );
 
-  // v8.34 — ONE FLUSH PER FRAME during a stroke. `continue_stroke` is cheap
-  // fire-and-forget, but `flushToCanvas` per move asked the worker for a full
-  // recomposite per pointer EVENT — at a real mouse's 120–420 Hz that floods
-  // the worker's event loop and every port reply queues behind it (the brush
-  // measured 17 s of ink lag from the same shape; usePaintTool has the full
-  // account). The blit draws whatever the engine holds NOW, so flushing faster
-  // than the display can show was pure queue traffic.
-  const stampFlushQueued = useRef(false);
-  const scheduleStampFlush = useCallback(() => {
-    if (stampFlushQueued.current) return;
-    stampFlushQueued.current = true;
-    requestAnimationFrame(() => {
-      stampFlushQueued.current = false;
-      flushToCanvas();
-    });
-  }, [flushToCanvas]);
+  // v8.41 — BOTH halves of the v8.34 fix, via the shared coalescer.
+  //
+  // v8.34 gave this stroke ONE FLUSH PER FRAME but left the input alone, and
+  // that half-fix is why "all of the brushes are still too slow": every
+  // pointermove still posted a `continue_stroke` to the worker with no
+  // in-flight gate, so at a real mouse's 120–420 Hz the port carried 120–420
+  // stroke messages a second and everything else queued behind the backlog.
+  // Measured 2026-08-14 on the production build: a ~3 s stroke banked a queue
+  // that outlived the port's 30 s call timeout — the stroke-end flush and
+  // syncState posted at mouseup were themselves timing out.
+  //
+  // The coalescer is usePaintTool's v8.34 discipline (one call in flight,
+  // newest-position-wins on unsent moves, one flush per rAF), extracted to
+  // `lib/strokeCoalescer.ts` so the next brush routes through the same code
+  // instead of growing a third copy. Coalescing is safe here for the same
+  // reason it was safe for paint: `continue_stroke` strokes the SEGMENT from
+  // the last landed point, so skipped coordinates cost curve detail between
+  // samples, never continuity.
+  //
+  // `flushRef` because the coalescer instance lives for the component while
+  // `flushToCanvas`'s identity may not; the lazy-ref init (not useMemo) is
+  // the guaranteed construct-once pattern.
+  const flushRef = useRef(flushToCanvas);
+  flushRef.current = flushToCanvas;
+  const strokeSchedRef = useRef<StrokeCoalescer | null>(null);
+  if (strokeSchedRef.current === null) {
+    strokeSchedRef.current = createStrokeCoalescer(() => flushRef.current());
+  }
+  const strokeSched = strokeSchedRef.current;
 
   const onMouseMove = useCallback(
     (e: MouseEvent<HTMLCanvasElement>) => {
       if (!isDrawingRef.current) return;
-      const t = toolRef.current;
-      if (!t) return;
-      const { x, y } = getCanvasCoords(e);
-      t.continue_stroke(x, y);
-      scheduleStampFlush();
+      if (!toolRef.current) return;
+      strokeSched.submit(getCanvasCoords(e), async (x, y) => {
+        const t = toolRef.current;
+        if (!t) return false;
+        // Awaited: the resolved reply IS the backpressure — the next move is
+        // not sent until the engine has serviced this one. Returns nothing,
+        // so the coalescer schedules a (rAF-gated) flush for every landed
+        // segment, same cadence the old per-move scheduleStampFlush had.
+        await t.continue_stroke(x, y);
+      });
     },
-    [toolRef, isDrawingRef, getCanvasCoords, scheduleStampFlush],
+    [toolRef, isDrawingRef, getCanvasCoords, strokeSched],
   );
 
   const onMouseUp = useCallback(() => {
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
-    // Reset the rAF gate (a tab hidden mid-stroke never fires rAF and would
-    // latch it), and flush directly so the committed stroke is published even
-    // if the scheduled frame never came.
-    stampFlushQueued.current = false;
+    // Discard the unsent pending move (its segment would land after
+    // `end_stroke` committed) and reset the rAF gate (a tab hidden mid-stroke
+    // never fires rAF and would latch it). FIFO does the rest: `end_stroke`
+    // posts AFTER any move already in flight, so the last landed segment is
+    // inside the committed stroke — then flush directly so the committed
+    // stroke is published even if the scheduled frame never came.
+    strokeSched.strokeEnd();
     toolRef.current?.end_stroke();
     flushToCanvas();
     syncState();
-  }, [toolRef, isDrawingRef, flushToCanvas, syncState]);
+  }, [toolRef, isDrawingRef, strokeSched, flushToCanvas, syncState]);
 
   /**
    * Clone-stamp teardown — called when the Stamp tool is deactivated or its
@@ -190,6 +213,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const clearCloneSource = useCallback(() => {
     if (isDrawingRef.current) {
       isDrawingRef.current = false;
+      // Same order as onMouseUp: drop the unsent move before end_stroke, so
+      // no stale coordinate leaks past the teardown into the next stroke.
+      strokeSched.strokeEnd();
       toolRef.current?.end_stroke();
     }
     if (!sourceDisarmedRef.current || sourcePosRef.current) {
@@ -197,7 +223,7 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       sourcePosRef.current = null;
       syncState(); // no-op until an image/engine exists
     }
-  }, [toolRef, isDrawingRef, sourceDisarmedRef, sourcePosRef, syncState]);
+  }, [toolRef, isDrawingRef, strokeSched, sourceDisarmedRef, sourcePosRef, syncState]);
 
   return {
     state,

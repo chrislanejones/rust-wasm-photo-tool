@@ -136,9 +136,19 @@ async function runScenario(
   }
 }
 
-/** Select the Paint tool and drag one diagonal stroke across the canvas. */
+/** Select the brush and drag one diagonal stroke across the canvas.
+ *
+ *  ⚠️ The selector here was `button "Paint"` until 2026-08-17. The five-group
+ *  toolbar (v7.51, 2026-07-26) renamed the flat Paint tool to "Create › Brush",
+ *  and this spec was last touched at v7.33 (2026-07-14) — so from v7.51 on the
+ *  locator matched nothing and the test died on the 120s timeout instead of
+ *  asserting anything. It was dark for ~18 releases: a guard that cannot run is
+ *  worse than no guard, because the suite still *looks* like it covers the
+ *  2026-07-14 op-log data loss. Reach the tool the way the UI now exposes it:
+ *  pick the group, then the sub-tool. */
 async function paintStroke(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Paint", exact: true }).first().click();
+  await page.getByRole("button", { name: "Create", exact: true }).first().click();
+  await page.getByRole("button", { name: "Brush", exact: true }).first().click();
   const canvas = page.locator("canvas.main-canvas");
   const box = await canvas.boundingBox();
   expect(box, "canvas has a bounding box").not.toBeNull();
