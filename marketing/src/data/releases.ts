@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.42",
+    date: "2026-08-17",
+    headline: "One brush engine instead of three",
+    entries: [
+      {
+        tag: "infra",
+        text: "Nothing you can see, which is the point. All three brushes that draw a stroke — paint, the clone stamp and blur — now run the same code for keeping up with your cursor. Paint had its own copy, written first and left in place when the other two were fixed. One copy is now the only copy, so the three cannot drift apart and get fixed one at a time again.",
+      },
+      {
+        tag: "perf",
+        text: "Measured before and after at 420 pointer events a second: no change to how fast a stroke settles. That was the point of measuring — a tidy-up that quietly costs speed is not a tidy-up.",
+      },
+    ],
+  },
+  {
     version: "v8.41",
     date: "2026-08-17",
     headline: "The brushes keep up",

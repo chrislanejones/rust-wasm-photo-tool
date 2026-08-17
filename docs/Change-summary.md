@@ -7450,3 +7450,50 @@ Twice in one release, the same shape: **a gate that only ever runs one
 configuration reports on that configuration, not on the code.** The first was
 a spec whose selector had rotted; the second was a build configuration nobody
 ran. Neither was visible to the gates the session actually ran.
+
+## v8.42 Change Summary — 2026-08-17
+
+**The paint brush joins the shared coalescer.** v8.41 fixed the clone stamp and
+blur by extracting the v8.34 backpressure into `app/src/lib/strokeCoalescer.ts`,
+and left paint on the inline original that module was extracted FROM — migrating
+measured-good code was out of scope that session. This closes it: paint routes
+through the shared module and the inline copy is deleted, so all three stroke
+consumers (paint/eraser/mask, clone stamp, blur/pixelate/redact) share one
+implementation with no second copy left to drift.
+
+Semantics are unchanged. The coalescer skips a flush only when the send returns
+exactly `false`, and all three `*_move` calls return a boolean, so paint's
+`changed === true` still flushes and `false` still does not.
+
+### Re-measured, because a refactor that costs speed is not a refactor
+
+600 synthetic mousemoves spin-paced at 420 Hz over a 1,429 ms stroke,
+production build, drain = mouseup → Undo goes live.
+
+| Build | Drain |
+|---|---|
+| inline original (control) | 21 ms |
+| shared coalescer, run 1 | 13 ms |
+| shared coalescer, run 2 | 30 ms |
+| shared coalescer, run 3 | 33 ms |
+
+**Indistinguishable within run-to-run variance — this is "no regression", not
+an improvement.** What the number is for is that it stays in the tens of
+milliseconds and bounded, against paint's 17,000 ms pre-v8.34 history. The
+control was taken by stashing the migration and re-measuring the same build
+shape, not by comparing against a remembered figure from a previous session.
+
+### The gate note in CLAUDE.md was wrong, and wrong in the way it warns about
+
+v8.41 corrected the type gate to `npx tsc --noEmit -p app/tsconfig.json`,
+verified in the main checkout. That verification was environment-dependent:
+`typescript` is an **app-level** dependency, and the main checkout happens to
+carry an incidental hoisted copy in its root `node_modules`. A fresh worktree
+under `~/ai-repo/` has app-level install only, so npx finds no compiler there,
+fetches the decoy `tsc` package instead — *"This is not the tsc command you are
+looking for"* — and exits 1. Caught by the perspective session running it in a
+worktree. The portable form, exit 0 in both trees, is
+`pnpm -C app exec tsc --noEmit`; CLAUDE.md now says only that.
+
+Which makes three in two releases, all one shape: **a gate verified in one
+environment is verified for that environment, not for the repo.**

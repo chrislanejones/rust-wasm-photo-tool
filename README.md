@@ -84,6 +84,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.42 — 2026-08-17
+
+**Nothing you can see, which is the point.** All three brushes that draw a
+stroke — paint, the clone stamp, and blur — now run the same piece of code for
+keeping up with your cursor. Paint had its own copy, written first and left in
+place when the other two were fixed in v8.41. One copy is now the only copy, so
+the three cannot drift apart and get fixed one at a time again.
+
+Measured before and after at 420 pointer events a second: no change to how fast
+a stroke settles. That was the point of measuring — a tidy-up that quietly costs
+speed is not a tidy-up.
+
+<details><summary>Older releases</summary>
+
 ### v8.41 — 2026-08-17
 
 **The brushes keep up now.** Clone stamp and blur used to fall behind the
@@ -124,8 +138,6 @@ instead of checking anything, dark for about eighteen releases. And a new
 engine test was never registered as a build target, so it failed to compile in
 the configuration the push check uses. Both are fixed, and the release checks
 now run as a script instead of a list somebody has to remember.
-
-<details><summary>Older releases</summary>
 
 ### v8.40 — 2026-08-14
 

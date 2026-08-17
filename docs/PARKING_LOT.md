@@ -54,7 +54,7 @@ FIFO fills with obsolete cursor positions.
 
 | Tool | In-flight gate | Newest-wins | Flush per rAF | State |
 |---|---|---|---|---|
-| Paint / eraser / mask (`usePaintTool`) | yes | yes | yes | **fixed v8.34** (inline original) |
+| Paint / eraser / mask (`usePaintTool`) | yes | yes | yes | **fixed v8.34**, migrated onto `lib/strokeCoalescer.ts` 2026-08-17 |
 | Clone stamp (`useCloneStamp`) | yes | yes | yes | **✅ FIXED v8.41** via `lib/strokeCoalescer.ts` |
 | Blur / pixelate / redact (`AppShell.blurMove`) | yes | yes | yes | **✅ FIXED v8.41** via `lib/strokeCoalescer.ts` |
 
@@ -94,11 +94,27 @@ hash, history label lands ("Stamp 1" / "Blur"), undo removes it, redo restores
 byte-exactly. Pixelate and redact share blurMove (mode picked at `effect_down`),
 so all three modes are covered by the one fix.
 
-**Still owed:**
-- **Paint migration**: `usePaintTool` keeps the measured-good inline original
-  the coalescer was extracted from; move it onto `lib/strokeCoalescer.ts` and
-  delete the copy, so the two cannot drift. Mechanical, but re-measure with the
-  420 Hz flood after — paint is the one with the 17 s history.
+**Paint migration — ✅ DONE (2026-08-17, post-v8.41).** `usePaintTool` now
+routes through `lib/strokeCoalescer.ts`; the inline original is deleted, so
+there is no second implementation left to drift. All three stroke consumers
+(paint, clone stamp, blur/pixelate/redact) are on the one module.
+
+Re-measured with the 420 Hz flood, as this entry required — 600 synthetic
+mousemoves spin-paced at 420 Hz over a 1,429 ms stroke, production build,
+drain = mouseup → Undo goes live:
+
+| Build | Drain |
+|---|---|
+| inline original (control, stashed migration) | 21 ms |
+| shared coalescer (3 runs) | 13 / 30 / 33 ms |
+
+**Indistinguishable within run-to-run variance — read this as "no regression",
+not as an improvement.** The point of the number is that it is still in the
+tens of milliseconds and bounded, against paint's 17,000 ms pre-v8.34 history.
+Control-tested by stashing the migration and re-measuring the same build shape,
+not by comparing against a remembered figure.
+
+**Still owed:** nothing on the brush arc.
 
 ⚠️ Probe lessons, hard-won twice now: verify against the SERVED production
 bundle; drive floods with `dispatchEvent` at hardware rates (`page.mouse` paces

@@ -2,6 +2,8 @@ import { useCallback, useRef } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
 import { isSmartEdgeEnabled } from "@/lib/smartEdge";
+import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
+import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import { useToolStore } from "@/stores/useToolStore";
 import { useCanvasCoords } from "./useCanvasCoords";
 
@@ -150,56 +152,52 @@ export function usePaintTool({
   //
   // So the backpressure is now explicit:
   //   • at most ONE move call in flight; while it runs, the newest
-  //     coordinates overwrite `pendingMove` (latest wins, unsent ones only)
+  //     coordinates overwrite the pending point (latest wins, unsent only)
   //   • the flush is scheduled at most once per animation frame — the blit
   //     draws whatever the engine holds NOW, so per-move flushes only added
   //     queue traffic (5.7 messages per event, measured)
   //
-  // Mode flags are read per iteration but cannot change mid-drag —
-  // `painting.current` gates entry and a mode switch requires the pointer.
-  const moveInFlight = useRef(false);
-  const pendingMove = useRef<{ x: number; y: number } | null>(null);
-  const flushQueued = useRef(false);
-
-  const scheduleFlush = useCallback(() => {
-    if (flushQueued.current) return;
-    flushQueued.current = true;
-    requestAnimationFrame(() => {
-      flushQueued.current = false;
-      flushToCanvas();
-    });
-  }, [flushToCanvas]);
+  // v8.41 — this WAS an inline copy of the above; it is now the shared
+  // `lib/strokeCoalescer.ts`, which was extracted FROM it in v8.41 for the
+  // clone stamp and blur. Paint was the last holdout and is migrated here so
+  // the three cannot drift. The semantics are unchanged: the coalescer skips
+  // the flush only when the send returns exactly `false`, and all three
+  // `*_move` calls return a boolean, so `changed === true` still flushes and
+  // `false` still does not.
+  //
+  // Mode flags are read per send, not captured per stroke — they cannot change
+  // mid-drag anyway (`painting.current` gates entry and a mode switch requires
+  // the pointer), so this only keeps the closure honest.
+  //
+  // `flushRef` because the coalescer instance lives for the component while
+  // `flushToCanvas`'s identity may not; the lazy-ref init (not useMemo) is the
+  // guaranteed construct-once pattern, same as useCloneStamp.
+  const flushRef = useRef(flushToCanvas);
+  flushRef.current = flushToCanvas;
+  const strokeSchedRef = useRef<StrokeCoalescer | null>(null);
+  if (strokeSchedRef.current === null) {
+    strokeSchedRef.current = createStrokeCoalescer(() => flushRef.current());
+  }
+  const strokeSched = strokeSchedRef.current;
 
   const onMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!painting.current) return;
       if (!toolRef.current) return;
-      pendingMove.current = coords(e);
-      if (moveInFlight.current) return; // coalesce: newest coords already stored
-      moveInFlight.current = true;
-      void (async () => {
-        try {
-          while (pendingMove.current) {
-            const { x, y } = pendingMove.current;
-            pendingMove.current = null;
-            const t = toolRef.current;
-            if (!t) break;
-            // `await` on each BRANCH of the ternary, not around it: the audit
-            // reads the text immediately before the receiver, so a wrapped
-            // await would count as three un-awaited calls and move the gate.
-            const changed = maskMode
-              ? await t.mask_paint_move(x, y)
-              : erase
-                ? await t.erase_move(x, y)
-                : await t.paint_move(x, y);
-            if (changed) scheduleFlush();
-          }
-        } finally {
-          moveInFlight.current = false;
-        }
-      })();
+      strokeSched.submit(coords(e), async (x, y) => {
+        const t = toolRef.current;
+        if (!t) return false;
+        // `await` on each BRANCH of the ternary, not around it: the audit
+        // reads the text immediately before the receiver, so a wrapped
+        // await would count as three un-awaited calls and move the gate.
+        return maskMode
+          ? await t.mask_paint_move(x, y)
+          : erase
+            ? await t.erase_move(x, y)
+            : await t.paint_move(x, y);
+      });
     },
-    [toolRef, coords, erase, maskMode, scheduleFlush],
+    [toolRef, coords, erase, maskMode, strokeSched],
   );
 
   const onMouseUp = useCallback(() => {
@@ -212,8 +210,7 @@ export function usePaintTool({
     // fires and the gate would stay latched — cannot wedge every later flush.
     // FIFO does the rest: this `*_up()` posts AFTER any move already in
     // flight, so the last landed segment is inside the committed stroke.
-    pendingMove.current = null;
-    flushQueued.current = false;
+    strokeSched.strokeEnd();
     const t = toolRef.current;
     if (maskMode) t?.mask_paint_up();
     else if (erase) t?.erase_up();
@@ -238,7 +235,7 @@ export function usePaintTool({
     // per frame — the zero-copy per-frame path is untouched.
     flushToCanvas();
     syncState();
-  }, [toolRef, erase, maskMode, flushToCanvas, syncState]);
+  }, [toolRef, erase, maskMode, flushToCanvas, syncState, strokeSched]);
 
   return { onMouseDown, onMouseMove, onMouseUp };
 }

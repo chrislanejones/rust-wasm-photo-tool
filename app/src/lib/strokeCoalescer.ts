@@ -29,11 +29,13 @@
 // without React (see strokeCoalescer.test.ts); consumers hold one instance in
 // a ref for the component's life.
 //
-// CONSUMERS: useCloneStamp (v8.41, first). usePaintTool still carries the
-// original inline copy this was extracted from — migrating measured-good code
-// was out of scope for the clone-stamp session — and AppShell's blurMove has
-// neither half yet. Both moves are filed in PARKING_LOT.md; when you make
-// them, delete the inline copy rather than letting the two drift.
+// CONSUMERS (all of them, as of v8.41): useCloneStamp, AppShell's blurMove
+// (which covers blur, pixelate and redact — they share `blurMove`), and
+// usePaintTool. Paint was the original: this module was extracted FROM its
+// inline copy, which then survived one release as a duplicate and was migrated
+// here in v8.41. The inline copy is GONE — there is no second implementation
+// left to drift. Any new stroke tool routes through this instead of growing a
+// fourth copy.
 
 export interface StrokePoint {
   x: number;
