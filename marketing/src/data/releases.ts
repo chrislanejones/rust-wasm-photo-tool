@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.43",
+    date: "2026-08-17",
+    headline: "Perspective — put a photo, or your words, onto a surface that recedes",
+    entries: [
+      {
+        tag: "feature",
+        text: "Drag the four corners and the image follows. Three tools in Edit share one box and differ only in what the other corners do when you drag one: Distort moves each corner on its own, Perspective mirrors the opposite edge so the shape stays a proper vanishing-point view, and Skew slides the edge keeping opposite sides parallel.",
+      },
+      {
+        tag: "feature",
+        text: "It works on text the way it works in Photoshop. Lay type down a car door and it recedes with the door — and it is still text. Click it again and the box comes back where you left it, because the four corners are stored against the words rather than baked into the picture. Change the wording or the size afterwards and the same perspective is reapplied to the new text instead of being stretched a second time.",
+      },
+      {
+        tag: "rust",
+        text: "The engine solves the projection and resamples the pixels; only the drag rules stay in the browser. That split is deliberate — the rules run on every mouse movement, up to 420 times a second, and sending each one to the engine is exactly the lag the brushes spent five releases getting rid of.",
+      },
+      {
+        tag: "fix",
+        text: "Two bugs got through every automated check and were found only by using the thing: the drag was being reset to a rectangle by an unrelated redraw, so applying it did nothing at all; and re-applying to already-warped text measured against the warped copy, compounding the distortion with no way back.",
+      },
+    ],
+  },
+  {
     version: "v8.42",
     date: "2026-08-17",
     headline: "One brush engine instead of three",

@@ -32,6 +32,16 @@ pub struct TextAnnotation {
     /// an OUTPUT of wrapping — so it drives layout instead: a taller box means
     /// a taller background/bubble with the type in the middle of it. v8.41.
     pub box_height: u32,
+    /// Projective corner quad, NORMALISED to 0..1 across the finished tile, in
+    /// the winding `perspective::Quad` documents (TL, TR, BR, BL).
+    /// [`perspective::IDENTITY_QUAD`] means "no perspective" and is what every
+    /// annotation written before v8.42 means.
+    ///
+    /// Normalised, not pixels — that is the whole reason the transform stays
+    /// VECTOR across an edit. Read the essay on `perspective::warp_normalised`
+    /// before changing the units here; storing pixels would make the warp drift
+    /// off the tile the first time somebody fixes a typo.
+    pub perspective: [(f32, f32); 4],
     pub text: String,
     pub x: i32, // unrotated top-left in canvas coords
     pub y: i32,
@@ -153,6 +163,10 @@ pub(crate) fn build_text_annotation(
     // px; 0 = size the box to the text. The other axis of the same box — see
     // `TextAnnotation::box_height`.
     box_height: u32,
+    // Normalised projective quad — see `TextAnnotation::perspective`. Applied
+    // as the LAST stage of the tile pipeline (after rotation), so a dragged
+    // corner lands under the cursor rather than under the cursor-rotated-back.
+    perspective: [(f32, f32); 4],
     font_size: f32,
     r: u8,
     g: u8,
@@ -211,10 +225,32 @@ pub(crate) fn build_text_annotation(
         shadow_dy,
         shadow_blur,
     );
+    // PERSPECTIVE IS THE LAST STAGE, deliberately: it warps the finished,
+    // already-rotated tile. Doing it here rather than inside
+    // `build_annotation_tile` also keeps it at ONE insertion point — that
+    // function has two return paths (background / no-background) and would
+    // otherwise need the same warp bolted onto both.
+    //
+    // A rejected quad (degenerate, self-crossing, or absurdly large) returns
+    // `None` and the unwarped tile is kept. That is the right failure: the
+    // annotation stays visible and editable, so the user can drag the handle
+    // back, instead of the text vanishing.
+    let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) =
+        match crate::perspective::warp_normalised(&tile_pixels, tile_w, tile_h, &perspective) {
+            Some(w) => (
+                w.pixels,
+                w.w,
+                w.h,
+                tile_offset_x + w.offset_x,
+                tile_offset_y + w.offset_y,
+            ),
+            None => (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y),
+        };
     TextAnnotation {
         id,
         wrap_width,
         box_height,
+        perspective,
         text: text.to_string(),
         x,
         y,
@@ -249,6 +285,31 @@ pub(crate) fn build_text_annotation(
     }
 }
 
+/// Read a flat `[x0,y0,x1,y1,x2,y2,x3,y3]` slice back into a corner quad.
+/// `None` for any other length, and for non-finite values — NaN survives every
+/// comparison in the solver and would come out the far end as an invisible
+/// annotation rather than an error.
+pub(crate) fn quad_from_flat(v: &[f32]) -> Option<[(f32, f32); 4]> {
+    if v.len() != 8 || v.iter().any(|f| !f.is_finite()) {
+        return None;
+    }
+    Some([(v[0], v[1]), (v[2], v[3]), (v[4], v[5]), (v[6], v[7])])
+}
+
+/// A normalised corner quad as a flat JSON array of 8 numbers,
+/// `[x0,y0,x1,y1,x2,y2,x3,y3]` in TL,TR,BR,BL order.
+///
+/// Flat rather than nested pairs because every consumer on the JS side — the
+/// overlay's handle hit-test, the drag rules, the engine call that sends it
+/// back — already works in the flat form that `&[f32]` marshals as. One shape
+/// across the boundary means no re-nesting step to get wrong.
+pub(crate) fn quad_to_json(q: &[(f32, f32); 4]) -> String {
+    format!(
+        "[{},{},{},{},{},{},{},{}]",
+        q[0].0, q[0].1, q[1].0, q[1].1, q[2].0, q[2].1, q[3].0, q[3].1
+    )
+}
+
 /// Serialize a list of annotations to the JSON format consumed by JS.
 /// Tile dimensions are included so the JS overlay can lay out chevrons
 /// and selection rectangles without a Rust round-trip per frame.
@@ -259,10 +320,11 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{}}}",
+            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"perspective\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{}}}",
             a.id,
             a.wrap_width,
             a.box_height,
+            quad_to_json(&a.perspective),
             json_escape(&a.text),
             a.x, a.y,
             a.font_size,
@@ -1229,8 +1291,9 @@ impl ImageHorseTool {
         let ann = build_text_annotation(
             id,
             text,
-            0, // new text starts unwrapped; the box is sized to it
-            0, // …and unboxed vertically, for the same reason
+            0,                                 // new text starts unwrapped; the box is sized to it
+            0,                                 // …and unboxed vertically, for the same reason
+            crate::perspective::IDENTITY_QUAD, // …and unwarped
             font_size,
             r,
             g,
@@ -1405,6 +1468,10 @@ impl ImageHorseTool {
             &text,
             wrap_width,
             box_height,
+            // Carry the quad through. Resizing the box must not silently drop a
+            // perspective the user applied — "edit it and it re-warps" is the
+            // whole reason the quad is stored normalised.
+            a.perspective,
             fs,
             a.r,
             a.g,
@@ -1470,6 +1537,10 @@ impl ImageHorseTool {
             &text,
             wrap_width,
             box_height,
+            // Carry the quad through. Resizing the box must not silently drop a
+            // perspective the user applied — "edit it and it re-warps" is the
+            // whole reason the quad is stored normalised.
+            a.perspective,
             fs,
             a.r,
             a.g,
@@ -1499,6 +1570,110 @@ impl ImageHorseTool {
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
         true
+    }
+
+    /// Set a text annotation's projective corner quad (normalised, TL/TR/BR/BL)
+    /// and rebuild its tile through it. Returns false if `id` isn't on the
+    /// active layer.
+    ///
+    /// The third dedicated setter in this family, for the same three reasons as
+    /// wrap width and box height: the gesture changes one thing, the full
+    /// update path already takes 19 arguments, and this maps 1:1 onto the
+    /// `Op::TextPerspective` the recorder emits.
+    ///
+    /// The annotation keeps its author text, font size, wrap width and box
+    /// height untouched — this is why the tool is non-destructive on text.
+    /// The quad is a property of the annotation, applied at render time, so
+    /// editing the words afterwards re-wraps AND re-warps in one rebuild rather
+    /// than fighting a baked-in raster.
+    ///
+    /// `quad` crosses the wasm boundary FLAT — 8 floats, `[x0,y0,…,x3,y3]` —
+    /// because `[(f32, f32); 4]` has no `FromWasmAbi`. A wrong-length slice is
+    /// rejected rather than padded: a truncated quad is a caller bug, and
+    /// silently completing it with zeros would collapse the annotation to a
+    /// point.
+    pub fn set_text_perspective(&mut self, id: u32, quad: &[f32]) -> bool {
+        let Some(quad) = quad_from_flat(quad) else {
+            return false;
+        };
+        let Some(idx) = self.layers[self.active]
+            .text_annotations
+            .iter()
+            .position(|a| a.id == id)
+        else {
+            return false;
+        };
+        if self.layers[self.active].text_annotations[idx].perspective == quad {
+            return true; // no-op: don't snap history for a drag that landed where it started
+        }
+        self.snap("Perspective");
+        let (text, fs, bold, wrap_width, box_height) = {
+            let a = &self.layers[self.active].text_annotations[idx];
+            (
+                a.text.clone(),
+                a.font_size,
+                a.bold,
+                a.wrap_width,
+                a.box_height,
+            )
+        };
+        let a = &mut self.layers[self.active].text_annotations[idx];
+        let rebuilt = build_text_annotation(
+            a.id,
+            &text,
+            wrap_width,
+            box_height,
+            quad,
+            fs,
+            a.r,
+            a.g,
+            a.b,
+            bold,
+            a.x,
+            a.y,
+            a.rotation_deg,
+            a.background_kind,
+            a.bg_r,
+            a.bg_g,
+            a.bg_b,
+            a.bg_a,
+            a.bg_padding,
+            a.bg_corner_radius,
+            a.bg_tail,
+            a.shadow_box,
+            a.shadow_text,
+            a.shadow_r,
+            a.shadow_g,
+            a.shadow_b,
+            a.shadow_a,
+            a.shadow_dx,
+            a.shadow_dy,
+            a.shadow_blur,
+        );
+        self.layers[self.active].text_annotations[idx] = rebuilt;
+        self.recomposite();
+        true
+    }
+
+    /// A text annotation's current quad, flat (8 floats), for the Perspective
+    /// tool's RESELECT path — click an existing warped item and the tool picks
+    /// its quad back up instead of restarting from the rectangle.
+    ///
+    /// Empty vec when the id isn't on the active layer. An empty result and an
+    /// identity quad are different answers ("no such annotation" vs "that one
+    /// is unwarped") and the caller distinguishes them by length.
+    pub fn text_perspective_of(&self, id: u32) -> Vec<f32> {
+        self.layers[self.active]
+            .text_annotations
+            .iter()
+            .find(|a| a.id == id)
+            .map(|a| {
+                let q = a.perspective;
+                vec![
+                    q[0].0, q[0].1, q[1].0, q[1].1, q[2].0, q[2].1, q[3].0, q[3].1,
+                ]
+            })
+            .unwrap_or_default()
     }
 
     pub fn set_text_shadow(

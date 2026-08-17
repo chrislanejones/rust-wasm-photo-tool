@@ -183,10 +183,14 @@ describe("parseRoute — garbage in, safe default out", () => {
   });
 
   it("a Coming Soon sub-tool falls back to the group default, never itself", () => {
-    // Perspective and Ruler must be unreachable by URL — they carry no tool, so
-    // applyRoute would have nothing to activate.
-    expect(parse("#/edit/perspective")).toMatchObject({ subTool: "crop" });
+    // Ruler must be unreachable by URL — it carries no tool, so applyRoute
+    // would have nothing to activate. (Perspective was the other example here
+    // until v8.42 shipped it; it is now a live sub-tool and is asserted
+    // reachable in the live-sub-tool tests instead.)
     expect(parse("#/edit/ruler")).toMatchObject({ subTool: "crop" });
+    // And the freshly-live one resolves to ITSELF, which is the other half of
+    // the same rule and the regression guard for switching it on.
+    expect(parse("#/edit/perspective")).toMatchObject({ subTool: "perspective" });
   });
 
   it("refuses a sub-tool that belongs to a DIFFERENT group", () => {

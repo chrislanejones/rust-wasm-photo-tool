@@ -52,6 +52,7 @@ import type {
   BatchMode,
   BrushMode,
   EraserMode,
+  PerspectiveMode,
   ResizeMode,
   SelectionKind,
   ShapesMode,
@@ -152,6 +153,15 @@ const MODE_ACCESS: Partial<Record<ToolType, ModeAccess>> = {
   text: {
     select: (s) => s.textMode,
     set: (m) => useToolStore.getState().setTextMode(m as TextMode),
+  },
+  // Perspective is a REGISTERED module, so its `modes` come from TOOL_MODULES
+  // (PERSPECTIVE_MODES) rather than LEGACY_SUBMODES — but it still needs a
+  // MODE_ACCESS row, because `modesFor` and the accessor are two separate
+  // sources: the registry says what the modes ARE, this says where the active
+  // one LIVES. Without it the SubtoolRow renders three tiles that never light.
+  perspective: {
+    select: (s) => s.perspectiveMode,
+    set: (m) => useToolStore.getState().setPerspectiveMode(m as PerspectiveMode),
   },
   emoji: {
     select: (s) => s.batchMode,

@@ -651,6 +651,15 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // axes. Born awaited, sitting one line below its width counterpart, and
     // the gate numbers are again unchanged.
     //
+    // v8.42 — 115 -> 118: the Perspective tool adds THREE awaited sites, all
+    // born awaited rather than converted. `usePerspectiveTool` awaits
+    // `text_perspective_of` (the reselect seed — it CONSUMES a value, so it
+    // could never have been a fire-and-forget), `set_text_perspective` (the
+    // non-destructive text path) and `perspective_warp_region` (the
+    // destructive pixel one). The gate numbers below (5 exempt / 0 unawaited /
+    // 0 truthy) are again unchanged, which is the point of updating this
+    // number deliberately instead of loosening the assertion.
+    //
     // The difference from v8.19's identical-looking claim is the method list:
     // that one was made against a shadow .d.ts missing 31 of the engine's
     // methods. This one knows all 280.
@@ -658,7 +667,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(115);
+    expect(gate.awaited, "cumulative converted sites").toBe(118);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

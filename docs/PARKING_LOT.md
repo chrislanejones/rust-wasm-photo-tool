@@ -4,6 +4,46 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## CLOSED before it was filed — `oplog_v3_resume` `required-features` (2026-08-17)
+
+Found independently on the perspective branch and on master, the same day.
+`tests/oplog_v3_resume.rs` had no `[[test]]` block, so `cargo clippy
+--all-targets` (no features — what the pre-push hook runs) tried to compile it
+featureless, where `stamp_tool::ops` does not exist.
+
+| Command | Before the fix |
+|---|---|
+| `cargo test --features tiles,patchmatch` | passed |
+| `cargo clippy --all-targets` (= the hook) | **failed to compile** |
+
+**Already fixed in v8.41 (`261f661`) — the push hook caught it there first.**
+Recorded only because the two fixes were byte-identical in the block and
+differed only in comment, and the perspective branch took master's. Nothing
+outstanding.
+
+## OPEN — the sub-mode axis has a THIRD hand-written copy (2026-08-17)
+
+Found while wiring Perspective's routing. `routeState.ts`'s `modeOfActiveTool`
+is a `switch` mapping each ToolType to the store field holding its sub-mode —
+which `toolModes.ts`'s `MODE_ACCESS` already knows, exactly and reactively.
+
+A tool missing from that switch does not fail loudly: it returns `undefined`,
+and `subToolForToolMode` then falls back to the group's FIRST live sub-tool. So
+`#/edit/perspective` silently lit Distort, and the hash round-trip rewrote
+itself. Caught by `hash -> state -> hash is identity for every live sub-tool`,
+which is the only reason it did not ship.
+
+Derive it from `MODE_ACCESS` instead. Not done here: it touches every tool's
+routing and this session was scoped to one tool.
+
+## OPEN — Perspective does not warp SHAPE annotations (2026-08-17)
+
+Named in ADR-034, deliberately not built. Text warps non-destructively; shapes
+do not. A homography maps straight lines to straight lines, so a rect's four
+mapped corners are exact and lines/arrows/polylines/pen paths are just their
+control points — but a circle becomes a conic needing polygon approximation,
+and the shape render path has no tile cache to warp the way text does.
+
 ## OPEN — a dragged text box does not survive a reload (2026-08-14, PRE-EXISTING)
 
 Found while smoke-testing v8.41's box height; **it is v8.40's bug, not v8.41's,

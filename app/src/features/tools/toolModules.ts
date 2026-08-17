@@ -16,13 +16,22 @@ import {
   Shrink,
   VectorSquare,
   SquareDashedMousePointer,
+  Frame,
 } from "lucide-react";
 import { PaintSettings, PAINT_MODES } from "./settings/PaintSettings";
 import type { PaintMode } from "./settings/PaintSettings";
 import { ResizeSettings, RESIZE_MODES } from "./settings/ResizeSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import { SelectSettings, SELECT_MODES } from "./settings/SelectSettings";
-import type { ResizeMode, SelectionKind } from "@/stores/useToolStore";
+import {
+  PerspectiveSettings,
+  PERSPECTIVE_MODES,
+} from "./settings/PerspectiveSettings";
+import type {
+  PerspectiveMode,
+  ResizeMode,
+  SelectionKind,
+} from "@/stores/useToolStore";
 
 /**
  * Minimal registry entry for one tool. Kept deliberately small — fields are
@@ -94,6 +103,23 @@ const selectModule: ToolModule<SelectionKind> = {
   Settings: SelectSettings,
 };
 
+/** Perspective — fifth registered module, and the SECOND tool whose registry
+ *  id matches its label from birth (after Select). There is no legacy id to
+ *  honour because the tool is new in v8.42: the `perspective` sub-tool had sat
+ *  in the Edit group as `comingSoon` since the five-group restructure, carrying
+ *  no `tool` at all, so nothing downstream ever spoke a different name for it.
+ *
+ *  Its `modes` are the three DRAG RULES — what dragging a handle does to the
+ *  quad's other corners — not three separate geometries. Sub-mode state lives
+ *  in `useToolStore.perspectiveMode`. */
+const perspectiveModule: ToolModule<PerspectiveMode> = {
+  id: "perspective",
+  label: "Perspective",
+  icon: Frame,
+  modes: PERSPECTIVE_MODES,
+  Settings: PerspectiveSettings,
+};
+
 /**
  * The registry. Partial — tools appear here one migration session at a time
  * (emoji/Batch next per the skill order; clone stamp last).
@@ -103,4 +129,5 @@ export const TOOL_MODULES: Partial<Record<ToolType, ToolModule>> = {
   compress: resizeModule,
   crop: adjustModule,
   select: selectModule,
+  perspective: perspectiveModule,
 };

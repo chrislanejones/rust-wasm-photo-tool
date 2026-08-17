@@ -45,6 +45,7 @@ import {
   FlipHorizontal,
   Frame,
   Grid2x2,
+  Move3d,
   ImagePlus,
   Lasso,
   Layers,
@@ -61,6 +62,7 @@ import {
   Shapes,
   Smile,
   SquareDashed,
+  SquareDashedBottom,
   SquareMousePointer,
   SquarePen,
   BadgeCheck,
@@ -469,14 +471,57 @@ const editGroup: ToolGroupDefinition = {
       tool: "crop",
       keywords: ["transform", "flip", "rotate", "mirror"],
     },
+    // ── Perspective, as THREE sub-tools ────────────────────────────────────
+    // One quad, three drag rules — and in this registry a rule IS a sub-tool,
+    // because that is how every other multi-mode tool surfaces its modes.
+    // Select's six kinds, Paint's four brushes and Resize's two modes are all
+    // group sub-tools backed by one ToolType; SubtoolRow renders the group, so
+    // a mode with no sub-tool of its own has nowhere to appear. Shipping this
+    // as a single tile left the three rules unreachable — the tool worked and
+    // the picker did not exist.
+    //
+    // All three carry `tool: "perspective"` and differ only in `mode`, so
+    // `subToolForToolMode` resolves each one exactly (they are not part of the
+    // six ambiguous Edit tiles that share a tool with no mode).
+    //
+    // The slot was held by a single `comingSoon` entry since the five-group
+    // restructure. Coming Soon carries no `tool` BY TYPE, so nothing downstream
+    // had ever resolved a route or palette entry for it and switching it on is
+    // purely additive.
+    {
+      id: "distort",
+      label: "Distort",
+      description: "Drag any corner freely — full four-point projective warp",
+      icon: Move3d,
+      tool: "perspective",
+      mode: "distort",
+      cursor: "crosshair",
+      keywords: [
+        "distort", "perspective", "corner pin", "free transform", "warp",
+        "four point", "quad",
+      ],
+    },
     {
       id: "perspective",
       label: "Perspective",
-      description: "Correct a keystoned or skewed photo",
+      description: "Keystone — drag a corner and its neighbour mirrors it",
       icon: Scan,
-      comingSoon: true,
-      note: "Perspective correction is not built yet",
-      keywords: ["perspective", "keystone", "skew", "warp"],
+      tool: "perspective",
+      mode: "perspective",
+      cursor: "crosshair",
+      keywords: [
+        "perspective", "keystone", "trapezoid", "receding", "depth", "warp",
+      ],
+    },
+    {
+      id: "skew",
+      label: "Skew",
+      description: "Shear — slide a whole edge along its own axis",
+      icon: SquareDashedBottom,
+      tool: "perspective",
+      mode: "skew",
+      cursor: "crosshair",
+      keywords: ["skew", "shear", "slant", "italic", "lean", "parallel"],
     },
     {
       // Maps to `crop` PLUS the panel's existing Color Picker toggle — which is

@@ -162,10 +162,23 @@ export function useEffectiveTool({
         case "transform":
         case "canvas-size":
         case "guides":
+        case "distort":
+        case "perspective":
+        case "skew":
           // Button-driven: flips/rotations, the W×H resizer, and guide
           // add/remove. Guides ARE draggable, but on their own overlay
           // (ImageGuidesOverlay), not through the stamp handlers — so this
           // must idle or a guide drag would reach the clone stamp.
+          //
+          // Perspective's three rules join them for exactly that reason
+          // (v8.42) — they are one tool wearing three sub-tool tiles. Its corner
+          // and edge handles are dragged on PerspectiveOverlay, which owns its
+          // own pointer capture. Routing it through the stamp handlers instead
+          // would put a clone-stamp dab under every handle grab — the same
+          // near-miss this whole function was rewritten to prevent. It carries
+          // a `crosshair` cursor because the canvas IS the target here, unlike
+          // the three above; cursor and dispatch are allowed to differ when the
+          // gesture lives on a sibling overlay, and guides is the precedent.
           return idle;
         default:
           return idle;

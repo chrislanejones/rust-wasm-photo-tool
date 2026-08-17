@@ -43,6 +43,12 @@ export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
  *  AND the hoisted SubtoolRow, all three of which read it via toolModes.ts. */
 export const TEXT_MODES = ["text", "background", "ocr"] as const;
 export type TextMode = (typeof TEXT_MODES)[number];
+
+/** Perspective tool sub-modes (v8.42). Not three tools — ONE quad and three
+ *  rules about what dragging a handle does to the other corners. See
+ *  `lib/perspective.ts` `dragCorner` for the rules themselves. */
+export const PERSPECTIVE_MODES = ["distort", "perspective", "skew"] as const;
+export type PerspectiveMode = (typeof PERSPECTIVE_MODES)[number];
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
  *  rename, and AI Rename (names every photo from what the engine sees in it).
  *  Lifted out of BatchSettings.tsx local state for the same reason as
@@ -152,6 +158,16 @@ export interface ToolState {
   shapesMode: ShapesMode;
   eraserMode: EraserMode;
   textMode: TextMode;
+  /** Which drag rule the Perspective tool's handles obey.
+   *
+   *  DELIBERATELY NOT PERSISTED — same reasoning as `activeSubTool` and
+   *  `pickedColorHistory`: `partialize` below is an explicit allowlist and this
+   *  is kept out of it, so the tool ships with no IndexedDB schema change, no
+   *  version bump, and without tripping the `dexie-migration` gate. On reload
+   *  the tool opens in `distort`, which is the mode a first-time drag wants
+   *  anyway. Persisting it is a one-line partialize change PLUS that migration
+   *  procedure — a deliberate follow-up, not something to slip in here. */
+  perspectiveMode: PerspectiveMode;
   batchMode: BatchMode;
   /** Export format + quality for Compress / Download / Apply Compression.
    *
@@ -191,6 +207,7 @@ export interface ToolState {
   setShapesMode: (v: SetArg<ShapesMode>) => void;
   setEraserMode: (v: SetArg<EraserMode>) => void;
   setTextMode: (v: SetArg<TextMode>) => void;
+  setPerspectiveMode: (v: SetArg<PerspectiveMode>) => void;
   setBatchMode: (v: SetArg<BatchMode>) => void;
   setCropRatio: (v: SetArg<[number, number] | null>) => void;
   setSelectionTolerance: (v: SetArg<number>) => void;
@@ -225,6 +242,7 @@ export const useToolStore = create<ToolState>()(
       shapesMode: "shapes",
       eraserMode: "brush",
       textMode: "text",
+      perspectiveMode: "distort",
       batchMode: "logo",
       // Same defaults the AppShell useState pair had, so a user with no
       // persisted blob (or one written before #14) sees no change at all.
@@ -279,6 +297,8 @@ export const useToolStore = create<ToolState>()(
       setShapesMode: (v) => set((s) => ({ shapesMode: resolveSet(v, s.shapesMode) })),
       setEraserMode: (v) => set((s) => ({ eraserMode: resolveSet(v, s.eraserMode) })),
       setTextMode: (v) => set((s) => ({ textMode: resolveSet(v, s.textMode) })),
+      setPerspectiveMode: (v) =>
+        set((s) => ({ perspectiveMode: resolveSet(v, s.perspectiveMode) })),
       setBatchMode: (v) => set((s) => ({ batchMode: resolveSet(v, s.batchMode) })),
       setCropRatio: (v) => set((s) => ({ cropRatio: resolveSet(v, s.cropRatio) })),
       setSelectionTolerance: (v) =>

@@ -30,6 +30,12 @@ mod history;
 mod layer;
 mod livewire;
 mod paint;
+// Pure-geometry projective transforms (the Perspective tool). `pub` for the
+// same reason `ops`/`tiles` are: the integration tests in `tests/` build
+// `TextParams` literals and need `IDENTITY_QUAD` by name. No wasm-bindgen
+// surface of its own, and visibility is a compile-time check — the emitted
+// bytes are identical either way.
+pub mod perspective;
 mod selection;
 mod settings;
 mod stamp;
@@ -1428,20 +1434,23 @@ impl ImageHorseTool {
             }
             for a in &layer.text_annotations {
                 let params = crate::ops::TextParams::from_annotation(a);
-                // ⚠️ `TextParams::wrap_width` and `TextParams::box_height` are
-                // both `#[serde(skip)]` (they have to be — see the fields'
+                // ⚠️ `TextParams::wrap_width`, `box_height` AND `perspective`
+                // are all `#[serde(skip)]` (they have to be — see the fields'
                 // comments), so `TextAdd`/`TextEdit` physically CANNOT carry
-                // either box dimension. Every box change therefore needs its
-                // own `TextWrap` / `TextBoxHeight` op, or replay rebuilds the
-                // text unboxed, the composite hash diverges, and the log marks
-                // itself broken — silently falling the user back to snapshot
-                // undo. The two axes are handled identically; keep them that
-                // way, because one of them being forgotten is the failure this
-                // comment exists to prevent.
+                // any of them. Every such change therefore needs its own
+                // `TextWrap` / `TextBoxHeight` / `TextPerspective` op, or
+                // replay rebuilds the text unboxed and unwarped, the composite
+                // hash diverges, and the log marks itself broken — silently
+                // falling the user back to snapshot undo. The three are handled
+                // identically; keep them that way, because one of them being
+                // forgotten is the failure this comment exists to prevent.
+                // (v8.42 added the third; the comment said "two axes" and this
+                // is what following it looks like.)
                 match log_doc.texts.iter().find(|t| t.id == a.id) {
                     None => {
                         let wrap = params.wrap_width;
                         let box_h = params.box_height;
+                        let quad = params.perspective;
                         pending.push(crate::ops::Op::TextAdd(params));
                         if wrap != 0 {
                             pending.push(crate::ops::Op::TextWrap {
@@ -1454,6 +1463,14 @@ impl ImageHorseTool {
                                 id: a.id,
                                 box_height: box_h,
                             });
+                        }
+                        // The "unset" sentinel for the quad is the IDENTITY,
+                        // not zero — the other two axes get to use 0 because 0
+                        // means "auto" for them, whereas an all-zero quad is a
+                        // collapsed point. Emitting nothing here leaves replay
+                        // at the identity, which is the same thing.
+                        if !crate::perspective::is_identity(&quad) {
+                            pending.push(crate::ops::Op::TextPerspective { id: a.id, quad });
                         }
                     }
                     Some(t) => {
@@ -1469,7 +1486,13 @@ impl ImageHorseTool {
                                 box_height: params.box_height,
                             });
                         }
-                        // Compare everything EXCEPT the two box dimensions,
+                        if t.perspective != params.perspective {
+                            pending.push(crate::ops::Op::TextPerspective {
+                                id: a.id,
+                                quad: params.perspective,
+                            });
+                        }
+                        // Compare everything EXCEPT the three skipped fields,
                         // which the branches above already accounted for —
                         // otherwise a box-only drag would also emit a redundant
                         // TextEdit (and `TextParams` derives PartialEq over the
@@ -1478,6 +1501,7 @@ impl ImageHorseTool {
                         let mut without_box = t.clone();
                         without_box.wrap_width = params.wrap_width;
                         without_box.box_height = params.box_height;
+                        without_box.perspective = params.perspective;
                         if without_box != params {
                             pending.push(crate::ops::Op::TextEdit(params));
                         }
@@ -1753,6 +1777,7 @@ impl ImageHorseTool {
                     &t.text,
                     t.wrap_width,
                     t.box_height,
+                    t.perspective,
                     t.font_size,
                     t.r,
                     t.g,
@@ -2546,7 +2571,8 @@ impl ImageHorseTool {
             // Snapshot pushes carry raw params, not a live annotation; wrapping is
             // re-derived when the snapshot is restored through the normal path.
             0,
-            0, // …and so is the box height, for the same reason
+            0,                                 // …and so is the box height, for the same reason
+            crate::perspective::IDENTITY_QUAD, // …and so is the corner quad
             font_size,
             r,
             g,
@@ -2617,7 +2643,8 @@ impl ImageHorseTool {
             // Snapshot pushes carry raw params, not a live annotation; wrapping is
             // re-derived when the snapshot is restored through the normal path.
             0,
-            0, // …and so is the box height, for the same reason
+            0,                                 // …and so is the box height, for the same reason
+            crate::perspective::IDENTITY_QUAD, // …and so is the corner quad
             font_size,
             r,
             g,
@@ -2947,6 +2974,12 @@ impl ImageHorseTool {
                         // would let a resize pull the type off-centre inside
                         // its own background.
                         (a.box_height as f64 * s_uniform) as u32,
+                        // NOT scaled — and that is the point of storing the
+                        // quad normalised. The corners are fractions of the
+                        // tile, so they mean the same shape at any size; a
+                        // resize re-renders the text bigger and re-applies the
+                        // identical perspective, with nothing to keep in step.
+                        a.perspective,
                         // Never round a glyph out of existence.
                         ((a.font_size as f64 * s_uniform) as f32).max(1.0),
                         a.r,

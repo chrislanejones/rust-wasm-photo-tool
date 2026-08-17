@@ -25,6 +25,7 @@ import { CompareSlider } from "./CompareSlider";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
+import { PerspectiveOverlay } from "./PerspectiveOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
@@ -36,6 +37,8 @@ import {
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
 import { useToolStore } from "@/stores/useToolStore";
+import { usePerspectiveStore } from "@/stores/usePerspectiveStore";
+import { usePerspectiveTool } from "@/hooks/usePerspectiveTool";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
 import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
@@ -1386,6 +1389,35 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const imageGuides = useGuidesStore((s) => s.guides);
     const guidesLocked = useGuidesStore((s) => s.guidesLocked);
     const selectedGuideId = useGuidesStore((s) => s.selectedGuideId);
+    // ── Perspective tool (v8.42) ────────────────────────────────────────
+    // The hook lives HERE, not in AppShell: everything it needs is already on
+    // `hookResult` (toolRef / syncState / flushToCanvas), and the panel reads
+    // its results out of usePerspectiveStore rather than through props. That is
+    // what let the tool land without adding anything to AppShell.
+    const perspectiveMode = useToolStore((s) => s.perspectiveMode);
+    const perspectiveTargetId = usePerspectiveStore((s) => s.targetId);
+    const setPerspectiveTargetId = usePerspectiveStore((s) => s.setTargetId);
+    // All three sub-tools (Distort / Perspective / Skew) resolve to the one
+    // `perspective` ToolType, so this stays a single check.
+    const perspectiveActive = activeTool === "perspective";
+    const perspectiveTargetBounds = React.useMemo(() => {
+      if (perspectiveTargetId === null) return null;
+      const a = (annotations ?? []).find((n) => n.id === perspectiveTargetId);
+      return a ? { x: a.x, y: a.y, w: a.tile_w, h: a.tile_h } : null;
+    }, [perspectiveTargetId, annotations]);
+    const perspective = usePerspectiveTool({
+      toolRef: hookResult.toolRef,
+      syncState: hookResult.syncState,
+      flushToCanvas: hookResult.flushToCanvas,
+      // A target only counts while the tool is actually active — otherwise a
+      // stale pick from a previous session would silently redirect the next
+      // warp onto an annotation the user is no longer looking at.
+      selectedTextId: perspectiveActive ? perspectiveTargetId : null,
+      imgW,
+      imgH,
+      targetBounds: perspectiveTargetBounds,
+    });
+
     const textWrapWidth = useTextBoxStore((s) => s.wrapWidth);
     const setTextWrapWidth = useTextBoxStore((s) => s.setWrapWidth);
     const textBoxHeight = useTextBoxStore((s) => s.boxHeight);
@@ -1586,6 +1618,36 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 color={guideColor}
                 onSelect={selectGuide}
                 onMove={moveGuide}
+              />
+            );
+          })()}
+
+        {/* ── Perspective quad + handles ─────────────────────────────────── */}
+        {perspectiveActive &&
+          perspective.quad &&
+          canvasRef.current &&
+          imgW > 0 &&
+          imgH > 0 &&
+          (() => {
+            const canvas = canvasRef.current!;
+            const r = canvas.getBoundingClientRect();
+            return (
+              <PerspectiveOverlay
+                rect={r}
+                sx={r.width / canvas.width}
+                sy={r.height / canvas.height}
+                quad={perspective.quad}
+                mode={perspectiveMode}
+                vector={perspective.targetLabel !== null}
+                onChange={perspective.setQuad}
+                // Pointer-up ends the GESTURE; it does not commit to the
+                // engine. Applying on every release would make an exploratory
+                // drag destructive, so the commit stays on the panel's Apply
+                // button and this is only where a drag stops.
+                onCommit={() => {}}
+                annotations={annotations ?? []}
+                targetId={perspectiveTargetId}
+                onTargetChange={setPerspectiveTargetId}
               />
             );
           })()}

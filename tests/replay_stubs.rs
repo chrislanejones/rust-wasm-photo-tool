@@ -100,6 +100,7 @@ fn text_add_parity() {
     let ops = [Op::TextAdd(TextParams {
         wrap_width: 0,
         box_height: 0,
+        perspective: stamp_tool::perspective::IDENTITY_QUAD,
         id: 1,
         text: "hi".into(),
         x: 10,
@@ -140,6 +141,7 @@ fn text_rotated_with_background_parity() {
     let ops = [Op::TextAdd(TextParams {
         wrap_width: 0,
         box_height: 0,
+        perspective: stamp_tool::perspective::IDENTITY_QUAD,
         id: 3,
         text: "ok".into(),
         x: 8,

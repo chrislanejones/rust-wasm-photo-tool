@@ -25,6 +25,7 @@ import { TransformCropSettings } from "./settings/TransformCropSettings";
 import { LayerSettings, type LayerMaskControls } from "./settings/LayerSettings";
 import type { LayerInfo } from "@/hooks/useEngineCore";
 import { SelectSettings } from "./settings/SelectSettings";
+import { PerspectiveSettings } from "./settings/PerspectiveSettings";
 import type { SelectionControls } from "./settings/SelectSettings";
 import type { PlacementCell } from "@/components/PlacementGrid";
 import { ResizeSettings } from "./settings/ResizeSettings";
@@ -339,6 +340,13 @@ export function ToolsSidebar({
 
         {activeTool === "select" && (
           <SelectSettings disabled={!imageReady} selection={selection!} />
+        )}
+
+        {/* Perspective takes no controls prop — it reads usePerspectiveStore
+            directly, which is what let this tool land without touching
+            AppShell. See the note on that store. */}
+        {activeTool === "perspective" && (
+          <PerspectiveSettings disabled={!imageReady} />
         )}
 
         {activeTool === "stamp" && (

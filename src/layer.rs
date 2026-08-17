@@ -951,6 +951,70 @@ impl ImageHorseTool {
         }
     }
 
+    /// Perspective tool, DESTRUCTIVE half — lift the pixels in the rectangle
+    /// `(x, y, w, h)` off the active layer and resample them into the quad
+    /// given as 8 flat floats (`[x0,y0,…,x3,y3]`, TL/TR/BR/BL, absolute canvas
+    /// coords). Pushes one "Perspective" snapshot and records one op.
+    ///
+    /// Returns false — having changed nothing — for a wrong-length quad, an
+    /// empty rect, or a degenerate/self-crossing quad. A half-applied warp is
+    /// the one outcome worth ruling out: the source rect is cleared as part of
+    /// the operation, so "failed after clearing" would be data loss dressed up
+    /// as a no-op.
+    ///
+    /// The pixel work itself lives in `perspective::warp_region_in_place`,
+    /// which the op-log replay calls too — read the ⚠️ there before adding a
+    /// second copy of the resampler.
+    pub fn perspective_warp_region(
+        &mut self,
+        x: i32,
+        y: i32,
+        w: u32,
+        h: u32,
+        quad: &[f32],
+    ) -> bool {
+        if self.active >= self.layers.len() || w == 0 || h == 0 {
+            return false;
+        }
+        let Some(pairs) = crate::annotations::quad_from_flat(quad) else {
+            return false;
+        };
+        let solved = crate::perspective::quad_from_pairs(&pairs);
+        if !crate::perspective::is_valid_quad(&solved) {
+            return false;
+        }
+        // Snap BEFORE mutating, and only once the quad is known good — so a
+        // rejected gesture leaves no empty history entry either.
+        self.snap("Perspective");
+        let (iw, ih) = (self.width, self.height);
+        let layer = &mut self.layers[self.active];
+        if !crate::perspective::warp_region_in_place(
+            &mut layer.buf.data,
+            iw,
+            ih,
+            (x, y, w, h),
+            &solved,
+        ) {
+            // `is_valid_quad` above now rejects collapsed and collinear quads
+            // outright (it used to SKIP degenerate vertices, which let a
+            // collapsed quad reach exactly here — past the snapshot, then fail
+            // — leaving an undo entry for a warp that never happened). What
+            // remains reachable is the output-size cap inside `warp_rgba`; if
+            // it fires, the snapshot just pushed is the undo for a no-op,
+            // which is harmless and honest.
+            return false;
+        }
+        #[cfg(feature = "tiles")]
+        {
+            self.oplog_record(crate::ops::Op::PerspectiveWarp {
+                rect: crate::ops::Rect { x, y, w, h },
+                quad: pairs,
+            });
+        }
+        self.recomposite();
+        true
+    }
+
     // ── Paste placement (movable/resizable bounding-box preview) ──────────
     // Same transient-preview split as the Move tool above: nothing here
     // touches a layer's stored pixel buffer until `commit_paste_preview`, so
@@ -1483,6 +1547,10 @@ impl ImageHorseTool {
             // so a restore through here comes back sized to its text.
             // Op::TextBoxHeight carries it on the path that matters.
             0,
+            // Third instance of the same gap (v8.42): layer JSON carries no
+            // corner quad, so a restore through here comes back unwarped.
+            // Op::TextPerspective carries it on the path that matters.
+            crate::perspective::IDENTITY_QUAD,
             font_size,
             r,
             g,

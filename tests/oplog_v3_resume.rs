@@ -69,6 +69,7 @@ fn a_text(id: u32, text: &str) -> TextParams {
         id,
         wrap_width: 0,
         box_height: 0,
+        perspective: stamp_tool::perspective::IDENTITY_QUAD,
         text: text.into(),
         x: 4,
         y: 6,

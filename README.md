@@ -84,6 +84,36 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.43 — 2026-08-17
+
+**Perspective — put a photo, or your words, onto a surface that recedes.**
+Drag the four corners and the image follows. It lives in Edit as three tools
+that share one box and differ only in what the other corners do when you drag
+one:
+
+| Tool | What the other corners do |
+|---|---|
+| Distort | nothing — each corner moves on its own |
+| Perspective | the opposite edge mirrors, so the shape stays a proper vanishing-point view |
+| Skew | the edge slides, keeping opposite sides parallel |
+
+**It works on text the way it works in Photoshop.** Lay type down a car door
+and it recedes with the door — and it is still text. Click it again and the box
+comes back exactly where you left it, because the app stores the four corners
+against the words rather than baking them into the picture. Change the wording
+or the size afterwards and the same perspective is reapplied to the new text
+instead of being stretched a second time.
+
+It shows up in Review → History like every other edit, so you can undo it or
+step back to it later.
+
+Shapes are not warped yet. That is written down rather than half-built.
+
+Older saved work keeps working — the third format change in a week, and again
+built so that files written by every previous version still load.
+
+<details><summary>Older releases</summary>
+
 ### v8.42 — 2026-08-17
 
 **Nothing you can see, which is the point.** All three brushes that draw a
@@ -95,8 +125,6 @@ the three cannot drift apart and get fixed one at a time again.
 Measured before and after at 420 pointer events a second: no change to how fast
 a stroke settles. That was the point of measuring — a tidy-up that quietly costs
 speed is not a tidy-up.
-
-<details><summary>Older releases</summary>
 
 ### v8.41 — 2026-08-17
 

@@ -19,6 +19,7 @@ export type ToolType =
   | "ai"
   | "shapes"
   | "effects"   // was "blur" — now includes brightness, contrast, blur
+  | "perspective" // Perspective tool — born matching its label, like "select"
   | "emoji";
 
 export interface StampSettings {

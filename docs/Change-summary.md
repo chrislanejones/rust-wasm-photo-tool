@@ -7497,3 +7497,84 @@ worktree. The portable form, exit 0 in both trees, is
 
 Which makes three in two releases, all one shape: **a gate verified in one
 environment is verified for that environment, not for the repo.**
+
+## v8.43 Change Summary — 2026-08-17
+
+**Perspective**, filling the slot ADR-023 reserved as Coming Soon since the
+five-group restructure. One four-corner quad with three drag rules, surfaced as
+three Edit sub-tools. See ADR-034.
+
+Built in a worktree by a parallel session and landed here; the gates below were
+re-run on this tree, not taken on report.
+
+### The shape of it
+
+| Piece | Where |
+|---|---|
+| homography solve + resampler | Rust, `src/perspective.rs`, solved dst→src so there is no matrix inverse |
+| drag rules (Distort / Perspective / Skew) | `app/src/lib/perspective.ts` — TypeScript, deliberately |
+| quad state | `app/src/stores/usePerspectiveStore.ts` |
+| overlay + panel | `PerspectiveOverlay.tsx`, `PerspectiveSettings.tsx` |
+| text corners | normalised fractions on the annotation, warp applied as the LAST tile stage |
+
+**The rules stay on the main thread on purpose.** "The engine owns pixels"
+holds — a drag rule maps one pointer position to four corner positions and
+touches no image data. Since ADR-024 the engine is in a worker, so putting a
+rule behind the port would add a `postMessage` round trip to every
+`pointermove` at 120–420 Hz. That is precisely the banked-lag failure the brush
+arc spent five releases removing, and v8.42 finished paying off.
+
+**Text keeps its corners, not its pixels.** A text annotation stores the quad
+as normalised fractions, so a tile rebuild at a new size re-applies the same
+quad instead of resampling already-resampled output. Verified by forcing a
+rebuild 488×280 → 488×862 with the quad bit-identical and re-applied. Reselect
+returns the quad to within 0.03 px after leaving the tool entirely, and
+`snap("Perspective")` lands in Review → History.
+
+Format v4 → v5 by ADR-033's recipe. ⚠️ **The skipped field's default is NOT
+its semantic default this time** — an all-zero quad is a collapsed point, not
+the identity — so `decode_op` normalises, or the recorder would append a
+`TextPerspective` on every sync forever.
+
+### Two bugs that passed every gate
+
+Both found only by driving the real browser. `tsc` was clean, 591 tests were
+green, the engine was verified correct by hand, and the feature still did
+nothing.
+
+1. `targetBounds` derived from the `annotations` prop, which gets a fresh
+   identity on every AppShell render. That re-ran the seed effect, which reset
+   the in-progress drag back to a rectangle — so Apply committed the identity
+   transform. Keyed the effect on a primitive string instead.
+2. Re-applying to already-warped text normalised against the POST-warp bounds
+   while the engine stores against the unwarped tile, compounding the shear
+   with no way back.
+
+There is a third, of the same family, recorded in ADR-034: the single-tile
+version with an in-panel mode row was built first and shipped broken into the
+first browser run. `SubtoolRow` renders the GROUP, so a mode with no sub-tool
+of its own has nowhere to appear — three working drag rules, two of them
+unreachable.
+
+### Gates, re-run on this tree
+
+| Gate | Result |
+|---|---|
+| cargo fmt --check | clean |
+| cargo clippy --all-targets (featureless — the pre-push hook) | **0** |
+| cargo clippy --all-targets --features tiles,patchmatch -D warnings | **0** |
+| cargo test --features tiles,patchmatch | **364 passed, 0 failed** |
+| `pnpm -C app exec tsc --noEmit` | clean |
+| pnpm lint | **0 errors** (58 warnings) |
+| `pnpm -C app test` | **591 passed** (50 files) |
+| playwright (incl. the v8.41 QC spec) | **10/10** |
+| production build | OK |
+| wasm | 790,179 → **806,967 B** (+16,788, +2.1%) |
+
+### Parked, named rather than half-built
+
+- **Shapes are not warped.** Named in ADR-034 and PARKING_LOT.
+- **`routeState.ts` holds a third hand-written copy of the sub-mode axis**, and
+  a tool missing from it fails silently — that is what lit Distort for
+  `#/edit/perspective`. The round-trip test caught it; the duplication itself
+  is still there.
