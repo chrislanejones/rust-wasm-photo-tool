@@ -55,6 +55,12 @@ const LEGACY_TOOL_SLUG: Record<ToolType, string> = {
   effects: "effects",
   stamp: "stamps",
   emoji: "batch",
+  // No LEGACY form ever existed for this one — Perspective is new in v8.42 and
+  // has only ever been reachable as `#/tool/edit/perspective`. The entry is
+  // here because the table is `Record<ToolType, string>` and a new tool must
+  // declare a slug; it resolves to its own id, which the alias loop below
+  // registers anyway.
+  perspective: "perspective",
 };
 
 const LEGACY_TOOL_BY_SLUG: Record<string, ToolType> = (() => {

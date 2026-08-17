@@ -21,6 +21,8 @@ import { useRedStampTool } from "@/hooks/useRedStampTool";
 import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import { canEncode } from "@/lib/encodeSupport";
+import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
+import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { panelSpacingTransition, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
@@ -1402,29 +1404,62 @@ export function AppShell() {
     ],
   );
 
-  // ADR-024 a10. A MUTATION plus a "did anything change" bool, so it awaits and
-  // does NOT drop-stale — the same reasoning as `usePaintTool.onMouseMove`:
-  // every dab of the blur brush must land, and FIFO puts them in mouse order
-  // whatever order the answers arrive in. Un-awaited, the Promise is truthy and
-  // the guard flushes the whole canvas on every pointermove including the ones
-  // that blurred nothing.
+  // v8.41 — the v8.34 backpressure, via the shared coalescer (the LAST of the
+  // three brushes to get it: paint v8.34, clone stamp earlier today, now this).
+  //
+  // This handler used to await one `effect_move` per pointer event AND call
+  // `flushToCanvas()` per event — no in-flight gate, no rAF gate — the worst
+  // shape of the three, asking for a full recomposite at mouse rate. Its old
+  // comment argued "every dab must land, so it does NOT drop-stale", which
+  // v8.34 overturned: right for a call already SENT, wrong for coalescing
+  // UNSENT ones, because `effect_move` strokes the SEGMENT from the last
+  // landed point — skipped coordinates cost curve detail between samples,
+  // never continuity. Measured on the clone stamp, the unfixed shape banked
+  // 10.8 s of queue on a 1.4 s stroke at a 200 px brush; blur's per-move cost
+  // (a kernel over the brush area) is higher still.
+  //
+  // `effect_move`'s "did anything change" bool is returned from the send, so
+  // the coalescer's flush gate preserves the old guard exactly: moves that
+  // blurred nothing schedule no flush.
+  // Only the flush half rides the rAF gate; syncState stays a stroke-end
+  // affair (blurUp below).
+  const blurFlushRef = useRef(stamp.flushToCanvas);
+  blurFlushRef.current = stamp.flushToCanvas;
+  const blurSchedRef = useRef<StrokeCoalescer | null>(null);
+  if (blurSchedRef.current === null) {
+    blurSchedRef.current = createStrokeCoalescer(() => blurFlushRef.current());
+  }
+  const blurSched = blurSchedRef.current;
+
   const blurMove = useCallback(
-    async (e: React.MouseEvent<HTMLCanvasElement>) => {
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!isBlurringRef.current) return;
-      const t = stamp.toolRef.current;
-      if (!t) return;
-      const { x, y } = getCoords(e);
-      if (await t.effect_move(x, y)) stamp.flushToCanvas();
+      if (!stamp.toolRef.current) return;
+      blurSched.submit(getCoords(e), async (x, y) => {
+        const t = stamp.toolRef.current;
+        if (!t) return false;
+        return await t.effect_move(x, y);
+      });
     },
-    [stamp, getCoords],
+    [stamp, getCoords, blurSched],
   );
 
   const blurUp = useCallback(() => {
     if (!isBlurringRef.current) return;
     isBlurringRef.current = false;
+    // Same stroke-end handoff as paint/clone: drop the unsent pending move
+    // (its segment would land after `effect_up` committed) and reset the rAF
+    // gate a hidden tab would latch. FIFO orders `effect_up` after any move
+    // still in flight.
+    blurSched.strokeEnd();
     stamp.toolRef.current?.effect_up();
+    // Flush directly at stroke end — the last landed dabs may only have a
+    // scheduled frame that never fires in a hidden tab, and `effect_up` is
+    // where the op log commits the stroke; paint's onMouseUp documents the
+    // save-scheduling half of this at length.
+    stamp.flushToCanvas();
     stamp.syncState();
-  }, [stamp]);
+  }, [stamp, blurSched]);
 
   const effectiveDrawingTool =
     activeTool === "shapes" && shapesMode === "arrows"

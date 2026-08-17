@@ -20,16 +20,32 @@ export interface CropSelection {
  * Pending (uncommitted) shape/arrow being edited via the Figma-style
  * overlay. Geometry lives in canvas pixels; `start`/`end` are the original
  * drag endpoints (opposite bbox corners for rect/circle, the actual segment
- * endpoints for line/arrow). Stroke color/width, the shape type, and the
- * arrow style are intentionally NOT snapshotted here — they're read live
- * from ToolSettings at render and at commit, so panel tweaks made while the
- * overlay is open apply to the pending shape (mirroring how the text tool
- * live-updates its open input).
+ * endpoints for line/arrow). Stroke color/width and the arrow style are
+ * intentionally NOT snapshotted here — they're read live from ToolSettings at
+ * render and at commit, so panel tweaks made while the overlay is open apply
+ * to the pending shape (mirroring how the text tool live-updates its open
+ * input). The shape TYPE is the exception — see `drawnShape`.
  */
 export interface DrawEditState {
   kind: "shape" | "arrow";
   start: Point;
   end: Point;
+  /** The shape type this pending NEW shape was drawn as, pinned at mouse-up.
+   *
+   *  The type used to be read live from `ToolSettings.shape` like the colour
+   *  and the stroke width, and that made picking a different shape in the
+   *  panel RETYPE the shape already on the canvas: draw a circle, click
+   *  Square, and the circle became a square. Chris's report — "clicking
+   *  another shape should not change the last shape created on the canvas,
+   *  let it just allow a new shape to be added."
+   *
+   *  Type is not like colour. A colour tweak is an edit to the thing in front
+   *  of you; a shape click is the choice of what you are about to draw NEXT,
+   *  which is why `panelStylePatch` already refuses to carry `shape` across to
+   *  a RESELECTED shape. This pins the same rule for a freshly drawn one, so
+   *  the two paths finally agree. Unset for reselected shapes, which carry
+   *  their own type in `style.shape`. */
+  drawnShape?: "rect" | "circle" | "handCircle" | "line";
   /** When set, we're editing an EXISTING live shape annotation (this id)
    *  rather than creating a new one. Commit calls update_shape_annotation. */
   editId?: number;
@@ -58,6 +74,27 @@ export interface DrawEditState {
 
 /** The style fields a reselected shape carries, minus `shape`/`kindByte`. */
 export type ShapeStylePatch = Partial<NonNullable<DrawEditState["style"]>>;
+
+/**
+ * Which shape type a pending edit IS — the single rule shared by the overlay
+ * renderer (CanvasArea) and `commitEdit`, so the preview and the committed
+ * pixels can never disagree about it.
+ *
+ * Precedence, most specific first:
+ *   1. `style.shape`  — a RESELECTED shape's own type, snapshotted on select.
+ *   2. `drawnShape`   — a NEW shape's type, pinned at mouse-up.
+ *   3. the panel      — nothing pending, so the panel is the only answer.
+ *
+ * The panel used to come FIRST for new shapes, which is what made clicking
+ * Square retype the circle already sitting on the canvas.
+ */
+export function pendingShapeType(
+  es: Pick<DrawEditState, "style" | "drawnShape"> | null | undefined,
+  panelShape: string | undefined,
+): "rect" | "circle" | "handCircle" | "line" {
+  const fromPanel = panelShape as "rect" | "circle" | "handCircle" | "line" | undefined;
+  return es?.style?.shape ?? es?.drawnShape ?? fromPanel ?? "rect";
+}
 
 /**
  * Which style fields the user just changed in the Shapes panel.
@@ -353,8 +390,9 @@ export function useDrawingTools({
     if (!tool) return;
     const s = settingsRef.current;
     // Existing-shape edits keep the shape's own style; new shapes read the
-    // current toolbar settings live.
-    const shapeName = es.style?.shape ?? s.shape ?? "rect";
+    // current toolbar settings live — except the TYPE, which every pending
+    // shape pins at draw time (see `pendingShapeType` / `drawnShape`).
+    const shapeName = pendingShapeType(es, s.shape);
     const strokeColor = es.style?.strokeColor ?? s.strokeColor;
     const strokeWidth = es.style?.strokeWidth ?? s.strokeWidth;
     const arrowStyle = es.style?.arrowStyle ?? s.arrowStyle;
@@ -435,7 +473,7 @@ export function useDrawingTools({
           key: `s${newId}`,
           type: "shape",
           id: newId,
-          label: es.style?.shape ?? "shape",
+          label: shapeName,
         });
       }
     }
@@ -929,6 +967,9 @@ export function useDrawingTools({
           kind: activeTool === "arrow" ? "arrow" : "shape",
           start,
           end,
+          // Pin the type the user actually drew. Everything else about a new
+          // shape still tracks the panel live; the type does not.
+          drawnShape: settingsRef.current.shape ?? "rect",
         };
         editStateRef.current = next;
         setEditState(next);

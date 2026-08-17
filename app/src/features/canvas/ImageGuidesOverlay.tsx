@@ -1,5 +1,6 @@
-// Draggable image guides overlay — non-destructive cyan lines drawn over the
-// canvas. Mounted alongside CanvasGuidesOverlay in CanvasArea and projects
+// Draggable image guides overlay — non-destructive colored lines (cyan by
+// default; user-picked via the Guides panel) drawn over the canvas.
+// Mounted alongside CanvasGuidesOverlay in CanvasArea and projects
 // image-space → screen the SAME way (rect + sx/sy from the live <canvas>), so it
 // tracks zoom + pan automatically. Independent of the rulers/grid pref: guides
 // show whenever any exist.
@@ -21,12 +22,11 @@ interface Props {
   guides: Guide[];
   locked: boolean;
   selectedId: string | null;
+  /** Stroke color for every guide line (from useGuidesStore.guideColor). */
+  color: string;
   onSelect: (id: string) => void;
   onMove: (id: string, pos: number) => void;
 }
-
-// Cyan is the Photoshop guide convention; bright enough to read on light + dark.
-const GUIDE_COLOR = "#22d3ee";
 
 export function ImageGuidesOverlay({
   rect,
@@ -37,6 +37,7 @@ export function ImageGuidesOverlay({
   guides,
   locked,
   selectedId,
+  color,
   onSelect,
   onMove,
 }: Props) {
@@ -118,7 +119,7 @@ export function ImageGuidesOverlay({
               y1={y1}
               x2={x2}
               y2={y2}
-              stroke={GUIDE_COLOR}
+              stroke={color}
               strokeWidth={selected ? 2 : 1}
               strokeOpacity={selected ? 1 : 0.85}
               shapeRendering="crispEdges"

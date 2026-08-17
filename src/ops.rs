@@ -81,7 +81,32 @@ use serde::{Deserialize, Serialize};
 /// **ON** (`USE_OPLOG_PERSISTENCE = true`), so a rejected log would have cost
 /// every user their cross-reload undo history; that is why this step migrates
 /// instead of rejecting.
-pub const OP_FORMAT_VERSION: u8 = 3;
+///
+/// **4** — v8.41, the text box's second axis: text annotations gained a
+/// `box_height` to go with the `wrap_width`. Built to the v3 recipe, clause
+/// for clause, because the recipe is what makes the step migratable:
+///
+///   * `box_height` is `#[serde(skip)]` on [`TextParams`], so the struct's
+///     wire layout is still byte-identical to v2's.
+///   * The height rides in an APPENDED variant ([`Op::TextBoxHeight`]), placed
+///     after `TextWrap` so no existing variant is renumbered.
+///   * `encode_annotations` gained a FIFTH tuple element, keeping v4 blobs a
+///     strict prefix-extension of v3 ones (which are one of v2's).
+///     `decode_annotations` tries 5, then 4, then 3 elements.
+///
+/// So v2, v3 and v4 all decode through one path, and a v2 or v3 document
+/// simply comes back with `box_height == 0` — "size the box to the text",
+/// which is exactly what it meant. Pinned by `v3_blobs_still_decode_under_v4`
+/// and `v2_blobs_still_decode_under_v3` (unchanged, and still passing under
+/// v4 — that it did not need editing IS the prefix-extension property).
+///
+/// v5 (v8.42, the Perspective tool) is the same move a third time: two more
+/// APPENDED `Op` variants (`TextPerspective`, `PerspectiveWarp`) and a sixth
+/// trailing element on the annotation tuple carrying the per-text corner
+/// quads. A v4 document decodes with every quad at the identity — "no
+/// perspective", which is exactly what a v4 document meant. Pinned by
+/// `v4_blobs_still_decode_under_v5`.
+pub const OP_FORMAT_VERSION: u8 = 5;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -181,6 +206,40 @@ pub struct TextParams {
     /// what every pre-v8.40 annotation meant.
     #[serde(skip)]
     pub wrap_width: u32,
+    /// Box height in px (0 = size the box to the text). v8.41.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
+    /// on `wrap_width` above — read that comment, it applies word for word.
+    /// The height travels beside the struct instead: as the fifth element of
+    /// `encode_annotations`, and as [`Op::TextBoxHeight`] in the log.
+    #[serde(skip)]
+    pub box_height: u32,
+    /// Normalised projective corner quad (TL, TR, BR, BL). v8.42.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
+    /// on `wrap_width` and `box_height` above — read that comment, it applies
+    /// word for word. The quad travels beside the struct instead: as the sixth
+    /// element of `encode_annotations`, and as [`Op::TextPerspective`] in the
+    /// log. Deserialises to all-zero, which `default_quad_if_unset` promotes to
+    /// the identity — exactly what every pre-v8.42 annotation meant.
+    #[serde(skip)]
+    pub perspective: [(f32, f32); 4],
+}
+
+/// An all-zero quad is what `#[serde(skip)]` leaves behind on a v4-or-older
+/// blob, and it is NOT a meaningful transform — all four corners at the origin
+/// is a collapsed point. Promote it to the identity so old documents mean "no
+/// perspective" rather than "warp this to nothing".
+///
+/// This exists because the skipped-field default and the semantic default are
+/// different values; leaving them conflated is how a migration silently eats
+/// every text annotation in a v4 document.
+pub fn default_quad_if_unset(q: [(f32, f32); 4]) -> [(f32, f32); 4] {
+    if q.iter().all(|&(x, y)| x == 0.0 && y == 0.0) {
+        crate::perspective::IDENTITY_QUAD
+    } else {
+        q
+    }
 }
 
 /// Full-fidelity serializable mirror of the engine's `ShapeAnnotation` —
@@ -223,6 +282,8 @@ impl TextParams {
         TextParams {
             id: a.id,
             wrap_width: a.wrap_width,
+            box_height: a.box_height,
+            perspective: a.perspective,
             text: a.text.clone(),
             x: a.x,
             y: a.y,
@@ -375,6 +436,32 @@ pub enum Op {
     /// same reason: a new field would move every byte after it in `TextAdd`
     /// and `TextEdit` payloads that are already persisted.
     TextWrap { id: u32, wrap_width: u32 },
+    /// v8.41 — the text box's HEIGHT, the second axis of the same box.
+    ///
+    /// Appended after [`Op::TextWrap`] for exactly the reason stated there:
+    /// postcard indexes variants positionally, so appending is invisible to
+    /// every op already on a user's disk while inserting would renumber them
+    /// all. Same argument for carrying it here instead of as a `TextParams`
+    /// field.
+    TextBoxHeight { id: u32, box_height: u32 },
+    /// v8.42 — a text annotation's projective corner quad, normalised 0..1
+    /// across its tile in TL/TR/BR/BL order.
+    ///
+    /// Appended, for the third time, for the reason spelled out on
+    /// [`Op::TextWrap`]: postcard indexes enum variants positionally, so
+    /// appending is invisible to every op already on a user's disk and
+    /// inserting would renumber all of them.
+    ///
+    /// Carried as `[(f32, f32); 4]` rather than a `TextParams` field for the
+    /// same reason — a new struct field shifts every byte after it in the
+    /// `TextAdd`/`TextEdit` payloads already persisted.
+    TextPerspective { id: u32, quad: [(f32, f32); 4] },
+    /// v8.42 — the DESTRUCTIVE half of the Perspective tool: lift the pixels
+    /// in `rect` and resample them into `quad` (absolute canvas coords, not
+    /// normalised — a pixel warp has no tile to be a fraction of).
+    ///
+    /// Appended after [`Op::TextPerspective`]; same rule, same reason.
+    PerspectiveWarp { rect: Rect, quad: [(f32, f32); 4] },
 }
 
 impl Op {
@@ -400,6 +487,14 @@ impl Op {
             // editing the text, and a separate "Wrap Text" entry would make
             // one gesture read as two history steps.
             Op::TextWrap { .. } => "Edit Text",
+            Op::TextBoxHeight { .. } => "Edit Text",
+            // Its OWN label, unlike TextWrap/TextBoxHeight which borrow "Edit
+            // Text". Those two are one gesture on the text box and reading as
+            // a second history entry would be noise; a perspective warp is a
+            // different operation the user chose a different tool to perform,
+            // and the History panel is where they go to find and re-select it.
+            Op::TextPerspective { .. } => "Perspective",
+            Op::PerspectiveWarp { .. } => "Perspective",
         }
     }
 }
@@ -446,15 +541,51 @@ pub fn encode_op(op: &Op) -> Vec<u8> {
 
 /// Decode an op, validating the leading version byte first.
 ///
-/// Accepts **2 and 3**: v3 only APPENDED an enum variant, so every byte
-/// sequence a v2 writer could produce means exactly the same thing here. v1 is
-/// still rejected (its structs differ). See [`OP_FORMAT_VERSION`].
+/// Accepts **everything from 2 up to [`OP_FORMAT_VERSION`]**: every step since
+/// v2 has only APPENDED enum variants, so a byte sequence any of those writers
+/// could produce means exactly the same thing here. v1 is still rejected (its
+/// structs differ).
+///
+/// ⚠️ Written as a RANGE on purpose. It used to read
+/// `ver != OP_FORMAT_VERSION && ver != 2`, which described "2 and the current
+/// version" — correct on the day it was written and quietly wrong the moment
+/// v4 landed, because v3 stopped being the current version and every v3 op
+/// frame in a user's IndexedDB started coming back `UnsupportedVersion(3)`.
+/// (`v3_op_bytes_still_decode_under_v4` is what caught it.) Enumerating the
+/// accepted versions one by one is a list somebody has to remember to extend;
+/// the range extends itself, and the append-only rule stated on
+/// [`OP_FORMAT_VERSION`] is what makes it sound. A future step that is NOT
+/// append-only must narrow this deliberately, not inherit it.
 pub fn decode_op(bytes: &[u8]) -> Result<Op, OpError> {
     let (&ver, body) = bytes.split_first().ok_or(OpError::Empty)?;
-    if ver != OP_FORMAT_VERSION && ver != 2 {
+    if !(2..=OP_FORMAT_VERSION).contains(&ver) {
         return Err(OpError::UnsupportedVersion(ver));
     }
-    postcard::from_bytes(body).map_err(|_| OpError::Decode)
+    let op: Op = postcard::from_bytes(body).map_err(|_| OpError::Decode)?;
+    // ⚠️ NORMALISE THE SKIPPED QUAD, and this is not cosmetic.
+    //
+    // `TextParams::perspective` is `#[serde(skip)]`, so it decodes as all-zero
+    // — a collapsed point, not the identity the field actually means when
+    // unset. `wrap_width` and `box_height` get away without this step because
+    // their skipped default (0) IS their semantic default; the quad's is not.
+    //
+    // What breaks without it: `oplog_sync_annotations` diffs the log
+    // document's `TextParams` against the live annotation's. The live one
+    // holds the identity, the decoded one held all-zero, so they compared
+    // unequal on EVERY sync and the recorder appended a fresh
+    // `Op::TextPerspective` each time — an op log that grows without the user
+    // doing anything. Caught by `postcard_round_trip_every_variant`.
+    Ok(match op {
+        Op::TextAdd(mut p) => {
+            p.perspective = default_quad_if_unset(p.perspective);
+            Op::TextAdd(p)
+        }
+        Op::TextEdit(mut p) => {
+            p.perspective = default_quad_if_unset(p.perspective);
+            Op::TextEdit(p)
+        }
+        other => other,
+    })
 }
 
 /// Frame a slice of ops for persistence: `[u32 LE frame-length][frame]*`,
@@ -511,8 +642,12 @@ pub fn encode_annotations(
     // v3 appends the per-text wrap widths as a trailing tuple element, making
     // a v3 blob a strict prefix-extension of a v2 one — which is exactly what
     // lets `decode_annotations` read both. Parallel to `texts` by index.
+    // v4 appends the box heights the same way, one element further out.
+    // v5 appends the corner quads one element further out again.
     let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
-    if let Ok(body) = postcard::to_allocvec(&(texts, shapes, canvas, &wraps)) {
+    let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
+    let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
+    if let Ok(body) = postcard::to_allocvec(&(texts, shapes, canvas, &wraps, &heights, &quads)) {
         out.extend_from_slice(&body);
     }
     out
@@ -531,12 +666,57 @@ pub fn decode_annotations(
     bytes: &[u8],
 ) -> Result<(Vec<TextParams>, Vec<ShapeParams>, Option<CanvasParams>), OpError> {
     let (&ver, body) = bytes.split_first().ok_or(OpError::Empty)?;
-    if ver != OP_FORMAT_VERSION && ver != 2 {
+    // Same range, same reasoning, as `decode_op` — read the ⚠️ there before
+    // changing either. Every version from 2 up is a strict prefix-extension of
+    // the one before it, which is what the narrowing ladder below relies on.
+    if !(2..=OP_FORMAT_VERSION).contains(&ver) {
         return Err(OpError::UnsupportedVersion(ver));
     }
-    // v3 first (the 4-tuple with wrap widths); a v2 blob simply runs out of
-    // bytes at the 4th element, so fall back and default every width to 0 —
-    // "don't wrap", which is precisely what a v2 document meant.
+    // Widest tuple first, narrowing on failure. Each older blob simply runs
+    // out of bytes at the element it never wrote, so the fallback fires and
+    // the missing values default to 0 — "size the box to the text" on both
+    // axes, which is precisely what a v2 or v3 document meant.
+    type V5 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+        Vec<u32>,
+        Vec<[(f32, f32); 4]>,
+    );
+    if let Ok((mut texts, shapes, canvas, wraps, heights, quads)) = postcard::from_bytes::<V5>(body)
+    {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        for (t, h) in texts.iter_mut().zip(heights) {
+            t.box_height = h;
+        }
+        for (t, q) in texts.iter_mut().zip(quads) {
+            t.perspective = default_quad_if_unset(q);
+        }
+        return Ok((texts, shapes, canvas));
+    }
+    type V4 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+        Vec<u32>,
+    );
+    if let Ok((mut texts, shapes, canvas, wraps, heights)) = postcard::from_bytes::<V4>(body) {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        for (t, h) in texts.iter_mut().zip(heights) {
+            t.box_height = h;
+        }
+        // No quad element at all — every annotation is unwarped.
+        for t in texts.iter_mut() {
+            t.perspective = crate::perspective::IDENTITY_QUAD;
+        }
+        return Ok((texts, shapes, canvas));
+    }
     type V3 = (
         Vec<TextParams>,
         Vec<ShapeParams>,
@@ -547,10 +727,17 @@ pub fn decode_annotations(
         for (t, w) in texts.iter_mut().zip(wraps) {
             t.wrap_width = w;
         }
+        for t in texts.iter_mut() {
+            t.perspective = crate::perspective::IDENTITY_QUAD;
+        }
         return Ok((texts, shapes, canvas));
     }
     type V2 = (Vec<TextParams>, Vec<ShapeParams>, Option<CanvasParams>);
-    let (texts, shapes, canvas) = postcard::from_bytes::<V2>(body).map_err(|_| OpError::Decode)?;
+    let (mut texts, shapes, canvas) =
+        postcard::from_bytes::<V2>(body).map_err(|_| OpError::Decode)?;
+    for t in texts.iter_mut() {
+        t.perspective = crate::perspective::IDENTITY_QUAD;
+    }
     Ok((texts, shapes, canvas))
 }
 
@@ -695,6 +882,7 @@ fn build_text_tile(t: &TextParams) -> (Vec<u8>, u32, u32, i32, i32) {
     crate::layer::build_annotation_tile(
         &t.text,
         t.font_size,
+        t.box_height,
         t.r,
         t.g,
         t.b,
@@ -894,6 +1082,35 @@ pub fn apply(op: &Op, doc: &mut Document) {
         Op::TextWrap { id, wrap_width } => {
             if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
                 t.wrap_width = *wrap_width;
+            }
+        }
+        Op::TextBoxHeight { id, box_height } => {
+            if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
+                t.box_height = *box_height;
+            }
+        }
+        Op::TextPerspective { id, quad } => {
+            if let Some(t) = doc.texts.iter_mut().find(|t| t.id == *id) {
+                t.perspective = *quad;
+            }
+        }
+        Op::PerspectiveWarp { rect, quad } => {
+            let (w, h) = (doc.width(), doc.height());
+            if w == 0 || h == 0 {
+                return;
+            }
+            // Straight through the SHARED helper the engine calls — see the ⚠️
+            // on `perspective::warp_region_in_place`. Replay and engine are the
+            // same code path, not two implementations that agree.
+            let mut flat = doc.pixels_flat();
+            if crate::perspective::warp_region_in_place(
+                &mut flat,
+                w,
+                h,
+                (rect.x, rect.y, rect.w, rect.h),
+                &crate::perspective::quad_from_pairs(quad),
+            ) {
+                doc.pixels.blit_from_flat(&flat, w, h);
             }
         }
         Op::ShapeAdd(p) => {
@@ -1214,6 +1431,8 @@ mod tests {
         TextParams {
             id,
             wrap_width: 0,
+            box_height: 0,
+            perspective: crate::perspective::IDENTITY_QUAD,
             text: "hi".into(),
             x: 3,
             y: 4,
@@ -1314,6 +1533,7 @@ mod tests {
             Op::TextAdd(test_text(1)),
             Op::TextEdit(TextParams {
                 wrap_width: 0,
+                box_height: 0,
                 text: "bye".into(),
                 bold: false,
                 rotation_deg: 0.0,
@@ -1600,6 +1820,7 @@ mod tests {
         apply(
             &Op::TextEdit(TextParams {
                 wrap_width: 0,
+                box_height: 0,
                 text: "edited".into(),
                 ..test_text(1)
             }),
@@ -1867,6 +2088,8 @@ mod v2_migration_tests {
         TextParams {
             id,
             wrap_width: 0,
+            box_height: 0,
+            perspective: crate::perspective::IDENTITY_QUAD,
             text: "hello".into(),
             x: 1,
             y: 2,
@@ -1998,5 +2221,298 @@ mod v2_migration_tests {
         );
         assert_eq!(doc.texts[0].wrap_width, 0, "untouched");
         assert_eq!(doc.texts[1].wrap_width, 180);
+    }
+
+    // ── v4: the box's second axis ──────────────────────────────────────────
+    // Same four guarantees v3 had to prove, restated for `box_height`. They are
+    // separate tests rather than extra asserts on the v3 ones deliberately: if
+    // a later change breaks only the height, the failure should say so.
+
+    /// A v3 writer emitted `[3] ++ postcard((texts, shapes, canvas, wraps))` —
+    /// the 4-tuple, with no box heights. Reconstructed here byte-for-byte.
+    fn v3_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
+        let mut out = vec![3u8];
+        let shapes: Vec<ShapeParams> = Vec::new();
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
+        out.extend_from_slice(&postcard::to_allocvec(&(texts, &shapes, &canvas, &wraps)).unwrap());
+        out
+    }
+
+    #[test]
+    fn v3_blobs_still_decode_under_v4() {
+        // The load-bearing one. `ih_oplog_persist` ships ON, so every user who
+        // has opened the app since v8.40 has v3 blobs in IndexedDB; rejecting
+        // them would drop their cross-reload undo history.
+        let mut t = a_text(7);
+        t.wrap_width = 240;
+        let (got, shapes, canvas) = decode_annotations(&v3_annotation_blob(&[t]))
+            .expect("a v3 annotation blob must still decode — users' logs depend on it");
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].id, 7);
+        assert_eq!(got[0].wrap_width, 240, "the v3 width survives the step");
+        assert_eq!(
+            got[0].box_height, 0,
+            "a v3 document meant 'size the box to the text'"
+        );
+        assert!(shapes.is_empty());
+        assert!(canvas.is_none());
+    }
+
+    #[test]
+    fn v4_blobs_round_trip_both_box_axes() {
+        let mut t = a_text(9);
+        t.wrap_width = 240;
+        t.box_height = 310;
+        let blob = encode_annotations(&[t], &[], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (got, _, _) = decode_annotations(&blob).unwrap();
+        assert_eq!(got[0].wrap_width, 240);
+        assert_eq!(got[0].box_height, 310, "v4 carries the height");
+    }
+
+    #[test]
+    fn v3_op_bytes_still_decode_under_v4() {
+        // Appending `TextBoxHeight` must not renumber the variants already on
+        // disk — `TextWrap` is the one appended last before it, so it is the
+        // one that would break first.
+        for op in [
+            Op::TextAdd(a_text(1)),
+            Op::TextRemove { id: 3 },
+            Op::TextWrap {
+                id: 5,
+                wrap_width: 200,
+            },
+        ] {
+            let mut v3_bytes = vec![3u8];
+            v3_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap());
+            let decoded = decode_op(&v3_bytes)
+                .unwrap_or_else(|e| panic!("v3 bytes for {:?} rejected: {e:?}", op.label()));
+            assert_eq!(decoded, op, "v3 op must mean the same thing under v4");
+        }
+    }
+
+    #[test]
+    fn text_params_wire_layout_is_unchanged_by_the_box_height_field() {
+        // Same measurement as `..._by_the_new_field` above, for the second
+        // skipped field. A regression here shifts every persisted
+        // TextAdd/TextEdit payload.
+        let a = a_text(4);
+        let mut b = a_text(4);
+        b.box_height = 512;
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(),
+            postcard::to_allocvec(&b).unwrap(),
+            "box_height must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn text_box_height_op_applies_to_the_right_annotation() {
+        let mut doc = Document::new(32, 32);
+        doc.texts.push(a_text(1));
+        doc.texts.push(a_text(2));
+        apply(
+            &Op::TextBoxHeight {
+                id: 2,
+                box_height: 310,
+            },
+            &mut doc,
+        );
+        assert_eq!(doc.texts[0].box_height, 0, "untouched");
+        assert_eq!(doc.texts[1].box_height, 310);
+    }
+
+    // ── v5: the corner quad ────────────────────────────────────────────────
+    // The same four guarantees a third time, restated for `perspective`. Kept
+    // as their own tests for the reason given above the v4 block: a failure
+    // should name the axis that broke.
+
+    /// A skewed but valid quad — the top edge pulled in, i.e. the keystone the
+    /// tool exists to produce.
+    fn a_quad() -> [(f32, f32); 4] {
+        [(0.15, 0.0), (0.85, 0.0), (1.0, 1.0), (0.0, 1.0)]
+    }
+
+    /// A v4 writer emitted `[4] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights))` — the 5-tuple, with no quads. Reconstructed byte-for-byte.
+    fn v4_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
+        let mut out = vec![4u8];
+        let shapes: Vec<ShapeParams> = Vec::new();
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
+        let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(texts, &shapes, &canvas, &wraps, &heights)).unwrap(),
+        );
+        out
+    }
+
+    #[test]
+    fn v4_blobs_still_decode_under_v5() {
+        // The load-bearing one, for the third time. Anyone who has opened the
+        // app since v8.41 has v4 blobs in IndexedDB.
+        let mut t = a_text(7);
+        t.wrap_width = 240;
+        t.box_height = 310;
+        let (got, shapes, canvas) = decode_annotations(&v4_annotation_blob(&[t]))
+            .expect("a v4 annotation blob must still decode — users' logs depend on it");
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].wrap_width, 240, "the v4 width survives the step");
+        assert_eq!(got[0].box_height, 310, "the v4 height survives the step");
+        assert_eq!(
+            got[0].perspective,
+            crate::perspective::IDENTITY_QUAD,
+            "a v4 document meant 'no perspective' — NOT a collapsed all-zero quad"
+        );
+        assert!(shapes.is_empty());
+        assert!(canvas.is_none());
+    }
+
+    #[test]
+    fn v5_blobs_round_trip_the_corner_quad() {
+        let mut t = a_text(9);
+        t.wrap_width = 240;
+        t.box_height = 310;
+        t.perspective = a_quad();
+        let blob = encode_annotations(&[t], &[], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (got, _, _) = decode_annotations(&blob).unwrap();
+        assert_eq!(got[0].wrap_width, 240);
+        assert_eq!(got[0].box_height, 310);
+        assert_eq!(got[0].perspective, a_quad(), "v5 carries the quad");
+    }
+
+    #[test]
+    fn v4_op_bytes_still_decode_under_v5() {
+        // Appending `TextPerspective` and `PerspectiveWarp` must not renumber
+        // the variants already on disk — `TextBoxHeight` was appended last
+        // before them, so it is the one that would break first.
+        for op in [
+            Op::TextAdd(a_text(1)),
+            Op::TextRemove { id: 3 },
+            Op::TextWrap {
+                id: 5,
+                wrap_width: 200,
+            },
+            Op::TextBoxHeight {
+                id: 5,
+                box_height: 310,
+            },
+        ] {
+            let mut v4_bytes = vec![4u8];
+            v4_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap());
+            let decoded = decode_op(&v4_bytes)
+                .unwrap_or_else(|e| panic!("v4 bytes for {:?} rejected: {e:?}", op.label()));
+            assert_eq!(decoded, op, "v4 op must mean the same thing under v5");
+        }
+    }
+
+    #[test]
+    fn text_params_wire_layout_is_unchanged_by_the_perspective_field() {
+        // Third instance of the measurement. A regression here shifts every
+        // persisted TextAdd/TextEdit payload in every user's IndexedDB.
+        let a = a_text(4);
+        let mut b = a_text(4);
+        b.perspective = a_quad();
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(),
+            postcard::to_allocvec(&b).unwrap(),
+            "perspective must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn text_perspective_op_applies_to_the_right_annotation() {
+        let mut doc = Document::new(32, 32);
+        doc.texts.push(a_text(1));
+        doc.texts.push(a_text(2));
+        apply(
+            &Op::TextPerspective {
+                id: 2,
+                quad: a_quad(),
+            },
+            &mut doc,
+        );
+        assert_eq!(
+            doc.texts[0].perspective,
+            crate::perspective::IDENTITY_QUAD,
+            "untouched"
+        );
+        assert_eq!(doc.texts[1].perspective, a_quad());
+    }
+
+    #[test]
+    fn decoded_text_ops_never_carry_the_all_zero_quad() {
+        // The regression this guards is subtle and expensive: an all-zero quad
+        // decoded back into a live document compares unequal to the identity
+        // the engine holds, so `oplog_sync_annotations` emits a fresh
+        // TextPerspective op on every single sync. The log grows forever while
+        // the user does nothing.
+        let bytes = encode_op(&Op::TextAdd(a_text(1)));
+        let Op::TextAdd(p) = decode_op(&bytes).unwrap() else {
+            panic!("wrong variant");
+        };
+        assert_eq!(
+            p.perspective,
+            crate::perspective::IDENTITY_QUAD,
+            "the skipped field must decode to the identity, not to zeros"
+        );
+    }
+
+    #[test]
+    fn perspective_warp_op_moves_pixels_into_the_quad() {
+        let mut doc = Document::new(64, 64);
+        // Fill a 20×20 block so there is something identifiable to move.
+        apply(
+            &Op::FillRegion {
+                rect: Rect {
+                    x: 10,
+                    y: 10,
+                    w: 20,
+                    h: 20,
+                },
+                color: Rgba {
+                    r: 255,
+                    g: 0,
+                    b: 0,
+                    a: 255,
+                },
+            },
+            &mut doc,
+        );
+        apply(
+            &Op::PerspectiveWarp {
+                rect: Rect {
+                    x: 10,
+                    y: 10,
+                    w: 20,
+                    h: 20,
+                },
+                // Same footprint, top edge pulled inward — a keystone.
+                quad: [(14.0, 10.0), (26.0, 10.0), (30.0, 30.0), (10.0, 30.0)],
+            },
+            &mut doc,
+        );
+        let flat = doc.pixels_flat();
+        let at = |x: usize, y: usize| -> [u8; 4] {
+            let i = (y * 64 + x) * 4;
+            [flat[i], flat[i + 1], flat[i + 2], flat[i + 3]]
+        };
+        // The near (bottom) edge still spans the full width...
+        assert_eq!(
+            at(12, 28)[3],
+            255,
+            "bottom-left corner should still be covered"
+        );
+        // ...while the far (top) edge has retreated inward.
+        assert_eq!(
+            at(11, 11)[3],
+            0,
+            "top-left corner must be vacated by the keystone"
+        );
+        // And the source rect was moved, not copied: nothing outside the quad
+        // keeps the original fill.
+        assert_eq!(at(28, 11)[3], 0, "top-right corner must be vacated too");
     }
 }

@@ -251,6 +251,8 @@ fn text_add_replay_matches_live_annotation() {
         &Op::TextAdd(TextParams {
             id,
             wrap_width: 0,
+            box_height: 0,
+            perspective: crate::perspective::IDENTITY_QUAD,
             text: "Parity!".into(),
             x: 14,
             y: 22,
@@ -542,6 +544,8 @@ fn persist_restore_keeps_base_annotations_live() {
     // not baked pixels.
     let text = TextParams {
         wrap_width: 0,
+        box_height: 0,
+        perspective: crate::perspective::IDENTITY_QUAD,
         id: 1,
         text: "base".into(),
         x: 6,
@@ -574,6 +578,8 @@ fn persist_restore_keeps_base_annotations_live() {
     let base_px = seed_pixels(64, 48);
     let edited = TextParams {
         wrap_width: 0,
+        box_height: 0,
+        perspective: crate::perspective::IDENTITY_QUAD,
         text: "edited".into(),
         bold: true,
         ..text

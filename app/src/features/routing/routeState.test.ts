@@ -86,7 +86,16 @@ describe("hash -> state", () => {
   });
 
   it("a Coming Soon route never activates anything", () => {
-    apply("#/edit/perspective"); // parses to the group default, not perspective
+    // Ruler, not Perspective: Perspective SHIPPED in v8.42 and is now a live
+    // sub-tool with its own ToolType, so it stopped being an example of this
+    // property. The property itself is unchanged — a Coming Soon entry carries
+    // no `tool` by type, so applyRoute has nothing to activate.
+    //
+    // ⚠️ Ruler is now the ONLY Coming Soon sub-tool in the registry. When it
+    // ships, this test (and the two below it in routes.test.ts and
+    // commands.test.ts) needs a new exemplar or a deliberate deletion — do not
+    // just delete the assertion and leave the property untested.
+    apply("#/edit/ruler"); // parses to the group default, not ruler
     expect(useToolStore.getState().activeSubTool).toBe("edit/crop");
   });
 

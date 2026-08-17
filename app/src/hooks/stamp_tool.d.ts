@@ -817,6 +817,44 @@ declare module "stamp_tool" {
      *  ambiently SHADOWS pkg's generated types, so a drift here type-checks
      *  and dies at runtime. */
     set_text_wrap_width(id: number, wrap_width: number): boolean;
+    /** Set a text annotation's BOX HEIGHT in px (0 = size the box to the text)
+     *  and rebuild its tile. Returns false if `id` isn't on the active layer.
+     *  The vertical twin of `set_text_wrap_width`. v8.41.
+     *
+     *  ⚠️ Same hand-sync warning as above — this file ambiently SHADOWS pkg's
+     *  generated types, so a drift here type-checks and dies at runtime. */
+    set_text_box_height(id: number, box_height: number): boolean;
+    /** Set a text annotation's projective corner quad and rebuild its tile
+     *  through it. `quad` is 8 floats, `[x0,y0,…,x3,y3]`, NORMALISED 0..1
+     *  across the tile, in TL/TR/BR/BL order. Returns false for a wrong-length
+     *  quad or an id that isn't on the active layer. v8.42.
+     *
+     *  Normalised, not pixels — that is what keeps the warp attached to the
+     *  text through an edit. See `perspective::warp_normalised` in the crate.
+     *
+     *  ⚠️ Same hand-sync warning as above — this file ambiently SHADOWS pkg's
+     *  generated types, so a drift here type-checks and dies at runtime. */
+    set_text_perspective(id: number, quad: Float32Array): boolean;
+    /** A text annotation's current corner quad, flat (8 floats). EMPTY when the
+     *  id isn't on the active layer — an empty result and an identity quad are
+     *  different answers, so callers check `length`. v8.42.
+     *
+     *  ⚠️ Same hand-sync warning as above. */
+    text_perspective_of(id: number): Float32Array;
+    /** Perspective tool, DESTRUCTIVE half — lift the pixels in `(x,y,w,h)` off
+     *  the active layer and resample them into `quad` (8 floats, ABSOLUTE
+     *  canvas coords, TL/TR/BR/BL). Pushes one "Perspective" history step and
+     *  records one op. Returns false, having changed nothing, for a degenerate
+     *  or self-crossing quad. v8.42.
+     *
+     *  ⚠️ Same hand-sync warning as above. */
+    perspective_warp_region(
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      quad: Float32Array,
+    ): boolean;
     set_text_shadow(
       id: number,
       on_box: boolean,

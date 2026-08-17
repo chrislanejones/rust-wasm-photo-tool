@@ -55,6 +55,7 @@ function modeOfActiveTool(s: ReturnType<typeof useToolStore.getState>) {
     case "ai": return s.eraserMode;
     case "text": return s.textMode;
     case "emoji": return s.batchMode;
+    case "perspective": return s.perspectiveMode;
     default: return undefined; // single-mode: effects, crop, arrow
   }
 }

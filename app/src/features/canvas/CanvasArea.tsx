@@ -11,6 +11,7 @@ import React, {
   useState,
 } from "react";
 import type { useCloneStamp } from "@/hooks/useCloneStamp";
+import { pendingShapeType } from "@/hooks/useDrawingTools";
 import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTools";
 import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
 import { TEXT_OVERLAY_PAD_X, TEXT_OVERLAY_PAD_Y } from "@/hooks/useTextTool";
@@ -24,6 +25,7 @@ import { CompareSlider } from "./CompareSlider";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
+import { PerspectiveOverlay } from "./PerspectiveOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
@@ -33,8 +35,10 @@ import {
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
 import { useGuidesStore } from "@/stores/useGuidesStore";
-import { useTextBoxStore, MIN_WRAP_WIDTH } from "@/stores/useTextBoxStore";
+import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
 import { useToolStore } from "@/stores/useToolStore";
+import { usePerspectiveStore } from "@/stores/usePerspectiveStore";
+import { usePerspectiveTool } from "@/hooks/usePerspectiveTool";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
 import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
@@ -1385,8 +1389,40 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const imageGuides = useGuidesStore((s) => s.guides);
     const guidesLocked = useGuidesStore((s) => s.guidesLocked);
     const selectedGuideId = useGuidesStore((s) => s.selectedGuideId);
+    // ── Perspective tool (v8.42) ────────────────────────────────────────
+    // The hook lives HERE, not in AppShell: everything it needs is already on
+    // `hookResult` (toolRef / syncState / flushToCanvas), and the panel reads
+    // its results out of usePerspectiveStore rather than through props. That is
+    // what let the tool land without adding anything to AppShell.
+    const perspectiveMode = useToolStore((s) => s.perspectiveMode);
+    const perspectiveTargetId = usePerspectiveStore((s) => s.targetId);
+    const setPerspectiveTargetId = usePerspectiveStore((s) => s.setTargetId);
+    // All three sub-tools (Distort / Perspective / Skew) resolve to the one
+    // `perspective` ToolType, so this stays a single check.
+    const perspectiveActive = activeTool === "perspective";
+    const perspectiveTargetBounds = React.useMemo(() => {
+      if (perspectiveTargetId === null) return null;
+      const a = (annotations ?? []).find((n) => n.id === perspectiveTargetId);
+      return a ? { x: a.x, y: a.y, w: a.tile_w, h: a.tile_h } : null;
+    }, [perspectiveTargetId, annotations]);
+    const perspective = usePerspectiveTool({
+      toolRef: hookResult.toolRef,
+      syncState: hookResult.syncState,
+      flushToCanvas: hookResult.flushToCanvas,
+      // A target only counts while the tool is actually active — otherwise a
+      // stale pick from a previous session would silently redirect the next
+      // warp onto an annotation the user is no longer looking at.
+      selectedTextId: perspectiveActive ? perspectiveTargetId : null,
+      imgW,
+      imgH,
+      targetBounds: perspectiveTargetBounds,
+    });
+
     const textWrapWidth = useTextBoxStore((s) => s.wrapWidth);
     const setTextWrapWidth = useTextBoxStore((s) => s.setWrapWidth);
+    const textBoxHeight = useTextBoxStore((s) => s.boxHeight);
+    const setTextBoxHeight = useTextBoxStore((s) => s.setBoxHeight);
+    const guideColor = useGuidesStore((s) => s.guideColor);
     const selectGuide = useGuidesStore((s) => s.selectGuide);
     const moveGuide = useGuidesStore((s) => s.moveGuide);
 
@@ -1579,8 +1615,39 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 guides={imageGuides}
                 locked={guidesLocked}
                 selectedId={selectedGuideId}
+                color={guideColor}
                 onSelect={selectGuide}
                 onMove={moveGuide}
+              />
+            );
+          })()}
+
+        {/* ── Perspective quad + handles ─────────────────────────────────── */}
+        {perspectiveActive &&
+          perspective.quad &&
+          canvasRef.current &&
+          imgW > 0 &&
+          imgH > 0 &&
+          (() => {
+            const canvas = canvasRef.current!;
+            const r = canvas.getBoundingClientRect();
+            return (
+              <PerspectiveOverlay
+                rect={r}
+                sx={r.width / canvas.width}
+                sy={r.height / canvas.height}
+                quad={perspective.quad}
+                mode={perspectiveMode}
+                vector={perspective.targetLabel !== null}
+                onChange={perspective.setQuad}
+                // Pointer-up ends the GESTURE; it does not commit to the
+                // engine. Applying on every release would make an exploratory
+                // drag destructive, so the commit stays on the panel's Apply
+                // button and this is only where a drag stops.
+                onCommit={() => {}}
+                annotations={annotations ?? []}
+                targetId={perspectiveTargetId}
+                onTargetChange={setPerspectiveTargetId}
               />
             );
           })()}
@@ -1813,7 +1880,14 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // style rather than the live toolbar settings (a new shape has no
           // `style` and reads the toolbar).
           const eff = drawEditState.style ?? drawSettings;
-          const shape = kind === "arrow" ? "line" : eff.shape;
+          // Type comes from the shape itself, never from the live panel — same
+          // rule the commit uses, so preview and pixels cannot disagree. See
+          // `pendingShapeType`; reading `drawSettings.shape` here is what let a
+          // Square click retype the circle already on the canvas.
+          const shape =
+            kind === "arrow"
+              ? "line"
+              : pendingShapeType(drawEditState, drawSettings.shape);
           const isSegment = kind === "arrow" || shape === "line";
 
           // Bounding box (canvas coords → viewport coords)
@@ -2224,7 +2298,12 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           // the moment they let go, and the handle would feel broken.
           const boxW =
             textWrapWidth > 0 ? Math.ceil(textWrapWidth * scaleX) : Math.ceil(rawW + fs * 0.6);
-          const boxH = Math.ceil(lines.length * fs * 1.3 + fs * 0.3);
+          // The height the TEXT needs. v8.41 makes this a floor rather than
+          // the answer: a dragged box height overrides it when it is taller,
+          // mirroring the engine, where `box_height` is a minimum and the type
+          // is centred in whatever surplus there is (`text::box_top_inset`).
+          const naturalH = Math.ceil(lines.length * fs * 1.3 + fs * 0.3);
+          const boxH = Math.max(naturalH, Math.ceil(textBoxHeight * scaleY));
 
           const rotation = textInput.rotation ?? 0;
 
@@ -2317,38 +2396,70 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             window.addEventListener("pointerup", onUp);
           };
 
-          // ── v8.40 — the SIX box handles: they resize the BOX, not the type.
+          // ── v8.40/v8.41 — the SIX box handles: they resize the BOX, not the type.
           //
           // Chris, for long-winded writers: corners make the bounding box
           // bigger and the text REFLOWS inside it at the same font size. Six
-          // because six is what can mean anything here — 4 corners + E + W all
-          // set a width; N/S would set a height the layout derives from the
-          // wrapped line count, so they would be handles that do nothing.
+          // because six is how he pictures it — "6 pockets like a pool table",
+          // 4 corners plus the two side pockets.
           //
-          // `side === "w"` drags the LEFT edge, so the box grows leftward and
-          // the anchor moves with it — otherwise grabbing the left handle
-          // would silently drag the text rightwards across the canvas.
+          // v8.40 shipped them as WIDTH-ONLY, with a comment arguing that a
+          // height would be a handle that does nothing because the line count
+          // is derived from wrapping. The first half was right and the
+          // conclusion was wrong: height cannot drive reflow, but it can drive
+          // LAYOUT. v8.41 gave the engine a real `box_height` (a minimum, with
+          // the text centred in the surplus and the background growing to it),
+          // so dragging up and down now means something all the way through to
+          // the committed pixels. Chris's report was simply "not just left and
+          // right".
+          //
+          // Which handle moves which axis:
+          //   • the four corners  → BOTH, one axis per pointer direction
+          //   • W and E (the side pockets) → width only
+          // No height-only handle exists, and that is the honest cost of six:
+          // the corners are how you set a height. Adding N/S would make eight,
+          // and eight is not what was asked for.
+          //
+          // A handle on the LEFT or TOP grows the box away from the anchor, so
+          // the anchor has to move with it — otherwise grabbing the top-left
+          // corner would silently drag the text down-right across the canvas.
+          // Both compensations run off the SAME start values, so a corner drag
+          // is exactly its two edge drags at once with no interaction between
+          // them.
           const handleBoxResizePointerDown = (
             e: React.PointerEvent,
             side: "e" | "w",
+            // null on the two side pockets: they set width and leave the
+            // height alone, which is what makes them the odd two out.
+            vSide: "n" | "s" | null,
           ) => {
             e.stopPropagation();
             e.preventDefault();
             const startX = e.clientX;
-            // An unwrapped box starts from whatever it currently measures, so
-            // the first drag continues from the box the user can see rather
-            // than jumping to some default.
+            const startY = e.clientY;
+            // An unwrapped/unboxed axis starts from whatever it currently
+            // measures, so the first drag continues from the box the user can
+            // see rather than jumping to some default.
             const startW = textWrapWidth > 0 ? textWrapWidth : boxW / (scaleX || 1);
+            const startH = textBoxHeight > 0 ? textBoxHeight : boxH / (scaleY || 1);
             const startCx = textInput.canvasX;
+            const startCy = textInput.canvasY;
             const onMove = (me: PointerEvent) => {
               const dx = (me.clientX - startX) / (scaleX || 1);
-              const next = Math.max(MIN_WRAP_WIDTH, side === "e" ? startW + dx : startW - dx);
-              setTextWrapWidth(next);
-              if (side === "w") {
-                // Keep the RIGHT edge stationary: the anchor moves by exactly
-                // the width the box gained.
-                onTextPositionChange?.(startCx + (startW - next), textInput.canvasY);
-              }
+              const dy = (me.clientY - startY) / (scaleY || 1);
+              const nextW = Math.max(MIN_WRAP_WIDTH, side === "e" ? startW + dx : startW - dx);
+              setTextWrapWidth(nextW);
+              const nextH =
+                vSide === null
+                  ? startH
+                  : Math.max(MIN_BOX_HEIGHT, vSide === "s" ? startH + dy : startH - dy);
+              if (vSide !== null) setTextBoxHeight(nextH);
+              // One position update carrying both compensations — two calls
+              // would make the second overwrite the first's axis with the
+              // stale `textInput` value it captured.
+              const nx = side === "w" ? startCx + (startW - nextW) : startCx;
+              const ny = vSide === "n" ? startCy + (startH - nextH) : startCy;
+              if (nx !== startCx || ny !== startCy) onTextPositionChange?.(nx, ny);
             };
             const onUp = () => {
               window.removeEventListener("pointermove", onMove);
@@ -2753,16 +2864,17 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   })()}
                   {/* The six BOX handles — on the border, so they read as
                       "grab the box" against the font handle floating out on
-                      its stem. Corners take the diagonal cursors even though
-                      only width changes: that is what every editor does, and
-                      a corner showing `ew-resize` reads as broken. */}
+                      its stem. The corners' diagonal cursors are now literally
+                      true: since v8.41 a corner drag really does move both
+                      axes. The two side pockets stay `ew-resize` because they
+                      really are width-only. */}
                   {[
-                    { id: "nw", x: sx, y: sy, side: "w" as const, cursor: "nwse-resize" },
-                    { id: "ne", x: sx + boxW, y: sy, side: "e" as const, cursor: "nesw-resize" },
-                    { id: "w", x: sx, y: sy + boxH / 2, side: "w" as const, cursor: "ew-resize" },
-                    { id: "e", x: sx + boxW, y: sy + boxH / 2, side: "e" as const, cursor: "ew-resize" },
-                    { id: "sw", x: sx, y: sy + boxH, side: "w" as const, cursor: "nesw-resize" },
-                    { id: "se", x: sx + boxW, y: sy + boxH, side: "e" as const, cursor: "nwse-resize" },
+                    { id: "nw", x: sx, y: sy, side: "w" as const, v: "n" as const, cursor: "nwse-resize" },
+                    { id: "ne", x: sx + boxW, y: sy, side: "e" as const, v: "n" as const, cursor: "nesw-resize" },
+                    { id: "w", x: sx, y: sy + boxH / 2, side: "w" as const, v: null, cursor: "ew-resize" },
+                    { id: "e", x: sx + boxW, y: sy + boxH / 2, side: "e" as const, v: null, cursor: "ew-resize" },
+                    { id: "sw", x: sx, y: sy + boxH, side: "w" as const, v: "s" as const, cursor: "nesw-resize" },
+                    { id: "se", x: sx + boxW, y: sy + boxH, side: "e" as const, v: "s" as const, cursor: "nwse-resize" },
                   ].map((h) => (
                     <rect
                       key={h.id}
@@ -2775,7 +2887,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                       strokeWidth={1}
                       rx={1}
                       style={{ cursor: h.cursor, pointerEvents: "all" }}
-                      onPointerDown={(e) => handleBoxResizePointerDown(e, h.side)}
+                      onPointerDown={(e) => handleBoxResizePointerDown(e, h.side, h.v)}
                     />
                   ))}
                   {/* Font-size handle: horizontal stem + SQUARE on the LEFT edge.

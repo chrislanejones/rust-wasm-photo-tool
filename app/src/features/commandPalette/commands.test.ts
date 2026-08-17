@@ -112,8 +112,10 @@ describe("entries come from the group registry", () => {
 
   it("offers no entry for a Coming Soon sub-tool", () => {
     const cmds = build(2);
-    expect(byId(cmds, "sub.edit.perspective")).toBeUndefined();
     expect(byId(cmds, "sub.edit.ruler")).toBeUndefined();
+    // Perspective went live in v8.42, so it must now be the opposite: PRESENT.
+    // Kept here rather than moved away so the pair reads as one rule.
+    expect(byId(cmds, "sub.edit.perspective")).toBeDefined();
   });
 
   it("no entry speaks a legacy tool id in its own id", () => {

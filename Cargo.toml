@@ -99,6 +99,17 @@ required-features = ["tiles"]
 name = "replay_stubs"
 required-features = ["tiles"]
 
+# v8.41's resume test drives `oplog_restore` and builds `ops::TextParams`, both
+# of which only exist under `tiles`. Without this block Cargo tries to build it
+# for the DEFAULT feature set, where the whole `ops` module is absent — so
+# `cargo clippy --all-targets` (no features, which is exactly what the pre-push
+# hook runs) fails to compile it, while `cargo test --features tiles` passes.
+# That split is the trap CLAUDE.md's Commands section calls out: the two
+# commands disagree, and only one of them is the gate.
+[[test]]
+name = "oplog_v3_resume"
+required-features = ["tiles"]
+
 # Release tuning for the WASM build. wasm-pack builds in release by default;
 # LTO + a single codegen unit let the optimizer inline across modules (pairs
 # with SIMD in .cargo/config.toml). Slower to compile, faster at runtime.
