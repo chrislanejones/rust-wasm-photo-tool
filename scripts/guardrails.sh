@@ -101,7 +101,23 @@ n_z=$(rg -n '\bz-(10|20|30|40|50|60|100)\b|z-\[[0-9]' app/src -g '*.tsx' \
 check "z-index" 4 "use z-[var(--z-*)] (§3)" "$n_z"
 
 # Already at zero — a true hard gate. Any reintroduction fails the build.
-n_any=$(rg -n '\bas any\b' app/src -g '*.ts' -g '*.tsx' -g '!*.d.ts' | wc -l)
+#
+# ⚠️ `\bas any\b` also matches ENGLISH, and did. The one hit that turned this
+# check red was `useCanvasActions.ts`'s note — "…corrected itself as soon as
+# any other dependency moved" — a comment explaining a real export bug, counted
+# as a cast. There was no `as any` cast anywhere in app/src; the gate had been
+# failing on prose. Comment lines are dropped before counting: `//`, `/*` or a
+# jsdoc `*` at the START of the matched line is prose, not code.
+#
+# A cast with a trailing comment (`foo as any // why`) is still counted — that
+# is the case worth catching, and it is not at the start of the line. A cast
+# buried inside a block comment is missed, which is fine: commented-out code
+# does not ship.
+#
+# The baseline stays 0. This fixes a FALSE POSITIVE; it does not soften the
+# gate. Verified by planting a real cast and watching the count go to 1.
+n_any=$(rg -n '\bas any\b' app/src -g '*.ts' -g '*.tsx' -g '!*.d.ts' \
+  | rg -v '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*)' | wc -l)
 check "as-any" 0 "import real types (R7)" "$n_any"
 
 # SIMD unsafe is expected here; the count keeps it from growing unnoticed.
@@ -123,7 +139,28 @@ check "as-any" 0 "import real types (R7)" "$n_any"
 # panic on a pixel path.
 n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
   | rg -v 'allow: rust-panic' | wc -l)
-check "rust-panics" 67 "panic/unsafe in the engine (§6)" "$n_rust"
+# LOWERED 67 -> 47 on 2026-08-18, by ANNOTATING, never by raising. 61 lines
+# inside `#[cfg(test)]` modules (plus `ops_engine_parity.rs`, whose whole file
+# is gated `#[cfg(all(test, feature = "tiles"))]` at its `mod` declaration in
+# lib.rs — easy to miss, it carries no inner `cfg(test)`) took
+# `// allow: rust-panic`. Count went 108 -> 47.
+#
+# What 47 now means: 45 genuine production sites — 35 of them SIMD `unsafe`,
+# which is expected and unchanged since v7.72 — plus exactly 2 test panics that
+# CANNOT carry a same-line annotation:
+#   src/ops_engine_parity.rs  the multi-line `panic!(` in assert_flat_identical
+#   src/ops.rs                the `.unwrap()` in a let-else scrutinee
+# rustfmt relocates a trailing comment out of a multi-line macro call and out of
+# a let-else head, onto its own line — where `rg -v` no longer drops the
+# violation, so the annotation silently does nothing. Leaving the orphan would
+# be a comment lying about its code, so those two are honestly uncounted-for.
+# ⚠️ Do not "fix" them by contorting the code to satisfy a grep.
+#
+# One more rustfmt hazard, found the same day: annotating a line IMMEDIATELY
+# followed by a standalone `//` comment makes rustfmt align that comment to the
+# annotation column, shoving unrelated prose out to column ~70. A blank line
+# between them prevents it.
+check "rust-panics" 47 "panic/unsafe in the engine (§6)" "$n_rust"
 
 n_aria=$(rg -n 'role="button"' app/src -g '*.tsx' | rg -v 'aria-label' | wc -l)
 check "aria-button" 5 "role=button needs aria-label (§8)" "$n_aria"

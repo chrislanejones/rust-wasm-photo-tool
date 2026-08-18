@@ -1663,7 +1663,7 @@ mod tests {
                             );
                             assert_eq!((off_x, off_y), (0, 0), "unrotated tile offset");
                             let ink = crate::utils::ink_bounds(&tile, w, h)
-                                .expect("tile has visible ink");
+                                .expect("tile has visible ink"); // allow: rust-panic
                             let want = annotation_ink_offset("Hg", fs, bold, kind, pad);
                             assert_eq!(
                                 (ink.0 as i32, ink.1 as i32),
@@ -1688,7 +1688,7 @@ mod tests {
                 "Hg", 24.0, box_h, 255, 255, 255, false, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, false, false,
                 0, 0, 0, 0, 0, 0, 0,
             );
-            let ink = crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink");
+            let ink = crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink"); // allow: rust-panic
             (w, h, ink.1)
         };
         let (nat_w, nat_h, nat_ink_y) = plain(0);

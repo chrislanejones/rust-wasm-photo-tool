@@ -571,7 +571,7 @@ mod capture_tests {
     }
     impl<'a> Read<'a> {
         fn u32(&mut self) -> u32 {
-            let v = u32::from_le_bytes(self.b[self.p..self.p + 4].try_into().unwrap());
+            let v = u32::from_le_bytes(self.b[self.p..self.p + 4].try_into().unwrap()); // allow: rust-panic
             self.p += 4;
             v
         }
@@ -582,7 +582,7 @@ mod capture_tests {
             s
         }
         fn text(&mut self) -> String {
-            String::from_utf8(self.blob().to_vec()).unwrap()
+            String::from_utf8(self.blob().to_vec()).unwrap() // allow: rust-panic
         }
     }
 
@@ -1084,7 +1084,7 @@ mod capture_tests {
         for pair in json[pts_at..end].split("],[") {
             for n in pair.trim_matches(|c| c == '[' || c == ']').split(',') {
                 if !n.is_empty() {
-                    flat.push(n.parse::<f64>().unwrap());
+                    flat.push(n.parse::<f64>().unwrap()); // allow: rust-panic
                 }
             }
         }
@@ -1110,7 +1110,7 @@ mod capture_tests {
 
         // A point on the path's bounding box — the same point both paths see.
         let (hx, hy) = HIT;
-        let old = pen_hit_the_old_way(&t, hx, hy).expect("the old way must find it");
+        let old = pen_hit_the_old_way(&t, hx, hy).expect("the old way must find it"); // allow: rust-panic
         assert_eq!(old.0, pen_id as i32);
 
         let hit = t.capture_pen_hit(hx, hy);

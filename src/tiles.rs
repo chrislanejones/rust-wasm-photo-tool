@@ -467,9 +467,9 @@ mod tests {
     fn generation_bumps_on_write() {
         let mut tb = TileBuffer::new(256, 256);
         tb.set_pixel(5, 5, [1, 1, 1, 1]);
-        let g1 = tb.tile(0, 0).unwrap().generation();
+        let g1 = tb.tile(0, 0).unwrap().generation(); // allow: rust-panic
         tb.set_pixel(6, 6, [2, 2, 2, 2]);
-        let g2 = tb.tile(0, 0).unwrap().generation();
+        let g2 = tb.tile(0, 0).unwrap().generation(); // allow: rust-panic
         assert!(g2 > g1);
     }
 

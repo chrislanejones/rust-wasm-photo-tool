@@ -946,7 +946,7 @@ mod smart_brush_tests {
     fn smart_dab(cx: f64, cy: f64, radius: f64, strength: u8) -> Vec<u8> {
         let cost = cost();
         let mut cov = vec![0u8; W * H];
-        let bbox = dab_bbox(W as i32, H as i32, cx, cy, radius).expect("dab is on canvas");
+        let bbox = dab_bbox(W as i32, H as i32, cx, cy, radius).expect("dab is on canvas"); // allow: rust-panic
         let (min_x, min_y, max_x, max_y) = bbox;
         let bw = (max_x - min_x + 1) as usize;
 
@@ -957,7 +957,7 @@ mod smart_brush_tests {
             prev.extend_from_slice(&cov[row..row + bw]);
         }
 
-        dab_coverage(&mut cov, W as i32, H as i32, cx, cy, radius, 1.0).expect("dab lands");
+        dab_coverage(&mut cov, W as i32, H as i32, cx, cy, radius, 1.0).expect("dab lands"); // allow: rust-panic
         let mut reach = vec![false; W * H];
         let mut stack = Vec::new();
         constrain_dab_to_region(
@@ -996,7 +996,7 @@ mod smart_brush_tests {
         // before asserting it's fixed. Without this, a containment that did
         // nothing would still pass.
         let mut plain = vec![0u8; W * H];
-        dab_coverage(&mut plain, W as i32, H as i32, cx, cy, r, 1.0).unwrap();
+        dab_coverage(&mut plain, W as i32, H as i32, cx, cy, r, 1.0).unwrap(); // allow: rust-panic
         assert!(
             coverage_across_the_seam(&plain) > 0,
             "fixture is wrong: the plain brush must spill across the seam"
@@ -1030,7 +1030,7 @@ mod smart_brush_tests {
         let (cx, cy, r) = (10.0, 16.0, 6.0);
         let smart = smart_dab(cx, cy, r, 128);
         let mut plain = vec![0u8; W * H];
-        dab_coverage(&mut plain, W as i32, H as i32, cx, cy, r, 1.0).unwrap();
+        dab_coverage(&mut plain, W as i32, H as i32, cx, cy, r, 1.0).unwrap(); // allow: rust-panic
         assert_eq!(
             smart, plain,
             "away from edges the Smart Brush must lay exactly the normal dab"
@@ -1150,13 +1150,14 @@ mod magic_eraser_brush_tests {
 
         t.magic_eraser_brush_down(5.0, 5.0, 3.0, 1.0, "off");
         t.magic_eraser_brush_up();
-        let first_count = t.selection.as_ref().unwrap().iter().filter(|&&b| b).count();
+        let first_count = t.selection.as_ref().unwrap().iter().filter(|&&b| b).count(); // allow: rust-panic
         assert!(first_count > 0);
 
         // A second, disjoint stroke well away from the first.
         t.magic_eraser_brush_down(35.0, 35.0, 3.0, 1.0, "off");
         t.magic_eraser_brush_up();
-        let sel = t.selection.as_ref().unwrap();
+        let sel = t.selection.as_ref().unwrap(); // allow: rust-panic
+
         // The first stroke's region must be gone — a fresh stroke replaces,
         // it does not accumulate ACROSS separate press/release gestures.
         assert!(

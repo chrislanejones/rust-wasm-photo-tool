@@ -5050,7 +5050,7 @@ mod layer_persistence_tests {
         t.load_image(&px_data);
         let rect = t.begin_layer_resize_preview();
         assert_eq!(rect, vec![3, 5, 6, 4], "returned rect = content bounds");
-        let p = t.paste_preview.as_ref().unwrap();
+        let p = t.paste_preview.as_ref().unwrap(); // allow: rust-panic
         assert_eq!(
             (p.dest_x, p.dest_y, p.dest_w, p.dest_h),
             (3, 5, 6, 4),

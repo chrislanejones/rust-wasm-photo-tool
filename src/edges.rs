@@ -266,7 +266,7 @@ mod tests {
             }
         });
         let mag = sobel_magnitude(&buf, w, h);
-        let peak = *mag.iter().max().unwrap();
+        let peak = *mag.iter().max().unwrap(); // allow: rust-panic
         assert!(peak < 100, "fixture must be a SOFT edge (peak {peak})");
 
         let cost = edge_cost_map(&mag);

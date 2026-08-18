@@ -451,9 +451,9 @@ mod tests {
     #[test]
     fn identity_correspondence_is_the_identity_map() {
         let q: Quad = [(0.0, 0.0), (10.0, 0.0), (10.0, 20.0), (0.0, 20.0)];
-        let h = Homography::from_correspondences(&q, &q).unwrap();
+        let h = Homography::from_correspondences(&q, &q).unwrap(); // allow: rust-panic
         for (x, y) in [(0.0, 0.0), (5.0, 5.0), (10.0, 20.0), (3.3, 17.1)] {
-            let (u, v) = h.apply(x, y).unwrap();
+            let (u, v) = h.apply(x, y).unwrap(); // allow: rust-panic
             assert!((u - x).abs() < 1e-9, "x {x} -> {u}");
             assert!((v - y).abs() < 1e-9, "y {y} -> {v}");
         }
@@ -467,12 +467,13 @@ mod tests {
             &[(0.0, 0.0), (10.0, 0.0), (10.0, 5.0), (0.0, 5.0)],
             &quad,
         )
-        .unwrap();
-        let back = Homography::rect_from_quad(&quad, 10.0, 5.0).unwrap();
+        .unwrap(); // allow: rust-panic
+        let back = Homography::rect_from_quad(&quad, 10.0, 5.0).unwrap(); // allow: rust-panic
+
         // Round trip every corner and a couple of interior points.
         for (x, y) in [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0), (0.0, 5.0), (4.0, 2.5)] {
-            let (u, v) = fwd.apply(x, y).unwrap();
-            let (rx, ry) = back.apply(u, v).unwrap();
+            let (u, v) = fwd.apply(x, y).unwrap(); // allow: rust-panic
+            let (rx, ry) = back.apply(u, v).unwrap(); // allow: rust-panic
             assert!((rx - x).abs() < 1e-6, "round trip x: {x} -> {u} -> {rx}");
             assert!((ry - y).abs() < 1e-6, "round trip y: {y} -> {v} -> {ry}");
         }
@@ -564,7 +565,7 @@ mod tests {
         // any colour drift here is a resampling bug.
         let src = solid(32, 32, [200, 40, 60, 255]);
         let quad: Quad = [(8.0, 0.0), (24.0, 0.0), (32.0, 32.0), (0.0, 32.0)];
-        let out = warp_rgba(&src, 32, 32, &quad).unwrap();
+        let out = warp_rgba(&src, 32, 32, &quad).unwrap(); // allow: rust-panic
         let cx = out.w / 2;
         let cy = out.h / 2;
         let i = ((cy * out.w + cx) * 4) as usize;
@@ -580,7 +581,7 @@ mod tests {
     fn warp_reports_negative_offsets_when_the_quad_grows_left_and_up() {
         let src = solid(16, 16, [9, 9, 9, 255]);
         let quad: Quad = [(-10.0, -6.0), (16.0, 0.0), (16.0, 16.0), (0.0, 16.0)];
-        let out = warp_rgba(&src, 16, 16, &quad).unwrap();
+        let out = warp_rgba(&src, 16, 16, &quad).unwrap(); // allow: rust-panic
         assert_eq!(out.offset_x, -10);
         assert_eq!(out.offset_y, -6);
         assert!(
@@ -605,7 +606,7 @@ mod tests {
             }
         }
         let quad: Quad = [(2.0, 0.0), (14.0, 0.0), (16.0, 16.0), (0.0, 16.0)];
-        let out = warp_rgba(&src, w, h, &quad).unwrap();
+        let out = warp_rgba(&src, w, h, &quad).unwrap(); // allow: rust-panic
         for i in (0..out.pixels.len()).step_by(4) {
             let a = out.pixels[i + 3];
             if a > 200 {

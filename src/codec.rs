@@ -142,7 +142,7 @@ mod decode_tests {
             data: pixels.clone(),
         };
         let encoded = export_png(&buf);
-        let (decoded, w, h) = decode_png(&encoded).expect("valid PNG decodes");
+        let (decoded, w, h) = decode_png(&encoded).expect("valid PNG decodes"); // allow: rust-panic
         assert_eq!((w, h), (2, 2));
         assert_eq!(decoded, pixels, "RGBA round-trip must be byte-identical");
     }
@@ -154,10 +154,10 @@ mod decode_tests {
             let mut encoder = png::Encoder::new(&mut output, 1, 1);
             encoder.set_color(png::ColorType::Rgb);
             encoder.set_depth(png::BitDepth::Eight);
-            let mut writer = encoder.write_header().unwrap();
-            writer.write_image_data(&[10, 20, 30]).unwrap();
+            let mut writer = encoder.write_header().unwrap(); // allow: rust-panic
+            writer.write_image_data(&[10, 20, 30]).unwrap(); // allow: rust-panic
         }
-        let (decoded, w, h) = decode_png(&output).expect("valid PNG decodes");
+        let (decoded, w, h) = decode_png(&output).expect("valid PNG decodes"); // allow: rust-panic
         assert_eq!((w, h), (1, 1));
         assert_eq!(decoded, vec![10, 20, 30, 255]);
     }
@@ -169,10 +169,10 @@ mod decode_tests {
             let mut encoder = png::Encoder::new(&mut output, 1, 1);
             encoder.set_color(png::ColorType::GrayscaleAlpha);
             encoder.set_depth(png::BitDepth::Eight);
-            let mut writer = encoder.write_header().unwrap();
-            writer.write_image_data(&[200, 64]).unwrap();
+            let mut writer = encoder.write_header().unwrap(); // allow: rust-panic
+            writer.write_image_data(&[200, 64]).unwrap(); // allow: rust-panic
         }
-        let (decoded, _, _) = decode_png(&output).expect("valid PNG decodes");
+        let (decoded, _, _) = decode_png(&output).expect("valid PNG decodes"); // allow: rust-panic
         assert_eq!(decoded, vec![200, 200, 200, 64]);
     }
 

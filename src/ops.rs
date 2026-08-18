@@ -1555,7 +1555,7 @@ mod tests {
         for op in sample_ops() {
             let bytes = encode_op(&op);
             assert_eq!(bytes[0], OP_FORMAT_VERSION, "version byte prefix");
-            let back = decode_op(&bytes).expect("decode");
+            let back = decode_op(&bytes).expect("decode"); // allow: rust-panic
             assert_eq!(op, back, "round-trip mismatch for {op:?}");
         }
     }
@@ -2125,7 +2125,7 @@ mod v2_migration_tests {
         let mut out = vec![2u8];
         let shapes: Vec<ShapeParams> = Vec::new();
         let canvas: Option<CanvasParams> = None;
-        out.extend_from_slice(&postcard::to_allocvec(&(texts, &shapes, &canvas)).unwrap());
+        out.extend_from_slice(&postcard::to_allocvec(&(texts, &shapes, &canvas)).unwrap()); // allow: rust-panic
         out
     }
 
@@ -2133,7 +2133,7 @@ mod v2_migration_tests {
     fn v2_blobs_still_decode_under_v3() {
         let texts = vec![a_text(7)];
         let (got, shapes, canvas) = decode_annotations(&v2_annotation_blob(&texts))
-            .expect("a v2 annotation blob must still decode — users' logs depend on it");
+            .expect("a v2 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].text, "hello");
         assert_eq!(got[0].id, 7);
@@ -2148,7 +2148,7 @@ mod v2_migration_tests {
         t.wrap_width = 240;
         let blob = encode_annotations(&[t], &[], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
-        let (got, _, _) = decode_annotations(&blob).unwrap();
+        let (got, _, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(got[0].wrap_width, 240, "v3 carries the width");
     }
 
@@ -2175,9 +2175,9 @@ mod v2_migration_tests {
             },
         ] {
             let mut v2_bytes = vec![2u8];
-            v2_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap());
+            v2_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
             let decoded = decode_op(&v2_bytes)
-                .unwrap_or_else(|e| panic!("v2 bytes for {:?} rejected: {e:?}", op.label()));
+                .unwrap_or_else(|e| panic!("v2 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
             assert_eq!(decoded, op, "v2 op must mean the same thing under v3");
         }
     }
@@ -2191,8 +2191,8 @@ mod v2_migration_tests {
         let mut b = a_text(4);
         b.wrap_width = 512;
         assert_eq!(
-            postcard::to_allocvec(&a).unwrap(),
-            postcard::to_allocvec(&b).unwrap(),
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
             "wrap_width must not appear on the wire"
         );
     }
@@ -2200,7 +2200,7 @@ mod v2_migration_tests {
     #[test]
     fn v1_is_still_rejected_not_silently_migrated() {
         let mut v1 = vec![1u8];
-        v1.extend_from_slice(&postcard::to_allocvec(&(vec![a_text(1)],)).unwrap());
+        v1.extend_from_slice(&postcard::to_allocvec(&(vec![a_text(1)],)).unwrap()); // allow: rust-panic
         assert!(matches!(
             decode_annotations(&v1),
             Err(OpError::UnsupportedVersion(1))
@@ -2235,7 +2235,7 @@ mod v2_migration_tests {
         let shapes: Vec<ShapeParams> = Vec::new();
         let canvas: Option<CanvasParams> = None;
         let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
-        out.extend_from_slice(&postcard::to_allocvec(&(texts, &shapes, &canvas, &wraps)).unwrap());
+        out.extend_from_slice(&postcard::to_allocvec(&(texts, &shapes, &canvas, &wraps)).unwrap()); // allow: rust-panic
         out
     }
 
@@ -2247,7 +2247,7 @@ mod v2_migration_tests {
         let mut t = a_text(7);
         t.wrap_width = 240;
         let (got, shapes, canvas) = decode_annotations(&v3_annotation_blob(&[t]))
-            .expect("a v3 annotation blob must still decode — users' logs depend on it");
+            .expect("a v3 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].id, 7);
         assert_eq!(got[0].wrap_width, 240, "the v3 width survives the step");
@@ -2266,7 +2266,7 @@ mod v2_migration_tests {
         t.box_height = 310;
         let blob = encode_annotations(&[t], &[], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
-        let (got, _, _) = decode_annotations(&blob).unwrap();
+        let (got, _, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(got[0].wrap_width, 240);
         assert_eq!(got[0].box_height, 310, "v4 carries the height");
     }
@@ -2285,9 +2285,9 @@ mod v2_migration_tests {
             },
         ] {
             let mut v3_bytes = vec![3u8];
-            v3_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap());
+            v3_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
             let decoded = decode_op(&v3_bytes)
-                .unwrap_or_else(|e| panic!("v3 bytes for {:?} rejected: {e:?}", op.label()));
+                .unwrap_or_else(|e| panic!("v3 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
             assert_eq!(decoded, op, "v3 op must mean the same thing under v4");
         }
     }
@@ -2301,8 +2301,8 @@ mod v2_migration_tests {
         let mut b = a_text(4);
         b.box_height = 512;
         assert_eq!(
-            postcard::to_allocvec(&a).unwrap(),
-            postcard::to_allocvec(&b).unwrap(),
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
             "box_height must not appear on the wire"
         );
     }
@@ -2343,7 +2343,7 @@ mod v2_migration_tests {
         let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
         let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
         out.extend_from_slice(
-            &postcard::to_allocvec(&(texts, &shapes, &canvas, &wraps, &heights)).unwrap(),
+            &postcard::to_allocvec(&(texts, &shapes, &canvas, &wraps, &heights)).unwrap(), // allow: rust-panic
         );
         out
     }
@@ -2356,7 +2356,7 @@ mod v2_migration_tests {
         t.wrap_width = 240;
         t.box_height = 310;
         let (got, shapes, canvas) = decode_annotations(&v4_annotation_blob(&[t]))
-            .expect("a v4 annotation blob must still decode — users' logs depend on it");
+            .expect("a v4 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].wrap_width, 240, "the v4 width survives the step");
         assert_eq!(got[0].box_height, 310, "the v4 height survives the step");
@@ -2377,7 +2377,7 @@ mod v2_migration_tests {
         t.perspective = a_quad();
         let blob = encode_annotations(&[t], &[], None);
         assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
-        let (got, _, _) = decode_annotations(&blob).unwrap();
+        let (got, _, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
         assert_eq!(got[0].wrap_width, 240);
         assert_eq!(got[0].box_height, 310);
         assert_eq!(got[0].perspective, a_quad(), "v5 carries the quad");
@@ -2401,9 +2401,9 @@ mod v2_migration_tests {
             },
         ] {
             let mut v4_bytes = vec![4u8];
-            v4_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap());
+            v4_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
             let decoded = decode_op(&v4_bytes)
-                .unwrap_or_else(|e| panic!("v4 bytes for {:?} rejected: {e:?}", op.label()));
+                .unwrap_or_else(|e| panic!("v4 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
             assert_eq!(decoded, op, "v4 op must mean the same thing under v5");
         }
     }
@@ -2416,8 +2416,8 @@ mod v2_migration_tests {
         let mut b = a_text(4);
         b.perspective = a_quad();
         assert_eq!(
-            postcard::to_allocvec(&a).unwrap(),
-            postcard::to_allocvec(&b).unwrap(),
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
             "perspective must not appear on the wire"
         );
     }
@@ -2451,7 +2451,7 @@ mod v2_migration_tests {
         // the user does nothing.
         let bytes = encode_op(&Op::TextAdd(a_text(1)));
         let Op::TextAdd(p) = decode_op(&bytes).unwrap() else {
-            panic!("wrong variant");
+            panic!("wrong variant"); // allow: rust-panic
         };
         assert_eq!(
             p.perspective,

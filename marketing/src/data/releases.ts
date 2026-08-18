@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.48",
+    date: "2026-08-18",
+    headline: "A build check that was failing on tests, and one failing on English",
+    entries: [
+      {
+        tag: "infra",
+        text: "The engine has a guard that counts every place it can crash. It had been over its limit since 7 August — and not one of the new ones could reach you. They were checks inside tests, where crashing is how a test reports a failure. The guard could not tell a test from the engine, so writing tests was setting off the alarm.",
+      },
+      {
+        tag: "infra",
+        text: "61 test lines are now marked as deliberate and the limit comes DOWN, from 67 to 47 — lowered, not raised. What is left is 45 real engine sites, most of them low-level image routines that predate all of this. The number means what it says again.",
+      },
+      {
+        tag: "fix",
+        text: "A second check was failing on English. It looked for a particular unsafe cast and found the words inside an ordinary code comment. There was no such cast anywhere in the app. Comments are no longer counted as code.",
+      },
+    ],
+  },
+  {
     version: "v8.47",
     date: "2026-08-18",
     headline: "The icon library moves to 1.0",

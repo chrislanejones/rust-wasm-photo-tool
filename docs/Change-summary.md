@@ -7851,3 +7851,121 @@ comment). Neither is caused by this release, and neither is visible to any gate
 that runs on this machine: `guardrails.sh` needs ripgrep, which is not
 installed, and the sentinel reads the deployed bundle. Named here so the badge
 is not read as a verdict on this change.
+
+## v8.48 Change Summary — 2026-08-18
+
+**The guardrails ratchet goes green by annotating, never by raising.** Static
+guardrails had failed on `rust-panics 108 > 67` since 2026-08-07 — roughly 25
+releases, every one of them shipped on a red badge nobody read, because the
+gate table run locally was green every night.
+
+### What the 108 actually were
+
+| Bucket | Count | Verdict |
+|---|---|---|
+| Inside `#[cfg(test)]` modules | **63** | panicking is how a test fails — correct code |
+| SIMD `unsafe` | 35 | expected; **19 in `simd/color.rs`, unchanged since v7.72** |
+| Other engine code | 10 | the part the gate exists to watch |
+
+Not one line of the +41 growth was a new panic on a pixel path. `ops.rs` gained
+24, of which 25 of its 26 total sit in test modules; `perspective.rs` (+9) and
+`capture.rs` (+4) are new files whose every hit is a test. The gate had been red
+for eleven days because people wrote tests.
+
+### The classification trap
+
+`src/ops_engine_parity.rs` carries **no inner `#[cfg(test)]`** — the whole file
+is gated at its `mod` declaration in `lib.rs`:
+
+```rust
+#[cfg(all(test, feature = "tiles"))]
+mod ops_engine_parity;
+```
+
+A first pass that scans each file for `cfg(test)` therefore calls all 5 of its
+hits production code. `src/paint.rs` hides the same shape mid-file — a second
+test module gated `#[cfg(all(test, feature = "patchmatch"))]`, which the literal
+string `cfg(test)` does not match. Between them that is 7 lines misfiled.
+**Per-line judgment, and check the `mod` declaration, not just the file.**
+
+### Two rustfmt hazards, both found the hard way
+
+`// allow: rust-panic` only works **on the same line** — `rg -v` drops the
+matching line, so an annotation one line up filters nothing.
+
+1. **rustfmt relocates the annotation out of multi-line constructs.** A trailing
+   comment on `panic!(` (a multi-line macro call) or on a let-else scrutinee is
+   moved onto its own line, silently un-annotating the violation. Two lines
+   resist annotation for this reason and are honestly left uncounted-for rather
+   than carrying an orphan comment that lies about its code:
+
+   | File | Construct |
+   |---|---|
+   | `src/ops_engine_parity.rs` | the multi-line `panic!(` in `assert_flat_identical` |
+   | `src/ops.rs` | the `.unwrap()` in a let-else scrutinee |
+
+2. **An annotated line immediately followed by a standalone comment** makes
+   rustfmt align that comment to the annotation column, shoving unrelated prose
+   out to roughly column 70. A blank line between them prevents it. Caught 3
+   mangled comments in `paint.rs` and `perspective.rs`.
+
+### The result
+
+| | Before | After |
+|---|---|---|
+| `rust-panics` count | 108 | **47** |
+| Baseline | 67 | **47** — lowered |
+| Lines annotated | — | 61 |
+| Production sites declined | — | 45 |
+
+Confirmed by running the script, not by subtracting: `ok rust-panics: 47
+(baseline)`, exit 0.
+
+### Mutation-tested, because a rule that cannot fail is not a rule
+
+| Probe in a non-test module | Result |
+|---|---|
+| unannotated `.expect(` | **FAIL 48 > 47** |
+| unannotated `panic!` | **FAIL 48 > 47** |
+| unannotated `unsafe fn` | **FAIL 48 > 47** |
+| unannotated `.unwrap()` | **FAIL 48 > 47** |
+| same-line `// allow: rust-panic` | ok 47 |
+| annotation on the line **above** | **FAIL 48 > 47** |
+
+The last row is the same-line rule proving itself, independently of the
+rustfmt discovery above.
+
+### The as-any rule stops counting English
+
+Shipped in the same release because it is the same file. The rule was
+`\bas any\b` over `app/src`, and its only hit was prose — a comment in
+`useCanvasActions.ts` reading "…corrected itself as soon as any other dependency
+moved". There was no `as any` cast anywhere in the app. Comment lines are now
+dropped before counting; the baseline stays **0**. Seven control cases: bare
+cast **1**, cast with trailing comment **1**, `//` prose **0**, jsdoc `*` prose
+**0**, block-comment prose **0**, two casts **2**, clean tree **0**.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `./scripts/guardrails.sh` | **exit 0** — all six rules at baseline |
+| cargo test `--features tiles,patchmatch` | **364 passed** |
+| clippy featureless `--all-targets` | clean |
+| clippy with features `-D warnings` | clean |
+| `cargo fmt --check` | clean |
+| `pnpm -C app exec tsc --noEmit` | clean |
+| pnpm lint | **0 errors** (58 warnings) |
+| `pnpm -C app test` | **591 passed** (50 files) |
+| app + marketing builds | both succeed |
+
+The Rust diff is comments and two blank lines only — verified by stripping every
+annotation and comparing against the previous commit, file by file: identical
+across all 11. `build:wasm` confirms it: **806,967 B, byte-identical to v8.47**.
+
+### Still red, and named
+
+Deploy sentinel: live wasm **813,546 B against an 800,000 B ceiling**. The
+ceiling predates the perspective tools, which added 16,796 B deliberately. That
+is a decision about the size budget — EXIF and AVIF are both queued against the
+same headroom — not a cleanup, so it is untouched here.

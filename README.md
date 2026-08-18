@@ -84,6 +84,35 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.48 — 2026-08-18
+
+**A build check that had been failing for eleven days is green again — and it
+now measures something.** The engine carries a guard that counts every place it
+can panic: `unwrap`, `expect`, `panic!`, `unsafe`. It had been over its limit
+since 7 August, 108 against a ceiling of 67, and nobody noticed because the
+checks run on this machine were all green.
+
+Not one of those 41 extra was a panic that could reach you. They were `expect`
+calls inside tests, where panicking is how a test reports a failure. The guard
+could not tell a test from the engine, so every test anyone wrote pushed it
+nearer the edge, and then over it. Writing tests was setting off the alarm.
+
+61 test lines are now marked as deliberate and the limit drops from 67 to
+**47** — lowered, not raised. What remains is 45 real engine sites, 35 of them
+SIMD routines that predate all of this. The number means "places the engine can
+panic" again, instead of that plus test noise.
+
+The same release fixes a second check that was failing on English. Its rule
+looked for `as any` and found the phrase inside an ordinary comment — "…
+corrected itself as soon as any other dependency moved". There was no such cast
+anywhere in the app. Comments are no longer counted as code.
+
+One check is still red: the engine binary is 813,546 bytes against an 800,000
+ceiling set before the perspective tools existed. That one is a real decision
+about the size budget, not a cleanup, so it is left alone here.
+
+<details><summary>Older releases</summary>
+
 ### v8.47 — 2026-08-18
 
 **The icon library moves to 1.0.** lucide-react 1.x drops every brand icon, and
@@ -93,8 +122,6 @@ used, so the pair render identically and nothing new is installed.
 
 Nothing moves on screen. The upgrade had been sitting as a failing
 dependency-update PR since 20 July — one file, one import, one error.
-
-<details><summary>Older releases</summary>
 
 ### v8.46 — 2026-08-17
 

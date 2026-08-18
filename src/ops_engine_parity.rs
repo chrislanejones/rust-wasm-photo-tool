@@ -705,7 +705,7 @@ fn persist_restore_via_engine_png_is_byte_identical_with_transparency() {
     let frames = t.oplog_encoded_ops(0, total);
 
     // Sanity: the PNG really decodes back to the exact keyframe pixels.
-    let (decoded, dw, dh) = crate::codec::decode_png(&base_png).expect("engine PNG decodes");
+    let (decoded, dw, dh) = crate::codec::decode_png(&base_png).expect("engine PNG decodes"); // allow: rust-panic
     assert_eq!((dw, dh), (96, 80));
     assert_eq!(
         decoded,
@@ -857,7 +857,7 @@ fn default_artboard_document_records_ops_and_undo_replays_byte_identically() {
     // Document::composite_flat reproduced the Canvas fill UNDER the content
     // exactly as composite_layers_into does. This is what the sync check
     // hashes; one rounding step out and every Canvas log would break.
-    let replay = t.oplog.as_ref().unwrap().live_document().composite_flat();
+    let replay = t.oplog.as_ref().unwrap().live_document().composite_flat(); // allow: rust-panic
     assert_flat_identical(&t.composite_cache, &replay, t.width(), "canvas document");
 
     // Undo replays through the log — byte-exact, both steps.
@@ -1168,8 +1168,8 @@ fn the_apps_own_import_path_arms_with_the_post_artboard_base() {
     );
     let ann = t.oplog_keyframe_annotations(0);
     let (_, _, canvas) =
-        crate::ops::decode_annotations(&ann).expect("base annotations blob decodes");
-    let canvas = canvas.expect("the base carries the Canvas as metadata");
+        crate::ops::decode_annotations(&ann).expect("base annotations blob decodes"); // allow: rust-panic
+    let canvas = canvas.expect("the base carries the Canvas as metadata"); // allow: rust-panic
     assert_eq!(
         (canvas.r, canvas.g, canvas.b, canvas.a),
         (20, 40, 60, 255),

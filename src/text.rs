@@ -439,7 +439,7 @@ mod wrap_tests {
 
     /// Ink width of one already-broken line, the same way `wrap` measures it.
     fn w(line: &str, size: f32) -> f32 {
-        let font = FontRef::try_from_slice(FONT_REGULAR).unwrap();
+        let font = FontRef::try_from_slice(FONT_REGULAR).unwrap(); // allow: rust-panic
         line_width(line, &font, PxScale::from(size))
     }
 
