@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.47",
+    date: "2026-08-18",
+    headline: "The icon library moves to 1.0",
+    entries: [
+      {
+        tag: "infra",
+        text: "The icon library the app draws its icons from went to version 1.0, and that release drops every brand icon. The app used one of them — the GitHub mark on the start screen.",
+      },
+      {
+        tag: "fix",
+        text: "The GitHub mark is now drawn by the app itself, the same way the Codeberg mountain beside it already was. The two render identically, nothing new was installed to replace it, and nothing moves on screen.",
+      },
+    ],
+  },
+  {
     version: "v8.46",
     date: "2026-08-17",
     headline: "Three perspective tools again — and each one lights up",

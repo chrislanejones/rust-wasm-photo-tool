@@ -84,6 +84,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.47 — 2026-08-18
+
+**The icon library moves to 1.0.** lucide-react 1.x drops every brand icon, and
+the app used one of them: the GitHub mark on the start screen. It is now drawn
+inline from the same simple-icons path the Codeberg mountain beside it already
+used, so the pair render identically and nothing new is installed.
+
+Nothing moves on screen. The upgrade had been sitting as a failing
+dependency-update PR since 20 July — one file, one import, one error.
+
+<details><summary>Older releases</summary>
+
 ### v8.46 — 2026-08-17
 
 **Distort, Perspective and Skew are three tools again — and now each one
@@ -97,8 +109,6 @@ Perspective — so it lit the first of the three no matter which you clicked.
 That copy is gone. With it gone, three tools work exactly as intended, so
 they're back, and the rest of the toolbar keeps one consistent rule for where a
 tool's options live.
-
-<details><summary>Older releases</summary>
 
 ### v8.45 — 2026-08-17
 

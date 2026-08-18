@@ -7791,3 +7791,63 @@ releases and the comment was a lie about the code beneath it.
 | playwright | **11/11**, §3 mutation-verified |
 
 No Rust; engine untouched at 806,967 B.
+
+## v8.47 Change Summary — 2026-08-18
+
+**The icon library moves to 1.0, and the GitHub mark comes along by hand.**
+lucide-react 1.x removed every brand icon. `Github` was a real export through
+0.x, so this is an upgrade break rather than a missing icon — and it was the
+only brand icon the app imported.
+
+### The fix was already sitting two buttons away
+
+`CodebergIcon` has been an inline simple-icons path since Codeberg was added,
+under a comment saying lucide ships no brand icon for it. `GithubIcon` is the
+same shape, so the pair render identically and no dependency was added to
+replace what lucide dropped.
+
+Neither SVG carries a width or a height on purpose — `Button`'s
+`[&_svg]:size-[1em]` sizes them. Measured in the production build: GitHub
+12×12, Codeberg 12×12.
+
+### Break surface
+
+| | |
+|---|---|
+| Typecheck errors under 1.x | **1** — `NewActions.tsx:17` |
+| App icons still exported | 86 of 86 |
+| Marketing icons still exported | 43 of 43 |
+
+### Size — stash-and-rebuild control at the same commit
+
+| Bundle | lucide 0.577 | lucide 1.31 | Δ |
+|---|---|---|---|
+| app `index.js` | 2,774,231 B | 2,774,907 B | **+676 B** |
+| marketing `index.js` | 534,341 B | 534,313 B | **−28 B** |
+
+`^1.25.0` resolves to 1.31.0 — the dependency PR's lockfile was pinned on
+20 July. Every gate below ran against 1.31.0, not against the pin.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | clean (was 1 error) |
+| pnpm lint | **0 errors** (58 warnings) |
+| `pnpm -C app test` | **591 passed** (50 files) |
+| playwright | **11/11** |
+| `cargo fmt --check` / `clippy --all-targets` | clean / clean |
+| app build + marketing build | both succeed |
+
+No Rust; engine untouched at 806,967 B.
+
+### Not fixed here, and not caused here
+
+GitHub CI has been red on master since 2026-08-07. Two jobs fail: the deploy
+sentinel (live wasm 813,546 B against its 800,000 B ceiling) and the static
+guardrails ratchet (`rust-panics` 108 against a baseline of 67; its `as-any`
+hit is a false positive — the pattern matches the words "as any" in an English
+comment). Neither is caused by this release, and neither is visible to any gate
+that runs on this machine: `guardrails.sh` needs ripgrep, which is not
+installed, and the sentinel reads the deployed bundle. Named here so the badge
+is not read as a verdict on this change.
