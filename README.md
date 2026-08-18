@@ -84,6 +84,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.51 — 2026-08-18
+
+**The last two updates in the queue, and the reason they looked broken.**
+CodeQL's action goes to version 4, the pnpm setup step to version 6. Both are
+build-pipeline pieces; nothing in the app changes.
+
+They had sat since 3 August marked as failing. That verdict was stale — the
+check they failed was the engine's panic-count guard, which at the time was
+failing for every branch including the main one. Two releases ago that was
+fixed, but their branches were never rebuilt, so the red mark stayed on screen
+describing a world that no longer existed. **A failing check is only evidence if
+it ran recently enough to mean anything.**
+
+<details><summary>Older releases</summary>
+
 ### v8.50 — 2026-08-18
 
 **Five dependency updates that had been sitting unmerged since July.** Serde,
@@ -96,8 +111,6 @@ passes everything: typecheck, 591 unit tests, 11 end-to-end tests, both builds.
 It also grows the app bundle by 126 KB and resolves to a version outside what
 the React plugin says it supports. That is a change worth landing on its own,
 where a problem has one possible cause, not six.
-
-<details><summary>Older releases</summary>
 
 ### v8.49 — 2026-08-18
 

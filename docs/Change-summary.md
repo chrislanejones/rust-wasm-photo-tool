@@ -8140,3 +8140,46 @@ to a PR branch, so it is left for a human.
 | clippy featureless / with features | clean / clean |
 | `./scripts/guardrails.sh` | exit 0 |
 | app + marketing builds | both succeed |
+
+## v8.51 Change Summary — 2026-08-18
+
+**The last two dependency PRs, and why their red mark was not evidence.**
+
+| PR | Bump | Where |
+|---|---|---|
+| #21 | `github/codeql-action` v3 → **v4.37.4** | `init` and `analyze` |
+| #22 | `pnpm/action-setup` v4 → **v6** | all four pnpm jobs |
+
+### The stale-verdict trap
+
+Both showed **Static guardrails** failing, so both read as broken. That check
+ran **2026-08-03** — fifteen days before v8.48 fixed the `rust-panics` ratchet,
+during the stretch when it failed on *every* branch including master. Their
+branches were never rebuilt, so the red mark persisted, describing a world that
+no longer existed.
+
+**A failing check is only evidence if it ran recently enough to mean anything.**
+Neither PR could be re-run through `gh pr update-branch`: #21 touches
+`.github/workflows/`, which needs `workflow` scope the local token does not
+have, and #22 reported already-up-to-date without triggering anything. So the
+bumps were applied directly and master's own CI is the verdict.
+
+### Risk checked before applying, not after
+
+`pnpm/action-setup` v5+ requires either a `packageManager` field or an explicit
+`version` input, and fails without one. The root `package.json` already
+declares `"packageManager": "pnpm@10.26.0"`, so the prerequisite was satisfied
+before the bump went in. `actions/setup-node@v7` from v8.50 was already proven
+green in that release's run.
+
+All four workflow files re-parsed as YAML after the edit.
+
+### Dependency queue, closed
+
+| PR | Outcome |
+|---|---|
+| #14, #15, #16, #18 | merged v8.50, closed by dependabot |
+| #19 | closed itself — superseded by v8.47 |
+| #20 | merged v8.50, self-closes |
+| #21, #22 | **this release** |
+| #17 vite 6 → 8 | **still held** — see v8.50; bundler swap, +125.87 kB, its own decision |

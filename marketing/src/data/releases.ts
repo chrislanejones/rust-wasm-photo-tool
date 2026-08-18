@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.51",
+    date: "2026-08-18",
+    headline: "The last two updates, and why they looked broken",
+    entries: [
+      {
+        tag: "infra",
+        text: "CodeQL's action goes to version 4 and the pnpm setup step to version 6. Both are build-pipeline pieces; nothing in the app changes.",
+      },
+      {
+        tag: "fix",
+        text: "They had sat since 3 August marked as failing, but that verdict was stale — the check they failed was one that was failing for every branch at the time, including the main one. It was fixed two releases ago; their branches were never rebuilt, so the red mark stayed on screen describing a world that no longer existed.",
+      },
+    ],
+  },
+  {
     version: "v8.50",
     date: "2026-08-18",
     headline: "Five dependency updates land, one is held back",
