@@ -192,3 +192,38 @@ confirming only `oplog_keyframe_rgba` (and `resize_pixels_filter`, if the
 delete branch is chosen) disappeared. Phase 3 is config + this baseline.
 Phase 4 is one extraction per session, ratchet lowered in the same commit,
 exactly as the Refactor-Playbook prescribes.
+
+## Addendum — twiggy size profile (2026-08-18)
+
+Run against a fresh `cargo build --release --target wasm32-unknown-unknown
+--features tiles,patchmatch` with `CARGO_PROFILE_RELEASE_DEBUG=limited` so
+twiggy can attribute bytes (the debug sections that adds are 86% of the raw
+7.4 MB file and are exactly what `twiggy garbage` flags; the real payload is
+**714 KB of code + 194 KB of `.rodata`**, pre-wasm-bindgen/wasm-opt).
+
+**Verdict: no size crisis.** `twiggy garbage` finds nothing but strip-able
+custom sections; `twiggy monos` tops out at ~3 KB of drop glue — the
+monomorphization bloat that usually plagues wasm crates isn't here.
+
+Per-crate code budget: `stamp_tool` 38.3%, `ttf_parser` 13.5% (~97 KB — the
+text tool's font stack, retained via `Face::parse` at 28 KB +
+`rasterise_line` at 49 KB), `core` 8.7%, `png` 7.5%, and ~6% split between
+`miniz_oxide`/`fdeflate`/`flate2` — two deflate implementations, but both
+are the `png` crate's own choices (fdeflate decode, flate2 encode), not an
+accident to fix. Biggest single dominators: `codec::decode_png` 58 KB
+retained, `text::rasterise_line` 49 KB, `codec::export_png` 41 KB.
+
+What this changes about the phases above:
+
+- **The Phase-1 Rust deletions are hygiene, not bytes.** `fill_rounded_rect`,
+  `fill_triangle_public` and `TileBuffer::is_dirty` do not appear in the
+  binary at all — LTO already eliminated them. The two dead *exports* do
+  ship, but tiny: `oplog_keyframe_rgba` retains 472 B (+58 B describe shim),
+  `resize_pixels_filter` 310 B (+142 B) — their bodies are shared with live
+  code. Delete them for API-surface truth, not for the sentinel band.
+- The only real size levers, if one is ever needed, are structural:
+  the font stack (~97 KB, priced into having a text tool) and the PNG
+  codec pair (~100 KB, priced into engine-side encode/decode per ADR).
+  ~11 KB of `flt2dec::strategy::dragon` float formatting rides in on the
+  JSON-string surfaces (`get_layers`, `describe_image`) — noted, not worth
+  chasing.
