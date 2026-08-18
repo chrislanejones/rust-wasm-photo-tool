@@ -89,21 +89,8 @@ export function PerspectiveSettings({ disabled }: { disabled: boolean }) {
   const ready = api !== null;
   return (
     <div className="space-y-4">
-      {/* showModeRow — DELIBERATE, and the case that set the rule (ADR-035).
-          Distort / Perspective / Skew are not three things you pick up; they
-          are one four-corner quad and three rules about what the OTHER corners
-          do when you drag one. Modes that are facets of a single object belong
-          in the panel, on one sidebar tile; modes that are siblings (Select's
-          six kinds, Paint's four brushes) stay as tiles in SubtoolRow. Three
-          quad tiles read as three tools and invite "which am I in?" — the
-          question that surfaced the v8.43 highlight bug.
-
-          Do not enable this in another panel without deciding, in writing,
-          that its modes are facets rather than siblings — a second panel
-          turning it on unasked is the pre-mortem's named warning sign. */}
       <ToolModeToggle
         modes={PERSPECTIVE_MODES}
-        showModeRow
         columns={3}
         activeMode={mode}
         onModeChange={setMode}

@@ -255,7 +255,7 @@ test.describe("imagehorse-qc v8.41", () => {
     expect(await canvasPng(page), "undo removed the text").toBe(before);
   });
 
-  test("§3 Perspective: one lit tile, three modes in the panel, and it STAYS lit", async ({
+  test("§3 Perspective: all THREE tiles are selectable and each lights on its own", async ({
     page,
   }) => {
     await blockExternalNetwork(page);
@@ -265,42 +265,33 @@ test.describe("imagehorse-qc v8.41", () => {
     await page.getByRole("button", { name: "Edit", exact: true }).first().click();
     await page.waitForTimeout(400);
 
-    const tile = page.getByRole("button", { name: "Perspective", exact: true }).first();
-    await tile.click();
-    await page.waitForTimeout(600);
+    const MODES = ["Perspective", "Distort", "Skew"] as const;
 
-    // THE REGRESSION. v8.43 shipped three sibling sub-tools whose tile never
-    // highlighted: `modeOfTool` in activateSubTool.ts was a hand-written copy
-    // of the mode axis with no `perspective` case, so it returned undefined,
-    // `useActiveSubTool` rejected the stored key on every read, and nothing
-    // lit. aria-pressed is the honest signal — a class check would pass on a
-    // tile that merely looks selected.
-    await expect(tile, "the Perspective tile lights up at all").toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-
-    // One tile, three modes in the panel — Edit → Perspective → the row.
-    for (const mode of ["Perspective", "Distort", "Skew"]) {
-      const modeBtn = page.getByRole("button", { name: mode, exact: true });
-      // The panel row button is the LAST match: the first is the sidebar tile
-      // for "Perspective", and Distort/Skew exist only in the row.
-      await modeBtn.last().click();
-      await page.waitForTimeout(400);
+    // All three are sidebar tiles (ADR-034 decision 1, restored by ADR-036).
+    for (const m of MODES) {
       await expect(
-        tile,
-        `the tile stays lit while the panel is on ${mode}`,
-      ).toHaveAttribute("aria-pressed", "true");
+        page.getByRole("button", { name: m, exact: true }).first(),
+        `${m} is a sidebar tile`,
+      ).toBeVisible();
     }
 
-    // And Distort/Skew must NOT be sidebar tiles any more — the whole point of
-    // collapsing them is that Edit shows one Perspective entry.
-    const sidebar = page.locator("aside, nav").first();
-    for (const gone of ["Distort", "Skew"]) {
-      expect(
-        await sidebar.getByRole("button", { name: gone, exact: true }).count(),
-        `${gone} is no longer a sidebar tile`,
-      ).toBe(0);
+    // THE REGRESSION, and the actual ask: "make sure I can select all of them."
+    // v8.43 shipped these three and NONE of them ever lit — `modeOfTool` in
+    // activateSubTool.ts was a fourth hand-written copy of the sub-mode axis
+    // with no `perspective` case, so it returned undefined, `useActiveSubTool`
+    // rejected the stored key on every read, and the fallback lit live[0]
+    // (Distort) whichever you clicked. So it is not enough to assert the
+    // clicked tile is pressed — assert the OTHER TWO are not, or a build that
+    // lights all three, or always the same one, passes.
+    for (const m of MODES) {
+      await page.getByRole("button", { name: m, exact: true }).first().click();
+      await page.waitForTimeout(500);
+      for (const other of MODES) {
+        await expect(
+          page.getByRole("button", { name: other, exact: true }).first(),
+          `after clicking ${m}, ${other} is ${other === m ? "lit" : "dark"}`,
+        ).toHaveAttribute("aria-pressed", other === m ? "true" : "false");
+      }
     }
   });
 

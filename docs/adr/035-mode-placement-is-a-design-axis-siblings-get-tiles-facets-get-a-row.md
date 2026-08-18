@@ -1,5 +1,5 @@
 # ADR-035: Mode placement is a design axis — sibling modes get sidebar tiles, facets of one object get an in-panel row
-Date: 2026-08-17   Status: accepted
+Date: 2026-08-17   Status: superseded by 036 (same day, v8.46)
 
 Supersedes **ADR-034 decision 1** (Perspective ships as three Edit sub-tools).
 ADR-034's decisions 2–4 — rules in TypeScript, resampling in Rust, text storing

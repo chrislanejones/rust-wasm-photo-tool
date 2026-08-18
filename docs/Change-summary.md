@@ -7719,3 +7719,75 @@ after.
 | playwright | **11/11** |
 
 No Rust, no engine change — 806,967 B, untouched.
+
+## v8.46 Change Summary — 2026-08-17
+
+**The three tiles come back, and this time they light.** ADR-036 supersedes
+ADR-035 entirely and restores ADR-034 decision 1. Chris: *"Actually let's do
+what the ADR says — each three as three separate tiles, but make sure I can
+select all of them."*
+
+### The mistake worth recording
+
+v8.43's complaint was "hitting distort, perspective and skew doesn't show the
+tool icon highlighted". v8.44 read that as a **placement** problem and
+collapsed the three into one tile with an in-panel row; v8.45 wrote the
+collapse up as a design rule and promoted `showModeRow` from migration shim to
+supported layout.
+
+It was never a placement problem. The cause was a stale **fourth copy of the
+sub-mode axis** in `activateSubTool.ts` — a hand-written switch with no
+`perspective` case, so `useActiveSubTool` rejected the stored key on every read
+and the fallback lit `live[0]` (Distort) whichever tile was clicked.
+
+**That copy was deleted in v8.44 as well — so the real fix shipped alongside
+the unnecessary one and the unnecessary one got the credit.** Two releases of
+design reasoning rest on a coincidence of timing. Worth naming precisely,
+because "we changed two things and it worked" is how a wrong explanation
+survives.
+
+### What v8.46 does
+
+| Piece | Change |
+|---|---|
+| `toolGroups.ts` | one tile → **three**, each carrying its own `mode` |
+| `PerspectiveSettings.tsx` | `showModeRow` removed |
+| `tool-mode-toggle.tsx` | prop back to migration shim, with the v8.45 promotion recorded so nobody re-runs it |
+| `activateSubTool.ts` | **unchanged** — the `selectModeOf()` de-duplication stays; it is the actual fix |
+
+The `mode` on each entry is load-bearing: `useActiveSubTool` keeps the stored
+key only while it equals the live mode, and that is what makes the *right* one
+of the three light rather than all or none.
+
+### The test that was worth rewriting
+
+The v8.44 test asserted only that the clicked tile was pressed. Both mutations
+of the design survived it — `subToolForToolMode`'s `?? live[0]` fallback lights
+the sole candidate either way — so it proved less than it appeared to.
+
+The rewrite asserts, for each of the three, that the clicked tile is lit **and
+the other two are dark**. That is what catches the real bug, where one tile
+lights whichever you click. **Mutation-verified:** reintroducing the missing
+`perspective` case fails it with *"after clicking Distort, Perspective is dark
+— expected false, received true"*.
+
+### A defect this release also clears
+
+v8.44 and v8.45 shipped a Perspective tile carrying `mode: "perspective"` under
+a comment stating it carried **no** `mode` "ON PURPOSE". The mutation-test
+backup that restored the file had captured it mid-mutation. It behaved
+correctly in the browser only because of the `?? live[0]` fallback masking the
+difference — the same fallback that made the old test vacuous. Moot now that
+all three tiles carry their modes deliberately, but it was live for two
+releases and the comment was a lie about the code beneath it.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | clean |
+| pnpm lint | **0 errors** (58 warnings) |
+| `pnpm -C app test` | **591 passed** (50 files) |
+| playwright | **11/11**, §3 mutation-verified |
+
+No Rust; engine untouched at 806,967 B.

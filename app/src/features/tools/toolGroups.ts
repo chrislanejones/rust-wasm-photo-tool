@@ -48,6 +48,7 @@ import {
   ImagePlus,
   Lasso,
   Layers,
+  Move3d,
   PackageOpen,
   Palette,
   PenTool,
@@ -61,6 +62,7 @@ import {
   Shapes,
   Smile,
   SquareDashed,
+  SquareDashedBottom,
   SquareMousePointer,
   SquarePen,
   BadgeCheck,
@@ -486,32 +488,52 @@ const editGroup: ToolGroupDefinition = {
     // restructure. Coming Soon carries no `tool` BY TYPE, so nothing downstream
     // had ever resolved a route or palette entry for it and switching it on is
     // purely additive.
-    {
-      // ONE tile, three modes in the panel — ADR-035, which supersedes
-      // ADR-034 decision 1 (three sibling sub-tools). The rule it sets: modes
-      // that are FACETS OF ONE OBJECT live in the panel on a single tile;
-      // sibling modes stay as tiles here. One quad, three drag rules = facets.
+      // THREE TILES, one per drag rule — ADR-034 decision 1, RESTORED by
+      // ADR-036 after v8.44/v8.45 briefly collapsed them into one tile with an
+      // in-panel row. The collapse was a fix for the wrong thing: the reported
+      // symptom ("none of them highlight") was the FOURTH copy of the sub-mode
+      // axis in activateSubTool.ts, not the placement. With that copy deleted
+      // (one `selectModeOf()` now) each tile lights on its own mode, which is
+      // what was wanted all along — and the toolbar keeps one rule for where
+      // modes live: sibling tiles in SubtoolRow, same as Select and Paint.
       //
-      // ⚠️ Carries NO `mode` ON PURPOSE. `useActiveSubTool` keeps the stored
-      // key only while `stored.subTool.mode === undefined || === the live
-      // mode`, so a tile pinned to one mode would go DARK the moment the
-      // panel's row switched to another — which is the same "tile never
-      // lights" symptom this restructure was asked for in the first place.
-      // Mode-less, it resolves through `subToolForToolMode`'s
-      // `mode === undefined` branch for all three and stays lit throughout.
+      // Each entry MUST carry its `mode`: `useActiveSubTool` keeps the stored
+      // key only while `stored.subTool.mode === the live mode`, so the mode is
+      // what makes the RIGHT one of the three light rather than all or none.
+    {
       id: "perspective",
       label: "Perspective",
-      description:
-        "Corner-pin a photo or text: perspective, distort or skew, chosen in the panel",
+      description: "Keystone — drag a corner and its neighbour mirrors it",
       icon: Scan,
       tool: "perspective",
       mode: "perspective",
       cursor: "crosshair",
       keywords: [
         "perspective", "keystone", "trapezoid", "receding", "depth", "warp",
-        "distort", "corner pin", "free transform", "four point", "quad",
-        "skew", "shear", "slant", "italic", "lean", "parallel",
       ],
+    },
+    {
+      id: "distort",
+      label: "Distort",
+      description: "Drag any corner freely — full four-point projective warp",
+      icon: Move3d,
+      tool: "perspective",
+      mode: "distort",
+      cursor: "crosshair",
+      keywords: [
+        "distort", "perspective", "corner pin", "free transform", "warp",
+        "four point", "quad",
+      ],
+    },
+    {
+      id: "skew",
+      label: "Skew",
+      description: "Shear — slide a whole edge along its own axis",
+      icon: SquareDashedBottom,
+      tool: "perspective",
+      mode: "skew",
+      cursor: "crosshair",
+      keywords: ["skew", "shear", "slant", "italic", "lean", "parallel"],
     },
     {
       // Maps to `crop` PLUS the panel's existing Color Picker toggle — which is

@@ -84,6 +84,22 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.46 — 2026-08-17
+
+**Distort, Perspective and Skew are three tools again — and now each one
+lights up when you pick it.** They shipped as three tools, none of which ever
+highlighted, so you couldn't tell which you were in. The next release read that
+as a layout problem and merged them into one tool with buttons in the panel.
+
+It wasn't a layout problem. The code that works out which tool is lit kept its
+own private copy of the list of tool modes, and that copy had never heard of
+Perspective — so it lit the first of the three no matter which you clicked.
+That copy is gone. With it gone, three tools work exactly as intended, so
+they're back, and the rest of the toolbar keeps one consistent rule for where a
+tool's options live.
+
+<details><summary>Older releases</summary>
+
 ### v8.45 — 2026-08-17
 
 **Nothing changes on screen — this one writes down why the toolbar is shaped
@@ -96,8 +112,6 @@ select, the four brushes — stay as their own icons in the sidebar. Modes that
 are **three ways of doing one thing to one object** get a single icon and a row
 of buttons in the panel. Perspective is the second kind: one box, three rules
 about what the other corners do when you drag one.
-
-<details><summary>Older releases</summary>
 
 ### v8.44 — 2026-08-17
 

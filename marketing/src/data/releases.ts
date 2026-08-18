@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.46",
+    date: "2026-08-17",
+    headline: "Three perspective tools again — and each one lights up",
+    entries: [
+      {
+        tag: "ui",
+        text: "Distort, Perspective and Skew are three separate tools in Edit again, and each highlights when you pick it. They shipped as three tools that never highlighted, so you could not tell which you were in; the next release read that as a layout problem and merged them into one tool with buttons in the panel.",
+      },
+      {
+        tag: "fix",
+        text: "It was not a layout problem. The code that works out which tool is lit kept its own private copy of the list of tool modes, and that copy had never heard of Perspective — so it lit the first of the three no matter which you clicked. That copy is gone, three tools work as intended, and the rest of the toolbar keeps one consistent rule for where a tool's options live.",
+      },
+    ],
+  },
+  {
     version: "v8.45",
     date: "2026-08-17",
     headline: "Writing down why the toolbar is shaped the way it is",

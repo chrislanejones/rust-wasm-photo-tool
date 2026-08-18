@@ -1,9 +1,10 @@
 # ADR-034 — Perspective is a projective warp, and text keeps its corners instead of its pixels
 
-**Status: Accepted** 2026-08-17 (v8.43); **decision 1 superseded by
-[ADR-035](035-mode-placement-is-a-design-axis-siblings-get-tiles-facets-get-a-row.md)**
-(v8.45) — Perspective is ONE Edit tile with its three rules in a panel row.
-Decisions 2–4 below stand unchanged. Extends ADR-006 (op log) and ADR-033
+**Status: Accepted** 2026-08-17 (v8.43). Decision 1 was superseded by ADR-035
+(v8.45) and **RESTORED by [ADR-036](036-perspectives-three-drag-rules-stay-three-sibling-tiles.md)**
+(v8.46) — three sibling tiles, as written here. The v8.43 complaint that none of
+them highlighted was a stale fourth copy of the sub-mode axis, not this
+decision. Decisions 2–4 were never in question. Extends ADR-006 (op log) and ADR-033
 (format v4). Fills the `perspective` slot that ADR-023 reserved as Coming Soon.
 Supersedes nothing.
 
