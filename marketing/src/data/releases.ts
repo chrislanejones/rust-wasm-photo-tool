@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.50",
+    date: "2026-08-18",
+    headline: "Five dependency updates land, one is held back",
+    entries: [
+      {
+        tag: "infra",
+        text: "Five updates that had been sitting unmerged since July: Serde, Clerk, two Radix UI packages, and the Node setup step CI uses. Nothing changes on screen — the point is that a queue of pending updates stops being a queue.",
+      },
+      {
+        tag: "infra",
+        text: "A sixth was held back on purpose. Vite 6 to 8 reads like a version bump but replaces the bundler underneath. It passes everything — typecheck, 591 unit tests, 11 end-to-end tests, both builds — and it also grows the app bundle by 126 KB and resolves outside what the React plugin says it supports. That lands on its own, where a problem has one possible cause instead of six.",
+      },
+    ],
+  },
+  {
     version: "v8.49",
     date: "2026-08-18",
     headline: "The last failing build check goes green",

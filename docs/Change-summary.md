@@ -8072,3 +8072,71 @@ a naive pass misfiles as production code.
 
 No engine change: `pkg/stamp_tool_bg.wasm` is 806,967 B, byte-identical to
 v8.47 and v8.48.
+
+## v8.50 Change Summary — 2026-08-18
+
+**Five of the eight open dependency PRs land; vite 6 → 8 is held back on
+evidence.** The queue had been open since 20 July.
+
+### Merged
+
+| PR | Bump | Kind |
+|---|---|---|
+| #15 | `serde` 1.0.228 → 1.0.229 | cargo patch |
+| #16 | `@clerk/clerk-react` 5.61.8 → 5.61.9 | npm patch |
+| #18 | `@radix-ui/react-dialog` ^1.1.15 → ^1.1.20 | npm minor |
+| #20 | `@radix-ui/react-context-menu` ^2.2.16 → ^2.3.4 | npm minor |
+| #14 | `actions/setup-node` v4 → v7 | GitHub Actions, 3 majors |
+
+`#19` (lucide-react) closed itself — v8.47 superseded it, which is the pattern:
+bump the manifest, let dependabot notice.
+
+### Held back — #17, vite 6.4.3 → 8.2.1
+
+The plan called this "two majors but touches only `pnpm-workspace.yaml` catalog
++ lockfile". The catalog line is one character; what it pulls in is not.
+
+| | vite 6 | vite 8 |
+|---|---|---|
+| Bundler | Rollup | **Rolldown** — emits a new `rolldown-runtime` chunk |
+| app `index.js` | 2,774.91 kB (gz 612.53) | **2,900.78 kB** (gz 631.54) — **+125.87 kB, +4.5%** |
+| marketing `index.js` | 534.31 kB | 526.41 kB — −7.90 kB |
+| Lockfile churn | — | **1,170 lines** for this bump alone |
+| `@vitejs/plugin-react` 4.7.0 peer | satisfied | declares `^4 \|\| ^5 \|\| ^6 \|\| ^7` — **8.2.1 is outside it** |
+| Resolved version | — | **8.2.1**, not the 8.1.5 the PR pins |
+
+It was verified, not assumed: tsc clean, **591** vitest, **11/11** playwright,
+app and marketing builds both succeed under it. It works. It is still a bundler
+swap wearing a version bump's clothing, and it landed the same week CI went
+green for the first time in eleven days — so it gets its own release, where a
+regression has one candidate cause instead of six. The catalog patch is kept.
+
+### Cost of what did land
+
+| | Before | After |
+|---|---|---|
+| app `index.js` | 2,774.91 kB | **2,816.35 kB** — +41.44 kB from the two Radix bumps |
+
+Named rather than buried: two minor UI-library bumps cost 41 KB.
+
+### Still open
+
+`#21` (`github/codeql-action` 3 → 4.37.4) and `#22` (`pnpm/action-setup` 4 →
+6.0.9). Their only failing check is **Static guardrails, run 2026-08-03** —
+fifteen days before v8.48 fixed that ratchet. **That is a stale result, not a
+current verdict**, and their branches have not been rebuilt since. They need a
+fresh CI run before anyone can say whether they pass; rebasing them is a change
+to a PR branch, so it is left for a human.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | clean |
+| pnpm lint | **0 errors** (58 warnings) |
+| `pnpm -C app test` | **591 passed** (50 files) |
+| playwright | **11/11** |
+| cargo test `--features tiles,patchmatch` | **364 passed** |
+| clippy featureless / with features | clean / clean |
+| `./scripts/guardrails.sh` | exit 0 |
+| app + marketing builds | both succeed |

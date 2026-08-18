@@ -84,6 +84,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.50 — 2026-08-18
+
+**Five dependency updates that had been sitting unmerged since July.** Serde,
+Clerk, two Radix UI packages, and the Node setup step CI uses. Nothing changes
+on screen; the point is that a queue of pending updates stops being a queue.
+
+A sixth was held back deliberately. Vite 6 → 8 is described as a version bump
+but it replaces the bundler underneath — Rollup gives way to Rolldown. It
+passes everything: typecheck, 591 unit tests, 11 end-to-end tests, both builds.
+It also grows the app bundle by 126 KB and resolves to a version outside what
+the React plugin says it supports. That is a change worth landing on its own,
+where a problem has one possible cause, not six.
+
+<details><summary>Older releases</summary>
+
 ### v8.49 — 2026-08-18
 
 **The last failing build check is green, and the number it guards now means
@@ -108,8 +123,6 @@ Reasoning and the argument against are in
 
 Nothing about the app changes. This is the last of twelve build checks that had
 been failing since 7 August.
-
-<details><summary>Older releases</summary>
 
 ### v8.48 — 2026-08-18
 
