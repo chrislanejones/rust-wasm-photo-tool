@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.49",
+    date: "2026-08-18",
+    headline: "The last failing build check goes green",
+    entries: [
+      {
+        tag: "infra",
+        text: "A check refuses to publish the engine if its size falls outside a band — too small means a build shipped missing half its features, too large means something unexpected got in. It had failed on every release since the perspective tools landed.",
+      },
+      {
+        tag: "infra",
+        text: "Two sizes were on record for the same engine, 6,579 bytes apart, and the gap was not code. The copy built here used Rust 1.92; the copy that actually ships is built by whatever Rust is current on the day, now 1.97. Five compiler releases are worth about 6 KB. Both binaries carry the identical feature set.",
+      },
+      {
+        tag: "fix",
+        text: "The floor moved UP, not down. It sat at 700,000 bytes while a stripped-down build had quietly grown to 723,755 — so the check written to catch a broken build would have waved one straight through. Nothing about the app changes.",
+      },
+    ],
+  },
+  {
     version: "v8.48",
     date: "2026-08-18",
     headline: "A build check that was failing on tests, and one failing on English",

@@ -10,16 +10,23 @@
 # and looking inside it would have caught it.
 #
 # Checks, against whatever is live right now:
-#   1. the wasm is in a sane size band (a featureless build is ~680KB, a real
-#      one ~750-765KB; the band spans local vs Netlify toolchain differences)
+#   1. the wasm is in a sane size band. ⚠️ The numbers here rot — re-measure,
+#      never trust the comment. As of 2026-08-18 (ADR-037): featureless 723,755 B
+#      local, featured 806,967 B local, featured 813,546 B LIVE. That last gap is
+#      6,579 B of rustc, not of code: nothing pins the toolchain (netlify.toml
+#      curls rustup `--default-toolchain stable`, CI uses dtolnay@stable), so the
+#      live binary is built by whatever stable is on the day — 1.97.1 against a
+#      local 1.92.0. The band absorbs that; a size measured locally is NOT the
+#      shipped size. The floor had already gone vacuous once: it sat at 700,000
+#      while a featureless build had grown to 723,755 and sailed through it.
 #   2. the JS glue actually exports the engine surface we think shipped
 #
 # Runnable by hand — that is the point:  ./scripts/deploy-sentinel.sh
 set -uo pipefail
 
 SITE="${SENTINEL_SITE:-https://rust-wasm-photo-tool.netlify.app}"
-MIN_WASM="${SENTINEL_MIN_WASM:-700000}"
-MAX_WASM="${SENTINEL_MAX_WASM:-800000}"
+MIN_WASM="${SENTINEL_MIN_WASM:-780000}"
+MAX_WASM="${SENTINEL_MAX_WASM:-850000}"
 # Symbols that only exist when the engine is built --features tiles,patchmatch.
 # oplog_* is the tiles/op-log surface; remove_object is PatchMatch; rect_select
 # is the marquee. Miss any one and prod is not running what we shipped.

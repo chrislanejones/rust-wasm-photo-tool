@@ -7969,3 +7969,106 @@ Deploy sentinel: live wasm **813,546 B against an 800,000 B ceiling**. The
 ceiling predates the perspective tools, which added 16,796 B deliberately. That
 is a decision about the size budget — EXIF and AVIF are both queued against the
 same headroom — not a cleanup, so it is untouched here.
+
+## v8.49 Change Summary — 2026-08-18
+
+**The sentinel band moves to 780,000–850,000 B, and what it bounds turns out to
+be a toolchain-dependent number.** Deploy sentinel was the last of twelve CI
+jobs still failing; it had failed on every release since v8.43. ADR-037 (draft)
+carries the decision and the argument against it.
+
+### The 6,579 B gap was rustc, not code
+
+Two sizes were in the record and they are the same build measured under
+different compilers:
+
+| Build | rustc | Bytes |
+|---|---|---|
+| Local `build:wasm` | **1.92.0** (`ded5c06cf`, 2025-12-08) | 806,967 |
+| Live / CI, `stable` | **1.97.1** (`8bab26f4f`, 2026-07-14) | **813,546** |
+
+Confirmed by reading the `/rustc/<hash>/` source paths embedded in both
+binaries and matching them against `rustup check`, which names exactly that
+pair. Both carry the identical engine surface — `perspective_warp` 1, `oplog_`
+18, `remove_object` 1, `rect_select` 1 — so it is five compiler releases, not a
+feature difference or a stale artifact.
+
+**Nothing pins the toolchain.** `netlify.toml` curls rustup with
+`--default-toolchain stable`, CI uses `dtolnay/rust-toolchain@stable`, and
+there is no `rust-toolchain.toml`. The shipped size therefore moves when Rust
+releases, with no commit involved. Every wasm figure quoted from a local build
+— including this file's own history — is a local number, not a shipped one.
+
+### The floor was already vacuous
+
+| Build (local, rustc 1.92.0) | Bytes | Against the old 700,000 floor |
+|---|---|---|
+| Featureless | **723,755** | **+23,755 — passed** |
+| Featured (`tiles,patchmatch`) | 806,967 | passed |
+
+The floor exists to catch the v7.36–v7.45 bug, where production shipped a
+featureless wasm for five weeks. A featureless build has since grown past the
+floor, so the size check would have waved that exact failure through. The
+symbol check (`oplog_`, `remove_object`, `rect_select`) still catches it — the
+floor had quietly stopped being defence in depth.
+
+### The new band
+
+| Edge | Was | Now | Margin against live 813,546 |
+|---|---|---|---|
+| Floor | 700,000 | **780,000** | 33,546 B below |
+| Ceiling | 800,000 | **850,000** | 36,454 B above |
+
+The ceiling is sized for toolchain drift, not just features: a rustc release
+alone moved this number 6,579 B. 820,000 was rejected at ~6 KB of headroom —
+hit by the next feature or the next compiler, then raised again reflexively.
+
+### Mutation-tested — both edges, and the boundaries
+
+| Band | Expect | Result |
+|---|---|---|
+| 780,000–850,000 (shipped) | PASS | **PASS** |
+| ceiling 813,545 (one under live) | FAIL ceiling | **FAIL** |
+| ceiling 813,546 (exactly live) | PASS | **PASS** |
+| floor 813,547 (one over live) | FAIL floor | **FAIL** |
+| floor 813,546 (exactly live) | PASS | **PASS** |
+| floor 830,000 (a shrunk build) | FAIL floor | **FAIL** |
+
+Run against the live site through `SENTINEL_MIN_WASM` / `SENTINEL_MAX_WASM`, so
+the shipped file was never edited to fake a result.
+
+### What the raise does not buy
+
+Neither `ravif` (PARKING_LOT's AVIF option 2) nor `wgpu` (ADR-030) fits under
+850,000 either. The band was never a budget those could have been funded from;
+raising it does not create room, it stops pretending there was room. Both need
+their own size work regardless of where the band sits.
+
+**Pinning the toolchain is filed, not dismissed.** It fixes the measurement
+rather than the bound, and it is a larger decision than the band — it changes
+what every build in the project compiles with. Holding CI red while deciding it
+is the wrong trade.
+
+### Also
+
+`scripts/guardrails.sh` gains the last of the v8.48 annotation hazards:
+`src/paint.rs` hides a second test module gated
+`#[cfg(all(test, feature = "patchmatch"))]` mid-file, which a scan for the
+literal `cfg(test)` does not match. With `ops_engine_parity.rs` that is 7 lines
+a naive pass misfiles as production code.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `./scripts/deploy-sentinel.sh` | **PASS** against the live site |
+| `./scripts/guardrails.sh` | exit 0, all six rules at baseline |
+| cargo test `--features tiles,patchmatch` | **364 passed** |
+| clippy featureless / with features | clean / clean |
+| `pnpm -C app exec tsc --noEmit` | clean |
+| pnpm lint | **0 errors** (58 warnings) |
+| `pnpm -C app test` | **591 passed** (50 files) |
+| app + marketing builds | both succeed |
+
+No engine change: `pkg/stamp_tool_bg.wasm` is 806,967 B, byte-identical to
+v8.47 and v8.48.

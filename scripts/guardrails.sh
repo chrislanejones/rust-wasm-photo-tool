@@ -145,6 +145,12 @@ n_rust=$(rg -n '\.unwrap\(\)|\.expect\(|panic!|unsafe ' src -g '*.rs' \
 # lib.rs — easy to miss, it carries no inner `cfg(test)`) took
 # `// allow: rust-panic`. Count went 108 -> 47.
 #
+# ⚠️ `src/paint.rs` hides the same shape MID-FILE: a second test module gated
+# `#[cfg(all(test, feature = "patchmatch"))]` at line ~1100, which a scan for
+# the literal string `cfg(test)` does not match. Between it and
+# ops_engine_parity that is 7 lines a naive pass misfiles as production code.
+# Match `cfg(all(test` too, and check the `mod` declaration, not just the file.
+#
 # What 47 now means: 45 genuine production sites — 35 of them SIMD `unsafe`,
 # which is expected and unchanged since v7.72 — plus exactly 2 test panics that
 # CANNOT carry a same-line annotation:

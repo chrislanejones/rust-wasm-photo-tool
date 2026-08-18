@@ -84,6 +84,33 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.49 — 2026-08-18
+
+**The last failing build check is green, and the number it guards now means
+something.** A check refuses to publish the engine if its size falls outside a
+band — too small means a build shipped missing half its features, too large
+means something unexpected got in. It had failed on every release since the
+perspective tools landed and added 16,788 bytes.
+
+Two sizes were on record for the same engine, 6,579 bytes apart. That gap was
+not code. The copy built on this machine used Rust 1.92; the copy that actually
+ships is built by whatever Rust is current on the day, which is now 1.97. Five
+compiler releases are worth about 6 KB. Both binaries carry the identical
+feature set — the difference is who compiled it, not what was compiled. A size
+measured locally has never been the size that ships, and now that is written
+down instead of assumed.
+
+The band moves to **780,000–850,000**. The floor went **up**, not down: it had
+been sitting at 700,000 while a stripped-down build quietly grew to 723,755, so
+the check written to catch a broken build would have waved one straight through.
+Reasoning and the argument against are in
+[ADR-037](docs/adr/037-the-wasm-sentinel-band-moves-and-bounds-a-toolchain-dependent-size.md).
+
+Nothing about the app changes. This is the last of twelve build checks that had
+been failing since 7 August.
+
+<details><summary>Older releases</summary>
+
 ### v8.48 — 2026-08-18
 
 **A build check that had been failing for eleven days is green again — and it
@@ -110,8 +137,6 @@ anywhere in the app. Comments are no longer counted as code.
 One check is still red: the engine binary is 813,546 bytes against an 800,000
 ceiling set before the perspective tools existed. That one is a real decision
 about the size budget, not a cleanup, so it is left alone here.
-
-<details><summary>Older releases</summary>
 
 ### v8.47 — 2026-08-18
 
