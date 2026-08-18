@@ -49,16 +49,16 @@ export const PERSPECTIVE_MODES: readonly (ToolMode<PerspectiveMode> & {
   info: string;
 })[] = [
   {
-    id: "distort",
-    label: "Distort",
-    icon: Move3d,
-    info: "Drag any corner anywhere. The other three stay put — full freedom, and the only mode that reaches shapes the other two can't.",
-  },
-  {
     id: "perspective",
     label: "Perspective",
     icon: Scan,
     info: "Drag a corner and its neighbour mirrors it, so the edge narrows about its centre. This is the keystone — the gesture that makes a flat thing sit on a receding surface.",
+  },
+  {
+    id: "distort",
+    label: "Distort",
+    icon: Move3d,
+    info: "Drag any corner anywhere. The other three stay put — full freedom, and the only mode that reaches shapes the other two can't.",
   },
   {
     id: "skew",
@@ -89,8 +89,17 @@ export function PerspectiveSettings({ disabled }: { disabled: boolean }) {
   const ready = api !== null;
   return (
     <div className="space-y-4">
+      {/* showModeRow: Perspective is the ONE panel that draws its own mode
+          row. Chris asked for Edit → Perspective → perspective | distort |
+          skew (2026-08-17), i.e. one sidebar tile and the three rules chosen
+          here. That is a deliberate divergence from Paint/Select/Stamp, whose
+          modes are sibling tiles in SubtoolRow — the prop's own note warns
+          against exactly this drift, so it is recorded in ADR-034 rather than
+          left as a surprise. Do not copy it to another panel without the
+          same explicit ask. */}
       <ToolModeToggle
         modes={PERSPECTIVE_MODES}
+        showModeRow
         columns={3}
         activeMode={mode}
         onModeChange={setMode}

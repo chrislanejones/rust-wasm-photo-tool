@@ -255,6 +255,55 @@ test.describe("imagehorse-qc v8.41", () => {
     expect(await canvasPng(page), "undo removed the text").toBe(before);
   });
 
+  test("§3 Perspective: one lit tile, three modes in the panel, and it STAYS lit", async ({
+    page,
+  }) => {
+    await blockExternalNetwork(page);
+    await page.goto("/");
+    await importFixture(page);
+
+    await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+    await page.waitForTimeout(400);
+
+    const tile = page.getByRole("button", { name: "Perspective", exact: true }).first();
+    await tile.click();
+    await page.waitForTimeout(600);
+
+    // THE REGRESSION. v8.43 shipped three sibling sub-tools whose tile never
+    // highlighted: `modeOfTool` in activateSubTool.ts was a hand-written copy
+    // of the mode axis with no `perspective` case, so it returned undefined,
+    // `useActiveSubTool` rejected the stored key on every read, and nothing
+    // lit. aria-pressed is the honest signal — a class check would pass on a
+    // tile that merely looks selected.
+    await expect(tile, "the Perspective tile lights up at all").toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    // One tile, three modes in the panel — Edit → Perspective → the row.
+    for (const mode of ["Perspective", "Distort", "Skew"]) {
+      const modeBtn = page.getByRole("button", { name: mode, exact: true });
+      // The panel row button is the LAST match: the first is the sidebar tile
+      // for "Perspective", and Distort/Skew exist only in the row.
+      await modeBtn.last().click();
+      await page.waitForTimeout(400);
+      await expect(
+        tile,
+        `the tile stays lit while the panel is on ${mode}`,
+      ).toHaveAttribute("aria-pressed", "true");
+    }
+
+    // And Distort/Skew must NOT be sidebar tiles any more — the whole point of
+    // collapsing them is that Edit shows one Perspective entry.
+    const sidebar = page.locator("aside, nav").first();
+    for (const gone of ["Distort", "Skew"]) {
+      expect(
+        await sidebar.getByRole("button", { name: gone, exact: true }).count(),
+        `${gone} is no longer a sidebar tile`,
+      ).toBe(0);
+    }
+  });
+
   test("§4 Guides: the colour is a preference and survives a reload", async ({ page }) => {
     await blockExternalNetwork(page);
     await page.goto("/");

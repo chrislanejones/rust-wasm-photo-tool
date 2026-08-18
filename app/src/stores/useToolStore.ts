@@ -47,7 +47,10 @@ export type TextMode = (typeof TEXT_MODES)[number];
 /** Perspective tool sub-modes (v8.42). Not three tools — ONE quad and three
  *  rules about what dragging a handle does to the other corners. See
  *  `lib/perspective.ts` `dragCorner` for the rules themselves. */
-export const PERSPECTIVE_MODES = ["distort", "perspective", "skew"] as const;
+// Order IS the panel button order (Chris, 2026-08-17: "perspective | distort
+// | skew"). Renaming an id would break saved routes; reordering is free —
+// nothing serialises the index, the engine stores a quad, not a mode.
+export const PERSPECTIVE_MODES = ["perspective", "distort", "skew"] as const;
 export type PerspectiveMode = (typeof PERSPECTIVE_MODES)[number];
 /** Batch tool (legacy id `emoji`) sub-modes: bulk logo stamp, bulk text, bulk
  *  rename, and AI Rename (names every photo from what the engine sees in it).
@@ -242,7 +245,7 @@ export const useToolStore = create<ToolState>()(
       shapesMode: "shapes",
       eraserMode: "brush",
       textMode: "text",
-      perspectiveMode: "distort",
+      perspectiveMode: "perspective",
       batchMode: "logo",
       // Same defaults the AppShell useState pair had, so a user with no
       // persisted blob (or one written before #14) sees no change at all.

@@ -207,6 +207,28 @@ export function useActiveMode(tool: ToolType): string | undefined {
 /** Switch a tool's sub-mode. No-op when the id isn't one of that tool's modes
  *  (a hand-typed URL is untrusted input — it must not poke a bogus value into
  *  a typed store union). Returns whether it took. */
+/**
+ * Read a tool's active sub-mode out of a store snapshot.
+ *
+ * Exported because `activateSubTool.ts` used to carry its OWN hand-written
+ * switch over the same axis ("mirrors MODE_ACCESS", per its comment) — a
+ * fourth copy after MODE_ACCESS, LEGACY_SUBMODES and routeState's. It went
+ * stale the moment perspective was added: the switch had no `perspective`
+ * case, fell through to `undefined`, and `useActiveSubTool` therefore rejected
+ * the stored key on every read and lit nothing. Three tiles that never
+ * highlighted — the exact failure MODE_ACCESS's own comment warns about, from
+ * the copy nobody thought to update.
+ *
+ * `select` is a plain selector, so this is safe inside a React selector and
+ * there is no reason for a second list to exist. Do not reintroduce one.
+ */
+export function selectModeOf(
+  s: ToolState,
+  tool: ToolType,
+): string | undefined {
+  return MODE_ACCESS[tool]?.select(s);
+}
+
 export function setModeOf(tool: ToolType, modeId: string): boolean {
   if (!modesFor(tool).some((m) => m.id === modeId)) return false;
   const access = MODE_ACCESS[tool];

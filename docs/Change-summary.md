@@ -7578,3 +7578,87 @@ unreachable.
   a tool missing from it fails silently — that is what lit Distort for
   `#/edit/perspective`. The round-trip test caught it; the duplication itself
   is still there.
+
+## v8.44 Change Summary — 2026-08-17
+
+**Perspective becomes one tool with a mode row, and the tile lights up.** Two
+things fixed together, because they turned out to be the same complaint: Chris,
+using v8.43 within the hour — *"Hitting distort, perspective, and skew doesn't
+show the tool icon highlighted"* — then *"Edit → perspective → perspective |
+distort | skew"*.
+
+### The bug: a fourth copy of the sub-mode axis
+
+None of the three tiles ever highlighted. `activateSubTool.ts` carried its own
+hand-written switch over the sub-mode axis, whose comment claimed it *"mirrors
+MODE_ACCESS in toolModes.ts"* and justified the duplication by needing to work
+inside a React selector. It had no `perspective` case, so it returned
+`undefined`; `useActiveSubTool` then rejected the stored key on every read and
+fell through to `subToolForToolMode(tool, undefined)`, which found no mode-less
+candidate among the three and returned `live[0]` — **Distort lit no matter
+which of the three you clicked.**
+
+That justification never held: `MODE_ACCESS.select` is already a plain
+selector. The switch is deleted and delegates to a new `selectModeOf()`; there
+is now ONE axis instead of four (`MODE_ACCESS`, `LEGACY_SUBMODES`,
+`routeState`'s, and this one).
+
+`MODE_ACCESS`'s own comment predicts the failure verbatim — *"Without it the
+SubtoolRow renders three tiles that never light."* The row it warns about was
+present and correct. The copy nobody thought to update was the one that broke
+it. Fourth in the run of gates and mirrors that only report on the copy you
+happen to look at.
+
+### The restructure
+
+| Piece | Change |
+|---|---|
+| `toolGroups.ts` | three Edit entries → **one**, carrying no `mode` |
+| `PerspectiveSettings.tsx` | `showModeRow` on, `columns={3}` |
+| `useToolStore.ts` | modes reordered to `perspective, distort, skew`; default `perspective` |
+| `activateSubTool.ts` | private mode switch deleted |
+
+**The single tile carries no `mode` deliberately.** `useActiveSubTool` keeps a
+stored key only while `stored.subTool.mode === undefined || === the live mode`,
+so a tile pinned to one mode goes dark the instant the panel row picks another
+— reproducing the exact symptom being fixed.
+
+The command palette needed no change: it derives from the registry, so three
+entries became one and the three modes stayed reachable as jump-to-sub-mode
+entries for free. Derived-or-nothing paying for itself.
+
+### The cost, accepted rather than hidden
+
+`showModeRow` is documented as a migration shim, and its note says plainly not
+to reach for it to keep one panel's old look, because two panels disagreeing
+about where their sub-modes live is the drift the toolbar arc removed.
+Perspective is now that one panel; the other seven keep their modes as sibling
+tiles. Recorded in ADR-034's Superseded section rather than left as a surprise.
+
+### Pinned, and control-verified
+
+`e2e/qc-v841.spec.ts` §3 asserts `aria-pressed="true"` on the Perspective tile,
+that it STAYS lit while the row cycles all three modes, and that Distort and
+Skew are gone from the sidebar.
+
+**Checked against the shipped v8.43 code, not assumed:** that build fails the
+first assertion with `aria-pressed="false"` — the reported symptom reproduced
+in the harness.
+
+⚠️ Recorded honestly: the test does **not** distinguish mode-less from
+mode-pinned. `subToolForToolMode`'s `?? live[0]` fallback lights the sole
+candidate either way, and both mutations survived. Only the real three-tile
+shape is killed. A future reader must not mistake it for protection of the
+`mode`-less choice.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | clean |
+| pnpm lint | **0 errors** (58 warnings) |
+| `pnpm -C app test` | **591 passed** (50 files) |
+| playwright | **11/11** |
+| production build | OK |
+
+No Rust changed, so the engine is untouched at 806,967 B.

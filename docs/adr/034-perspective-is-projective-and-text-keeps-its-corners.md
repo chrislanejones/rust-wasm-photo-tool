@@ -1,6 +1,8 @@
 # ADR-034 — Perspective is a projective warp, and text keeps its corners instead of its pixels
 
-**Status: Accepted** 2026-08-17 (v8.43). Extends ADR-006 (op log) and ADR-033
+**Status: Accepted** 2026-08-17 (v8.43), **decision 1 SUPERSEDED the same day
+by v8.44** — see *Superseded: the three sub-tools became one* at the bottom.
+Extends ADR-006 (op log) and ADR-033
 (format v4). Fills the `perspective` slot that ADR-023 reserved as Coming Soon.
 Supersedes nothing.
 
@@ -169,3 +171,75 @@ normalised corners solve.
 
 **A `showModeRow` in-panel mode row.** See decision 1 — it works, and it
 disagrees with every other multi-mode tool about where sub-modes live.
+
+
+---
+
+## Superseded: the three sub-tools became one (v8.44, 2026-08-17)
+
+**Decision 1 above is reversed.** Distort / Perspective / Skew are no longer
+three sibling entries in the Edit group. Edit now carries ONE `perspective`
+sub-tool, and the three drag rules are chosen from a button row inside its
+panel: **Edit → Perspective → perspective | distort | skew**. Chris's call,
+the same day it shipped, after using it.
+
+Decisions 2, 3 and 4 are untouched — the rules still live in TypeScript, Rust
+still owns the resampler, and text still stores normalised corners.
+
+### Why it was reversed
+
+The shipped shape had a bug that made it read as broken. **None of the three
+tiles ever highlighted.** `activateSubTool.ts` carried its own hand-written
+switch over the sub-mode axis — a FOURTH copy, after `MODE_ACCESS`,
+`LEGACY_SUBMODES` and `routeState`'s — whose comment claimed it "mirrors
+MODE_ACCESS" and which had no `perspective` case. It returned `undefined`, so
+`useActiveSubTool` rejected the stored key on every read and fell through to
+`subToolForToolMode(tool, undefined)`, which found no mode-less candidate among
+the three and returned `live[0]` — Distort — no matter which you clicked.
+
+This is the same defect class the ADR already documents twice, and the third
+instance in one feature: `MODE_ACCESS`'s own comment predicts it verbatim —
+*"Without it the SubtoolRow renders three tiles that never light."* The row it
+warns about was present and correct. The copy nobody thought to update was the
+one that broke it.
+
+### What changed
+
+| Piece | Change |
+|---|---|
+| `activateSubTool.ts` | its private mode switch DELETED; delegates to a new `selectModeOf()` exported from `toolModes.ts`. One axis, not four |
+| `toolGroups.ts` | three Edit entries → one, carrying **no `mode`** |
+| `PerspectiveSettings.tsx` | `showModeRow` on, `columns={3}` |
+| `useToolStore.ts` | `PERSPECTIVE_MODES` reordered to `perspective, distort, skew`; default `perspective` |
+
+**The single tile carries no `mode` on purpose.** `useActiveSubTool` keeps a
+stored key only while `stored.subTool.mode === undefined || === the live mode`,
+so a tile pinned to one mode goes dark the moment the panel's row selects
+another — reproducing the very symptom this reversal was asked to fix.
+
+### The honest cost
+
+`showModeRow` is documented in `tool-mode-toggle.tsx` as a migration shim whose
+own note says: *"Do NOT reach for it to 'keep the old look' in one panel: two
+panels disagreeing about where their sub-modes live is exactly the drift this
+arc removed."* Perspective is now that one panel. Paint, Select, Stamp, Shapes,
+Text, AI and Batch keep their modes as sibling tiles in `SubtoolRow`.
+
+That inconsistency is real and is accepted deliberately rather than hidden: the
+Edit group is the one group whose members are mostly single-mode tools sharing
+a tool id, so three near-identical quad tiles read as three tools rather than
+three rules about one box. The prop stays a shim — do not reach for it in a
+second panel without an explicit ask.
+
+### Pinned
+
+`e2e/qc-v841.spec.ts` §3 asserts `aria-pressed="true"` on the Perspective tile
+and that it STAYS lit while the panel row cycles all three modes, plus that
+Distort and Skew are gone from the sidebar. **Control-verified against the
+shipped v8.43 code**: that build fails the first assertion with
+`aria-pressed="false"` — the reported symptom, reproduced.
+
+⚠️ The test does NOT distinguish mode-less from mode-pinned on its own —
+`subToolForToolMode`'s `?? live[0]` fallback lights the only candidate either
+way. Both mutations survived; only the real three-tile shape is killed. Do not
+read it as protecting the `mode`-less choice.

@@ -24,6 +24,21 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.44",
+    date: "2026-08-17",
+    headline: "Perspective is one tool again, and its icon lights up",
+    entries: [
+      {
+        tag: "ui",
+        text: "Yesterday's release put Distort, Perspective and Skew in Edit as three separate tools. Edit now has a single Perspective tool, and the three rules are buttons inside its panel: Edit → Perspective → perspective | distort | skew.",
+      },
+      {
+        tag: "fix",
+        text: "None of the three tiles ever highlighted when you picked one, so there was no way to tell which you were in. The code that works out which tool is lit kept its own private copy of the list of tool modes — a fourth copy — and that copy had never heard of perspective, so it lit the first one in the group no matter which you clicked. The copy is gone; there is one list now.",
+      },
+    ],
+  },
+  {
     version: "v8.43",
     date: "2026-08-17",
     headline: "Perspective — put a photo, or your words, onto a surface that recedes",

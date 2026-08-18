@@ -13,7 +13,7 @@
 import { useCallback } from "react";
 import { useToolStore } from "@/stores/useToolStore";
 import type { ToolState } from "@/stores/useToolStore";
-import { setModeOf } from "./toolModes";
+import { setModeOf, selectModeOf } from "./toolModes";
 import {
   ALL_SUB_TOOLS,
   defaultSubToolOf,
@@ -24,31 +24,16 @@ import {
   type ToolGroupDefinition,
 } from "./toolGroups";
 
-/** The mode field a tool's sub-mode lives in, for the read-back path. Mirrors
- *  MODE_ACCESS in toolModes.ts; kept as a selector list rather than re-exported
- *  from there because this one has to be usable inside a React selector. */
+/** The mode field a tool's sub-mode lives in, for the read-back path.
+ *
+ *  WAS a hand-written switch that "mirrors MODE_ACCESS in toolModes.ts",
+ *  justified by needing to be usable inside a React selector. MODE_ACCESS's
+ *  `select` is a plain selector, so that justification never held — and the
+ *  copy went stale the moment perspective was added (no `perspective` case →
+ *  `undefined` → `useActiveSubTool` rejected the stored key on every read →
+ *  the Perspective tiles never lit). Delegates now; there is ONE axis. */
 function modeOfTool(s: ToolState): string | undefined {
-  switch (s.activeTool) {
-    case "brush":
-      return s.brushMode;
-    case "compress":
-      return s.resizeMode;
-    case "select":
-      return s.selectionKind;
-    case "stamp":
-      return s.stampSubMode;
-    case "shapes":
-      return s.shapesMode;
-    case "ai":
-      return s.eraserMode;
-    case "text":
-      return s.textMode;
-    case "emoji":
-      return s.batchMode;
-    default:
-      // Single-mode tools: `effects`, `crop`, `arrow`.
-      return undefined;
-  }
+  return selectModeOf(s, s.activeTool);
 }
 
 /**

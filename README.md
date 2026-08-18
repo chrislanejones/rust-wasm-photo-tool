@@ -84,6 +84,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.44 — 2026-08-17
+
+**Perspective is one tool again, and its icon lights up.** Yesterday's release
+put Distort, Perspective and Skew in the Edit group as three separate tools,
+and none of the three ever highlighted when you picked it — so there was no way
+to tell which one you were in. Both are fixed together: Edit now has a single
+**Perspective** tool, and the three rules are buttons inside its panel.
+
+**Edit → Perspective → perspective | distort | skew.**
+
+The tile lights up when you pick it and stays lit while you switch between the
+three, which is what it should have done the first time.
+
+<details><summary>Older releases</summary>
+
 ### v8.43 — 2026-08-17
 
 **Perspective — put a photo, or your words, onto a surface that recedes.**
@@ -111,8 +126,6 @@ Shapes are not warped yet. That is written down rather than half-built.
 
 Older saved work keeps working — the third format change in a week, and again
 built so that files written by every previous version still load.
-
-<details><summary>Older releases</summary>
 
 ### v8.42 — 2026-08-17
 
