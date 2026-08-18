@@ -84,6 +84,29 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.52 — 2026-08-18
+
+**The build tool goes from Vite 6 to Vite 8, which quietly means a different
+bundler underneath.** Vite 8 ships Rolldown in place of Rollup — the piece that
+takes several hundred source files and produces the handful of files a browser
+downloads. Nothing about the app changes, but everything about how it is
+assembled does.
+
+It costs **126 KB** on the main bundle, about 19 KB after compression. That is
+a real number and it is not obviously worth it; it is here because the
+alternative was staying on a version that will keep drifting further from the
+ecosystem, and every month of waiting makes the jump larger, not smaller.
+
+The React plugin moves with it, 4 to 6. That pairing matters: version 4 states
+it supports Vite 4 through 7, so running it under 8 worked but was outside what
+its author promised. Version 6 states Vite 8. A build that works while ignoring
+a stated incompatibility is a bug waiting for a reason.
+
+Verified rather than assumed: typecheck clean, 591 unit tests, 11 end-to-end
+tests, both sites build. Reverting is one line.
+
+<details><summary>Older releases</summary>
+
 ### v8.51 — 2026-08-18
 
 **The last two updates in the queue, and the reason they looked broken.**
@@ -96,8 +119,6 @@ failing for every branch including the main one. Two releases ago that was
 fixed, but their branches were never rebuilt, so the red mark stayed on screen
 describing a world that no longer existed. **A failing check is only evidence if
 it ran recently enough to mean anything.**
-
-<details><summary>Older releases</summary>
 
 ### v8.50 — 2026-08-18
 

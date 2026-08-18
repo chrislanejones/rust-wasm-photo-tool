@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.52",
+    date: "2026-08-18",
+    headline: "The build tool jumps two majors, and swaps its bundler",
+    entries: [
+      {
+        tag: "infra",
+        text: "Vite 6 to Vite 8, which quietly means a different bundler underneath — Rolldown in place of Rollup. That is the piece that takes several hundred source files and produces the handful a browser downloads. Nothing about the app changes; everything about how it is assembled does.",
+      },
+      {
+        tag: "perf",
+        text: "It costs 126 KB on the main bundle, about 19 KB after compression. That is not defended as a win. It is the price of not drifting further from a fast-moving ecosystem, and the gap only grows with waiting.",
+      },
+      {
+        tag: "fix",
+        text: "The React plugin moves with it. The old version said it supported Vite 4 through 7, so running it under 8 worked but was outside what its author promised — and a build that works while ignoring a stated incompatibility is a bug waiting for a reason. With that, the dependency queue is empty: eight updates, six of which were fine the whole time.",
+      },
+    ],
+  },
+  {
     version: "v8.51",
     date: "2026-08-18",
     headline: "The last two updates, and why they looked broken",

@@ -8183,3 +8183,67 @@ All four workflow files re-parsed as YAML after the edit.
 | #20 | merged v8.50, self-closes |
 | #21, #22 | **this release** |
 | #17 vite 6 → 8 | **still held** — see v8.50; bundler swap, +125.87 kB, its own decision |
+
+## v8.52 Change Summary — 2026-08-18
+
+**Vite 6 → 8, which is a bundler swap wearing a version bump's clothing.**
+Dependabot #17, held back in v8.50 pending a decision, taken deliberately.
+Rolldown replaces Rollup.
+
+### What it costs
+
+| | vite 6 | vite 8 |
+|---|---|---|
+| app `index.js` | 2,774.91 kB (gz 612.53) | **2,900.78 kB** (gz 631.54) |
+| Δ | — | **+125.87 kB, +19.01 kB gzipped** |
+| marketing `index.js` | 534.31 kB | 527.76 kB — **−6.55 kB** |
+| New output | — | a `rolldown-runtime` chunk, 1.70 kB |
+| Lockfile churn | — | ~1,170 lines |
+
+The 126 KB is not defended as a win. It is the price of not drifting further
+from a fast-moving ecosystem, and the gap only grows with waiting — the same
+queue that produced this PR had `actions/setup-node` three majors behind.
+
+### The peer mismatch, fixed rather than tolerated
+
+`@vitejs/plugin-react@4.7.0` declares `vite ^4 || ^5 || ^6 || ^7`. Under vite
+8.2.1 it worked and pnpm warned. **A build that works while ignoring a stated
+incompatibility is a bug waiting for a reason**, so the plugin moves 4 → 6:
+
+| Package | Was | Now | Declared peer |
+|---|---|---|---|
+| `vite` (catalog) | ^6.0.5 → 6.4.3 | ^8.1.5 → **8.2.1** | — |
+| `@vitejs/plugin-react` (catalog) | ^4.3.4 → 4.7.0 | ^6.0.5 → **6.0.5** | **`vite ^8.0.0`** |
+
+After pairing them the only remaining peer warning is the pre-existing
+`@emoji-mart/react` / React 19 one.
+
+⚠️ **The catalog resolves to 8.2.1, not the 8.1.5 the PR pinned.** Every gate
+below ran against 8.2.1.
+
+### No ADR
+
+The `adr` skill excludes "anything reversible in an hour". Reverting is one
+line in `pnpm-workspace.yaml` plus an install, so this is recorded here rather
+than as a decision record. If Rolldown turns out to have teeth, the ADR gets
+written then — with evidence instead of speculation.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | clean |
+| pnpm lint | **0 errors** (58 warnings) |
+| `pnpm -C app test` | **591 passed** (50 files) |
+| playwright | **11/11** |
+| app + marketing builds | both succeed under Rolldown |
+| `./scripts/guardrails.sh` | exit 0 |
+
+No Rust, no engine change — wasm 806,967 B, untouched.
+
+### The dependency queue is now empty
+
+Eight PRs, opened 20 July through 3 August, all resolved in one day across
+v8.47 and v8.50–v8.52. **Six of the eight were fine the whole time.** What
+actually blocked the queue was an unrelated red check that nobody had read for
+eleven days — see v8.48 and v8.51.
