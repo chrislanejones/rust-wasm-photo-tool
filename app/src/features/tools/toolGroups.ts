@@ -487,9 +487,10 @@ const editGroup: ToolGroupDefinition = {
     // had ever resolved a route or palette entry for it and switching it on is
     // purely additive.
     {
-      // ONE tile, three modes in the panel — Chris's call 2026-08-17, and it
-      // reverses ADR-034's decision 1 (which shipped them as three sibling
-      // sub-tools). See the ADR's Superseded note.
+      // ONE tile, three modes in the panel — ADR-035, which supersedes
+      // ADR-034 decision 1 (three sibling sub-tools). The rule it sets: modes
+      // that are FACETS OF ONE OBJECT live in the panel on a single tile;
+      // sibling modes stay as tiles here. One quad, three drag rules = facets.
       //
       // ⚠️ Carries NO `mode` ON PURPOSE. `useActiveSubTool` keeps the stored
       // key only while `stored.subTool.mode === undefined || === the live

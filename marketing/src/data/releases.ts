@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.45",
+    date: "2026-08-17",
+    headline: "Writing down why the toolbar is shaped the way it is",
+    entries: [
+      {
+        tag: "infra",
+        text: "Nothing changes on screen. The last release moved Perspective's three rules into its panel, which was right for Perspective but left the app with two different places a tool's modes can live and no stated rule for which to use. The rule now: modes that are separate things you pick up — the six ways to select, the four brushes — keep their own icons in the sidebar; modes that are three ways of doing one thing to one object get a single icon and a row of buttons in the panel.",
+      },
+    ],
+  },
+  {
     version: "v8.44",
     date: "2026-08-17",
     headline: "Perspective is one tool again, and its icon lights up",

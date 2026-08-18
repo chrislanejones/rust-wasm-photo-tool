@@ -7662,3 +7662,60 @@ shape is killed. A future reader must not mistake it for protection of the
 | production build | OK |
 
 No Rust changed, so the engine is untouched at 806,967 B.
+
+## v8.45 Change Summary — 2026-08-17
+
+**ADR-035, and `showModeRow` stops being a shim.** No behaviour change: this
+release makes v8.44's UI decision the recorded, deliberate one instead of an
+exception apologised for in a footnote. Chris: *"ok I do want to do this, can
+we bypass, and rewrite the adr."*
+
+### Why a new ADR instead of rewriting ADR-034
+
+The `adr` skill is explicit — *"Never edit an accepted ADR's Decision — write a
+new one"* — so ADR-034 keeps its text and its status line now reads **decision
+1 superseded by ADR-035**; decisions 2–4 (rules in TypeScript, resampling in
+Rust, text storing normalised corners) stand untouched. The essay v8.44 bolted
+onto the bottom of ADR-034 has been removed: that content is ADR-035's job, and
+a superseded record should point at its successor rather than argue with
+itself. Same for the INDEX row, which is now a pointer instead of a paragraph.
+
+### The decision, stated properly
+
+**Mode placement is a design axis, not a default.**
+
+| Modes are… | Where they live | Examples |
+|---|---|---|
+| **siblings** — separate things you pick up | tiles in `SubtoolRow` | Select's six kinds, Paint's four brushes |
+| **facets of one object** | one tile + an in-panel row | Perspective's three drag rules |
+
+`ToolModeToggle`'s `showModeRow` is promoted from *"MIGRATION SHIM, not a
+feature… should be deleted outright"* to a supported layout choice. Its old
+note warned that two panels disagreeing about mode placement is drift. That was
+right about *accidental* drift and wrong to be absolute — placement is a real
+axis, and the deciding question is siblings-or-facets. It still defaults to
+false, and seven of the eight multi-mode panels still use sidebar tiles.
+
+### The cost, named rather than buried
+
+Two placements now exist, so a reader has to ask which applies. ADR-035's
+pre-mortem argues the case against: *siblings vs facets* is a judgement call,
+and Shapes (rectangle/ellipse/line) and Text (text/background/OCR) are
+genuinely arguable both ways — drift could eat ADR-023's consistency one
+plausible header comment at a time.
+
+**Named warning sign: a second panel enabling `showModeRow` without an explicit
+ask from Chris.** That is written into the ADR, the prop's own note and the
+Perspective panel's comment, so the next person meets it before deciding, not
+after.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | clean |
+| pnpm lint | **0 errors** (58 warnings) |
+| `pnpm -C app test` | **591 passed** (50 files) |
+| playwright | **11/11** |
+
+No Rust, no engine change — 806,967 B, untouched.

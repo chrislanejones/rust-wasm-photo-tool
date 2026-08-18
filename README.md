@@ -84,6 +84,21 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.45 — 2026-08-17
+
+**Nothing changes on screen — this one writes down why the toolbar is shaped
+the way it is.** v8.44 moved Perspective's three rules into its panel. That was
+the right call for Perspective but it left the app with two different places a
+tool's modes can live, and no stated rule for which to use.
+
+The rule now: modes that are **separate things you pick up** — the six ways to
+select, the four brushes — stay as their own icons in the sidebar. Modes that
+are **three ways of doing one thing to one object** get a single icon and a row
+of buttons in the panel. Perspective is the second kind: one box, three rules
+about what the other corners do when you drag one.
+
+<details><summary>Older releases</summary>
+
 ### v8.44 — 2026-08-17
 
 **Perspective is one tool again, and its icon lights up.** Yesterday's release
@@ -96,8 +111,6 @@ to tell which one you were in. Both are fixed together: Edit now has a single
 
 The tile lights up when you pick it and stays lit while you switch between the
 three, which is what it should have done the first time.
-
-<details><summary>Older releases</summary>
 
 ### v8.43 — 2026-08-17
 

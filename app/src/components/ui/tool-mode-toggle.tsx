@@ -6,12 +6,25 @@
 // now `SubtoolRow` in the ToolsSidebar header (features/tools/SubtoolRow.tsx),
 // so what's left here is the per-mode title + lightbulb + animated body swap.
 //
-// `showModeRow` is a MIGRATION SHIM, not a feature. It defaults to false (the
-// hoisted world). Pass `showModeRow` only where a panel renders somewhere the
-// header row can't reach it — today that is nowhere, and the prop should be
-// deleted outright once that stays true through a release. Do NOT reach for it
-// to "keep the old look" in one panel: two panels disagreeing about where their
-// sub-modes live is exactly the drift this arc removed.
+// `showModeRow` is a SUPPORTED LAYOUT CHOICE (promoted from migration shim,
+// v8.45, ADR-035). It still defaults to false — sibling tiles in SubtoolRow
+// remain the norm, and seven of the eight multi-mode panels use it.
+//
+// Turn it on when a tool's modes are RULES ABOUT ONE OBJECT rather than
+// separate things to pick up. Perspective is the case that earned the rule:
+// Distort / Perspective / Skew are one four-corner quad and three rules about
+// what the other corners do when you drag one, so three sidebar tiles read as
+// three tools and invite "which one am I in?" — the question that surfaced the
+// v8.43 highlight bug in the first place. One tile plus an in-panel row says
+// "one tool, three rules" without a word of explanatory text.
+//
+// The old note here called this a shim to be deleted and warned that two
+// panels disagreeing about where their sub-modes live is drift. That warning
+// was right about accidental drift and wrong to be absolute: the placement is
+// a real design axis, and the deciding question is whether the modes are
+// SIBLINGS (tiles) or FACETS OF ONE THING (row). Choose deliberately, put the
+// reason in the panel's header comment, and do not flip an existing panel
+// without a reason worth writing down.
 //
 // Everything else is unchanged: styling composes 100% from existing primitives
 // (`ToolButtonGroup` / `ToolButton` carry the HOVER_RING SSOT in lib/styles.ts
