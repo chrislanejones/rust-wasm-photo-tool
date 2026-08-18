@@ -80,9 +80,14 @@ interface UIState {
   // Image-load indicator (top progress bar + New/Upload spinners).
   isImageLoading: boolean;
   loadProgress: number;
-  // A/B compare: the "before" original blob URL + whether the slider is on.
+  // A/B compare: the "before" original blob URL, whether the slider is on, and
+  // where the divider sits (0..1). The handle position lives here rather than in
+  // CompareSlider's own useState so it survives a CanvasArea remount and so the
+  // "reset to centre when compare closes" rule has ONE home — the setter below —
+  // instead of being re-implemented by every caller that turns compare off.
   originalUrl: string | null;
   compareActive: boolean;
+  comparePosition: number;
   // Spacebar-held pan mode.
   isPanning: boolean;
   // Resolved auth tier + the Super-User client-side override.
@@ -123,6 +128,7 @@ interface UIState {
   finishImageLoad: () => void;
   setOriginalUrl: (v: SetArg<string | null>) => void;
   setCompareActive: (v: SetArg<boolean>) => void;
+  setComparePosition: (v: SetArg<number>) => void;
   setIsPanning: (v: SetArg<boolean>) => void;
   setUserMode: (v: SetArg<UserMode>) => void;
   setAuthResolved: (v: SetArg<boolean>) => void;
@@ -159,6 +165,7 @@ export const useUIStore = create<UIState>()(
       loadProgress: 0,
       originalUrl: null,
       compareActive: false,
+      comparePosition: 0.5,
       isPanning: false,
       userMode: "demo",
       authResolved: false,
@@ -237,7 +244,18 @@ export const useUIStore = create<UIState>()(
       },
       setOriginalUrl: (v) => set((s) => ({ originalUrl: resolveSet(v, s.originalUrl) })),
       setCompareActive: (v) =>
-        set((s) => ({ compareActive: resolveSet(v, s.compareActive) })),
+        set((s) => {
+          const next = resolveSet(v, s.compareActive);
+          // Turning compare OFF re-centres the divider, so the next open starts
+          // from the middle instead of wherever it was abandoned.
+          return next
+            ? { compareActive: true }
+            : { compareActive: false, comparePosition: 0.5 };
+        }),
+      setComparePosition: (v) =>
+        set((s) => ({
+          comparePosition: Math.max(0, Math.min(1, resolveSet(v, s.comparePosition))),
+        })),
       setIsPanning: (v) => set((s) => ({ isPanning: resolveSet(v, s.isPanning) })),
       setUserMode: (v) => set((s) => ({ userMode: resolveSet(v, s.userMode) })),
       setAuthResolved: (v) =>

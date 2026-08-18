@@ -22,9 +22,11 @@ jobs:
     if: github.event_name != 'schedule' # no point rebuilding on the cron
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+      # Toolchain comes from rust-toolchain.toml (ADR-038), not from a floating
+      # `@stable` — that is the whole point of the pin. `rustup show` installs
+      # and selects it, and prints which one, so the log says what compiled.
+      # Components (clippy, rustfmt) are declared in the toml.
+      - run: rustup show
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       # --features tiles so the tile-engine core (src/tiles.rs, src/ops.rs)
@@ -48,7 +50,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup show   # toolchain pinned by rust-toolchain.toml (ADR-038)
       - uses: Swatinem/rust-cache@v2
       - uses: jetli/wasm-pack-action@v0.4.0
       - run: pnpm install --frozen-lockfile

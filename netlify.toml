@@ -10,7 +10,10 @@
   publish = "www-dist"
 
 [build.environment]
-  RUSTUP_TOOLCHAIN = "stable"
+  # ⚠️ RUSTUP_TOOLCHAIN is deliberately ABSENT. It OVERRIDES rust-toolchain.toml
+  # (verified: `RUSTUP_TOOLCHAIN=stable rustup show` reports "overridden by
+  # environment variable"), so setting it here would have made the pin a no-op
+  # on the one builder that actually ships. See ADR-038. Do not reintroduce it.
   NODE_VERSION = "20"
 
 [[redirects]]

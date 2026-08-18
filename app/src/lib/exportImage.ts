@@ -26,6 +26,52 @@ const MIME: Record<ExportFormat, string> = {
   avif: "image/avif",
 };
 
+/** The formats that carry an alpha channel. JPEG is the only export format
+ *  that does not, and the browser encoder does not ask what to do about the
+ *  pixels it cannot represent — it writes them OPAQUE BLACK. Measured in
+ *  Chrome: a transparent margin round-trips out of `convertToBlob` as
+ *  rgba(0,0,5,255) for image/jpeg, while png/webp both keep rgba(0,0,0,0).
+ *  (AVIF does carry alpha; where the browser cannot encode it, `blob.type`
+ *  comes back image/png and the PNG rule applies anyway.) */
+export const ALPHA_CAPABLE_FORMATS: ReadonlySet<ExportFormat> = new Set([
+  "png",
+  "webp",
+  "avif",
+]);
+
+/**
+ * Should the artboard's backing canvas be baked into THIS export?
+ *
+ * "Include canvas" (ADR-016) ships the padded backing with the image, which is
+ * what you want when the fill is a colour you can see. It is NOT what you want
+ * when the fill is transparent and the target format has no alpha: there is
+ * nothing to include, the encoder cannot write "nothing", so it writes black —
+ * and every JPEG comes out framed in a border that was never on screen. The
+ * default border is 10px per side and the setting goes higher.
+ *
+ * Dropping the backing in that one case is the only outcome that matches what
+ * the user was looking at. An OPAQUE fill still exports, transparent still
+ * exports to PNG/WebP/AVIF, and "Photo only" still means photo only.
+ *
+ * Shared by all three surfaces — the export dialog's predicted size, the single
+ * Download, and the batch ZIP — because a rule they each re-derive is a rule
+ * they eventually disagree about.
+ */
+export function includeCanvasInExport(opts: {
+  /** Settings → Layers and Canvas → "Include canvas" / "Photo only". */
+  exportCanvasBackground: boolean;
+  /** The format actually being written (post AVIF→PNG fallback). */
+  format: ExportFormat;
+  /** Backing fill has alpha < 255 — i.e. the "transparent" swatch. */
+  canvasBgTransparent: boolean;
+}): boolean {
+  if (!opts.exportCanvasBackground) return false;
+  if (opts.canvasBgTransparent && !ALPHA_CAPABLE_FORMATS.has(opts.format)) {
+    return false;
+  }
+  return true;
+}
+
 export const EXT: Record<ExportFormat, string> = {
   png: ".png",
   jpeg: ".jpg",

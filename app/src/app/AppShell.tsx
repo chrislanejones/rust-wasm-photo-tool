@@ -95,7 +95,13 @@ import { useRecentTexts } from "@/hooks/useRecentTexts";
 import { putOriginal, getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
 import { collectDeletedPhotoOriginals, deleteReplacedOriginal } from "@/lib/originalRefs";
 import { collectExtraRoots } from "@/lib/extraRoots";
-import { compositeSavedEdit, encodeRgba, EXT, extFromMime } from "@/lib/exportImage";
+import {
+  compositeSavedEdit,
+  encodeRgba,
+  EXT,
+  extFromMime,
+  includeCanvasInExport,
+} from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
 import { RadioCards } from "@/components/ui/radio-cards";
@@ -439,6 +445,10 @@ export function AppShell() {
   // Canvas background on export (Settings → General); all export/share/copy
   // paths read this committed value.
   const exportCanvasBackground = prefs.exportCanvasBackground;
+  /** The backing fill is transparent (the "transparent" swatch ⇒ a:0). With an
+   *  alpha-less format that makes "Include canvas" unrepresentable — see
+   *  `includeCanvasInExport`, which is the ONE place that rule lives. */
+  const canvasBgTransparent = canvasBgToRgba(prefs.canvasBgColor).a < 255;
   // Apply the saved theme to <html> (light/dark/system); index.html sets the
   // initial class pre-paint, this keeps it in sync as the choice changes.
   useTheme(prefs.theme);
@@ -1214,7 +1224,14 @@ export function AppShell() {
     handleZoomReset,
     handleCopyToClipboard,
     handleExport,
-  } = useCanvasActions({ stamp, exportFormat, quality, exifKeep, exportCanvasBackground });
+  } = useCanvasActions({
+    stamp,
+    exportFormat,
+    quality,
+    exifKeep,
+    exportCanvasBackground,
+    canvasBgTransparent,
+  });
 
   // The size the export will actually produce. Computed in an effect, because
   // the "Photo only" branch costs a whole-image composite per call and used to
@@ -1222,7 +1239,13 @@ export function AppShell() {
   const exportDims = useExportDimensions({
     stamp,
     active: exportDialogOpen,
-    excludeBackground: !exportCanvasBackground,
+    // `effectiveExportFormat`, not `exportFormat`: the dialog must predict the
+    // crop the encoder will actually cause.
+    excludeBackground: !includeCanvasInExport({
+      exportCanvasBackground,
+      format: effectiveExportFormat,
+      canvasBgTransparent,
+    }),
   });
 
   const handleDeleteAll = useCallback(() => {
@@ -2519,7 +2542,11 @@ export function AppShell() {
           // never read it at all, so a batch export always shipped the padded
           // artboard even when every other path cropped to the photo.
           const { pixels, w, h } = await compositeSavedEdit(edit, {
-            excludeBackground: !exportCanvasBackground,
+            excludeBackground: !includeCanvasInExport({
+              exportCanvasBackground,
+              format: exportFormat,
+              canvasBgTransparent,
+            }),
           });
           const enc = await encodeRgba(pixels, w, h, exportFormat, quality / 100);
           bytes = new Uint8Array(await enc.arrayBuffer());
@@ -2582,6 +2609,7 @@ export function AppShell() {
       stamp,
       exportFormat,
       quality,
+      canvasBgTransparent,
       loadPhotoEdit,
       savePhotoEdit,
       exifKeep,

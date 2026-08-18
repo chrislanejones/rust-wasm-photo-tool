@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.53",
+    date: "2026-08-18",
+    headline: "A black border on every JPEG, and the compiler that kept changing the engine's size",
+    entries: [
+      {
+        tag: "fix",
+        text: "Every JPEG export came out with a black border. A photo opens on a slightly larger backing canvas, that canvas ships with the export, and its default fill is transparent — which PNG stores perfectly well, so nothing looked wrong there. JPEG cannot store transparency, and rather than say so it fills those pixels with black. A transparent canvas is now left out of a JPEG; an opaque canvas colour still exports, because that border is something you can actually see.",
+      },
+      {
+        tag: "fix",
+        text: "The setting behind it had been describing the wrong default in Settings for about a year — the text said the padding was off while the code had it on. Both looked correct on their own, which is why nobody read either twice. The text now says what the app does.",
+      },
+      {
+        tag: "ui",
+        text: "A/B compare says which side is which. The two labels used to sit centred on the divider, one top and one bottom, so each hung half over each picture and named neither. They now sit fully on their own side and point outwards, as two tabs attached to the divider. Compare also switches itself off when you leave the Enhance tools instead of staying stuck on the canvas.",
+      },
+      {
+        tag: "infra",
+        text: "Nothing pinned the compiler before this. The build servers fetched whatever version was current the day they ran, so the shipped file could change size with no commit from anyone — and it did. That is what a 6,579-byte discrepancy in the records turned out to be: two numbers for the same engine, both correct, five compiler releases apart.",
+      },
+      {
+        tag: "rust",
+        text: "The version is now written down in the repository, so upgrading becomes a change you can see, review and undo. Yesterday's release put a size limit around that number; a limit around a number that moves by itself is a limit around nothing.",
+      },
+      {
+        tag: "fix",
+        text: "One trap worth recording: the deploy server also set an environment variable naming the version, and an environment variable overrides the file. The pin would have quietly done nothing on the one machine that actually publishes the site — which is worse than the original problem, because everything else would have looked fixed.",
+      },
+    ],
+  },
+  {
     version: "v8.52",
     date: "2026-08-18",
     headline: "The build tool jumps two majors, and swaps its bundler",

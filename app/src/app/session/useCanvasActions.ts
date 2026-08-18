@@ -8,7 +8,7 @@ import { useGalleryStore } from "@/stores/useGalleryStore";
 import { toast } from "@/components/ui/sonner";
 import { getOriginal } from "@/lib/dexie/originalsAdapter";
 import { readExifTiff, applyExifToReencoded } from "@/lib/exif";
-import { EXT, encodeRgba, extFromMime } from "@/lib/exportImage";
+import { EXT, encodeRgba, extFromMime, includeCanvasInExport } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 
 export function useCanvasActions({
@@ -17,6 +17,7 @@ export function useCanvasActions({
   quality,
   exifKeep,
   exportCanvasBackground,
+  canvasBgTransparent,
 }: {
   stamp: ReturnType<typeof useCloneStamp>;
   exportFormat: ExportFormat;
@@ -26,6 +27,9 @@ export function useCanvasActions({
    *  leave the artboard's backing "Background" layer out of the exported/
    *  copied pixels — see `get_image_data_excluding_background` in Rust. */
   exportCanvasBackground: boolean;
+  /** The backing fill is the "transparent" swatch. With a format that has no
+   *  alpha there is then nothing to include — see `includeCanvasInExport`. */
+  canvasBgTransparent: boolean;
 }) {
   const photos = useGalleryStore((s) => s.photos);
   const activePhotoId = useGalleryStore((s) => s.activePhotoId);
@@ -130,7 +134,16 @@ export function useCanvasActions({
       // `exportImage.ts` still does this and should get the same treatment —
       // it is a separate path with its own callers, so it is a separate change.
       let blob: Blob;
-      if (exportCanvasBackground) {
+      // PNG carries alpha, so this always resolves to `exportCanvasBackground`
+      // itself — routed through the shared rule anyway so the copy path cannot
+      // drift from the download path if the clipboard format ever changes.
+      if (
+        includeCanvasInExport({
+          exportCanvasBackground,
+          format: "png",
+          canvasBgTransparent,
+        })
+      ) {
         // Important: `tool.export_png()` returns a Uint8Array view into wasm
         // memory. Passing `.buffer` to Blob() would include the entire wasm
         // heap, not just the PNG slice — the resulting blob is huge and the
@@ -166,7 +179,7 @@ export function useCanvasActions({
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast.error(`Couldn't copy to clipboard: ${msg}`);
     }
-  }, [stamp, exportCanvasBackground]);
+  }, [stamp, exportCanvasBackground, canvasBgTransparent]);
 
   const handleExport = useCallback(async () => {
     const entry = photos.find((p) => p.id === activePhotoId) ?? null;
@@ -178,7 +191,16 @@ export function useCanvasActions({
     let exportW = stamp.state.width;
     let exportH = stamp.state.height;
     let blob: Blob | null;
-    if (exportCanvasBackground) {
+    // THE JPEG BORDER FIX. "Include canvas" + a transparent backing + a format
+    // with no alpha would hand the encoder pixels it cannot write, and it fills
+    // them with black — a frame the user never saw on screen.
+    if (
+      includeCanvasInExport({
+        exportCanvasBackground,
+        format: exportFormat,
+        canvasBgTransparent,
+      })
+    ) {
       blob = await stamp.exportBlob(exportFormat, quality / 100);
     } else if (tool) {
       // ATOMIC CAPTURE (ADR-024). This site matters more than the others that
@@ -237,7 +259,7 @@ export function useCanvasActions({
     // (switching photos, changing format), which is what made it look
     // intermittent rather than broken. `handleCopyToClipboard` above always
     // had it; only this path did not.
-  }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep, exportCanvasBackground]);
+  }, [stamp, exportFormat, quality, photos, activePhotoId, exifKeep, exportCanvasBackground, canvasBgTransparent]);
 
   return {
     getHistogram,

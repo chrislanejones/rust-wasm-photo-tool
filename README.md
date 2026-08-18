@@ -84,6 +84,54 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.53 — 2026-08-18
+
+**Every JPEG you exported had a black border, and it was not the encoder's
+fault.** A photo opens on a slightly larger backing canvas, and that canvas
+ships with the exported image. Its default fill is transparent — which PNG
+stores perfectly well, so nothing looked wrong there. JPEG cannot store
+transparency at all, and rather than say so it fills those pixels with black.
+The result was a frame around every JPEG, the width of the canvas border, from
+a setting nobody chose.
+
+Two things kept it hidden. PNG made the same padding invisible, and the setting
+that controls it has been describing the wrong default in Settings for about a
+year — the text said the padding was off while the code had it on. Both looked
+correct, so neither got read twice.
+
+Now a transparent canvas is simply left out of a JPEG. An opaque canvas colour
+still exports, because that border is something you can actually see; PNG, WebP
+and AVIF are untouched. Measured on the same image: PNG 320×240 with its
+transparent border intact, JPEG 240×160 with no border at all.
+
+**A/B compare says which side is which.** The two labels used to sit centred on
+the divider, one at the top and one at the bottom, so each one hung half over
+each picture and named neither. They now sit fully on their own side of the
+line, pointing outwards — ‹ Original and Edited › — as two tabs attached to the
+divider, and they stay on the photo instead of sliding onto the backdrop.
+Compare also turns itself off when you leave the Enhance tools, rather than
+staying stuck on a canvas with no button left to switch it off.
+
+**The compiler is pinned, so the engine's size stops changing on its own.**
+Nothing pinned Rust before this. The build servers fetched whatever version was
+current the day they ran, which meant the shipped file could change size with
+no commit from anyone — and it did.
+
+That is what a 6,579-byte discrepancy in the records turned out to be. Two
+numbers for the same engine, 806,967 and 813,546, both correct, five compiler
+releases apart. Yesterday's release set a size limit around that number. A
+limit around a number that moves by itself is a limit around nothing.
+
+The version is now written down in the repository, and upgrading Rust becomes a
+change you can see, review and undo. One trap worth recording: the deploy
+server also set an environment variable naming the version, and an environment
+variable **overrides** the file — so the pin would have quietly done nothing on
+the one machine that actually publishes the site. It was removed.
+
+Nothing about the app changes.
+
+<details><summary>Older releases</summary>
+
 ### v8.52 — 2026-08-18
 
 **The build tool goes from Vite 6 to Vite 8, which quietly means a different
@@ -104,8 +152,6 @@ a stated incompatibility is a bug waiting for a reason.
 
 Verified rather than assumed: typecheck clean, 591 unit tests, 11 end-to-end
 tests, both sites build. Reverting is one line.
-
-<details><summary>Older releases</summary>
 
 ### v8.51 — 2026-08-18
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useUIStore } from "@/stores/useUIStore";
+import { useToolStore } from "@/stores/useToolStore";
 
 interface CompareSliderProps {
   /** The canvas element rendering the current edited image — we mirror its bounding box. */
@@ -10,14 +12,25 @@ interface CompareSliderProps {
  * Squoosh-style A/B compare. Renders an overlay positioned exactly over the
  * canvas. The "before" layer fills that same box via background-size 100% 100%,
  * so both layers share one coordinate space regardless of zoom/pan.
+ *
+ * LEFT of the divider is the ORIGINAL (the before layer is clipped from the
+ * right, so what survives is the left band); RIGHT is the EDITED canvas showing
+ * through. Every part of the labelling below exists to say that without being
+ * read twice — see the label block.
  */
 export function CompareSlider({ canvasEl }: CompareSliderProps) {
   // The "before" original URL + whether compare is on now come from the UI store
   // (were prop-drilled AppShell → CanvasArea → here before stage 1).
   const beforeUrl = useUIStore((s) => s.originalUrl);
   const active = useUIStore((s) => s.compareActive);
+  const setCompareActive = useUIStore((s) => s.setCompareActive);
+  // Divider position lives in the store (see useUIStore) — it is the thing the
+  // "re-centre on close" rule resets, and a CanvasArea remount must not silently
+  // move the handle back to the middle mid-comparison.
+  const position = useUIStore((s) => s.comparePosition);
+  const setPosition = useUIStore((s) => s.setComparePosition);
+  const activeSubTool = useToolStore((s) => s.activeSubTool);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState(0.5);
   const [dragging, setDragging] = useState(false);
   const [box, setBox] = useState<{
     left: number;
@@ -84,6 +97,14 @@ export function CompareSlider({ canvasEl }: CompareSliderProps) {
     };
   }, [active, canvasEl]);
 
+  // The ONLY control for this overlay is the "Hide A/B Compare" button in
+  // Enhance › Compress. Walk to any other group and that button is gone while
+  // the overlay stays pinned over the canvas — a stuck comparison with nothing
+  // left to switch it off. Leaving the group closes it.
+  useEffect(() => {
+    if (active && !activeSubTool.startsWith("enhance/")) setCompareActive(false);
+  }, [active, activeSubTool, setCompareActive]);
+
   const getPosition = useCallback((clientX: number) => {
     const el = overlayRef.current;
     if (!el) return 0.5;
@@ -99,7 +120,7 @@ export function CompareSlider({ canvasEl }: CompareSliderProps) {
       setPosition(getPosition(e.clientX));
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [getPosition],
+    [getPosition, setPosition],
   );
 
   const onPointerMove = useCallback(
@@ -107,7 +128,7 @@ export function CompareSlider({ canvasEl }: CompareSliderProps) {
       if (!dragging) return;
       setPosition(getPosition(e.clientX));
     },
-    [dragging, getPosition],
+    [dragging, getPosition, setPosition],
   );
 
   const onPointerUp = useCallback(() => setDragging(false), []);
@@ -115,6 +136,13 @@ export function CompareSlider({ canvasEl }: CompareSliderProps) {
   if (!active || !beforeUrl || !box) return null;
 
   const clipPercent = position * 100;
+
+  // Room test in PIXELS, not percent: a chip is ~90px wide whatever the image
+  // is, so "is there space for it" cannot be asked in percent. Below this the
+  // chip fades rather than being sliced by its half's overflow clip.
+  const LABEL_ROOM = 104;
+  const originalRoom = box.width * position >= LABEL_ROOM;
+  const editedRoom = box.width * (1 - position) >= LABEL_ROOM;
 
   return (
     <div
@@ -151,12 +179,48 @@ export function CompareSlider({ canvasEl }: CompareSliderProps) {
           transform: "translateX(-50%)",
           boxShadow: "0 0 8px rgba(0,0,0,0.5), 0 0 2px rgba(0,0,0,0.3)",
         }}
-      >
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/70 text-2xs text-white font-mono whitespace-nowrap select-none">
-          Original
+      />
+
+      {/*
+        SIDE LABELS. They used to be children of the divider and centred on it
+        (`left-1/2 -translate-x-1/2`), which is why they could not be read: each
+        chip sat half over the original and half over the edit, so it named
+        NEITHER side — and stacked diagonally (one top, one bottom) there was
+        nothing left tying either word to a picture. Centred on the line they
+        also hung off the photo onto the workspace backdrop once the handle
+        neared an edge.
+
+        Now each chip lives inside its OWN half and says so four ways at once:
+        position (fully on its side), a chevron pointing out into that side, a
+        tab shape squared off against the divider and rounded on the outside,
+        and colour (plain white = untouched, warm accent = the edit). Each half
+        is its own overflow-clipped box, so a chip can never cross the divider
+        or leave the image — the thing that put text on the canvas backdrop.
+      */}
+      <div className="absolute inset-x-0 top-3 flex items-start pointer-events-none select-none">
+        <div
+          className="flex min-w-0 justify-end overflow-hidden transition-opacity duration-150"
+          style={{ width: `${clipPercent}%`, opacity: originalRoom ? 1 : 0 }}
+        >
+          <span
+            className="flex items-center gap-1 py-1 pl-2 pr-1.5 rounded-l-md border-r-2 border-white bg-black/75 text-2xs text-white font-mono whitespace-nowrap"
+            style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.45)" }}
+          >
+            <ChevronLeft size={12} strokeWidth={2.5} aria-hidden="true" />
+            Original
+          </span>
         </div>
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/70 text-2xs text-white font-mono whitespace-nowrap select-none">
-          Edited
+        <div
+          className="flex min-w-0 justify-start overflow-hidden transition-opacity duration-150"
+          style={{ width: `${100 - clipPercent}%`, opacity: editedRoom ? 1 : 0 }}
+        >
+          <span
+            className="flex items-center gap-1 py-1 pl-1.5 pr-2 rounded-r-md border-l-2 border-white bg-black/75 text-2xs text-theme-primary font-mono whitespace-nowrap"
+            style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.45)" }}
+          >
+            Edited
+            <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />
+          </span>
         </div>
       </div>
     </div>

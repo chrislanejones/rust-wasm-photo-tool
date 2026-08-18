@@ -1,0 +1,24 @@
+# The Rust toolchain, pinned — ADR-038.
+#
+# Before this file, nothing pinned it: netlify.toml curled rustup with
+# `--default-toolchain stable`, CI used `dtolnay/rust-toolchain@stable`, and a
+# developer had whatever they last installed. The shipped wasm therefore changed
+# size when Rust released, with no commit from anyone. That is how 806,967 B
+# (local, rustc 1.92.0) and 813,546 B (live, rustc 1.97.1) both sat in the
+# record as "the size of the engine" — a 6,579 B gap that read as a mystery for
+# days and was five compiler releases.
+#
+# The deploy sentinel bounds that size to 780,000–850,000 B (ADR-037). A band
+# around a number that moves on its own is a band around nothing, so the number
+# is pinned here and a Rust upgrade becomes a commit you can see and revert.
+#
+# ⚠️ `RUSTUP_TOOLCHAIN` in the environment OVERRIDES this file. netlify.toml set
+# it to "stable" and had to be changed; do not reintroduce it anywhere.
+#
+# To upgrade: bump `channel`, run the gates, and note the new wasm size in the
+# release. Expect the size to move — that is the point, it moves visibly now.
+[toolchain]
+channel = "1.97.1"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

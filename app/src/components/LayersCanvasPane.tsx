@@ -17,7 +17,11 @@ import type { Preferences } from "@/lib/preferences";
  *   done in Rust (`set_artboard_border`); this only picks the color.
  * - Canvas background on export and copy to clipboard
  *   (`exportCanvasBackground`) — whether the backing canvas is baked into
- *   downloads/shares/copies, or left out (the default). The crop-to-content
+ *   downloads/shares/copies, or left out. INCLUDE is the default (ADR-016
+ *   reversed it on 2026-07-13); this header and the panel copy below both
+ *   still said "photo only … the default" for a year of releases, which is how
+ *   a padded artboard shipped in every export without anyone choosing it. The
+ *   crop-to-content
  *   compositing is Rust-side (`get_image_data_excluding_background`);
  *   selection copies use `copy_region_composited`, which takes the same flag
  *   without tight-cropping (its rect is in document coordinates).
@@ -111,10 +115,12 @@ export function LayersCanvasPane({
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-text-muted">
             The backing canvas above (“Canvas + photo”) is a compositional
-            guide. “Photo only” leaves it out of downloads, shares, and
-            copies — the default. “Include canvas” bakes the full padded
-            backing into the exported image too. This applies to copying a
-            selection as well as the whole canvas.
+            guide. “Include canvas” — the default — bakes the full padded
+            backing into the exported image. “Photo only” leaves it out of
+            downloads, shares, and copies. This applies to copying a selection
+            as well as the whole canvas. JPEG has no transparency, so a
+            transparent backing is left out of a JPEG either way — it would
+            otherwise be written as a black border.
           </p>
         </div>
         <ToggleButtonGroup

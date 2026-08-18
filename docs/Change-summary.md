@@ -8247,3 +8247,177 @@ Eight PRs, opened 20 July through 3 August, all resolved in one day across
 v8.47 and v8.50–v8.52. **Six of the eight were fine the whole time.** What
 actually blocked the queue was an unrelated red check that nobody had read for
 eleven days — see v8.48 and v8.51.
+
+## v8.53 Change Summary — 2026-08-18
+
+Three things: a JPEG export defect found in the field, the A/B compare labels,
+and the toolchain pin that was already staged.
+
+### 1 · Every JPEG export carried a black border — ADR-039 (draft)
+
+Reported from the field as "5px? borders on all jpeg images". It is the canvas
+border, and the width is whatever `canvasPadding` is set to.
+
+| Default | Value | Effect |
+|---|---|---|
+| `canvasArtboard` | true | the photo sits on a backing canvas layer |
+| `canvasPadding` | 10 (reporter had 15) | that much canvas on every side |
+| `canvasBgColor` | `"transparent"` | the margin has **alpha 0** |
+| `exportCanvasBackground` | **true** (ADR-016) | the margin ships in the export |
+
+**JPEG has no alpha channel, and the encoder does not ask what to do about it.**
+Measured directly rather than assumed:
+
+| Format | Transparent margin round-trips as | Border |
+|---|---|---|
+| `image/jpeg` | **rgba(0,0,5,255)** — opaque black | **yes** |
+| `image/webp` | rgba(0,0,0,0) | no |
+| `image/png` | rgba(0,0,0,0) | no |
+| `image/avif` | `blob.type` comes back `image/png` — Chrome has no AVIF encoder | no |
+
+So it is JPEG only, which is exactly what "all jpeg images" meant.
+
+The fix is a routing rule, not pixel surgery: when the format has no alpha and
+the fill is transparent, the backing canvas is left out. One predicate,
+`includeCanvasInExport`, shared by the single Download, the batch ZIP and the
+export dialog's predicted size — a rule three surfaces re-derive is a rule they
+eventually disagree about.
+
+Verified in the running app under the real defaults ("Include canvas" on,
+transparent fill, 40px pad), both branches:
+
+| Export | Size | Corner pixel |
+|---|---|---|
+| PNG | 320×240 | rgba(0,0,0,0) — canvas kept, still transparent |
+| **JPEG** | **240×160** | 200,40,50 — the photo, **no black frame** |
+
+⚠️ **The first measurement proved nothing and was thrown away.** The browser
+profile it ran in had `exportCanvasBackground: false` and an opaque grey fill,
+so both formats cropped for reasons unrelated to the change. The prefs were set
+to the actual bug conditions and the pair re-run.
+
+⚠️ **A second defect, found on the way: the Settings copy has been stating the
+wrong default for about a year.** "Photo only … the default" was written before
+ADR-016 reversed it in v7.36 (2026-07-13) and never updated. That is why a
+padded artboard shipped in exports nobody had opted into — the UI said off, the
+code said on, and each looked right on its own. The copy is corrected; the
+default itself was deliberately NOT flipped, because reversing an accepted ADR
+is a decision, not a typo fix.
+
+⚠️ **Not covered, stated rather than hidden:** interior transparency. An erased
+hole in the middle of a photo still encodes as black — cropping cannot reach it.
+That needs a matte flatten over the buffer (real per-pixel work, belonging in
+`src/simd/color.rs`) and is filed, not built.
+
+10 tests pin both halves of the rule, including one that names the alpha-capable
+set so a fifth format cannot be added into the bug by accident.
+
+### 2 · A/B compare — the labels name a side now
+
+Both chips were children of the divider element and centred on it
+(`left-1/2 -translate-x-1/2`), so each sat half over the original and half over
+the edit and named **neither**; stacked diagonally, nothing tied either word to
+a picture. Centred on the line they also hung off the photo onto the workspace
+backdrop whenever the handle neared an edge.
+
+| | Before | Now |
+|---|---|---|
+| Position | centred on the divider | fully inside its own half |
+| Direction | none | `‹ Original` / `Edited ›`, pointing outward |
+| Shape | floating pill | squared against the line, rounded outside — a tab |
+| Colour | both white | white = untouched, warm accent = the edit |
+| At an edge | spilled onto the backdrop | clipped to its half, fades under 104px |
+| Leaving Enhance | overlay stayed pinned, button gone | closes itself |
+
+The divider position moved into the Zustand UI store, with the re-centre-on-close
+rule living in the setter so no caller re-implements it.
+
+Deliberately NOT moved into Rust: there is no pixel work in compare — it is a
+CSS layer over the canvas — and holding the original's pixels in wasm costs
+memory that never shrinks, the same trade b2 measured at 10.84 MB and rejected.
+
+### 3 · The Rust toolchain is pinned — ADR-038 (draft)
+
+Closes the finding v8.49 surfaced rather than leaving it filed.
+
+### What was unpinned, and where
+
+| Builder | How it chose a compiler |
+|---|---|
+| Netlify | `curl … --default-toolchain stable` **and** `RUSTUP_TOOLCHAIN = "stable"` |
+| GitHub CI | `dtolnay/rust-toolchain@stable` ×2 |
+| A developer | whatever they last installed |
+
+So the shipped binary was compiled by whichever `stable` existed on build day.
+
+### The gap, now fully accounted for
+
+| Build | Bytes | vs live |
+|---|---|---|
+| local, rustc 1.92.0 | 806,967 | −6,579 |
+| local, **rustc 1.97.1** | **813,407** | **−139** |
+| live production | 813,546 | — |
+
+| Component of the original 6,579 B | Bytes |
+|---|---|
+| rustc 1.92.0 → 1.97.1 | **6,440** (98%) |
+| build-machine path length — `/opt/buildhome/` vs `/home/clj/`, 5 chars × 27 embedded paths | 135 |
+| residual, likely data-segment length varints — not pinned down | 4 |
+
+Both binaries now embed the identical rustc hash `8bab26f4f`, 27 build-home
+paths, 24 rustc paths, 2 `/rust/deps/`. **Local can never byte-match production**
+without `--remap-path-prefix`; do not chase the last 139 B.
+
+A hypothesis died on the way: `wasm-pack` was updated 0.14.0 → 0.15.0 expecting
+it to explain the residual. It produced a byte-identical 813,407. Not the cause.
+
+### ⚠️ The trap that would have made the pin decorative
+
+`RUSTUP_TOOLCHAIN` **overrides** `rust-toolchain.toml`. Verified directly:
+
+| Command | Reports |
+|---|---|
+| `rustup show active-toolchain` | `1.97.1 … (overridden by '…/rust-toolchain.toml')` |
+| `RUSTUP_TOOLCHAIN=stable rustup show active-toolchain` | `stable … (**overridden by environment variable RUSTUP_TOOLCHAIN**)` |
+
+netlify.toml set exactly that variable. Adding the pin without removing it
+would have left production floating while every other surface looked pinned —
+**worse than the original problem, because it looks fixed.** It is gone, with a
+comment saying why.
+
+`dtolnay/rust-toolchain` was checked rather than assumed: its `action.yml` runs
+`rustup default <toolchain>` and does **not** export `RUSTUP_TOOLCHAIN`, so a
+pin file wins there. Both CI steps became `rustup show` anyway — it installs and
+selects whatever the file names and prints it, so the log states what compiled.
+
+### The pin
+
+| Field | Value |
+|---|---|
+| `channel` | **1.97.1** |
+| `components` | `clippy`, `rustfmt` |
+| `targets` | `wasm32-unknown-unknown` |
+| `profile` | `minimal` |
+
+### Gates, all re-run under 1.97.1
+
+| Gate | Result |
+|---|---|
+| `rustup show` honours the file | **yes** — "overridden by '…/rust-toolchain.toml'" |
+| `cargo fmt --check` | clean |
+| clippy featureless / with features | **0 / 0** |
+| `cargo test --features tiles,patchmatch` | **364 passed** |
+| `./scripts/guardrails.sh` | exit 0, `rust-panics` still 47 |
+| `pnpm -C app exec tsc --noEmit` | clean |
+| `pnpm -C app test` | **591 passed** |
+
+Five compiler releases of new lints and nothing fired.
+
+### The cost, stated
+
+The pin now goes stale **invisibly** — nothing announces that 1.97.1 is old, and
+dependabot does not watch `rust-toolchain.toml`. The previous regime at least
+drifted forward. ADR-038's pre-mortem names the failure: someone deletes the
+file "temporarily" to unblock a build, floating behaviour returns silently, and
+the next size surprise takes just as long to diagnose — only with an ADR
+claiming it cannot happen.
