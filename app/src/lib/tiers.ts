@@ -43,13 +43,16 @@ export const TIERS: Record<UserMode, TierConfig> = {
     storageLabel: "—",
     // Layers are a fundamental, purely client-side editing tool (the Rust
     // layer stack lives entirely in-memory / IndexedDB), so they are NOT
-    // paywalled — the no-login tier gets the same 3-per-image as Logged In.
+    // paywalled — the no-login tier gets the same allowance as Logged In.
     // Login/paid differentiate on CLOUD features (storage, gallery cap,
-    // sharing, AI), not on local editing. "Unlimited layers" stays the paid
-    // perk.
-    layersPerImage: 3,
-    layersShort: "3",
-    layersLabel: "3 per image",
+    // sharing, AI), not on local editing.
+    //
+    // 3 → 8 on 2026-08-18: three was a limit people hit while doing ordinary
+    // work, which made it feel like a paywall rather than a ceiling. Paid goes
+    // to 16 rather than Infinity — see the `paid` entry.
+    layersPerImage: 8,
+    layersShort: "8",
+    layersLabel: "8 per image",
     replicateAI: false,
   },
   loggedIn: {
@@ -58,9 +61,9 @@ export const TIERS: Record<UserMode, TierConfig> = {
     galleryLimit: 24,
     storageQuotaBytes: 100 * MB,
     storageLabel: "100 MB",
-    layersPerImage: 3,
-    layersShort: "3",
-    layersLabel: "3 per image",
+    layersPerImage: 8,
+    layersShort: "8",
+    layersLabel: "8 per image",
     replicateAI: false,
   },
   paid: {
@@ -69,9 +72,14 @@ export const TIERS: Record<UserMode, TierConfig> = {
     galleryLimit: 100,
     storageQuotaBytes: 5 * GB,
     storageLabel: "5 GB",
-    layersPerImage: Infinity,
-    layersShort: "∞",
-    layersLabel: "unlimited",
+    // 16, NOT Infinity (changed 2026-08-18). Unlimited was never really
+    // unlimited: an .ora export holds every layer's pixels at once, and wasm
+    // memory never shrinks, so the tail of that promise landed on the paying
+    // user as a tab that ran out of memory. A stated ceiling is the honest
+    // version of a limit the machine was already imposing.
+    layersPerImage: 16,
+    layersShort: "16",
+    layersLabel: "16 per image",
     replicateAI: true,
   },
 };

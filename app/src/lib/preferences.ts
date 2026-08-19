@@ -101,12 +101,15 @@ export const DEFAULT_PREFERENCES: Preferences = {
   canvasPadding: 10,
   // Backing canvas defaults to transparent ⇒ the checkerboard shows through.
   canvasBgColor: "transparent",
-  // Default ON (ADR-016, 2026-07-13). This REVERSES the previous default, which
-  // treated the backing canvas as "a compositional guide, not real content" and
-  // cropped exports to just the photo. Under ADR-016 the Canvas is the document's
-  // bottom layer — what you see on screen is what you get on export — so the
-  // padding/colour ships unless the user turns this off or X's the layer out.
-  exportCanvasBackground: true,
+  // Default OFF again (ADR-040, 2026-08-18) — reverses ADR-016's reversal, at
+  // Chris's explicit request after the JPEG black-border report (ADR-039).
+  // ADR-016's argument was "what you see on screen is what you get on export";
+  // the counter-argument that won is that the backing canvas is padding the
+  // user never asked for, arriving on every import, and quietly changing the
+  // dimensions of every exported file. Including it is now opt-in.
+  // NOTE: this changes the default only. An existing install keeps whatever is
+  // already stored in `image-horse-prefs` — no forced migration.
+  exportCanvasBackground: false,
 };
 
 const THEME_CHOICES: ThemeChoice[] = ["system", "dark", "light"];

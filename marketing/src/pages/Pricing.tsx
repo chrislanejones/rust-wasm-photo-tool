@@ -33,7 +33,7 @@ const CARDS: Card[] = [
     tagKind: "local",
     price: "$0",
     unit: "forever",
-    perks: ["All WASM tools", "3 layers per image", "12 image gallery", "Session-only", "No signup"],
+    perks: ["All WASM tools", "8 layers per image", "12 image gallery", "Session-only", "No signup"],
     cta: "Try it now",
   },
   {
@@ -48,7 +48,7 @@ const CARDS: Card[] = [
       "Originals stay on-device",
       "24 images",
       "3 projects",
-      "3 layers per image",
+      "8 layers per image",
     ],
     cta: "Create account",
   },
@@ -61,7 +61,7 @@ const CARDS: Card[] = [
     unit: "per month",
     perks: [
       <>Cloud originals — 5&nbsp;GB, or bring your own S3</>,
-      "Unlimited layers",
+      "16 layers per image",
       "Background and object removal",
       "4× upscale",
       "Unlimited AI passes",

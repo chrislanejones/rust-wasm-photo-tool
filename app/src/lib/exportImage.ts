@@ -57,6 +57,30 @@ export const ALPHA_CAPABLE_FORMATS: ReadonlySet<ExportFormat> = new Set([
  * Download, and the batch ZIP — because a rule they each re-derive is a rule
  * they eventually disagree about.
  */
+/** Can this format store a transparent pixel at all? JPEG cannot, and the
+ *  encoder silently substitutes opaque black rather than failing. */
+export function formatCarriesAlpha(format: ExportFormat): boolean {
+  return ALPHA_CAPABLE_FORMATS.has(format);
+}
+
+/**
+ * Would writing this document in this format INVENT pixels the user never saw?
+ *
+ * True when the backing canvas is transparent and the format has no alpha — the
+ * ADR-039 condition. Distinct from `includeCanvasInExport` below, which also
+ * consults the user's export preference: this one is not a preference at all.
+ * Baking black into a saved file is data loss, and it must be refused on every
+ * surface that writes pixels, including the INTERNAL working-copy save (see
+ * `persistActiveCanvas`) — which is how a black border ended up permanently
+ * inside stored files while all three export surfaces were behaving.
+ */
+export function wouldInventOpaquePixels(
+  format: ExportFormat,
+  canvasBgTransparent: boolean,
+): boolean {
+  return canvasBgTransparent && !formatCarriesAlpha(format);
+}
+
 export function includeCanvasInExport(opts: {
   /** Settings → Layers and Canvas → "Include canvas" / "Photo only". */
   exportCanvasBackground: boolean;
@@ -66,9 +90,7 @@ export function includeCanvasInExport(opts: {
   canvasBgTransparent: boolean;
 }): boolean {
   if (!opts.exportCanvasBackground) return false;
-  if (opts.canvasBgTransparent && !ALPHA_CAPABLE_FORMATS.has(opts.format)) {
-    return false;
-  }
+  if (wouldInventOpaquePixels(opts.format, opts.canvasBgTransparent)) return false;
   return true;
 }
 
@@ -78,6 +100,20 @@ export const EXT: Record<ExportFormat, string> = {
   webp: ".webp",
   avif: ".avif",
 };
+
+/** A stored MIME back to the export format that writes it, or null when the
+ *  file is something we do not re-encode to (gif/svg). Used by "Apply Resize",
+ *  which must re-encode in the photo's OWN format rather than the compression
+ *  panel's chosen one — resizing is not the moment to change a file's type. */
+export function formatFromMime(mime: string): ExportFormat | null {
+  switch (mime) {
+    case "image/png": return "png";
+    case "image/jpeg": return "jpeg";
+    case "image/webp": return "webp";
+    case "image/avif": return "avif";
+    default: return null;
+  }
+}
 
 /** Filename extension for a stored original's MIME type (used for verbatim copies). */
 export function extFromMime(mime: string): string {

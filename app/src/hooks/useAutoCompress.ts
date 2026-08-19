@@ -199,12 +199,12 @@ export function useAutoCompress() {
 
           const newUrl = URL.createObjectURL(blob);
           const compressedSize = blob.size;
+          // Signed, matching AppShell's badge convention: positive = smaller
+          // than the upload, negative = larger. Not clamped at 0 — a photo that
+          // grows should say so rather than show an empty badge.
           const savingsPercent =
             originalSize > 0
-              ? Math.max(
-                  0,
-                  Math.round((1 - compressedSize / originalSize) * 100),
-                )
+              ? Math.round((1 - compressedSize / originalSize) * 100)
               : 0;
 
           onPhotoCompressed(photo.id, newFile, newUrl);

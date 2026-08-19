@@ -17,11 +17,12 @@ import type { Preferences } from "@/lib/preferences";
  *   done in Rust (`set_artboard_border`); this only picks the color.
  * - Canvas background on export and copy to clipboard
  *   (`exportCanvasBackground`) — whether the backing canvas is baked into
- *   downloads/shares/copies, or left out. INCLUDE is the default (ADR-016
- *   reversed it on 2026-07-13); this header and the panel copy below both
- *   still said "photo only … the default" for a year of releases, which is how
- *   a padded artboard shipped in every export without anyone choosing it. The
- *   crop-to-content
+ *   downloads/shares/copies, or left out. LEFT OUT is the default again
+ *   (ADR-040, 2026-08-18, reversing ADR-016). Between 2026-07-13 and then it
+ *   was INCLUDE while this header and the panel copy both still said
+ *   "photo only … the default" — which is how a padded artboard shipped in
+ *   every export without anyone choosing it, and how the JPEG black border
+ *   (ADR-039) went unnoticed. The crop-to-content
  *   compositing is Rust-side (`get_image_data_excluding_background`);
  *   selection copies use `copy_region_composited`, which takes the same flag
  *   without tight-cropping (its rect is in document coordinates).
@@ -115,12 +116,12 @@ export function LayersCanvasPane({
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-text-muted">
             The backing canvas above (“Canvas + photo”) is a compositional
-            guide. “Include canvas” — the default — bakes the full padded
-            backing into the exported image. “Photo only” leaves it out of
-            downloads, shares, and copies. This applies to copying a selection
-            as well as the whole canvas. JPEG has no transparency, so a
-            transparent backing is left out of a JPEG either way — it would
-            otherwise be written as a black border.
+            guide. “Photo only” — the default — leaves it out of downloads,
+            shares, and copies, so an export is the photo at the photo’s own
+            size. “Include canvas” bakes the full padded backing in instead.
+            This applies to copying a selection as well as the whole canvas.
+            JPEG has no transparency, so a transparent backing is left out of a
+            JPEG either way — it would otherwise be written as a black border.
           </p>
         </div>
         <ToggleButtonGroup

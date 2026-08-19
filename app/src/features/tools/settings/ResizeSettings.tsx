@@ -93,6 +93,9 @@ interface ResizeSettingsProps {
   /** Apply Compression & Resize: resample to w×h with the given Rust filter
    *  code, then re-encode at the panel's format + quality. */
   onResize: (w: number, h: number, filter: number) => void;
+  /** Apply Resize: the same Rust resample, re-encoded in the photo's OWN format
+   *  at full quality — the dimensions change and nothing else does. */
+  onResizeOnly: (w: number, h: number, filter: number) => void;
   exportFormat: ExportFormat;
   onExportFormatChange: (f: ExportFormat) => void;
   onToggleCompare: () => void;
@@ -124,6 +127,7 @@ export function ResizeSettings({
   onQualityChange,
   onQualityCommit,
   onResize,
+  onResizeOnly,
   exportFormat,
   onExportFormatChange,
   onToggleCompare,
@@ -245,6 +249,21 @@ export function ResizeSettings({
     }
   };
 
+  /** Resize only. Deliberately does NOT touch baseQualityRef / baseFormatRef:
+   *  those track what the COMPRESSION button has committed, and a resize leaves
+   *  a pending quality change still pending. It does set `appliedHere`, because
+   *  an edit really was applied to this photo — that is what unlocks A/B
+   *  compare, and a resize is exactly the kind of change worth comparing. */
+  const handleApplyResizeOnly = () => {
+    const w = parseInt(width, 10);
+    const h = parseInt(height, 10);
+    if (w > 0 && h > 0 && (w !== imageWidth || h !== imageHeight)) {
+      onResizeOnly(w, h, FILTER_CODE[method]);
+      baseMethodRef.current = method;
+      setAppliedHere(true);
+    }
+  };
+
   const handleAutoCompress = (scope: "selected" | "all") => {
     onAutoCompress(scope);
     setAppliedHere(true);
@@ -257,6 +276,12 @@ export function ResizeSettings({
   const qualityChanged = quality < baseQualityRef.current;
   const formatChanged = exportFormat !== baseFormatRef.current;
   const methodChanged = method !== baseMethodRef.current;
+  /** Dimensions alone — what "Apply Resize" acts on. Separate from
+   *  `resizeChanged` below, which also counts quality/format/method, because a
+   *  resize-only button must stay dark when the only pending change is one it
+   *  would silently discard. */
+  const dimensionsChanged =
+    parseInt(width, 10) !== imageWidth || parseInt(height, 10) !== imageHeight;
   const resizeChanged =
     parseInt(width, 10) !== imageWidth ||
     parseInt(height, 10) !== imageHeight ||
@@ -463,6 +488,30 @@ export function ResizeSettings({
 
       {/* ── Bottom Buttons ── */}
       <div className="border-t border-theme-sidebar-border pt-4 mt-8 space-y-2">
+        {/* Resize WITHOUT re-compressing — enabled only when the pixel
+            dimensions actually differ, since that is all it applies. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <Button size="large"
+                onClick={handleApplyResizeOnly}
+                disabled={disabled || !dimensionsChanged}
+                className="w-full"
+              >
+                <Scaling className="h-4 w-4" />
+                Apply Resize
+              </Button>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-[220px] text-center">
+            <p className="text-xs">
+              {dimensionsChanged
+                ? "Changes the pixel dimensions only — re-saved in this photo's own format at full quality, so the quality slider is left alone."
+                : "Enter a different width or height first. This button applies the new dimensions and nothing else."}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+
         <Button size="large"
           onClick={handleApplyResize}
           disabled={disabled || !resizeChanged}

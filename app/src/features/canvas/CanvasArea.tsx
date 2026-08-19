@@ -2166,16 +2166,29 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           );
         })()}
 
-        {/* Brush-size ring — only for the size-based brush tools (Paint/Blur/
-            Eraser brush + the Effects blur brush, plus the Eraser tool's two
-            canvas-brush modes: brush + Magic Eraser). Other tools (Resize/
-            compress, Layer-Settings arrow, the Eraser tool's click-action
-            modes, …) keep the standard default arrow, on the canvas and over
-            the panels. `!cursor` still hides it while the Effects color-picker
-            shows its crosshair. Hidden during pan. */}
+        {/* Brush-size ring — only for the size-based brush tools: Paint's four
+            brushes, and the Eraser tool's two canvas-brush modes (brush + Magic
+            Eraser). Everything else keeps the standard arrow, on the canvas and
+            over the panels. `!cursor` still hides it while a sub-tool declares
+            its own cursor (the Effects color-picker's crosshair). Hidden during
+            pan.
+
+            ⚠️ `activeTool === "effects"` was removed 2026-08-18: it dated from
+            when the blur brush lived in the Effects panel, and that brush moved
+            into Paint. What was left under `effects` is Levels — Enhance ›
+            Adjustments — which has NO canvas gesture at all: `useEffectiveTool`
+            returns `idle` for the WHOLE Enhance group, and the registry gives
+            none of its tiles a cursor. So the ring was promising a brush that
+            could not paint. The ring and the dispatch are two views of one
+            fact, exactly like `LiveSubTool.cursor`; if a tool idles, it gets
+            the arrow.
+
+            The `ai` clause STAYS: those two modes are the Create-side eraser
+            painting a real mask onto the canvas, sharing the `ai` tool id with
+            the Enhance › AI tile that only clicks. `eraserMode` is what tells
+            them apart. */}
         {cursorVisible &&
           (activeTool === "brush" ||
-            activeTool === "effects" ||
             (activeTool === "ai" &&
               (eraserMode === "brush" || eraserMode === "magic"))) &&
           !cursor &&

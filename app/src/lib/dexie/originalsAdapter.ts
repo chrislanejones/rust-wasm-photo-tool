@@ -57,6 +57,33 @@ export async function putOriginal(
  * or torn copy just means the next read re-copies. Returns the legacy
  * `StoredOriginal` shape regardless of source.
  */
+/**
+ * Just the pixel dimensions of a stored original — no bytes.
+ *
+ * `getOriginal` resolves `blob.arrayBuffer()`, which for a phone photo is tens
+ * of megabytes copied out of IndexedDB. The status bar wants two integers, so
+ * it reads the record and leaves the blob alone (Dexie hands back a lazy Blob
+ * reference; not calling `.arrayBuffer()` is what makes this cheap).
+ *
+ * Falls back to the legacy store on a Dexie miss, same read-through order as
+ * `getOriginal`, but WITHOUT the copy-forward — a dimensions probe should not
+ * have a write as a side effect.
+ */
+export async function getOriginalDimensions(
+  key: string,
+): Promise<{ width: number; height: number } | null> {
+  if (USE_DEXIE_ORIGINALS) {
+    const rec = await db.originals.get(key);
+    if (rec && rec.width > 0 && rec.height > 0) {
+      return { width: rec.width, height: rec.height };
+    }
+  }
+  const legacy = await legacyGetOriginal(key);
+  return legacy && legacy.width > 0 && legacy.height > 0
+    ? { width: legacy.width, height: legacy.height }
+    : null;
+}
+
 export async function getOriginal(key: string): Promise<StoredOriginal | null> {
   if (!USE_DEXIE_ORIGINALS) return legacyGetOriginal(key);
 

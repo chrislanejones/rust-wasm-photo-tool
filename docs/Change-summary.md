@@ -8421,3 +8421,141 @@ drifted forward. ADR-038's pre-mortem names the failure: someone deletes the
 file "temporarily" to unblock a build, floating behaviour returns silently, and
 the next size surprise takes just as long to diagnose — only with an ADR
 claiming it cannot happen.
+
+---
+
+## v8.54 Change Summary — 2026-08-18
+
+Four user-visible changes and one defect, all downstream of the same question:
+which surfaces write pixels?
+
+### 1. The black border was going INTO the saved file (the fourth surface)
+
+v8.53 fixed three surfaces that write an exported image — the single Download,
+the batch ZIP, and the dialog's predicted size — so a transparent artboard is
+never baked into a format with no alpha (ADR-039). **The internal working-copy
+save was a fourth surface and was missed.**
+
+`persistActiveCanvas` encoded the full padded composite at the compression
+panel's format. One Apply Compression with JPEG selected wrote the black border
+into the stored file in IndexedDB, **permanently** — after which every export
+carried it as genuine pixels regardless of the export setting, because there was
+no longer anything to leave out.
+
+| Stored working copy | Dimensions | Corner pixel |
+|---|---|---|
+| Before — `probe.jpg` | 320×240 | `rgba(0,0,0,255)` |
+| After — `probe.png` | **240×160** | **`201,41,51`** (the photo) |
+
+The predicate is now named for what it asks — `wouldInventOpaquePixels(format,
+canvasBgTransparent)` — and the save consults it **without** consulting the
+user's export preference. Baking invented black into a file the user is keeping
+is data loss, not a preference.
+
+**The lesson, recorded:** "which surfaces export" and "which surfaces write
+pixels" are different questions, and v8.53 answered only the first.
+
+### 2. `exportCanvasBackground` defaults to false again — ADR-040
+
+Supersedes ADR-016's export-default decision. The two-layer artboard on import
+is unchanged; only the export default flips back.
+
+| | ADR-016 (2026-07-13) | ADR-040 (2026-08-18) |
+|---|---|---|
+| Default | Include canvas | **Photo only** |
+| Rationale | What you see is what you export | Padding nobody asked for, on every import |
+
+Three things are known now that were not in July: the Settings copy **never
+followed** the reversal (panel and header both still said "Photo only … the
+default" for a year, so nobody ever actively chose Include), it **produced a
+visible defect** (ADR-039), and it **silently changes exported dimensions** — a
+240×160 photo exported at 260×180, so the resize panel's numbers were not what
+you got.
+
+⚠️ **Existing installs are NOT migrated.** `normalize()` only fills an absent
+key, so anyone with the pref already stored keeps their behaviour.
+
+### 3. Apply Resize — resample and nothing else
+
+The panel's existing button couples two decisions: pixel count and compression.
+Wanting the first meant accepting wherever the quality slider sat.
+
+`Apply Resize` runs the same Rust `resize_with_filter` kernel and re-encodes in
+the photo's **own** MIME at quality 1.0 (`formatFromMime`, falling back to the
+panel's format for gif/svg, because something has to be written). It enables on
+a dimension change only — `dimensionsChanged`, not `resizeChanged` — so a
+button that would silently discard a pending quality change stays dark.
+
+### 4. The gallery badge is signed
+
+`Math.max(0, …)` clamped the savings percentage at zero in three places, so a
+photo that GREW showed no badge and looked untouched — which Apply Resize makes
+a one-click operation.
+
+| | Before | After |
+|---|---|---|
+| Smaller | green `-38%` | green `-38%` |
+| Larger | **no badge** | **amber `+150%`** |
+| Bound | clamped at 0 | unbounded |
+
+Fixed in `persistActiveCanvas`, `handleApplyCompression` and `useAutoCompress`
+together, because three call sites deriving one convention is a convention they
+eventually disagree about.
+
+### 5. The status bar shows the uploaded size
+
+New `Original: W×H` segment beside the current canvas size.
+
+⚠️ **`entry.origWidth` is NOT the upload size despite the name** —
+`persistActiveCanvas` rewrites it to whatever it just saved, so after one Apply
+Resize it reports the resized number and the original is gone. The immutable
+pair lives on the `uploadKey` originals record, so `useUploadDimensions` reads
+from there.
+
+Deliberately **not** a new `PhotoEntry` field: the gallery is persisted, so that
+would be a storage change requiring the dexie-migration procedure. Deriving it
+from an existing key needs no migration. `getOriginalDimensions` reads the
+record without touching `blob.arrayBuffer()` — for a phone photo that copy is
+tens of megabytes for two integers.
+
+### 6. Layer allowances
+
+| Tier | Before | After |
+|---|---|---|
+| Demo (no login) | 3 | **8** |
+| Logged in | 3 | **8** |
+| Paid | ∞ | **16** |
+
+Three was a limit reached during ordinary work, which read as a paywall rather
+than a ceiling. Layers stay off the paywall — login and paid differentiate on
+cloud features, not local editing.
+
+Paid drops from unlimited to a stated 16 deliberately. Unlimited was never true:
+an .ora export holds every layer's pixels simultaneously and wasm memory never
+shrinks (measured in b2 at 10.84 MB for two layers, +5.38 MB per layer,
+unbounded), so the tail of that promise arrived as an out-of-memory tab. A
+stated ceiling is the honest form of a limit the machine already imposed.
+
+### 7. Smaller
+
+- `Ctrl+[` / `Ctrl+]` moved out of "Stamps (Clone)" into **"Brush size (all
+  paints & stamps)"**. `adjustBrushSize` covers Paint's brush, its blur brush
+  and eraser, the Eraser tool's two canvas modes, the emoji stamp and the
+  clone/redaction stamp — filing it under Clone meant a painter could not find
+  it.
+- The brush ring no longer renders on tools that declare no cursor, so it stops
+  promising a brush that is not there.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | clean |
+| `pnpm lint` | **0 errors**, 58 warnings (unchanged baseline) |
+| `pnpm -C app test` | **601 passed** across 51 files |
+| `pnpm run build` | succeeds |
+| `pnpm run build:wasm` | **813,407 B** — byte-identical to v8.53 |
+
+The Rust crate is untouched this release; the wasm was rebuilt as a verify step
+and reproduced v8.53's byte count exactly, which is the toolchain pin from
+ADR-038 doing its job.

@@ -84,6 +84,60 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.54 — 2026-08-18
+
+**The last release stopped the black border on the way out. It was also going
+in.** v8.53 taught three export surfaces to leave a transparent backing canvas
+out of a JPEG. Saving was a fourth surface, and it was the one that got away.
+Apply Compression with JPEG selected wrote the padded canvas into the stored
+working copy, border and all — and from that moment the border was real pixels
+in the file. Every later export carried it, whatever the export setting said,
+because by then there was nothing left to leave out.
+
+Saving now refuses on the same terms, and it does not consult your preference
+first. Writing black into a file you are keeping is not a setting.
+
+**The backing canvas is left out of exports again, by default.** It has been
+included since July. The argument then was that what you see on screen is what
+you should get on export, which is a fair argument — but the canvas is padding
+you never asked for, it arrives on every import, and it quietly changes the
+dimensions of every file you save. A 240×160 photo was exporting at 260×180,
+so the numbers in the resize panel were not the numbers you got.
+
+Including it is now something you turn on. If you already changed that setting,
+you keep what you chose — nothing is migrated underneath you.
+
+**Apply Resize does only that.** The panel had one button for two decisions: how
+many pixels the image has, and how hard it is compressed. Wanting the first
+meant accepting whatever the quality slider happened to be sitting at. There is
+now a separate Apply Resize that resamples and stops — same filter, re-encoded
+in the photo's own format at full quality. Resizing is not the moment to change
+a file's type.
+
+**The gallery badge tells you when a file got bigger.** It only ever counted
+savings, so anything that grew — an upscale, or quality raised past the
+original — showed no badge at all and looked untouched. Growth now shows in
+amber with a plus. It is not capped either: a file two and a half times the
+upload reads +150%.
+
+**The status bar shows the size you uploaded**, next to the size the canvas is
+now, so you can see what a resize actually did.
+
+**Layers: eight for everyone, sixteen on paid.** Three was a limit people hit
+doing ordinary work, which made it feel like a paywall rather than a ceiling.
+Layers are local editing and stay off the paywall — signing in and paying buy
+cloud things, not the ability to stack images.
+
+Paid goes to sixteen rather than unlimited, which is a reduction on paper and
+an honest one. Unlimited was never true: an .ora export holds every layer's
+pixels at once and the engine's memory never shrinks, so the far end of that
+promise arrived as a tab that ran out of memory. A stated ceiling is the honest
+version of a limit the machine was already imposing.
+
+**Smaller things.** The brush-size shortcuts were filed under Stamps (Clone) and
+read as clone-only; they work for every brush that draws a size ring, and now
+say so. The brush ring no longer promises a brush on tools that do not have one.
+
 ### v8.53 — 2026-08-18
 
 **Every JPEG you exported had a black border, and it was not the encoder's

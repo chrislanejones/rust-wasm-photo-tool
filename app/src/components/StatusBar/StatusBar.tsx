@@ -6,6 +6,7 @@ import { Fragment, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 import { formatBytes } from "@/lib/format";
+import { useUploadDimensions } from "@/hooks/useUploadDimensions";
 
 export interface ShortcutHint {
   keys: string;
@@ -58,6 +59,9 @@ export function StatusBar({
   activeToolHint2,
 }: Props) {
   const sizeLabel = formatBytes(fileSize);
+  // Read from the gallery store rather than two more props out of AppShell —
+  // see the hook for why `entry.origWidth` is NOT the upload size.
+  const uploadDims = useUploadDimensions();
 
   // Rotate the interface-hint slot every 3 minutes. The first three slots
   // change (two tool-related, one interface-related cycling); Alt+/ is
@@ -111,7 +115,15 @@ export function StatusBar({
             <span className="status-divider" />
           </>
         )}
-        <span className="status-zoom">
+        {uploadDims && (
+          <>
+            <span className="status-zoom" title="Dimensions of the photo as uploaded">
+              Original: {uploadDims.width}×{uploadDims.height}
+            </span>
+            <span className="status-divider" />
+          </>
+        )}
+        <span className="status-zoom" title="Dimensions of the canvas as it is now">
           {state.width && state.height ? `${state.width}×${state.height}` : "—"}
         </span>
         <span className="status-divider" />

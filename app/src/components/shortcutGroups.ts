@@ -64,12 +64,21 @@ export const SHORTCUT_GROUPS = [
     ],
   },
   {
-    title: "Stamps (Clone)",
+    // The bracket keys were filed under "Stamps (Clone)" and read as a
+    // clone-only binding. They are not: `adjustBrushSize` covers Paint's brush,
+    // its blur brush, its eraser, the Eraser tool's two canvas-brush modes, the
+    // emoji stamp and the clone/redaction stamp — every brush that draws a size
+    // ring. Filed under their own heading so they can be found by someone
+    // painting, not only by someone cloning.
+    title: "Brush size (all paints & stamps)",
     shortcuts: [
-      { keys: ["Alt", "Click"], action: "Set Source Point" },
       { keys: ["Ctrl", "["], action: "Decrease Brush Size" },
       { keys: ["Ctrl", "]"], action: "Increase Brush Size" },
     ],
+  },
+  {
+    title: "Stamps (Clone)",
+    shortcuts: [{ keys: ["Alt", "Click"], action: "Set Source Point" }],
   },
   {
     title: "View",

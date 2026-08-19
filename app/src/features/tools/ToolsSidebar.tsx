@@ -86,6 +86,8 @@ interface ToolsSidebarProps {
   imageReady: boolean;
   /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
   onResize: (newW: number, newH: number, filter: number) => void;
+  /** "Apply Resize" — resample only, no re-compression. See AppShell. */
+  onResizeOnly: (newW: number, newH: number, filter: number) => void;
   /** Photoshop-style Canvas Size resize (no resample) — Layer Settings tool. */
   onResizeCanvas: (w: number, h: number) => void;
   /** Deletes the artboard's Background layer outright. */
@@ -182,6 +184,7 @@ export function ToolsSidebar({
   onSharpen,
   imageReady,
   onResize,
+  onResizeOnly,
   onResizeCanvas,
   onRemoveCanvas,
   canRemoveCanvas,
@@ -307,6 +310,7 @@ export function ToolsSidebar({
             onQualityChange={onQualityChange}
             onQualityCommit={onQualityCommit}
             onResize={onResize}
+            onResizeOnly={onResizeOnly}
             exportFormat={exportFormat}
             onExportFormatChange={onExportFormatChange ?? (() => {})}
             onToggleCompare={onToggleCompare}

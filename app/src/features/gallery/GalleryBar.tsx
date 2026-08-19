@@ -103,7 +103,14 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
   const isCompressing = progress !== undefined && progress >= 0 && progress < 100;
   const isDone = progress === 100;
   const isError = progress === -1;
-  const hasSavings = savings != null && savings.savingsPercent > 0;
+  // `savingsPercent` is SIGNED: positive = smaller than the upload, negative =
+  // bigger. Both are worth showing — the badge used to require > 0, so a photo
+  // that GREW (an upscale, or a quality raised past the original) showed no
+  // badge at all and looked untouched. Growth is unbounded and routinely passes
+  // 100%: a file 2.5x the upload reads "+150%".
+  const sizeDelta = savings?.savingsPercent ?? 0;
+  const hasSavings = sizeDelta !== 0;
+  const grew = sizeDelta < 0;
 
   const dims =
     entry.origWidth && entry.origHeight
@@ -220,8 +227,19 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       </AnimatePresence>
 
       {hasSavings && (
-        <div className="absolute top-1 left-1 z-20 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-500/90 text-white text-2xs font-bold font-mono shadow-lg pointer-events-none">
-          <Zap className="h-2.5 w-2.5" />-{savings!.savingsPercent}%
+        <div
+          className={`absolute top-1 left-1 z-20 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-white text-2xs font-bold font-mono shadow-lg pointer-events-none ${
+            grew ? "bg-amber-500/90" : "bg-emerald-500/90"
+          }`}
+          title={
+            grew
+              ? `${Math.abs(sizeDelta)}% larger than the uploaded file`
+              : `${sizeDelta}% smaller than the uploaded file`
+          }
+        >
+          <Zap className="h-2.5 w-2.5" />
+          {grew ? "+" : "-"}
+          {Math.abs(sizeDelta)}%
         </div>
       )}
 

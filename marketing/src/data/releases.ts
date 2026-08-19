@@ -24,6 +24,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.54",
+    date: "2026-08-18",
+    headline: "The black border was going into the saved file too, and the canvas goes back to opt-in",
+    entries: [
+      {
+        tag: "fix",
+        text: "Last release stopped the black border on the way out. It was also going in. Three export surfaces learned to leave a transparent backing canvas out of a JPEG; saving was a fourth surface, and it was the one that got away. Applying compression with JPEG selected wrote the padded canvas into the stored working file, border and all — and from that moment the border was real pixels, so every later export carried it whatever the export setting said.",
+      },
+      {
+        tag: "fix",
+        text: "Saving now refuses on the same terms, and it does not consult your export preference first. Writing invented black into a file you are keeping is not a setting.",
+      },
+      {
+        tag: "feature",
+        text: "The backing canvas is left out of exports again by default. It had been included since July; the argument then was that what you see on screen is what you get on export. The canvas is padding you never asked for, it arrives on every import, and it quietly changes the dimensions of every file you save — a 240×160 photo was exporting at 260×180, so the numbers in the resize panel were not the numbers you got. If you already changed that setting, you keep what you chose.",
+      },
+      {
+        tag: "feature",
+        text: "Apply Resize does only that. The panel had one button for two decisions — how many pixels the image has, and how hard it is compressed — so wanting the first meant accepting wherever the quality slider happened to sit. Apply Resize resamples and stops, re-encoding in the photo's own format at full quality. Resizing is not the moment to change a file's type.",
+      },
+      {
+        tag: "ui",
+        text: "The gallery badge tells you when a file got bigger. It only ever counted savings, so anything that grew — an upscale, or quality raised past the original — showed no badge and looked untouched. Growth now shows in amber with a plus, and it is not capped: a file two and a half times the upload reads +150%.",
+      },
+      {
+        tag: "ui",
+        text: "The status bar shows the size you uploaded next to the size the canvas is now, so you can see what a resize actually did.",
+      },
+      {
+        tag: "feature",
+        text: "Layers go from three to eight for everyone, and paid gets sixteen. Three was a limit people hit doing ordinary work, which made it feel like a paywall rather than a ceiling — layers are local editing and stay off the paywall. Paid moves from unlimited to sixteen, which is a reduction on paper and an honest one: an .ora export holds every layer's pixels at once and the engine's memory never shrinks, so the far end of unlimited arrived as a tab that ran out of memory.",
+      },
+      {
+        tag: "ui",
+        text: "The brush-size shortcuts were filed under Stamps (Clone) and read as clone-only. They work for every brush that draws a size ring, and now say so. The ring itself no longer appears on tools that do not have a brush.",
+      },
+    ],
+  },
+  {
     version: "v8.53",
     date: "2026-08-18",
     headline: "A black border on every JPEG, and the compiler that kept changing the engine's size",

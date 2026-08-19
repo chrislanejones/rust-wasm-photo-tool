@@ -100,7 +100,9 @@ import {
   encodeRgba,
   EXT,
   extFromMime,
+  formatFromMime,
   includeCanvasInExport,
+  wouldInventOpaquePixels,
 } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
@@ -2113,26 +2115,56 @@ export function AppShell() {
    * Apply Compression/Resize and the Canvas-Size paths so a resized document is
    * persisted exactly like a resample. No-op when there's no active photo/tool.
    */
-  const persistActiveCanvas = useCallback(async () => {
+  /**
+   * @param opts.keepSourceEncoding  Re-encode in the photo's OWN format at full
+   *   quality instead of the compression panel's format + quality slider. This
+   *   is what separates "Apply Resize" from "Apply Compression & Resize":
+   *   resizing changes how many pixels there are, and should not silently also
+   *   change the file's type or push it through the quality slider. Falls back
+   *   to the panel's format when the stored MIME is not one we re-encode to
+   *   (gif/svg), because something has to be written.
+   */
+  const persistActiveCanvas = useCallback(async (opts?: { keepSourceEncoding?: boolean }) => {
     const entry = photos.find((p) => p.id === activePhotoId);
     const tool = stamp.toolRef.current;
     if (!entry || !tool) return;
+    const sourceFormat = opts?.keepSourceEncoding
+      ? formatFromMime(entry.mimeType ?? "")
+      : null;
+    const encodeFormat = sourceFormat ?? exportFormat;
+    const encodeQuality = sourceFormat ? 1 : quality / 100;
     try {
       // ATOMIC CAPTURE (ADR-024). Was `get_image_data()` + `width()` +
       // `height()`. These three are not merely read together, they TRAVEL
       // together: `pixels`, `tw` and `th` cross three awaits below and are then
       // written to IndexedDB as one record (`putOriginal(newFile, tw, th)`) and
       // scaled as one image. A mismatch here is persisted, not transient.
-      const cap = await tool.capture_composite();
+      // ⚠️ THE SAVE IS A SURFACE THAT WRITES PIXELS, and it was the one that got
+      // away. v8.53 taught the three EXPORT surfaces not to bake a transparent
+      // artboard into a format with no alpha (ADR-039) — but this internal save
+      // still encoded the full padded composite at the panel's format. Apply
+      // Compression with JPEG selected and the black border went into the
+      // STORED working file, permanently: every later export then carried it as
+      // real pixels, whatever the export setting said. Verified in IndexedDB —
+      // a stored `probe.jpg` at 320×240 with corner rgba(0,0,0,255) beside a
+      // `probe.png` at 240×160 with the photo in the corner.
+      //
+      // So the crop happens here too, and NOT on the user's export preference —
+      // this is not a preference. Writing invented black into a saved file is
+      // data loss and is refused regardless of what "Include canvas" says.
+      const dropCanvasToSave = wouldInventOpaquePixels(encodeFormat, canvasBgTransparent);
+      const cap = dropCanvasToSave
+        ? await tool.capture_composite_excluding_background()
+        : await tool.capture_composite();
       const { rgba: pixels, width: tw, height: th } = cap;
       cap.free();
       // encodeRgba and makeThumbnailFromPixels each hand their buffer to the
       // codec worker, which transfers (detaches) it. Give encodeRgba its own
       // copy so the original `pixels` survives for the thumbnail below.
-      const blob = await encodeRgba(pixels.slice(), tw, th, exportFormat, quality / 100);
+      const blob = await encodeRgba(pixels.slice(), tw, th, encodeFormat, encodeQuality);
       // convertToBlob may fall back (e.g. AVIF → PNG on some browsers); trust
       // the blob's actual MIME for the stored metadata.
-      const mime = blob.type || `image/${exportFormat}`;
+      const mime = blob.type || `image/${encodeFormat}`;
       const newFile = new File([blob], `${entry.name}${extFromMime(mime)}`, {
         type: mime,
       });
@@ -2176,10 +2208,15 @@ export function AppShell() {
         ),
       );
 
-      // Real savings vs. the immutable upload-size baseline.
+      // Real change vs. the immutable upload-size baseline. SIGNED on purpose:
+      // positive = smaller than the upload (a saving), negative = LARGER. The
+      // old `Math.max(0, …)` clamp meant an upscale — which "Apply Resize" makes
+      // a one-click operation — silently reported nothing at all, and the
+      // gallery badge just vanished. Growth is unbounded, so this can exceed
+      // -100% (a file 2.5x the original reads as +150% bigger).
       const realSavings =
         entry.originalByteSize > 0
-          ? Math.max(0, Math.round((1 - blob.size / entry.originalByteSize) * 100))
+          ? Math.round((1 - blob.size / entry.originalByteSize) * 100)
           : 0;
       setImageSavings((prev) => ({
         ...prev,
@@ -2189,7 +2226,7 @@ export function AppShell() {
       console.error("Persist canvas failed:", err);
       toast.error("Couldn't save canvas changes");
     }
-  }, [photos, activePhotoId, stamp, exportFormat, quality]);
+  }, [photos, activePhotoId, stamp, exportFormat, quality, canvasBgTransparent]);
 
   const handleApplyCompression = useCallback(
     async (w: number, h: number, filter: number) => {
@@ -2220,11 +2257,11 @@ export function AppShell() {
       if (activePhotoId) {
         const areaRatio = origW * origH > 0 ? (w * h) / (origW * origH) : 1;
         const qualityRatio = quality / 100;
-        const savingsPercent = Math.max(
-          0,
-          Math.round((1 - areaRatio * qualityRatio) * 100),
-        );
-        if (savingsPercent > 0) {
+        // Signed, same convention as the real measurement in
+        // `persistActiveCanvas` that replaces it a moment later: positive is a
+        // saving, negative is growth. An upscale gives areaRatio > 1.
+        const savingsPercent = Math.round((1 - areaRatio * qualityRatio) * 100);
+        if (savingsPercent !== 0) {
           setImageSavings((prev) => ({
             ...prev,
             [activePhotoId]: { savingsPercent },
@@ -2236,6 +2273,39 @@ export function AppShell() {
       await persistActiveCanvas();
     },
     [stamp, activePhotoId, quality, persistActiveCanvas],
+  );
+
+  /**
+   * "Apply Resize" — resample and nothing else.
+   *
+   * The panel's older button couples two decisions: how many pixels the image
+   * has, and how hard it is compressed. Wanting the first without the second
+   * meant accepting whatever the quality slider happened to sit at. This
+   * applies the resample (Rust `resize_with_filter`, same kernel) and persists
+   * in the photo's OWN format at full quality, so the only loss is the
+   * resample itself.
+   *
+   * Guarded on an actual dimension change: with w/h unchanged there is nothing
+   * to resample, and the compression path is the one that has a job to do.
+   */
+  const handleApplyResizeOnly = useCallback(
+    async (w: number, h: number, filter: number) => {
+      if (w < 1 || h < 1) return;
+      if (w === stamp.state.width && h === stamp.state.height) return;
+      stamp.resizeWithFilter(w, h, filter);
+      setHasBeenModified(true);
+      if (activePhotoId) {
+        setModifiedPhotos((prev) =>
+          prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
+        );
+      }
+      // No instant estimate here. The compression path can predict its own
+      // result from area x quality; a resize-only re-encode cannot be guessed
+      // that way (format efficiency dominates), and a wrong number that flashes
+      // for a moment is worse than the real one arriving a moment later.
+      await persistActiveCanvas({ keepSourceEncoding: true });
+    },
+    [stamp, activePhotoId, persistActiveCanvas, setHasBeenModified, setModifiedPhotos],
   );
 
   /**
@@ -3152,6 +3222,7 @@ export function AppShell() {
             onSharpen={stamp.adjustSharpen}
             imageReady={hasImage}
             onResize={handleApplyCompression}
+            onResizeOnly={handleApplyResizeOnly}
             onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
             onRemoveCanvas={() => void handleRemoveCanvas()}
             canRemoveCanvas={backgroundLayerId !== undefined}

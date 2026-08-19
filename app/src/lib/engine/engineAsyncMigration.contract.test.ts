@@ -660,6 +660,14 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // 0 truthy) are again unchanged, which is the point of updating this
     // number deliberately instead of loosening the assertion.
     //
+    // v8.54 — 118 -> 119: `persistActiveCanvas` awaits
+    // `capture_composite_excluding_background` on the branch where the save
+    // would otherwise bake an invented black border into the stored file
+    // (ADR-039's condition reaching the INTERNAL save, not just the three
+    // export surfaces — see that call site). Born awaited: it consumes a
+    // capture struct, so it could never have been fire-and-forget. Gate
+    // numbers below (5 exempt / 0 unawaited / 0 truthy) unchanged again.
+    //
     // The difference from v8.19's identical-looking claim is the method list:
     // that one was made against a shadow .d.ts missing 31 of the engine's
     // methods. This one knows all 280.
@@ -667,7 +675,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(118);
+    expect(gate.awaited, "cumulative converted sites").toBe(119);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
