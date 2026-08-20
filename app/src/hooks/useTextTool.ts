@@ -5,6 +5,7 @@ import type { ToolSettings } from "@/lib/types";
 import { parseColorSync, warmColorParser } from "@/lib/colorParser";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { textInkOffsetBgAwaited } from "@/lib/engine/textMetricsCache";
+import { findForeignAnnotation } from "@/lib/annotationHitTest";
 
 interface TextInput {
   screenX: number;
@@ -556,6 +557,29 @@ export function useTextTool({
             await editAnnotation(ann);
             return;
           }
+        } else {
+          // #50 — A MISS NOW MEANS A MISS.
+          //
+          // `text_annotation_at` answers for the ACTIVE layer only, but the
+          // canvas composites every visible layer. So -1 has two meanings and
+          // this code used to collapse them into one: click a text that lives
+          // on another layer, get -1, fall through, and open a fresh blank box
+          // ON TOP of the thing you were aiming at. That is the whole of the
+          // reported "crosstalk".
+          //
+          // Ask the other visible layers before deciding the canvas is empty.
+          // If one of them has ink here, do nothing at all — the click was
+          // aimed at something, and inventing a new annotation over it is the
+          // one response that is certainly wrong.
+          //
+          // Costs N engine reads on a MISS only; a hit on the active layer
+          // (the common case) returns above without touching this path.
+          const foreign = await findForeignAnnotation(
+            tool,
+            Math.round(canvasX),
+            Math.round(canvasY),
+          );
+          if (foreign) return;
         }
       }
 

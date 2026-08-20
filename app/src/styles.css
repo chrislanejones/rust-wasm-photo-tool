@@ -1556,8 +1556,11 @@ input[type="range"].slider-overlay::-moz-range-thumb {
   overflow: hidden;
   cursor: pointer;
   border: 2px solid transparent;
+  /* `box-shadow` joins the transition because #58 moved both the current and
+     selected markers onto it; without this they snap while the tile eases. */
   transition:
     border-color 0.15s,
+    box-shadow 0.15s,
     transform 0.12s;
 }
 
@@ -1594,14 +1597,52 @@ input[type="range"].slider-overlay::-moz-range-thumb {
    dropped its selection marker; measured, not theorised — the first
    verification pass read `borderColor: rgba(0,0,0,0)` on a selected thumb with
    the pointer parked on it. */
-.photo-thumb:hover:not(.active) {
-  box-shadow: 0 0 0 2px var(--text-muted);
+/* ─── THUMB RING VOCABULARY (#58) ───────────────────────────────────────────
+   Two things can be true of one thumb at the same time, and before this they
+   fought over a single property:
+
+     · CANVAS-CURRENT (`.active`)   — this photo is open on the canvas. ONE
+                                      thumb in the gallery. Drawn INSIDE.
+     · GALLERY-SELECTED (`.selected`) — in the multi-select set for a batch
+                                      operation. ANY number of thumbs.
+                                      Drawn OUTSIDE.
+     · FOCUS                        — the keyboard is here. `outline`, always,
+                                      and nothing else may take that channel.
+
+   THE PROBLEM THIS SOLVES: `box-shadow` is one property. `.active` and
+   `.selected` both wanted it, so whichever rule came later won and the other
+   state silently vanished — the same failure the `border-color` comment below
+   records from 2026-07-28, one property later. Combinatorial rules
+   (`.active.selected`) fix it by hand and rot the moment a fourth state
+   arrives.
+
+   Instead each affordance owns a NAMED CHANNEL, and the single `box-shadow`
+   composes whatever is lit. Adding a state means adding a channel, not
+   auditing pairs. A custom property holds a token stream, so a channel can
+   itself be a two-part shadow.
+
+   INSIDE vs OUTSIDE is the whole reason both stay readable in one accent
+   colour: current hugs the image, selected floats off it. Same argument the
+   tool tiles settled on — differ by channel and shape, not only hue. */
+.photo-thumb {
+  --thumb-ring-inner: 0 0 #0000;
+  --thumb-ring-outer: 0 0 #0000;
+  box-shadow: var(--thumb-ring-inner), var(--thumb-ring-outer);
 }
 
+/* Hover is the WEAKEST claim, so it yields to either real state. It still
+   fires on an `.active` thumb (that tile is hoverable and should say so) but
+   never on a `.selected` one, whose outer accent it would otherwise overwrite
+   with muted grey — which is exactly the bug the border comment below
+   describes, and it is one `:not()` away from happening again. */
+.photo-thumb:hover:not(.selected) {
+  --thumb-ring-outer: 0 0 0 2px var(--text-muted);
+}
+
+/* INSET, so the open photo is marked without growing the tile's footprint —
+   `gap-2` is 8px and an outward halo here would butt into the neighbour's. */
 .photo-thumb.active {
-  box-shadow:
-    0 0 0 2px var(--bg-secondary),
-    0 0 0 4px var(--accent);
+  --thumb-ring-inner: inset 0 0 0 3px var(--accent);
 }
 
 /* Multi-select (the checkbox state, distinct from `.active` = the open photo).
@@ -1612,10 +1653,19 @@ input[type="range"].slider-overlay::-moz-range-thumb {
    survives that, so a selected thumb never stops looking selected just because
    it is also focused. Border width is already 2px transparent on `.photo-thumb`,
    so lighting it shifts no layout. */
+/* #58: moved off `outline` onto the outer ring channel. It used to paint the
+   accent on TWO channels (border AND outline) precisely BECAUSE focus took the
+   outline away and something had to survive that. With selection on its own
+   box-shadow channel, focus can own `outline` outright and selection is never
+   at risk from it — so the doubling is no longer buying anything, and the
+   border goes back to being purely structural.
+
+   Two-part shadow: a `--bg-secondary` spacer first so the accent reads against
+   the panel rather than against arbitrary photo content at the tile edge. */
 .photo-thumb.selected {
-  border-color: var(--accent);
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  --thumb-ring-outer:
+    0 0 0 2px var(--bg-secondary),
+    0 0 0 4px var(--accent);
 }
 
 /* MUST come after `.photo-thumb.selected` — equal specificity (0,2,0), so

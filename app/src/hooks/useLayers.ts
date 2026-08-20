@@ -23,10 +23,24 @@
 // there is no multi-read picture to tear.
 import { useCallback, useMemo } from "react";
 import type { EngineCore } from "./useEngineCore";
+import { useGalleryStore } from "@/stores/useGalleryStore";
 
 export function useLayers(engine: EngineCore) {
   const { toolRef, syncState, flushToCanvas, broadcastAnnotationsChanged } =
     engine;
+  // #53 — LAYER-PANEL STATE HAD NO WAY TO REACH DISK.
+  //
+  // Every op below that calls `snap()` in Rust raises `undoCount`, and the
+  // autosave effect watches `undoCount`, so add / remove / duplicate / move /
+  // merge / flatten and the mask ops already schedule a save for free.
+  //
+  // Four do NOT snap — `set_active_layer`, `set_layer_visible`,
+  // `set_layer_opacity`, `rename_layer` (verified in layer.rs). They changed
+  // the document and nothing downstream could tell, so hide-a-layer-and-reload
+  // brought it back visible, and the active layer reverted to whatever
+  // `restoreLayerStack`'s `layers.length - 1` fallback picked. Those four bump
+  // a counter the autosave effect can actually see.
+  const bumpLayerRevision = useGalleryStore((s) => s.bumpLayerRevision);
 
   // ── Layers ────────────────────────────────────────────────────────────────
   // Each mutates the Rust layer stack, then repaints the composite and re-syncs
@@ -75,9 +89,10 @@ export function useLayers(engine: EngineCore) {
         flushToCanvas();
         syncState();
         broadcastAnnotationsChanged();
+        bumpLayerRevision();
       }
     },
-    [toolRef, flushToCanvas, syncState, broadcastAnnotationsChanged],
+    [toolRef, flushToCanvas, syncState, broadcastAnnotationsChanged, bumpLayerRevision],
   );
 
   const setLayerVisible = useCallback(
@@ -87,9 +102,10 @@ export function useLayers(engine: EngineCore) {
       if (await t.set_layer_visible(id, visible)) {
         flushToCanvas();
         syncState();
+        bumpLayerRevision();
       }
     },
-    [toolRef, flushToCanvas, syncState],
+    [toolRef, flushToCanvas, syncState, bumpLayerRevision],
   );
 
   const setLayerOpacity = useCallback(
@@ -99,9 +115,10 @@ export function useLayers(engine: EngineCore) {
       if (await t.set_layer_opacity(id, opacity)) {
         flushToCanvas();
         syncState();
+        bumpLayerRevision();
       }
     },
-    [toolRef, flushToCanvas, syncState],
+    [toolRef, flushToCanvas, syncState, bumpLayerRevision],
   );
 
   const renameLayer = useCallback(
@@ -110,9 +127,10 @@ export function useLayers(engine: EngineCore) {
       if (!t) return;
       if (await t.rename_layer(id, name)) {
         syncState();
+        bumpLayerRevision();
       }
     },
-    [toolRef, syncState],
+    [toolRef, syncState, bumpLayerRevision],
   );
 
   const moveLayer = useCallback(

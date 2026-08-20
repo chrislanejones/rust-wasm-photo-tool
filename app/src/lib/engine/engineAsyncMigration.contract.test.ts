@@ -668,6 +668,19 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // capture struct, so it could never have been fire-and-forget. Gate
     // numbers below (5 exempt / 0 unawaited / 0 truthy) unchanged again.
     //
+    // v8.55 — 119 -> 122: `lib/annotationHitTest.ts` adds THREE awaited sites,
+    // all born awaited and all value-consuming, so none could ever have been
+    // fire-and-forget: `get_layers`, `get_layer_text_annotations` and
+    // `get_layer_shape_annotations`. They exist because a `-1` from
+    // `text_annotation_at` means BOTH "empty canvas" and "the annotation is on
+    // another layer", and #50 needs those told apart before deciding a click
+    // landed on nothing. These three run on a MISS only — a hit on the active
+    // layer returns before reaching them.
+    //
+    // ⚠️ This module is a temporary duplicate of a rule Rust already states,
+    // and the sites disappear when v8.56 replaces it with ONE engine call
+    // returning (layer, id). Expect this number to go 122 -> 120 then, not up.
+    //
     // The difference from v8.19's identical-looking claim is the method list:
     // that one was made against a shadow .d.ts missing 31 of the engine's
     // methods. This one knows all 280.
@@ -675,7 +688,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(119);
+    expect(gate.awaited, "cumulative converted sites").toBe(122);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

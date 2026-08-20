@@ -3,6 +3,7 @@ import type { ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useToolStore } from "@/stores/useToolStore";
+import { findForeignAnnotation } from "@/lib/annotationHitTest";
 
 export interface Point {
   x: number;
@@ -852,6 +853,12 @@ export function useDrawingTools({
           await selectShape(hit); // click an existing pin → move it
           return;
         }
+        // #50 — a miss on the ACTIVE layer is not proof the canvas is empty.
+        // Without this, clicking a pin that lives on another layer drops a
+        // SECOND pin on top of it. See lib/annotationHitTest.ts.
+        if (toolRef.current && (await findForeignAnnotation(toolRef.current, p.x, p.y))) {
+          return;
+        }
         await dropPin(p);
         return;
       }
@@ -861,6 +868,12 @@ export function useDrawingTools({
         const hit = (await toolRef.current?.shape_annotation_at(p.x, p.y)) ?? -1;
         if (hit >= 0) {
           await selectShape(hit);
+          return;
+        }
+        // #50, same rule as the pins branch: a shape on another visible layer
+        // is something the user can see and was aiming at. Starting a fresh
+        // rubber-band drag across it is the one wrong answer.
+        if (toolRef.current && (await findForeignAnnotation(toolRef.current, p.x, p.y))) {
           return;
         }
       }

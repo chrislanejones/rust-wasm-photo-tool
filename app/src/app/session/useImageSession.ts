@@ -106,6 +106,11 @@ export function useImageSession({
   const setImageSavings = useGalleryStore((s) => s.setImageSavings);
   const setModifiedPhotos = useGalleryStore((s) => s.setModifiedPhotos);
   const hasBeenModified = useGalleryStore((s) => s.hasBeenModified);
+  // #53. Layer visibility / opacity / rename / active-selection change the
+  // document without recording an undo entry, so neither `undoCount` nor the
+  // `hasBeenModified` boolean moves when they happen. See the store for why
+  // this has to be a counter.
+  const layerRevision = useGalleryStore((s) => s.layerRevision);
   const setHasBeenModified = useGalleryStore((s) => s.setHasBeenModified);
   const maxPhotos = useGalleryStore((s) => s.maxPhotos);
   const setCompareActive = useUIStore((s) => s.setCompareActive);
@@ -183,7 +188,8 @@ export function useImageSession({
   //     user data with no backup.
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
-  dirtyRef.current = stamp.state.undoCount > 0 || hasBeenModified;
+  dirtyRef.current =
+    stamp.state.undoCount > 0 || hasBeenModified || layerRevision > 0;
 
   const flushEditArchive = useCallback(
     async (photoId?: string, opts?: { detachCloudUpload?: boolean }) => {
@@ -253,7 +259,11 @@ export function useImageSession({
       autosaveDelayMs(getOplogStats(), stamp.state.undoCount),
     );
     return () => window.clearTimeout(t);
-  }, [activePhotoId, stamp.state.undoCount, hasBeenModified]);
+    // `layerRevision` is in here for its CHANGE, not its value — it is what
+    // re-runs this effect for a layer-panel edit. `hasBeenModified` is a
+    // boolean and cannot re-trigger once true, which is exactly why hiding a
+    // second layer never scheduled a save (#53).
+  }, [activePhotoId, stamp.state.undoCount, hasBeenModified, layerRevision]);
 
   // Leaving the page: last chance to write. Same treatment, for a smaller
   // reason: this used to remove and re-add both listeners on every render that
@@ -335,7 +345,12 @@ export function useImageSession({
         toast.error(capMessage(effectiveUserMode, maxPhotos));
       }
 
-      if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
+      // `layerRevision` included for the same reason as the autosave effect:
+      // a layer-panel-only edit moves neither of the other two (#53).
+      if (
+        activePhotoId &&
+        (stamp.state.undoCount > 0 || hasBeenModified || layerRevision > 0)
+      ) {
         setModifiedPhotos((prev) => {
           if (prev.has(activePhotoId)) return prev;
           const next = new Set(prev);
@@ -422,15 +437,33 @@ export function useImageSession({
           }
         } catch (err) {
           console.error("Failed to add photo:", raw.name, err);
+          // #55 — DO NOT BLAME THE FILE FOR THE ORIGIN'S PROBLEM.
+          //
+          // Storing an original hashes it with `crypto.subtle`, which exists
+          // ONLY in a secure context. Served over plain HTTP from anything but
+          // localhost — a LAN IP for phone testing, a WSL IP because Windows
+          // Chrome cannot reach the VM's localhost — `crypto.subtle` is
+          // `undefined`, `sha256Hex` throws, and every single import failed
+          // with "Couldn't open <name>". The file is fine; the page is not,
+          // and the old message sent you to look at the wrong one. It cost an
+          // hour before anyone checked `window.isSecureContext`.
+          //
+          // Checked here rather than at boot on purpose: it is only ever a
+          // problem for a code path that hashes, and saying it at the moment
+          // it bites is what connects cause to effect.
+          const insecureOrigin =
+            !window.isSecureContext && typeof crypto?.subtle === "undefined";
           toast.error(
             err instanceof ImageTooLargeError
               ? `${raw.name}: ${err.message}`
-              : `Couldn't open ${raw.name}.`,
+              : insecureOrigin
+                ? `Can't save images on an insecure page. ${location.protocol}//${location.host} isn't a secure context, so the browser withholds the crypto API used to store originals. Use https, or localhost.`
+                : `Couldn't open ${raw.name}.`,
           );
         }
       }
     },
-    [activePhotoId, hasBeenModified, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
+    [activePhotoId, hasBeenModified, layerRevision, stamp, loadImageFromPixels, savePhotoEdit, photos.length, maxPhotos, effectiveUserMode, prefs.canvasArtboard, prefs.canvasPadding, prefs.canvasBgColor],
   );
 
   // ── Select photo ───────────────────────────────────────────────────────────
@@ -464,7 +497,12 @@ export function useImageSession({
       // to save on EVERY switch — and when signed in, savePhotoEdit uploads the
       // full edit archive to Convex, so just browsing the gallery re-uploaded
       // each photo and made switching slow ("only when logged in").
-      if (activePhotoId && (stamp.state.undoCount > 0 || hasBeenModified)) {
+      // `layerRevision` included for the same reason as the autosave effect:
+      // a layer-panel-only edit moves neither of the other two (#53).
+      if (
+        activePhotoId &&
+        (stamp.state.undoCount > 0 || hasBeenModified || layerRevision > 0)
+      ) {
         const outgoing = activePhotoId;
         setModifiedPhotos((prev) => {
           if (prev.has(outgoing)) return prev;
@@ -550,7 +588,7 @@ export function useImageSession({
         void loadPhotoFromEntry(entry, isCurrent);
       }
     },
-    [activePhotoId, hasBeenModified, stamp, loadPhotoFromEntry, flushEditArchive, loadPhotoEdit],
+    [activePhotoId, hasBeenModified, layerRevision, stamp, loadPhotoFromEntry, flushEditArchive, loadPhotoEdit],
   );
 
   // Item 4: PgUp/PgDn gallery cycling

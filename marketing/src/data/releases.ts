@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.55",
+    date: "2026-08-19",
+    headline: "Clicking a layer you weren't on used to make a new one",
+    entries: [
+      {
+        tag: "fix",
+        text: "Text and shapes belong to a layer, but the canvas shows every layer at once — so you could see a caption perfectly well, click it, and have the editor decide there was nothing there and start a fresh empty one on top of it. It looked like the app was duplicating your work at random. It was answering a different question: is there anything here on the layer you have selected? A miss now stays a miss.",
+      },
+      {
+        tag: "fix",
+        text: "Three places had the same fault, not one: text, the pin tool, and the shape and arrow tools — the last of which would start dragging a new box across whatever you were pointing at.",
+      },
+      {
+        tag: "fix",
+        text: "Hiding a layer used to survive until you reloaded. Visibility, opacity, name and which layer is selected were never written down, so a layer you hid came back visible and the selection had quietly moved to whichever layer was on top. The app only schedules a save when something it watches changes, and it was watching a yes/no flag that was already yes — so only the first such edit in a session would ever have saved. It counts edits now.",
+      },
+      {
+        tag: "ui",
+        text: "Selected and current are two different things, and a thumbnail can be both. The photo open on the canvas is marked inside its own edge; photos ticked for a batch job are marked outside it. Before, whichever the browser drew last erased the other, so a photo that was both looked like it was only one. Keyboard focus keeps its own dashed outline and no longer competes with either.",
+      },
+      {
+        tag: "fix",
+        text: "A failed import blames the right thing. Opening the app over plain http from something that isn't localhost — a phone testing against a laptop — makes the browser withhold the crypto needed to store originals, and every import failed with \"Couldn't open your-file.png\". That sends you to inspect a file that was never the problem. It now says the page isn't a secure context, and names the address.",
+      },
+      {
+        tag: "infra",
+        text: "The deploy installed whatever Rust shipped that day and whatever wasm-pack was newest. Both are written down now, so the engine binary is a function of the repository and a compiler upgrade is a commit you can see and undo. Pinning the packer pins the optimiser with it.",
+      },
+    ],
+  },
+  {
     version: "v8.54",
     date: "2026-08-18",
     headline: "The black border was going into the saved file too, and the canvas goes back to opt-in",

@@ -84,6 +84,52 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.55 — 2026-08-19
+
+**Clicking a layer you weren't on used to make a new one.** Text and shapes
+belong to a layer, but the canvas shows every layer at once — so you could see
+a caption perfectly well, click it, and have the editor decide there was
+nothing there and start a fresh empty one on top. It looked like the app was
+duplicating your work at random. It was answering a different question: *is
+there anything here on the layer you have selected?*
+
+Now a miss stays a miss. If something on another visible layer is under the
+cursor, the click does nothing rather than inventing something. Three places
+had the same fault — text, the pin tool, and the shape and arrow tools, which
+would start dragging a new box across whatever you were pointing at.
+
+Selecting the right layer first is still how you edit it. That part is the next
+piece of work, not this one.
+
+**Hiding a layer used to survive until you reloaded.** Layer visibility,
+opacity, name and which layer is selected were never written down. Hide a
+layer, come back, and it was visible again — and the selected layer had quietly
+moved to whichever one was on top.
+
+The reason is worth stating because the obvious fix does not work: the app only
+schedules a save when something it watches *changes*, and it was watching a
+yes/no flag that was already yes. Setting it to yes again is not a change, so
+only the first such edit in a session would ever have saved — which is worse
+than none, because it looks like it works. It now counts edits instead.
+
+**Selected and current are two different things, and a thumbnail can be both.**
+The photo open on the canvas is now marked inside its own edge; photos ticked
+for a batch job are marked outside it. Before, whichever one the browser drew
+last simply erased the other, so a photo that was both looked like it was only
+one. Keyboard focus keeps its own dashed outline and no longer competes with
+either.
+
+**A failed import blames the right thing.** Opening the app over plain http
+from something that isn't localhost — a phone testing against a laptop, say —
+makes the browser withhold the crypto it needs to store originals. Every import
+failed with "Couldn't open *your-file*.png", which sends you to inspect a file
+that was never the problem. It now says the page isn't a secure context and
+names the address.
+
+**Build pins.** The deploy installed whatever Rust shipped that day and
+whatever `wasm-pack` was newest. Both are now written down, so the engine binary
+is a function of the repository and a compiler upgrade is a commit you can see.
+
 ### v8.54 — 2026-08-18
 
 **The last release stopped the black border on the way out. It was also going

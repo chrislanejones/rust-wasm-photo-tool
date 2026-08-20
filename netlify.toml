@@ -1,8 +1,33 @@
 [build]
+  # ⚠️ TWO PINS LIVE IN THIS COMMAND. Both exist so the shipped wasm is a
+  # function of the repository and nothing else — see ADR-038.
+  #
+  # 1. `--default-toolchain none`. This used to say `stable`, which installed
+  #    whatever Rust shipped that day and THEN let rust-toolchain.toml pull
+  #    1.97.1 as well — two toolchains downloaded, one of them never used.
+  #    The BINARY was never at risk: `RUSTUP_TOOLCHAIN` went away in v8.53, so
+  #    the pin file already won every compile. This is a wasted download and a
+  #    misleading install line, not a mis-built artifact.
+  #    `none` installs rustup and no toolchain, so the pin file is the only
+  #    thing that decides; cargo installs it on first use and the log says so.
+  #    Do NOT put a version here instead — that is a second place to update,
+  #    and it is the one that drifts.
+  #    ⚠️ THIS REMOVES THE FALLBACK, deliberately. With no rust-toolchain.toml
+  #    (deleted, or a Netlify `base` subdirectory that cannot see it) the build
+  #    now FAILS with "no default toolchain" instead of quietly compiling under
+  #    whatever `stable` happens to be. Failing loud is the point: silent
+  #    compiler drift is the bug ADR-038 exists to close.
+  #
+  # 2. `wasm-pack --version`. `cargo install wasm-pack` unpinned takes the
+  #    latest release, so the tool that runs wasm-opt could change under a
+  #    build with no commit — the same class of drift the toolchain pin closed.
+  #    0.14.0 -> 0.15.0 was measured as byte-identical output (v8.53), so this
+  #    pin costs nothing today; it is here to keep the binary reproducible.
+  #    `--locked` makes it honour wasm-pack's own lockfile too.
   command = """
-    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable &&
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none &&
     source $HOME/.cargo/env &&
-    cargo install wasm-pack &&
+    cargo install wasm-pack --version 0.15.0 --locked &&
     wasm-pack build --target web -- --features tiles,patchmatch &&
     pnpm install &&
     pnpm --filter stamp-tool build

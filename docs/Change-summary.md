@@ -8426,7 +8426,7 @@ claiming it cannot happen.
 
 ## v8.54 Change Summary — 2026-08-18
 
-Four user-visible changes and one defect, all downstream of the same question:
+Six user-visible changes and one defect, all downstream of the same question:
 which surfaces write pixels?
 
 ### 1. The black border was going INTO the saved file (the fourth surface)
@@ -8559,3 +8559,147 @@ stated ceiling is the honest form of a limit the machine already imposed.
 The Rust crate is untouched this release; the wasm was rebuilt as a verify step
 and reproduced v8.53's byte count exactly, which is the toolchain pin from
 ADR-038 doing its job.
+
+---
+
+## v8.55 Change Summary — 2026-08-19
+
+Five changes, all TypeScript. **The Rust crate is deliberately untouched** —
+this release is what proves the `netlify.toml` pins work, and a source change
+would move the byte count and cost the assertion.
+
+### 1. Cross-layer click no longer invents an annotation (#50)
+
+`text_annotation_at` / `shape_annotation_at` answer for the ACTIVE layer
+(`self.layers[self.active]`) while `render_layer` composites EVERY visible one.
+So `-1` carries two meanings and the call sites collapsed them into one:
+
+| `-1` means | Old behaviour | New |
+|---|---|---|
+| Empty canvas | new annotation | new annotation ✅ |
+| Ink on another layer | **new annotation on top of it** | **nothing** |
+
+Three call sites had it, not one:
+
+| Site | Old failure |
+|---|---|
+| `useTextTool.ts:544` | fell through to `:562`, opened a blank box |
+| `useDrawingTools.ts` pins | dropped a SECOND pin over the first |
+| `useDrawingTools.ts` shapes/arrow | started a rubber-band drag across it |
+
+⚠️ **`lib/annotationHitTest.ts` is a KNOWN DUPLICATE with a stated expiry.** It
+ports both Rust hit-tests into TS — including `.rev()` iteration order and the
+asymmetry where text tiles are half-open (`x < tx + w`) while shape boxes are
+inclusive. The right shape is one engine call returning `(layer, id)`; that is
+v8.56, and this module shrinks to a thin call then. 21 tests pin it, one seeded
+from an annotation measured off the live engine.
+
+Hidden layers are skipped on purpose — invisible ink must not create a dead
+zone the user can neither see nor explain.
+
+### 2. Layer-panel state now persists (#53)
+
+Hide a layer → reload → it came back visible, and the active layer reverted to
+the topmost.
+
+⚠️ **THE OBVIOUS FIX DOES NOT WORK.** The autosave effect's dependency array
+held `hasBeenModified`, a **boolean**. Setting a `true` boolean to `true` is not
+a change, React does not re-run the effect, and no save is scheduled — so only
+the FIRST layer edit of a session would ever have persisted. That is worse than
+none, because it looks like it works.
+
+The four operations involved do not `snap()` in Rust (verified in `layer.rs`),
+so `undoCount` cannot stand in for them either:
+
+| Operation | `snap()`? | Covered before |
+|---|---|---|
+| add / remove / duplicate / move / merge / flatten | yes | ✅ via `undoCount` |
+| `set_active_layer` | **no** | ❌ |
+| `set_layer_visible` | **no** | ❌ |
+| `set_layer_opacity` | **no** | ❌ |
+| `rename_layer` | **no** | ❌ |
+
+Fix: `layerRevision`, a monotonic counter on the gallery store (Zustand,
+session-only, outside `partialize`), bumped by those four. Same shape and same
+reason as `annotationsRevision`.
+
+It had to reach **three** gates, not one — the autosave effect plus save-on-
+leave and save-on-switch, which shared the condition and would otherwise have
+dropped a layer-only edit when switching photos.
+
+`restoreLayerStack.ts:129`'s `activeIdx >= 0 ? activeIdx : layers.length - 1`
+fallback is unchanged. It should now stop firing; if it still does, that is a
+second bug wearing the first one's coat.
+
+### 3. Ring semantics (#58)
+
+Three affordances, three channels, all composable:
+
+| State | Mechanism | Drawn |
+|---|---|---|
+| Canvas-current (`.active`) | `--thumb-ring-inner` | **inside** |
+| Gallery-selected (`.selected`) | `--thumb-ring-outer` | **outside** |
+| Focus | `outline`, dashed | outside, own channel |
+
+`box-shadow` is ONE property, so `.active` and `.selected` used to overwrite
+each other — whichever rule came last won and the other state vanished. Two
+named custom-property channels feed one `box-shadow`, so adding a state means
+adding a channel rather than auditing pairs.
+
+Measured in the production build:
+
+| State | Computed |
+|---|---|
+| Current only | `accent 3px inset` |
+| Selected only | `bg 2px, accent 4px` |
+| **Both** | **`accent 3px inset` + `bg 2px` + `accent 4px`** |
+
+`.selected` also gave up `outline`, which it only ever held because focus used
+to take it away. Exactly one rule now touches `outline`.
+
+### 4. Insecure-origin import error names the cause (#55)
+
+`crypto.subtle` exists only in a secure context. Over plain http from a LAN or
+WSL IP it is `undefined`, `sha256Hex` throws, and every import failed with
+"Couldn't open *name*" — blaming the file. Now names the origin and the reason.
+
+### 5. Build pins (#47/#48)
+
+| Pin | Was | Now |
+|---|---|---|
+| Toolchain | `--default-toolchain stable` | **`none`** — `rust-toolchain.toml` decides |
+| wasm-pack | unpinned latest | **`--version 0.15.0 --locked`** |
+
+Both proven in an isolated `RUSTUP_HOME`: `none` auto-installs 1.97.1 from the
+pin file (rustc `8bab26f4f`), and `--locked` works because wasm-pack ships a
+lockfile. Pinning wasm-pack also pins **wasm-opt** — `version_117` is a
+hardcoded constant in its source.
+
+⚠️ **`none` REMOVES THE FALLBACK, deliberately.** A missing `rust-toolchain.toml`
+now fails the build instead of silently compiling under whatever `stable` is.
+Silent compiler drift is the bug ADR-038 exists to close.
+
+### 6. Repo cleanup
+
+~1.8 MB of stale artifacts removed: two root screenshots, three unreferenced
+`public/` webp files (two superseded heroes, one **never referenced in any
+commit**), a marketing webp orphaned by the v7.35 rewrite, and
+`COMPILER-VIOLATIONS.md` — a v7.42 baseline that ADR-020 itself says should
+live untracked.
+
+Root `public/` turns out not to be a build input for anything: the app's
+publicDir is `app/public/` and marketing's is `marketing/public/`. It exists
+solely so the README's hero resolves on GitHub.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `tsc --noEmit` (app + marketing) | clean |
+| `pnpm lint` | **0 errors**, 58 warnings (baseline) |
+| `pnpm -C app test` | **622 passed** / 52 files (601 → 622) |
+| Both builds | succeed |
+| `build:wasm` | **813,407 B** — byte-identical to v8.53 and v8.54 |
+
+The wasm number is the point: Rust was untouched and the pinned toolchain
+reproduced the same binary three releases running.
