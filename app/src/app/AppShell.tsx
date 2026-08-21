@@ -2738,6 +2738,37 @@ export function AppShell() {
     [activeTool, brushMode, stampSubMode, eraserMode, setToolSettings, setStampSettings, stamp],
   );
 
+  // Ctrl/Cmd+Shift+] / [ — send the active layer to the top / bottom of the
+  // stack. NO ENGINE CHANGE: `move_layer(id, new_index)` has shipped since the
+  // layers work and is already what ReviewPanel's Move up / Move down call, one
+  // step at a time. Front and back are the same call with the end indices.
+  //
+  // Both bounds are deliberately naive, because `LayerStack::move_layer` is the
+  // one that knows the rules (src/layer.rs:872) and it CLAMPS:
+  //
+  //   to = new_index.min(last).max(floor)      floor = canvas_idx + 1
+  //
+  // So `layers.length - 1` is "as far up as allowed" and `0` is "as far down as
+  // allowed", and the floor keeps a layer from being sent underneath the canvas
+  // layer — which is why back is 0 here and not something computed. It also
+  // refuses outright when the ACTIVE layer is the canvas layer, and returns
+  // false when the move is a no-op, so both chords are safe to fire at any
+  // time. Reproducing any of that arithmetic on this side would be a second
+  // copy of a rule that already exists.
+  //
+  // It snaps ("Reorder Layer"), so both are undoable like any other op.
+  const handleLayerToFront = useCallback(() => {
+    const active = stamp.state.layers.find((l) => l.active);
+    if (!active) return;
+    void stamp.moveLayer(active.id, stamp.state.layers.length - 1);
+  }, [stamp]);
+
+  const handleLayerToBack = useCallback(() => {
+    const active = stamp.state.layers.find((l) => l.active);
+    if (!active) return;
+    void stamp.moveLayer(active.id, 0);
+  }, [stamp]);
+
   useKeyboardShortcuts({
     onUndo: stamp.undo,
     onRedo: stamp.redo,
@@ -2750,6 +2781,8 @@ export function AppShell() {
     onNewLayerCopy: handleNewLayerCopy,
     onNewLayerCut: handleNewLayerCut,
     onToggleMove: handleToggleMove,
+    onLayerToFront: handleLayerToFront,
+    onLayerToBack: handleLayerToBack,
     onApplyCrop: drawingTools.applyCrop,
     hasCropSelection: drawingTools.cropSelection !== null,
     onShowCelebration: () => setShowCelebration(true),

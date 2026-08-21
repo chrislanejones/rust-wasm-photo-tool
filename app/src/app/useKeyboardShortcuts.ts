@@ -75,6 +75,10 @@ interface KeyboardShortcutOptions {
   onNewLayerCut?: () => void;
   /** Ctrl/Cmd+M — toggle the Move-layer mode (Layer Settings tool). */
   onToggleMove?: () => void;
+  /** Ctrl/Cmd+Shift+] — send the active layer to the top of the stack.
+   *  Ctrl/Cmd+Shift+[ — send it to the bottom (above the canvas layer). */
+  onLayerToFront?: () => void;
+  onLayerToBack?: () => void;
   /** Enter — apply the pending crop box (same action as the Apply Crop
    *  button). Only fires while a crop selection exists. */
   onApplyCrop?: () => void;
@@ -99,6 +103,8 @@ export function useKeyboardShortcuts({
   onDeselect,
   hasSelection,
   onToggleMove,
+  onLayerToFront,
+  onLayerToBack,
   onApplyCrop,
   hasCropSelection,
   onShowCelebration,
@@ -254,15 +260,26 @@ export function useKeyboardShortcuts({
           onShowCelebration?.();
           return;
         }
-        // Ctrl/Cmd + [ or ] → shrink / grow the active brush (any brush tool).
-        if (e.code === "BracketLeft") {
+        // Brackets. THIS BRANCH READS `shiftKey` AND IT DID NOT USED TO.
+        //
+        // Both handlers below sat outside any shift test, so Ctrl+Shift+] and
+        // Ctrl+Shift+[ ALSO did brush size — silently, undocumented, and
+        // occupying the two chords Photoshop uses for bring-to-front and
+        // send-to-back. `docs/Keyboard-Shortcuts.md` listed only the unshifted
+        // pair, so anyone checking for a collision would have concluded the
+        // shifted pair was free. It was not; it was bound by omission.
+        //
+        // Nothing is taken from anyone here: the shifted pair now does what a
+        // user coming from Photoshop already expects, and brush size keeps the
+        // unshifted pair it was documented as owning.
+        if (e.code === "BracketLeft" || e.code === "BracketRight") {
           e.preventDefault();
-          onAdjustBrushSize(-1);
-          return;
-        }
-        if (e.code === "BracketRight") {
-          e.preventDefault();
-          onAdjustBrushSize(1);
+          const toFront = e.code === "BracketRight";
+          if (e.shiftKey) {
+            (toFront ? onLayerToFront : onLayerToBack)?.();
+          } else {
+            onAdjustBrushSize(toFront ? 1 : -1);
+          }
           return;
         }
         return;
@@ -361,5 +378,6 @@ export function useKeyboardShortcuts({
     setShowHistory, setShowShortcutModal, setShowDiagnostics, onZoomIn,
     onZoomOut, onZoomReset, onGroupChange, onFlipH, onFlipV, onRotateCw,
     onCopyToClipboard, onCopyRegion, onNewLayerCopy, onNewLayerCut, onNextPhoto, onPrevPhoto, onSpaceDown, onSpaceUp,
+    onLayerToFront, onLayerToBack,
   ]);
 }

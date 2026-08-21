@@ -59,6 +59,21 @@ Reset Zoom — that is a different chord.)
 | `Ctrl + V`         | Paste image into the active layer |
 | `Alt + D`          | Delete all images |
 
+## Layers
+
+| Shortcut               | Action |
+| ---------------------- | ------ |
+| `Ctrl + M`             | Toggle Move-layer mode |
+| `Ctrl + J`             | New layer via copy (keeps the original) |
+| `Ctrl + Shift + J`     | New layer via cut (clears the source) |
+| `Ctrl + Shift + ]`     | Send the active layer to the front |
+| `Ctrl + Shift + [`     | Send the active layer to the back |
+
+The two reorder chords match Photoshop. "Back" means as far down as the stack
+allows — the engine keeps every layer above the canvas layer, and refuses to
+move the canvas layer itself, so neither chord can put the document in a state
+the Layers panel could not. Both are undoable.
+
 ## Transform
 
 | Shortcut  | Action |
@@ -73,6 +88,12 @@ Reset Zoom — that is a different chord.)
 | `Alt + Click` | Set clone source point |
 | `Ctrl + [`    | Decrease brush size |
 | `Ctrl + ]`    | Increase brush size |
+
+⚠️ **Unshifted only.** Until 2026-08-21 the handler did not read `shiftKey`, so
+`Ctrl + Shift + [` and `Ctrl + Shift + ]` also changed brush size — undocumented
+and unintended. This table listed two of the four bracket chords, so checking it
+for a collision would have said the shifted pair was free. It was not. The
+shifted pair is now the layer reorder above.
 
 ## View
 
