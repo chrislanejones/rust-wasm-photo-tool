@@ -273,7 +273,7 @@ export function ToolsSidebar({
         embedded
           ? // Compact master-bar content box: flush below the chrome (top 56 =
             // top-2 + 48px chrome), filling to the status bar.
-            "fixed left-2 top-[56px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
+            "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
           : "fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
       }
       style={embedded ? { boxShadow: "var(--shadow-panel)" } : { boxShadow: "var(--shadow-panel)" }}

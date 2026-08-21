@@ -152,7 +152,7 @@ export function TopBar({
             <div className="flex items-center gap-3 min-w-0">
             {!narrow && (
               <>
-                {/* Undo / Redo */}
+                {/* Undo / Redo — see the shape note on the Zoom group below. */}
                 <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -191,6 +191,17 @@ export function TopBar({
             {/* Zoom */}
             <Tooltip>
               <TooltipTrigger asChild>
+                {/* THE REVIEW PANEL'S SECTION TOGGLES ARE THE REFERENCE for
+                    every group in this bar (Chris, 2026-08-20). All four —
+                    Undo/Redo, this one, the New/Tools/Gallery/Review toggles
+                    and the cog/user pair — are that group's container copied
+                    literally, `p-1 rounded-lg bg-bg-tertiary`, holding its
+                    30px `rounded-md` buttons. The bar used to run three radii
+                    and two heights across four clusters; one box is what makes
+                    it read as a single object rather than four adjacent
+                    widgets. Note the buttons and their container do NOT share
+                    a radius, and should not: 6px inside 10px is the nesting,
+                    and it is the panel's, not an invention here. */}
                 <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
                   <IconButton
                     icon={ZoomOut}
@@ -231,14 +242,23 @@ export function TopBar({
               <div className="w-px h-6 bg-border shrink-0" />
             </div>
 
-            {/* Right cluster: Clerk user menu, anchored right */}
-            <div className="flex items-center justify-end gap-1 min-w-0">
-              <SubscriptionButton
-                general={general}
-                superUser={superUser}
-                openRaster={openRaster}
-              />
-              <UserMenu />
+            {/* Right cluster: Settings + Clerk user menu, anchored right.
+                These two used to float loose against the bar background while
+                every other control sat in a group — the same near-miss the
+                toggle group had, one channel over. They are a group now: same
+                `p-1 rounded-lg bg-bg-tertiary` container as Undo/Redo and
+                Zoom, and `grouped` turns off their standalone fill so the
+                container's own shows through. */}
+            <div className="flex items-center justify-end min-w-0">
+              <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
+                <SubscriptionButton
+                  general={general}
+                  superUser={superUser}
+                  openRaster={openRaster}
+                  grouped
+                />
+                <UserMenu grouped />
+              </div>
             </div>
           </div>
         </div>

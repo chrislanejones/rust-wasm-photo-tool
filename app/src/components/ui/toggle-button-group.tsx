@@ -34,6 +34,19 @@ interface ToggleButtonGroupProps {
   className?: string;
 }
 
+/* NO `variant` PROP, and there was one for an afternoon on 2026-08-20 — a
+   `bar` variant that gave the top bar's copy 36px buttons and a tighter
+   container radius. It is gone because it ended up describing a difference
+   that no longer exists: this component IS the reference now. The top bar's
+   and master bar's Undo/Redo, Zoom and cog/user groups were all resized and
+   re-radiused to match THESE buttons (`IconButton` is 30px with an 18px glyph
+   for that reason) and to match this container (`p-1 rounded-lg
+   bg-bg-tertiary`, copied literally). One box, one radius, fifteen call sites.
+
+   So: if a bar ever needs to look different from a panel again, prove the
+   difference is real before adding the prop back. Last time it was the bar
+   that was wrong, not the panel. */
+
 /**
  * A pill-style group of multi-select toggle buttons — the Upload / Tools /
  * Gallery cluster in the top bar and the History / Reselect / Layers cluster
@@ -58,6 +71,10 @@ export function ToggleButtonGroup({
             className={cn(
               "flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold font-mono",
               "transition-all duration-200 ease-out",
+              // `px-3 py-1.5` around an 18px glyph is a 30px box, and that box
+              // is now the reference the bars are built from — IconButton was
+              // matched to it, not the reverse. Changing this padding resizes
+              // Undo, Redo, both Zooms, the cog and the user icon with it.
               // Same warm-accent hover ring as the tool rail and the top bar's
               // icon buttons — one hover vocabulary across every button group.
               HOVER_RING,

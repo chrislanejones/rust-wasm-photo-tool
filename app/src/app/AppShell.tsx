@@ -3159,9 +3159,10 @@ export function AppShell() {
                   general={general}
                   superUser={superUser}
                   openRaster={openRaster}
+                  grouped
                 />
               }
-              userSlot={<UserMenu />}
+              userSlot={<UserMenu grouped />}
             />
           )}
         </AnimatePresence>

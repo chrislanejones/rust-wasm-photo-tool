@@ -440,7 +440,7 @@ export function GalleryBar({
       className={
         vertical
           ? // Master-bar content box: flush below the 48px chrome (top 56).
-            "fixed left-2 top-[56px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] flex w-[252px] flex-col overflow-hidden rounded-b-xl border border-t-0 border-border bg-bg-secondary"
+            "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] flex w-[252px] flex-col overflow-hidden rounded-b-xl border border-t-0 border-border bg-bg-secondary"
           : "fixed left-0 right-0 bottom-[var(--panel-bottom)] z-[var(--z-panel)] pointer-events-none"
       }
       style={vertical ? { boxShadow: "var(--shadow-panel)" } : undefined}

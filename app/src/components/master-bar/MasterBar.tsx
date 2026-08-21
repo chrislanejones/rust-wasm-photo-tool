@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
 import {
   Upload,
   Wrench,
@@ -11,6 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { IconButton } from "@/components/ui/icon-button";
 import { MASTER_BAR_CHROME_H } from "./constants";
 import type { MasterTab } from "@/stores/useUIStore";
 
@@ -26,6 +28,19 @@ interface Props {
   userSlot: React.ReactNode;
 }
 
+/**
+ * Tooltip + the shared `IconButton`. This used to be a private 32px button with
+ * 16px glyphs and its own active treatment — a fourth icon-button vocabulary,
+ * and the one that showed. The `settingsSlot` / `userSlot` below are the
+ * desktop top bar's controls passed straight through, and those are `IconButton`
+ * at 36px with 18px glyphs, so the master bar shipped four small tabs sitting
+ * next to two larger ones. Now everything in this strip is the same button.
+ *
+ * `aria-pressed` is passed explicitly (it spreads after IconButton's own) so an
+ * inactive tab still announces `false`. IconButton's default drops the
+ * attribute entirely when off, which is right for the actions it was written
+ * for — Undo, the cog — and wrong for a tab.
+ */
 function IconBtn({
   icon: Icon,
   label,
@@ -33,7 +48,7 @@ function IconBtn({
   disabled,
   active,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   label: string;
   onClick: () => void;
   disabled?: boolean;
@@ -42,20 +57,15 @@ function IconBtn({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          aria-pressed={active}
+        <IconButton
+          icon={Icon}
+          label={label}
+          active={active}
+          standalone
+          aria-pressed={active ?? false}
           disabled={disabled}
           onClick={onClick}
-          className={`flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:opacity-40 disabled:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 ${
-            active
-              ? "bg-theme-primary text-theme-primary-foreground border-theme-primary"
-              : "border-border bg-bg-elevated text-text-secondary hover:text-text-primary"
-          }`}
-        >
-          <Icon />
-        </button>
+        />
       </TooltipTrigger>
       <TooltipContent side="bottom">
         <p className="text-xs font-semibold">{label}</p>
@@ -86,6 +96,22 @@ export function MasterBar({
   settingsSlot,
   userSlot,
 }: Props) {
+  // GEOMETRY, because this bar is a FIXED 252 wide and the height is mirrored
+  // elsewhere. Every button is 30px (the shared `IconButton`, sized to the
+  // Review panel's toggles) and the cog/user pair sits in a `p-1` container:
+  //
+  //   width   30 + 1 + 30*3 + 72 (group) = 193, + 5 gaps * 4 = 20, + divider
+  //           margins 4, + 12 padding = 229, inside 252 with 23px to spare
+  //   height  38 (group) + 12 padding = 50 = MASTER_BAR_CHROME_H
+  //
+  // `gap-1` and the divider's `mx-0.5` are the ORIGINAL values. They were cut
+  // to `gap-0.5` / no margin while the buttons were briefly 36px and the row
+  // did not fit; at 30px the room is back, so they are back.
+  //
+  // The height is the expensive half: three files position their docked panel
+  // under this bar with a hardcoded `top-[58px]` (= `top-2` gutter + chrome) —
+  // ToolsSidebar, ReviewPanel and GalleryBar. Change the chrome, change those.
+  // Noted in constants.ts too, since that is where anyone would look first.
   return (
     <motion.div
       variants={slideFromLeft}
@@ -94,7 +120,7 @@ export function MasterBar({
       exit="exit"
       role="region"
       aria-label="Master bar"
-      className="fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center gap-1 overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-2"
+      className="fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center gap-1 overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-1.5"
       style={{ height: MASTER_BAR_CHROME_H, boxShadow: "var(--shadow-panel)" }}
     >
       {/* New action + the three view tabs + settings/user */}
@@ -109,7 +135,10 @@ export function MasterBar({
           active={activeTab === t.id}
         />
       ))}
-      <div className="ml-auto flex items-center gap-1">
+      {/* Settings + user, in the same group the desktop top bar gives them.
+          They used to sit loose at the end of the strip — the only two controls
+          in either bar without a container. */}
+      <div className="ml-auto flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
         {settingsSlot}
         {userSlot}
       </div>

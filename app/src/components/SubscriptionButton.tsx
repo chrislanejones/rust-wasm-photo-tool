@@ -112,12 +112,17 @@ interface Props {
   superUser?: SuperUserControls | null;
   /** Live-tool access for the Import / Export (.ora) tab. */
   openRaster: OpenRasterControls;
+  /** The cog sits inside a group pill (both bars do this now), so it must be
+   *  transparent at rest and let the pill's fill through rather than carrying
+   *  its own. See `IconButton`'s `standalone`. */
+  grouped?: boolean;
 }
 
 export function SubscriptionButton({
   general,
   superUser,
   openRaster,
+  grouped = false,
 }: Props) {
   // Open state + active pane live in useUIStore, not here. The URL mirrors the
   // current view (`#/settings/security`), so which pane is showing has to be
@@ -249,7 +254,7 @@ export function SubscriptionButton({
         icon={Settings}
         label="Settings"
         title="Settings"
-        standalone
+        standalone={!grouped}
         onClick={() => openSettings(tab)}
       />
 

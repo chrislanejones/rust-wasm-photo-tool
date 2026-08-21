@@ -196,7 +196,7 @@ export function ReviewPanel({
       className={
         embedded
           ? // Compact master-bar content box: flush below the 48px chrome.
-            "fixed left-2 top-[56px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
+            "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
           : "review-panel"
       }
     >

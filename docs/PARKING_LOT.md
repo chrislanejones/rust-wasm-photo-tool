@@ -2149,3 +2149,32 @@ pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
      inserted. No format change — but one-way: widening the box on re-edit
      cannot tell user newlines from baked ones. Chris would notice. Decide
      awake, not at 1am.
+
+- **Top bar left cluster overlaps the toggle group at 1000–1200px with both
+  side panels open (found 2026-08-20, during the oval/sizing pass — PRE-EXISTING,
+  not caused by it).** The bar is `grid-cols-[1fr_auto_1fr]`. At that width the
+  panel gutters shrink the bar's inner box to ~532px, so each `1fr` column is
+  ~130px while the left cluster's own content (Undo pill 84 + divider + Zoom
+  pill 84 + two 12px gaps) is **193px**. Grid does not shrink it — it spills
+  right, under the centre column, and the centre column is later in the DOM so
+  it paints on top and takes the clicks.
+
+  Measured on master with the component changes stashed, at 1100px, Tools +
+  Review both open:
+
+  | | master (before the oval pass) | after |
+  |---|---|---|
+  | Left column width | 130px | 143px |
+  | Left cluster content | 193px | 193px |
+  | Zoom ↔ toggle-group overlap | **38px** | **26px** |
+  | `elementFromPoint` at Zoom-in's centre | **"New"** | **"New"** |
+
+  So **the Zoom-in button is unclickable in that band** — the click activates
+  New. The oval pass narrowed the centre pill (188 → 164) and therefore reduced
+  the overlap, but did not remove it and was not its cause.
+
+  The fix is a layout decision, not a size tweak: either drop the `1fr_auto_1fr`
+  grid for a flex row that lets the centre move off-centre under pressure, or
+  extend the existing `compact` collapse so the Undo/Redo pill (or the divider
+  and gaps) also drops in the BP_TIGHT band, the way `narrow` already does.
+  Both change where the toggles sit — Chris's call, not a passing edit.
