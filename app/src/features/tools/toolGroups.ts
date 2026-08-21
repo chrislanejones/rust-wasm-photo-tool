@@ -70,6 +70,7 @@ import {
   SunDim,
   SwatchBook,
   Type,
+  BroomSparkles,
   Wand2,
   Zap,
 } from "lucide-react";
@@ -353,7 +354,10 @@ const createGroup: ToolGroupDefinition = {
       id: "magic-eraser",
       label: "Magic Eraser",
       description: "Paint over something and let PatchMatch fill it in",
-      icon: Wand2,
+      // NOT `Wand2` — that is the SELECT group's Magic Wand, still on it a
+      // hundred lines up. Two different tools sharing one glyph read as the
+      // same feature in two places.
+      icon: BroomSparkles,
       tool: "ai",
       mode: "magic",
       cursor: "crosshair",

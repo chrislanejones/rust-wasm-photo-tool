@@ -43,7 +43,7 @@ import {
   Stamp as StampIcon,
   Trash2,
   Type,
-  Wand2,
+  BroomSparkles,
 } from "lucide-react";
 import type { ToolType } from "@/lib/types";
 import { TOOL_MODULES } from "./toolModules";
@@ -95,7 +95,7 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
   ],
   ai: [
     { id: "brush", label: "Eraser", icon: Eraser, keywords: ["erase", "brush", "rub out"] },
-    { id: "magic", label: "Magic Eraser", icon: Wand2, keywords: ["magic", "patchmatch", "inpaint", "content aware"] },
+    { id: "magic", label: "Magic Eraser", icon: BroomSparkles, keywords: ["magic", "patchmatch", "inpaint", "content aware"] },
     { id: "rembg", label: "Background Removal", icon: Scissors, keywords: ["background", "cutout", "rembg", "transparent"] },
     { id: "inpaint", label: "Object Removal", icon: Trash2, keywords: ["object", "remove", "inpaint", "delete"] },
   ],

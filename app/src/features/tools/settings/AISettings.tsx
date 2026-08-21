@@ -4,7 +4,7 @@
 // image-shaped one, and it has its own dedicated useAIJob instance there now.
 // 4x Upscale's Coming Soon placeholder moved to EffectsSettings.tsx.
 import { useState } from "react";
-import { Scissors, Eraser, Wand2, Trash2, Lock } from "lucide-react";
+import { Scissors, Eraser, BroomSparkles, Trash2, Lock } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { SizeSlider } from "@/components/SizeSlider";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -48,7 +48,7 @@ const ERASER_MODES: {
   {
     id: "magic",
     label: "Magic Eraser",
-    icon: Wand2,
+    icon: BroomSparkles,
     title: "Magic Eraser",
     info: "Local object removal (PatchMatch) — free, runs on your device, no sign-in required. Coming soon.",
   },
