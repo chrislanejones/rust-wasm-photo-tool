@@ -1627,7 +1627,37 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 .photo-thumb {
   --thumb-ring-inner: 0 0 #0000;
   --thumb-ring-outer: 0 0 #0000;
-  box-shadow: var(--thumb-ring-inner), var(--thumb-ring-outer);
+  box-shadow: var(--thumb-ring-outer);
+}
+
+/* The INNER channel cannot ride the tile's own `box-shadow`, and this is the
+   bug that shipped: an `inset` shadow paints on the element's BACKGROUND
+   layer, which is BELOW every descendant. Each child of a thumb covers the
+   whole tile — `.checkerboard` is `absolute inset-0`, and `.photo-thumb img`
+   is `position: relative; z-index: 1` two rules down — so the active ring was
+   painted and then immediately buried. All that survived were four corner
+   slivers where the children's rounded box pulled away from the tile's, which
+   is why a current thumb read as corner brackets instead of a ring.
+
+   So the inner channel gets its own painter ON TOP of the children. `inset: 0`
+   is the PADDING box, hence radius 8px − 2px border = 6px; anything wider is
+   pointless because `overflow: hidden` clips a pseudo-element back to that box
+   anyway (an `inset: -2px` overlay loses most of its ring to the clip and
+   leaves a 1px hairline). z-index sits above the image, the progress/skeleton
+   overlays (z-10) and the badges (z-20), but below the remove/select buttons
+   (z-30) — and `pointer-events: none` keeps it out of every hit test.
+
+   OUTSIDE stays on the element: an outward shadow on this pseudo-element
+   would be clipped away entirely by that same `overflow: hidden`. */
+.photo-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow: var(--thumb-ring-inner);
+  transition: box-shadow 0.15s;
 }
 
 /* Hover is the WEAKEST claim, so it yields to either real state. It still
@@ -1640,7 +1670,9 @@ input[type="range"].slider-overlay::-moz-range-thumb {
 }
 
 /* INSET, so the open photo is marked without growing the tile's footprint —
-   `gap-2` is 8px and an outward halo here would butt into the neighbour's. */
+   `gap-2` is 8px and an outward halo here would butt into the neighbour's.
+   Painted by `.photo-thumb::after`, not by the tile — see the channel comment
+   above for why an inset shadow on the tile itself is invisible here. */
 .photo-thumb.active {
   --thumb-ring-inner: inset 0 0 0 3px var(--accent);
 }
