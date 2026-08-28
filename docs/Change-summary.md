@@ -8703,3 +8703,183 @@ solely so the README's hero resolves on GitHub.
 
 The wasm number is the point: Rust was untouched and the pinned toolchain
 reproduced the same binary three releases running.
+
+## v8.56 Change Summary — 2026-08-28
+
+Six commits. Four are UI and one is a test; the sixth removes dead code from
+both sides of the boundary and installs the checks that catch the next lot.
+
+### 1. The current-photo ring was painted under the photo
+
+v8.55 gave the gallery thumb two named `box-shadow` channels so canvas-current
+and gallery-selected could both be lit at once. The channels were correct. The
+inner one was never visible.
+
+An `inset` box-shadow paints on the element's background layer, **below every
+descendant**, and every child of a thumb covers the whole tile:
+
+| Rule | Why it covers the ring |
+|---|---|
+| `.checkerboard` | `absolute inset-0` |
+| `.photo-thumb img` | `position: relative; z-index: 1` |
+
+What survived were four corner slivers where the children's rounded box pulls
+away from the tile's — hence brackets, not a ring. In the vertical grid
+(`object-fit: cover`) the image fills the tile and it vanished entirely.
+
+⚠️ **v8.55 verified this with `getComputedStyle`, which cannot see it.** The
+property reads back correct and is drawn underneath the photo. Confirmed still
+live on production before the fix. The inner channel now gets its own painter
+above the children.
+
+### 2. Ctrl+Shift+] / [ send the active layer to front / back
+
+**The handler did not read `shiftKey`.** Both bracket branches sat in the
+Ctrl/Cmd block with no Shift test, so all four PSD bracket chords ran brush
+size, while `docs/Keyboard-Shortcuts.md` documented only the unshifted two — so
+the shifted pair looked free and was bound by omission.
+
+**No engine change.** `move_layer(id, new_index)` has shipped since the layers
+work and is what Move up / Move down already call. Front and back are the same
+call with the end indices, and the bounds are deliberately naive (`len - 1`,
+`0`) because the engine clamps:
+
+    to = new_index.min(last).max(floor)      floor = canvas_idx + 1
+
+So `0` means "as far down as allowed", and the floor keeps a layer from going
+under the canvas layer. `move_layer` refuses when the active layer IS the canvas
+layer and returns false on a no-op, so both chords are safe in any state.
+
+### 3. Magic Eraser stops borrowing Magic Wand's icon
+
+Both were on `Wand2`, in two different tool groups. Magic Eraser moves to
+`broom-sparkles`, swapped in all three definition sites:
+
+| Site | What it defines |
+|---|---|
+| `toolGroups.ts:356` | the magic-eraser sub-tool (Create) |
+| `toolModes.ts:98` | the `ai` → `magic` mode |
+| `AISettings.tsx:51` | the mode's panel header |
+
+Three other `Wand2` uses are deliberately untouched — Select's Magic Wand and
+the Enhance preset. A comment at the swap site records which is which, so the
+next pass does not "restore consistency" by putting them back on one glyph.
+
+### 4. One button box across both bars
+
+Measured before anything was touched:
+
+| Cluster | Button | Radius | Glyph | Group |
+|---|---|---|---|---|
+| Undo / Redo / Zoom | 36×36 | r12 | 20px | 44px r10 |
+| New / Tools / Gallery / Review | 30px | r6 | 18px | 38px r10 |
+| Settings cog | 36×36 | r12 | 20px | **none** |
+| Sign in | 36×36 | r12 | 20px | **none** |
+
+The Review panel's section toggles are the reference. Everything in both bars is
+now a 30×30 `rounded-md` button with a fixed 18px glyph in a 38px `p-1`
+`rounded-lg` group. `IconButton` came DOWN to the toggle group rather than the
+group going up — it had been sized to the tool rail, not to the bar it lives in,
+and that is what made the bar taller than its own toggle group.
+
+### 5. Drift guard for the annotationHitTest port (#60)
+
+`annotationHitTest.ts` is a hand port of two Rust functions, pinned by 21
+tests — but those check TypeScript against TypeScript. Proven by mutation
+rather than argued:
+
+| Mutation | Guard | The 21 port tests |
+|---|---|---|
+| `x < tx + w` → `x <= tx + w` in `annotations.rs` | **FAILS**, names the file | **21/21 pass** |
+
+That control is the whole case: the port's own tests are blind to a real change
+in the source they mirror. The guard hashes the Rust function bodies with
+whitespace and comments normalised.
+
+### 6. Dead code removed, and the tripwires that catch the next lot
+
+Executes Phases 1–3 of `docs/Entropy-Refactor-Plan.md`. The plan was nine days
+old, so every claim was re-verified first — **two did not survive**.
+
+Deleted from the engine: `fill_rounded_rect`, `fill_triangle_public`,
+`TileBuffer::is_dirty`, and the WASM exports `oplog_keyframe_rgba` and
+`resize_pixels_filter`. The stale `allow(dead_code)` on `is_wall` is gone too
+(`paint.rs:224` does call it now), which leaves `src/` with **zero**
+`allow(dead_code)`.
+
+Deleted from the app: `components/TabGroup.tsx` entirely, `activeModeOf` /
+`useActiveMode` / `allToolModes`, `CAPTURE_REPLY`, `__resetGpuProbe`,
+`__resetEncodeSupportCache`. Unexported `webgpuAvailable`, `formatAuditBytes`,
+`MultiTabCard`.
+
+No cascade: `resize_nearest` / `resize_catmull_rom` / `resize_lanczos3` all keep
+live callers in `layer.rs` and `lib.rs`.
+
+**`DESCRIBE_TOKENS` was a live drift, not a dead export.** The expander honours
+eleven tokens; the constant and the hand-written help text each listed nine:
+
+| Source | Tokens | Missing |
+|---|---|---|
+| `applyDescriptionPattern` | **11** | — |
+| `DESCRIBE_TOKENS` | 9 | `{palette}`, `{contrast}` |
+| `AIRenamePanel` help text | 9 | `{palette}`, `{contrast}` |
+
+Both worked and were documented nowhere. There is now one `patternValues()`
+table, `supportedPatternTokens()` derived from it, a panel that renders from the
+constant, and a mutation-tested guard asserting the lists are equal. The wire
+went into `AIRenamePanel`, not the plain Rename panel — that one has no
+description to draw on, so the AI tokens would be actively wrong there.
+
+⚠️ **CORRECTION to the plan: `encode_op` / `decode_op` cannot be `pub(crate)`.**
+`tests/replay_determinism.rs:10` imports them, and an integration test links the
+crate as an external consumer, so the proposed demotion does not compile. Only
+`default_quad_if_unset` and `History::undo_bytes` were demoted.
+
+⚠️ **CORRECTION to the plan: `RUSTFLAGS="-D dead_code"` catches nothing in this
+crate.** An unused private fn produces no diagnostic at all:
+
+| Probe (unused private fn) | `stamp_tool` | minimal crate, same toolchain |
+|---|---|---|
+| appended to `lib.rs` | **no diagnostic** | warns |
+| appended to `history.rs` | **no diagnostic** | warns |
+| appended to `core.rs` | **no diagnostic** | warns |
+
+Verified with `--message-format=json`: **zero `compiler-message` entries**. The
+file really is compiled — a type error at the same position fails with `E0308`.
+`crate-type = ["cdylib","rlib"]` and `wasm-bindgen` were each tested in
+isolation and **ruled out**; both warn correctly in a minimal crate. The cause
+is **not identified**, and the plan's stated reason ("`pub` items in `pub`
+mods are exempt") is not it either, since every probe was private.
+
+So the scanner became the deliverable instead of a compiler flag:
+
+| New tripwire | Baseline | Proven to fire by |
+|---|---|---|
+| `max-lines` (eslint) | 900, 5 files pinned | a fresh 949-line file raises it |
+| `librs-lines` (guardrails) | 5,213 | count vs `wc -l` |
+| `dead-exports` (guardrails) | 2 | `scripts/dead-exports-audit.mjs` |
+| token drift guard (vitest) | — | removing `{palette}` fails it |
+
+The eslint ratchet is `warn`, not `error`, on purpose: the lint gate is
+errors-only, so a new 901-line file must not block a push the day it appears.
+Pinned at today's sizes — AppShell **3,806**, CanvasArea **2,959**,
+BatchSettings 1,428, useDrawingTools **1,173**, the contract test 1,015. Those
+numbers only ever go down.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `cargo fmt` / `clippy --all-targets -D warnings` | clean |
+| `cargo test --all-features` | **367 passed**, 0 failed |
+| `pnpm -C app exec tsc --noEmit` | clean, against a REBUILT `pkg/` |
+| `pnpm lint` | **0 errors**, 58 warnings |
+| `pnpm -C app test` | **627 passed** / 53 files (622 → 627) |
+| `pnpm exec playwright test` | **11 passed**, incl. the whole `imagehorse-qc` spec |
+| `scripts/guardrails.sh` | **8/8 at baseline** |
+| `build:wasm` | **812,652 B** (813,407 → −755) |
+
+The wasm number moved for the first time in four releases, and by exactly the
+amount the dead exports were worth. It stays inside the 780,000–850,000 sentinel
+band (ADR-037), and the pinned toolchain reproduced the figure in two separate
+checkouts.

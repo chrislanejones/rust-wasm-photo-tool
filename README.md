@@ -84,6 +84,48 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.56 — 2026-08-28
+
+**The ring marking the photo you're editing was painted underneath the photo.**
+v8.55 gave a gallery thumbnail two rings — one for the photo open on the canvas,
+one for photos ticked for a batch job. The inner one was drawn on the tile's
+background layer, which sits below everything inside the tile, so the photo
+covered it. What survived were four corner slivers where the rounded corners
+pull apart, which is why the current photo read as brackets; in the vertical
+grid, where the image fills the tile, it was invisible outright. The check that
+passed it read the style property, and the property was set correctly the whole
+time. It has its own painter now, on top of the photo.
+
+**Ctrl+Shift+] and Ctrl+Shift+[ send the active layer to the front or the back.**
+The shifted pair was already taken, by accident: the handler never tested for
+Shift, so all four bracket chords changed brush size, and the shortcuts table
+documented only the unshifted two. Anyone checking for a collision would have
+read it as free. Nothing is taken from anyone here. The engine already knew how
+to move a layer and already clamps the ends, so a layer still cannot be sent
+underneath the canvas.
+
+**Magic Eraser was borrowing Magic Wand's icon.** Two different tools in two
+different groups drew the same glyph, which reads as one feature appearing
+twice. Magic Eraser gets a broom. Select's Magic Wand is unchanged.
+
+**Both bars now use one button size.** The top bar ran three corner radii and
+two button heights across four clusters, and two of its controls sat in no
+container at all. Everything in both bars is now the 30px button in a 38px
+group that the Review panel's toggles already used.
+
+**AI Rename lists every token it actually accepts.** The panel offered nine.
+The renamer honours eleven — `{palette}` and `{contrast}` worked and appeared
+in no help text anywhere. The list is now generated from the same table the
+renamer substitutes from, so the two cannot disagree, and a test fails if they
+ever do.
+
+**The engine lost 755 bytes of code nothing called.** Five Rust functions, two
+WASM exports, a React component that was never imported, and six dead
+TypeScript exports. Three new checks keep the next batch from settling in
+quietly: a file-length ratchet pinned to today's sizes, a dead-export scan, and
+a line cap on the engine's largest file. Each one was tested by breaking it on
+purpose first — a check nobody has seen fail is not a check.
+
 ### v8.55 — 2026-08-19
 
 **Clicking a layer you weren't on used to make a new one.** Text and shapes

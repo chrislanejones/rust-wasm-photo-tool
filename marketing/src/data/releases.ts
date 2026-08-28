@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.56",
+    date: "2026-08-28",
+    headline: "The ring marking the current photo was painted underneath it",
+    entries: [
+      {
+        tag: "fix",
+        text: "A gallery thumbnail lights one ring for the photo open on the canvas and another for photos ticked for a batch job. The inner one was drawn on the tile's background layer, which sits below everything inside the tile, so the photo covered it. What survived were four corner slivers where the rounded corners pull apart — which is why the current photo read as brackets — and in the vertical grid, where the image fills the tile, nothing at all. The check that passed it read the style property, and the property was set correctly the whole time.",
+      },
+      {
+        tag: "feature",
+        text: "Ctrl+Shift+] and Ctrl+Shift+[ send the active layer to the front or the back. The shifted pair was already taken by accident: the handler never tested for Shift, so all four bracket chords changed brush size while the shortcuts table documented only the unshifted two. The engine already knew how to move a layer and already clamps the ends, so a layer still cannot be sent underneath the canvas.",
+      },
+      {
+        tag: "ui",
+        text: "Magic Eraser stops borrowing Magic Wand's icon. Two different tools in two different groups drew the same glyph, which reads as one feature appearing twice. Magic Eraser gets a broom; Select's Magic Wand is unchanged.",
+      },
+      {
+        tag: "ui",
+        text: "Both bars now use one button size. The top bar ran three corner radii and two button heights across four clusters, and two of its controls sat in no container at all. Everything is now the 30px button in a 38px group that the Review panel's toggles already used.",
+      },
+      {
+        tag: "fix",
+        text: "AI Rename lists every token it actually accepts. The panel offered nine; the renamer honours eleven — {palette} and {contrast} worked and appeared in no help text anywhere. The list is generated from the same table the renamer substitutes from, and a test fails if the two ever disagree.",
+      },
+      {
+        tag: "rust",
+        text: "The engine lost 755 bytes of code nothing called: five Rust functions, two WASM exports, a React component that was never imported, and six dead TypeScript exports. Three new checks keep the next batch from settling in quietly — a file-length ratchet pinned to today's sizes, a dead-export scan, and a line cap on the engine's largest file. Each was tested by breaking it on purpose first.",
+      },
+    ],
+  },
+  {
     version: "v8.55",
     date: "2026-08-19",
     headline: "Clicking a layer you weren't on used to make a new one",
