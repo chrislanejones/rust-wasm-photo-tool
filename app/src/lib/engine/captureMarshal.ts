@@ -51,10 +51,6 @@
 // reasoning as `engineSurface.ts`, and drift between two hand-synced copies of
 // an engine's shape is the failure this file's neighbours were built to prevent.
 
-/** Marker on a reply whose `value` is a flattened capture rather than a plain
- *  return. Set by the worker, consumed by `EngineWorkerClient.onReply`. */
-export const CAPTURE_REPLY = "capture" as const;
-
 /** Own property wasm-bindgen puts on every boxed struct. Never copied across —
  *  on the far side it is a dangling index into another thread's linear memory,
  *  and a number that LOOKS like a handle is worse than no handle at all. */

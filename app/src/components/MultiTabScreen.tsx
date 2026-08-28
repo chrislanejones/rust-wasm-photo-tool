@@ -13,7 +13,7 @@ import { AppWindow } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-export function MultiTabCard({ onUseHere }: { onUseHere: () => void }) {
+function MultiTabCard({ onUseHere }: { onUseHere: () => void }) {
   return (
     <div className="max-w-xs rounded-2xl border border-border bg-card p-6 text-center shadow-panel">
       <AppWindow className="mx-auto h-8 w-8 text-text-muted" aria-hidden />

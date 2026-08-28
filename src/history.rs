@@ -97,7 +97,7 @@ impl History {
     }
 
     /// Total bytes currently held by the undo stack.
-    pub fn undo_bytes(&self) -> usize {
+    fn undo_bytes(&self) -> usize {
         self.undo_stack.iter().map(|s| s.bytes()).sum()
     }
 

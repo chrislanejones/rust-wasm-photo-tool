@@ -130,11 +130,7 @@ pub(crate) fn edge_cost_map(mag: &[u8]) -> Vec<u16> {
 ///
 /// Higher `strength` = fewer walls (only the very hardest edges contain a
 /// brush stroke); lower = more walls, tighter containment.
-///
-/// The `allow` is temporary: the Smart Brush is this function's only non-test
-/// consumer and it lands in the next commit.
 #[inline]
-#[allow(dead_code)]
 pub(crate) fn is_wall(cost: u16, strength: u8) -> bool {
     // cost = COST_MAX - norm  ⇒  norm = COST_MAX - cost
     COST_MAX.saturating_sub(cost) >= strength as u16

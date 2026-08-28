@@ -234,7 +234,7 @@ pub struct TextParams {
 /// This exists because the skipped-field default and the semantic default are
 /// different values; leaving them conflated is how a migration silently eats
 /// every text annotation in a v4 document.
-pub fn default_quad_if_unset(q: [(f32, f32); 4]) -> [(f32, f32); 4] {
+pub(crate) fn default_quad_if_unset(q: [(f32, f32); 4]) -> [(f32, f32); 4] {
     if q.iter().all(|&(x, y)| x == 0.0 && y == 0.0) {
         crate::perspective::IDENTITY_QUAD
     } else {

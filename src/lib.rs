@@ -1942,17 +1942,6 @@ impl ImageHorseTool {
         })
     }
 
-    /// Flat RGBA of the COMPOSITE of the resident keyframe at `at_op`
-    /// (empty if not resident). Pair with `oplog_keyframe_width/height` and
-    /// `oplog_keyframe_annotations` to persist a full document snapshot.
-    #[cfg(feature = "tiles")]
-    pub fn oplog_keyframe_rgba(&self, at_op: u32) -> Vec<u8> {
-        self.oplog
-            .as_ref()
-            .and_then(|l| l.keyframe_document(at_op as usize))
-            .map_or_else(Vec::new, |d| d.composite_flat())
-    }
-
     #[cfg(feature = "tiles")]
     pub fn oplog_keyframe_width(&self, at_op: u32) -> u32 {
         self.oplog
@@ -3754,27 +3743,6 @@ pub fn describe_image(pixels: &[u8], w: u32, h: u32) -> String {
 #[wasm_bindgen]
 pub fn resize_pixels(pixels: &[u8], old_w: u32, old_h: u32, new_w: u32, new_h: u32) -> Vec<u8> {
     transform::resize_bilinear(pixels, old_w, old_h, new_w, new_h)
-}
-
-/// Stateless filtered resize. `filter`: 0 = nearest, 2 = Catmull-Rom,
-/// 3 = Lanczos3, anything else = bilinear. A pure pixels-in/pixels-out utility
-/// (no tool state / history) — also the entry point the SIMD benchmark harness
-/// times against a scalar build.
-#[wasm_bindgen]
-pub fn resize_pixels_filter(
-    pixels: &[u8],
-    old_w: u32,
-    old_h: u32,
-    new_w: u32,
-    new_h: u32,
-    filter: u8,
-) -> Vec<u8> {
-    match filter {
-        0 => transform::resize_nearest(pixels, old_w, old_h, new_w, new_h),
-        2 => transform::resize_catmull_rom(pixels, old_w, old_h, new_w, new_h),
-        3 => transform::resize_lanczos3(pixels, old_w, old_h, new_w, new_h),
-        _ => transform::resize_bilinear(pixels, old_w, old_h, new_w, new_h),
-    }
 }
 
 /// Stateless: encode an RGBA pixel buffer as PNG bytes. Used by the batch-logo

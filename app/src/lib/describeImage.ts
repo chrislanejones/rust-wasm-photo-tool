@@ -45,13 +45,18 @@ export const UNKNOWN_DESCRIPTION: ImageDescription = {
   slug: "image",
 };
 
-/** Tokens the Name-pattern field understands, for the panel's help text. */
+/** Tokens the Name-pattern field understands — the SINGLE source for the
+ *  panel's help text. `patternTokenDrift()` asserts this list and the
+ *  substitution map below cannot disagree; before v8.56 they did, and
+ *  `{palette}` / `{contrast}` worked while being documented nowhere. */
 export const DESCRIBE_TOKENS = [
   { token: "{desc}", hint: "what the engine saw, e.g. dark-blue-portrait" },
   { token: "{color}", hint: "dominant colour" },
   { token: "{subject}", hint: "portrait / nature / sky / screenshot" },
   { token: "{kind}", hint: "photo / graphic / screenshot" },
   { token: "{tone}", hint: "dark / bright" },
+  { token: "{palette}", hint: "muted / vivid" },
+  { token: "{contrast}", hint: "flat / punchy" },
   { token: "{orientation}", hint: "landscape / portrait / square" },
   { token: "{detail}", hint: "busy / smooth" },
   { token: "{name}", hint: "the original filename" },
@@ -127,12 +132,15 @@ interface PatternInput {
  * and their surrounding separators collapse, so `{color}-{subject}` on a
  * subjectless image gives `blue`, not `blue-`.
  */
-export function applyDescriptionPattern(pattern: string, input: PatternInput): string {
-  const { description: d, originalName, index, start, pad } = input;
-  const [originalBase] = splitExtension(originalName);
-  const num = String(start + index).padStart(Math.max(1, pad), "0");
-
-  const values: Record<string, string> = {
+/** The substitution table — the ONE place a token's value is defined. Both
+ *  `applyDescriptionPattern` and `supportedPatternTokens` read it, so the
+ *  help text cannot document a token the expander does not honour. */
+function patternValues(
+  d: ImageDescription,
+  originalBase: string,
+  num: string,
+): Record<string, string> {
+  return {
     "{desc}": d.slug,
     "{color}": d.color,
     "{subject}": d.subject,
@@ -145,6 +153,21 @@ export function applyDescriptionPattern(pattern: string, input: PatternInput): s
     "{name}": originalBase,
     "{n}": num,
   };
+}
+
+/** Every token the expander actually honours, derived from the table itself
+ *  rather than restated — the drift guard in `describeImage.test.ts` compares
+ *  this against `DESCRIBE_TOKENS`. */
+export function supportedPatternTokens(): string[] {
+  return Object.keys(patternValues(UNKNOWN_DESCRIPTION, "", ""));
+}
+
+export function applyDescriptionPattern(pattern: string, input: PatternInput): string {
+  const { description: d, originalName, index, start, pad } = input;
+  const [originalBase] = splitExtension(originalName);
+  const num = String(start + index).padStart(Math.max(1, pad), "0");
+
+  const values = patternValues(d, originalBase, num);
 
   const expanded = pattern.replace(/\{[a-z]+\}/g, (tok) =>
     tok in values ? values[tok] : tok,

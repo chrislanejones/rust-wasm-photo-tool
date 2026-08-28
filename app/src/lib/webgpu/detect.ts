@@ -37,7 +37,7 @@ export function webgpuEnabled(): boolean {
 }
 
 /** Is the API even present? Cheap, synchronous, no device acquisition. */
-export function webgpuAvailable(): boolean {
+function webgpuAvailable(): boolean {
   return typeof navigator !== "undefined" && "gpu" in navigator && !!navigator.gpu;
 }
 
@@ -86,9 +86,4 @@ export function probeWebGpu(): Promise<GpuStatus> {
 export async function gpuUsable(): Promise<boolean> {
   if (!webgpuEnabled()) return false;
   return (await probeWebGpu()).ok;
-}
-
-/** Test seam — forget the cached probe. */
-export function __resetGpuProbe(): void {
-  cached = null;
 }

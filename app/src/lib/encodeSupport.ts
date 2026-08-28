@@ -39,9 +39,3 @@ export function canEncode(mime: string): Promise<boolean> {
   }
   return p;
 }
-
-/** Test seam — the probe caches for the page's lifetime, which unit tests
- *  spanning multiple fake browsers would otherwise inherit from each other. */
-export function __resetEncodeSupportCache(): void {
-  cache.clear();
-}

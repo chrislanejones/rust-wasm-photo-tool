@@ -19,6 +19,7 @@ import { getWorkingCopy, putWorkingCopy } from "@/lib/workingCopyCache";
 import { makeWorkingCopy } from "@/lib/workingCopy";
 import {
   applyDescriptionPattern,
+  DESCRIBE_TOKENS,
   dedupeNames,
   parseDescription,
   splitExtension,
@@ -230,15 +231,13 @@ export function AIRenamePanel({ photos, setPhotos }: Props) {
             doesn&rsquo;t recognise objects in it, so expect{" "}
             <span className="font-mono">dark-blue-portrait</span>, not{" "}
             <span className="font-mono">golden-retriever</span>. Tokens:{" "}
-            <span className="font-mono">{"{desc}"}</span>,{" "}
-            <span className="font-mono">{"{color}"}</span>,{" "}
-            <span className="font-mono">{"{subject}"}</span>,{" "}
-            <span className="font-mono">{"{kind}"}</span>,{" "}
-            <span className="font-mono">{"{tone}"}</span>,{" "}
-            <span className="font-mono">{"{orientation}"}</span>,{" "}
-            <span className="font-mono">{"{detail}"}</span>,{" "}
-            <span className="font-mono">{"{name}"}</span>,{" "}
-            <span className="font-mono">{"{n}"}</span>.
+            {DESCRIBE_TOKENS.map(({ token, hint }, i) => (
+              <span key={token}>
+                {i > 0 && ", "}
+                <span className="font-mono">{token}</span> ({hint})
+              </span>
+            ))}
+            .
           </>
         }
       />

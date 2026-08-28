@@ -476,7 +476,7 @@ export async function auditContentStores(): Promise<ContentAuditReport> {
 }
 
 /** Human-readable byte size, matching the status bar's style. */
-export function formatAuditBytes(n: number): string {
+function formatAuditBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;

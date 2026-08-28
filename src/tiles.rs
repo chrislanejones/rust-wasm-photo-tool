@@ -51,11 +51,6 @@ impl Tile {
         &self.pixels
     }
 
-    /// Whether this tile has unflushed writes.
-    pub fn is_dirty(&self) -> bool {
-        self.dirty
-    }
-
     /// Write generation counter.
     pub fn generation(&self) -> u64 {
         self.generation

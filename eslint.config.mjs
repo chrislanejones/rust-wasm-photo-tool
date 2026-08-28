@@ -7,9 +7,9 @@
 //
 // Deliberately NOT enabled yet (each is its own decision, not a side effect of
 // getting a linter running):
-//   - `max-lines` / entropy + drift rules. The tripwire that would catch the
-//     next AppShell, but switching it on the same day as the config buries the
-//     signal under the current AppShell. Needs a ratchet baseline first.
+//   - Entropy/drift rules beyond `max-lines` (which is now ON — see the
+//     ratchet block at the bottom; the baseline it was waiting for is
+//     docs/Entropy-Refactor-Plan.md).
 //   - The React Compiler rule set that ships in eslint-plugin-react-hooks v7's
 //     `recommended` (17 rules, 14 of them `error` — purity, immutability,
 //     set-state-in-effect, preserve-manual-memoization, …). Real correctness
@@ -136,6 +136,62 @@ export default tseslint.config(
     rules: {
       "react-hooks/exhaustive-deps": "error",
     },
+  },
+
+  {
+    // ── THE max-lines RATCHET ──
+    //
+    // 900 lines is not a style opinion; it is the point past which every file
+    // in this repo that crossed it kept going. AppShell went 3,314 -> 3,806
+    // WHILE it was being dismantled, so accretion outpaced extraction for a
+    // month without anything saying so out loud. This is the thing that says
+    // so out loud.
+    //
+    // `warn`, not `error`, on purpose: the lint gate is errors-only, so a new
+    // 901-line file must not block a push on the day it appears. It shows up
+    // in the warning count instead, which is where this repo keeps its
+    // backlog.
+    //
+    // The five overrides below are TODAY'S line counts, measured 2026-08-27,
+    // not round numbers. That is what makes this a ratchet:
+    //
+    //   THE RULE — when an extraction lands, lower that file's number to its
+    //   new size IN THE SAME COMMIT. These numbers only ever go down. Raising
+    //   one is not a fix, it is the ratchet being unbolted.
+    //
+    // Any file NOT on this list that trips 900 is a new AppShell being born,
+    // which is the entire point of the rule. Do not answer that by adding it
+    // here.
+    files: ["app/**/*.{ts,tsx}"],
+    rules: {
+      "max-lines": ["warn", { max: 900, skipBlankLines: false, skipComments: false }],
+    },
+  },
+
+  {
+    // The four legacy giants + the one long contract test, pinned at their
+    // 2026-08-27 sizes. Ordered biggest first, which is also roughly the
+    // order docs/Entropy-Refactor-Plan.md Phase 4 works through them.
+    files: ["app/src/app/AppShell.tsx"],
+    rules: { "max-lines": ["warn", { max: 3806 }] },
+  },
+  {
+    files: ["app/src/features/canvas/CanvasArea.tsx"],
+    rules: { "max-lines": ["warn", { max: 2959 }] },
+  },
+  {
+    files: ["app/src/features/tools/settings/BatchSettings.tsx"],
+    rules: { "max-lines": ["warn", { max: 1428 }] },
+  },
+  {
+    files: ["app/src/hooks/useDrawingTools.ts"],
+    rules: { "max-lines": ["warn", { max: 1173 }] },
+  },
+  {
+    // A test file, not a god object — it is long because it enumerates 166
+    // engine call sites. Pinned so it cannot drift upward unnoticed either.
+    files: ["app/src/lib/engine/engineAsyncMigration.contract.test.ts"],
+    rules: { "max-lines": ["warn", { max: 1015 }] },
   },
 
   {

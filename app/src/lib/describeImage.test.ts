@@ -17,6 +17,8 @@ import {
   splitExtension,
   UNKNOWN_DESCRIPTION,
   type ImageDescription,
+  DESCRIBE_TOKENS,
+  supportedPatternTokens,
 } from "@/lib/describeImage";
 
 const DESC: ImageDescription = {
@@ -174,5 +176,31 @@ describe("dedupeNames", () => {
     const out = dedupeNames(["x", "x", "x-2", "X", "y", "x-3", "x"]);
     const lower = out.map((s) => s.toLowerCase());
     expect(new Set(lower).size).toBe(out.length);
+  });
+});
+
+// The help text in AIRenamePanel renders from DESCRIBE_TOKENS, and the expander
+// substitutes from patternValues. Before v8.56 those were two hand-kept lists
+// and they disagreed: `{palette}` and `{contrast}` expanded correctly while
+// appearing in no help text anywhere. This is the guard that keeps them equal —
+// add a token to one side and this fails rather than the docs quietly rotting.
+describe("token drift guard", () => {
+  it("documents exactly the tokens the expander honours", () => {
+    const documented = [...DESCRIBE_TOKENS].map((t) => t.token).sort();
+    const supported = supportedPatternTokens().sort();
+    expect(documented).toEqual(supported);
+  });
+
+  it("every documented token actually substitutes", () => {
+    for (const { token } of DESCRIBE_TOKENS) {
+      const out = applyDescriptionPattern(token, {
+        description: UNKNOWN_DESCRIPTION,
+        originalName: "beach.jpg",
+        index: 0,
+        start: 1,
+        pad: 2,
+      });
+      expect(out, `${token} was left unexpanded`).not.toContain(token);
+    }
   });
 });

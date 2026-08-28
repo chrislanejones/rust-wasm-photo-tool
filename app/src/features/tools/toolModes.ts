@@ -15,9 +15,10 @@
 // new-ui-toolbar arc:
 //   1. `icon` on ToolModeInfo — the row draws tiles, not text, so the thin
 //      projection now has to carry the icon the rich ToolMode already had.
-//   2. `useActiveMode(tool)` — a REACTIVE read. `activeModeOf` stays as the
-//      imperative getState() read the palette/router use; a React component
-//      cannot use it or it will never re-render on a mode change.
+//   2. `selectModeOf(state, tool)` — the single sub-mode read. It is a plain
+//      selector, so it is safe inside a React selector and from a getState()
+//      snapshot alike; see its own comment for why a second copy must not
+//      come back.
 //
 // SOURCES (priority order, same rule the palette always used):
 //   1. TOOL_MODULES — the tool registry. A migrated tool's `modes` array IS
@@ -26,7 +27,6 @@
 //      registry.
 // DECISION (unchanged): when a tool migrates into TOOL_MODULES, delete its row
 // from LEGACY_SUBMODES in that same session.
-import { useCallback } from "react";
 import {
   ArrowUpRight,
   Copy,
@@ -186,24 +186,6 @@ export function modesFor(tool: ToolType): ToolModeInfo[] {
   return LEGACY_SUBMODES[tool] ?? [];
 }
 
-/** The tool's currently-active sub-mode id, or `undefined` if it has none.
- *  IMPERATIVE — for the palette and the router. React components want
- *  `useActiveMode` instead; this one does not subscribe. */
-export function activeModeOf(tool: ToolType): string | undefined {
-  if (!modesFor(tool).length) return undefined;
-  const access = MODE_ACCESS[tool];
-  return access ? access.select(useToolStore.getState()) : undefined;
-}
-
-/** REACTIVE active sub-mode — the SubtoolRow's read. Returns `undefined` for
- *  single-mode tools. The selector is memoized on `tool` so switching tools
- *  re-subscribes but a mode change inside one tool does not churn it. */
-export function useActiveMode(tool: ToolType): string | undefined {
-  return useToolStore(
-    useCallback((s: ToolState) => MODE_ACCESS[tool]?.select(s), [tool]),
-  );
-}
-
 /** Switch a tool's sub-mode. No-op when the id isn't one of that tool's modes
  *  (a hand-typed URL is untrusted input — it must not poke a bogus value into
  *  a typed store union). Returns whether it took. */
@@ -235,14 +217,4 @@ export function setModeOf(tool: ToolType, modeId: string): boolean {
   if (!access) return false;
   if (access.select(useToolStore.getState()) !== modeId) access.set(modeId);
   return true;
-}
-
-/** Every (tool, mode) pair that exists — the palette's jump-to-sub-mode source
- *  and the routing module's validation table. */
-export function allToolModes(): { tool: ToolType; mode: ToolModeInfo }[] {
-  const out: { tool: ToolType; mode: ToolModeInfo }[] = [];
-  for (const tool of Object.keys(MODE_ACCESS) as ToolType[]) {
-    for (const mode of modesFor(tool)) out.push({ tool, mode });
-  }
-  return out;
 }
