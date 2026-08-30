@@ -1157,9 +1157,13 @@ mod capture_tests {
         let mut t = ImageHorseTool::new(128, 128);
         t.load_image(&solid(128, 128, [10, 20, 30, 255]));
         t.add_bezier_annotation(&PEN_PTS, "#00ff00", 3.0, 0, "#000000");
-        // A rect covering the whole path, added AFTER it so it is newest.
+        // A FILLED rect covering the whole path, added AFTER it so it is
+        // newest. Filled, because since 2026-08-28 an unfilled rect is only its
+        // outline to the hit-test — its empty middle is not ink and does not
+        // shadow what is drawn inside it (see the twin below). A solid fill is
+        // ink all the way across and still covers the path.
         t.add_shape_annotation(
-            0, 5.0, 5.0, 95.0, 95.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            0, 5.0, 5.0, 95.0, 95.0, "#ff0000", 2.0, 0, 1, "#000000", "#000000", 0, 0,
         );
 
         let hit = t.capture_pen_hit(HIT.0, HIT.1);
@@ -1173,6 +1177,31 @@ mod capture_tests {
         assert!(
             old.is_none(),
             "the code being replaced also returned nothing here"
+        );
+    }
+
+    /// The twin of the case above, pinning the 2026-08-28 rule from this side:
+    /// an UNFILLED rect drawn over the path is a frame around it, not a lid on
+    /// it, so the path stays reachable through the hollow middle.
+    #[test]
+    fn capture_pen_hit_reaches_a_bezier_through_an_unfilled_rects_hollow_middle() {
+        let mut t = ImageHorseTool::new(128, 128);
+        t.load_image(&solid(128, 128, [10, 20, 30, 255]));
+        let pen_id = t.add_bezier_annotation(&PEN_PTS, "#00ff00", 3.0, 0, "#000000");
+        t.add_shape_annotation(
+            0, 5.0, 5.0, 95.0, 95.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        );
+
+        let hit = t.capture_pen_hit(HIT.0, HIT.1);
+        assert_eq!(
+            hit.id, pen_id as i32,
+            "the hollow rect does not shadow the path"
+        );
+        assert_eq!(hit.points, PEN_PTS.to_vec());
+        assert_eq!(
+            pen_hit_the_old_way(&t, HIT.0, HIT.1).map(|o| o.0),
+            Some(pen_id as i32),
+            "and the two-call path agrees"
         );
     }
 
@@ -1208,11 +1237,15 @@ mod capture_tests {
             0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
         );
 
+        // Probe the rect's LEFT STROKE (x = 20), not its centre: an unfilled
+        // rect's empty interior stopped counting as a hit on 2026-08-28 (so a
+        // shape can be drawn inside another), and the control below is about
+        // the rect being found at all, not about where.
         assert!(
-            t.shape_annotation_at(40.0, 40.0) >= 0,
+            t.shape_annotation_at(20.0, 40.0) >= 0,
             "control: the rect IS under the point"
         );
-        let hit = t.capture_pen_hit(40.0, 40.0);
+        let hit = t.capture_pen_hit(20.0, 40.0);
         assert_eq!(hit.id, -1, "a rect is not a pen path");
         assert!(hit.points.is_empty());
     }

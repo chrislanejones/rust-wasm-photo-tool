@@ -2441,23 +2441,7 @@ impl ImageHorseTool {
     /// `push_annotation_to_undo_snapshot` after this returns. (Multi-layer
     /// history is not yet persisted; restored snapshots are single-layer.)
     pub fn inject_undo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
-        let layer = Layer {
-            id: 1,
-            name: "Background".to_string(),
-            // A restored snapshot is a flattened single plane — content, not a
-            // Canvas. "Background" here means the photo (ADR-016).
-            kind: crate::layer::LayerKind::Content,
-            visible: true,
-            opacity: 1.0,
-            buf: ImageBuffer {
-                width: w,
-                height: h,
-                data: data.to_vec(),
-            },
-            mask: None,
-            text_annotations: Vec::new(),
-            shape_annotations: Vec::new(),
-        };
+        let layer = Layer::from_snapshot_pixels(data, w, h);
         self.hist.undo_stack.push_back(Snapshot {
             // Reconstructed from the op log — it rebuilds a document, it does
             // not change a setting, so it carries the live quality (ADR-031).
@@ -2474,21 +2458,7 @@ impl ImageHorseTool {
 
     /// Append a raw-RGBA snapshot to the redo stack (used when restoring a session).
     pub fn inject_redo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
-        let layer = Layer {
-            id: 1,
-            name: "Background".to_string(),
-            kind: crate::layer::LayerKind::Content,
-            visible: true,
-            opacity: 1.0,
-            buf: ImageBuffer {
-                width: w,
-                height: h,
-                data: data.to_vec(),
-            },
-            mask: None,
-            text_annotations: Vec::new(),
-            shape_annotations: Vec::new(),
-        };
+        let layer = Layer::from_snapshot_pixels(data, w, h);
         self.hist.redo_stack.push(Snapshot {
             export_quality: self.export_quality,
             label: label.to_string(),

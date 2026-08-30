@@ -76,6 +76,20 @@ export interface LayerInfo {
   active: boolean;
   /** Whether this layer has a non-destructive mask (paint it in Edit-mask mode). */
   hasMask: boolean;
+  /** The layer's non-destructive Color Overlay style (Photoshop's), or `null`
+   *  when it has none. A solid colour tinting the layer's own pixels at
+   *  composite time — clipped to its alpha, applied UNDER the mask, reversible
+   *  until Applied. Session-lived: like `hasMask`, it does not survive a reload
+   *  (`push_restored_layer` restores pixels + annotations only). */
+  overlay: LayerColorOverlay | null;
+}
+
+/** A layer's Color Overlay style, mirrored from the Rust `get_layers()` JSON. */
+export interface LayerColorOverlay {
+  /** `#rrggbb`. */
+  color: string;
+  /** 0..1. */
+  opacity: number;
 }
 
 export interface CloneStampState {

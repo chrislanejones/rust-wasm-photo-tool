@@ -22,7 +22,11 @@ import { SubtoolRow } from "./SubtoolRow";
 import { useActiveSubTool } from "./activateSubTool";
 import { StampSettingsPanel } from "./settings/StampSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
-import { LayerSettings, type LayerMaskControls } from "./settings/LayerSettings";
+import {
+  LayerSettings,
+  type LayerMaskControls,
+  type LayerOverlayControls,
+} from "./settings/LayerSettings";
 import type { LayerInfo } from "@/hooks/useEngineCore";
 import { SelectSettings } from "./settings/SelectSettings";
 import { PerspectiveSettings } from "./settings/PerspectiveSettings";
@@ -60,6 +64,9 @@ interface ToolsSidebarProps {
   layers?: LayerInfo[];
   onSelectLayer?: (id: number) => void;
   layerMask?: LayerMaskControls;
+  /** Color Overlay controls for the selected layer — same one-set-per-panel
+   *  shape as `layerMask`, acting on whatever the panel's dropdown selected. */
+  layerOverlay?: LayerOverlayControls;
   /** Embedded mode: render the inner content as a plain flex column (no fixed
    *  positioning / panel chrome / slide animation) so it can fill the compact
    *  master bar's content area instead of floating as its own panel. */
@@ -166,6 +173,7 @@ export function ToolsSidebar({
   layers,
   onSelectLayer,
   layerMask,
+  layerOverlay,
   embedded = false,
   onExport,
   canExport,
@@ -393,6 +401,7 @@ export function ToolsSidebar({
             layers={layers}
             onSelectLayer={onSelectLayer}
             mask={layerMask}
+            overlay={layerOverlay}
             imgW={imageWidth}
             imgH={imageHeight}
             canvasWidth={imageWidth}

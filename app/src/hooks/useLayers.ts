@@ -205,6 +205,49 @@ export function useLayers(engine: EngineCore) {
     [toolRef, flushToCanvas, syncState],
   );
 
+  // ── Layer colour overlay (Photoshop's Color Overlay style) ──
+  // Non-destructive: a solid colour tinting the layer's pixels at composite
+  // time, under the mask. `set` doubles as "add" and "adjust" — the engine
+  // snaps history only on the first set, so dragging the opacity slider gives
+  // ONE undo entry rather than one per pointer move.
+  const setLayerColorOverlay = useCallback(
+    async (id: number, color: string, opacity: number) => {
+      const rgb = hexToRgb(color);
+      if (!rgb) return;
+      if (
+        await toolRef.current?.set_layer_color_overlay(
+          id,
+          rgb[0],
+          rgb[1],
+          rgb[2],
+          opacity,
+        )
+      ) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [toolRef, flushToCanvas, syncState],
+  );
+  const removeLayerColorOverlay = useCallback(
+    async (id: number) => {
+      if (await toolRef.current?.remove_layer_color_overlay(id)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [toolRef, flushToCanvas, syncState],
+  );
+  const applyLayerColorOverlay = useCallback(
+    async (id: number) => {
+      if (await toolRef.current?.apply_layer_color_overlay(id)) {
+        flushToCanvas();
+        syncState();
+      }
+    },
+    [toolRef, flushToCanvas, syncState],
+  );
+
   return useMemo(
     () => ({
       addLayer,
@@ -221,6 +264,9 @@ export function useLayers(engine: EngineCore) {
       removeLayerMask,
       applyLayerMask,
       invertLayerMask,
+      setLayerColorOverlay,
+      removeLayerColorOverlay,
+      applyLayerColorOverlay,
     }),
     [
       addLayer,
@@ -237,6 +283,26 @@ export function useLayers(engine: EngineCore) {
       removeLayerMask,
       applyLayerMask,
       invertLayerMask,
+      setLayerColorOverlay,
+      removeLayerColorOverlay,
+      applyLayerColorOverlay,
     ],
   );
+}
+
+/** `#rgb` / `#rrggbb` → [r,g,b], or null if it isn't one.
+ *
+ * The engine takes three bytes, not a CSS string — the Rust colour parser is a
+ * separate, async path (`lib/colorParser`) used where the user TYPES a colour.
+ * Every value that reaches here comes from `ColorSwatchGrid`, which only ever
+ * emits hex (its custom-colour flow stores `parsed.hex`), so a local parse is
+ * the whole job and keeps the slider drag synchronous.
+ */
+function hexToRgb(hex: string): [number, number, number] | null {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  const n = parseInt(h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }

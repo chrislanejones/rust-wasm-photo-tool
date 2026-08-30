@@ -93,6 +93,19 @@ interface KeyboardShortcutOptions {
   onSpaceUp?: () => void;
 }
 
+/** `<input>` types that are controls rather than text fields. Ctrl+Z while
+ *  one has focus is the app's undo — see the guard in `handleKeyDown`. */
+const NON_TEXT_INPUT_TYPES: ReadonlySet<string> = new Set([
+  "range",
+  "checkbox",
+  "radio",
+  "button",
+  "submit",
+  "reset",
+  "color",
+  "file",
+]);
+
 export function useKeyboardShortcuts({
   onUndo,
   onRedo,
@@ -144,10 +157,31 @@ export function useKeyboardShortcuts({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target;
+      // A NON-text input — a range slider, checkbox, radio, button — takes
+      // focus when clicked and keeps it. It is not a place the user types, so
+      // Ctrl+Z there means the app's undo, not the field's. Drag the Strength
+      // slider, press Ctrl+Z, and nothing happening is a bug: this used to be
+      // masked by a second, unguarded Ctrl+Z listener in useHistory (removed
+      // 2026-08-28 because it made every undo a double step).
+      //
+      // ONLY undo/redo pass through for these controls. Everything else keeps
+      // the early return, so a focused slider's arrow keys, Space and Enter
+      // still reach the control itself.
+      const nonTextInput =
+        target instanceof HTMLInputElement && NON_TEXT_INPUT_TYPES.has(target.type);
+      if (nonTextInput) {
+        if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) {
+          e.preventDefault();
+          if (e.shiftKey) onRedo();
+          else onUndo();
+        }
+        return;
+      }
       if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.isContentEditable)
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
       ) {
         return;
       }

@@ -1183,8 +1183,19 @@ impl ImageHorseTool {
     }
 
     /// Hit-test shape annotations against a canvas-space point. Iterates
-    /// newest-first (last-added wins). Returns the id, or -1. Lines/arrows use
-    /// distance-to-segment; closed shapes use a padded bounding box.
+    /// newest-first (last-added wins). Returns the id, or -1.
+    ///
+    /// Three rules, by what the user can actually see:
+    /// - lines / arrows / polylines → distance to the stroke;
+    /// - an UNFILLED rect / circle / hand-circle → the stroke RING only. Its
+    ///   empty interior is not ink, so a click there is a click on whatever is
+    ///   behind it — which is what lets a shape be drawn inside another shape
+    ///   instead of every such drag re-selecting the outer one;
+    /// - everything else (filled shapes, pins, bézier) → padded bounding box.
+    ///   A fill IS ink, so its interior selects, as in Photoshop.
+    ///
+    /// ⚠️ Mirrored by hand in `app/src/lib/annotationHitTest.ts` — #60's drift
+    /// guard hashes this body, so a change here must be ported there first.
     pub fn shape_annotation_at(&self, x: f64, y: f64) -> i32 {
         for s in self.layers[self.active].shape_annotations.iter().rev() {
             let pad = (s.stroke_width * 0.5).max(6.0);
@@ -1197,12 +1208,42 @@ impl ImageHorseTool {
                     point_segment_distance(x, y, p[0].0, p[0].1, p[1].0, p[1].1) <= pad + 4.0
                 })
             } else {
-                // rect / circle / handCircle / pin → padded bounding box
-                let minx = s.x0.min(s.x1) - pad;
-                let maxx = s.x0.max(s.x1) + pad;
-                let miny = s.y0.min(s.y1) - pad;
-                let maxy = s.y0.max(s.y1) + pad;
-                x >= minx && x <= maxx && y >= miny && y <= maxy
+                let minx = s.x0.min(s.x1);
+                let maxx = s.x0.max(s.x1);
+                let miny = s.y0.min(s.y1);
+                let maxy = s.y0.max(s.y1);
+                let in_outer =
+                    x >= minx - pad && x <= maxx + pad && y >= miny - pad && y <= maxy + pad;
+                let hollow = s.fill_kind == 0 && (s.kind == 0 || s.kind == 1 || s.kind == 3);
+                if !hollow {
+                    // filled rect / circle, pin, bézier → padded bounding box
+                    in_outer
+                } else if s.kind == 0 {
+                    // unfilled rect → the ring between the padded outer box and
+                    // the box shrunk by the same pad. A rect thinner than 2·pad
+                    // has no hole and is all ring.
+                    let in_inner =
+                        x > minx + pad && x < maxx - pad && y > miny + pad && y < maxy - pad;
+                    in_outer && !in_inner
+                } else {
+                    // unfilled circle / hand-circle → the ring between two
+                    // concentric ellipses, radii ± pad. Same no-hole rule.
+                    let cx = (minx + maxx) * 0.5;
+                    let cy = (miny + maxy) * 0.5;
+                    let rx = (maxx - minx) * 0.5;
+                    let ry = (maxy - miny) * 0.5;
+                    let norm = |ax: f64, ay: f64| {
+                        if ax <= 0.0 || ay <= 0.0 {
+                            return f64::INFINITY;
+                        }
+                        let dx = (x - cx) / ax;
+                        let dy = (y - cy) / ay;
+                        dx * dx + dy * dy
+                    };
+                    let in_outer_ellipse = norm(rx + pad, ry + pad) <= 1.0;
+                    let in_inner_ellipse = norm(rx - pad, ry - pad) < 1.0;
+                    in_outer_ellipse && !in_inner_ellipse
+                }
             };
             if hit {
                 return s.id as i32;
@@ -1697,8 +1738,22 @@ impl ImageHorseTool {
         let c = drawing::parse_hex_color(color_hex);
         // No-op (and no history snapshot) when unchanged — lets commitText call
         // this on every text commit cheaply.
+        //
+        // "Unchanged" means VISIBLY unchanged. A shadow that is off before and
+        // off after is the same picture whatever its dormant colour, alpha,
+        // offset and blur say — and those always differ on a fresh commit: a
+        // new annotation is built with every shadow field zeroed, while the
+        // panel's defaults sit at 60% alpha, a 2 px offset and some blur even
+        // with both toggles off. Comparing them made every text commit TWO
+        // history entries ("Add Text" + a phantom "Text Shadow"), which the
+        // double-bound Ctrl+Z of the same era happened to hide (2026-08-28).
+        // The dormant values are not stored either: every caller passes the
+        // full set on the next call, so there is nothing to lose.
         {
             let a = &self.layers[self.active].text_annotations[idx];
+            if !a.shadow_box && !a.shadow_text && !on_box && !on_text {
+                return true;
+            }
             if a.shadow_box == on_box
                 && a.shadow_text == on_text
                 && a.shadow_r == c[0]
@@ -1857,5 +1912,177 @@ impl ImageHorseTool {
         }
         self.editing_shape_id = None;
         true
+    }
+}
+
+#[cfg(test)]
+mod hit_test_tests {
+    //! `shape_annotation_at` — the ring rule for unfilled closed shapes
+    //! (2026-08-28). Every case here has a twin in
+    //! `app/src/lib/annotationHitTest.test.ts`; the #60 drift guard is what
+    //! ties the two files together.
+    use crate::ImageHorseTool;
+
+    fn tool_with(kind: u8, bbox: [f64; 4], fill_kind: u8) -> (ImageHorseTool, i32) {
+        let mut t = ImageHorseTool::new(200, 200);
+        let [x0, y0, x1, y1] = bbox;
+        let id = t.add_shape_annotation(
+            kind, x0, y0, x1, y1, "#ff0000", 2.0, 0, fill_kind, "#00ff00", "#0000ff", 0, 0,
+        );
+        (t, id as i32)
+    }
+
+    /// THE user-testing finding: a drag started inside an outlined rect used
+    /// to re-select the rect instead of drawing a new shape inside it.
+    #[test]
+    fn unfilled_rect_interior_is_a_miss_and_its_stroke_is_a_hit() {
+        // stroke 2 → pad 6; box 20..100 → ring is 14..26 and 94..106 on each axis
+        let (t, id) = tool_with(0, [20.0, 20.0, 100.0, 100.0], 0);
+        assert_eq!(
+            t.shape_annotation_at(60.0, 60.0),
+            -1,
+            "dead centre is empty"
+        );
+        assert_eq!(
+            t.shape_annotation_at(30.0, 30.0),
+            -1,
+            "just inside the ring"
+        );
+        assert_eq!(t.shape_annotation_at(20.0, 60.0), id, "on the left stroke");
+        assert_eq!(
+            t.shape_annotation_at(15.0, 60.0),
+            id,
+            "outer pad still counts"
+        );
+        assert_eq!(
+            t.shape_annotation_at(25.0, 60.0),
+            id,
+            "inner pad still counts"
+        );
+        assert_eq!(t.shape_annotation_at(100.0, 100.0), id, "corner");
+        assert_eq!(t.shape_annotation_at(110.0, 60.0), -1, "outside the pad");
+    }
+
+    /// A fill IS ink — its interior must keep selecting, as in Photoshop.
+    #[test]
+    fn filled_rect_interior_still_hits() {
+        for fill in [1u8, 2, 3] {
+            let (t, id) = tool_with(0, [20.0, 20.0, 100.0, 100.0], fill);
+            assert_eq!(t.shape_annotation_at(60.0, 60.0), id, "fill_kind {fill}");
+        }
+    }
+
+    #[test]
+    fn unfilled_circle_is_a_ring() {
+        // bbox 20..120 → centre (70,70), radius 50; pad 6 → ring radii 44..56
+        let (t, id) = tool_with(1, [20.0, 20.0, 120.0, 120.0], 0);
+        assert_eq!(t.shape_annotation_at(70.0, 70.0), -1, "centre is empty");
+        assert_eq!(t.shape_annotation_at(70.0, 40.0), -1, "r=30, well inside");
+        assert_eq!(
+            t.shape_annotation_at(70.0, 20.0),
+            id,
+            "on the top of the stroke"
+        );
+        assert_eq!(
+            t.shape_annotation_at(70.0, 25.0),
+            id,
+            "r=45, inside the ring"
+        );
+        assert_eq!(t.shape_annotation_at(70.0, 15.0), id, "r=55, outer pad");
+        // The bbox CORNER is outside the circle — the old bbox rule hit there.
+        assert_eq!(
+            t.shape_annotation_at(22.0, 22.0),
+            -1,
+            "bbox corner is not ink"
+        );
+    }
+
+    #[test]
+    fn filled_circle_interior_still_hits() {
+        let (t, id) = tool_with(1, [20.0, 20.0, 120.0, 120.0], 1);
+        assert_eq!(t.shape_annotation_at(70.0, 70.0), id);
+    }
+
+    /// A shape thinner than the pad has no hole: it is all ring.
+    #[test]
+    fn a_thin_unfilled_rect_has_no_hole() {
+        let (t, id) = tool_with(0, [20.0, 20.0, 100.0, 28.0], 0); // 8 px tall, pad 6
+        assert_eq!(t.shape_annotation_at(60.0, 24.0), id);
+    }
+
+    /// Hand-circle (3) follows the circle rule; pin (5) keeps its bbox — a pin
+    /// is a filled disc with a label and is drawn with fill_kind 0.
+    #[test]
+    fn hand_circle_is_a_ring_and_a_pin_stays_a_box() {
+        let (t, id) = tool_with(3, [20.0, 20.0, 120.0, 120.0], 0);
+        assert_eq!(t.shape_annotation_at(70.0, 70.0), -1);
+        assert_eq!(t.shape_annotation_at(70.0, 20.0), id);
+        let (t, id) = tool_with(5, [20.0, 20.0, 60.0, 60.0], 0);
+        assert_eq!(t.shape_annotation_at(40.0, 40.0), id);
+    }
+
+    /// Newest-first still holds: a small rect drawn INSIDE a big one wins on
+    /// its own stroke, and the big one's interior no longer shadows it.
+    #[test]
+    fn inner_shape_is_selectable_through_the_outer_ones_interior() {
+        let (mut t, outer) = tool_with(0, [10.0, 10.0, 190.0, 190.0], 0);
+        let inner = t.add_shape_annotation(
+            0, 60.0, 60.0, 120.0, 120.0, "#ff0000", 2.0, 0, 0, "#000", "#000", 0, 0,
+        ) as i32;
+        assert_eq!(t.shape_annotation_at(60.0, 90.0), inner, "inner stroke");
+        assert_eq!(t.shape_annotation_at(10.0, 90.0), outer, "outer stroke");
+        assert_eq!(t.shape_annotation_at(40.0, 40.0), -1, "between the two");
+    }
+}
+
+#[cfg(test)]
+mod text_shadow_history_tests {
+    //! One committed text = ONE undo step (2026-08-28). `commitText` calls
+    //! `set_text_shadow` after every `add_text_annotation` with the panel's
+    //! values; with the shadow off that must not cost a history entry.
+    use crate::ImageHorseTool;
+
+    fn fresh_text(t: &mut ImageHorseTool) -> u32 {
+        t.add_text_annotation(
+            "hi", 24.0, 255, 255, 255, false, 10, 10, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+        )
+    }
+
+    /// THE probe finding: a fresh commit with the shadow OFF but the panel's
+    /// dormant defaults (60% alpha, 2 px offset, blur) used to snap a second
+    /// "Text Shadow" entry. Labels are asserted, not just the count, so a
+    /// future second snap with a different label is still caught.
+    #[test]
+    fn off_to_off_with_different_dormant_params_is_not_a_history_step() {
+        let mut t = ImageHorseTool::new(64, 64);
+        let id = fresh_text(&mut t);
+        assert_eq!(t.undo_count(), 1, "Add Text is one step");
+        assert!(t.set_text_shadow(id, false, false, "#000000", 153, 2, 2, 4));
+        assert_eq!(t.undo_count(), 1, "an invisible shadow must not add a step");
+        assert!(
+            !t.history_labels().contains("Text Shadow"),
+            "no phantom label: {}",
+            t.history_labels()
+        );
+    }
+
+    /// Turning it ON is a real, visible change and stays undoable on its own;
+    /// turning it back OFF likewise.
+    #[test]
+    fn on_and_off_transitions_still_snap() {
+        let mut t = ImageHorseTool::new(64, 64);
+        let id = fresh_text(&mut t);
+        assert!(t.set_text_shadow(id, true, false, "#000000", 153, 2, 2, 4));
+        assert_eq!(t.undo_count(), 2, "off → on snaps");
+        assert!(t.set_text_shadow(id, true, false, "#000000", 153, 2, 2, 4));
+        assert_eq!(t.undo_count(), 2, "on → same on is a no-op");
+        assert!(t.set_text_shadow(id, true, false, "#ff0000", 153, 2, 2, 4));
+        assert_eq!(
+            t.undo_count(),
+            3,
+            "a visible colour change on a live shadow snaps"
+        );
+        assert!(t.set_text_shadow(id, false, false, "#ff0000", 153, 2, 2, 4));
+        assert_eq!(t.undo_count(), 4, "on → off snaps");
     }
 }

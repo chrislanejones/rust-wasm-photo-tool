@@ -1,5 +1,6 @@
 // History — undo/redo/jump/delete/clear against the engine's snapshot +
-// op-log stacks, plus the Ctrl+Z / Ctrl+Shift+Z window binding.
+// op-log stacks. The Ctrl+Z / Ctrl+Shift+Z binding is NOT here — see the note
+// above the return.
 //
 // Extracted VERBATIM from useCloneStamp.ts in the clonestamp-split refactor.
 // Every history move repaints (flush), re-mirrors state (sync), bumps the
@@ -27,12 +28,12 @@
 // reads nothing it has to keep consistent with the guard.
 //
 // Reentrancy, stated rather than discovered later: `undo`/`redo` are fired from
-// the keydown handler and from TopBar without being awaited, so behind the
+// useKeyboardShortcuts and from TopBar without being awaited, so behind the
 // worker two fast Ctrl+Z presses can overlap. That is safe — the port is FIFO
 // so the engine still applies them in order, and the ritual is idempotent
 // (flush/sync/broadcast/refresh all just re-read whatever is current). The
 // worst case is one briefly stale frame, which the second ritual corrects.
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import type { EngineCore } from "./useEngineCore";
 import { useToolStore } from "@/stores/useToolStore";
 
@@ -94,20 +95,19 @@ export function useHistory(engine: EngineCore) {
     syncState();
   }, [toolRef, syncState]);
 
-  // ── Keyboard shortcuts ────────────────────────────────────────────────────
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
-        // Deliberately not awaited: a keydown listener cannot be async without
-        // changing when preventDefault would apply, and the ritual is
-        // idempotent under overlap (see the header).
-        if (e.shiftKey) void redo();
-        else void undo();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo]);
+  // ── Keyboard shortcuts: NONE here, on purpose ──────────────────────────
+  // Ctrl+Z / Ctrl+Shift+Z are bound in ONE place — `app/useKeyboardShortcuts.ts`
+  // — which receives `undo`/`redo` from AppShell as `onUndo`/`onRedo`.
+  //
+  // This hook used to bind them too (carried verbatim out of useCloneStamp in
+  // the split), so every Ctrl+Z reached the engine TWICE: two window listeners,
+  // two `undo()` calls, two history steps. Measured on the production build
+  // 2026-08-28: one keypress took `undo_count` 3 → 1 and removed two shapes.
+  // It survived because the one e2e that undoes has a single-entry history
+  // (stroke → undo), where the second call finds nothing and returns false.
+  //
+  // If Ctrl+Z ever needs to be bound again, bind it THERE, where the typing
+  // guard and `preventDefault` already live — never add a second listener.
 
   return useMemo(
     () => ({

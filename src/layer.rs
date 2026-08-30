@@ -33,6 +33,26 @@ pub enum LayerKind {
     Content,
 }
 
+/// A non-destructive Photoshop-style **Color Overlay** layer style: a solid
+/// colour laid over the layer's own pixels at composite time, clipped to the
+/// layer's existing alpha so it tints what is there rather than filling the
+/// frame.
+///
+/// Normal blend only (Photoshop's default for this effect). `opacity` is
+/// 0.0..=1.0; the layer's alpha is never changed, so a fully-opaque overlay
+/// recolours the layer and leaves its silhouette exactly as it was.
+///
+/// `Copy` because it is four small scalars — snapshots and `Layer::clone`
+/// carry it for free, which is what makes undo/redo reverse it.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct ColorOverlay {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    /// 0.0..=1.0. Zero is a no-op, not an error — the UI slider can reach it.
+    pub opacity: f64,
+}
+
 /// A single Photoshop-style layer: an independent RGBA pixel buffer plus its
 /// own live (non-destructive) text and shape annotations. Layers share the
 /// canvas dimensions held on `ImageHorseTool`. The display canvas is the
@@ -57,6 +77,11 @@ pub struct Layer {
     /// touching `buf`, so masking is fully reversible until "Apply Mask" bakes
     /// it in. `None` when the layer has no mask.
     pub mask: Option<Vec<u8>>,
+    /// Optional non-destructive colour overlay (see [`ColorOverlay`]). Applied
+    /// in `render_layer` AFTER the shape/text overlays and BEFORE the mask —
+    /// the Photoshop order, where a layer style tints the whole styled layer
+    /// and the mask then hides the styled result. `None` when unset.
+    pub overlay: Option<ColorOverlay>,
     pub text_annotations: Vec<TextAnnotation>,
     pub shape_annotations: Vec<ShapeAnnotation>,
 }
@@ -73,6 +98,38 @@ impl Layer {
             opacity: 1.0,
             buf: ImageBuffer::new(width, height),
             mask: None,
+            overlay: None,
+            text_annotations: Vec::new(),
+            shape_annotations: Vec::new(),
+        }
+    }
+
+    /// The single flattened `Content` layer a restored op-log snapshot is made
+    /// of: id 1, named "Background", fully visible and opaque, carrying `data`
+    /// verbatim, with no mask, no colour overlay and no live annotations.
+    ///
+    /// Both `inject_undo_snapshot` and `inject_redo_snapshot` built this by
+    /// hand, identically. Naming it means a new `Layer` field is set in ONE
+    /// place instead of two — which is how it earned its keep: adding
+    /// `overlay` broke both copies at once.
+    ///
+    /// "Background" here means the PHOTO, not the artboard fill — a restored
+    /// snapshot is a flattened single plane, so `Content` is correct and
+    /// `Canvas` would hand the op log the wrong content plane (ADR-016).
+    pub(crate) fn from_snapshot_pixels(data: &[u8], w: u32, h: u32) -> Self {
+        Layer {
+            id: 1,
+            name: "Background".to_string(),
+            kind: LayerKind::Content,
+            visible: true,
+            opacity: 1.0,
+            buf: ImageBuffer {
+                width: w,
+                height: h,
+                data: data.to_vec(),
+            },
+            mask: None,
+            overlay: None,
             text_annotations: Vec::new(),
             shape_annotations: Vec::new(),
         }
@@ -111,6 +168,38 @@ impl Layer {
 /// "Background" now always means CONTENT (the photo of a `load_image` document,
 /// a flattened stack, a restored snapshot).
 pub(crate) const CANVAS_LAYER_NAME: &str = "Canvas";
+/// Tint `rgba` in place with a [`ColorOverlay`] — Photoshop's Color Overlay at
+/// Normal blend. Pure per-channel lerp toward the overlay colour, weighted by
+/// `opacity`; the alpha byte is never touched, so the layer keeps its exact
+/// silhouette.
+///
+/// Fully-transparent pixels are skipped rather than tinted. Their RGB is
+/// invisible either way, but writing colour into them bleeds a halo the moment
+/// anything downsamples the buffer (export, thumbnail, layer resize).
+///
+/// Shared by `render_layer` (the live, non-destructive path) and the two bake
+/// paths (`apply_layer_color_overlay`, `merge_down`) so a baked overlay is
+/// byte-identical to the one that was on screen.
+pub(crate) fn apply_color_overlay(rgba: &mut [u8], ov: ColorOverlay) {
+    let o = ov.opacity.clamp(0.0, 1.0);
+    if o <= 0.0 {
+        return;
+    }
+    // 0..=255 weight applied once up front — the inner loop stays integer-only,
+    // matching `blend_over`'s convention (no f64 per channel per pixel).
+    let ow = (o * 255.0).round() as u32;
+    let inv = 255 - ow;
+    let src = [ov.r as u32 * ow, ov.g as u32 * ow, ov.b as u32 * ow];
+    for px in rgba.chunks_exact_mut(4) {
+        if px[3] == 0 {
+            continue;
+        }
+        for c in 0..3 {
+            px[c] = ((px[c] as u32 * inv + src[c] + 127) / 255) as u8;
+        }
+    }
+}
+
 /// Render one layer (its pixels with shapes + text overlays composited on top)
 /// into a fresh RGBA buffer of `w×h`. The shape being edited (if any) is
 /// skipped so the JS overlay preview is the only thing drawn for it.
@@ -146,6 +235,13 @@ pub(crate) fn render_layer(
             a.x + a.tile_offset_x,
             a.y + a.tile_offset_y,
         );
+    }
+    // Colour overlay BEFORE the mask: a layer style tints the styled layer
+    // (pixels + shapes + text), and the mask then hides the styled result —
+    // Photoshop's order. Clipped to the layer's own alpha, so it recolours
+    // what is there instead of flooding the frame.
+    if let Some(ov) = layer.overlay {
+        apply_color_overlay(&mut out, ov);
     }
     // Layer mask LAST: scale the whole layer's alpha (pixels + overlays) by the
     // grayscale mask, so a mask hides the layer's entire contribution. Applied
@@ -237,10 +333,14 @@ pub(crate) fn composite_layers_into(
     if move_preview.is_none() && hide_layer.is_none() {
         let mut visible = layers.iter().filter(|l| l.visible);
         if let (Some(only), None) = (visible.next(), visible.next()) {
-            // A masked layer isn't a straight copy — it must go through
-            // render_layer so the mask scales its alpha; so opt it out here.
+            // A masked or colour-overlaid layer isn't a straight copy — it must
+            // go through render_layer so the mask scales its alpha and the
+            // overlay tints it; so opt both out here. (Missing the overlay
+            // guard would make the style invisible on exactly the common
+            // single-layer document.)
             if only.opacity >= 0.999
                 && only.mask.is_none()
+                && only.overlay.is_none()
                 && layer_has_no_overlays(only)
                 && only.buf.data.len() == n
             {
@@ -737,7 +837,9 @@ impl ImageHorseTool {
     }
 
     /// JSON array of the layer stack, bottom → top:
-    /// `[{id,name,kind,visible,opacity,active,hasMask}]`.
+    /// `[{id,name,kind,visible,opacity,active,hasMask,overlay}]`.
+    /// `overlay` is `null` or `{color:"#rrggbb",opacity:0..1}` — the layer's
+    /// non-destructive Color Overlay style.
     /// `kind` is `"canvas"` for the artboard fill, `"content"` otherwise — the
     /// UI labels and gates on this rather than matching the name.
     pub fn get_layers(&self) -> String {
@@ -747,7 +849,7 @@ impl ImageHorseTool {
                 out.push(',');
             }
             out.push_str(&format!(
-                "{{\"id\":{},\"name\":\"{}\",\"kind\":\"{}\",\"visible\":{},\"opacity\":{},\"active\":{},\"hasMask\":{}}}",
+                "{{\"id\":{},\"name\":\"{}\",\"kind\":\"{}\",\"visible\":{},\"opacity\":{},\"active\":{},\"hasMask\":{},\"overlay\":{}}}",
                 l.id,
                 json_escape(&l.name),
                 if l.is_canvas() { "canvas" } else { "content" },
@@ -755,6 +857,17 @@ impl ImageHorseTool {
                 l.opacity,
                 i == self.active,
                 l.mask.is_some(),
+                match l.overlay {
+                    // `null`, not an omitted key: the UI reads this to decide
+                    // between "Add color overlay" and the live controls, and an
+                    // absent key and a present-but-unset one must not be the
+                    // same shape on the JS side.
+                    None => "null".to_string(),
+                    Some(ov) => format!(
+                        "{{\"color\":\"#{:02x}{:02x}{:02x}\",\"opacity\":{}}}",
+                        ov.r, ov.g, ov.b, ov.opacity
+                    ),
+                },
             ));
         }
         out.push(']');
@@ -1288,6 +1401,14 @@ impl ImageHorseTool {
                     a.y + a.tile_offset_y,
                 );
             }
+            // Bake the lower layer's colour overlay into its pixels and drop it —
+            // BEFORE the mask, the same order render_layer uses for the upper
+            // layer. Skipping this would silently discard the lower layer's
+            // style at merge time (the upper layer's is already baked in by
+            // `render_layer` above).
+            if let Some(ov) = lower.overlay.take() {
+                apply_color_overlay(&mut lower.buf.data, ov);
+            }
             // Bake the lower layer's own mask into its alpha and drop it, so the
             // merged pixels (including the upper layer we're about to blend in)
             // aren't re-masked by it. The upper layer's mask is already baked in
@@ -1409,6 +1530,78 @@ impl ImageHorseTool {
         self.layers.iter().any(|l| l.id == id && l.mask.is_some())
     }
 
+    // ── Layer colour overlay (non-destructive style) ──────────────────────
+    // Photoshop's Color Overlay: a solid colour tinting the layer's own pixels
+    // at composite time (`render_layer`), clipped to its alpha and sitting
+    // UNDER the mask. Reversible until `apply_layer_color_overlay` bakes it.
+
+    /// Set (or update) layer `id`'s colour overlay. `opacity` is 0..=1 and is
+    /// clamped. Returns false only if the layer isn't found.
+    ///
+    /// ## History: one snap on the first set, none on adjustment
+    /// The colour swatches and the opacity slider both land here, and a slider
+    /// drag fires this on every pointer move — snapping each one would bury the
+    /// undo stack under a hundred identical "Color Overlay" entries. So the
+    /// None → Some transition snaps (undo removes the overlay outright) and
+    /// subsequent tweaks ride on that entry. `set_layer_opacity` already sets
+    /// this precedent for a live-dragged layer property.
+    pub fn set_layer_color_overlay(&mut self, id: u32, r: u8, g: u8, b: u8, opacity: f64) -> bool {
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        if self.layers[idx].overlay.is_none() {
+            self.snap("Color Overlay");
+        }
+        self.layers[idx].overlay = Some(ColorOverlay {
+            r,
+            g,
+            b,
+            opacity: opacity.clamp(0.0, 1.0),
+        });
+        self.recomposite();
+        true
+    }
+
+    /// Discard layer `id`'s colour overlay (back to its true colours). False if
+    /// it had none.
+    pub fn remove_layer_color_overlay(&mut self, id: u32) -> bool {
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        if self.layers[idx].overlay.is_none() {
+            return false;
+        }
+        self.snap("Remove Color Overlay");
+        self.layers[idx].overlay = None;
+        self.recomposite();
+        true
+    }
+
+    /// Bake layer `id`'s colour overlay into its pixels permanently, then drop
+    /// the style. False if it had none. Uses the same `apply_color_overlay` the
+    /// live render does, so the baked pixels match what was on screen.
+    pub fn apply_layer_color_overlay(&mut self, id: u32) -> bool {
+        let Some(idx) = self.layers.iter().position(|l| l.id == id) else {
+            return false;
+        };
+        if self.layers[idx].overlay.is_none() {
+            return false;
+        }
+        self.snap("Apply Color Overlay");
+        if let Some(ov) = self.layers[idx].overlay.take() {
+            apply_color_overlay(&mut self.layers[idx].buf.data, ov);
+        }
+        self.recomposite();
+        true
+    }
+
+    /// Whether layer `id` currently carries a colour overlay.
+    pub fn has_layer_color_overlay(&self, id: u32) -> bool {
+        self.layers
+            .iter()
+            .any(|l| l.id == id && l.overlay.is_some())
+    }
+
     // ── Layer persistence (serialize / restore) ──────────────────────────
     // These let the JS persistence layer round-trip the full layer stack
     // (pixels + per-layer overlays) across reloads. Serialization reads each
@@ -1493,6 +1686,10 @@ impl ImageHorseTool {
             opacity: opacity.clamp(0.0, 1.0),
             buf,
             mask: None,
+            // Not persisted — same as `mask` directly above. The layer archive
+            // carries pixels + overlays only, so a colour overlay is a
+            // session-lived, undoable style until the user Applies it.
+            overlay: None,
             text_annotations: Vec::new(),
             shape_annotations: Vec::new(),
         });
@@ -1635,6 +1832,182 @@ impl ImageHorseTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A `w×h` buffer of one repeated RGBA value.
+    fn solid(w: u32, h: u32, rgba: [u8; 4]) -> Vec<u8> {
+        let mut v = Vec::with_capacity((w * h * 4) as usize);
+        for _ in 0..(w * h) {
+            v.extend_from_slice(&rgba);
+        }
+        v
+    }
+
+    /// One pixel of the COMPOSITE (what the canvas shows), not of a layer.
+    fn px(tool: &ImageHorseTool, x: u32, y: u32) -> [u8; 4] {
+        let data = tool.get_image_data();
+        let i = ((y * tool.width + x) * 4) as usize;
+        [data[i], data[i + 1], data[i + 2], data[i + 3]]
+    }
+
+    // ── Colour overlay (Photoshop's Color Overlay layer style) ───────────
+
+    /// THE trap this feature had: `composite_layers_into`'s fast path copies a
+    /// lone opaque un-overlaid layer straight out without calling
+    /// `render_layer` at all. A single-layer document — the common case, what
+    /// `load_image` produces — takes that path, so an overlay applied only
+    /// inside `render_layer` would be invisible for exactly the documents most
+    /// users have, while working fine the moment a second layer existed.
+    #[test]
+    fn color_overlay_tints_through_the_single_visible_layer_fast_path() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [255, 255, 255, 255]));
+        assert_eq!(t.layer_count(), 1, "precondition: the fast path's shape");
+        let id = t.layers[t.active].id;
+
+        assert!(t.set_layer_color_overlay(id, 255, 0, 0, 1.0));
+        assert_eq!(
+            px(&t, 1, 1),
+            [255, 0, 0, 255],
+            "a full-opacity overlay recolours the layer"
+        );
+    }
+
+    /// The overlay is clipped to the layer's own alpha: it tints what is there
+    /// and never fills the frame. Alpha itself is untouched, so the layer keeps
+    /// its exact silhouette (this is what separates an overlay from a fill).
+    #[test]
+    fn color_overlay_never_changes_alpha_or_paints_empty_pixels() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [0, 0, 0, 0])); // fully transparent layer
+        let id = t.layers[t.active].id;
+        // One opaque pixel in an otherwise empty layer.
+        t.layers[t.active].buf.data[0..4].copy_from_slice(&[10, 20, 30, 255]);
+        t.recomposite();
+
+        assert!(t.set_layer_color_overlay(id, 0, 0, 255, 1.0));
+        assert_eq!(px(&t, 0, 0), [0, 0, 255, 255], "the opaque pixel is tinted");
+        assert_eq!(
+            px(&t, 2, 2),
+            [0, 0, 0, 0],
+            "a transparent pixel stays fully transparent — no frame fill"
+        );
+    }
+
+    /// Half opacity is a straight lerp toward the overlay colour, and it is the
+    /// SAME arithmetic on the live path and the bake path — `apply` must not
+    /// shift the image it was previewing.
+    #[test]
+    fn apply_color_overlay_bakes_exactly_what_was_on_screen() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [0, 0, 0, 255]));
+        let id = t.layers[t.active].id;
+
+        assert!(t.set_layer_color_overlay(id, 255, 255, 255, 0.5));
+        let live = px(&t, 2, 2);
+        assert_eq!(live, [128, 128, 128, 255], "black + 50% white = mid grey");
+
+        assert!(t.apply_layer_color_overlay(id));
+        assert_eq!(px(&t, 2, 2), live, "bake must not move the pixels");
+        assert!(
+            !t.has_layer_color_overlay(id),
+            "the style is consumed once baked"
+        );
+        assert!(
+            !t.apply_layer_color_overlay(id),
+            "nothing left to apply a second time"
+        );
+    }
+
+    /// History contract (documented on `set_layer_color_overlay`): the first
+    /// set snaps so undo can remove the style, and adjusting colour/opacity
+    /// afterwards rides on that one entry rather than flooding the undo stack
+    /// — the opacity slider fires this on every pointer move.
+    #[test]
+    fn color_overlay_snaps_once_then_adjusts_free() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [255, 255, 255, 255]));
+        let id = t.layers[t.active].id;
+        let base = t.undo_count();
+
+        t.set_layer_color_overlay(id, 255, 0, 0, 1.0);
+        assert_eq!(t.undo_count(), base + 1, "the first set is undoable");
+        for op in [0.9, 0.8, 0.7, 0.6] {
+            t.set_layer_color_overlay(id, 0, 255, 0, op);
+        }
+        assert_eq!(
+            t.undo_count(),
+            base + 1,
+            "a slider drag must not push four more entries"
+        );
+
+        assert!(t.undo());
+        assert!(
+            !t.has_layer_color_overlay(id),
+            "one undo clears the overlay entirely"
+        );
+        assert_eq!(
+            px(&t, 1, 1),
+            [255, 255, 255, 255],
+            "and restores the pixels"
+        );
+    }
+
+    /// `remove` discards the style non-destructively — the pixels underneath
+    /// come back untouched, which is the whole point of it being a style.
+    #[test]
+    fn remove_color_overlay_restores_the_true_pixels() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [12, 34, 56, 255]));
+        let id = t.layers[t.active].id;
+
+        assert!(!t.remove_layer_color_overlay(id), "nothing to remove yet");
+        t.set_layer_color_overlay(id, 255, 0, 0, 1.0);
+        assert!(t.remove_layer_color_overlay(id));
+        assert_eq!(px(&t, 1, 1), [12, 34, 56, 255]);
+    }
+
+    /// The UI decides between "Add color overlay" and the live controls from
+    /// this JSON, so `overlay` must be present as an explicit `null` when unset
+    /// and carry colour + opacity when set.
+    #[test]
+    fn get_layers_reports_the_color_overlay() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [255, 255, 255, 255]));
+        let id = t.layers[t.active].id;
+
+        assert!(
+            t.get_layers().contains("\"overlay\":null"),
+            "unset must serialise as null, not a missing key: {}",
+            t.get_layers()
+        );
+
+        t.set_layer_color_overlay(id, 0x33, 0x66, 0x99, 0.25);
+        let js = t.get_layers();
+        assert!(
+            js.contains("\"overlay\":{\"color\":\"#336699\",\"opacity\":0.25}"),
+            "got {js}"
+        );
+    }
+
+    /// `merge_down` flattens the LOWER layer by hand rather than through
+    /// `render_layer`, so its overlay needs baking explicitly. Without that the
+    /// style vanishes at merge time — silently, since the merge itself works.
+    #[test]
+    fn merge_down_bakes_the_lower_layers_color_overlay() {
+        let mut t = ImageHorseTool::new(4, 4);
+        t.load_image(&solid(4, 4, [0, 0, 0, 255]));
+        let lower_id = t.layers[t.active].id;
+        t.set_layer_color_overlay(lower_id, 255, 255, 255, 1.0);
+
+        let upper_id = t.add_layer("Upper"); // transparent, above the base
+        assert!(t.merge_down(upper_id));
+
+        assert_eq!(
+            px(&t, 1, 1),
+            [255, 255, 255, 255],
+            "the lower layer's overlay must survive the merge as pixels"
+        );
+    }
 
     /// `annotation_ink_offset` must agree with the REAL tile builder: build
     /// the tile with a fully transparent background (isolates the glyph ink

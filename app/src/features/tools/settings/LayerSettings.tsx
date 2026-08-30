@@ -18,7 +18,11 @@ import { ReselectBar } from "@/components/ui/reselect-bar";
 import { SectionHeader } from "@/components/ui/section-header";
 import { CanvasResize } from "@/components/CanvasResize";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
-import { GUIDE_COLORS } from "@/lib/colors";
+import {
+  GUIDE_COLORS,
+  OVERLAY_COLORS,
+  DEFAULT_OVERLAY_OPACITY,
+} from "@/lib/colors";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { cn } from "@/lib/utils";
 import type { LayerInfo } from "@/hooks/useEngineCore";
@@ -52,6 +56,21 @@ export interface LayerMaskControls {
   onSetValue: (v: number) => void;
 }
 
+/** Color Overlay handlers for the SELECTED layer — Photoshop's Color Overlay
+ *  layer style. Same one-set-per-panel shape as {@link LayerMaskControls}: the
+ *  layer dropdown above chooses what these act on, so there is nothing
+ *  per-row. */
+export interface LayerOverlayControls {
+  /** Set OR adjust the overlay — one entry point for both, because the swatch
+   *  grid and the opacity slider are the same engine call. The engine snaps
+   *  history only on the first set, so a slider drag is one undo step. */
+  onSet: (id: number, color: string, opacity: number) => void;
+  /** Discard the style; the layer's true colours come back untouched. */
+  onRemove: (id: number) => void;
+  /** Bake the tint into the layer's pixels permanently. */
+  onApply: (id: number) => void;
+}
+
 interface LayerSettingsProps {
   disabled: boolean;
   /** Move-layer toggle — while on, canvas drags reposition the active layer. */
@@ -69,6 +88,8 @@ interface LayerSettingsProps {
   onSelectLayer?: (id: number) => void;
   /** Mask controls for the SELECTED layer — one set, not per-row. */
   mask?: LayerMaskControls;
+  /** Color Overlay controls for the SELECTED layer — same one-set rule. */
+  overlay?: LayerOverlayControls;
   /** Live canvas (image) dimensions — used to evenly distribute new guides. */
   imgW: number;
   imgH: number;
@@ -104,6 +125,7 @@ export function LayerSettings({
   layers,
   onSelectLayer,
   mask,
+  overlay,
   imgW,
   imgH,
   canvasWidth,
@@ -200,6 +222,7 @@ export function LayerSettings({
                   {l.name}
                   {l.visible ? "" : " (hidden)"}
                   {l.hasMask ? " · masked" : ""}
+                  {l.overlay ? " · tinted" : ""}
                 </option>
               ))}
             </select>
@@ -294,6 +317,105 @@ export function LayerSettings({
                   title="Remove mask"
                 />
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Color Overlay — Photoshop's Color Overlay layer style ────────
+            Sits directly under Layer Mask because it is the same KIND of
+            thing: a non-destructive style on the selected layer, reversible
+            until Applied. The engine tints at composite time, clipped to the
+            layer's own alpha and applied UNDER the mask — so masking a
+            tinted layer hides the tint with it, as Photoshop does. */}
+        {overlay && activeLayer && (
+          <div className={cn("space-y-2", MASK_SECTION_SEP)}>
+            <SectionHeader
+              title="Color Overlay"
+              info={
+                <>
+                  Tints the selected layer with a solid colour — clipped to
+                  what the layer actually contains, so transparent areas stay
+                  transparent. Pick a colour to switch it on, drag{" "}
+                  <strong className="font-semibold text-theme-foreground">
+                    Strength
+                  </strong>{" "}
+                  to blend it back toward the true colours.{" "}
+                  <strong className="font-semibold text-theme-foreground">
+                    Apply
+                  </strong>{" "}
+                  bakes it into the pixels permanently;{" "}
+                  <strong className="font-semibold text-theme-foreground">
+                    Remove
+                  </strong>{" "}
+                  discards it. Undo reverses the whole overlay in one step.
+                </>
+              }
+            />
+            {/* The swatch grid IS the on-switch — no separate "Add" tile.
+                Picking a colour with no overlay yet creates one at full
+                strength (Photoshop's default); picking another recolours the
+                existing one. `value` is "" when unset so no circle reads as
+                selected, which is what makes "pick one to start" legible. */}
+            <ColorSwatchGrid
+              label="Overlay Color"
+              colors={OVERLAY_COLORS}
+              value={overlayColorOf(activeLayer)}
+              onChange={(color) =>
+                overlay.onSet(
+                  activeLayer.id,
+                  color,
+                  activeLayer.overlay?.opacity ?? DEFAULT_OVERLAY_OPACITY,
+                )
+              }
+            />
+
+            {/* Strength + the two one-shot actions only exist once there IS
+                an overlay — a slider for a style that isn't on would be a
+                dead control. */}
+            {activeLayer.overlay && (
+              <>
+                <label className="text-2xs text-theme-muted-foreground">
+                  Strength
+                </label>
+                <div className="layer-opacity">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(activeLayer.overlay.opacity * 100)}
+                    disabled={disabled}
+                    aria-label="Color overlay strength"
+                    onChange={(e) =>
+                      overlay.onSet(
+                        activeLayer.id,
+                        activeLayer.overlay?.color ?? OVERLAY_COLORS[0],
+                        Number(e.target.value) / 100,
+                      )
+                    }
+                  />
+                  <span className="layer-opacity-val">
+                    {Math.round(activeLayer.overlay.opacity * 100)}%
+                  </span>
+                </div>
+                {/* One-shot ACTIONS → ActionTile, never `active` (the
+                    button-variant SSOT the mask block above spells out). */}
+                <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
+                  <ActionTile
+                    icon={Check}
+                    label="Apply"
+                    disabled={disabled}
+                    onClick={() => overlay.onApply(activeLayer.id)}
+                    title="Apply color overlay (bake in, permanent)"
+                  />
+                  <ActionTile
+                    icon={X}
+                    label="Remove"
+                    disabled={disabled}
+                    onClick={() => overlay.onRemove(activeLayer.id)}
+                    title="Remove color overlay"
+                  />
+                </div>
+              </>
             )}
           </div>
         )}
@@ -399,4 +521,12 @@ export function LayerSettings({
       )}
     </div>
   );
+}
+
+/** The swatch grid's `value`: the layer's overlay colour, or `""` when it has
+ *  none so NO circle renders as selected. Returning a default colour instead
+ *  would ring a swatch for a style that isn't applied — the control would look
+ *  on while the layer is untinted. */
+function overlayColorOf(layer: LayerInfo): string {
+  return layer.overlay?.color ?? "";
 }

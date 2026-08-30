@@ -84,6 +84,57 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.57 — 2026-08-30
+
+**Ctrl+Z had been bound twice for the app's entire life.** Two separate places
+listened for it, so every press undid two things. Nobody caught it because the
+only test that covered undo had a one-entry history — the second undo found
+nothing to do and returned quietly. One press is now one step. If undo has ever
+felt like it took too much, that was this.
+
+Fixing it uncovered two more faults that had been cancelling it out:
+
+Undo was dead after you touched any slider. The listener that got deleted was
+the one with no guard on it; the one that survived treats a focused `<input>` as
+"the user is typing" and steps aside. A range slider is an input. So the moment
+you dragged Opacity or a brush size, undo stopped answering until you clicked
+elsewhere. Sliders, checkboxes and radios now let undo and redo through, and
+nothing else — a focused slider's arrow keys still belong to the slider.
+
+Committing a line of text wrote two history entries instead of one. The text
+tool compared the drop-shadow settings before and after, and counted a change
+even when the shadow was off on both sides, because a new annotation starts at
+all zeros and the panel's idea of "off" carries a default colour and offset.
+Off to off is a no-op now. Text with the shadow actually turned on is still two
+steps; that one needs the engine to group operations and is written up in the
+parking lot.
+
+**Colour Overlay.** Photoshop's layer style, under Layer Mask in the Layers
+tool. Pick a colour to turn it on, drag Strength to blend it back toward the
+real colours, Apply to bake it in or Remove to drop it. It tints what the layer
+actually contains — transparent stays transparent, with no coloured fringe at
+the edges — and it sits under the mask, so masking a tinted layer hides the tint
+along with it. One undo removes the whole thing, however long you spent dragging
+the slider. It survives merging and flattening, exports, and the thumbnail. It
+does not survive a reload yet: it is session-lived, exactly like the layer mask
+it sits under, and persisting the two of them is one job for a later release.
+
+**Three fixes to drawing shapes, all found by sitting down and using it:**
+
+Delete and Backspace now remove the selected shape. There was no handler for
+either key anywhere except the reselect list, so the obvious way to get rid of a
+shape did nothing at all.
+
+Drawing inside an unfilled rectangle drew inside it. Before, the empty middle of
+an outlined shape counted as part of it, so starting a drag there re-selected
+the outer shape instead of drawing. The hit area for an unfilled rectangle,
+circle or hand-drawn circle is the outline itself now. Filled shapes, pins and
+curves are unchanged — clicking the middle of a filled shape still picks it up.
+
+Ctrl+Z on a shape you have drawn but not committed discards that shape. It used
+to undo the previous action instead and leave the new shape sitting on screen,
+which read as undo skipping a step.
+
 ### v8.56 — 2026-08-28
 
 **The ring marking the photo you're editing was painted underneath the photo.**

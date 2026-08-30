@@ -884,8 +884,10 @@ declare module "stamp_tool" {
      *  document (Canvas + Photo) answers 1. This — not `layer_count()` — is what
      *  decides whether the op log can describe the document (`isLogTrustworthy`). */
     content_layer_count(): number;
-    /** JSON array bottom→top: [{id,name,kind,visible,opacity,active,hasMask}].
-     *  `kind` is "canvas" for the artboard fill, "content" otherwise. */
+    /** JSON array bottom→top:
+     *  [{id,name,kind,visible,opacity,active,hasMask,overlay}].
+     *  `kind` is "canvas" for the artboard fill, "content" otherwise.
+     *  `overlay` is null or {color:"#rrggbb",opacity:0..1}. */
     get_layers(): string;
     /** Id of the active layer (receives all tool edits). */
     active_layer_id(): number;
@@ -926,6 +928,24 @@ declare module "stamp_tool" {
     mask_paint_move(x: number, y: number): boolean;
     /** End the active mask stroke + free buffers; true if it changed the mask. */
     mask_paint_up(): boolean;
+
+    // ── Layer colour overlay (Photoshop's Color Overlay layer style) ──
+    // A solid colour tinting the layer's pixels at composite time, clipped to
+    // the layer's alpha and sitting UNDER the mask. Non-destructive until
+    // applied. Like masks, it is session-lived — `push_restored_layer` does not
+    // carry it back across a reload.
+    /** Set/update a layer's colour overlay. `opacity` 0..1 (clamped). False if
+     *  the layer isn't found. Snaps history ONLY on the first set, so a slider
+     *  drag doesn't flood the undo stack. */
+    set_layer_color_overlay(
+      id: number, r: number, g: number, b: number, opacity: number,
+    ): boolean;
+    /** Discard the overlay (true colours back). False if it had none. */
+    remove_layer_color_overlay(id: number): boolean;
+    /** Bake the overlay into the layer's pixels permanently, then drop it.
+     *  False if it had none. */
+    apply_layer_color_overlay(id: number): boolean;
+    has_layer_color_overlay(id: number): boolean;
 
     // ── Move tool (reposition the active layer's content) ──
     /** Live, non-destructive drag offset for the active layer; recomposite then
@@ -1260,7 +1280,11 @@ declare module "stamp_tool" {
     set_editing_text(id: number): void;
     /** JSON array of all live shapes (id, kind, x0,y0,x1,y1, r,g,b, stroke_width, arrow_style, number, points). */
     get_shape_annotations(): string;
-    /** Returns the matching shape id, or -1 if no hit. */
+    /** Returns the matching shape id, or -1 if no hit. Newest-first. Lines,
+     *  arrows and polylines hit near their stroke; an UNFILLED rect / circle /
+     *  hand-circle hits on its outline RING only (the empty middle is a miss,
+     *  so a shape can be drawn inside another); filled shapes, pins and bézier
+     *  paths hit anywhere in their padded bounding box. */
     shape_annotation_at(x: number, y: number): number;
   }
 }

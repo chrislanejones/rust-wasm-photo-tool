@@ -24,6 +24,45 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.57",
+    date: "2026-08-30",
+    headline: "Ctrl+Z had been bound twice for the app's entire life",
+    entries: [
+      {
+        tag: "fix",
+        text: "Two separate places listened for Ctrl+Z on the window, so every press undid two things. It had been that way since the shortcut existed. Nobody caught it because the only end-to-end test covering undo built a one-entry history — the second undo found nothing to do and returned quietly, so the test passed on a broken binding. One press is now one step.",
+      },
+      {
+        tag: "fix",
+        text: "Undo was dead after you touched any slider. The duplicate listener that got removed was the one with no guard on it; the one that survived treats a focused input as the user typing and steps aside — and a range slider is an input. So dragging Opacity or a brush size stopped undo answering until you clicked elsewhere. Sliders, checkboxes and radios now let undo and redo through and nothing else, so a focused slider's arrow keys still belong to the slider.",
+      },
+      {
+        tag: "fix",
+        text: "Committing a line of text wrote two history entries instead of one. The text tool compared its drop-shadow settings before and after and counted a change even when the shadow was off on both sides, because a new annotation starts at all zeros while the panel's idea of off carries a default colour and offset. Off to off is a no-op now. Text with the shadow actually on is still two steps — that one needs the engine to group operations.",
+      },
+      {
+        tag: "feature",
+        text: "Colour Overlay — Photoshop's layer style, under Layer Mask in the Layers tool. Pick a colour to turn it on, drag Strength to blend it back toward the real colours, Apply to bake it in or Remove to drop it. It tints what the layer actually contains, so transparent stays transparent with no coloured fringe at the edges, and it sits under the mask, so masking a tinted layer hides the tint with it. One undo removes the whole thing however long you spent dragging the slider. It survives merging, flattening, exports and the thumbnail; it does not survive a reload yet — it is session-lived, exactly like the layer mask it sits under.",
+      },
+      {
+        tag: "fix",
+        text: "Delete and Backspace remove the selected shape. There was no handler for either key anywhere except the reselect list, so the obvious way to get rid of a shape did nothing at all.",
+      },
+      {
+        tag: "fix",
+        text: "Drawing inside an unfilled rectangle now draws inside it. The empty middle of an outlined shape used to count as part of it, so starting a drag there re-selected the outer shape instead of drawing a new one. The hit area for an unfilled rectangle, circle or hand-drawn circle is the outline itself now. Filled shapes, pins and curves are unchanged — clicking the middle of a filled shape still picks it up.",
+      },
+      {
+        tag: "fix",
+        text: "Ctrl+Z on a shape you have drawn but not committed discards that shape. It used to undo the previous action instead and leave the new shape sitting there, which read as undo skipping a step.",
+      },
+      {
+        tag: "rust",
+        text: "The engine grew 3,533 bytes to 816,185 — overlay 3,149, the ring hit-test 349, the shadow comparison 35 — and stays inside the size band the build watches. The static guardrails caught 166 lines of engine tests that had been written into lib.rs while every documented local gate was green; they moved into the layer module and one helper collapsed two hand-built snapshot initializers, taking lib.rs from 5,213 lines to 5,183.",
+      },
+    ],
+  },
+  {
     version: "v8.56",
     date: "2026-08-28",
     headline: "The ring marking the current photo was painted underneath it",

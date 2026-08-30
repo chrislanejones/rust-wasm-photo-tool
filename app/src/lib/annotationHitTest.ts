@@ -51,6 +51,8 @@ export interface ShapeHitGeometry {
   x1: number;
   y1: number;
   stroke_width: number;
+  /** 0 = outline only. Decides ring-vs-box for rect/circle — see below. */
+  fill_kind?: number;
   points?: number[][];
 }
 
@@ -98,13 +100,17 @@ export function pointSegmentDistance(
 }
 
 /**
- * Port of `shape_annotation_at` (annotations.rs:1188).
+ * Port of `shape_annotation_at` (annotations.rs).
  *
  * Kind codes: 2 = line, 4 = arrow (distance to segment); 6 = polyline
- * (distance to any segment); everything else — rect, circle, handCircle, pin,
- * and bézier (kind 7, which the Rust also does not special-case here) — uses a
- * padded bounding box. Padding is `max(stroke_width / 2, 6)`, plus 4 for the
- * stroked kinds, exactly as Rust computes it.
+ * (distance to any segment). Closed kinds split on whether they are ink all
+ * the way through (2026-08-28):
+ *   - an UNFILLED rect (0) / circle (1) / hand-circle (3) is a RING — the
+ *     padded outline minus the interior shrunk by the same pad, so a click in
+ *     its empty middle is a miss and a shape can be drawn inside it;
+ *   - a filled one, a pin (5) and a bézier (7) are a padded bounding box.
+ * Padding is `max(stroke_width / 2, 6)`, plus 4 for the stroked kinds, exactly
+ * as Rust computes it. A shape thinner than 2·pad has no hole.
  */
 export function shapeAnnotationAt(
   shapes: readonly ShapeHitGeometry[],
@@ -129,11 +135,33 @@ export function shapeAnnotationAt(
         }
       }
     } else {
-      const minx = Math.min(s.x0, s.x1) - pad;
-      const maxx = Math.max(s.x0, s.x1) + pad;
-      const miny = Math.min(s.y0, s.y1) - pad;
-      const maxy = Math.max(s.y0, s.y1) + pad;
-      hit = x >= minx && x <= maxx && y >= miny && y <= maxy;
+      const minx = Math.min(s.x0, s.x1);
+      const maxx = Math.max(s.x0, s.x1);
+      const miny = Math.min(s.y0, s.y1);
+      const maxy = Math.max(s.y0, s.y1);
+      const inOuter =
+        x >= minx - pad && x <= maxx + pad && y >= miny - pad && y <= maxy + pad;
+      const hollow =
+        (s.fill_kind ?? 0) === 0 && (s.kind === 0 || s.kind === 1 || s.kind === 3);
+      if (!hollow) {
+        hit = inOuter;
+      } else if (s.kind === 0) {
+        const inInner =
+          x > minx + pad && x < maxx - pad && y > miny + pad && y < maxy - pad;
+        hit = inOuter && !inInner;
+      } else {
+        const cx = (minx + maxx) * 0.5;
+        const cy = (miny + maxy) * 0.5;
+        const rx = (maxx - minx) * 0.5;
+        const ry = (maxy - miny) * 0.5;
+        const norm = (ax: number, ay: number): number => {
+          if (ax <= 0 || ay <= 0) return Infinity;
+          const dx = (x - cx) / ax;
+          const dy = (y - cy) / ay;
+          return dx * dx + dy * dy;
+        };
+        hit = norm(rx + pad, ry + pad) <= 1 && !(norm(rx - pad, ry - pad) < 1);
+      }
     }
     if (hit) return s.id;
   }

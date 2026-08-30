@@ -681,6 +681,15 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // and the sites disappear when v8.56 replaces it with ONE engine call
     // returning (layer, id). Expect this number to go 122 -> 120 then, not up.
     //
+    // v8.57 — 122 -> 125: the layer Color Overlay adds THREE awaited sites in
+    // `useLayers.ts` — `set_layer_color_overlay`, `remove_layer_color_overlay`
+    // and `apply_layer_color_overlay`. All born awaited in the file's
+    // `if (await t.x(id))` truthy-guard shape, which is precisely the shape
+    // this gate exists to police: the boolean gates a flush + resync, so a
+    // dropped `await` would make the condition permanently true and repaint on
+    // a call that did nothing. Gate numbers below (5 exempt / 0 unawaited /
+    // 0 truthy) unchanged again.
+    //
     // The difference from v8.19's identical-looking claim is the method list:
     // that one was made against a shadow .d.ts missing 31 of the engine's
     // methods. This one knows all 280.
@@ -688,7 +697,7 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(122);
+    expect(gate.awaited, "cumulative converted sites").toBe(125);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

@@ -4,6 +4,77 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — a fresh text commit with the shadow ON is still two undo steps (2026-08-28)
+
+Found by the shapes user-testing session, via the QC text spec going red the
+moment Ctrl+Z stopped being double-bound. Measured with `history_labels()` on
+the production build:
+
+| Commit | Before | After this session |
+|---|---|---|
+| fresh text, shadow **off** (the default) | `Add Text` + phantom `Text Shadow` = **2** | **1** |
+| fresh text, shadow **on** | `Add Text` + `Text Shadow` = **2** | still **2** |
+
+The off case was a comparison bug (`set_text_shadow` compared dormant colour /
+alpha / offset while the shadow was invisible on both sides) and is fixed in
+the engine. The on case is structural: `commitText` is `add_text_annotation`
+followed by three setters, each of which is its own snap, and the op log's
+undo steps back ONE op per snapshot ("one op ↔ one snapshot" lockstep in
+`try_oplog_undo`). Folding the snaps into one is not enough — the ops would
+still be two, and the second op-log undo would pop a snapshot belonging to an
+earlier action.
+
+The real fix is an engine-side compound: `add_text_annotation` taking the
+shadow (and box) params, OR a `begin/end_compound` that also defers the
+`oplog_sync_annotations` diff so ONE `TextAdd` op carries the whole thing.
+Either changes the recorded op stream, so it is a `tiles` replay-parity
+change, not a quick one. Filed, not built.
+
+## OPEN — Color Overlay does not survive a reload (2026-08-28)
+
+The Layers → Color Overlay style shipped session-lived, exactly like the layer
+MASK it sits under: `push_restored_layer` sets both `mask: None` and
+`overlay: None`, because the layer archive carries pixels + annotations only.
+Undo/redo DO reverse it (the style rides on `Layer`'s `Clone` into every
+snapshot) — it is only the reload boundary that drops it.
+
+| Boundary | Mask | Color Overlay |
+|---|---|---|
+| undo / redo | survives | **survives** |
+| merge down / flatten | baked | **baked** |
+| PNG/JPEG export + thumbnail | honoured | **honoured** |
+| **OpenRaster (.ora) per-layer export** | **lost** | **lost** |
+| reload | **lost** | **lost** |
+
+The `.ora` row is the same root cause as the reload row: `get_layer_png(i)`
+returns `layer.buf` — raw pixels — while the flat composite paths all route
+through `render_layer`, which applies mask then overlay. Verified in code
+2026-08-28, not inferred. It is pre-existing behaviour for masks; Color Overlay
+simply inherits it.
+
+Not fixed here: persisting either one is an IndexedDB schema change, so it goes
+through the `dexie-migration` skill, and it should carry BOTH in one migration
+rather than adding a second half-persisted style. Filed, not built.
+
+## OPEN — three `max-lines` pins are now stale by 5, 9 and 32 lines (2026-08-28)
+
+Color Overlay pushed two pinned files past their 2026-08-27 baselines:
+
+| File | Pin | Now | Over by | Why |
+|---|---|---|---|---|
+| `app/src/app/AppShell.tsx` | 3806 | 3811 | **+5** | the `layerOverlay={{…}}` prop block at the composition root |
+| `…/engineAsyncMigration.contract.test.ts` | 1015 | 1024 | **+9** | that gate REQUIRES a documented comment when its count moves (122 → 125) |
+| `app/src/hooks/useDrawingTools.ts` | 1173 | 1205 | **+32** | the shapes key handler grew Delete/Backspace and the pending-aware Ctrl+Z (same day, second session) — it is the hook that owns the pending edit, so this is where they go |
+
+Both are `warn`, and the lint gate is errors-only, so nothing is blocked. **Do
+NOT raise either pin** — that is the one move the ratchet exists to prevent.
+They come back under on their own when AppShell's next extraction lands and the
+pin is lowered in that commit.
+
+For contrast, the Rust twin went the right way in this session:
+`src/lib.rs` 5213 → **5183** (`Layer::from_snapshot_pixels` collapsed the two
+hand-built snapshot layers), and `scripts/guardrails.sh` was lowered to match.
+
 ## CLOSED before it was filed — `oplog_v3_resume` `required-features` (2026-08-17)
 
 Found independently on the perspective branch and on master, the same day.

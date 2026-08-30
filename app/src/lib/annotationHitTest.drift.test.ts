@@ -98,7 +98,10 @@ function hashOf(fnName: string): string {
  */
 const CONFIRMED: Record<(typeof MIRRORED)[number], string> = {
   text_annotation_at: "69fa8d110af212b2",
-  shape_annotation_at: "6769816ca3a09358",
+  // 6769816ca3a09358 → cd6a41ce328a78b2 (2026-08-28): the ring rule for
+  // unfilled rect / circle / hand-circle. Port + tests updated FIRST, per the
+  // order above.
+  shape_annotation_at: "cd6a41ce328a78b2",
 };
 
 describe("#60 — annotationHitTest.ts has not drifted from annotations.rs", () => {

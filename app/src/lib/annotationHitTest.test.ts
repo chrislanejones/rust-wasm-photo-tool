@@ -121,7 +121,7 @@ describe("shapeAnnotationAt", () => {
     expect(shapeAnnotationAt(poly, 50, 50)).toBe(-1); // interior, not near either
   });
 
-  it("uses a padded bounding box for closed kinds, INCLUSIVE both edges", () => {
+  it("pads the outline of a closed kind, INCLUSIVE both edges", () => {
     // Rust's box test is `>=` and `<=` on both sides — unlike the text tile,
     // which is half-open. The asymmetry is real; keep it.
     const rect = [shape({ id: 13, kind: 0, x0: 10, y0: 10, x1: 50, y1: 50 })];
@@ -132,7 +132,68 @@ describe("shapeAnnotationAt", () => {
 
   it("normalises an inverted rect (x1 < x0)", () => {
     const rect = [shape({ id: 14, kind: 0, x0: 50, y0: 50, x1: 10, y1: 10 })];
-    expect(shapeAnnotationAt(rect, 30, 30)).toBe(14);
+    expect(shapeAnnotationAt(rect, 10, 30)).toBe(14); // on its left stroke
+    expect(shapeAnnotationAt(rect, 30, 30)).toBe(-1); // hollow middle
+  });
+
+  // ── The ring rule (2026-08-28): an UNFILLED closed shape is its outline. ──
+  // Twins of `annotations::hit_test_tests` in Rust; #60 keeps them honest.
+
+  it("REGRESSION: an unfilled rect's empty interior is a MISS, its stroke a hit", () => {
+    // pad 6 on a 20..100 box → ring is 14..26 and 94..106 on each axis.
+    const rect = [shape({ id: 20, kind: 0, x0: 20, y0: 20, x1: 100, y1: 100 })];
+    expect(shapeAnnotationAt(rect, 60, 60)).toBe(-1); // dead centre
+    expect(shapeAnnotationAt(rect, 30, 30)).toBe(-1); // just inside the ring
+    expect(shapeAnnotationAt(rect, 20, 60)).toBe(20); // on the left stroke
+    expect(shapeAnnotationAt(rect, 15, 60)).toBe(20); // outer pad
+    expect(shapeAnnotationAt(rect, 25, 60)).toBe(20); // inner pad
+    expect(shapeAnnotationAt(rect, 100, 100)).toBe(20); // corner
+    expect(shapeAnnotationAt(rect, 110, 60)).toBe(-1); // past the pad
+  });
+
+  it("a FILLED rect's interior still hits — a fill is ink", () => {
+    for (const fill_kind of [1, 2, 3]) {
+      const rect = [shape({ id: 21, kind: 0, x0: 20, y0: 20, x1: 100, y1: 100, fill_kind })];
+      expect(shapeAnnotationAt(rect, 60, 60), `fill_kind ${fill_kind}`).toBe(21);
+    }
+  });
+
+  it("an unfilled circle is a ring, and its bbox corner is not ink", () => {
+    // 20..120 → centre (70,70), r 50; pad 6 → ring radii 44..56.
+    const circ = [shape({ id: 22, kind: 1, x0: 20, y0: 20, x1: 120, y1: 120 })];
+    expect(shapeAnnotationAt(circ, 70, 70)).toBe(-1); // centre
+    expect(shapeAnnotationAt(circ, 70, 40)).toBe(-1); // r=30
+    expect(shapeAnnotationAt(circ, 70, 20)).toBe(22); // on the stroke
+    expect(shapeAnnotationAt(circ, 70, 25)).toBe(22); // r=45
+    expect(shapeAnnotationAt(circ, 70, 15)).toBe(22); // r=55, outer pad
+    expect(shapeAnnotationAt(circ, 22, 22)).toBe(-1); // bbox corner — the old rule hit here
+  });
+
+  it("a filled circle's interior still hits", () => {
+    const circ = [shape({ id: 23, kind: 1, x0: 20, y0: 20, x1: 120, y1: 120, fill_kind: 1 })];
+    expect(shapeAnnotationAt(circ, 70, 70)).toBe(23);
+  });
+
+  it("a shape thinner than 2·pad has no hole", () => {
+    const thin = [shape({ id: 24, kind: 0, x0: 20, y0: 20, x1: 100, y1: 28 })];
+    expect(shapeAnnotationAt(thin, 60, 24)).toBe(24);
+  });
+
+  it("hand-circle (3) is a ring; a pin (5) keeps its box", () => {
+    const hand = [shape({ id: 25, kind: 3, x0: 20, y0: 20, x1: 120, y1: 120 })];
+    expect(shapeAnnotationAt(hand, 70, 70)).toBe(-1);
+    expect(shapeAnnotationAt(hand, 70, 20)).toBe(25);
+    const pin = [shape({ id: 26, kind: 5, x0: 20, y0: 20, x1: 60, y1: 60 })];
+    expect(shapeAnnotationAt(pin, 40, 40)).toBe(26);
+  });
+
+  it("a shape drawn INSIDE another is reachable through the outer one's interior", () => {
+    const outer = shape({ id: 27, kind: 0, x0: 10, y0: 10, x1: 190, y1: 190 });
+    const inner = shape({ id: 28, kind: 0, x0: 60, y0: 60, x1: 120, y1: 120 });
+    const both = [outer, inner]; // inner is newer → iterated first
+    expect(shapeAnnotationAt(both, 60, 90)).toBe(28); // inner stroke
+    expect(shapeAnnotationAt(both, 10, 90)).toBe(27); // outer stroke
+    expect(shapeAnnotationAt(both, 40, 40)).toBe(-1); // between the two
   });
 
   it("treats bézier (7) as a bounding box, as Rust's fallback branch does", () => {

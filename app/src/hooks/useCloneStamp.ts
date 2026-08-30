@@ -69,6 +69,9 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     removeLayerMask,
     applyLayerMask,
     invertLayerMask,
+    setLayerColorOverlay,
+    removeLayerColorOverlay,
+    applyLayerColorOverlay,
   } = useLayers(engine);
 
   const {
@@ -292,5 +295,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     removeLayerMask,
     applyLayerMask,
     invertLayerMask,
+    setLayerColorOverlay,
+    removeLayerColorOverlay,
+    applyLayerColorOverlay,
   };
 }

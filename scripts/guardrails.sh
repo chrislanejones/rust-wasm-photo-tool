@@ -191,8 +191,12 @@ check "aria-button" 5 "role=button needs aria-label (§8)" "$n_aria"
 # crate on the same pinned 1.97.1 toolchain. Cause not identified; do not
 # re-derive it as "pub items are exempt" — the probe was private, and cdylib
 # and wasm-bindgen were both ruled out by isolation.
+# 5213 -> 5183 (layer Color Overlay, 2026-08-28): `Layer::from_snapshot_pixels`
+# moved the two hand-built snapshot layers out to layer.rs, and the Color
+# Overlay engine tests were written into layer.rs's own test module rather than
+# here. Lowered in the same commit as the extraction, per the rule above.
 n_librs=$(wc -l < src/lib.rs)
-check "librs-lines" 5213 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
+check "librs-lines" 5183 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
 
 # ── DEAD EXPORTS ──
 # See scripts/dead-exports-audit.mjs for why this is a scan and not a compiler

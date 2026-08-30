@@ -3310,6 +3310,11 @@ export function AppShell() {
               onToggleEdit: handleToggleMaskEdit,
               onSetValue: setMaskPaintValue,
             }}
+            layerOverlay={{
+              onSet: stamp.setLayerColorOverlay,
+              onRemove: stamp.removeLayerColorOverlay,
+              onApply: stamp.applyLayerColorOverlay,
+            }}
             toolSettings={toolSettings}
             onToolSettingsChange={handleToolSettingsChange}
             shapesMode={shapesMode}

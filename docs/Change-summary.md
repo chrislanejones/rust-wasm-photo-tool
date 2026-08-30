@@ -8883,3 +8883,108 @@ The wasm number moved for the first time in four releases, and by exactly the
 amount the dead exports were worth. It stays inside the 780,000–850,000 sentinel
 band (ADR-037), and the pinned toolchain reproduced the figure in two separate
 checkouts.
+
+## v8.57 Change Summary — 2026-08-30
+
+Two pieces of work, both proven by driving the production build rather than by
+green gates: a new layer style, and a round of user-testing on the shapes tool
+that turned up a keybinding fault as old as the app.
+
+### Ctrl+Z was bound twice
+
+`useHistory.ts` and `useKeyboardShortcuts.ts` both listened for Ctrl+Z on the
+window. Every press ran undo twice.
+
+| | Before | After |
+|---|---|---|
+| `undo_count` per press | 3 → **1** | 3 → **2** |
+
+The duplicate came out of `useCloneStamp` verbatim when that hook was split, and
+survived because the only end-to-end test covering undo built a **one-entry**
+history — the second `undo()` found nothing and returned false, so the test
+passed on a broken binding. A gate that runs one configuration reports on that
+configuration.
+
+Removing it made two existing specs fail. Both had been passing on the double
+undo cancelling out a real bug.
+
+**Undo was dead after any slider.** The listener that was deleted happened to be
+the unguarded one. The survivor's guard returns early for any focused
+`<input>` — which includes a range slider, so undo stopped responding the moment
+Opacity or a brush size was dragged. `NON_TEXT_INPUT_TYPES` now lets undo and
+redo through for range, checkbox, radio, button, submit, reset, color and file,
+and returns early for everything else, so a focused slider's arrow keys, Space
+and Enter still reach the control.
+
+**Every text commit wrote two history entries.** `set_text_shadow` compared the
+dormant colour, alpha and offset while the shadow was OFF on both sides: a fresh
+annotation is all zeros, the panel's default is 60% alpha at 2px with blur, so
+off-to-off compared unequal and snapped. Probed with `history_labels()`:
+`Add Text|Text Shadow` → `Add Text`. A fresh text with the shadow genuinely on
+is still two steps — that needs an engine-side compound, since `try_oplog_undo`
+steps one op per snapshot. Filed in PARKING_LOT with the analysis.
+
+### Color Overlay
+
+Photoshop's Color Overlay layer style, under Layer Mask in the Layers tool.
+`Layer.overlay: Option<ColorOverlay>` — a field on the layer, not a layer in the
+stack, because a tint layer would change `content_layer_count` and the op log's
+view of the document. ADR-041.
+
+| Decision | |
+|---|---|
+| Composite order | after shapes/text, BEFORE the mask (Photoshop's order) |
+| Alpha | never touched; clipped to the layer's alpha; transparent pixels skipped, so downsampling cannot bleed a halo |
+| Fast path | `composite_layers_into` copies a lone opaque layer straight out — without `overlay.is_none()` the style was invisible on exactly the single-layer document. Named regression test |
+| History | snaps ONCE on None→Some; slider adjustments ride on it, so one undo removes the whole overlay |
+| Baking | one `apply_color_overlay` helper shared by the live render, Apply, and `merge_down` — which flattens the lower layer by hand and would have dropped its style |
+| Persistence | session-lived, same as masks. Both need one dexie migration — filed, not built |
+
+Centre pixel on the production build: `72,61,59` → red at full strength
+**`239,68,68`** → 50% `156,65,64` → one undo **`72,61,59`** → Apply holds
+`239,68,68`.
+
+### Shapes
+
+Four findings from a real user session, each reproduced on the unfixed build
+first.
+
+| Finding | Cause → fix |
+|---|---|
+| Delete did nothing on a selected shape | no handler existed outside the reselect row. Added to `useDrawingTools`' key effect in the capture phase, yielding via `e.defaultPrevented` so the reselect row's own Delete does not fire twice |
+| a drag inside an unfilled rect re-selected it | `shape_annotation_at` counted the empty interior. The hit area is a **ring** for unfilled rect, circle and hand-drawn circle; filled shapes, pins and curves keep the bounding box |
+| Ctrl+Z on a pending shape undid the previous action | capture-phase listener + `stopImmediatePropagation`; bubble order between two window listeners cannot be won |
+| a click on the stroke | already worked; pinned with a test |
+
+The ring rule lives in Rust and in the hand port `app/src/lib/annotationHitTest.ts`.
+The drift guard that hashes the Rust body moved `6769816ca3a09358` →
+`cd6a41ce328a78b2`, port and tests updated first. `capture.rs`'s "a rect over a
+path shadows it" test now uses a FILLED rect, with a twin pinning that an
+unfilled one does not shadow.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `cargo fmt --check` / `clippy --all-targets -D warnings` | clean |
+| `cargo test --features tiles` | **352 passed**, 0 failed |
+| `cargo test --all-features` | **384 passed**, 0 failed |
+| `pnpm -C app exec tsc --noEmit` | clean, against a rebuilt `pkg/` |
+| `pnpm lint` | **0 errors**, 61 warnings |
+| `pnpm -C app test` | **634 passed** / 53 files |
+| `pnpm exec playwright test` | **13 passed**, incl. two new specs |
+| `scripts/guardrails.sh` | **8/8 at baseline**, `librs-lines` 5,183 |
+| `build:wasm` | **816,185 B** (812,652 → +3,533) |
+
+The wasm grew by overlay +3,149, the ring hit-test +349 and the shadow
+comparison +35. It stays inside the 780,000–850,000 sentinel band (ADR-037).
+
+`scripts/guardrails.sh` is a blocking CI job that no documented local gate runs,
+and it caught 166 lines of engine tests written into `src/lib.rs` while every
+gate in CLAUDE.md was green. Tests moved into `layer.rs`'s own module and
+`Layer::from_snapshot_pixels` collapsed two hand-built snapshot layers:
+lib.rs **5,213 → 5,183**, baseline lowered to match.
+
+Three `max-lines` pins are over — AppShell by 5, the async contract test by 9,
+`useDrawingTools` by 32. Warning-level only, deliberately **not raised**, filed
+in PARKING_LOT.

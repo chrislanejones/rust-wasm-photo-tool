@@ -738,8 +738,13 @@ export function useDrawingTools({
     });
   }, [settings]);
 
-  // Commit triggers — listeners exist only while an edit is pending.
-  // Enter commits, Escape cancels.
+  // Key triggers — listeners exist only while an edit is pending.
+  // Enter commits, Escape cancels, Delete/Backspace deletes, and Ctrl+Z
+  // drops an UNCOMMITTED change instead of reaching the engine.
+  //
+  // CAPTURE phase, deliberately. useKeyboardShortcuts binds Ctrl+Z on the same
+  // window in the bubble phase; a capture listener runs first and can stop it
+  // for the one case where engine undo is the wrong answer (below).
   useEffect(() => {
     if (!editState) return;
     const onKey = (e: KeyboardEvent) => {
@@ -749,6 +754,8 @@ export function useDrawingTools({
       ) {
         return;
       }
+      const es = editStateRef.current;
+      if (!es) return;
       if (e.key === "Enter") {
         e.preventDefault();
         // `void`: a DOM listener cannot await, and since Stage 3.5 this returns
@@ -757,11 +764,36 @@ export function useDrawingTools({
       } else if (e.key === "Escape") {
         e.preventDefault();
         cancelEdit();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        // The Reselect list's ✕ row handles its own Delete and calls
+        // preventDefault — yield to it, or one keypress deletes two shapes.
+        if (e.defaultPrevented) return;
+        e.preventDefault();
+        if (es.editId != null) {
+          // A selected committed shape: one "Delete Shape" history step.
+          void removeShape(es.editId);
+        } else {
+          // A drawn-but-uncommitted shape: nothing is in the engine yet, so
+          // there is nothing to snap — just drop it.
+          cancelEdit();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "z" || e.key === "Z")) {
+        // Ctrl+Z with an uncommitted change: the change the user SEES is the
+        // pending one, and it is not in the engine. Letting the engine undo
+        // run would step back over the PREVIOUS action while the pending
+        // shape stayed on screen — "undo skipped one". So the pending change
+        // is the step: discard it (same as Escape) and stop the engine undo.
+        // A clean re-selection has no pending change and falls through.
+        if (es.editId == null || editDirtyRef.current) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          cancelEdit();
+        }
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [editState, commitEdit, cancelEdit]);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [editState, commitEdit, cancelEdit, removeShape]);
 
   // Escape releases a pending crop selection (Edit & Transform tool) without
   // applying it — bound only while a crop rect actually exists.

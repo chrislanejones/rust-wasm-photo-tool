@@ -27,3 +27,14 @@ export const GUIDE_COLORS = [
 ] as const;
 
 export const DEFAULT_GUIDE_COLOR = p.cyan;
+
+/** Layer Color Overlay tints. Hues first — white and black last, because a
+ *  full-strength monochrome overlay flattens the layer to a silhouette: a real
+ *  use (and what the opacity slider is for), just rarely the first reach. */
+export const OVERLAY_COLORS = [
+  p.red, p.orange, p.yellow, p.green, p.teal, p.cyan,
+  p.blue, p.violet, p.purple, p.pink, p.white, p.black,
+] as const;
+
+/** Photoshop opens Color Overlay at full strength; the slider dials it back. */
+export const DEFAULT_OVERLAY_OPACITY = 1;
