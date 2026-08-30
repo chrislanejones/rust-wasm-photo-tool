@@ -8988,3 +8988,114 @@ lib.rs **5,213 → 5,183**, baseline lowered to match.
 Three `max-lines` pins are over — AppShell by 5, the async contract test by 9,
 `useDrawingTools` by 32. Warning-level only, deliberately **not raised**, filed
 in PARKING_LOT.
+
+## v8.58 Change Summary — 2026-08-31
+
+A placement fix and the end of a hand-maintained number, both found by the
+v8.57 user-testing pass rather than by a gate.
+
+### Apply Resize is Resize-mode only
+
+`ResizeSettings.tsx` renders its two sub-modes through `ToolModeToggle`, but
+the "Bottom Buttons" footer opens AFTER the toggle closes — so every button in
+it is mode-independent. **Apply Resize** was therefore offered under the
+Compress tile, a button whose own tooltip reads "re-saved in this photo's own
+format at full quality, so the quality slider is left alone".
+
+| | Compress tile | Resize tile |
+|---|---|---|
+| `Apply Resize` — before | present | present |
+| `Apply Resize` — **after** | **absent** | present |
+| `Apply Compression & Resize` | present | present |
+
+Gated in place (`{mode === "resize" && …}`) rather than moved inside the
+toggle, so the footer's shared border and spacing are untouched — verified
+identical geometry in both tiles, 226×38 at the same x.
+
+**The sibling is deliberately NOT mirrored.** `Apply Compression & Resize` is
+the commit-everything action and the one that sets `appliedHere`, which unlocks
+A/B Compare. Gating it to Compress would strand a user who resized in the
+Resize tile, and would change which button unlocks Compare from that tile. The
+asymmetry is the point: one button is resize-only and belongs to one tile, the
+other is the compound and belongs to both. `e2e/resize-apply-placement.spec.ts`
+pins both halves, so a future tidy-up that gates them together fails.
+
+Why it survived: `Apply Resize` is disabled unless `dimensionsChanged`, and the
+dimension fields live in the Resize tile — so in Compress it was almost always
+grey, which reads as "not applicable right now" rather than "wrong panel". The
+Compress percent slider changes dimensions too, so it was reachable enabled.
+
+### The celebration popper stopped being hand-typed
+
+`CelebrationDialog` (Ctrl/Cmd + `\`) counts the month's shipping. Its `STATS`
+object was hand-maintained, and on 2026-08-30 it was still showing July.
+
+| Stat | Was (July, thru v7.61) | Now (August, incl. this release) |
+|---|---|---|
+| Month entries | 205 | **285** |
+| Month releases | 61 | **97** |
+| All-time entries | 496 | **781** |
+| Month % of all-time | 41% | **36%** |
+| Features | 35 | **10** |
+| Fixes | 66 | **116** |
+
+Those figures include v8.58 itself, because the generator runs after
+`releases.ts` is written — which is the ordering the stale comment warned
+about and never enforced.
+
+`marketing/scripts/gen-trail-data.mjs` — which already regenerates the trail-log
+squares and the feature list every release — now emits a third file,
+`app/src/lib/celebrationStats.ts`, parsed from `releases.ts`. It throws rather
+than writing zeros if the parse finds no releases, so a shape change to
+`releases.ts` fails loudly instead of shipping an empty popper.
+
+Deriving it beat adding a routine step on purpose: a routine step is a rule
+that depends on someone following it, and the component's own comment already
+*was* that rule — "re-derive rather than guess", plus a warning that the release
+being cut has to be in `releases.ts` first "or the popper ships a release behind
+its own changelog". Nothing enforced either, so the warning aged into the bug it
+described.
+
+**The headline is entries, not features.** August logged 285 entries across 97
+releases against July's 205 across 61, yet only 10 carried the `feature` tag —
+the month went into the engine-worker migration and the fixes around it.
+Leading on features would have rendered the busiest month in the log as the
+quietest. `Trail.tsx` hit the same wall and falls back to total entries when a
+month has none; this leads with entries unconditionally, which needs no
+threshold to get right.
+
+### Section F — the v8.57 ring hit-test, verified
+
+The riskiest change in v8.57 was the unfilled-shape "ring" hit rule, which
+lives in Rust and in the hand port. All 22 rows of the manual plan's Section F
+were run against the production build, probing `shape_annotation_at` directly
+at measured coordinates:
+
+| Rows | What | Result |
+|---|---|---|
+| F1–F7 | unfilled rect: 5 edges hit, 3 interior points miss, a drag inside draws | **pass** |
+| F8–F10 | solid / gradient / pixelate fills: centre hits | **pass** |
+| F11–F14 | unfilled circle + hand-drawn: centre misses, rims hit | **pass** |
+| F15–F16 | pin keeps its bbox; line is distance-based | **pass** |
+| F17–F18 | stroke width scales the ring pad (sw 8 → pad 6; sw 2) | **pass** |
+| F19–F21 | a filled shape shadows, an unfilled one does not | **pass** |
+| F22 | hit-test is image-space, so a real zoom cannot desync it | **pass** |
+
+No findings. Kept as a scratch harness rather than a permanent spec — the rule
+already has Rust unit tests, the `annotationHitTest` drift guard and
+`shapes-ux.spec.ts` covering it.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `cargo fmt --check` / `clippy --all-targets -D warnings` | clean |
+| `cargo test --features tiles` / `--all-features` | **352** / **384** |
+| `pnpm -C app exec tsc --noEmit` | clean |
+| `pnpm lint` | **0 errors**, 61 warnings |
+| `pnpm -C app test` | **634 passed** / 53 files |
+| `pnpm exec playwright test` | **14 passed** (+1 new spec) |
+| `scripts/guardrails.sh` | **8/8 at baseline** |
+| `build:wasm` | **816,185 B** — unchanged, no Rust in this release |
+
+TypeScript only, so the engine is byte-identical to v8.57.

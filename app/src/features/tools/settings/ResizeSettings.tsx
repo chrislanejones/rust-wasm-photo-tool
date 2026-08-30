@@ -489,28 +489,40 @@ export function ResizeSettings({
       {/* ── Bottom Buttons ── */}
       <div className="border-t border-theme-sidebar-border pt-4 mt-8 space-y-2">
         {/* Resize WITHOUT re-compressing — enabled only when the pixel
-            dimensions actually differ, since that is all it applies. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <Button size="large"
-                onClick={handleApplyResizeOnly}
-                disabled={disabled || !dimensionsChanged}
-                className="w-full"
-              >
-                <Scaling className="h-4 w-4" />
-                Apply Resize
-              </Button>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-[220px] text-center">
-            <p className="text-xs">
-              {dimensionsChanged
-                ? "Changes the pixel dimensions only — re-saved in this photo's own format at full quality, so the quality slider is left alone."
-                : "Enter a different width or height first. This button applies the new dimensions and nothing else."}
-            </p>
-          </TooltipContent>
-        </Tooltip>
+            dimensions actually differ, since that is all it applies.
+            RESIZE MODE ONLY: this footer sits outside the ToolModeToggle, so
+            without the gate the button also renders under the Compress tile —
+            a button whose own tooltip says it does NOT compress, offered while
+            the user is compressing. It read as merely disabled there (the
+            dimension fields live in the Resize tile, so `dimensionsChanged` is
+            usually false), which is why it went unnoticed; but the Compress
+            percent slider changes dimensions too, so it was reachable ENABLED
+            from the wrong tile. Its sibling below is deliberately NOT gated:
+            "Apply Compression & Resize" is the commit-everything action, and
+            it is what unlocks A/B Compare (`appliedHere`) from either tile. */}
+        {mode === "resize" && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Button size="large"
+                  onClick={handleApplyResizeOnly}
+                  disabled={disabled || !dimensionsChanged}
+                  className="w-full"
+                >
+                  <Scaling className="h-4 w-4" />
+                  Apply Resize
+                </Button>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[220px] text-center">
+              <p className="text-xs">
+                {dimensionsChanged
+                  ? "Changes the pixel dimensions only — re-saved in this photo's own format at full quality, so the quality slider is left alone."
+                  : "Enter a different width or height first. This button applies the new dimensions and nothing else."}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         <Button size="large"
           onClick={handleApplyResize}

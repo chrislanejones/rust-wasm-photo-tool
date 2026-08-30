@@ -21,48 +21,50 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CELEBRATION_STATS } from "@/lib/celebrationStats";
 
-/** Live shipping stats (July 2026, through v7.61 · Jul 2–31).
+/** Shipping stats come from `celebrationStats.ts`, which is GENERATED from
+ *  `marketing/src/data/releases.ts` by `marketing/scripts/gen-trail-data.mjs`
+ *  — the same script that already regenerates the trail-log squares and the
+ *  feature list every release.
  *
- *  Counted from `marketing/src/data/releases.ts`, the hand-written trail log,
- *  NOT typed in by hand — 61 July releases, 205 entries, against 496 all-time
- *  across 109 releases. Tag split for July: fix 66, ui 45, feature 35, infra 33,
- *  rust 25, perf 1. Re-derive rather than guess when this is next refreshed:
- *  parse each `version/date/headline/entries` block out of releases.ts, keep
- *  the ones dated 2026-07, and count `tag:` occurrences. Note the order —
- *  the release being cut has to be IN releases.ts before these are counted,
- *  or the popper ships a release behind its own changelog.
+ *  They used to be hand-typed here. The comment that stood in this spot said
+ *  to "re-derive rather than guess" and warned that the release being cut had
+ *  to be in releases.ts first "or the popper ships a release behind its own
+ *  changelog". Nothing enforced either, so the numbers sat on July's figures
+ *  until 2026-08-30 — 96 August releases later, in an app that had shipped
+ *  five more versions. The warning aged into the bug it described.
  *
- *  The two numbers in the milestone chip below are part of this set and were
- *  hard-coded in the markup while the rest lived here, which is how they went
- *  stale on their own — they read off STATS now, so one refresh moves all of
- *  them together. */
-const STATS = {
-  monthShipped: 205, // entries logged in July across 61 releases
-  releases: 61,
-  allTime: 496, // all-time trail-log entries
-  monthPct: 41, // July = 41% of everything ever shipped
-  features: 35, // July `tag: "feature"` entries
-  fixes: 66, // July `tag: "fix"` entries
-};
+ *  THE HEADLINE IS ENTRIES, NOT FEATURES. A month can ship more than the one
+ *  before it and still carry fewer `feature` tags: August 2026 logged 281
+ *  entries across 96 releases against July's 205 across 61, and only 10 of
+ *  them were tagged `feature`, because the month went into the engine-worker
+ *  migration and the fixes around it. Leading on the feature count would have
+ *  rendered the busiest month in the log as the quietest. `Trail.tsx` hit the
+ *  same wall and solved it by falling back to total entries; this leads with
+ *  entries unconditionally, which needs no threshold to get right. */
 
-/** July's headline work — icon + label, shown as chips. Drawn from real
- *  release headlines, newest first.
+/** The month's headline work — icon + label, shown as chips. Drawn from real
+ *  release headlines, newest first, and each one checked against
+ *  `releases.ts` before it went in: worker v8.32, perspective v8.44–v8.49,
+ *  reproducible builds v8.53, layer limit v8.54, cross-layer clicks v8.55.
  *
- *  App-facing features only. The trail log this is counted from covers the
+ *  Hand-written on purpose while the NUMBERS above are generated. A headline
+ *  is a judgement about what mattered, and the trail log's `feature` tag does
+ *  not carry that — August's biggest change shipped tagged `infra`.
+ *
+ *  App-facing features only. The trail log this is drawn from covers the
  *  marketing site too, but a chip in the editor for something that only exists
- *  on the website reads as a feature the user can't find — the site's ⌘K
- *  feature search is the obvious trap, because the editor's own palette is
- *  Alt+, and pointing at ⌘K here would just be wrong. */
+ *  on the website reads as a feature the user cannot find. */
 const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: string }[] = [
-  { icon: ScanEye, label: "AI Rename a whole gallery" },
-  { icon: LayoutGrid, label: "Five-group toolbar" },
-  { icon: Palette, label: "Eyedropper remembers colours" },
-  { icon: Eraser, label: "Object removal (local)" },
-  { icon: MousePointerClick, label: "Select is its own tool" },
-  { icon: Aperture, label: "Magnetic lasso" },
-  { icon: Layers, label: "Selection → its own layer" },
-  { icon: RotateCcw, label: "Undo that survives reload" },
+  { icon: Layers, label: "The engine moved into a worker" },
+  { icon: LayoutGrid, label: "Layers went from three to eight" },
+  { icon: ScanEye, label: "Perspective transform" },
+  { icon: MousePointerClick, label: "Clicking another layer stopped inventing one" },
+  { icon: Aperture, label: "Colour Overlay on any layer" },
+  { icon: RotateCcw, label: "One Ctrl+Z is one step again" },
+  { icon: Eraser, label: "Delete removes the shape you picked" },
+  { icon: Palette, label: "Same binary three releases running" },
 ];
 
 const CONFETTI_COLORS = [
@@ -169,7 +171,7 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PartyPopper className="h-5 w-5 text-theme-accent" />
-            July shipping spree
+            {CELEBRATION_STATS.month} shipping spree
           </DialogTitle>
         </DialogHeader>
 
@@ -182,26 +184,26 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
           >
             <div className="flex items-baseline gap-2">
               <span className="text-6xl font-extrabold tabular-nums text-theme-accent">
-                {STATS.monthShipped}
+                {CELEBRATION_STATS.monthShipped}
               </span>
               <Sparkles className="h-6 w-6 text-theme-accent" />
             </div>
             <span className="text-sm font-semibold text-text-secondary">
-              features and fixes shipped in July&nbsp;🐎
+              things shipped in {CELEBRATION_STATS.month}&nbsp;🐎
             </span>
             {/* Milestone */}
             <span className="mt-1 rounded-full border border-theme-sidebar-border bg-bg-elevated px-3 py-1 text-2xs font-semibold text-theme-accent">
-              {STATS.features} features and {STATS.fixes} fixes, across{" "}
-              {STATS.releases} releases
+              across {CELEBRATION_STATS.releases} releases &middot;{" "}
+              {CELEBRATION_STATS.features} features, {CELEBRATION_STATS.fixes} fixes
             </span>
           </motion.div>
 
           {/* Stat row */}
           <div className="grid grid-cols-3 gap-2 text-center">
             {[
-              { n: STATS.releases, label: "releases" },
-              { n: STATS.allTime, label: "all-time" },
-              { n: `${STATS.monthPct}%`, label: "this month" },
+              { n: CELEBRATION_STATS.releases, label: "releases" },
+              { n: CELEBRATION_STATS.allTime, label: "all-time" },
+              { n: `${CELEBRATION_STATS.monthPct}%`, label: "this month" },
             ].map((s) => (
               <div
                 key={s.label}

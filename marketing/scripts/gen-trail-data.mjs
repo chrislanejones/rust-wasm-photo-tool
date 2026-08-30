@@ -165,3 +165,107 @@ writeFileSync(out("features.ts"), f);
 console.log(
   `features.ts ${featureCount} features · ${kept.map((g) => `${g.name} (${g.items.length})`).join(" · ")}`,
 );
+
+// ── app/src/lib/celebrationStats.ts ─────────────────────────────────────
+// The in-app celebration popper (Ctrl/Cmd + \) counts what shipped this
+// month. Those numbers were hard-coded in the component and drifted a full
+// month — July's figures were still showing on 2026-08-30, five releases and
+// 96 August releases later.
+//
+// The component's own header comment had already predicted it: "re-derive
+// rather than guess", and "the release being cut has to be IN releases.ts
+// before these are counted, or the popper ships a release behind its own
+// changelog". It was never automated, so the warning aged into the bug it
+// described. Deriving it here rather than adding a step to the git routine is
+// deliberate: a routine step is a rule that depends on someone following it,
+// and this repo already has several documented-rule-vs-reality drifts.
+//
+// This is the ONLY output that leaves the marketing package. It reads
+// releases.ts (hand-written prose, the changelog) and writes a small typed
+// constant into the app — the app must not import across the package
+// boundary, so the numbers are copied at generate time instead.
+const releasesSrc = readFileSync(resolve(here, "..", "src", "data", "releases.ts"), "utf8");
+
+// Split on the release-object boundary. Each block starts at `version:`.
+const relBlocks = releasesSrc.split(/\n  \{\n    version: /).slice(1);
+const releases = relBlocks
+  .map((b) => {
+    const version = (b.match(/^"([^"]+)"/) || [])[1];
+    const date = (b.match(/date: "([\d-]+)"/) || [])[1];
+    const headline = (b.match(/headline: "((?:[^"\\]|\\.)*)"/) || [])[1];
+    const tags = [...b.matchAll(/tag: "(\w+)"/g)].map((m) => m[1]);
+    return version && date ? { version, date, headline, tags } : null;
+  })
+  .filter(Boolean);
+
+if (releases.length === 0) {
+  throw new Error(
+    "gen-trail-data: parsed 0 releases out of releases.ts — the object shape changed. " +
+      "Fix the parser rather than shipping a zeroed popper.",
+  );
+}
+
+const allTime = releases.reduce((n, r) => n + r.tags.length, 0);
+// Newest release wins the month — the popper is about what just shipped.
+const latest = releases.reduce((a, b) => (a.date >= b.date ? a : b));
+const monthKey = latest.date.slice(0, 7);
+const monthRels = releases.filter((r) => r.date.startsWith(monthKey));
+const monthEntries = monthRels.reduce((n, r) => n + r.tags.length, 0);
+const monthTags = {};
+for (const r of monthRels) for (const t of r.tags) monthTags[t] = (monthTags[t] ?? 0) + 1;
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const monthName = MONTH_NAMES[parseInt(monthKey.slice(5, 7), 10) - 1];
+
+let s = `// GENERATED — do not edit. Run: node marketing/scripts/gen-trail-data.mjs
+//
+// Shipping stats for the in-app celebration popper (Ctrl/Cmd + \\), derived
+// from marketing/src/data/releases.ts — the hand-written trail log.
+//
+// ${monthName} ${monthKey.slice(0, 4)}: ${monthEntries} entries across ${monthRels.length} releases,
+// against ${allTime} all-time. Latest release ${latest.version} (${latest.date}).
+//
+// The headline numbers are ENTRIES and RELEASES, never the feature count. A
+// month can ship more than the one before it and carry fewer \`feature\` tags —
+// ${monthName} did exactly that, because the work landed as infrastructure and
+// fixes. Leading with features would have made the busiest month in the log
+// read as the quietest.
+
+export interface CelebrationStats {
+  /** Month the newest release falls in, e.g. "August". */
+  month: string;
+  /** Trail-log entries logged this month — the headline number. */
+  monthShipped: number;
+  /** Releases cut this month. */
+  releases: number;
+  /** Trail-log entries all time. */
+  allTime: number;
+  /** This month as a whole-number percentage of all time. */
+  monthPct: number;
+  /** \`tag: "feature"\` entries this month — a secondary chip, not the headline. */
+  features: number;
+  /** \`tag: "fix"\` entries this month. */
+  fixes: number;
+  /** Newest release in the log, e.g. "v8.57". */
+  latestVersion: string;
+}
+
+export const CELEBRATION_STATS: CelebrationStats = {
+  month: ${q(monthName)},
+  monthShipped: ${monthEntries},
+  releases: ${monthRels.length},
+  allTime: ${allTime},
+  monthPct: ${Math.round((monthEntries / allTime) * 100)},
+  features: ${monthTags.feature ?? 0},
+  fixes: ${monthTags.fix ?? 0},
+  latestVersion: ${q(latest.version)},
+};
+`;
+writeFileSync(resolve(root, "app", "src", "lib", "celebrationStats.ts"), s);
+console.log(
+  `celebrationStats.ts  ${monthName} ${monthEntries} entries · ${monthRels.length} releases · ` +
+    `${allTime} all-time · feature ${monthTags.feature ?? 0} · fix ${monthTags.fix ?? 0} · latest ${latest.version}`,
+);
