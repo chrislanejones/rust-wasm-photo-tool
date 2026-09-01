@@ -5,6 +5,7 @@ import {
   Wrench,
   Image as ImageIcon,
   BookOpenCheck,
+  Download,
 } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
 import {
@@ -23,6 +24,11 @@ interface Props {
    *  whether that dialog is open. */
   onNew: () => void;
   newActive: boolean;
+  /** Export — also an action, never a tab. Replaced the Tools panel's
+   *  full-width "Download & Share {FORMAT}" footer, which spent an entire row
+   *  of a 252px sidebar on one button. */
+  onExport: () => void;
+  canExport: boolean;
   /** Settings + user controls (rendered as-is from the desktop top bar). */
   settingsSlot: React.ReactNode;
   userSlot: React.ReactNode;
@@ -93,6 +99,8 @@ export function MasterBar({
   onTab,
   onNew,
   newActive,
+  onExport,
+  canExport,
   settingsSlot,
   userSlot,
 }: Props) {
@@ -100,13 +108,18 @@ export function MasterBar({
   // elsewhere. Every button is 30px (the shared `IconButton`, sized to the
   // Review panel's toggles) and the cog/user pair sits in a `p-1` container:
   //
-  //   width   30 + 1 + 30*3 + 72 (group) = 193, + 5 gaps * 4 = 20, + divider
-  //           margins 4, + 12 padding = 229, inside 252 with 23px to spare
+  //   width   30*5 + 72 (group) = 222, + 5 gaps * 2 = 10, + 12 padding = 244,
+  //           inside 252 with 8px to spare
   //   height  38 (group) + 12 padding = 50 = MASTER_BAR_CHROME_H
   //
-  // `gap-1` and the divider's `mx-0.5` are the ORIGINAL values. They were cut
-  // to `gap-0.5` / no margin while the buttons were briefly 36px and the row
-  // did not fit; at 30px the room is back, so they are back.
+  // `gap-0.5` and no divider, because Export made five buttons and four plus a
+  // divider no longer fit: at `gap-1` the row measures 254 against a 252 box.
+  // The 4px gaps and the divider's `mx-0.5` were the values before that, and
+  // they had themselves been cut to 0.5 once already while the buttons were
+  // briefly 36px. The buttons are still 30px — it is the count that changed.
+  // The divider is gone on purpose rather than to save its 5px: New and Export
+  // are both ACTIONS while the middle three are tabs, so a rule after New
+  // grouped one action with three tabs and left the other action outside.
   //
   // The height is the expensive half: three files position their docked panel
   // under this bar with a hardcoded `top-[58px]` (= `top-2` gutter + chrome) —
@@ -120,12 +133,12 @@ export function MasterBar({
       exit="exit"
       role="region"
       aria-label="Master bar"
-      className="fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center gap-1 overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-1.5"
+      className="fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center gap-0.5 overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-1.5"
       style={{ height: MASTER_BAR_CHROME_H, boxShadow: "var(--shadow-panel)" }}
     >
-      {/* New action + the three view tabs + settings/user */}
+      {/* New · Tools · Gallery · Review · Export, one run of five, then
+          settings/user. New and Export are actions; the middle three are tabs. */}
       <IconBtn icon={Upload} label="New" onClick={onNew} active={newActive} />
-      <div className="mx-0.5 h-5 w-px bg-border" />
       {TABS.map((t) => (
         <IconBtn
           key={t.id}
@@ -135,6 +148,12 @@ export function MasterBar({
           active={activeTab === t.id}
         />
       ))}
+      <IconBtn
+        icon={Download}
+        label="Export"
+        onClick={onExport}
+        disabled={!canExport}
+      />
       {/* Settings + user, in the same group the desktop top bar gives them.
           They used to sit loose at the end of the strip — the only two controls
           in either bar without a container. */}

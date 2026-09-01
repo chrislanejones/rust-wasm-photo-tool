@@ -9289,3 +9289,92 @@ move.
 | `build:wasm` | **816,185 B** — unchanged, no Rust |
 
 One file changed. The engine is byte-identical to v8.57.
+
+---
+
+## v8.61 Change Summary — 2026-08-31
+
+Export leaves the Tools panel's footer and becomes the fifth item in the app's
+main button run. One action, two bars, no sidebar row.
+
+### The footer is gone
+
+`ToolsSidebar.tsx` ended in a `p-4 border-t` block holding a single
+`size="large"` full-width Button reading **"Download & Share {FORMAT}"**
+(pluralized past one photo). In a 252px panel that is a whole row plus its
+padding and border, present under every tool, at every point in the session.
+
+The block is removed. `onExport`, `canExport`, the `Download` icon, `Button`
+and the three `Tooltip` imports went with it; `photoCount` stays because the
+Compress panel still reads it.
+
+### Export joins New · Tools · Gallery · Review
+
+| Bar | Component | Shape |
+|---|---|---|
+| Wide | `TopBar.tsx` | 5th `ToggleGroupItem`, `key: "E"` |
+| Compact (≤1000px) | `MasterBar.tsx` | 5th `IconBtn` |
+
+Both call the same `handleExportClick` AppShell already had, so the dialog and
+the `Alt + E` shortcut are untouched. **`Alt + E` was verified in the code
+(`useKeyboardShortcuts.ts:373`, `case "KeyE"` under `altKey`) before it went in
+the tooltip** — the first draft of that tooltip said `Ctrl + S`, which is not
+bound to anything.
+
+**Export is an ACTION inside a group of TOGGLES**, and that is deliberate:
+there is no "export mode" to be in, so it passes `active: false` permanently.
+`ToggleGroupItem` gained an optional `disabled` for it — the one thing an
+action in that row needs that a toggle does not, so it can say "not yet" with
+no image loaded instead of looking available.
+
+### The compact bar had to give up 2px to fit
+
+`MasterBar` is a fixed 252px. Five 30px buttons plus the cog/user group did not
+fit at the old spacing:
+
+| Layout | Width | Fits 252? |
+|---|---|---|
+| 4 buttons + divider, `gap-1` | 229 | yes, 23 spare |
+| 5 buttons + divider, `gap-1` | 254 | **no** |
+| **5 buttons, no divider, `gap-0.5`** | **244** | **yes, 8 spare** |
+
+The divider is dropped for a reason beyond its 5px: New and Export are both
+actions and the middle three are tabs, so a rule after New fenced one action in
+with the tabs and left the other outside. `gap-0.5` is what the gaps were
+before, when the buttons were briefly 36px — the buttons are still 30px, it is
+the count that changed.
+
+**Measured in a browser, not calculated.** Production build, 900px viewport,
+image loaded:
+
+| Metric | Value |
+|---|---|
+| `bar.clientWidth` | 250 |
+| `bar.scrollWidth` | **250** |
+| Overflow | **none** |
+| Buttons found | New, Tools, Gallery, Review, **Export**, Settings, Sign in — 30px each |
+
+### Verified end to end, not just rendered
+
+Clicking Export opens the **"Download, Copy, or Share"** dialog — the same one
+the footer opened. Checked by driving the real button in the production build
+and asserting the dialog count goes 0 → 1, because a button that renders is not
+a button that works.
+
+| Check | Result |
+|---|---|
+| Export present after image load | **yes**, enabled, label "Export" |
+| Click → dialog | **0 → 1**, "Download, Copy, or Share" |
+| Compact bar overflow | **none** |
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **exit 0** |
+| `pnpm -C app test` | **634 passed** / 53 files |
+| `pnpm lint` | **0 errors**, 61 warnings |
+| `pnpm run build` | **succeeds** |
+| `build:wasm` | **816,185 B** — unchanged, no Rust |
+
+TypeScript only. The engine is byte-identical to v8.57.

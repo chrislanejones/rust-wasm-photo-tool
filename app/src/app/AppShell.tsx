@@ -3187,6 +3187,8 @@ export function AppShell() {
               onTab={setMasterTab}
               onNew={() => setShowUpload(true)}
               newActive={showUpload}
+              onExport={handleExportClick}
+              canExport={hasImage}
               settingsSlot={
                 <SubscriptionButton
                   general={general}
@@ -3219,6 +3221,8 @@ export function AppShell() {
             onToggleTools={() => setShowTools((v) => !v)}
             onToggleGallery={() => setShowGallery((v) => !v)}
             onToggleHistory={() => setShowHistory((v) => !v)}
+            onExport={handleExportClick}
+            canExport={hasImage}
             winWidth={bp.width}
             drawerMode={bp.narrow}
             reduceMotion={prefs.reduceMotion}
@@ -3238,8 +3242,6 @@ export function AppShell() {
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
             hasSource={stamp.state.hasSource}
-            onExport={handleExportClick}
-            canExport={hasImage}
             photoCount={photos.length}
             exportFormat={exportFormat}
             onExportFormatChange={setExportFormat}

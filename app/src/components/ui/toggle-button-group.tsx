@@ -17,6 +17,12 @@ export interface ToggleGroupItem {
   /** Whether this button is currently on (multiple may be on at once). */
   active: boolean;
   onToggle: () => void;
+  /** Greys the button out and drops it from the tab order. Added for Export,
+   *  which is the one item in the top bar's cluster that is an ACTION rather
+   *  than a toggle — it fires a download instead of turning a panel on, so it
+   *  passes `active: false` permanently and needs a way to say "not yet"
+   *  when there is no image to export. */
+  disabled?: boolean;
   /** Optional rich hover tooltip (e.g. label + keyboard shortcut). When
    *  omitted the label is used as a plain `title`. */
   tooltip?: { label?: string; shortcut?: string };
@@ -62,10 +68,11 @@ export function ToggleButtonGroup({
 }: ToggleButtonGroupProps) {
   return (
     <div className={cn("flex gap-1 p-1 rounded-lg bg-bg-tertiary", className)}>
-      {items.map(({ key, icon: Icon, label, active, onToggle, tooltip }) => {
+      {items.map(({ key, icon: Icon, label, active, onToggle, tooltip, disabled }) => {
         const button = (
           <button
             onClick={onToggle}
+            disabled={disabled}
             title={tooltip ? undefined : label}
             aria-label={tooltip?.label ?? label}
             className={cn(
@@ -86,6 +93,9 @@ export function ToggleButtonGroup({
               active
                 ? "bg-bg-elevated text-text-primary shadow-md"
                 : "text-text-muted hover:text-text-primary hover:bg-bg-elevated",
+              // Disabled wins over the hover styles above — without this the
+              // ring and colour shift still fire on a button that does nothing.
+              disabled && "pointer-events-none opacity-40",
             )}
           >
             {/* ONE glyph size, labelled or not: 18px, matching the top bar's

@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.61",
+    date: "2026-08-31",
+    headline: "Export moved to the bar, and the Tools panel got a row back",
+    entries: [
+      {
+        tag: "ui",
+        text: "The way to save your work was a full-width \"Download & Share JPEGs\" button pinned to the bottom of the Tools panel — a large button under its own top border, so a 252-pixel sidebar spent a whole row plus padding on one action, under every tool, whether or not you were anywhere near finishing. It is now the fifth item in the bar you already use to move around the app: New, Tools, Gallery, Review, Export, in the wide top bar and the compact one alike. Same dialog, same Alt + E, no footer.",
+      },
+      {
+        tag: "ui",
+        text: "Two things had to give for five buttons to fit the compact bar's fixed 252 pixels. The divider after New is gone — with Export added, New and Export are both actions while the middle three are tabs, so a rule after New fenced one action in with the tabs and left the other outside it. And the gaps went from four pixels to two, which is what they were the last time this row ran out of room. Measured in a browser rather than assumed: the row comes to exactly its container, nothing clipped.",
+      },
+      {
+        tag: "fix",
+        text: "Export is the only button in that group that is not a toggle. It fires an action rather than turning a panel on, so it never lights up, and it greys out when there is no image instead of pretending to be available. Its tooltip says Alt + E because that shortcut was checked in the code before it was written down — the first draft said Ctrl + S, which is not bound to anything.",
+      },
+    ],
+  },
+  {
     version: "v8.60",
     date: "2026-08-31",
     headline: "The celebration's highlights caught up, and its comment stopped quoting numbers",

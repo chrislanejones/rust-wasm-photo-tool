@@ -1,14 +1,7 @@
 // ===== FILE: app/src/features/tools/ToolsSidebar.tsx =====
 // Item 7: "effects" replaces "blur" — includes brightness, contrast, blur
 import { motion } from "framer-motion";
-import { Download } from "lucide-react";
 import { slideFromLeft } from "@/lib/animations";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type {
   ToolType,
   StampSettings as StampSettingsType,
@@ -71,11 +64,8 @@ interface ToolsSidebarProps {
    *  positioning / panel chrome / slide animation) so it can fill the compact
    *  master bar's content area instead of floating as its own panel. */
   embedded?: boolean;
-  /** Download button: exports the single photo, or opens the chooser dialog
-   *  when the gallery holds more than one. */
-  onExport: () => void;
-  canExport: boolean;
-  /** Total photos in the gallery — pluralizes the Download label. */
+  /** Total photos in the gallery — drives the Compress panel's count. (It used
+   *  to pluralize the Download footer's label too; Export moved to the bar.) */
   photoCount: number;
   exportFormat: ExportFormat;
   onExportFormatChange?: (f: ExportFormat) => void;
@@ -175,8 +165,6 @@ export function ToolsSidebar({
   layerMask,
   layerOverlay,
   embedded = false,
-  onExport,
-  canExport,
   photoCount,
   exportFormat,
   onExportFormatChange,
@@ -468,31 +456,12 @@ export function ToolsSidebar({
         )}
       </motion.div>
 
-      <div className="p-4 border-t border-border">
-        {/* One Download button. With a single photo it downloads directly;
-            with several it opens the Selected / All / Cancel chooser (zip).
-            Label pluralizes the format when the gallery holds more than one. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <Button size="large"
-                onClick={onExport}
-                disabled={!canExport}
-                className="w-full"
-              >
-                <Download className="h-4 w-4" />
-                Download &amp; Share {exportFormat.toUpperCase()}
-                {photoCount > 1 ? "s" : ""}
-              </Button>
-            </div>
-          </TooltipTrigger>
-          {!canExport && (
-            <TooltipContent side="top" className="max-w-[200px] text-center">
-              <p className="text-xs">Load an image first.</p>
-            </TooltipContent>
-          )}
-        </Tooltip>
-      </div>
+      {/* The "Download & Share {FORMAT}" footer used to live here — a
+          full-width `size="large"` Button under a top border, so a 252px panel
+          spent an entire row plus its padding on one action. Export is now the
+          fifth item in the bar's New · Tools · Gallery · Review run, in both
+          the top bar and the compact master bar, which is where the other
+          whole-app actions already are. Same handler, no footer. */}
     </motion.div>
   );
 }

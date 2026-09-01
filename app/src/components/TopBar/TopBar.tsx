@@ -16,6 +16,7 @@ import {
   Image,
   Wrench,
   BookOpenCheck,
+  Download,
   ZoomIn,
   ZoomOut,
   Undo2,
@@ -44,6 +45,12 @@ interface TopBarProps {
   onToggleTools: () => void;
   onToggleGallery: () => void;
   onToggleHistory: () => void;
+  /** Export — the fifth item in the cluster and the only ACTION in it: it
+   *  fires the download rather than toggling a panel, so it never renders
+   *  active. It replaced the Tools panel's full-width "Download & Share
+   *  {FORMAT}" footer, which took a whole row of the sidebar for one button. */
+  onExport: () => void;
+  canExport: boolean;
   /** Shared window width (from useBreakpoint) — drives the compact / narrow
    *  collapse; TopBar no longer owns a resize listener. */
   winWidth: number;
@@ -72,6 +79,8 @@ export function TopBar({
   showTools,
   showGallery,
   showHistory,
+  onExport,
+  canExport,
   onToggleUpload,
   onToggleTools,
   onToggleGallery,
@@ -124,6 +133,18 @@ export function TopBar({
       active: showHistory,
       onToggle: onToggleHistory,
       tooltip: { label: "Review", shortcut: "Alt + R" },
+    },
+    // The odd one out, deliberately: an ACTION in a group of toggles. It never
+    // reports active — there is no "export mode" to be in — and disables
+    // instead when there is nothing loaded to export.
+    {
+      key: "E",
+      icon: Download,
+      label: "Export",
+      active: false,
+      onToggle: onExport,
+      disabled: !canExport,
+      tooltip: { label: "Export", shortcut: "Alt + E" },
     },
   ];
 

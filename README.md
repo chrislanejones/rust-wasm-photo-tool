@@ -84,6 +84,30 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.61 — 2026-08-31
+
+**Export moved to the bar, and the Tools panel got a row back.** The way to
+save your work was a full-width "Download & Share JPEGs" button pinned to the
+bottom of the Tools panel — a `large` button under its own top border, so a
+252-pixel-wide sidebar spent an entire row plus padding on one action, on every
+tool, whether or not you were anywhere near finishing.
+
+It is now the fifth item in the bar you already use to move around the app:
+**New · Tools · Gallery · Review · Export**, in the wide top bar and in the
+compact bar alike. Same dialog, same `Alt + E`, no footer.
+
+Two things had to give for five buttons to fit the compact bar's fixed 252
+pixels. The divider after New is gone — with Export added, New and Export are
+both actions while the middle three are tabs, so a rule after New grouped one
+action with three tabs and left the other one outside the fence. And the gaps
+went from 4 pixels to 2, which is what they were the last time this row ran out
+of room. Measured in the browser rather than assumed: the row comes to exactly
+its container, with nothing clipped.
+
+Export is the only button in that group that is not a toggle. It fires an
+action rather than turning a panel on, so it never lights up, and it greys out
+when there is no image rather than pretending to be available.
+
 ### v8.60 — 2026-08-31
 
 **The celebration's chips caught up, and its comment stopped quoting numbers.**
