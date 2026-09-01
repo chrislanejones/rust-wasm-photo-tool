@@ -169,15 +169,28 @@ export default function Nav({ onOpenSearch, searchOpen }: NavProps) {
           <span className="nav-pill__glide" aria-hidden="true" />
         </ul>
 
-        {/* "Demo", not "Open the demo", at every width. The phone pill needed
-            the width — it has to seat the logo, the wordmark, this button and
-            the burger inside ~335px — but the short label is not a mobile
-            compromise: the button sits next to a horse and the word "Image
-            Horse" on a page whose whole job is explaining the demo, so the
-            verb was carrying nothing. The long form still lives where it has
-            room to work: the hero and Pricing CTAs, and the ⌘K palette. */}
-        <a className="cta cta--fill nav-pill__cta" href={EDITOR_URL} {...external}>
-          Demo
+        {/* "Beta", at every width. The phone pill needed the width — it has to
+            seat the logo, the wordmark, this button and the burger inside
+            ~335px — and the short label is not a mobile compromise: the button
+            sits next to a horse and the word "Image Horse" on a page whose
+            whole job is explaining the demo, so the verb was already carrying
+            nothing. The label now spends that room on product status instead.
+            The long form still lives where it has room to work: the hero and
+            Pricing CTAs, and the ⌘K palette.
+
+            The aria-label is load-bearing, not decoration. Sighted users read
+            "Beta" in context — beside the wordmark, on a page about the demo —
+            but someone tabbing the links or pulling up a link list gets the
+            accessible name alone, and "Beta" on its own names a state, not a
+            destination. It contains the visible word, so WCAG 2.5.3 (Label in
+            Name) still holds. */}
+        <a
+          className="cta cta--fill nav-pill__cta"
+          href={EDITOR_URL}
+          aria-label="Open the demo (Beta)"
+          {...external}
+        >
+          Beta
         </a>
 
         {/* Condensing hides these, so they have to leave the tab order too. */}
