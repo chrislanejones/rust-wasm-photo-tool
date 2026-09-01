@@ -84,6 +84,23 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.60 — 2026-08-31
+
+**The celebration's chips caught up, and its comment stopped quoting numbers.**
+Ctrl + \ counts the month's shipping. The counts have been generated since
+v8.58, but the little list of highlights beside them is hand-written on purpose
+— a headline is a judgement about what mattered, and the log's `feature` tag
+does not carry that. It now includes the two things from v8.59 a user can
+actually notice: the mask tile saying it picks up the brush, and the upload
+dialog no longer drawing a progress bar out of thin air.
+
+The note above that list had been quoting the month's totals inline, and those
+were already two releases out of date — the same hand-typed-number problem the
+generated counts were built to end, sitting in a comment right next to them.
+The live figures are gone from the prose; July's stay, because July cannot
+change. The chips also render two to a row, so the list is kept to an even
+number and says so.
+
 ### v8.59 — 2026-08-31
 
 **Every build broke on a lockfile nobody had edited.** Two dependency updates

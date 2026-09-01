@@ -11,6 +11,8 @@ import {
   MousePointerClick,
   RotateCcw,
   ScanEye,
+  Brush,
+  Gauge,
 } from "lucide-react";
 import {
   Dialog,
@@ -36,18 +38,28 @@ import { CELEBRATION_STATS } from "@/lib/celebrationStats";
  *  five more versions. The warning aged into the bug it described.
  *
  *  THE HEADLINE IS ENTRIES, NOT FEATURES. A month can ship more than the one
- *  before it and still carry fewer `feature` tags: August 2026 logged 281
- *  entries across 96 releases against July's 205 across 61, and only 10 of
- *  them were tagged `feature`, because the month went into the engine-worker
- *  migration and the fixes around it. Leading on the feature count would have
- *  rendered the busiest month in the log as the quietest. `Trail.tsx` hit the
- *  same wall and solved it by falling back to total entries; this leads with
- *  entries unconditionally, which needs no threshold to get right. */
+ *  before it and still carry fewer `feature` tags — August 2026 beat July's 205
+ *  entries across 61 releases while tagging barely a dozen of its own as
+ *  features, because the month went into the engine-worker migration and the
+ *  fixes around it. Leading on the feature count would have rendered the
+ *  busiest month in the log as the quietest. `Trail.tsx` hit the same wall and
+ *  solved it by falling back to total entries; this leads with entries
+ *  unconditionally, which needs no threshold to get right.
+ *
+ *  The current month's figures are deliberately NOT written here. They live in
+ *  `CELEBRATION_STATS` and change every release, and a comment quoting them
+ *  goes stale the moment one ships — which is the failure this whole file
+ *  exists to have fixed. July's numbers stay because they are history and
+ *  cannot move. */
 
 /** The month's headline work — icon + label, shown as chips. Drawn from real
  *  release headlines, newest first, and each one checked against
  *  `releases.ts` before it went in: worker v8.32, perspective v8.44–v8.49,
- *  reproducible builds v8.53, layer limit v8.54, cross-layer clicks v8.55.
+ *  reproducible builds v8.53, layer limit v8.54, cross-layer clicks v8.55,
+ *  the mask tile and the upload bar v8.59.
+ *
+ *  KEEP THE COUNT EVEN — they render in a `grid-cols-2`, so an odd number
+ *  orphans the last chip in a half-empty row.
  *
  *  Hand-written on purpose while the NUMBERS above are generated. A headline
  *  is a judgement about what mattered, and the trail log's `feature` tag does
@@ -65,6 +77,8 @@ const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: stri
   { icon: RotateCcw, label: "One Ctrl+Z is one step again" },
   { icon: Eraser, label: "Delete removes the shape you picked" },
   { icon: Palette, label: "Same binary three releases running" },
+  { icon: Brush, label: "Add mask tells you it picks up the brush" },
+  { icon: Gauge, label: "The upload bar stopped inventing progress" },
 ];
 
 const CONFETTI_COLORS = [

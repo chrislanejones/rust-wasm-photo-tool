@@ -9234,3 +9234,58 @@ form.
 | `build:wasm` | **816,185 B** — unchanged, no Rust in this release |
 
 TypeScript, config and docs only, so the engine is byte-identical to v8.57.
+
+---
+
+## v8.60 Change Summary — 2026-08-31
+
+`CelebrationDialog` only. The generated half was already current; this fixes the
+hand-written half beside it.
+
+### Two chips for v8.59
+
+The `FEATURES` list is hand-written on purpose while the numbers above it are
+generated — a headline is a judgement about what mattered, and the trail log's
+`feature` tag does not carry it (August's biggest change shipped tagged
+`infra`). It had no entry for v8.59.
+
+| Added | Icon |
+|---|---|
+| "Add mask tells you it picks up the brush" | `Brush` |
+| "The upload bar stopped inventing progress" | `Gauge` |
+
+App-facing only, so v8.59's lockfile repair and the marketing nav change are
+deliberately absent — a chip in the editor for something a user cannot find
+there reads as a missing feature.
+
+**The count is kept EVEN and the comment now says why.** The chips render in a
+`grid grid-cols-2`; nine would orphan the last one in a half-empty row. Eight
+became ten.
+
+### The doc comment stopped quoting live numbers
+
+The block above `FEATURES` explained why the headline leads with entries rather
+than features, and made the case with inline figures:
+
+| | Was in the comment | Actual at v8.59 |
+|---|---|---|
+| August entries | 281 | **291** |
+| August releases | 96 | **98** |
+
+Two releases stale, in a comment sitting directly beside the generated constant
+that exists precisely because hand-typed numbers drift. The current month's
+figures are removed rather than refreshed — refreshing them would have restored
+the same trap. July's 205 across 61 stay, because they are history and cannot
+move.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **exit 0** |
+| `pnpm -C app test` | **634 passed** / 53 files |
+| `pnpm lint` | **0 errors**, 61 warnings |
+| Chip count | **10** — even, 5 rows |
+| `build:wasm` | **816,185 B** — unchanged, no Rust |
+
+One file changed. The engine is byte-identical to v8.57.

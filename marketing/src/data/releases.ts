@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.60",
+    date: "2026-08-31",
+    headline: "The celebration's highlights caught up, and its comment stopped quoting numbers",
+    entries: [
+      {
+        tag: "ui",
+        text: "Ctrl + \\ counts the month's shipping. The counts have been generated since v8.58, but the short list of highlights beside them is hand-written on purpose — a headline is a judgement about what mattered, and the log's feature tag does not carry that; August's biggest change shipped tagged infra. The list now includes the two things from v8.59 a user can actually notice: the mask tile saying it picks up the brush, and the upload dialog no longer drawing a progress bar out of thin air. The lockfile repair and the nav change are deliberately left off — a highlight in the editor for something you cannot find there reads as a missing feature.",
+      },
+      {
+        tag: "fix",
+        text: "The note above that list had been making its case with the month's totals typed inline, and they were two releases out of date — the same hand-typed-number problem the generated counts were built to end, sitting in a comment directly beside them. The live figures are gone from the prose rather than refreshed, because refreshing them would have restored the trap. July's stay, since July cannot change.",
+      },
+      {
+        tag: "ui",
+        text: "The highlights render two to a row, so an odd number leaves the last one alone in a half-empty row. The list is kept even and the comment now says so out loud, which is cheaper than the next person rediscovering it.",
+      },
+    ],
+  },
+  {
     version: "v8.59",
     date: "2026-08-31",
     headline: "Every build broke on a lockfile nobody had edited",
