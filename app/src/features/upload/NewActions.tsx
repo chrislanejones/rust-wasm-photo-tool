@@ -18,7 +18,6 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { Spinner } from "@/components/ui/spinner";
 import { panelSwap } from "@/lib/animations";
-import { useUIStore } from "@/stores/useUIStore";
 import { Button } from "@/components/ui/button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
@@ -155,9 +154,11 @@ export function NewActions({
   showLinks = true,
   onBlankModeChange,
 }: Props) {
-  // Image-load indicator now lives in the UI store (was prop-drilled).
-  const isLoading = useUIStore((s) => s.isImageLoading);
-  const loadProgress = useUIStore((s) => s.loadProgress);
+  // No image-load bar here. The gallery thumbnails ARE the progress: they
+  // appear one per decoded photo, which is real per-item feedback rather than
+  // an aggregate. `useUIStore`'s isImageLoading/loadProgress still drive the
+  // page-top bar in AppShell; this dialog no longer subscribes to either, so
+  // it also stops re-rendering on every 100ms tick of that fake interval.
   const inputRef = useRef<HTMLInputElement>(null);
   const firstButtonRef = useRef<HTMLButtonElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -342,20 +343,6 @@ export function NewActions({
 
   return (
     <>
-      {/* Loading bar */}
-      {isLoading && (
-        <div className="px-6 pt-2">
-          <div className="h-1.5 w-full rounded-full bg-bg-elevated overflow-hidden">
-            <motion.div
-              className="h-full bg-gradient-to-r from-accent to-accent/60 rounded-full"
-              initial={{ width: "0%" }}
-              animate={{ width: `${Math.min(loadProgress, 100)}%` }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
-            />
-          </div>
-        </div>
-      )}
-
       <div className="px-6 pt-6 pb-4">
         <div
           onDrop={handleDrop}
