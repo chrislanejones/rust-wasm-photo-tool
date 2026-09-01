@@ -16,6 +16,18 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # React refuses to run when `react` and `react-dom` resolve to different
+    # versions — it is an exact-match guard at runtime, not a type or peer-dep
+    # warning. Ungrouped, Dependabot moved react to 19.2.8 and left react-dom at
+    # 19.2.7 (PR #28), and every test that mounted a component died on that
+    # guard. Grouped, the set moves together or not at all.
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
 
   # Keeps the `uses:` action versions in the workflows above current.
   - package-ecosystem: github-actions
