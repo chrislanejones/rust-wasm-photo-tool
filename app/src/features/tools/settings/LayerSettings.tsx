@@ -257,10 +257,10 @@ export function LayerSettings({
               title="Layer Mask"
               info={
                 <>
-                  Non-destructive hide/reveal for the selected layer. While
-                  editing, the Paint brush paints the mask — black hides,
-                  white reveals. Apply bakes it in permanently; Remove
-                  discards it.
+                  Non-destructive hide/reveal for the selected layer. Adding a
+                  mask switches you straight to the Paint brush and starts
+                  editing it — black hides, white reveals. Apply bakes it in
+                  permanently; Remove discards it.
                 </>
               }
             />
@@ -272,11 +272,17 @@ export function LayerSettings({
                 actions, which read as four permanently-unlit toggles. */}
             {!activeLayer.hasMask ? (
               <div className="grid gap-2 [grid-auto-rows:1fr]">
+                {/* Announces the tool switch the same way "Paint mask" below
+                    does: `onAdd` creates the mask AND enters mask editing on
+                    the Paint brush, which unmounts this panel. It was the only
+                    tile in this section changing the active tool without
+                    saying so. */}
                 <ActionTile
                   icon={Aperture}
                   label="Add mask"
                   disabled={disabled}
                   onClick={() => mask.onAdd(activeLayer.id)}
+                  title="Add a mask and start painting it with the brush"
                 />
               </div>
             ) : (
