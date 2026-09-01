@@ -9,9 +9,9 @@ packages:
 # Single source of truth for versions shared across packages. Reference these
 # from a package.json with `"<dep>": "catalog:"`.
 catalog:
-  react: ^19.0.0
+  react: ^19.2.8
   react-dom: ^19.0.0
-  '@types/react': ^19.0.0
+  '@types/react': ^19.2.18
   '@types/react-dom': ^19.0.0
   '@vitejs/plugin-react': ^6.0.5
   vite: ^8.1.5
