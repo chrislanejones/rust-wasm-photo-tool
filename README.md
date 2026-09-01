@@ -84,6 +84,43 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.59 — 2026-08-31
+
+**Every build broke on a lockfile nobody had edited.** Two dependency updates
+landed back to back, and each rewrote `pnpm-lock.yaml`. The second had been
+branched before the first, so it carried its own copy — and because the two
+edits sat in different parts of the file, git merged them without reporting a
+conflict. What came out listed `acorn`, `brace-expansion` and `minimatch` twice
+each, which is not valid YAML. pnpm refused it outright, and with it went the
+frontend build, the Convex checks, the marketing build, the dependency audit and
+the Vercel deploy. The site stayed up the whole time on its last good deploy,
+but nothing new could ship. GitHub calling a pull request mergeable means it
+found no textual conflict; it says nothing about whether the file it produced
+still parses.
+
+**Dependabot can no longer move React without react-dom.** It had been filing
+every package on its own, so it raised `react` to 19.2.8 and left `react-dom` at
+19.2.7. React checks those two match at runtime and throws when they don't, so
+the tests died the moment one mounted a component. The four React packages are
+grouped now — they move together or not at all.
+
+**"Add mask" says what it is about to do.** The tile creates the mask and then
+switches you to the Paint brush, which is correct, since a mask is something you
+paint. But it did that silently, and the switch closes the Layers panel, so you
+ended up somewhere else with no explanation of how you got there. It now says
+so, the same way the "Paint mask" tile beside it always has.
+
+**The upload dialog's progress bar was not measuring anything.** It filled by a
+random amount every tenth of a second, stopped at ninety percent, and jumped to
+full when the load finished. Whether you saw it at all came down to whether the
+photo decoded faster than the timer — which is why it seemed to appear only
+sometimes. The gallery already shows the real thing: a thumbnail per photo, as
+each one decodes. The bar is gone.
+
+**The button in the marketing site's nav reads "Beta".** It said "Demo". The
+long form still lives on the hero, the pricing page and the ⌘K palette, where
+there is room for it.
+
 ### v8.58 — 2026-08-31
 
 **Apply Resize was showing up while you were compressing.** The Resize tool's

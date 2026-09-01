@@ -9099,3 +9099,138 @@ already has Rust unit tests, the `annotationHitTest` drift guard and
 | `build:wasm` | **816,185 B** — unchanged, no Rust in this release |
 
 TypeScript only, so the engine is byte-identical to v8.57.
+
+---
+
+## v8.59 Change Summary — 2026-08-31
+
+A broken lockfile that stopped every build, the config gap that produced it, and
+three small interface fixes found while testing v8.58.
+
+### The lockfile listed six packages twice
+
+`pnpm install` had refused the lockfile since `3db3dd2`, with
+`ERR_PNPM_BROKEN_LOCKFILE — duplicated mapping key (2246:3)`.
+
+| Commit | Genuine duplicate keys |
+|---|---|
+| `4e7fc56` (v8.58) | 0 |
+| `551a9b7` (eslint bump) | 0 |
+| `3db3dd2` (react-router-dom bump) | **6** |
+
+The eslint bump rewrote `pnpm-lock.yaml`. The react-router-dom PR had been
+branched before it and carried its own copy. GitHub reported `MERGEABLE/CLEAN`
+and squash-merged it, because git found no **textual** conflict — the two
+lockfiles edited non-adjacent regions. The merge produced semantically invalid
+YAML: `acorn@8.18.0`, `brace-expansion@5.0.9` and `minimatch@10.2.6` each
+present twice, once under `packages` and again under `snapshots`.
+
+| Check on master | Before | After |
+|---|---|---|
+| Frontend (typecheck + build) | fail | **pass** |
+| Convex (codegen + typecheck + drift) | fail | **pass** |
+| Marketing build | fail | **pass** |
+| pnpm audit | fail | **pass** |
+| Vercel | fail | **pass** |
+
+Production was never down — the last good deploy kept serving — but no new build
+or deploy could complete.
+
+**Repaired surgically, not regenerated.** All six duplicate blocks were verified
+byte-identical to the copy kept, so the fix is **23 deletions and 0 additions**
+and changes no resolution. A full `pnpm install --lockfile-only` also clears the
+error but silently drifts versions (here: eslint 10.8.1 → 10.9.1,
+react-router-dom 7.18.2 → 7.18.3) — unreviewed upgrades arriving inside a
+repair.
+
+> **`MERGEABLE/CLEAN` means no textual conflict. It does not mean the lockfile
+> is valid.** Two lockfile-touching PRs must not be merged back to back without
+> regenerating in between.
+
+Two detection traps worth recording, both hit while diagnosing this:
+
+1. A pnpm lockfile lists every package **twice legitimately** — once under
+   `packages:`, once under `snapshots:`. A whole-file duplicate count reports
+   ~335 "duplicates" on a perfectly healthy lockfile, which briefly made this
+   look like two-week-old corruption rather than same-day. **Count per section.**
+2. Keys appear as both `  key:` and `  key: {}`. A check anchored on a trailing
+   colon misses the inline form, and a lockfile that passed that check still
+   failed `pnpm install`. Only `pnpm install --frozen-lockfile` settles it.
+
+### React and react-dom are grouped
+
+`.github/dependabot.yml` had no `groups:` key, so Dependabot filed each package
+separately and moved `react` to 19.2.8 while leaving `react-dom` at 19.2.7.
+React enforces an exact match between the two at runtime, so the vitest step
+died as soon as a test mounted a component.
+
+| Catalog entry | The split PR |
+|---|---|
+| `react` | `^19.0.0` → **`^19.2.8`** |
+| `@types/react` | `^19.0.0` → **`^19.2.18`** |
+| `react-dom` | **untouched** — resolved 19.2.7 |
+| `@types/react-dom` | **untouched** |
+
+The four React packages now share a group and move as a set. The failing job is
+named "Frontend (typecheck + build)", which first read as React 19 type
+breakage; typecheck and build both passed, and the **test** step was the one
+that failed.
+
+### "Add mask" announces the tool switch
+
+`useMaskActions.handleAddMask` selects the layer, creates the mask, then calls
+`setActiveTool("brush")`, `setBrushMode("paint")` and `setMaskEditing(true)`.
+The switch is deliberate — the hook's own header comment has always said so —
+but the tile said nothing, and the switch unmounts the Layers panel.
+
+| Tile | Switches the active tool? | Had a `title`? |
+|---|---|---|
+| **Add mask** | **yes** | **no — the only one without** |
+| Paint mask | yes | yes |
+| Invert / Apply / Remove | no | yes |
+
+The sibling "Paint mask" tile performs the same switch and already explained
+itself, so this applies that pattern rather than inventing one. Behaviour is
+unchanged; tool selection keeps its single owner in `useToolStore`.
+
+### The upload dialog's progress bar is gone
+
+`useUIStore.startImageLoad` advanced `loadProgress` by
+`Math.random() * 15` every 100 ms, capped at 90, and `finishImageLoad` jumped to
+100 and cleared after 500 ms. The width never represented real progress, and
+whether the bar appeared at all depended on whether the decode outran the
+interval — fast loads showed a flicker or nothing.
+
+The gallery already gives per-item feedback: one thumbnail per decoded photo.
+Removing the bar also drops two store subscriptions, so the dialog no longer
+re-renders on every tick of that interval. The **page-top** bar in `AppShell` is
+a separate surface and is untouched.
+
+### Marketing nav CTA reads "Beta"
+
+`Nav.tsx` — the nav pill button said "Demo".
+`aria-label="Open the demo (Beta)"` keeps the accessible name a destination
+rather than a state, and contains the visible word, so WCAG 2.5.3 (Label in
+Name) holds. The hero, both Pricing CTAs and the ⌘K palette still use the long
+form.
+
+### Dependencies
+
+| Package | To |
+|---|---|
+| eslint | 10.8.1 |
+| react-router-dom | 7.18.2 |
+| github/codeql-action | 4.37.9 |
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **exit 0** |
+| `pnpm -C app test` | **634 passed** / 53 files |
+| `pnpm lint` | **0 errors**, 61 warnings |
+| `pnpm install --frozen-lockfile` | **passes** — it was the failing command |
+| master CI | **12/12 jobs green** |
+| `build:wasm` | **816,185 B** — unchanged, no Rust in this release |
+
+TypeScript, config and docs only, so the engine is byte-identical to v8.57.

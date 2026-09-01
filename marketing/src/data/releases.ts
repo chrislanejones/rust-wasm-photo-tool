@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.59",
+    date: "2026-08-31",
+    headline: "Every build broke on a lockfile nobody had edited",
+    entries: [
+      {
+        tag: "fix",
+        text: "Two dependency updates landed back to back, and each rewrote the lockfile. The second had been branched before the first, so it carried its own copy — and because the two edits sat in different parts of the file, git merged them without reporting a conflict. What came out listed acorn, brace-expansion and minimatch twice each, which is not valid YAML. pnpm refused it outright, and with it went the frontend build, the Convex checks, the marketing build, the dependency audit and the Vercel deploy. The site stayed up the whole time on its last good deploy, but nothing new could ship until the duplicates came out.",
+      },
+      {
+        tag: "infra",
+        text: "GitHub calling a pull request mergeable means it found no textual conflict. It says nothing about whether the file it produced still parses, and a lockfile is exactly the file where that distinction bites. The repair is 23 deleted lines and no additions: every duplicate block was byte-identical to the one kept, so nothing about which versions resolve changed. Regenerating the lockfile instead would also have cleared the error, and would have quietly carried two packages to versions nobody had reviewed — an upgrade smuggled inside a repair.",
+      },
+      {
+        tag: "infra",
+        text: "The config gap that caused it is closed too. Dependabot had been filing every package on its own, so it raised react to 19.2.8 and left react-dom at 19.2.7. React checks those two match at runtime and throws when they don't, so the tests died the moment one mounted a component. The four React packages are grouped now — they move together or not at all.",
+      },
+      {
+        tag: "ui",
+        text: "\"Add mask\" says what it is about to do. The tile creates the mask and then switches you to the Paint brush, which is correct, since a mask is something you paint. But it did that silently, and the switch closes the Layers panel, so you ended up somewhere else with no explanation of how you got there. It now says so, the same way the \"Paint mask\" tile beside it always has. Nothing about the behaviour changed — only the silence.",
+      },
+      {
+        tag: "fix",
+        text: "The upload dialog's progress bar was not measuring anything. It filled by a random amount every tenth of a second, stopped at ninety percent, and jumped to full when the load finished. Whether you saw it at all came down to whether the photo decoded faster than the timer, which is why it seemed to appear only sometimes. The gallery already shows the real thing — a thumbnail per photo, as each one decodes — so the bar is gone, and the dialog stops re-rendering ten times a second while it loads.",
+      },
+      {
+        tag: "ui",
+        text: "The button in this site's nav reads \"Beta\" instead of \"Demo\". The long form still lives on the hero, the pricing page and the ⌘K palette, where there is room for it. Its accessible name stays \"Open the demo (Beta)\", because a screen reader reading the button on its own needs a destination, not a status.",
+      },
+    ],
+  },
+  {
     version: "v8.58",
     date: "2026-08-31",
     headline: "Apply Resize was showing up while you were compressing",
