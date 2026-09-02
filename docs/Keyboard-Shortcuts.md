@@ -81,6 +81,36 @@ the Layers panel could not. Both are undoable.
 | `Alt + F` | Flip horizontal |
 | `Alt + V` | Flip vertical |
 
+## Dragging a resize handle
+
+Not keyboard shortcuts, but the only place `Shift` changes what a *drag* does.
+**Which way it works depends on what the box means**, and the two are opposites
+on purpose:
+
+| Surface | Plain corner drag | `Shift` + corner drag |
+| ------- | ----------------- | --------------------- |
+| Selected image / layer ("Resize Layer"), and the paste-placement box | **keeps the aspect ratio** | frees it — a deliberate skew |
+| Crop | free — any rectangle | **keeps the aspect ratio** |
+
+Scaling a photo out of proportion is the rare intent and the one that visibly
+damages the picture, so on raster surfaces it is the one that costs a modifier.
+Crop is choosing a region rather than scaling a picture, so an arbitrary
+rectangle stays the no-modifier case.
+
+**Edge handles (`n` `e` `s` `w`) are always free on both surfaces** — a
+single-axis drag has no second axis to reconcile, which is how Figma,
+Illustrator and Photoshop behave too. The rule above is about *corner* handles.
+
+Two other drag modifiers, unchanged:
+
+| Gesture | `Shift` does |
+| ------- | ------------ |
+| Dragging a box body (move, not resize) | constrains to the dominant axis |
+| Dragging a line/arrow endpoint | snaps the angle to the nearest 90° |
+
+The policy lives in one function — `aspectLocked` in `app/src/lib/aspectLock.ts`
+— so the surfaces cannot drift apart; `aspectLock.test.ts` pins the table above.
+
 ## Brush / Clone Stamp
 
 | Shortcut      | Action |

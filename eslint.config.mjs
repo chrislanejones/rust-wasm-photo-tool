@@ -177,7 +177,7 @@ export default tseslint.config(
   },
   {
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["warn", { max: 2959 }] },
+    rules: { "max-lines": ["warn", { max: 2950 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],

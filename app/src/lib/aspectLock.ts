@@ -1,10 +1,13 @@
-// Shift-to-preserve-aspect-ratio for bounding-box resize handles (crop, the
+// Aspect-ratio handling for bounding-box resize handles (crop, the
 // paste-placement box, shape/arrow annotations). Only corner handles
 // (nw/ne/se/sw) have two free axes to reconcile; edge handles (n/e/s/w) are
-// left unchanged when Shift is held — matches how Figma/Illustrator/
-// Photoshop treat a single-axis drag. Text annotations need no equivalent:
-// their resize is already a single uniform scalar (font-size distance
-// scaling), which can't distort proportions.
+// always left free — matches how Figma/Illustrator/Photoshop treat a
+// single-axis drag, and it is why "plain drag keeps the ratio" below is a
+// statement about CORNERS. Text annotations need no equivalent: their resize
+// is already a single uniform scalar (font-size distance scaling), which
+// can't distort proportions.
+//
+// WHICH WAY SHIFT WORKS IS NOT THE SAME ON EVERY SURFACE — see `aspectLocked`.
 
 /** Force two independent scale factors (1 = no change) to whichever implies
  *  the larger magnitude of change — i.e. uniform scale, which by
@@ -74,4 +77,61 @@ export function lockCornerDelta(
     dx: (startW * lkx - startW) * wSign,
     dy: (startH * lky - startH) * hSign,
   };
+}
+
+/** The surfaces that resize by dragging a bounding box, grouped by what the
+ *  box MEANS. The two groups want opposite defaults, so the surface has to be
+ *  named at the call site rather than inferred. */
+export type ResizeSurface =
+  /** Pixels being scaled: the selected image / active layer, and the
+   *  paste-placement box (which is the same overlay — `beginLayerResize`
+   *  seeds it from the layer's own content bounds). */
+  | "raster"
+  /** A region being chosen rather than scaled: crop. */
+  | "region";
+
+/** Should this drag preserve the start-of-drag aspect ratio?
+ *
+ *  **Raster surfaces default to LOCKED.** A plain corner drag on a photo keeps
+ *  its proportions and Shift frees it for a deliberate skew. Skewing a
+ *  photograph is the rare intent and it is the one that visibly damages the
+ *  picture, so it is the one that costs a modifier — you cannot do it by
+ *  accident, and the common case needs no keyboard at all.
+ *
+ *  **Region surfaces default to FREE.** Crop is choosing a rectangle, not
+ *  scaling a picture; an arbitrary rectangle is the common case, and a
+ *  constrained one is the exception. Shift constrains. This is the classic
+ *  design-tool behaviour and crop keeps it.
+ *
+ *  The asymmetry is deliberate and is the whole reason this function exists
+ *  instead of an inline `if (e.shiftKey)` at each call site: the two surfaces
+ *  read identically in the drag handlers and would otherwise silently drift
+ *  toward whichever one was edited last.
+ */
+export function aspectLocked(
+  surface: ResizeSurface,
+  shiftKey: boolean,
+): boolean {
+  return surface === "raster" ? !shiftKey : shiftKey;
+}
+
+/** The single call a corner-resize drag handler makes.
+ *
+ *  Callers do NOT branch on Shift themselves. That branch is precisely what
+ *  drifted between surfaces — three handlers each wrote `if (e.shiftKey)` and
+ *  each meant something slightly different by it — so it lives here, next to
+ *  the policy it depends on, and the call site names its surface instead.
+ *
+ *  Returns the delta to apply, in the caller's existing sign convention.
+ */
+export function cornerDelta(
+  surface: ResizeSurface,
+  mods: { shiftKey: boolean },
+  handle: string,
+  d: { dx: number; dy: number },
+  start: { width: number; height: number },
+): { dx: number; dy: number } {
+  return aspectLocked(surface, mods.shiftKey)
+    ? lockCornerDelta(handle, d.dx, d.dy, start.width, start.height)
+    : d;
 }
