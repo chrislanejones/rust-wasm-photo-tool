@@ -379,7 +379,13 @@ export function ReviewPanel({
                 </span>
               </div>
             ) : (
-              <ul className="history-list layers-list">
+              // role="group", not the implicit `list`: the rows below are
+              // role="button", so a `list` here would claim listitem children
+              // it does not have. A real listbox/option pair would be the
+              // richer answer, but it demands roving tabindex + arrow keys AND
+              // options with no interactive descendants — these rows carry six
+              // buttons each. Filed, not faked.
+              <ul className="history-list layers-list" role="group" aria-label="Layers">
                 {layersTopDown.map((layer) => {
                   // Stack index in the bottom→top array (for reorder math).
                   const idx = layers.findIndex((l) => l.id === layer.id);
@@ -393,6 +399,12 @@ export function ReviewPanel({
                       }`}
                       role="button"
                       tabIndex={0}
+                      // #10: which layer is active was carried ONLY by the
+                      // `layer-active` class — visible, and announced to
+                      // nobody. `aria-current` rather than `aria-pressed`
+                      // because a layer cannot be un-selected: clicking one
+                      // moves the selection, it does not toggle this row off.
+                      aria-current={layer.active ? "true" : undefined}
                       onClick={() => onSelectLayer(layer.id)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
