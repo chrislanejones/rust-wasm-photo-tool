@@ -80,6 +80,7 @@ import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
 import { hasReplicateAI, TIERS, userModeForTier } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
+import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
 import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
@@ -100,9 +101,7 @@ import {
   encodeRgba,
   EXT,
   extFromMime,
-  formatFromMime,
   includeCanvasInExport,
-  wouldInventOpaquePixels,
 } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
 import { resolveExportSource } from "@/lib/batchExportPlan";
@@ -114,7 +113,7 @@ import {
 } from "@/lib/exif";
 import { pinLabelText } from "@/lib/pinLabel";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
-import { makeThumbnail, makeThumbnailFromPixels } from "@/lib/workingCopy";
+import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
@@ -2124,109 +2123,15 @@ export function AppShell() {
    *   to the panel's format when the stored MIME is not one we re-encode to
    *   (gif/svg), because something has to be written.
    */
-  const persistActiveCanvas = useCallback(async (opts?: { keepSourceEncoding?: boolean }) => {
-    const entry = photos.find((p) => p.id === activePhotoId);
-    const tool = stamp.toolRef.current;
-    if (!entry || !tool) return;
-    const sourceFormat = opts?.keepSourceEncoding
-      ? formatFromMime(entry.mimeType ?? "")
-      : null;
-    const encodeFormat = sourceFormat ?? exportFormat;
-    const encodeQuality = sourceFormat ? 1 : quality / 100;
-    try {
-      // ATOMIC CAPTURE (ADR-024). Was `get_image_data()` + `width()` +
-      // `height()`. These three are not merely read together, they TRAVEL
-      // together: `pixels`, `tw` and `th` cross three awaits below and are then
-      // written to IndexedDB as one record (`putOriginal(newFile, tw, th)`) and
-      // scaled as one image. A mismatch here is persisted, not transient.
-      // ⚠️ THE SAVE IS A SURFACE THAT WRITES PIXELS, and it was the one that got
-      // away. v8.53 taught the three EXPORT surfaces not to bake a transparent
-      // artboard into a format with no alpha (ADR-039) — but this internal save
-      // still encoded the full padded composite at the panel's format. Apply
-      // Compression with JPEG selected and the black border went into the
-      // STORED working file, permanently: every later export then carried it as
-      // real pixels, whatever the export setting said. Verified in IndexedDB —
-      // a stored `probe.jpg` at 320×240 with corner rgba(0,0,0,255) beside a
-      // `probe.png` at 240×160 with the photo in the corner.
-      //
-      // So the crop happens here too, and NOT on the user's export preference —
-      // this is not a preference. Writing invented black into a saved file is
-      // data loss and is refused regardless of what "Include canvas" says.
-      const dropCanvasToSave = wouldInventOpaquePixels(encodeFormat, canvasBgTransparent);
-      const cap = dropCanvasToSave
-        ? await tool.capture_composite_excluding_background()
-        : await tool.capture_composite();
-      const { rgba: pixels, width: tw, height: th } = cap;
-      cap.free();
-      // encodeRgba and makeThumbnailFromPixels each hand their buffer to the
-      // codec worker, which transfers (detaches) it. Give encodeRgba its own
-      // copy so the original `pixels` survives for the thumbnail below.
-      const blob = await encodeRgba(pixels.slice(), tw, th, encodeFormat, encodeQuality);
-      // convertToBlob may fall back (e.g. AVIF → PNG on some browsers); trust
-      // the blob's actual MIME for the stored metadata.
-      const mime = blob.type || `image/${encodeFormat}`;
-      const newFile = new File([blob], `${entry.name}${extFromMime(mime)}`, {
-        type: mime,
-      });
-
-      const mod = await import("stamp_tool");
-      await mod.default();
-      const oldKey = entry.originalKey;
-      const [newKey, newThumb] = await Promise.all([
-        putOriginal(newFile, tw, th),
-        makeThumbnailFromPixels(pixels, tw, th, mod.resize_pixels),
-      ]);
-      // Collect the blob this photo just stopped pointing at — but only if
-      // NOTHING else points at it. The old test here was
-      // `oldKey !== entry.uploadKey`, which knew about this photo's own
-      // baseline and nothing else, so it deleted blobs shared with a duplicate.
-      // See lib/originalRefs.ts for the four-step repro.
-      void deleteReplacedOriginal({
-        oldKey,
-        newKey,
-        photoId: entry.id,
-        // Read fresh, not from the render-time `photos`: this runs after two
-        // awaits and the gallery may have moved under it.
-        photos: useGalleryStore.getState().photos,
-      });
-
-      setPhotos((prev) =>
-        prev.map((p) =>
-          p.id !== entry.id
-            ? p
-            : {
-                ...p,
-                originalKey: newKey,
-                byteSize: blob.size,
-                mimeType: mime,
-                origWidth: tw,
-                origHeight: th,
-                workingWidth: tw,
-                workingHeight: th,
-                thumbBlob: newThumb,
-              },
-        ),
-      );
-
-      // Real change vs. the immutable upload-size baseline. SIGNED on purpose:
-      // positive = smaller than the upload (a saving), negative = LARGER. The
-      // old `Math.max(0, …)` clamp meant an upscale — which "Apply Resize" makes
-      // a one-click operation — silently reported nothing at all, and the
-      // gallery badge just vanished. Growth is unbounded, so this can exceed
-      // -100% (a file 2.5x the original reads as +150% bigger).
-      const realSavings =
-        entry.originalByteSize > 0
-          ? Math.round((1 - blob.size / entry.originalByteSize) * 100)
-          : 0;
-      setImageSavings((prev) => ({
-        ...prev,
-        [entry.id]: { savingsPercent: realSavings },
-      }));
-    } catch (err) {
-      console.error("Persist canvas failed:", err);
-      toast.error("Couldn't save canvas changes");
-    }
-  }, [photos, activePhotoId, stamp, exportFormat, quality, canvasBgTransparent]);
+  // Extracted whole to session/usePersistActiveCanvas.ts (#45). The internal
+  // save that re-encodes the live canvas over its stored original — see that
+  // file for the ADR-039 reason the crop is NOT on the export preference.
+  const persistActiveCanvas = usePersistActiveCanvas({
+    stamp,
+    exportFormat,
+    quality,
+    canvasBgTransparent,
+  });
 
   const handleApplyCompression = useCallback(
     async (w: number, h: number, filter: number) => {
