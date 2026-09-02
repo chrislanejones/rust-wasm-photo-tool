@@ -4,6 +4,37 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — the marketing architecture page promises a service worker that does not ship (2026-09-01)
+
+Found by the v8.62 docs catch-up, which was scoped to flag marketing drift and
+not touch it — public copy is a human call. Four findings on
+`marketing/src/pages/Architecture.tsx`:
+
+| Line | Says | Reality at v8.61 |
+|---|---|---|
+| 134-135 (**visible copy**) | "a service worker that precaches the shell and the WASM binary" | never on in a shipped build — `__IH_SW_MODE__` defaults `"off"` |
+| 83 (source comment) | "There is no service worker in a shipped build" | **correct** — and it sits 50 lines above the copy that contradicts it |
+| 113 | "Codec worker — encode · thumbnail · OffscreenCanvas" | the **engine worker** owns the OffscreenCanvas, not the codec worker |
+| 115 | "rayon worker pool — planned, gated on COOP/COEP" | measured and **rejected** (8-31× slower), preserved as tag `negative-result/rayon-wavefront` |
+| — | no mention of the engine worker anywhere | it has been the default engine since v8.32 |
+
+The first row is the one that matters: a visitor reads a shipped feature that
+does not exist, and somebody already left a comment on the same page warning
+about exactly this failure mode. The last row is the bigger omission — the
+page describes the architecture and is missing its largest structural fact.
+
+## OPEN — 13 broken in-page anchors in docs/archive/Refactor-Playbook.md (2026-09-01)
+
+Its table of contents links `#0-the-one-rule`, `#2-color--theme-tokens` and
+eleven more, but the headings carry `[generic]` / `[IH conventions]` suffixes
+that GitHub folds into the slug — so every TOC link lands nowhere. Pre-existing,
+and the file is archived (`docs/archive/README.md`: "Nothing in here is a
+reference"), so the v8.62 link sweep left it alone. Fix is mechanical: either
+strip the suffixes from the headings or write the anchors to match them.
+
+The sweep itself is clean — 181 relative links across 80 tracked `.md` files,
+0 broken. This is anchors only, in one archived file.
+
 ## OPEN — a fresh text commit with the shadow ON is still two undo steps (2026-08-28)
 
 Found by the shapes user-testing session, via the QC text spec going red the

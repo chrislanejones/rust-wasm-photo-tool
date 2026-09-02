@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.62",
+    date: "2026-09-01",
+    headline: "The architecture doc caught up to the architecture",
+    entries: [
+      {
+        tag: "infra",
+        text: "Nothing in the app changed this release. What changed is that the documentation stopped describing a version of this project that stopped existing around v7.8. The architecture doc's status line said v7.8 and its diagram showed the Rust engine running on the main thread — it has not run there since v8.32, when it moved into a Web Worker that draws straight onto a transferred canvas and took the main thread's blocking time per heavy operation from 129-137 ms to zero. That was the single most wrong thing in the docs. The diagram is redrawn around it.",
+      },
+      {
+        tag: "infra",
+        text: "Rather than bump version numbers, every claim in the doc was re-read against the code, and seven were wrong. The tool registry existed when the doc said it did not, and was unwired when a working note said it was finished. The service worker was written up as \"investigated only, nothing wired, no ADR\" — it has been in the tree since July under an accepted decision record, shipping switched off, which is a third state the doc had no room for and now has a section for. Undo was still written as a plan plus its correction rather than as the one system it has been since v7.36. AppShell was cited at 2,930 lines; it is 3,813.",
+      },
+      {
+        tag: "infra",
+        text: "The README's changelog went on a diet. It carried 88 release sections against its own \"latest release below\" rule — every release added one, none ever removed one — and it carries one now, which took it from 1,874 lines to 118. All 87 that were cut were confirmed present in the full dated history first.",
+      },
+      {
+        tag: "fix",
+        text: "Every relative link in all 80 tracked Markdown files was checked against the path it actually resolves to. Two were broken, both pointing at docs that moved into the archive in August. Both fixed, and the count is now zero.",
+      },
+    ],
+  },
+  {
     version: "v8.61",
     date: "2026-08-31",
     headline: "Export moved to the bar, and the Tools panel got a row back",

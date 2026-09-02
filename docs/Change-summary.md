@@ -9378,3 +9378,132 @@ a button that works.
 | `build:wasm` | **816,185 B** — unchanged, no Rust |
 
 TypeScript only. The engine is byte-identical to v8.57.
+
+## v8.62 Change Summary — 2026-09-01
+
+The architecture doc caught up to the architecture. No app code changed; what
+changed is that the docs stopped describing a version of this project that
+stopped existing around v7.8.
+
+### Architecture.md was 53 releases behind
+
+Its status line said v7.8, verified 2026-07-09. Master was v8.61. Rather than
+bump the numbers, every claim was re-read against the tree at `7c166fc` and
+the sections that had drifted were rewritten from what was there.
+
+| Claim | The doc said | The code says |
+|---|---|---|
+| Where the engine runs | main thread, in the diagram | **a Web Worker**, default since v8.32 |
+| `ToolModule` type | "no `ToolModule` type anywhere" | **exists** — `features/tools/toolModules.ts:40` |
+| Registered tool modules | none | **5** — Paint, Resize, Adjust, Select, Perspective |
+| `features/tools/modules/` | absent | **still absent** — the doc was right about this one |
+| `AppShell.tsx` | 2,930 lines | **3,813 lines** |
+| Service worker | "investigated only, nothing wired… no ADR yet" | **ships dark** under ADR-019, Accepted 2026-07-19 |
+| Op format version | v4 | **5** |
+
+**The tool-registry section was wrong in both directions.** The doc said Stage
+4 had not started; a working note said Stage 4 was closed. Neither survived
+the tree: the registry shape exists and five tools are registered, and nothing
+routes through it — `AppShell.tsx` still imports seven tool hooks directly and
+never imports `TOOL_MODULES`. The honest line is "the shape exists, the wiring
+does not", and the 883 lines AppShell gained since v7.8 are the measure of
+what is left.
+
+**The service-worker entry was the one that had rotted furthest.** It sat
+under Planned claiming nothing was wired and no ADR existed. Both halves were
+wrong: `swBoot.ts`, `skew.ts`, `updatePrompt.ts` and `UpdatePrompt.tsx` are
+all in the tree, and ADR-019 has been Accepted since July. What is true is
+that it has never been *on* in a shipped build — `__IH_SW_MODE__` defaults to
+`"off"` and constant-folds every branch out. Shipped-dark is a third state,
+and the doc had no room for it, so it now has a section: **Two things in the
+tree that no pixel goes through**, covering the service worker and the WebGPU
+Phase 0 blur harness together.
+
+`playwright.sw.config.ts` at the repo root was checked for dead weight and is
+not: it is a live harness (`pnpm run test:e2e:sw`, spec at
+`e2e/sw/sw-lifecycle.spec.ts`), separate from the default Playwright config
+because the service worker is opt-in at *build* time. Not run in CI.
+
+**The undo section stopped being a before/after.** It led with "snapshot-based
+today — not an operation log" and carried the op-log correction beside it,
+which reads as a plan superseded. The two run together and have since v7.36 —
+the op log is an optimisation allowed to fail its hash check, and the snapshot
+stack is the thing that is not allowed to. Rewritten as one description, with
+the caps that were never documented: **50 steps, 512 MB**.
+
+**WebGPU got named precisely.** There is a WGSL blur, an opt-in flag, and a
+self-test that compares it against the CPU reference. No pixel in the app goes
+near the GPU — not in preview, not in export. ADR-030 is still draft.
+
+### The diagram
+
+Redrawn. It now has a main thread and an engine worker as separate planes,
+the port between them (request ids, FIFO queue, cancellation), the fallback
+path, and the eleven Convex tables instead of nine.
+
+### README — 88 version sections down to 1
+
+The README's own Changelog line has said "Latest release below. Full dated
+history → docs/Change-summary.md" for months while carrying every release back
+to v7.74. Every version header removed was verified present as a
+`## vX.Y Change Summary` section in `docs/Change-summary.md` first.
+
+| | Before | After |
+|---|---|---|
+| Version sections | **88** | **1** |
+| Lines | 1,874 | **118** |
+| Bytes | 100,649 | **7,090** |
+
+### Link audit
+
+Every relative link in every tracked Markdown file, checked against the path
+it actually resolves to.
+
+| | Count |
+|---|---|
+| Tracked `.md` files scanned | 80 |
+| Relative links, before this pass | 176 — **2 broken** |
+| Relative links, after | 180 — **0 broken** |
+
+Both were in `app/src/lib/dexie/USAGE.md`, pointing at
+`docs/IndexedDB-Investigation.md` and `docs/State-Management.md` — files that
+moved into `docs/archive/` on 2026-08-04. The `docs/Architecture-Roadmap.md`
+404 that prompted this check no longer exists: nothing links it, and the two
+docs that mention the file already point at `archive/`.
+
+### Sub-docs
+
+- **`app/src/lib/dexie/USAGE.md`** — its status line said "nothing in the app
+  imports it yet". Nine non-test modules do, and have since v7.5.
+- **`convex/README.md`** — listed **8** tables against a schema with **11**.
+  `recent_texts`, `photo_edits` and `ai_jobs` added.
+
+### Not done, on purpose
+
+- No "coming in September" roadmap prose was found anywhere in the repo — not
+  in the README, not in `docs/`, not on the marketing site. The only match for
+  "September" is a month-name array in `Trail.tsx`. Nothing to correct.
+- The marketing site's architecture page has drift and was **not touched** —
+  public copy is a human call. What is there: the visible footer promises "a
+  service worker that precaches the shell and the WASM binary" fifty lines
+  below a source comment correctly stating no service worker ships; the codec
+  worker is credited with the OffscreenCanvas the engine worker owns; the
+  rayon worker pool is listed as planned when it was measured and rejected;
+  and the engine worker is absent from the page entirely.
+- Thirteen broken in-page anchors in `docs/archive/Refactor-Playbook.md` (its
+  table of contents predates `[generic]` suffixes on its headings). Archived
+  doc, out of scope, logged in PARKING_LOT.
+- ADRs 038–041 are still Draft. Separate decision.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** |
+| `pnpm lint` | **0 errors**, 61 warnings |
+| `pnpm -C app test` | **634 passed**, 53 files |
+| `pnpm run build` | **succeeds** |
+| Link audit | **0 broken** of 180 |
+| Rust | **untouched** — no `build:wasm` |
+
+Documentation only. No app code, no engine, no schema.

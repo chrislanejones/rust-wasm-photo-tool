@@ -1,104 +1,183 @@
 # Architecture
 
-> Part of the [Image Horse](../README.md) docs. See also: [File Map](File-Map.md) · [State Management](archive/State-Management.md) · [Change Summary](Change-summary.md).
+> Part of the [Image Horse](../README.md) docs. See also: [File Map](File-Map.md) · [Change Summary](Change-summary.md) · [ADR index](adr/INDEX.md).
 >
-> **Status:** describes what exists on `master` at **v7.8** (`d9960f6`),
-> verified against code and git history on 2026-07-09 — not aspirational.
-> **Amended 2026-07-17 (v7.36):** the op-log pipeline is now LIVE by
-> default — see [The op-log pipeline](#the-op-log-pipeline-live-since-v736)
-> below, which supersedes the "Tile engine + operation-log undo" entry
-> that used to sit under Planned.
-> A separate [Planned](#planned-not-yet-in-the-diagram-above) section at
-> the bottom covers what's designed or in-branch but not live. No mermaid
-> or other diagram file exists elsewhere in the repo (checked before
-> writing this); the ASCII box diagram below is the one system diagram.
+> **Status:** describes what exists on `master` at **v8.61** (`7c166fc`),
+> re-verified against code on 2026-09-01 — not aspirational.
+>
+> This pass re-read the tree rather than patching version numbers. What was
+> checked, and what it cost: the engine's **thread** (it moved into a worker
+> and the diagram still had it on the main one), the **tool registry** (the
+> doc said "not started", the code says a registry shape exists and nothing
+> routes through it — both the doc and the backlog note were wrong, in
+> opposite directions), the **service worker** (the doc said "nothing wired,
+> no ADR"; the code ships it dark behind a build flag under an ADR that has
+> been Accepted since July), **undo**, **WebGPU**, the **Convex table list**,
+> and `AppShell.tsx`'s **line count**. Sections that had drifted were
+> rewritten from the code, not amended in place.
+>
+> A separate [Planned](#planned-not-yet-in-the-diagram-above) section at the
+> bottom covers what is designed or in-tree but not live. The ASCII box
+> diagram below is the one system diagram in the repo.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Browser                                                        │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  React UI Shell (Tailwind CSS, Zustand)                   │   │
-│  │                                                          │   │
-│  │  AppShell.tsx (composition root, 2,930 lines) orchestrates│   │
-│  │  TopBar · ToolsSidebar · GalleryBar · ReviewPanel         │   │
-│  │  UploadDialog · StatusBar · ShortcutModal                │   │
-│  │                                                          │   │
-│  │  Session hooks (app/src/app/session/):                   │   │
-│  │  useImageSession · useSelectionActions ·                 │   │
-│  │  useCanvasActions · useMaskActions                       │   │
-│  │                                                          │   │
-│  │  Tool hooks — still hand-wired in AppShell, NOT a         │   │
-│  │  registry (see Planned): useEmojiTool, usePaintTool,     │   │
-│  │  useMoveLayerTool, usePastePlacementTool, useTextTool,   │   │
-│  │  useRedStampTool, dispatched via useEffectiveTool          │   │
-│  │                                                          │   │
-│  │  Zustand stores (app/src/stores/): useUIStore ·           │   │
-│  │  useToolStore · useGalleryStore · useAnnotationStore ·    │   │
-│  │  useGuidesStore — panel/tool/gallery/annotation state,   │   │
-│  │  atomic selectors, a subset persisted to IndexedDB        │   │
-│  │  (idbStorage.ts, its own DB, separate from content data) │   │
-│  └────────────────────┬─────────────────────────────────────┘   │
-│                       │ zero-copy data_ptr()/data_len() blit    │
-│                       ▼                                         │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  stamp_tool.wasm  (single Rust→WASM binary)               │   │
-│  │                                                          │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐   │   │
-│  │  │  core    │ │  layer   │ │   paint   │ │ effects  │   │   │
-│  │  │ ImageBuf │ │ Stack &  │ │ Brush/Era │ │ Blur/Pix │   │   │
-│  │  │ Bilinear │ │ Composit │ │ Mask/Stab │ │ Redact   │   │   │
-│  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘   │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐   │   │
-│  │  │ annot    │ │ select   │ │   stamp   │ │ transfrm │   │   │
-│  │  │ Text &   │ │ Magic-   │ │ Clone Br  │ │ Flip/Rot │   │   │
-│  │  │ Shapes   │ │ Wand     │ │ Dab/Strok │ │ Resize   │   │   │
-│  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘   │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐   │   │
-│  │  │ filters  │ │ drawing  │ │   text    │ │ codec/   │   │   │
-│  │  │ Bright/  │ │ Arrows/  │ │ Fonts/    │ │ history  │   │   │
-│  │  │ Contrast │ │ Shapes   │ │ Bezier    │ │ Snapshot │   │   │
-│  │  │          │ │          │ │           │ │ undo     │   │   │
-│  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘   │   │
-│  │  ┌──────────────────────────────────────────────────┐    │   │
-│  │  │ simd/{blur,color,resize,pixel}.rs — v128/f32x4    │    │   │
-│  │  │ kernels, cfg-gated, bit-identical scalar fallback │    │   │
-│  │  └──────────────────────────────────────────────────┘    │   │
-│  │  utils · shared leaf helpers — all share one pixel buffer│   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                       │                                         │
-│                       ▼                                         │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Codec worker (Vite module Web Worker, Comlink)           │   │
-│  │  WebP/JPEG export encode + gallery thumbnails, off the    │   │
-│  │  main thread. Silent main-thread fallback on failure.     │   │
-│  │  PNG export stays on the Rust encoder.                   │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                       │                                         │
-│                       ▼                                         │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Convex (persistent layer, signed-in only)                │   │
-│  │                                                          │   │
-│  │  users · subscriptions · projects · images · layers       │   │
-│  │  annotations · history · photo_edits · recent_texts ·     │   │
-│  │  shares · ai_jobs                                        │   │
-│  │                                                          │   │
-│  │  Auth via Clerk (AUTH_ENABLED false path = fully local)  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  Originals → IndexedDB, content-addressed (SHA-256), lazy       │
-│    Dexie read-through (legacy store stays the rollback target)  │
-│  Working copies downscaled to ≤2048px long edge on upload       │
-│  SVG imports rasterized to PNG at the import boundary            │
-│    (raw SVG never enters the pipeline)                          │
-└─────────────────────────────────────────────────────────────────┘
+┌─ Browser ──────────────────────────────────────────────────────────┐
+│                                                                    │
+│  MAIN THREAD                                                       │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │  React UI Shell (React 19, Tailwind CSS v4, Zustand)         │  │
+│  │                                                              │  │
+│  │  AppShell.tsx (composition root, 3,813 lines) orchestrates   │  │
+│  │  TopBar · ToolsSidebar · GalleryBar · ReviewPanel            │  │
+│  │  UploadDialog · StatusBar · ShortcutModal                    │  │
+│  │                                                              │  │
+│  │  Session hooks (app/src/app/session/):                       │  │
+│  │  useImageSession · useSelectionActions ·                     │  │
+│  │  useCanvasActions · useMaskActions                           │  │
+│  │                                                              │  │
+│  │  Tool hooks — still hand-wired in AppShell (see Planned):    │  │
+│  │  useEmojiTool, usePaintTool, useMoveLayerTool,               │  │
+│  │  usePastePlacementTool, useTextTool, useRedStampTool,        │  │
+│  │  dispatched via useEffectiveTool. A registry SHAPE exists    │  │
+│  │  (features/tools/toolModules.ts, 5 modules) but nothing      │  │
+│  │  routes through it yet.                                      │  │
+│  │                                                              │  │
+│  │  Zustand stores (app/src/stores/): useUIStore ·              │  │
+│  │  useToolStore · useGalleryStore · useAnnotationStore ·       │  │
+│  │  useGuidesStore — atomic selectors, a subset persisted to    │  │
+│  │  IndexedDB (idbStorage.ts, its own DB, separate from         │  │
+│  │  content data)                                               │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                       │                                            │
+│                       │  engine port — lib/engine/port.ts          │
+│                       │  request ids · FIFO queue ·                │
+│                       │  cancellation · panics come back as        │
+│                       │  rejections, never hangs                   │
+│                       ▼                                            │
+│  ENGINE WORKER — the default engine since v8.32 (ADR-024)          │
+│  ┌───────────────────────────────────────────────────────────────┐ │
+│  │  engine.worker.ts — owns its OWN wasm instance and its own    │ │
+│  │  ImageHorseTool. Nothing is shared with the main thread: no   │ │
+│  │  SharedArrayBuffer, no COOP/COEP, no wasm threads.            │ │
+│  │                                                               │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐         │ │
+│  │  │  core    │ │  layer   │ │   paint   │ │ effects  │         │ │
+│  │  │ ImageBuf │ │ Stack &  │ │ Brush/Era │ │ Blur/Pix │         │ │
+│  │  │ Bilinear │ │ Composit │ │ Mask/Stab │ │ Redact   │         │ │
+│  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘         │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐         │ │
+│  │  │ annot    │ │ select   │ │   stamp   │ │ transfrm │         │ │
+│  │  │ Text &   │ │ Magic-   │ │ Clone Br  │ │ Flip/Rot │         │ │
+│  │  │ Shapes   │ │ Wand     │ │ Dab/Strok │ │ Resize   │         │ │
+│  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘         │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐         │ │
+│  │  │ filters  │ │ drawing  │ │   text    │ │ codec/   │         │ │
+│  │  │ Bright/  │ │ Arrows/  │ │ Fonts/    │ │ history  │         │ │
+│  │  │ Contrast │ │ Shapes   │ │ Bezier    │ │ Snapshot │         │ │
+│  │  │          │ │          │ │           │ │ + op log │         │ │
+│  │  └──────────┘ └──────────┘ └───────────┘ └──────────┘         │ │
+│  │  ┌───────────────────────────────────────────────────┐        │ │
+│  │  │ simd/{blur,color,resize,pixel}.rs — v128/f32x4    │        │ │
+│  │  │ kernels, cfg-gated, bit-identical scalar fallback │        │ │
+│  │  └───────────────────────────────────────────────────┘        │ │
+│  │  utils · shared leaf helpers — all share one pixel buffer     │ │
+│  │                                                               │ │
+│  │  Draws the composite straight onto the OffscreenCanvas        │ │
+│  │  transferred from the main thread. Main-thread blocking per   │ │
+│  │  heavy op: 129–137 ms → 0.                                    │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+│                       │                                            │
+│                       │  ih_engine_worker=0 falls back to the      │
+│                       │  main-thread engine — slower under load,   │
+│                       │  never wrong                               │
+│                       ▼                                            │
+│  ┌───────────────────────────────────────────────────────────────┐ │
+│  │  Codec worker (Vite module Web Worker, Comlink)               │ │
+│  │  WebP/JPEG export encode + gallery thumbnails, off the main   │ │
+│  │  thread. Silent main-thread fallback on failure.              │ │
+│  │  PNG export stays on the Rust encoder.                        │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+│                       │                                            │
+│                       ▼                                            │
+│  ┌───────────────────────────────────────────────────────────────┐ │
+│  │  Convex (persistent layer, signed-in only)                    │ │
+│  │                                                               │ │
+│  │  users · subscriptions · projects · images · layers ·         │ │
+│  │  annotations · history · recent_texts · photo_edits ·         │ │
+│  │  shares · ai_jobs                                             │ │
+│  │                                                               │ │
+│  │  Auth via Clerk (AUTH_ENABLED false path = fully local)       │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│  Originals → IndexedDB, content-addressed (SHA-256), lazy          │
+│    Dexie read-through (legacy store stays the rollback target)     │
+│  Working copies downscaled to ≤2048px long edge on upload          │
+│  SVG imports rasterized to PNG at the import boundary              │
+│    (raw SVG never enters the pipeline)                             │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-### AppShell & the session-hook refactor — stage 1-3 done, stage 4 not started
+### The engine runs in a Web Worker — default since v8.32
+
+This is the biggest structural change since the op log, and until this pass
+the diagram above still drew the engine on the main thread. It is not there
+any more.
+
+`app/src/workers/engine.worker.ts` owns **its own wasm instance and its own
+`ImageHorseTool`**. Nothing is shared with the main thread: no
+`SharedArrayBuffer`, no COOP/COEP headers, no wasm threads. The main
+`<canvas>` is handed over with `transferControlToOffscreen()` and the worker
+draws the composite onto it directly, so a heavy operation never touches the
+thread that handles input.
+
+| | |
+| --- | --- |
+| Shipped | **v8.32**, 2026-08-13 ([ADR-024](adr/024-engine-in-a-worker.md), Accepted 2026-08-07) |
+| Default | **ON.** `ih_engine_worker=0` in `localStorage` opts a tab out, on next load |
+| Main-thread blocking, per heavy op | **129–137 ms → 0** |
+| Shared memory | none — one wasm instance per side, never both live for one document |
+
+**The invariant the whole thing rests on is one port per document.** Every
+mutation of the document the user is editing reaches the engine through a
+single message queue. That queue is explicit rather than left to Comlink for
+one reason: `OpLog::append` records **arrival** order and no `Op` carries a
+sequence number, so `postMessage` order *is* append order — but only while
+every mutation goes through one port, in order. Comlink would return correct
+results with no ordering promise between concurrent calls, and the op log
+would quietly stop describing the document.
+
+The port (`app/src/lib/engine/port.ts`) adds what the early spike lacked:
+request ids so concurrent calls cannot take each other's answers, FIFO
+queueing, cancellation for superseded requests, and errors that come back as
+rejections instead of hangs.
+
+**Two details that cost real bugs, recorded here so they are not rediscovered:**
+
+- **The fallback branches on where the engine lives, not on the flag.** A live
+  handle was built by whichever mode was active when the document opened, and
+  nothing migrates it afterwards, so the flag and the engine can disagree.
+  Reading the flag at call time is how a stale flag reaches a live document —
+  measured, it took down the whole React tree (`#root` empty), not merely the
+  canvas. `livePort` answers the real question — *is this document
+  worker-resident?* — and cannot be stale, because it **is** the thing that
+  owns the engine.
+- **The worker is reused, not rebuilt, and the reason is not efficiency.**
+  `transferControlToOffscreen()` may be called once per element. Disposing the
+  worker to load a second photo destroys the only surface that element will
+  ever yield, and the replacement worker draws nowhere — which shipped as a
+  blank canvas on every load past the first, with a correct thumbnail and an
+  empty console.
+
+Turning the switch off falls back to the main-thread engine: slower under
+load, never wrong. The losing instance is terminated on the way, because wasm
+memory never shrinks and a worker left running holds a whole instance for a
+document nobody is editing.
+
+### AppShell & the session-hook refactor — stages 1-3 done, stage 4 part-built
 
 `AppShell.tsx` is being dismantled in four stages (see the
 `tool-module-migration` and `repo-boundaries` skills). **Stages 1-3
-shipped in v7.3** and are verified still true at v7.8:
+shipped in v7.3** and are still true at v8.61:
 
 - Orphan `useState`s that belonged in stores moved to Zustand.
 - Four domain hooks were extracted to `app/src/app/session/`:
@@ -108,16 +187,32 @@ shipped in v7.3** and are verified still true at v7.8:
   `text-annotations-changed`) were replaced with store actions; new
   `CustomEvent`s are forbidden project-wide.
 
-**Stage 4 (the tool registry) has NOT shipped** — this is the one
-place this document differs from an earlier draft that implied it had.
-`AppShell.tsx` is **2,930 lines** as of v7.8 and still imports and
-calls tool hooks directly — `useEmojiTool`, `usePaintTool` (three
-instances: paint/eraser/mask), `useMoveLayerTool`,
-`usePastePlacementTool`, `useTextTool`, `useRedStampTool` — dispatched
-through `useEffectiveTool`. There is no `features/tools/modules/`
-registry directory and no `ToolModule` type anywhere in the codebase.
-Adding tool #N still means editing the shell in multiple places. See
-[ADR-002](adr/002-tool-module-registry.md).
+**Stage 4 (the tool registry) is part-built, and the honest description is
+"the shape exists, the wiring does not."** This section is where the doc had
+drifted furthest, in both directions — the previous revision said Stage 4 had
+not started and no `ToolModule` type existed anywhere, which is wrong; a note
+in the backlog said Stage 4 was closed, which is also wrong. What is in the
+tree at v8.61:
+
+| | Status at v8.61 | Where |
+| --- | --- | --- |
+| `ToolModule` type | **Exists** | `app/src/features/tools/toolModules.ts:40` |
+| Registered modules | **5** — Paint, Resize, Adjust, Select, Perspective | `TOOL_MODULES`, same file |
+| `features/tools/modules/` directory | **Does not exist** | — |
+| AppShell imports `TOOL_MODULES` | **No** | nothing routes through the registry |
+| Tool hooks hand-wired in AppShell | **Still 7** | `AppShell.tsx:14-22` |
+| `AppShell.tsx` line count | **3,813** | was 2,930 at v7.8 |
+
+The registry file says so itself: it "only LAYS THE SHAPE", and routing —
+the `ToolsSidebar` `activeTool` switch, keyboard shortcuts, persistence keys
+— is not wired through it. So adding tool #N still means editing the shell in
+several places, which is the thing ADR-002 exists to end.
+
+**AppShell grew by 883 lines while being dismantled.** That is not a
+contradiction to explain away: the registry work added a parallel structure
+without removing the old one, and eleven releases of features landed in the
+shell in the meantime. The line count is the honest measure of how much of
+Stage 4 is left. See [ADR-002](adr/002-tool-module-registry.md).
 
 ### Layers & compositing
 
@@ -136,17 +231,54 @@ copies straight through when there's a single fully-opaque layer with
 no overlays. `export_png`, `get_image_data`, and the thumbnail path all
 composite the full stack, so export always matches what's on screen.
 
-### Undo/redo is snapshot-based today — not an operation log
+### Undo/redo — two mechanisms, one of them authoritative
 
-`src/history.rs` stores undo as a `VecDeque<Snapshot>`, where each
-`Snapshot` is a **full copy of the entire layer stack** (every layer's
-pixel buffer + annotations), the active index, and canvas dimensions.
-This is deliberately what makes structural layer ops (add/delete/
-reorder/merge) undoable alongside pixel edits, at the cost of memory
-scaling with edit count rather than edit size. An operation-log
-replacement is designed (see [ADR-003](adr/003-operation-log-undo.md))
-and exists on an unmerged, feature-gated branch — it is **not** the
-live path. See Planned, below.
+The previous revision of this doc led with "snapshot-based today — not an
+operation log" and carried the op-log amendment beside it as a correction.
+Both halves are still true, and reading them as a before/after gets the
+system backwards. They run **together**, and have since v7.36. Written as one
+description of what happens at v8.61:
+
+**Snapshots are the base mechanism and the fallback.** `src/history.rs`
+stores undo as a `VecDeque<Snapshot>`. Each `Snapshot` is a full copy of the
+entire layer stack — every layer's pixel buffer and its annotations — plus
+the active index, canvas dimensions, the selection mask, and (since
+[ADR-031](adr/031-export-quality-lives-on-the-engine-snapshot.md)) the export
+quality. That is what makes structural layer ops (add/delete/reorder/merge)
+undoable alongside pixel edits, at the cost of memory scaling with edit
+count rather than edit size. Two caps bound it, both in `src/settings.rs`:
+**50 steps** (`DEFAULT_MAX_HISTORY`) and **512 MB** (`DEFAULT_MAX_HISTORY_BYTES`),
+enforced on every push.
+
+**The op log replays when it can prove it is still describing the document.**
+`undo()`/`redo()` take the op-log path only when the engine's composite
+FNV-hashes byte-identical to the log's. Any unrecorded edit — clone stamp,
+filters, masks, layer ops — fails that hash, marks the log broken, and
+snapshot undo takes over untouched
+([ADR-013](adr/013-oplog-undo-hash-fallback.md)). No stage can strand the
+editor. This is why the two are not alternatives: the op log is an
+optimisation that is allowed to fail, and the snapshot stack is the thing
+that is not.
+
+**Selection is an undo step, and a transparent one.** Each select / add /
+subtract / deselect pushes a snapshot carrying `selection_only: true`. Those
+steps recorded no op, so undo restores just the mask and never seeks the log
+cursor — the layer stack in a selection-only snapshot is identical to the
+state below it by construction.
+
+**It survives reload.** `oplogPersistence.ts` debounces ~2s after each flush
+and commits op chunks, PNG keyframes (engine codec, byte-exact) and a
+manifest in one Dexie transaction. Restore replays from the base keyframe.
+See [The op-log pipeline](#the-op-log-pipeline-live-since-v736) below for the
+recording and persistence detail.
+
+**The on-disk op format is at version 5**, not the v4 that
+[ADR-033](adr/033-the-text-box-has-a-height-and-the-op-log-goes-to-v4.md)
+named — [ADR-034](adr/034-perspective-is-projective-and-text-keeps-its-corners.md)
+took it to 5 for the perspective quads. `OP_FORMAT_VERSION` in `src/ops.rs`
+is the value; v2, v3 and v4 blobs all still decode through the one path, and
+that prefix-extension property is pinned by tests
+(`v3_blobs_still_decode_under_v4`, `v4_blobs_still_decode_under_v5`).
 
 ### Client state (Zustand)
 
@@ -201,6 +333,50 @@ Pixel buffers cross as transferables only. Wired into
 main-thread fallback if the worker fails to construct or its first
 call fails. PNG export stays on the Rust encoder. Shipped v7.7. See
 [ADR-005](adr/005-codec-worker-fallback.md).
+
+### Two things in the tree that no pixel goes through
+
+Both of these are real code on `master`, both are off in a default build, and
+both were described wrongly by this doc before 2026-09-01 — in opposite
+directions. They are grouped here so the distinction stays visible:
+**shipped-but-dark is not the same as planned, and neither is the same as
+wired.**
+
+**Service worker — ships dark, not "investigated only".** The previous
+revision of this doc said "investigated only, nothing wired… no ADR yet."
+Every clause was wrong.
+[ADR-019](adr/019-opt-in-precache-service-worker.md)
+has been **Accepted since 2026-07-19**, and the code is in the tree:
+`app/src/lib/pwa/swBoot.ts` (registration), `skew.ts`, `updatePrompt.ts` and
+`components/UpdatePrompt.tsx` (the Phase 2 update toast). What is true is
+that **it has never been on in a shipped build.** `__IH_SW_MODE__` is a
+build-time constant fed by `VITE_ENABLE_SW`, defaulting to `"off"`, and in an
+"off" build every service-worker branch is statically dead code the minifier
+drops — verified empirically at merge: no `sw.js`, no workbox chunk, no
+`version.json`, zero occurrences of `serviceWorker` in the bundle. A third
+mode, `"kill"`, ships a self-destruct worker for the rollback path. Phase 3
+(installable PWA) is genuinely unstarted.
+
+`playwright.sw.config.ts` at the repo root belongs to this and is **not dead
+weight** — it is a live harness (`pnpm run test:e2e:sw`, spec at
+`e2e/sw/sw-lifecycle.spec.ts`) that is separate from the default Playwright
+config on purpose: the SW is opt-in at *build* time, so these specs need a
+`VITE_ENABLE_SW=1` build while the default harness must keep building without
+it, since its own spec pins the dark default. It is not run in CI.
+
+**WebGPU — a correctness harness, Phase 0.** The engine's blur has a WGSL
+counterpart under `app/src/lib/webgpu/`, and
+[ADR-030](adr/030-webgpu-runs-in-js-not-in-the-crate.md) (status: **draft**)
+records why it runs in JS beside the engine rather than as `wgpu` inside the
+crate. It is opt-in — `ih_webgpu=1` in `localStorage` — and what the opt-in
+buys is a self-test: `main.tsx` installs `window.__ihGpuBlurSelfTest()`, which
+compares the WGSL blur against the CPU reference. The Features panel can
+probe for an adapter and show what it found.
+
+**No pixel in the app goes near the GPU.** Not in preview, not in export, not
+behind a flag — the only consumers of the WebGPU modules outside their own
+tests are that self-test installer and the adapter probe. Anything describing
+a shipped GPU accelerator is describing something that is not in this tree.
 
 ### Metadata scrub (Settings → Security)
 
@@ -290,15 +466,25 @@ trip). ADRs [003](adr/003-operation-log-undo.md) ·
 
 ## Planned (not yet in the diagram above)
 
-Nothing in this section is live. Each item links the ADR that owns it;
-none are Accepted yet (see [ADR index](adr/INDEX.md)).
-- **Tool registry (Stage 4)** — replace AppShell's hand-wired tool
-  hooks with a `ToolModule` interface + static registry so adding a
-  tool is one folder, not a shell edit. Not started; see
+Nothing in this section is live in a default build. The two entries that used
+to sit here both claimed less than the tree contains, so the list is now
+shorter and the "in the tree but dark" cases have moved up to
+[their own section](#two-things-in-the-tree-that-no-pixel-goes-through) where
+they can be described accurately.
+
+- **Tool registry (Stage 4), the routing half** — `ToolModule` and
+  `TOOL_MODULES` exist and five tools are registered, but nothing routes
+  through them: the `ToolsSidebar` `activeTool` switch, the keyboard
+  shortcuts and the persistence keys are still hand-wired, and `AppShell.tsx`
+  still imports seven tool hooks directly. What remains is the migration
+  itself — one tool per session, emoji first as the reference
+  implementation, clone stamp last. See
   [ADR-002](adr/002-tool-module-registry.md) and the
   `tool-module-migration` skill.
-- **Service worker / precache** — investigated only, nothing wired.
-  Would cache `stamp_tool_bg.wasm` and the app shell for instant
-  repeat loads and offline editing. See
-  [Service Workers & Caching](archive/Service-Workers-Caching.md) (status line:
-  "no service worker ships today") — no ADR yet.
+- **Service worker Phase 3 (installable PWA)** — genuinely unstarted. Phases
+  1 and 2 are written and ship dark; see above for what that means and how
+  to build with them on.
+- **WebGPU on a pixel path** — the blur has a WGSL counterpart and a
+  self-test that says it agrees with the CPU reference. Nothing consumes it.
+  [ADR-030](adr/030-webgpu-runs-in-js-not-in-the-crate.md) is still **draft**,
+  and it is the decision that would have to be Accepted first.

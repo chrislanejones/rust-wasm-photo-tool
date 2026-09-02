@@ -1,8 +1,8 @@
 # Dexie content layer — usage & migration
 
-> The code: [`db.ts`](./db.ts). Background & decisions: [docs/IndexedDB-Investigation.md](../../../../docs/IndexedDB-Investigation.md) · [docs/State-Management.md](../../../../docs/State-Management.md).
+> The code: [`db.ts`](./db.ts). Background & decisions: [docs/archive/IndexedDB-Investigation.md](../../../../docs/archive/IndexedDB-Investigation.md) · [docs/archive/State-Management.md](../../../../docs/archive/State-Management.md).
 >
-> **Status:** new, parallel database (`image-horse-dexie`). The three live hand-rolled stores (`image-horse-originals` / `-edits` / `-gallery`) are untouched. This module is ready to adopt incrementally; nothing in the app imports it yet.
+> **Status:** adopted, and no longer parallel. `image-horse-dexie` is read on the live path — **9 non-test modules** import `lib/dexie` at v8.61, among them `AppShell.tsx`, `useImageSession.ts`, `useCanvasActions.ts` and `oplogPersistence.ts`. The legacy hand-rolled stores (`image-horse-originals` / `-edits` / `-gallery`) are still never written by the migration path, only read, so they remain a byte-identical rollback target; `USE_DEXIE_ORIGINALS` in `flags.ts` is the kill switch. (This line read "nothing in the app imports it yet" until 2026-09-01, which stopped being true at v7.5.)
 
 ## Why Dexie
 
