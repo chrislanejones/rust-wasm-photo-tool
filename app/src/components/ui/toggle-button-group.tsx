@@ -36,6 +36,13 @@ interface ToggleButtonGroupProps {
   noIcons?: boolean;
   /** Stretch buttons to share the row width evenly. */
   fill?: boolean;
+  /** Give every button the SAME width — the width of the widest label —
+   *  instead of letting each shrink to its own text. Use when the labels are
+   *  uneven enough that the short ones read as mistakes ("New" beside
+   *  "Gallery"). Distinct from `fill`, which is about consuming leftover row
+   *  space: `fill` in a shrink-to-fit row leaves the widest button at its own
+   *  content width and only pads the rest, so it does NOT equalize. */
+  equalWidth?: boolean;
   /** Extra classes on the group container. */
   className?: string;
 }
@@ -64,10 +71,22 @@ export function ToggleButtonGroup({
   compact = false,
   noIcons = false,
   fill = false,
+  equalWidth = false,
   className,
 }: ToggleButtonGroupProps) {
   return (
-    <div className={cn("flex gap-1 p-1 rounded-lg bg-bg-tertiary", className)}>
+    // `equalWidth` swaps flex for a single-row grid whose columns are all
+    // `1fr`. In a shrink-to-fit container every fr column resolves to the
+    // largest item's max-content, so the buttons come out identical and the
+    // group is still only as wide as it needs to be — no magic min-width to
+    // re-tune when a label changes.
+    <div
+      className={cn(
+        "gap-1 p-1 rounded-lg bg-bg-tertiary",
+        equalWidth ? "grid grid-flow-col auto-cols-fr" : "flex",
+        className,
+      )}
+    >
       {items.map(({ key, icon: Icon, label, active, onToggle, tooltip, disabled }) => {
         const button = (
           <button
