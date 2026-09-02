@@ -94,10 +94,10 @@ export default function Architecture() {
             <div className="map__row">
               <article className="node">
                 <h3 className="node__title">UI plane</h3>
-                <p className="node__sub">React 18 · TypeScript · Vite</p>
+                <p className="node__sub">React 19 · TypeScript · Vite</p>
                 <ul className="node__list">
                   <li>AppShell — composition and layout only</li>
-                  <li>Tool registry — ~10 tool modules</li>
+                  <li>Tool registry — 5 modules registered, routing still in AppShell</li>
                   <li>Session hooks — image · selection · canvas · mask</li>
                   <li>Zustand stores — UI · tool · gallery · annotation · guides</li>
                 </ul>
@@ -108,13 +108,20 @@ export default function Architecture() {
                 <p className="node__sub">where the pixels are touched</p>
                 <ul className="node__list">
                   <li>
+                    <strong>Engine worker</strong> — the engine and the canvas both live here, off
+                    the main thread
+                  </li>
+                  <li>
                     <strong>WASM engine — stamp_tool</strong>: kernels, TileBuffer, OpLog
                   </li>
-                  <li>Codec worker — encode · thumbnail · OffscreenCanvas</li>
+                  <li>Codec worker — WebP/JPEG encode · gallery thumbnails</li>
                   <li className={`node__planned${dim("planned")}`}>
-                    rayon worker pool — planned, gated on COOP/COEP
+                    rayon worker pool — tried and dropped: 8–31× slower than the single-threaded
+                    kernel
                   </li>
-                  <li className={`node__planned${dim("planned")}`}>WebGPU backend — far off</li>
+                  <li className={`node__planned${dim("planned")}`}>
+                    WebGPU backend — one blur kernel and a self-test, nothing on the pixel path
+                  </li>
                 </ul>
               </article>
 
@@ -131,8 +138,9 @@ export default function Architecture() {
             </div>
 
             <p className="plane__foot">
-              Plus <code>localStorage</code> for lightweight prefs, and a service worker that
-              precaches the shell and the WASM binary.
+              Plus <code>localStorage</code> for lightweight prefs. A service worker that precaches
+              the shell and the WASM binary is written and tested, and switched off — it has never
+              been on in a build that shipped.
             </p>
           </div>
 
@@ -182,7 +190,7 @@ export default function Architecture() {
             </article>
             <article className={node("demo free pro")}>
               <h4 className="node__title">Canvas Engine</h4>
-              <p className="node__sub">JS ↔ WASM bridge · zero-copy blit</p>
+              <p className="node__sub">Engine worker · zero-copy blit to an OffscreenCanvas</p>
             </article>
             <article className={node("demo free pro")}>
               <h4 className="node__title">Zustand State</h4>
