@@ -259,7 +259,7 @@ export function TopBar({
                 kept dead-centered on the bar by the grid's 1fr/auto/1fr cols. */}
             <div className="flex items-center gap-3">
               <div className="w-px h-6 bg-border shrink-0" />
-              <ToggleButtonGroup items={toggleButtons} compact={compact} />
+              <ToggleButtonGroup items={toggleButtons} compact={compact} equalWidth />
               <div className="w-px h-6 bg-border shrink-0" />
             </div>
 
