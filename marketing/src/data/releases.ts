@@ -24,6 +24,33 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.63",
+    date: "2026-09-02",
+    headline: "The bar buttons line up, and the active layer says which one it is",
+    entries: [
+      {
+        tag: "ui",
+        text: "The five buttons across the top bar \u2014 New, Tools, Gallery, Review, Export \u2014 each sized themselves to their own text, so \"New\" came out 71.6px against Gallery's 100.4. Twenty-eight pixels of difference between two things that are meant to read as peers. They are all one width now, the width of the widest label. The group costs 57.6px more and grows symmetrically, so the centred cluster does not move.",
+      },
+      {
+        tag: "fix",
+        text: "In the Review panel's layer list, which layer was active lived in a CSS class and nowhere else. It looked right and announced nothing \u2014 a screen reader heard four identical \"Select <name>, button\" rows with no way to tell them apart. The active row now carries aria-current. Not aria-pressed: a layer cannot be un-selected, so \"pressed\" would advertise a state you cannot reach.",
+      },
+      {
+        tag: "fix",
+        text: "New and Export in the mobile bar announced themselves as unpressed toggle buttons. They are actions, not toggles \u2014 there is no \"export mode\" to be in \u2014 and a comment two lines away in the same file said exactly that. The bar was passing aria-pressed=false explicitly, overriding the button component's own rule of leaving the attribute off when it means nothing.",
+      },
+      {
+        tag: "infra",
+        text: "CI installed whatever wasm-pack \"latest\" happened to resolve to. On September 2nd that was v0.15.0 at 03:04 UTC and v0.9.1 at 03:22 \u2014 same workflow, same commit, eighteen minutes apart, one green and one red. The old one ships a 2020-era wasm-opt that cannot parse the engine's WebAssembly, so the build died with nothing wrong in the repository, and a plain re-run went green again. That is the worst shape this kind of bug takes: it reads as flake and it is an unpinned dependency. The Netlify build had been pinned to 0.15.0 for months, with a comment predicting this exact failure. GitHub CI never got the same pin. It has one now.",
+      },
+      {
+        tag: "infra",
+        text: "The marketing site's architecture page promised \"a service worker that precaches the shell and the WASM binary\" in visible copy, fifty lines below a source comment correctly stating that no service worker ships in a build. It credited the codec worker with the OffscreenCanvas the engine worker owns, listed a rayon worker pool as planned when it had been measured and rejected, and never mentioned the engine worker at all \u2014 which has been the default since v8.32 and is the largest structural fact about the app.",
+      },
+    ],
+  },
+  {
     version: "v8.62",
     date: "2026-09-01",
     headline: "The architecture doc caught up to the architecture",

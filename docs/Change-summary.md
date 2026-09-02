@@ -9507,3 +9507,145 @@ docs that mention the file already point at `archive/`.
 | Rust | **untouched** — no `build:wasm` |
 
 Documentation only. No app code, no engine, no schema.
+
+## v8.63 Change Summary — 2026-09-02
+
+The bar buttons line up, and the active layer says which one it is. Four
+changes, none of them large, all of them things that were quietly wrong.
+
+### The five top-bar buttons were five different widths
+
+New / Tools / Gallery / Review / Export each sized to its own text.
+
+| Button | Before | After |
+|---|---|---|
+| New | 71.6 px | **100.4 px** |
+| Tools | 86.0 px | **100.4 px** |
+| Gallery | 100.4 px | 100.4 px |
+| Review | 93.2 px | **100.4 px** |
+| Export | 93.2 px | **100.4 px** |
+| **Spread** | **28.8 px** | **0 px** |
+
+`ToggleButtonGroup` gained an opt-in `equalWidth` that swaps its container from
+flex to a single-row grid of `1fr` columns. In a shrink-to-fit container every
+fr column resolves to the largest item's max-content, so the buttons equalise
+to the widest label with no `min-w-[]` magic number to re-tune later.
+
+The existing `fill` prop looks like it should do this and does not: in a
+shrink-to-fit row `flex-1` leaves the widest button at its own content width
+and only pads the others. Hence a new flag rather than a reuse.
+
+Opt-in, because eleven other call sites share this component and their labels
+are already even. The group costs 57.6px (468.4 → 526) and grows
+symmetrically — measured centre shift **0.0px**.
+
+Measured at 1600, 1010 and 335px and in compact mode. The mobile bar is
+untouched and cannot be affected: it wires `IconButton` directly rather than
+through `ToggleButtonGroup`, and its seven buttons were already a uniform 30px
+inside a fixed 252px box.
+
+### The active layer was announced to nobody
+
+Each layer row in Review renders as `<li>` with a button role. Which one was
+active lived in the `layer-active` CSS class and nowhere else, so a screen
+reader heard four identical "Select &lt;name&gt;, button" rows.
+
+| | Before | After |
+|---|---|---|
+| Active row | CSS class only | `aria-current="true"` |
+| Inactive rows | CSS class only | attribute absent |
+| Container `<ul>` | implicit `list`, **zero `listitem` children** | `role="group"` + label |
+
+`aria-current` rather than `aria-pressed`, because a layer cannot be
+un-selected — clicking a row moves the selection, it does not toggle that row
+off, and "pressed" would advertise a state the user cannot reach.
+
+**Not done, and filed rather than faked.** `role="listbox"` + `role="option"`
+is what `aria-selected` actually wants. It needs roving tabindex and arrow-key
+handling, and `role="option"` forbids interactive descendants while each row
+carries six buttons. That is a row redesign, not an accessibility patch.
+
+### A label was overwriting the word printed on the button
+
+An `aria-label` replaces the accessible name rather than adding to it, so
+putting one on a button that already shows text overwrites what you can see.
+`ToggleButtonGroup` is both kinds of button in one component — `compact` hides
+the visible label — so the `aria-label` is now conditional on `compact`.
+
+No announced name changed today: every caller happens to pass a tooltip equal
+to its label, so the unconditional form was correct by luck. The first
+descriptive tooltip anyone wrote would have renamed a button out from under
+its own visible text.
+
+The same check turned up a real one. The mobile bar passed
+`aria-pressed={active ?? false}`, overriding `IconButton`'s own
+`aria-pressed={active || undefined}`, so **New and Export announced as
+unpressed toggle buttons** — while the comment beside them reads "New and
+Export are actions; the middle three are tabs."
+
+### CI was installing a different wasm-pack from one hour to the next
+
+`jetli/wasm-pack-action` was called with no version, so it took `latest`.
+
+| Run | Time (UTC) | Installed | Frontend job |
+|---|---|---|---|
+| PR #38 | 03:04 | wasm-pack **v0.15.0** | pass |
+| PR #39 | 03:22 | wasm-pack **v0.9.1** | **FAIL** |
+| PR #39 re-run | 03:29 | wasm-pack **v0.15.0** | pass |
+
+Same workflow, same commit base, eighteen minutes apart. v0.9.1 ships a
+2020-era `wasm-opt` that predates reference-types, so the build died on
+`[parse exception: Only 1 table definition allowed in MVP]` with nothing wrong
+in the repository — and a plain re-run went green.
+
+That is the worst shape this bug can take: it reads as flake, so the instinct
+is to re-run and move on, and the next PR rolls the dice again.
+
+`netlify.toml` has pinned `wasm-pack --version 0.15.0 --locked` for months, and
+its comment names the risk in advance — "the tool that runs wasm-opt could
+change under a build with no commit, the same class of drift the toolchain pin
+closed." The pin went to Netlify and never to GitHub CI, so while ADR-038
+pinned rustc on both halves of the build, the two halves still disagreed about
+which optimizer ran. Both call sites are pinned now.
+
+### The marketing architecture page described a different app
+
+Flagged during the v8.62 docs pass and left alone then, because public copy is
+a human call. Fixed now:
+
+| Said | Reality |
+|---|---|
+| "a service worker that precaches the shell and the WASM binary" | never on in a shipped build — `__IH_SW_MODE__` defaults `"off"` |
+| "Codec worker — encode · thumbnail · OffscreenCanvas" | the **engine worker** owns the OffscreenCanvas |
+| "rayon worker pool — planned, gated on COOP/COEP" | measured and **rejected**, 8–31× slower |
+| no mention of the engine worker | default engine since **v8.32** |
+
+The first line is the one that mattered: a visitor read a shipped feature that
+does not exist, fifty lines below a source comment in the same file correctly
+saying it does not ship.
+
+### Documented, because both cost real time this week
+
+`./scripts/guardrails.sh` is a blocking CI job and no other local gate runs it.
+It went red while `tsc`, `pnpm lint` and `pnpm -C app test` were all green. It
+greps text and cannot tell a comment from code — a source comment that spelled
+out `role="button"` while explaining the rule counted as a violation. It is in
+CLAUDE.md's command list now.
+
+`gh pr checks | tail` hides failures. A failing job was line 1 of 19 and a
+`tail -15` reported a red PR as green.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** |
+| `pnpm lint` | **0 errors**, 61 warnings |
+| `pnpm -C app test` | **634 passed**, 53 files |
+| `./scripts/guardrails.sh` | **OK** — all baselines |
+| `cargo fmt --check` | **clean** |
+| `cargo clippy -D warnings` | **clean** |
+| `cargo test --features tiles` | **267 passed**, 0 failed |
+| `pnpm run build` | **succeeds** |
+
+No engine change, so no `build:wasm` and no size-band movement.

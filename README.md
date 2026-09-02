@@ -84,35 +84,38 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.62 — 2026-09-01
+### v8.63 — 2026-09-02
 
-**The architecture doc caught up to the architecture.** Nothing in the app
-changed. What changed is that the documentation stopped describing a version
-of this project that stopped existing around v7.8.
+**The bar buttons line up, and the active layer says which one it is.** Four
+changes, none of them large, all of them things that were quietly wrong.
 
-`docs/Architecture.md` had a status line reading v7.8 and a diagram showing
-the Rust engine running on the main thread. It has not run there since v8.32 —
-it lives in a Web Worker, drawing straight onto a transferred canvas, and the
-main thread's blocking time per heavy operation went from 129–137 ms to zero.
-That was the single most wrong thing in the docs tree. The diagram is redrawn
-around it.
+The five buttons across the top bar each sized themselves to their own text, so
+"New" came out 71.6px against Gallery's 100.4 — twenty-eight pixels between
+five things meant to read as peers. They are one width now, the width of the
+widest label, and the centred cluster does not move because the group grows
+symmetrically.
 
-Rather than bump version numbers, every claim in the doc was re-read against
-the code. Seven were wrong. The tool registry existed when the doc said it did
-not, and was unwired when a working note said it was finished. The service
-worker was described as "investigated only, nothing wired, no ADR" — it has
-been in the tree since July under an accepted ADR, shipping switched off, which
-is a third state the doc had no room for and now has a section for. Undo was
-still written as a plan and its correction rather than as one system. `AppShell.tsx`
-was cited at 2,930 lines; it is 3,813.
+In the Review panel's layer list, which layer was active lived in a CSS class
+and nowhere else. It looked right and announced nothing: a screen reader heard
+four identical "Select &lt;name&gt;, button" rows. The active row carries
+`aria-current` now — not `aria-pressed`, because a layer cannot be un-selected
+and "pressed" would advertise a state you cannot reach.
 
-This changelog also went on a diet. It carried **88 release sections** against
-its own "latest release below" rule — every release added one and none ever
-removed one. It carries one now. All 87 removed were confirmed present in
-`docs/Change-summary.md` before being cut.
+New and Export in the mobile bar announced themselves as unpressed toggle
+buttons. They are actions, not toggles, and a comment two lines away in the
+same file said so.
 
-Every relative link in all 80 tracked Markdown files was checked against the
-path it resolves to: **2 broken, now 0.**
+CI installed whatever `wasm-pack` "latest" resolved to. On September 2nd that
+was v0.15.0 at 03:04 UTC and v0.9.1 at 03:22 — same workflow, same commit,
+eighteen minutes apart, one green and one red. The old one ships a 2020-era
+`wasm-opt` that cannot parse the engine's WebAssembly, so the build failed with
+nothing wrong in the repository and a re-run went green again. The Netlify
+build had been pinned for months, with a comment predicting this exact failure.
+GitHub CI never got the same pin. It has one now.
+
+And the marketing site's architecture page promised a service worker that has
+never shipped switched on, fifty lines below a source comment correctly saying
+it does not ship. That page describes the app it is actually running on now.
 
 ## License
 
