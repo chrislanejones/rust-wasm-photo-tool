@@ -4,6 +4,47 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — the layer rows want listbox semantics, and cannot have them cheaply (2026-09-01)
+
+Found by the #10 pass, which fixed what a leaf could fix and stopped there.
+`ReviewPanel.tsx` renders each layer as `<li role="button" tabIndex={0}>`.
+#10 added `aria-current` so the active layer is announced at all — before, it
+was a CSS class and nothing else.
+
+The richer answer is `role="listbox"` on the container and `role="option"` on
+the rows, which is what `aria-selected` actually requires. Two things block it,
+and neither is a leaf:
+
+| Blocker | Why it stops here |
+|---|---|
+| Roving tabindex + arrow-key navigation | a listbox that does not answer arrow keys is worse than no listbox — it promises a keyboard model it does not have |
+| `role="option"` forbids interactive descendants | **each row carries six buttons** — visibility, rename, up, down, merge, duplicate, delete |
+
+The second is the harder one: it is not extra work, it is a different row
+design. Every row button would have to move out of the row — probably into the
+Layers tool panel, where v8.38 already moved the mask controls for the same
+reason. That is a UI decision, not an accessibility patch.
+
+Until then `role="group"` is on the container, honestly: the rows are buttons,
+so the implicit `list` role was claiming `listitem` children it never had.
+
+## OPEN — this repo cannot test a component, so no panel a11y is pinned (2026-09-01)
+
+`@testing-library/*` is **not a dependency** and there are zero component tests
+in `app/src` — every one of the 53 test files is a pure-module test. So the
+#10/#64 attributes just shipped with no assertion behind them, and the same
+was true of #78 in August, which was filed as a coverage gap for exactly this
+reason and has not moved since.
+
+Adding React Testing Library is a new dependency and an ADR trigger, so it
+cannot ride along on an accessibility fix. It is worth a sitting of its own:
+the layer panel, the tool panels and the master bar are all now carrying
+a11y attributes that nothing can regress-test, and the count only grows.
+
+Playwright can reach these — the `imagehorse-qc` spec already drives the real
+DOM — so the cheaper path may be an e2e assertion rather than a unit harness.
+Either way it is a decision, not a chore.
+
 ## OPEN — the marketing architecture page promises a service worker that does not ship (2026-09-01)
 
 Found by the v8.62 docs catch-up, which was scoped to flag marketing drift and

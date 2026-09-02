@@ -74,7 +74,15 @@ export function ToggleButtonGroup({
             onClick={onToggle}
             disabled={disabled}
             title={tooltip ? undefined : label}
-            aria-label={tooltip?.label ?? label}
+            // #64: an `aria-label` REPLACES the accessible name, so it goes on
+            // icon-only buttons and nowhere else. This component is both:
+            // `compact` hides the <span>{label}</span> below, and only then is
+            // there no visible name to read. Labelled, the visible text IS the
+            // name — and today every caller happens to pass a tooltip equal to
+            // its label, so the old unconditional form was correct by luck. The
+            // first descriptive tooltip anyone writes would have silently
+            // renamed the button out from under its own visible text.
+            aria-label={compact ? (tooltip?.label ?? label) : undefined}
             className={cn(
               "flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold font-mono",
               "transition-all duration-200 ease-out",

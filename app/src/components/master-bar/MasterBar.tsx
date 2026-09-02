@@ -68,7 +68,11 @@ function IconBtn({
           label={label}
           active={active}
           standalone
-          aria-pressed={active ?? false}
+          // NOT `aria-pressed={active ?? false}`. IconButton already sets
+          // `aria-pressed={active || undefined}` so the attribute is absent
+          // when it means nothing; passing an explicit `false` overrode that
+          // and put "toggle button, not pressed" on New and Export — which are
+          // actions, never toggles, as the comment beside their JSX says.
           disabled={disabled}
           onClick={onClick}
         />
