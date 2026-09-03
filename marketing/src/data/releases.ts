@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.64",
+    date: "2026-09-02",
+    headline: "The status bar stops whispering, and undo stops moving your layer in silence",
+    entries: [
+      {
+        tag: "ui",
+        text: "Half the status bar was one grey and half was another, on the same row at the same 10px \u2014 the file size, dimensions and zoom looked right while the brand, the shortcut labels and their key chips looked washed out beside them. That was not a taste problem. Measured against the bar's own background, the dim half came to 3.65:1 in light mode, under the 4.5:1 that WCAG AA asks for at this size, and the shortcut hints were dimmed TWICE because a 70% opacity sat on top of the faint colour. Everything in the bar now uses the same value the readouts already used: 6.99:1 in light, 8.56:1 in dark.",
+      },
+      {
+        tag: "fix",
+        text: "Undo could move which layer you had selected, without saying so. It is not restoring \"the layer that operation belonged to\" \u2014 no such link exists in the engine, where exactly one of sixteen operation types records a layer at all. What it restores is whichever layer was active when the snapshot was taken. So if you run an operation, pick a different layer, then undo, your choice is quietly discarded. The row you land on now flashes for a moment, so the jump is something you see rather than something you discover later. Selecting a layer yourself stays silent \u2014 only a change you did not ask for flashes.",
+      },
+      {
+        tag: "infra",
+        text: "The swap itself is deliberately still there. Making undo remember which layer an operation belonged to means teaching the engine an ownership it has never had, which is a much larger change than a flash; the honest version of this release is that the behaviour is unchanged and only its visibility is fixed.",
+      },
+      {
+        tag: "infra",
+        text: "AppShell.tsx lost another 96 lines \u2014 the internal save that re-encodes your canvas over its stored copy moved into a file of its own. Nothing about the app behaves differently. Worth recording alongside it: the whole file was inventoried while picking what to move, and the numbers say this approach cannot finish the job. Of 247 blocks in it, only 34 are big enough to be worth relocating, and moving every one of them would still leave roughly 2,560 lines. The remaining work is two different changes, and they are written up rather than started.",
+      },
+    ],
+  },
+  {
     version: "v8.63",
     date: "2026-09-02",
     headline: "The bar buttons line up, and the active layer says which one it is",

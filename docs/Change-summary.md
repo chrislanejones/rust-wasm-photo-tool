@@ -9649,3 +9649,113 @@ CLAUDE.md's command list now.
 | `pnpm run build` | **succeeds** |
 
 No engine change, so no `build:wasm` and no size-band movement.
+
+## v8.64 Change Summary — 2026-09-02
+
+The status bar stops whispering, and undo stops moving your layer in silence.
+Two visible fixes, one invisible one, and a correction to this record.
+
+### The status bar was two different greys
+
+Half of it used `--text-muted` and half used `--text-secondary`, on the same row
+at the same 10px. Measured against the bar's own background:
+
+| Theme | Token | Contrast | WCAG AA (4.5) |
+|---|---|---|---|
+| **LIGHT** | `--text-muted` | **3.65** | **FAILS** |
+| LIGHT | `--text-secondary` | 6.99 | passes |
+| DARK | `--text-muted` | 5.14 | passes, barely |
+| DARK | `--text-secondary` | 8.56 | passes |
+
+`.status-shortcut-hint` made it worse by stacking `opacity: 0.7` **on top of**
+muted — two dimmings applied to "undo", "redo", "commands" and the active tool's
+own name. Four rules move to `--text-secondary` and the opacity is deleted
+rather than raised.
+
+After, measured in the browser in both themes:
+
+| | Brand | kbd chip | Zoom readout |
+|---|---|---|---|
+| Dark | **8.56** (was 5.14) | 6.83 | 8.56 |
+| Light | **6.99** | 7.35 | 6.99 |
+
+`.status-dot` keeps `--text-muted` on purpose — a 6px dot is non-text and
+answers to the 3:1 threshold, which it clears.
+
+⚠️ A first measurement read light-mode brand at 1.97 and looked like a bad
+regression. It was the probe: `.status-brand-link` has `transition: color
+0.15s`, and the sample landed mid-transition after a theme toggle. Anything
+timing a themed colour has to wait that out.
+
+### Undo moved the active layer without saying so
+
+`restore_snapshot` does `self.active = snap.active` (`src/lib.rs:711`) — it
+restores whichever layer was active when the SNAPSHOT was taken, not the layer
+the operation belonged to. There is no such ownership: **1 of 16 `Op` variants
+carries a layer** (`LayerMove`).
+
+Reproduced on v8.63 before any code was written:
+
+| Step | Active layer |
+|---|---|
+| 0. start | Photo |
+| 1. Apply Compression | Photo |
+| 2. user selects Canvas | Canvas |
+| 3. **undo** | **Photo — silently moved** |
+
+⚠️ **The obvious three-step test is a FALSE NEGATIVE.** Op → undo with no
+selection change between reports "stays", because the snapshot happens to hold
+the same layer. You must move the active layer BETWEEN the op and the undo.
+
+The row now flashes for 900ms when the selection moves without being asked;
+selecting a layer yourself stays silent. `prefers-reduced-motion` gets a steady
+tint instead of an animation.
+
+**The swap itself is still there, deliberately.** "Undoing a global op must not
+swap the active layer" remains known-violated and deferred — reinstating it
+means minting op→layer ownership in Rust, the expensive branch that was
+explicitly declined. Only the invisibility is fixed.
+
+This was machine-observable for the first time because v8.63 added
+`aria-current` to the active row.
+
+### AppShell lost another 96 lines, and the approach lost its case
+
+`persistActiveCanvas` — the internal save that re-encodes the canvas over its
+stored original — moved to `app/src/app/session/usePersistActiveCanvas.ts`.
+**3,814 → 3,718**, ratchet lowered to match in the same commit. No behaviour
+change.
+
+The inventory that picked it also answered a bigger question. Of **247 named
+blocks** in AppShell's logic, only **34 are ≥15 lines**, totalling 1,255 — so
+extracting every block worth extracting still leaves ~2,560, and the 993-line
+JSX return (26% of the file) is untouched by moving handlers at all. Written up
+as **ADR-042 (draft)**: the remaining reduction is two structural changes, not
+more extractions.
+
+⚠️ **Rank extraction candidates by what a block READS, never by its declared
+dependency array.** `confirmDeleteAll` declares 2 dependencies and touches 11
+identifiers — 34.0 by the array, 6.2 by reality, wrong by 5×.
+
+### Correction to the v8.63–v8.64 record
+
+Commit `a6b2bfc` is titled for the status-bar contrast fix and **also contains
+the layer-swap flash**, because its branch was cut from the flash's branch
+instead of from master. Both changes were reviewed and green before merging and
+no code is wrong, but that commit does not describe its own contents. The
+history is pushed and is not being rewritten; this paragraph is the correction.
+PR #44 was closed rather than merged for the same reason — its code was already
+on master, and merging its branch would have reverted `styles.css` by 15 lines.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** (app + marketing) |
+| `pnpm lint` | **0 errors**, 59 warnings (was 61) |
+| `pnpm -C app test` | **634 passed**, 53 files |
+| `./scripts/guardrails.sh` | **OK** — all baselines |
+| `cargo fmt --check` / `clippy -D warnings` | **clean** |
+| `pnpm run build` | **succeeds** |
+
+No engine change — no `build:wasm`, crate untouched, size band unmoved.

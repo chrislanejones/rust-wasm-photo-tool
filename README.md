@@ -84,38 +84,37 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.63 — 2026-09-02
+### v8.64 — 2026-09-02
 
-**The bar buttons line up, and the active layer says which one it is.** Four
-changes, none of them large, all of them things that were quietly wrong.
+**The status bar stops whispering, and undo stops moving your layer in silence.**
 
-The five buttons across the top bar each sized themselves to their own text, so
-"New" came out 71.6px against Gallery's 100.4 — twenty-eight pixels between
-five things meant to read as peers. They are one width now, the width of the
-widest label, and the centred cluster does not move because the group grows
-symmetrically.
+Half the status bar was one grey and half was another, on the same row at the
+same 10px — the file size, dimensions and zoom looked right while the brand, the
+shortcut labels and their key chips looked washed out beside them. That was not
+a taste problem: the dim half measured 3.65:1 in light mode, under the 4.5:1
+WCAG AA asks for at this size, and the shortcut hints were dimmed twice because
+a 70% opacity sat on top of the faint colour. Everything in the bar now uses the
+value the readouts already used — 6.99:1 in light, 8.56:1 in dark.
 
-In the Review panel's layer list, which layer was active lived in a CSS class
-and nowhere else. It looked right and announced nothing: a screen reader heard
-four identical "Select &lt;name&gt;, button" rows. The active row carries
-`aria-current` now — not `aria-pressed`, because a layer cannot be un-selected
-and "pressed" would advertise a state you cannot reach.
+Undo could move which layer you had selected without saying so. It is not
+restoring "the layer that operation belonged to" — no such link exists in the
+engine, where exactly one of sixteen operation types records a layer at all.
+What it restores is whichever layer was active when the snapshot was taken. So
+if you run an operation, pick a different layer, then undo, your choice is
+quietly discarded. The row you land on now flashes for a moment. Selecting a
+layer yourself stays silent; only a change you did not ask for flashes.
 
-New and Export in the mobile bar announced themselves as unpressed toggle
-buttons. They are actions, not toggles, and a comment two lines away in the
-same file said so.
+The swap itself is deliberately still there. Teaching undo which layer an
+operation belonged to means giving the engine an ownership it has never had,
+which is a far larger change than a flash — this release fixes the invisibility,
+not the behaviour.
 
-CI installed whatever `wasm-pack` "latest" resolved to. On September 2nd that
-was v0.15.0 at 03:04 UTC and v0.9.1 at 03:22 — same workflow, same commit,
-eighteen minutes apart, one green and one red. The old one ships a 2020-era
-`wasm-opt` that cannot parse the engine's WebAssembly, so the build failed with
-nothing wrong in the repository and a re-run went green again. The Netlify
-build had been pinned for months, with a comment predicting this exact failure.
-GitHub CI never got the same pin. It has one now.
-
-And the marketing site's architecture page promised a service worker that has
-never shipped switched on, fifty lines below a source comment correctly saying
-it does not ship. That page describes the app it is actually running on now.
+`AppShell.tsx` lost another 96 lines and nothing about the app behaves
+differently. Worth recording alongside it: the file was inventoried while
+picking what to move, and the numbers say this approach cannot finish the job.
+Of 247 blocks in it only 34 are big enough to be worth relocating, and moving
+every one would still leave roughly 2,560 lines. The rest is two different
+changes, now written up rather than started.
 
 ## License
 
