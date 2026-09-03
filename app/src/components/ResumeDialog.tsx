@@ -5,7 +5,7 @@
 //
 // Uses the shared Dialog primitives so it matches the other modals: title in the
 // header (with a close X), content in the body, the two actions in the footer.
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, useAnimation } from "framer-motion";
 import { Upload } from "lucide-react";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
@@ -42,18 +42,22 @@ export function ResumeDialog({
   dismissible = false,
   onClose,
 }: Props) {
-  // Object URLs for a few thumbnail previews; revoked on unmount / change.
-  const thumbUrls = useMemo(
-    () => photos.slice(0, 5).map((p) => URL.createObjectURL(p.thumbBlob)),
-    [photos],
-  );
-  useEffect(
-    () => () => thumbUrls.forEach((u) => URL.revokeObjectURL(u)),
-    [thumbUrls],
-  );
+  // Object URLs for a few thumbnail previews, CREATED AND REVOKED IN THE SAME
+  // EFFECT — see the long note in `features/upload/ResumeContent.tsx`, which
+  // had the identical bug. Short version: a `useMemo` that creates and an
+  // effect cleanup that revokes come apart under StrictMode's mount / unmount
+  // / remount, because the cleanup fires and the memo does not re-run, leaving
+  // every <img> pointed at a revoked blob: URL.
+  const [thumbUrls, setThumbUrls] = useState<string[]>([]);
+  useEffect(() => {
+    const urls = photos.slice(0, 5).map((p) => URL.createObjectURL(p.thumbBlob));
+    setThumbUrls(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [photos]);
 
   const n = photos.length;
-  const more = n - thumbUrls.length;
+  // From `photos`, not `thumbUrls` — the latter is empty on the first render.
+  const more = n - Math.min(5, n);
 
   // The header X / Esc / click-outside don't dismiss — there's no neutral
   // "close" here (you must pick Resume or Start fresh), so a close attempt just
