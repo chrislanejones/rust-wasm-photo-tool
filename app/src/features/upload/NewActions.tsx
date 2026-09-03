@@ -14,11 +14,15 @@ import {
   SquarePen,
   ChevronLeft,
   Link,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Spinner } from "@/components/ui/spinner";
 import { panelSwap } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
+import { ActionTile } from "@/components/ui/action-tile";
+import { IconButton } from "@/components/ui/icon-button";
+import { UserMenu } from "@/components/UserMenu";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { TEXT_COLORS } from "@/lib/colors";
@@ -108,9 +112,9 @@ const PRESET_BY_ID = new Map<string, SizePreset>(
 
 /** Codeberg's mountain mark — lucide ships no brand icon for it, so inline the
  *  simple-icons path. `.btn-icon svg` sizes it to 14px to match lucide icons. */
-function CodebergIcon() {
+function CodebergIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.14 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 16.553a12 12 0 0 0 5.137-4.213L12.42 6.957a.124.093 0 0 0-.09-.003z" />
     </svg>
   );
@@ -122,9 +126,9 @@ function CodebergIcon() {
  *  simple-icons path keeps the pair rendering identically and adds no
  *  dependency. No width/height on purpose: Button's `[&_svg]:size-[1em]` sizes
  *  it, so it lands at 12px here — measured equal to CodebergIcon beside it. */
-function GithubIcon() {
+function GithubIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
     </svg>
   );
@@ -476,39 +480,43 @@ export function NewActions({
                 exit="exit"
                 className="flex flex-1 flex-col items-center gap-4"
               >
-                <div className="grid grid-cols-2 gap-3 w-full">
-                  <Button size="large"
+                {/* Three columns of stacked tiles — the same ActionTile the
+                    tool panels use (Select → Magic Wand), icon on top. Five
+                    tiles, so the second row holds two; `Create AI Image` is
+                    disabled until it exists. Was four full-width Buttons in
+                    two columns. */}
+                <div className="grid grid-cols-3 gap-3 w-full">
+                  <ActionTile
                     ref={firstButtonRef}
+                    icon={FolderOpen}
+                    label="Browse Files"
                     onClick={() => inputRef.current?.click()}
-                    className="w-full"
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                    Browse Files
-                  </Button>
-                  <Button size="large" onClick={handlePasteClick} className="w-full">
-                    <Clipboard className="h-4 w-4" />
-                    Paste (Ctrl+V)
-                  </Button>
-                  <Button size="large"
+                  />
+                  <ActionTile
+                    icon={Clipboard}
+                    label="Paste (Ctrl+V)"
+                    onClick={handlePasteClick}
+                  />
+                  <ActionTile
+                    // Spinner stands in for the icon while the samples load —
+                    // same slot, so the tile does not change shape.
+                    icon={loadingTest ? () => <Spinner size={24} /> : Images}
+                    label={loadingTest ? `Loading ${TEST_IMAGE_COUNT}…` : "Sample Images"}
                     onClick={handleTestImages}
                     disabled={loadingTest}
-                    className="w-full"
-                  >
-                    {loadingTest ? (
-                      <Spinner size={16} />
-                    ) : (
-                      <Images className="h-4 w-4" />
-                    )}
-                    {loadingTest ? `Loading ${TEST_IMAGE_COUNT}…` : "Sample Images"}
-                  </Button>
-                  <Button size="large"
+                  />
+                  <ActionTile
+                    icon={SquarePen}
+                    label="New Canvas"
                     onClick={() => setBlankMode(true)}
                     title="Start with a new canvas"
-                    className="w-full"
-                  >
-                    <SquarePen className="h-4 w-4" />
-                    New Canvas
-                  </Button>
+                  />
+                  <ActionTile
+                    icon={Sparkles}
+                    label="Create AI Image"
+                    disabled
+                    title="Coming soon"
+                  />
                 </div>
 
                 {/* Dotted drop zone — highlights + nudges when an image is
@@ -554,19 +562,28 @@ export function NewActions({
       {/* Marketing links — only in the default upload view, not the Blank
           Canvas panel (keeps that panel uncluttered). */}
       {showLinks && !blankMode && (
+        // Sign-in lives HERE now — the same compact IconButton the top bar
+        // uses — instead of as a 64px tile in the dialog's corner. Four
+        // identical 30px icon buttons: sign-in, website, GitHub, Codeberg. No
+        // words on any of them; the names live in `label` (screen readers)
+        // and `title` (hover). (Line comments, not {/* */}: this sits inside
+        // the `&&( … )` parens where a JSX comment is a second expression.)
         <div className="flex items-center gap-2 px-6 pb-4">
-          <Button size="large"
+          <UserMenu />
+          <IconButton
+            icon={Link}
+            label="Image Horse website"
+            title="Image Horse Website"
+            standalone
             onClick={() =>
               window.open("https://image-horse.vercel.app/", "_blank", "noopener")
             }
-            className="flex-[2]"
-          >
-            <Link className="h-4 w-4" />
-            Image Horse Website
-          </Button>
-          <Button size="large"
-            aria-label="View source on GitHub"
+          />
+          <IconButton
+            icon={GithubIcon}
+            label="View source on GitHub"
             title="GitHub"
+            standalone
             onClick={() =>
               window.open(
                 "https://github.com/chrislanejones/rust-wasm-photo-tool",
@@ -574,14 +591,12 @@ export function NewActions({
                 "noopener",
               )
             }
-            className="flex-1"
-          >
-            <GithubIcon />
-            GitHub
-          </Button>
-          <Button size="large"
-            aria-label="View source on Codeberg"
+          />
+          <IconButton
+            icon={CodebergIcon}
+            label="View source on Codeberg"
             title="Codeberg"
+            standalone
             onClick={() =>
               window.open(
                 "https://codeberg.org/chrislanejones/rust-wasm-photo-tool",
@@ -589,11 +604,7 @@ export function NewActions({
                 "noopener",
               )
             }
-            className="flex-1"
-          >
-            <CodebergIcon />
-            Codeberg
-          </Button>
+          />
         </div>
       )}
     </>

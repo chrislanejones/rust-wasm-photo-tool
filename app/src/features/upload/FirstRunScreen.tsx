@@ -3,7 +3,6 @@
 // the passed `children` (New actions / Welcome-back) reveal. Auto-reopen just
 // fades it out. Thin wrapper over the shared BrandRevealScreen entrance.
 import type { ReactNode } from "react";
-import { UserMenu } from "@/components/UserMenu";
 import { BrandRevealScreen } from "@/components/BrandRevealScreen";
 
 export function FirstRunScreen({
@@ -26,9 +25,6 @@ export function FirstRunScreen({
       loading={!ready}
       reduceMotion={reduceMotion}
       ariaLabel={ready ? "Get started" : "Loading Image Horse"}
-      // Sign-in pinned top-right (new browser / cache-cleared users restore
-      // here) — welcome-back-sized so it's actually visible.
-      topRight={<UserMenu large />}
       // Below z-dialog (unlike the real IdleScreen): this is just the app's
       // empty state, so dialogs opened over it (e.g. Alt+Delete Diagnostics)
       // must render visibly on top instead of getting trapped underneath.

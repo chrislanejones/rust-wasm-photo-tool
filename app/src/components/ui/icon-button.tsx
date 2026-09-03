@@ -1,5 +1,4 @@
 import { forwardRef } from "react";
-import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HOVER_RING } from "@/lib/styles";
 
@@ -62,7 +61,11 @@ import { HOVER_RING } from "@/lib/styles";
  */
 export interface IconButtonProps
   extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
-  icon: LucideIcon;
+  /** Any component that takes a className — lucide icons qualify, and so do
+   *  the inline brand marks (GitHub, Codeberg) the New dialog's footer uses.
+   *  The glyph is sized purely via className, never a lucide `size` prop, so
+   *  nothing here depends on the icon being lucide's. */
+  icon: React.ComponentType<{ className?: string }>;
   /** Accessible name. Required — these are icon-only, so there is no text. */
   label: string;
   /** Persistent-on state (e.g. a toggle). Omit for plain actions. */

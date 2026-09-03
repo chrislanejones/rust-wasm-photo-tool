@@ -12,16 +12,15 @@ interface ActionTileProps extends Omit<ToolButtonProps, "children" | "active"> {
   label: React.ReactNode;
 }
 
-export function ActionTile({
-  icon: Icon,
-  label,
-  className,
-  ...props
-}: ActionTileProps) {
-  return (
-    <ToolButton stacked className={cn("flex-1", className)} {...props}>
+// forwardRef so a caller can focus a tile — the New dialog autofocuses its
+// first tile on open (`firstButtonRef`). Transparent to every existing caller;
+// none of the six passed a ref before this.
+export const ActionTile = React.forwardRef<HTMLButtonElement, ActionTileProps>(
+  ({ icon: Icon, label, className, ...props }, ref) => (
+    <ToolButton ref={ref} stacked className={cn("flex-1", className)} {...props}>
       <Icon />
       <span>{label}</span>
     </ToolButton>
-  );
-}
+  ),
+);
+ActionTile.displayName = "ActionTile";
