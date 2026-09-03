@@ -830,6 +830,28 @@ textarea:focus-visible {
   outline-offset: -1px;
 }
 
+/* #57 — the active layer moved WITHOUT the user asking. Undo restores the
+   layer that was active when the snapshot was taken (src/lib.rs:711), so a
+   selection made after the op is silently discarded on undo. The swap is
+   deferred, not fixed; this is the part that stops it being invisible. */
+@keyframes layer-swapped-flash {
+  0%   { background-color: color-mix(in srgb, var(--accent, #6366f1) 38%, transparent); }
+  100% { background-color: transparent; }
+}
+
+.layer-swapped {
+  animation: layer-swapped-flash 900ms ease-out;
+}
+
+/* A flash is a motion cue, so honour the OS setting: hold a steady tint for
+   the same beat instead of animating it away. */
+@media (prefers-reduced-motion: reduce) {
+  .layer-swapped {
+    animation: none;
+    background-color: color-mix(in srgb, var(--accent, #6366f1) 24%, transparent);
+  }
+}
+
 .layer-name {
   flex: 1;
   min-width: 0;
