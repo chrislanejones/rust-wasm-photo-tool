@@ -1222,7 +1222,13 @@ textarea:focus-visible {
   gap: 0;
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  color: var(--text-muted);
+  /* --text-secondary, NOT --text-muted. At this size (10px) muted measured
+     3.65:1 against the bar in LIGHT mode — under WCAG AA's 4.5:1 — while the
+     `.status-zoom` readouts on the same row were already secondary at 6.99:1.
+     Half the bar was failing and the other half was fine, which is what made
+     it read as a styling accident rather than a rule. Dark was 5.14 vs 8.56:
+     passing, but the mismatch was just as visible. */
+  color: var(--text-secondary);
   z-index: var(--z-panel);
   backdrop-filter: blur(8px);
 }
@@ -1278,7 +1284,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   transition: color 0.2s;
   white-space: nowrap;
 }
@@ -1296,13 +1302,17 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 2px;
-  color: var(--text-muted);
-  opacity: 0.7;
+  /* Was `--text-muted` with `opacity: 0.7` on top of it — two dimmings
+     stacked, which put the shortcut labels ("undo", "redo", "commands") below
+     even muted's own failing 3.65:1 in light mode. Inherits the bar now, and
+     the opacity is gone rather than reduced: there is nothing here that wants
+     to be quieter than the readouts beside it. */
+  color: inherit;
 }
 
 .status-zoom-label {
   font-size: var(--text-2xs);
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 kbd {
