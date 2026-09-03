@@ -16,8 +16,8 @@ import type { CropSelection, DrawEditState, Point } from "@/hooks/useDrawingTool
 import type { PastePlacementRect } from "@/hooks/usePastePlacementTool";
 import { TEXT_OVERLAY_PAD_X, TEXT_OVERLAY_PAD_Y } from "@/hooks/useTextTool";
 import {
+  cornerDelta,
   lockAxisDelta,
-  lockCornerDelta,
   lockPointToAxis,
   lockScaleFactors,
 } from "@/lib/aspectLock";
@@ -948,9 +948,8 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
         const { handle, startX, startY, startSel, scaleX, scaleY } = drag;
         let dx = (e.clientX - startX) / scaleX;
         let dy = (e.clientY - startY) / scaleY;
-        if (e.shiftKey) {
-          ({ dx, dy } = lockCornerDelta(handle, dx, dy, startSel.width, startSel.height));
-        }
+        // Crop chooses a REGION: free by default, Shift constrains.
+        ({ dx, dy } = cornerDelta("region", e, handle, { dx, dy }, startSel));
         let { x, y, width: w, height: h } = startSel;
         switch (handle) {
           case "nw": x += dx; y += dy; w -= dx; h -= dy; break;
@@ -1041,17 +1040,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           return;
         }
         let { x, y, width: w, height: h } = startRect;
-        let cdx = dx;
-        let cdy = dy;
-        if (e.shiftKey) {
-          ({ dx: cdx, dy: cdy } = lockCornerDelta(
-            handle,
-            dx,
-            dy,
-            startRect.width,
-            startRect.height,
-          ));
-        }
+        // Both the paste box and "Resize Layer" are this overlay, and both scale
+        // PIXELS: plain drag keeps the ratio, Shift frees it for a skew.
+        const { dx: cdx, dy: cdy } = cornerDelta("raster", e, handle, { dx, dy }, startRect);
         switch (handle) {
           case "nw": x += cdx; y += cdy; w -= cdx; h -= cdy; break;
           case "n":  y += cdy; h -= cdy; break;
