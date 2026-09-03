@@ -4,6 +4,89 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — no Content-Security-Policy on either site (2026-09-03)
+
+Found by the night-0902 security pass. Live responses from **both** the app and
+the marketing site carry exactly one security header:
+
+| Header | App | Marketing |
+|---|---|---|
+| `strict-transport-security` | ✅ present | ✅ present |
+| `content-security-policy` | **absent** | **absent** |
+| `x-frame-options` | **absent** | **absent** |
+| `x-content-type-options` | **absent** | **absent** |
+| `referrer-policy` | **absent** | **absent** |
+| `permissions-policy` | **absent** | **absent** |
+
+There is no `[[headers]]` block in `netlify.toml` and none in `vercel.json`, so
+this is absence rather than misconfiguration.
+
+**Not a midnight patch.** A CSP for this app has to allow things most templates
+forbid: `'wasm-unsafe-eval'` for the engine, `blob:` and `worker-src` for the
+engine and codec workers, plus the Clerk and Convex origins. Getting it wrong
+breaks image loading or auth in ways that only show up in production. It wants
+an ADR-sized think and a deploy-preview check, not a guess.
+
+Everything else in that pass came back clean: **0 secret patterns** in the
+shipped bundle across 9 checks, `.env*` gitignored and untracked, no
+`dangerouslySetInnerHTML`, no `target="_blank"` without `noopener`, and the 12
+npm advisories are all **devDependencies** that never reach a user.
+
+## CLOSED at the engine level — #72 "paint lands on every layer" (2026-09-03)
+
+Three sessions could not reproduce this. It is now driven and measured, and the
+engine is **correctly scoped**.
+
+Reached the engine through the React fiber tree (`stampToolRef`) on the running
+app and ran the sequence directly, hashing every layer's PNG before and after:
+
+| Step | Result |
+|---|---|
+| Start | 2 layers, active **id 1 (Photo)** |
+| `select_all()` + `selection_to_new_layer(true)` | 3 layers, active **id 3** |
+| Engine vs Layers panel | **agree** — no sync bug |
+| `paint_down` → 10 × `paint_move` → `paint_up` | — |
+| **Layers changed by the stroke** | **exactly one — the active layer** |
+
+```
+idx0 Canvas   644f4b5b4160e3d3 -> 644f4b5b4160e3d3   unchanged
+idx1 Photo    644f4b5b4160e3d3 -> 644f4b5b4160e3d3   unchanged
+idx2 Layer 3  8d184920ad379c8d -> c15e7e57e1dfc805   CHANGED (active)
+```
+
+Three independent confirmations now agree: the 08-28 per-layer hashing, the
+code (`paint.rs:459` writes `&mut self.layers[active].buf.data`, and
+`layer.rs:803` moves `self.active` on insert), and this live drive.
+
+**So what was seen is compositing, not routing.** `selection_to_new_layer`
+clones the ENTIRE source layer and clears outside the selection
+(`selection.rs:605`), so the new layer is a **full-canvas buffer above the
+source** — a stroke on it composites over every layer below and reads as "it
+hit everything".
+
+⚠️ **Caveat:** driven with `select_all()`, not a magic-wand partial selection —
+the worker proxy exposes no rect/wand select. A partial selection still yields
+a full-canvas layer on top, so the conclusion holds, but the one-action human
+check is still worth doing: paint after a cut, toggle the new layer off, and
+confirm the stroke goes with it.
+
+**What remains is a UX question, not a bug**: should cut-to-layer produce a
+full-canvas layer? Reword #72 accordingly rather than hunting for a pixel bug
+that measurement says is not there.
+
+### Two probe traps, so the next person does not lose the time
+
+- `begin_stroke` / `continue_stroke` / `end_stroke` is the **clone stamp**, not
+  the paint brush. Used for a paint test it reports "no layer changed" and
+  looks like a clean pass.
+- The brush is
+  `paint_down(x, y, size, color: &str, opacity, hardness, stab: &str)`. A wrong
+  signature throws **`memory access out of bounds`** from the worker, not a
+  type error — it looks like an engine crash and is a caller mistake.
+- The engine handle from the fiber tree is an **async proxy**: every method
+  returns a Promise. Forgetting `await` yields `{}` and an empty method list,
+  which reads as "the engine is missing".
+
 ## OPEN — the layer rows want listbox semantics, and cannot have them cheaply (2026-09-01)
 
 Found by the #10 pass, which fixed what a leaf could fix and stopped there.
