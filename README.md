@@ -84,37 +84,42 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.64 — 2026-09-02
+### v8.65 — 2026-09-03
 
-**The status bar stops whispering, and undo stops moving your layer in silence.**
+**Skewed is the rare case.**
 
-Half the status bar was one grey and half was another, on the same row at the
-same 10px — the file size, dimensions and zoom looked right while the brand, the
-shortcut labels and their key chips looked washed out beside them. That was not
-a taste problem: the dim half measured 3.65:1 in light mode, under the 4.5:1
-WCAG AA asks for at this size, and the shortcut hints were dimmed twice because
-a 70% opacity sat on top of the faint colour. Everything in the bar now uses the
-value the readouts already used — 6.99:1 in light, 8.56:1 in dark.
+Dragging a corner of a selected image or layer now keeps its proportions, and
+holding Shift frees it. That is the opposite of what it used to do. Stretching a
+photo out of shape is the rare thing to want and the one that visibly damages
+the picture, so it is the one that costs a modifier — you cannot do it by
+accident any more, and the common case needs no keyboard at all.
 
-Undo could move which layer you had selected without saying so. It is not
-restoring "the layer that operation belonged to" — no such link exists in the
-engine, where exactly one of sixteen operation types records a layer at all.
-What it restores is whichever layer was active when the snapshot was taken. So
-if you run an operation, pick a different layer, then undo, your choice is
-quietly discarded. The row you land on now flashes for a moment. Selecting a
-layer yourself stays silent; only a change you did not ask for flashes.
+Crop and the shapes are deliberately unchanged: choosing a rectangle is not the
+same as scaling a photograph, so an arbitrary shape stays the no-modifier case
+there. Edge handles are free everywhere, because a single-axis drag has no
+second axis to reconcile.
 
-The swap itself is deliberately still there. Teaching undo which layer an
-operation belonged to means giving the engine an ownership it has never had,
-which is a far larger change than a flash — this release fixes the invisibility,
-not the behaviour.
+The two thumbnails on the "Welcome back" screen showed the browser's
+broken-image icon instead of your photos. The screen built its preview images
+and then threw them away a moment later, before the page had drawn them, so
+every return visit greeted you with two grey placeholders. They are built and
+released together now, and the same fault is fixed in the resume dialog.
 
-`AppShell.tsx` lost another 96 lines and nothing about the app behaves
-differently. Worth recording alongside it: the file was inventoried while
-picking what to move, and the numbers say this approach cannot finish the job.
-Of 247 blocks in it only 34 are big enough to be worth relocating, and moving
-every one would still leave roughly 2,560 lines. The rest is two different
-changes, now written up rather than started.
+The New Image panel is laid out as tiles — three across, icon above the label,
+matching the tool panels rather than looking like a different app. There is a
+fifth tile for Create AI Image, deliberately visible and disabled, so the shape
+of what is coming is honest rather than hidden. The row underneath is four plain
+icon buttons at one size: sign in, the website, GitHub and Codeberg.
+
+Two investigations that produced no code are written down rather than lost.
+Neither site sends a Content-Security-Policy — filed rather than patched,
+because a policy here has to allow the WebAssembly engine and its workers and
+would break image loading in production if guessed at. And the long-running
+report that painting hit every layer was measured at last: after cutting a
+selection to a new layer, a brush stroke changed exactly one layer's pixels and
+the other two were byte-identical. Cutting produces a full-size layer that sits
+on top, so a stroke on it covers everything below and reads as if it went
+everywhere. The pixels were always going to the right place.
 
 ## License
 

@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.65",
+    date: "2026-09-03",
+    headline: "Skewed is the rare case",
+    entries: [
+      {
+        tag: "feature",
+        text: "Dragging a corner of a selected image or layer now keeps its proportions, and holding Shift frees it. That is the opposite of what it used to do, and the reason is that stretching a photo out of shape is the rare thing to want and the one that visibly damages the picture \u2014 so it is the one that costs a modifier. You cannot do it by accident any more, and the common case needs no keyboard at all. Crop and the shapes are deliberately unchanged: choosing a rectangle is not the same as scaling a photograph, so an arbitrary shape stays the no-modifier case there. Edge handles are still free everywhere, because a single-axis drag has no second axis to reconcile.",
+      },
+      {
+        tag: "fix",
+        text: "The two thumbnails on the \"Welcome back\" screen showed the browser's broken-image icon instead of your photos. The screen built its preview images and then threw them away a moment later, before the page had drawn them \u2014 so every return visit greeted you with two grey placeholders. They are built and released together now, and the same fault is fixed in the resume dialog.",
+      },
+      {
+        tag: "ui",
+        text: "The New Image panel is laid out as tiles \u2014 three across, icon above the label, matching the tool panels rather than looking like a different app. There is a fifth tile for Create AI Image, deliberately visible and disabled, so the shape of what is coming is honest rather than hidden. The row underneath is four plain icon buttons at one size: sign in, the website, GitHub and Codeberg. The sign-in button that used to float in the corner is gone \u2014 it lives in that row now, where the other buttons are.",
+      },
+      {
+        tag: "infra",
+        text: "Two investigations that produced no code are written down in the repository instead of being lost. Neither site sends a Content-Security-Policy \u2014 filed rather than patched, because a policy here has to allow the WebAssembly engine and its workers and would break image loading in production if guessed at. And the long-running report that painting hit every layer was driven and measured at last: after cutting a selection to a new layer, a brush stroke changed exactly one layer's pixels, and the other two were byte-identical. Cutting produces a full-size layer that sits on top, so a stroke on it covers everything below and reads as if it went everywhere. The pixels were always going to the right place.",
+      },
+    ],
+  },
+  {
     version: "v8.64",
     date: "2026-09-02",
     headline: "The status bar stops whispering, and undo stops moving your layer in silence",

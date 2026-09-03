@@ -9759,3 +9759,121 @@ on master, and merging its branch would have reverted `styles.css` by 15 lines.
 | `pnpm run build` | **succeeds** |
 
 No engine change — no `build:wasm`, crate untouched, size band unmoved.
+
+## v8.65 Change Summary — 2026-09-03
+
+Skewed is the rare case. One behaviour change people will feel immediately, one
+visible bug gone, a redesigned New panel, and two investigations recorded.
+
+### Dragging a corner keeps the proportions now
+
+| Surface | Plain corner drag | `Shift` + corner drag |
+|---|---|---|
+| Selected image / layer, paste placement | **keeps the aspect ratio** | frees it — a deliberate skew |
+| Crop | free — any rectangle | keeps the aspect ratio |
+| Shapes / arrows | free — **unchanged** | keeps the ratio — unchanged |
+
+This reverses the raster surfaces. Stretching a photo out of shape is the rare
+intent and the one that visibly damages the picture, so it is the one that costs
+a modifier. Crop is choosing a region rather than scaling a picture, so an
+arbitrary rectangle stays the no-modifier case — the asymmetry is deliberate.
+
+Edge handles (`n` `e` `s` `w`) are free on every surface: a single-axis drag has
+no second axis to reconcile, which is how Figma, Illustrator and Photoshop
+behave.
+
+Shapes were left free-form by decision, not omission — tested by hand and
+confirmed: *"I can Shift if I want something different."*
+
+The policy is one function, `aspectLocked(surface, shiftKey)` in
+`app/src/lib/aspectLock.ts`. Call sites name their surface instead of branching
+on Shift, because that branch is exactly what drifts — the handlers read
+identically and mean opposite things. `aspectLock.test.ts` (18 tests) drives the
+real `cornerDelta` through a switch mirroring the handlers, pinning **vector in
+→ dimensions out** per surface.
+
+⚠️ Backlog #52 ("Shift inverted on shapes + paste, crop untouched") closed **by
+spec, not by fix**: at baseline all three surfaces read `if (e.shiftKey)` then
+lock, identically. Nothing was inverted.
+
+### The Welcome-back thumbnails were broken images
+
+Both preview thumbnails rendered as the browser's broken-image icon, with
+`net::ERR_FILE_NOT_FOUND` for a `blob:` URL in the console.
+
+The components built their object URLs in a `useMemo` and revoked them in a
+`useEffect` cleanup. Under StrictMode that pairing cannot hold: React mounts the
+effect, unmounts it, mounts it again — the cleanup revokes the URLs while the
+memo does **not** re-run, because `photos` never changed.
+
+A memo is a cache, not a lifecycle. Both now create and revoke in the same
+effect, matching `GridThumbnails.tsx`, which already did it correctly.
+
+Verified on production after deploy: 2 thumbnails, **0 broken**, real dimensions,
+`+10` overflow correct.
+
+### The New Image panel
+
+| | Before | After |
+|---|---|---|
+| Start actions | 4 full-width buttons, 2 columns | **5 tiles, 3 columns**, icon above label |
+| New tile | — | **Create AI Image**, visible and **disabled** |
+| Footer | 3 text buttons | **4 icon buttons at 30×30** |
+| Sign-in | 64px tile in the corner | in the footer row with the others |
+
+Measured: all five tiles 146×71; all four footer buttons 30×30 with 18px glyphs.
+
+### Two investigations, recorded rather than lost
+
+**No Content-Security-Policy on either site.** Live responses carry only
+`strict-transport-security` — no CSP, `X-Frame-Options`,
+`X-Content-Type-Options`, `Referrer-Policy` or `Permissions-Policy`, and no
+`[[headers]]` block exists in `netlify.toml` or `vercel.json`. Filed, not
+patched: a policy here must allow `'wasm-unsafe-eval'`, `blob:` and
+`worker-src` for the engine and codec workers plus the Clerk and Convex
+origins, and a wrong one breaks image loading or auth in production only.
+
+The rest of that pass was clean — **0 secret patterns** in the shipped bundle
+across 9 checks, `.env*` gitignored and untracked, no `dangerouslySetInnerHTML`,
+no `target="_blank"` without `noopener`, all 12 npm advisories confined to
+devDependencies, and Convex auth sound across 52 public functions.
+
+**#72 closed at the engine level.** Three sessions failed to reproduce "paint
+lands on every layer". Driven through the React fiber tree on the running app:
+after cutting a selection to a new layer, a stroke changed **exactly one
+layer** — the active one — while the other two stayed byte-identical.
+
+```
+idx0 Canvas   644f4b5b4160e3d3 -> 644f4b5b4160e3d3   unchanged
+idx1 Photo    644f4b5b4160e3d3 -> 644f4b5b4160e3d3   unchanged
+idx2 Layer 3  8d184920ad379c8d -> c15e7e57e1dfc805   CHANGED (active)
+```
+
+What was seen is compositing, not routing: `selection_to_new_layer` clones the
+whole source layer and clears outside the selection, so the new layer is a
+full-canvas buffer above the source and a stroke on it covers everything below.
+Full detail and the probe traps are in `docs/PARKING_LOT.md`.
+
+**ADR-042** (draft) also lands: AppShell shrinks by two structural changes, not
+by more handler extractions.
+
+### Correction carried from v8.63–v8.64
+
+Commit `a6b2bfc` is titled for the status-bar contrast fix and **also contains
+the layer-swap flash**, because its branch was cut from that branch instead of
+from master. Both changes were reviewed and green; the defect is that the commit
+does not describe its own contents. History was not rewritten.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** (app + marketing) |
+| `pnpm lint` | **0 errors**, 59 warnings |
+| `pnpm -C app test` | **652 passed**, 54 files |
+| `./scripts/guardrails.sh` | **OK** — all baselines |
+| `cargo fmt --check` / `clippy -D warnings` | **clean** |
+| `cargo test --features tiles` | **17 suites ok** |
+| `pnpm run build` | **succeeds** |
+
+No engine change — no `build:wasm`, crate untouched, size band unmoved.
