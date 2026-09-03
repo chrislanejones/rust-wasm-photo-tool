@@ -84,35 +84,37 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.62 — 2026-09-01
+### v8.64 — 2026-09-02
 
-**The architecture doc caught up to the architecture.** Nothing in the app
-changed. What changed is that the documentation stopped describing a version
-of this project that stopped existing around v7.8.
+**The status bar stops whispering, and undo stops moving your layer in silence.**
 
-`docs/Architecture.md` had a status line reading v7.8 and a diagram showing
-the Rust engine running on the main thread. It has not run there since v8.32 —
-it lives in a Web Worker, drawing straight onto a transferred canvas, and the
-main thread's blocking time per heavy operation went from 129–137 ms to zero.
-That was the single most wrong thing in the docs tree. The diagram is redrawn
-around it.
+Half the status bar was one grey and half was another, on the same row at the
+same 10px — the file size, dimensions and zoom looked right while the brand, the
+shortcut labels and their key chips looked washed out beside them. That was not
+a taste problem: the dim half measured 3.65:1 in light mode, under the 4.5:1
+WCAG AA asks for at this size, and the shortcut hints were dimmed twice because
+a 70% opacity sat on top of the faint colour. Everything in the bar now uses the
+value the readouts already used — 6.99:1 in light, 8.56:1 in dark.
 
-Rather than bump version numbers, every claim in the doc was re-read against
-the code. Seven were wrong. The tool registry existed when the doc said it did
-not, and was unwired when a working note said it was finished. The service
-worker was described as "investigated only, nothing wired, no ADR" — it has
-been in the tree since July under an accepted ADR, shipping switched off, which
-is a third state the doc had no room for and now has a section for. Undo was
-still written as a plan and its correction rather than as one system. `AppShell.tsx`
-was cited at 2,930 lines; it is 3,813.
+Undo could move which layer you had selected without saying so. It is not
+restoring "the layer that operation belonged to" — no such link exists in the
+engine, where exactly one of sixteen operation types records a layer at all.
+What it restores is whichever layer was active when the snapshot was taken. So
+if you run an operation, pick a different layer, then undo, your choice is
+quietly discarded. The row you land on now flashes for a moment. Selecting a
+layer yourself stays silent; only a change you did not ask for flashes.
 
-This changelog also went on a diet. It carried **88 release sections** against
-its own "latest release below" rule — every release added one and none ever
-removed one. It carries one now. All 87 removed were confirmed present in
-`docs/Change-summary.md` before being cut.
+The swap itself is deliberately still there. Teaching undo which layer an
+operation belonged to means giving the engine an ownership it has never had,
+which is a far larger change than a flash — this release fixes the invisibility,
+not the behaviour.
 
-Every relative link in all 80 tracked Markdown files was checked against the
-path it resolves to: **2 broken, now 0.**
+`AppShell.tsx` lost another 96 lines and nothing about the app behaves
+differently. Worth recording alongside it: the file was inventoried while
+picking what to move, and the numbers say this approach cannot finish the job.
+Of 247 blocks in it only 34 are big enough to be worth relocating, and moving
+every one would still leave roughly 2,560 lines. The rest is two different
+changes, now written up rather than started.
 
 ## License
 

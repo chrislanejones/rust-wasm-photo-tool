@@ -24,6 +24,56 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.64",
+    date: "2026-09-02",
+    headline: "The status bar stops whispering, and undo stops moving your layer in silence",
+    entries: [
+      {
+        tag: "ui",
+        text: "Half the status bar was one grey and half was another, on the same row at the same 10px \u2014 the file size, dimensions and zoom looked right while the brand, the shortcut labels and their key chips looked washed out beside them. That was not a taste problem. Measured against the bar's own background, the dim half came to 3.65:1 in light mode, under the 4.5:1 that WCAG AA asks for at this size, and the shortcut hints were dimmed TWICE because a 70% opacity sat on top of the faint colour. Everything in the bar now uses the same value the readouts already used: 6.99:1 in light, 8.56:1 in dark.",
+      },
+      {
+        tag: "fix",
+        text: "Undo could move which layer you had selected, without saying so. It is not restoring \"the layer that operation belonged to\" \u2014 no such link exists in the engine, where exactly one of sixteen operation types records a layer at all. What it restores is whichever layer was active when the snapshot was taken. So if you run an operation, pick a different layer, then undo, your choice is quietly discarded. The row you land on now flashes for a moment, so the jump is something you see rather than something you discover later. Selecting a layer yourself stays silent \u2014 only a change you did not ask for flashes.",
+      },
+      {
+        tag: "infra",
+        text: "The swap itself is deliberately still there. Making undo remember which layer an operation belonged to means teaching the engine an ownership it has never had, which is a much larger change than a flash; the honest version of this release is that the behaviour is unchanged and only its visibility is fixed.",
+      },
+      {
+        tag: "infra",
+        text: "AppShell.tsx lost another 96 lines \u2014 the internal save that re-encodes your canvas over its stored copy moved into a file of its own. Nothing about the app behaves differently. Worth recording alongside it: the whole file was inventoried while picking what to move, and the numbers say this approach cannot finish the job. Of 247 blocks in it, only 34 are big enough to be worth relocating, and moving every one of them would still leave roughly 2,560 lines. The remaining work is two different changes, and they are written up rather than started.",
+      },
+    ],
+  },
+  {
+    version: "v8.63",
+    date: "2026-09-02",
+    headline: "The bar buttons line up, and the active layer says which one it is",
+    entries: [
+      {
+        tag: "ui",
+        text: "The five buttons across the top bar \u2014 New, Tools, Gallery, Review, Export \u2014 each sized themselves to their own text, so \"New\" came out 71.6px against Gallery's 100.4. Twenty-eight pixels of difference between two things that are meant to read as peers. They are all one width now, the width of the widest label. The group costs 57.6px more and grows symmetrically, so the centred cluster does not move.",
+      },
+      {
+        tag: "fix",
+        text: "In the Review panel's layer list, which layer was active lived in a CSS class and nowhere else. It looked right and announced nothing \u2014 a screen reader heard four identical \"Select <name>, button\" rows with no way to tell them apart. The active row now carries aria-current. Not aria-pressed: a layer cannot be un-selected, so \"pressed\" would advertise a state you cannot reach.",
+      },
+      {
+        tag: "fix",
+        text: "New and Export in the mobile bar announced themselves as unpressed toggle buttons. They are actions, not toggles \u2014 there is no \"export mode\" to be in \u2014 and a comment two lines away in the same file said exactly that. The bar was passing aria-pressed=false explicitly, overriding the button component's own rule of leaving the attribute off when it means nothing.",
+      },
+      {
+        tag: "infra",
+        text: "CI installed whatever wasm-pack \"latest\" happened to resolve to. On September 2nd that was v0.15.0 at 03:04 UTC and v0.9.1 at 03:22 \u2014 same workflow, same commit, eighteen minutes apart, one green and one red. The old one ships a 2020-era wasm-opt that cannot parse the engine's WebAssembly, so the build died with nothing wrong in the repository, and a plain re-run went green again. That is the worst shape this kind of bug takes: it reads as flake and it is an unpinned dependency. The Netlify build had been pinned to 0.15.0 for months, with a comment predicting this exact failure. GitHub CI never got the same pin. It has one now.",
+      },
+      {
+        tag: "infra",
+        text: "The marketing site's architecture page promised \"a service worker that precaches the shell and the WASM binary\" in visible copy, fifty lines below a source comment correctly stating that no service worker ships in a build. It credited the codec worker with the OffscreenCanvas the engine worker owns, listed a rayon worker pool as planned when it had been measured and rejected, and never mentioned the engine worker at all \u2014 which has been the default since v8.32 and is the largest structural fact about the app.",
+      },
+    ],
+  },
+  {
     version: "v8.62",
     date: "2026-09-01",
     headline: "The architecture doc caught up to the architecture",

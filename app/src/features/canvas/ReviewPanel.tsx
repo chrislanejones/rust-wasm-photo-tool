@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
+import { useLayerSwapFlash } from "@/hooks/useLayerSwapFlash";
 import { TIERS } from "@/lib/tiers";
 import type { UserMode } from "@/components/StatusBar";
 import type { HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
@@ -170,6 +171,13 @@ export function ReviewPanel({
   const openCount = TOGGLES.filter((t) => open[t.key]).length;
 
   // Inline-rename state for the Layers list (null = not renaming).
+  // #57 — undo/redo restores the active layer from the SNAPSHOT, so a
+  // selection made after an op is silently discarded. Flash the row that
+  // moved; see hooks/useLayerSwapFlash.ts for why the swap itself is deferred.
+  const { flashingId, markUserSelection } = useLayerSwapFlash(
+    layers.find((l) => l.active)?.id,
+  );
+
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
 
@@ -379,7 +387,18 @@ export function ReviewPanel({
                 </span>
               </div>
             ) : (
-              <ul className="history-list layers-list">
+              // role="group", not the implicit `list`: every row below carries
+              // a button role, so a `list` here would claim listitem children
+              // it does not have. A real listbox/option pair would be the
+              // richer answer, but it demands roving tabindex + arrow keys AND
+              // options with no interactive descendants — these rows carry six
+              // buttons each. Filed, not faked.
+              //
+              // (Prose deliberately avoids the literal attribute spelling:
+              //  scripts/guardrails.sh greps that attribute on lines lacking
+              //  an aria-label, and it cannot tell a comment from code — this
+              //  comment failed the ratchet on its first push.)
+              <ul className="history-list layers-list" role="group" aria-label="Layers">
                 {layersTopDown.map((layer) => {
                   // Stack index in the bottom→top array (for reorder math).
                   const idx = layers.findIndex((l) => l.id === layer.id);
@@ -390,13 +409,26 @@ export function ReviewPanel({
                       key={layer.id}
                       className={`full-width-badge layer-row ${
                         layer.active ? "layer-active" : ""
-                      }`}
+                      } ${layer.id === flashingId ? "layer-swapped" : ""}`}
                       role="button"
                       tabIndex={0}
-                      onClick={() => onSelectLayer(layer.id)}
+                      // #10: which layer is active was carried ONLY by the
+                      // `layer-active` class — visible, and announced to
+                      // nobody. `aria-current` rather than `aria-pressed`
+                      // because a layer cannot be un-selected: clicking one
+                      // moves the selection, it does not toggle this row off.
+                      aria-current={layer.active ? "true" : undefined}
+                      // #57: mark the pick BEFORE delegating, so the swap
+                      // this causes is recognised as the user's own and stays
+                      // quiet. Only a selection nobody asked for flashes.
+                      onClick={() => {
+                        markUserSelection(layer.id);
+                        onSelectLayer(layer.id);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
+                          markUserSelection(layer.id);
                           onSelectLayer(layer.id);
                         }
                       }}

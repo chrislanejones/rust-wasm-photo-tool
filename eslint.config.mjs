@@ -173,7 +173,7 @@ export default tseslint.config(
     // 2026-08-27 sizes. Ordered biggest first, which is also roughly the
     // order docs/Entropy-Refactor-Plan.md Phase 4 works through them.
     files: ["app/src/app/AppShell.tsx"],
-    rules: { "max-lines": ["warn", { max: 3806 }] },
+    rules: { "max-lines": ["warn", { max: 3718 }] },
   },
   {
     files: ["app/src/features/canvas/CanvasArea.tsx"],

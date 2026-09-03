@@ -9507,3 +9507,255 @@ docs that mention the file already point at `archive/`.
 | Rust | **untouched** — no `build:wasm` |
 
 Documentation only. No app code, no engine, no schema.
+
+## v8.63 Change Summary — 2026-09-02
+
+The bar buttons line up, and the active layer says which one it is. Four
+changes, none of them large, all of them things that were quietly wrong.
+
+### The five top-bar buttons were five different widths
+
+New / Tools / Gallery / Review / Export each sized to its own text.
+
+| Button | Before | After |
+|---|---|---|
+| New | 71.6 px | **100.4 px** |
+| Tools | 86.0 px | **100.4 px** |
+| Gallery | 100.4 px | 100.4 px |
+| Review | 93.2 px | **100.4 px** |
+| Export | 93.2 px | **100.4 px** |
+| **Spread** | **28.8 px** | **0 px** |
+
+`ToggleButtonGroup` gained an opt-in `equalWidth` that swaps its container from
+flex to a single-row grid of `1fr` columns. In a shrink-to-fit container every
+fr column resolves to the largest item's max-content, so the buttons equalise
+to the widest label with no `min-w-[]` magic number to re-tune later.
+
+The existing `fill` prop looks like it should do this and does not: in a
+shrink-to-fit row `flex-1` leaves the widest button at its own content width
+and only pads the others. Hence a new flag rather than a reuse.
+
+Opt-in, because eleven other call sites share this component and their labels
+are already even. The group costs 57.6px (468.4 → 526) and grows
+symmetrically — measured centre shift **0.0px**.
+
+Measured at 1600, 1010 and 335px and in compact mode. The mobile bar is
+untouched and cannot be affected: it wires `IconButton` directly rather than
+through `ToggleButtonGroup`, and its seven buttons were already a uniform 30px
+inside a fixed 252px box.
+
+### The active layer was announced to nobody
+
+Each layer row in Review renders as `<li>` with a button role. Which one was
+active lived in the `layer-active` CSS class and nowhere else, so a screen
+reader heard four identical "Select &lt;name&gt;, button" rows.
+
+| | Before | After |
+|---|---|---|
+| Active row | CSS class only | `aria-current="true"` |
+| Inactive rows | CSS class only | attribute absent |
+| Container `<ul>` | implicit `list`, **zero `listitem` children** | `role="group"` + label |
+
+`aria-current` rather than `aria-pressed`, because a layer cannot be
+un-selected — clicking a row moves the selection, it does not toggle that row
+off, and "pressed" would advertise a state the user cannot reach.
+
+**Not done, and filed rather than faked.** `role="listbox"` + `role="option"`
+is what `aria-selected` actually wants. It needs roving tabindex and arrow-key
+handling, and `role="option"` forbids interactive descendants while each row
+carries six buttons. That is a row redesign, not an accessibility patch.
+
+### A label was overwriting the word printed on the button
+
+An `aria-label` replaces the accessible name rather than adding to it, so
+putting one on a button that already shows text overwrites what you can see.
+`ToggleButtonGroup` is both kinds of button in one component — `compact` hides
+the visible label — so the `aria-label` is now conditional on `compact`.
+
+No announced name changed today: every caller happens to pass a tooltip equal
+to its label, so the unconditional form was correct by luck. The first
+descriptive tooltip anyone wrote would have renamed a button out from under
+its own visible text.
+
+The same check turned up a real one. The mobile bar passed
+`aria-pressed={active ?? false}`, overriding `IconButton`'s own
+`aria-pressed={active || undefined}`, so **New and Export announced as
+unpressed toggle buttons** — while the comment beside them reads "New and
+Export are actions; the middle three are tabs."
+
+### CI was installing a different wasm-pack from one hour to the next
+
+`jetli/wasm-pack-action` was called with no version, so it took `latest`.
+
+| Run | Time (UTC) | Installed | Frontend job |
+|---|---|---|---|
+| PR #38 | 03:04 | wasm-pack **v0.15.0** | pass |
+| PR #39 | 03:22 | wasm-pack **v0.9.1** | **FAIL** |
+| PR #39 re-run | 03:29 | wasm-pack **v0.15.0** | pass |
+
+Same workflow, same commit base, eighteen minutes apart. v0.9.1 ships a
+2020-era `wasm-opt` that predates reference-types, so the build died on
+`[parse exception: Only 1 table definition allowed in MVP]` with nothing wrong
+in the repository — and a plain re-run went green.
+
+That is the worst shape this bug can take: it reads as flake, so the instinct
+is to re-run and move on, and the next PR rolls the dice again.
+
+`netlify.toml` has pinned `wasm-pack --version 0.15.0 --locked` for months, and
+its comment names the risk in advance — "the tool that runs wasm-opt could
+change under a build with no commit, the same class of drift the toolchain pin
+closed." The pin went to Netlify and never to GitHub CI, so while ADR-038
+pinned rustc on both halves of the build, the two halves still disagreed about
+which optimizer ran. Both call sites are pinned now.
+
+### The marketing architecture page described a different app
+
+Flagged during the v8.62 docs pass and left alone then, because public copy is
+a human call. Fixed now:
+
+| Said | Reality |
+|---|---|
+| "a service worker that precaches the shell and the WASM binary" | never on in a shipped build — `__IH_SW_MODE__` defaults `"off"` |
+| "Codec worker — encode · thumbnail · OffscreenCanvas" | the **engine worker** owns the OffscreenCanvas |
+| "rayon worker pool — planned, gated on COOP/COEP" | measured and **rejected**, 8–31× slower |
+| no mention of the engine worker | default engine since **v8.32** |
+
+The first line is the one that mattered: a visitor read a shipped feature that
+does not exist, fifty lines below a source comment in the same file correctly
+saying it does not ship.
+
+### Documented, because both cost real time this week
+
+`./scripts/guardrails.sh` is a blocking CI job and no other local gate runs it.
+It went red while `tsc`, `pnpm lint` and `pnpm -C app test` were all green. It
+greps text and cannot tell a comment from code — a source comment that spelled
+out `role="button"` while explaining the rule counted as a violation. It is in
+CLAUDE.md's command list now.
+
+`gh pr checks | tail` hides failures. A failing job was line 1 of 19 and a
+`tail -15` reported a red PR as green.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** |
+| `pnpm lint` | **0 errors**, 61 warnings |
+| `pnpm -C app test` | **634 passed**, 53 files |
+| `./scripts/guardrails.sh` | **OK** — all baselines |
+| `cargo fmt --check` | **clean** |
+| `cargo clippy -D warnings` | **clean** |
+| `cargo test --features tiles` | **267 passed**, 0 failed |
+| `pnpm run build` | **succeeds** |
+
+No engine change, so no `build:wasm` and no size-band movement.
+
+## v8.64 Change Summary — 2026-09-02
+
+The status bar stops whispering, and undo stops moving your layer in silence.
+Two visible fixes, one invisible one, and a correction to this record.
+
+### The status bar was two different greys
+
+Half of it used `--text-muted` and half used `--text-secondary`, on the same row
+at the same 10px. Measured against the bar's own background:
+
+| Theme | Token | Contrast | WCAG AA (4.5) |
+|---|---|---|---|
+| **LIGHT** | `--text-muted` | **3.65** | **FAILS** |
+| LIGHT | `--text-secondary` | 6.99 | passes |
+| DARK | `--text-muted` | 5.14 | passes, barely |
+| DARK | `--text-secondary` | 8.56 | passes |
+
+`.status-shortcut-hint` made it worse by stacking `opacity: 0.7` **on top of**
+muted — two dimmings applied to "undo", "redo", "commands" and the active tool's
+own name. Four rules move to `--text-secondary` and the opacity is deleted
+rather than raised.
+
+After, measured in the browser in both themes:
+
+| | Brand | kbd chip | Zoom readout |
+|---|---|---|---|
+| Dark | **8.56** (was 5.14) | 6.83 | 8.56 |
+| Light | **6.99** | 7.35 | 6.99 |
+
+`.status-dot` keeps `--text-muted` on purpose — a 6px dot is non-text and
+answers to the 3:1 threshold, which it clears.
+
+⚠️ A first measurement read light-mode brand at 1.97 and looked like a bad
+regression. It was the probe: `.status-brand-link` has `transition: color
+0.15s`, and the sample landed mid-transition after a theme toggle. Anything
+timing a themed colour has to wait that out.
+
+### Undo moved the active layer without saying so
+
+`restore_snapshot` does `self.active = snap.active` (`src/lib.rs:711`) — it
+restores whichever layer was active when the SNAPSHOT was taken, not the layer
+the operation belonged to. There is no such ownership: **1 of 16 `Op` variants
+carries a layer** (`LayerMove`).
+
+Reproduced on v8.63 before any code was written:
+
+| Step | Active layer |
+|---|---|
+| 0. start | Photo |
+| 1. Apply Compression | Photo |
+| 2. user selects Canvas | Canvas |
+| 3. **undo** | **Photo — silently moved** |
+
+⚠️ **The obvious three-step test is a FALSE NEGATIVE.** Op → undo with no
+selection change between reports "stays", because the snapshot happens to hold
+the same layer. You must move the active layer BETWEEN the op and the undo.
+
+The row now flashes for 900ms when the selection moves without being asked;
+selecting a layer yourself stays silent. `prefers-reduced-motion` gets a steady
+tint instead of an animation.
+
+**The swap itself is still there, deliberately.** "Undoing a global op must not
+swap the active layer" remains known-violated and deferred — reinstating it
+means minting op→layer ownership in Rust, the expensive branch that was
+explicitly declined. Only the invisibility is fixed.
+
+This was machine-observable for the first time because v8.63 added
+`aria-current` to the active row.
+
+### AppShell lost another 96 lines, and the approach lost its case
+
+`persistActiveCanvas` — the internal save that re-encodes the canvas over its
+stored original — moved to `app/src/app/session/usePersistActiveCanvas.ts`.
+**3,814 → 3,718**, ratchet lowered to match in the same commit. No behaviour
+change.
+
+The inventory that picked it also answered a bigger question. Of **247 named
+blocks** in AppShell's logic, only **34 are ≥15 lines**, totalling 1,255 — so
+extracting every block worth extracting still leaves ~2,560, and the 993-line
+JSX return (26% of the file) is untouched by moving handlers at all. Written up
+as **ADR-042 (draft)**: the remaining reduction is two structural changes, not
+more extractions.
+
+⚠️ **Rank extraction candidates by what a block READS, never by its declared
+dependency array.** `confirmDeleteAll` declares 2 dependencies and touches 11
+identifiers — 34.0 by the array, 6.2 by reality, wrong by 5×.
+
+### Correction to the v8.63–v8.64 record
+
+Commit `a6b2bfc` is titled for the status-bar contrast fix and **also contains
+the layer-swap flash**, because its branch was cut from the flash's branch
+instead of from master. Both changes were reviewed and green before merging and
+no code is wrong, but that commit does not describe its own contents. The
+history is pushed and is not being rewritten; this paragraph is the correction.
+PR #44 was closed rather than merged for the same reason — its code was already
+on master, and merging its branch would have reverted `styles.css` by 15 lines.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** (app + marketing) |
+| `pnpm lint` | **0 errors**, 59 warnings (was 61) |
+| `pnpm -C app test` | **634 passed**, 53 files |
+| `./scripts/guardrails.sh` | **OK** — all baselines |
+| `cargo fmt --check` / `clippy -D warnings` | **clean** |
+| `pnpm run build` | **succeeds** |
+
+No engine change — no `build:wasm`, crate untouched, size band unmoved.
