@@ -7,7 +7,6 @@ import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { X } from "lucide-react";
 import { fadeIn, quickSpring } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
-import { UserMenu } from "@/components/UserMenu";
 import { NewActions } from "@/features/upload/NewActions";
 
 const horseLogo = "/Image-Horse-Logo.svg";
@@ -93,11 +92,6 @@ export function UploadDialog({
                   </h1>
                 </div>
               )}
-
-              {/* Sign-in — top-left, mirroring the close button's spot */}
-              <div className="absolute top-4 left-4">
-                <UserMenu />
-              </div>
 
               {/* Close */}
               <Button size="tiny" className="absolute top-4 right-4" onClick={handleTryClose}>
