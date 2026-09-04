@@ -2,5 +2,22 @@
 # touching build commands. SIMD128 lets the pixel loops (resize, blur,
 # brightness/contrast, composite, paint) auto-vectorize — typically 2–4× on
 # those ops. All current browsers support wasm SIMD.
+# ⚠️ RUSTFLAGS AS AN ENV VAR REPLACES THIS ARRAY, it does not merge with it.
+# Setting `RUSTFLAGS=…` on a build silently drops simd128 AND the remaps below
+# — the same shape as the `RUSTUP_TOOLCHAIN` trap ADR-038 documents. Measured
+# while testing this file: a build with RUSTFLAGS set came out 14,459 B smaller
+# because it had lost SIMD, which reads as a size win and is a performance
+# regression. Add flags HERE, never on the command line.
+#
+# The remaps make the binary a function of the source rather than of the
+# machine that built it. Cargo embeds absolute registry paths in panic
+# locations; ours differ between this laptop (`/home/clj`) and Netlify
+# (`/opt/buildhome`), which is the 139 B gap ADR-038 measured and could not
+# close. Both prefixes are listed because each is a no-op where it does not
+# match, so one file serves both builders.
 [target.wasm32-unknown-unknown]
-rustflags = ["-C", "target-feature=+simd128"]
+rustflags = [
+  "-C", "target-feature=+simd128",
+  "--remap-path-prefix=/home/clj/.cargo/registry=/cargo-registry",
+  "--remap-path-prefix=/opt/buildhome/.cargo/registry=/cargo-registry",
+]
