@@ -145,6 +145,129 @@ whose "small TS job" scoping did not survive contact with the code — #63
 on an engine export). The backlog is systematically optimistic about what is TS
 and what is Rust. Check the engine surface before estimating.
 
+## OPEN → UNBLOCKED — #71: the emptiness scan is cheap, and it must not go in `get_layers()` (2026-09-04)
+
+The 08-31 correction was right that #71 is blocked on an engine export rather
+than a product decision. What it left open is the design question it ended on:
+
+> Perf is the real design question, not the extraction. Proving a layer *is*
+> empty has no early exit — every pixel must be checked, ~12M on a 4000×3000
+> document […] Needs memoization with a real invalidation signal, or a dirty
+> flag on the `Layer` struct.
+
+**Measured. That worry is aimed at the wrong case, and the cache it asks for is
+not needed.**
+
+| Buffer, 4000×3000 RGBA (45 MB) | today's inlined `bbox` scan | per-pixel + early exit | u64 word scan + early exit |
+|---|---|---|---|
+| **Photo layer** (opaque at pixel 0) | 11.277 ms | **0.000 ms** | **0.000 ms** |
+| **Empty layer** (the "no early exit" case) | 6.983 ms | 3.441 ms | **1.817 ms** |
+| One opaque pixel, at the LAST pixel | — | 3.961 ms | **1.576 ms** |
+
+Every row asserted against the expected answer before timing.
+`cargo build --release`, native x86-64, `black_box` on both sides.
+⚠️ **Native, not wasm** — the wasm figure is unmeasured and will be slower.
+The conclusions below survive a large multiplier; the numbers themselves should
+not be quoted as wasm costs.
+
+Three things fall out of that:
+
+1. **The common case is free.** A layer with a photo on it exits at the first
+   pixel. The scan only runs to completion on a layer that is empty — which is
+   the answer #71 wants, and it costs under 2 ms.
+2. **Today's predicate is the slowest of the three** because it computes a
+   bounding box it does not need for a yes/no answer, and therefore cannot exit
+   early. A pure `layer_is_empty` should NOT be extracted from
+   `begin_layer_resize_preview` by refactoring — it is a different algorithm.
+   Leave the bbox scan alone; it needs the box.
+3. **No dirty flag, no cache, no invalidation signal.** All three were proposed
+   against a cost that is not there. `buf` is a `pub` field, so a cache on
+   `Layer` could be silently invalidated by any direct write — that is a real
+   staleness hazard bought for nothing.
+
+### But it must NOT be a field on `get_layers()`
+
+This is the part that matters for scheduling, and it is where #71 and #63 part
+company despite looking like the same change.
+
+`get_layers()` is not a panel-open call. It is inside `capture_state`
+(`capture.rs:147`) and `capture_ui_state`, which is what `readUiSnapshot` and
+therefore `syncState` read — and `syncState` has **199 call sites**, including
+the per-stroke paths (`usePaintTool`, `useDrawingTools`, `useCloneStamp`). An
+alpha scan there is paid on every stroke, per layer, forever.
+
+| | #63 (`textCount` / `shapeCount`) | #71 (emptiness) |
+|---|---|---|
+| Cost per call | `Vec::len()` — free | a scan |
+| Safe inside `get_layers()`? | **yes** | **no** |
+| Shape | two more fields in the format string, `layer.rs:852` | a separate pure query |
+
+So: **#63 goes in `get_layers()`, #71 does not.** They were about to be
+scheduled as one change because both read "add a field to the layer JSON".
+
+### The shape #71 actually wants
+
+```rust
+pub fn layer_is_empty(&self, index: usize) -> bool
+```
+
+Pure `&self`, early-exit word scan, no `paste_preview` side effect — which is
+exactly what made `begin_layer_resize_preview` unusable as a probe.
+
+The consumer is **one layer, not N**: the Color Overlay block in
+`LayerSettings.tsx:336` is gated on `activeLayer` and edits only that layer. So
+this is a single query, re-asked when the document changes (`activeLayerId` +
+`undoCount`) rather than held in React state — which keeps it clear of the
+"which photos have edits" derived-state failure the v7.81 batch-export data loss
+came from.
+
+Still needs: the ADR for the new API surface, the size band (ADR-037), the
+toolchain pins (ADR-038), and a wasm-side timing to replace the native numbers
+above. It does **not** touch ADR-041's "tints, never fills".
+
+## OPEN — the engine sitting: what it contains and what it does NOT (2026-09-04)
+
+Five backlog items now all end with "ride the engine sitting", which is only
+useful if the sitting has a shape. It does, and two of the items have quietly
+changed status.
+
+| Item | What it needs in the crate | Size | Blocked on |
+|---|---|---|---|
+| **#70** remap path prefix | `.cargo/config.toml` only | done | in review, rides the next release |
+| **#65** narrow the sentinel band | nothing — CI config | — | **#70 deploying**, then a measured spread |
+| **#63** per-layer annotation counts | 2 fields in `get_layers()`, `layer.rs:852` | ~2 lines | nothing |
+| **#71** empty-layer signal | `layer_is_empty(&self, i) -> bool` | ~15 lines | ADR for the new API surface |
+| **#62** shape z-order | `move_shape_annotation(&mut self, id, to)` | ~15 lines + 4 UI actions | ADR ("reorder is deliberately not replayable") |
+
+**#68 may not exist as separate work.** It was carried as "shape z-order, with
+the `OP_FORMAT_VERSION` 5→6 bump and a dexie migration". The `remove_object`
+precedent found while scoping #62 (`selection.rs:643` — snap history, skip the
+op-log, let `oplog_engine_in_sync` fall back to snapshot undo) removes the
+reason for the bump. If that precedent is accepted for reorder, #62 lands and
+**#68 closes with no code**. If it is rejected, #68 is the real item and #62 is
+its UI half. That is one ADR decision, and it should be taken before either is
+scheduled.
+
+### Why they are batched
+
+One wasm rebuild, one size-band check (ADR-037), one toolchain exposure
+(ADR-038), one bench. Doing #63 alone spends a full engine verification cycle
+on two integers.
+
+### Why #71 and #63 are NOT the same change
+
+Both read as "add a field to the layer JSON" and were about to be scheduled as
+one. `get_layers()` is on the `syncState` path — **199 call sites**, per-stroke
+paths included — so a `Vec::len()` is free there and an alpha scan is not. #63
+is a field; #71 is a separate pure query. See the #71 entry above.
+
+### The pattern, now four for four
+
+#71, #63 and #62 were each carried as small TS jobs and each turned out to need
+the crate. #65 was carried as ready and needs a deploy first. **The backlog is
+systematically optimistic about where work lives.** Check the engine surface
+before estimating — grep the exported method list, not the issue title.
+
 ## OPEN — no Content-Security-Policy on either site (2026-09-03)
 
 Found by the night-0902 security pass. Live responses from **both** the app and
