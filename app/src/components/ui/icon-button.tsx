@@ -101,7 +101,12 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         active
           ? "border-2 border-theme-primary bg-bg-elevated text-text-primary shadow-sm"
           : [
-              "border-2 border-transparent text-text-muted",
+              // --text-secondary, not --text-muted. Muted measures only 3.00:1
+              // against the pill in LIGHT mode, which left no room below it
+              // for a disabled state that was both dimmer AND visible — see
+              // the disabled rule further down. Secondary is 5.75:1 light /
+              // 7.67:1 dark, and matches the status bar (v8.64).
+              "border-2 border-transparent text-text-secondary",
               // The rail's own idle fill when there is no pill to supply one.
               standalone && "bg-bg-tertiary",
               "hover:bg-bg-elevated hover:text-text-primary active:scale-[0.94]",
@@ -109,7 +114,15 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
               .filter(Boolean)
               .join(" "),
         !active && HOVER_RING,
-        "disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent",
+        // DISABLED IS A COLOUR, NOT AN OPACITY. `opacity-30` over the pill
+        // rendered 1.33:1 in light mode and 1.56:1 in dark — invisible, not
+        // dimmed. Opacity could never fix it either: the old enabled colour
+        // was 3.00:1 at FULL strength, so every reduction of it lands below
+        // the floor. Enabled is secondary now and disabled is muted at full
+        // opacity — 3.00:1 light / 4.61:1 dark, clearly quieter than enabled
+        // and still perceivable.
+        "disabled:text-text-muted disabled:cursor-not-allowed disabled:hover:bg-transparent",
+        "disabled:hover:text-text-muted",
         "disabled:hover:ring-0 disabled:active:scale-100",
         className,
       )}
