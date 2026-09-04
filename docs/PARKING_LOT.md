@@ -4,6 +4,41 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — #56: the Netlify UI holds a stale copy of the build command (2026-09-04)
+
+Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI is the
+**pre-ADR-038** command:
+
+| | Netlify UI setting | `netlify.toml` |
+|---|---|---|
+| wasm features | **none passed** | `--features tiles,patchmatch` |
+| Rust toolchain | `--default-toolchain stable` | `none` — the pin file decides |
+| wasm-pack | unpinned `cargo install` | `--version 0.15.0 --locked` |
+| install | `pnpm ci` (not a pnpm command) | `pnpm install` |
+| build | `cd app && pnpm run build` | `pnpm --filter stamp-tool build` |
+
+**`netlify.toml` wins today, and production is correct.** Evidence rather than
+precedence-docs: the live wasm is **816,324 B**, a measured featureless build
+was **723,755 B**, the sentinel band is 780,000–850,000 B (ADR-037), and the
+"Deploy sentinel (live prod engine)" CI job is green.
+
+So it is a loaded gun, not a live fire. It fires if `netlify.toml` is renamed,
+moved under a `base` subdirectory Netlify cannot see, or if anyone edits the
+command in the UI — and the failure mode is the **v7.36–v7.45 featureless-wasm
+bug**, which shipped for ten releases without anyone noticing.
+
+**Fix: clear the UI command** so `netlify.toml` is the only source. That is a
+production build-settings change, so it wants a human hand:
+
+```
+netlify api updateSite --data '{"site_id":"<id>","build_settings":{"cmd":""}}'
+```
+
+Or clear it in Site configuration → Build & deploy → Build command.
+
+Same shape as the `wasm-pack: latest` drift that cost a night: two sources of
+truth for one build, and the invisible one is the one that rots.
+
 ## OPEN — no Content-Security-Policy on either site (2026-09-03)
 
 Found by the night-0902 security pass. Live responses from **both** the app and

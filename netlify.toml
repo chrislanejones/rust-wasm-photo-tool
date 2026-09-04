@@ -1,4 +1,31 @@
 [build]
+  # ⚠️ A SECOND, STALE COPY OF THIS COMMAND LIVES IN THE NETLIFY UI (#56).
+  # Read 2026-09-04 via `netlify api getSite` — `build_settings.cmd` is still
+  # the pre-ADR-038 version:
+  #
+  #   curl … --default-toolchain stable && cargo install wasm-pack &&
+  #   wasm-pack build --target web --out-dir pkg && cd app && pnpm ci &&
+  #   pnpm run build
+  #
+  # Three things wrong with it, in descending order of damage:
+  #   1. NO `--features tiles,patchmatch` — that is the v7.36–v7.45 bug, where
+  #      Netlify shipped a FEATURELESS wasm for ten releases.
+  #   2. `--default-toolchain stable` and an unpinned `cargo install wasm-pack`
+  #      — the exact two drifts ADR-038 and v8.63's CI pin closed.
+  #   3. `pnpm ci` is not a pnpm command at all.
+  #
+  # THIS FILE WINS TODAY. netlify.toml's `command` overrides the UI setting, and
+  # the shipped wasm proves it: 816,324 B live, against 723,755 B for a measured
+  # featureless build and a 780,000–850,000 B sentinel band (ADR-037). The
+  # "Deploy sentinel (live prod engine)" job is green.
+  #
+  # So this is a loaded gun, not a live fire. It goes off if netlify.toml is
+  # renamed, moved under a `base` subdirectory where Netlify cannot see it, or
+  # if anyone edits the build command in the UI. The fix is to CLEAR the UI
+  # command so there is one source of truth — a production-settings change, so
+  # it needs a human. Same shape as the wasm-pack drift: two sources for one
+  # build, and the invisible one is the one that rots.
+  #
   # ⚠️ TWO PINS LIVE IN THIS COMMAND. Both exist so the shipped wasm is a
   # function of the repository and nothing else — see ADR-038.
   #
