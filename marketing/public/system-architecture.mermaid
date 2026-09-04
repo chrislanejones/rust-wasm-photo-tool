@@ -1,49 +1,75 @@
-%% Image Horse — whole-app system architecture (target, July 2026)
-%% The dashed "Network" plane is optional: sever it and the solid
-%% client subgraph is a complete, working editor. Demo mode is sacred.
+%% Image Horse — whole-app system architecture (AS SHIPPED, v8.66, 2026-09-04)
+%% 
+%% The dashed "Network" plane is optional: sever it and the solid client
+%% subgraph is a complete, working editor. Demo mode is sacred.
+%% 
+%% This file is the downloadable source behind the hand-drawn map on
+%% /architecture. It had drifted to v7.10 (July 2026) and described a version
+%% of the app that stopped existing at v8.32; the corrections in this pass:
+%% 
+%%   - The engine runs in a WORKER, and has been the default since v8.32
+%%     (ADR-024). It was drawn on the main thread. This is the largest
+%%     structural fact about the app: main-thread blocking per heavy
+%%     operation went from 129-137 ms to 0.
+%%   - The OffscreenCanvas belongs to the ENGINE worker, not the codec worker.
+%%   - The rayon worker pool is GONE, not "planned": measured at 8-31x SLOWER
+%%     than single-threaded and rejected (tag negative-result/rayon-wavefront).
+%%     No SharedArrayBuffer, no COOP/COEP, no wasm threads anywhere.
+%%   - PatchMatch SHIPPED (v7.46, Magic Eraser) — it was listed as planned.
+%%     The wasm is built `--features tiles,patchmatch`.
+%%   - The service worker is BUILT BUT OFF: the default build statically
+%%     removes it (`__IH_SW_MODE__ === "off"`, ADR-019). It was drawn serving
+%%     the app. It has never shipped on.
+%%   - WebGPU is one blur kernel plus a self-test, with zero consumers on the
+%%     pixel path — not a backend the engine renders through.
+%%   - React 19, not 18. Seven Zustand stores, not five.
 flowchart TB
-    subgraph client["BROWSER — fully functional offline"]
+    subgraph client["BROWSER — fully functional offline, no account"]
         direction TB
 
-        subgraph ui["UI plane · React 18 + TypeScript + Vite"]
-            SHELL["AppShell<br/>composition + layout only"]
-            REG["Tool registry<br/>ToolModule x ~10"]
+        subgraph ui["UI plane · main thread · React 19 + TypeScript + Vite"]
+            SHELL["AppShell<br/>composition + layout only<br/>(being dismantled, stage 4)"]
+            REG["Tool registry<br/>ToolModule per tool"]
             SESS["Session hooks<br/>image · selection · canvas · mask"]
-            STORES["Zustand stores<br/>UI · Tool · Gallery · Annotation · Guides"]
+            STORES["Zustand · 7 stores<br/>UI · Tool · Gallery · Annotation<br/>Guides · Perspective · TextBox"]
         end
 
-        subgraph compute["Compute plane"]
-            ENGINE["WASM engine · stamp_tool<br/>kernels · TileBuffer · OpLog<br/>+ planned: edge core · PatchMatch · seam carve · color-blind sim"]
-            CODEC["Codec worker<br/>encode · thumbnail · OffscreenCanvas<br/>+ planned: indexed-color optimizer"]
-            RAYON["rayon worker pool — planned<br/>gated on COOP/COEP spike"]
-            WGPU["WebGPU backend — far<br/>filter + composite throughput"]
+        subgraph ew["Engine worker · THE DEFAULT since v8.32 (ADR-024)"]
+            ENGINE["WASM engine · stamp_tool<br/>own wasm instance + ImageHorseTool<br/>kernels · TileBuffer · OpLog · PatchMatch<br/>built --features tiles,patchmatch"]
+            OSC[("Transferred OffscreenCanvas<br/>composite drawn from THIS thread")]
         end
 
-        subgraph persist["Persistence plane · IndexedDB / Dexie"]
-            ORIG["originals<br/>content-addressed · immutable"]
+        subgraph cw["Codec worker · no wasm"]
+            CODEC["encode · thumbnail · resize<br/>OffscreenCanvas.convertToBlob / drawImage"]
+        end
+
+        subgraph persist["Persistence plane · IndexedDB / Dexie · no backup, no server copy"]
+            ORIG["originals<br/>SHA-256 content-addressed · immutable"]
             OPS["opLogs + keyframes"]
             GAL["gallery manifest"]
             CACHE["renderCache<br/>disposable"]
         end
 
-        LOCAL["localStorage<br/>lightweight prefs"]
-        SW["Service worker<br/>precache shell + WASM"]
+        LOCAL["localStorage<br/>lightweight prefs · kill switches"]
+        SW["Service worker · BUILT, NOT SHIPPED<br/>statically removed from the default<br/>build (ADR-019) — never registered"]
+        WGPU["WebGPU · one blur kernel + self-test<br/>zero consumers on the pixel path"]
     end
 
     subgraph edge["NETWORK — optional, additive only"]
         direction TB
         CLERK["Clerk<br/>identity"]
         CONVEX["Convex<br/>prefs sync · entitlements · gallery"]
-        AIPROXY["AI proxy → Replicate<br/>server holds provider key"]
+        AIPROXY["AI proxy → Replicate<br/>the server holds the provider key"]
         SHARE["Share delivery<br/>ShareViewer"]
     end
 
-    %% core editing path
+    %% core editing path — every pixel operation crosses into the worker
     SHELL --> STORES
     STORES --> REG
     REG -->|ToolContext| ENGINE
     SESS -->|batched pointer events| ENGINE
-    ENGINE -->|dirty tiles| SHELL
+    ENGINE -->|zero-copy blit| OSC
+    OSC -->|presented in place| SHELL
 
     %% encode + persist
     SESS -->|pixels transferable| CODEC
@@ -54,9 +80,8 @@ flowchart TB
     STORES --> LOCAL
     CACHE -.->|invalid → keyframe + replay| ENGINE
 
-    %% offline delivery
-    SW -. serves .-> ui
-    SW -. serves .-> compute
+    %% kill switch: ih_engine_worker=0 drops the engine back onto the main thread
+    LOCAL -.->|ih_engine_worker=0 opts out| ENGINE
 
     %% optional network plane
     ui -. auth .-> CLERK
@@ -66,14 +91,13 @@ flowchart TB
     AIPROXY -. result .-> SESS
     GAL -. free+: create link .-> SHARE
 
-    %% planned compute wiring
-    RAYON -. parallel kernels .-> ENGINE
-    WGPU -. render backend .-> ENGINE
-
     classDef optional stroke-dasharray:5 4;
     class edge,CLERK,CONVEX,AIPROXY,SHARE optional;
-    classDef planned stroke-dasharray:3 3;
-    class RAYON,WGPU planned;
 
+    %% Built but not on the shipped path — present in the repo, absent at runtime.
+    classDef dark stroke-dasharray:3 3;
+    class SW,WGPU dark;
+
+    %% The only two stores that are the user's irreplaceable truth.
     classDef truth fill:transparent,stroke-width:2px;
     class ORIG,OPS truth;
