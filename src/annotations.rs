@@ -1163,6 +1163,55 @@ impl ImageHorseTool {
         true
     }
 
+    /// Move the shape `id` to index `to` within the ACTIVE layer's shape list,
+    /// sliding everything between it and the destination along. Returns false
+    /// (changing nothing) when the id is not on the active layer or the move
+    /// would be a no-op. `to` saturates at the last index, so "bring to front"
+    /// can pass `u32::MAX` without the caller reading the count first.
+    ///
+    /// **Z-order IS Vec order.** `render_layer` draws
+    /// `for s in &layer.shape_annotations` (layer.rs:217), so a later index is
+    /// drawn later and therefore sits on top. There is nothing else to update.
+    ///
+    /// ## Why this records NO op-log entry (ADR-044)
+    ///
+    /// Following the `remove_object` precedent (`selection.rs`) and the two
+    /// shape calls either side of it — neither `add_shape_annotation` nor
+    /// `remove_shape_annotation` records an op either. Shape annotations are
+    /// not written to the log at their call sites at all: the log RECONCILES,
+    /// diffing engine shapes against `log_doc.shapes` (lib.rs:1511) and
+    /// emitting Add/Edit/Remove for the differences.
+    ///
+    /// That reconciliation is keyed by `id` and is **order-insensitive**, and
+    /// `ShapeParams` carries no z field — so a pure reorder emits exactly zero
+    /// ops no matter what we do here. A format bump (the `#68` proposal) would
+    /// be needed to make it replayable, and is deliberately not taken.
+    ///
+    /// **What stops that from being silent data loss:** `oplog_engine_in_sync`
+    /// compares the COMPOSITE PIXEL HASH, not the annotation structure
+    /// (lib.rs:1572). A reorder that changes what the user sees changes that
+    /// hash, so the next op-log undo declines and snapshot undo takes over —
+    /// the documented safe fallback, same as `rotate_90_cw` and `resize_canvas`.
+    /// A reorder that does NOT change the composite is one where the z-order
+    /// was visually irrelevant. The check catches exactly the cases that matter.
+    pub fn move_shape_annotation(&mut self, id: u32, to: u32) -> bool {
+        let shapes = &self.layers[self.active].shape_annotations;
+        let Some(from) = shapes.iter().position(|s| s.id == id) else {
+            return false;
+        };
+        // Saturate rather than reject: "to front" is a UI concept, and making
+        // every caller fetch the count first is how off-by-ones get written.
+        let to = (to as usize).min(shapes.len().saturating_sub(1));
+        if to == from {
+            return false; // no-op — must not push a history entry
+        }
+        self.snap("Reorder Shape");
+        let shapes = &mut self.layers[self.active].shape_annotations;
+        let s = shapes.remove(from);
+        shapes.insert(to, s);
+        true
+    }
+
     /// Mark a shape as being edited (suppressed from render so the JS overlay
     /// preview is the only thing drawn). Pass -1 to clear. No history.
     pub fn set_editing_shape(&mut self, id: i32) {

@@ -117,3 +117,7 @@ required-features = ["tiles"]
 opt-level = 3
 lto = true
 codegen-units = 1
+
+[[test]]
+name = "shape_z_order"
+required-features = ["tiles"]
