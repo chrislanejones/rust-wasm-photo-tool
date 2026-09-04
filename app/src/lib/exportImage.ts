@@ -63,6 +63,65 @@ export function formatCarriesAlpha(format: ExportFormat): boolean {
   return ALPHA_CAPABLE_FORMATS.has(format);
 }
 
+/** The colour a transparent pixel becomes in a format that cannot store one.
+ *
+ *  WHITE, deliberately. The browser's own answer is opaque BLACK — measured,
+ *  rgba(0,0,5,255) out of `convertToBlob` for image/jpeg — and black is not a
+ *  chosen matte, it is the absence of one: drop the alpha channel without
+ *  compositing and you get it by construction. White is the conventional
+ *  photo-editor default and the one people expect a hole to become.
+ *
+ *  Change this one constant to change the matte everywhere; both encode
+ *  backends read it through `matteOntoOpaque` below. */
+export const JPEG_MATTE: readonly [number, number, number] = [255, 255, 255];
+
+/** Composite straight-alpha RGBA onto an opaque colour, in place.
+ *
+ *  WHY THIS EXISTS (#46). JPEG has no alpha channel, so every transparent
+ *  pixel has to be composited onto something before encoding. Nothing on the
+ *  export path did that, so the encoder received alpha it could not represent
+ *  and wrote opaque black — a hole punched by the eraser, Magic Eraser or a
+ *  layer mask came out as a black blob.
+ *
+ *  ⚠️ The two mitigations that already existed are BOUNDARY-shaped and could
+ *  never have covered this. Rust's tight-crop (`lib.rs:807`) removes
+ *  transparent MARGIN by cropping to the content bbox, and ADR-039's
+ *  backing-canvas drop removes the transparent artboard AROUND the photo.
+ *  Cropping cannot reach a hole in the middle. This is the per-pixel one they
+ *  were never going to be.
+ *
+ *  Straight (non-premultiplied) alpha in, opaque out:
+ *      out = src·a + matte·(1 − a),  a := 255
+ *
+ *  Mutates `pixels` rather than allocating — a full-size copy of a large
+ *  export is real memory, and every caller hands over a buffer it is about to
+ *  transfer to the codec worker anyway. */
+export function matteOntoOpaque(
+  pixels: Uint8Array | Uint8ClampedArray,
+  matte: readonly [number, number, number] = JPEG_MATTE,
+): void {
+  const [mr, mg, mb] = matte;
+  for (let i = 0; i < pixels.length; i += 4) {
+    const a = pixels[i + 3];
+    // Fully opaque is the overwhelming majority of pixels in a photo — skip
+    // the arithmetic entirely rather than multiply by 1.
+    if (a === 255) continue;
+    if (a === 0) {
+      pixels[i] = mr;
+      pixels[i + 1] = mg;
+      pixels[i + 2] = mb;
+      pixels[i + 3] = 255;
+      continue;
+    }
+    const f = a / 255;
+    const inv = 1 - f;
+    pixels[i] = Math.round(pixels[i] * f + mr * inv);
+    pixels[i + 1] = Math.round(pixels[i + 1] * f + mg * inv);
+    pixels[i + 2] = Math.round(pixels[i + 2] * f + mb * inv);
+    pixels[i + 3] = 255;
+  }
+}
+
 /**
  * Would writing this document in this format INVENT pixels the user never saw?
  *
@@ -277,6 +336,18 @@ export async function encodeRgba(
     const png = mod.encode_png_pixels(pixels, w, h);
     return new Blob([new Uint8Array(png)], { type: "image/png" });
   }
+
+  // #46 — matte BEFORE either backend, so both inherit it and cannot drift.
+  // A format with no alpha channel gets every transparent pixel composited
+  // onto JPEG_MATTE first; otherwise the encoder receives alpha it cannot
+  // represent and writes opaque BLACK (measured: rgba(0,0,5,255) for
+  // image/jpeg out of convertToBlob). Alpha-capable formats are untouched —
+  // PNG returned above, and WebP/AVIF keep their transparency.
+  //
+  // This sits here rather than in either backend on purpose: the worker path
+  // and the main-thread fallback are the exact pair that drifted apart before,
+  // and one of them silently not matteing is the bug all over again.
+  if (!formatCarriesAlpha(format)) matteOntoOpaque(pixels);
 
   // Off-thread encode (transfers `pixels`); null → worker unavailable.
   const viaWorker = await encodeViaWorker(pixels, w, h, MIME[format], quality);
