@@ -98,10 +98,17 @@ export function parseStackXml(xml: string): OraStack {
       );
     }
     if (el.getAttribute("imagehorse:active") === "true") activeIndex = i;
+    // `parseFloat` alone is how #79 got in: it returns NaN for any
+    // non-numeric attribute, and `opacityAttr` is truthy for ANY non-empty
+    // string, so `opacity="abc"` in a .ora reached the engine as NaN. The
+    // engine now sanitises it too (`sane_opacity`), which is the real fix —
+    // this guard is the belt: a file is untrusted input and should not be
+    // handing the engine values it has to defend against.
     const opacityAttr = el.getAttribute("opacity");
+    const parsedOpacity = opacityAttr ? parseFloat(opacityAttr) : 1;
     return {
       name: el.getAttribute("name") ?? `Layer ${i}`,
-      opacity: opacityAttr ? parseFloat(opacityAttr) : 1,
+      opacity: Number.isFinite(parsedOpacity) ? parsedOpacity : 1,
       visible: el.getAttribute("visibility") !== "hidden",
       src: el.getAttribute("src") ?? "",
     };

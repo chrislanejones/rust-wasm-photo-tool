@@ -6,7 +6,7 @@ use crate::annotations::{
     TextAnnotation,
 };
 use crate::core::ImageBuffer;
-use crate::utils::json_escape;
+use crate::utils::{json_escape, sane_opacity};
 use crate::ImageHorseTool;
 use crate::PastePreview;
 use crate::{codec, transform};
@@ -959,7 +959,12 @@ impl ImageHorseTool {
 
     pub fn set_layer_opacity(&mut self, id: u32, opacity: f64) -> bool {
         if let Some(l) = self.layers.iter_mut().find(|l| l.id == id) {
-            l.opacity = opacity.clamp(0.0, 1.0);
+            // `sane_opacity`, not `clamp` — clamp returns NaN for NaN and the
+            // NaN reaches `get_layers()` as a bare token that JSON.parse
+            // rejects (#79). SANITISES rather than returning false: `false`
+            // already means "no such layer" to every caller, and overloading it
+            // with "bad value" would be a contract change riding a bug fix.
+            l.opacity = sane_opacity(opacity);
             true
         } else {
             false
@@ -1556,7 +1561,9 @@ impl ImageHorseTool {
             r,
             g,
             b,
-            opacity: opacity.clamp(0.0, 1.0),
+            // Also JSON-visible: the overlay is emitted as
+            // {"color":"#rrggbb","opacity":N} inside each layer (#79).
+            opacity: sane_opacity(opacity),
         });
         self.recomposite();
         true
@@ -1683,7 +1690,8 @@ impl ImageHorseTool {
             // "is this the bottom of a multi-layer document?" has no answer yet.
             kind: LayerKind::Content,
             visible,
-            opacity: opacity.clamp(0.0, 1.0),
+            // The .ora import path: `parseFloat` on a file attribute (#79).
+            opacity: sane_opacity(opacity),
             buf,
             mask: None,
             // Not persisted — same as `mask` directly above. The layer archive
