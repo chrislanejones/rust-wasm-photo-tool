@@ -183,14 +183,6 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       run: () => openSettingsTab("security"),
     },
     {
-      id: "settings.rulers-pane",
-      label: "Rulers & Grids Settings",
-      group: "settings",
-      keywords: ["ruler", "grid", "guides", "overlay"],
-      icon: Ruler,
-      run: () => openSettingsTab("rulers"),
-    },
-    {
       id: "settings.toggle-rulers",
       label: ctx.prefs?.rulers ? "Hide Rulers" : "Show Rulers",
       group: "settings",

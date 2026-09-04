@@ -472,6 +472,7 @@ export function AppShell() {
     gridRows: prefs.gridRows,
     gridColor: prefs.gridColor,
     gridOpacity: prefs.gridOpacity,
+    rulerUnit: prefs.rulerUnit,
   };
   // The Settings modal owns the draft; here we just expose live prefs + the
   // commit. maxHistory reaches the engine via the effect below; idle reaches
@@ -3141,6 +3142,8 @@ export function AppShell() {
       <AnimatePresence>
         {(bp.dock ? masterTab === "tools" : showTools) && (
           <ToolsSidebar
+            rulersPrefs={prefs}
+            onRulersChange={(p) => applyPreferences({ ...prefs, ...p })}
             embedded={bp.dock}
             onClose={() => setShowTools(false)}
             activeTool={activeTool}

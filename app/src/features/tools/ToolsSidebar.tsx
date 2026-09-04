@@ -35,8 +35,16 @@ import { PaintSettings } from "./settings/PaintSettings";
 import { TextSettings } from "./settings/TextSettings";
 import { AISettings } from "./settings/AISettings";
 import type { AIResultPixels } from "@/hooks/useAIJob";
+import { RulersGridsPane } from "@/components/RulersGridsPane";
+import type { Preferences } from "@/lib/preferences";
 
 interface ToolsSidebarProps {
+  /** Live preferences for the Rulers panel (Edit → Rulers). Optional so every
+   *  other embedding of this sidebar keeps working without them. */
+  rulersPrefs?: Preferences;
+  /** Patch preferences from the Rulers panel. */
+  onRulersChange?: (patch: Partial<Preferences>) => void;
+
   onClose: () => void;
   activeTool: ToolType;
   stampSettings: StampSettingsType;
@@ -151,6 +159,8 @@ interface ToolsSidebarProps {
 }
 
 export function ToolsSidebar({
+  rulersPrefs,
+  onRulersChange,
   activeTool,
   stampSettings,
   onStampSettingsChange,
@@ -243,6 +253,11 @@ export function ToolsSidebar({
       : subToolId === "color-picker"
         ? ("colorPicker" as const)
         : ("crop" as const);
+
+  /** The Rulers sub-tool shares `tool: "arrow"` with Layers and Guides, but
+   *  wants its OWN panel rather than a section of LayerSettings — it edits
+   *  preferences, not the document. */
+  const showRulersPanel = subToolId === "rulers";
 
   /** Same, for LayerSettings' three sections. */
   const layerSection =
@@ -380,7 +395,11 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "arrow" && (
+        {activeTool === "arrow" && showRulersPanel && rulersPrefs && onRulersChange && (
+          <RulersGridsPane value={rulersPrefs} onChange={onRulersChange} />
+        )}
+
+        {activeTool === "arrow" && !showRulersPanel && (
           <LayerSettings
             disabled={!imageReady}
             moveActive={moveActive ?? false}

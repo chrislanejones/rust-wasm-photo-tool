@@ -89,7 +89,6 @@ export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
   appearance: "Appearance",
   canvas: "Layers and Canvas",
   security: "Security",
-  rulers: "Rulers & Grids",
   export: "Import / Export",
   storage: "S3 / Image Hosting",
   billing: "Plan & Billing",

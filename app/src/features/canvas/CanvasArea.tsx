@@ -43,7 +43,7 @@ import { useActiveSubTool } from "@/features/tools/activateSubTool";
 import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
 import { gridLinesSync, ensureGridGeometry } from "@/lib/gridGeometry";
-import type { GridKind } from "@/lib/preferences";
+import type { GridKind, RulerUnit } from "@/lib/preferences";
 import { selectionCombineMode } from "@/lib/selectionBool";
 import { canvasSurfaceKey } from "@/lib/engine/port";
 import { strokeDown, strokeUp } from "@/lib/strokeGate";
@@ -271,6 +271,7 @@ interface Props {
     gridRows: number;
     gridColor: string;
     gridOpacity: number;
+    rulerUnit?: RulerUnit;
   };
 }
 
@@ -1582,6 +1583,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   grid: guides.grid,
                   gridColor: guides.gridColor,
                   gridOpacity: guides.gridOpacity,
+                  rulerUnit: guides.rulerUnit,
                 }}
                 gridSegments={guides.grid ? gridSegments : EMPTY_SEGMENTS}
               />
