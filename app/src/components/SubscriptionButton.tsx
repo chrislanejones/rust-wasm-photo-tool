@@ -10,7 +10,6 @@ import {
   Settings,
   SlidersHorizontal,
   Palette,
-  Ruler,
   Package,
   Cloud,
   CreditCard,
@@ -36,7 +35,6 @@ import { GeneralPane, type GeneralControls } from "@/components/GeneralPane";
 import { LayersCanvasPane } from "@/components/LayersCanvasPane";
 import { AppearancePane } from "@/components/AppearancePane";
 import { SecurityPane } from "@/components/SecurityPane";
-import { RulersGridsPane } from "@/components/RulersGridsPane";
 import { ExportPane, type OpenRasterControls } from "@/components/ExportPane";
 import { StoragePane } from "@/components/StoragePane";
 import { AIUsagePane } from "@/components/AIUsagePane";
@@ -65,7 +63,6 @@ export type SettingsTab =
   | "canvas"
   | "appearance"
   | "security"
-  | "rulers"
   | "export"
   | "storage"
   | "billing"
@@ -144,7 +141,6 @@ export function SubscriptionButton({
     appearance: Palette,
     canvas: Layers,
     security: Shield,
-    rulers: Ruler,
     export: Package,
     storage: Cloud,
     billing: CreditCard,
@@ -157,7 +153,6 @@ export function SubscriptionButton({
     "appearance",
     "canvas",
     "security",
-    "rulers",
     "export",
     "storage",
     "billing",
@@ -322,11 +317,6 @@ export function SubscriptionButton({
                   setDraft((d) => ({ ...d, exifStripMode }))
                 }
               />
-            ) : tab === "rulers" ? (
-              <RulersGridsPane
-                value={draft}
-                onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
-              />
             ) : tab === "export" ? (
               <ExportPane {...openRaster} />
             ) : tab === "storage" ? (
@@ -436,7 +426,6 @@ export function SubscriptionButton({
                 tab === "canvas" ||
                 tab === "appearance" ||
                 tab === "security" ||
-                tab === "rulers" ||
                 tab === "superuser") && (
                 <div className="flex items-center gap-2">
                   <Button

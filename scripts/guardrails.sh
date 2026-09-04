@@ -211,7 +211,7 @@ if [ -z "$n_deadexp" ]; then
   echo "FATAL: dead-exports-audit printed no TOTAL — treat as broken, not as zero." >&2
   exit 1
 fi
-check "dead-exports" 2 "exported and never used (scripts/dead-exports-audit.mjs)" "$n_deadexp"
+check "dead-exports" 1 "exported and never used (scripts/dead-exports-audit.mjs)" "$n_deadexp"
 
 if [ "$fail" -ne 0 ]; then
   echo

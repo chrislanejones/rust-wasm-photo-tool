@@ -1,7 +1,7 @@
 import { Frame, Grid3x3, LayoutGrid, Ruler } from "lucide-react";
 import { SizeSlider } from "@/components/SizeSlider";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
-import type { GridKind, Preferences } from "@/lib/preferences";
+import type { GridKind, Preferences, RulerUnit } from "@/lib/preferences";
 
 /**
  * Settings → Rulers & Grids pane. Non-destructive canvas overlays persisted via
@@ -19,6 +19,12 @@ interface RulersGridsPaneProps {
   /** Patch the draft; the Settings footer's Apply commits it. */
   onChange: (patch: Partial<Preferences>) => void;
 }
+
+const RULER_UNIT_CHOICES: { unit: RulerUnit; label: string }[] = [
+  { unit: "px", label: "Pixels" },
+  { unit: "in", label: "Inches" },
+  { unit: "cm", label: "Centimetres" },
+];
 
 const GRID_LAYOUTS: { kind: GridKind; label: string; icon: typeof Grid3x3 }[] = [
   { kind: "square", label: "Square", icon: Grid3x3 },
@@ -41,7 +47,7 @@ export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
         <div>
           <h3 className="text-sm font-semibold text-text-primary">Rulers</h3>
           <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            Top + left pixel rulers along the canvas; tick labels track zoom.
+            Top + left rulers along the canvas; tick labels track zoom.
           </p>
         </div>
         <ToggleButtonGroup
@@ -63,6 +69,28 @@ export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
             },
           ]}
         />
+        {/* Units. Hidden while rulers are off — a unit picker for an invisible
+            ruler is a control with no visible effect, which is how a panel
+            starts feeling broken. */}
+        {value.rulers && (
+          <div className="space-y-2">
+            <ToggleButtonGroup
+              fill
+              items={RULER_UNIT_CHOICES.map(({ unit, label }) => ({
+                key: `unit-${unit}`,
+                icon: Ruler,
+                label,
+                active: value.rulerUnit === unit,
+                onToggle: () => onChange({ rulerUnit: unit }),
+              }))}
+            />
+            <p className="text-2xs leading-relaxed text-text-muted">
+              Inches and centimetres are derived at 96&nbsp;DPI — a web image has
+              no physical size of its own, so this is a fixed convention rather
+              than a print measurement.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">

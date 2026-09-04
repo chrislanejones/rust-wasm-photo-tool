@@ -14,6 +14,16 @@ export type ThemeChoice = "system" | "dark" | "light";
 /** Canvas grid layout: uniform px squares, golden-ratio lines, or N×M divisions. */
 export type GridKind = "square" | "golden" | "grid";
 
+/** Ruler tick units. Pixels are the document's own unit; inches and
+ *  centimetres are derived at a FIXED 96 DPI — the CSS reference pixel — because
+ *  a web image carries no inherent physical size. That makes "1 inch" a
+ *  consistent 96px here rather than a promise about print output. */
+export type RulerUnit = "px" | "in" | "cm";
+const RULER_UNITS: readonly RulerUnit[] = ["px", "in", "cm"] as const;
+
+/** CSS reference pixels per inch. Fixed on purpose — see `RulerUnit`. */
+export const RULER_DPI = 96;
+
 export interface Preferences {
   /** Undo-history depth applied to the WASM engine (50–1000). */
   maxHistory: number;
@@ -22,8 +32,10 @@ export interface Preferences {
   /** Appearance theme (light / dark / system). */
   theme: ThemeChoice;
   // ── Rulers & Grids (canvas overlays; non-destructive) ──────────────────────
-  /** Show top + left pixel rulers along the canvas. */
+  /** Show top + left rulers along the canvas. */
   rulers: boolean;
+  /** Unit the ruler tick labels are drawn in. */
+  rulerUnit: RulerUnit;
   /** Show the grid overlay. */
   grid: boolean;
   /** Which grid layout to draw. */
@@ -79,6 +91,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   idleTimeoutMin: 30,
   theme: "dark",
   rulers: false,
+  rulerUnit: "px",
   grid: false,
   gridKind: "square",
   gridSpacing: 50,
@@ -151,6 +164,9 @@ function normalize(p: Partial<Preferences> | null | undefined): Preferences {
       ? (p?.theme as ThemeChoice)
       : DEFAULT_PREFERENCES.theme,
     rulers: typeof p?.rulers === "boolean" ? p.rulers : DEFAULT_PREFERENCES.rulers,
+    rulerUnit: RULER_UNITS.includes(p?.rulerUnit as RulerUnit)
+      ? (p?.rulerUnit as RulerUnit)
+      : DEFAULT_PREFERENCES.rulerUnit,
     grid: typeof p?.grid === "boolean" ? p.grid : DEFAULT_PREFERENCES.grid,
     gridKind: GRID_KINDS.includes(p?.gridKind as GridKind)
       ? (p?.gridKind as GridKind)

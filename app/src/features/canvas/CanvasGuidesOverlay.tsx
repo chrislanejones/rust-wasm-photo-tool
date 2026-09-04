@@ -3,11 +3,16 @@
 // Rendered as a fixed full-viewport SVG, projecting image-space → screen-space
 // the same way the crop overlay does (`rect` + scale from the canvas element),
 // so it tracks zoom and pan automatically.
+import { niceStep, tickLabel } from "@/lib/rulerTicks";
+import type { RulerUnit } from "@/lib/preferences";
 import { useMemo, type ReactElement } from "react";
 
 /** The subset of preferences that drives the canvas guides. */
 export interface CanvasGuides {
   rulers: boolean;
+  /** Tick label unit. Optional so an older caller (or a persisted pref from
+   *  before this existed) still renders — it falls back to "px". */
+  rulerUnit?: RulerUnit;
   grid: boolean;
   gridColor: string;
   gridOpacity: number; // 0–100
@@ -27,13 +32,6 @@ interface Props {
 }
 
 const RULER = 20; // ruler strip thickness, screen px
-const NICE_STEPS = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
-
-/** Smallest "nice" image-px interval whose on-screen spacing ≥ minScreen px. */
-function niceStep(scale: number, minScreen: number): number {
-  for (const s of NICE_STEPS) if (s * scale >= minScreen) return s;
-  return NICE_STEPS[NICE_STEPS.length - 1];
-}
 
 export function CanvasGuidesOverlay({
   rect,
@@ -74,8 +72,11 @@ export function CanvasGuidesOverlay({
   // Ruler ticks + labels.
   const rulerEls = useMemo(() => {
     if (!guides.rulers) return null;
-    const stepX = niceStep(sx, 56);
-    const stepY = niceStep(sy, 56);
+    // Unit is a LENS, not a coordinate change: the steps come back in image
+    // px whichever unit is chosen, so the projection below is untouched.
+    const unit = guides.rulerUnit ?? "px";
+    const stepX = niceStep(sx, 56, unit);
+    const stepY = niceStep(sy, 56, unit);
     const ticks: ReactElement[] = [];
 
     // Top ruler — vertical ticks + value labels.
@@ -100,7 +101,7 @@ export function CanvasGuidesOverlay({
           fill="var(--text-muted)"
           fontFamily="var(--font-mono)"
         >
-          {Math.round(ix)}
+          {tickLabel(ix, unit, stepX)}
         </text>,
       );
     }
@@ -127,7 +128,7 @@ export function CanvasGuidesOverlay({
           fontFamily="var(--font-mono)"
           transform={`rotate(-90 ${left - 9} ${y - 2})`}
         >
-          {Math.round(iy)}
+          {tickLabel(iy, unit, stepY)}
         </text>,
       );
     }
@@ -162,7 +163,7 @@ export function CanvasGuidesOverlay({
         <g strokeWidth={1}>{ticks}</g>
       </g>
     );
-  }, [guides.rulers, sx, sy, imgW, imgH, left, top, width, height]);
+  }, [guides.rulers, guides.rulerUnit, sx, sy, imgW, imgH, left, top, width, height]);
 
   if (!gridEls && !rulerEls) return null;
 
