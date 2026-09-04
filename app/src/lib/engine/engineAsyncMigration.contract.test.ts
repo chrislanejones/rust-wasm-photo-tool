@@ -693,11 +693,18 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // The difference from v8.19's identical-looking claim is the method list:
     // that one was made against a shadow .d.ts missing 31 of the engine's
     // methods. This one knows all 280.
+    //
+    // #62 — 125 -> 126: shape z-order adds ONE awaited site in
+    // `useDrawingTools.ts`, `move_shape_annotation`, born awaited in the same
+    // `if (!(await t.x(id, to))) return false` guard shape as the overlay
+    // trio above: the boolean gates a flush + resync + shape refresh, and an
+    // un-awaited Promise is always truthy, so the panel would repaint and
+    // re-read on a move the engine refused. Gate numbers unchanged.
     ).toBe(5);
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(125);
+    expect(gate.awaited, "cumulative converted sites").toBe(126);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

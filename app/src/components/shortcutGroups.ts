@@ -56,6 +56,17 @@ export const SHORTCUT_GROUPS = [
     ],
   },
   {
+    // With a shape SELECTED. Brackets were the natural chord and every one
+    // is taken (brush size, layer front/back), so shapes take the arrows.
+    title: "Shapes (selected shape)",
+    shortcuts: [
+      { keys: ["Ctrl", "Shift", "↑"], action: "Bring Shape Forward" },
+      { keys: ["Ctrl", "Shift", "↓"], action: "Send Shape Backward" },
+      { keys: ["Ctrl", "Shift", "Alt", "↑"], action: "Bring Shape to Front" },
+      { keys: ["Ctrl", "Shift", "Alt", "↓"], action: "Send Shape to Back" },
+    ],
+  },
+  {
     title: "Transform",
     shortcuts: [
       { keys: ["Alt", "F"], action: "Flip Horizontal" },

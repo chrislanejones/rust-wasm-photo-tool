@@ -33,6 +33,7 @@ import { useLayerSwapFlash } from "@/hooks/useLayerSwapFlash";
 import { TIERS } from "@/lib/tiers";
 import type { UserMode } from "@/components/StatusBar";
 import type { HistoryEntry, LayerInfo } from "@/hooks/useCloneStamp";
+import { zMoveFor, zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
 
 /** One placed object shown in the Reselect list (text or shape annotation). */
 export interface ReselectObject {
@@ -64,6 +65,9 @@ interface Props {
   onSelectObject: (o: ReselectObject) => void;
   /** Hover-X → delete that object. */
   onDeleteObject: (o: ReselectObject) => void;
+  /** ▲/▼ on a SHAPE row → restack it (text has no draw order). Optional so
+   *  callers without shape z-order (tests, older composition) still render. */
+  onMoveShape?: (id: number, dir: ZMove) => void | boolean | Promise<boolean>;
   /** Current effective tier — drives the Layers section's allowance. */
   userMode: UserMode;
   // ── Layers ──
@@ -127,6 +131,7 @@ export function ReviewPanel({
   objects,
   onSelectObject,
   onDeleteObject,
+  onMoveShape,
   userMode,
   layers,
   onAddLayer,
@@ -187,6 +192,10 @@ export function ReviewPanel({
   const canAddLayer = layersUnlocked && layers.length < layerLimit;
   // Render top → bottom (the array is bottom → top), the way every editor shows it.
   const layersTopDown = [...layers].reverse();
+
+  // Shape ids in draw order (bottom → top) — `objects` carries shapes in the
+  // order `get_shape_annotations()` returns them, which IS the z-order.
+  const shapeIds = objects.filter((o) => o.type === "shape").map((o) => o.id);
 
   const commitRename = (id: number) => {
     const name = renameDraft.trim();
@@ -308,16 +317,36 @@ export function ReviewPanel({
                   </span>
                 </div>
               )}
-              {objects.map((o) => (
-                <ReselectBar
-                  key={o.key}
-                  label={o.label}
-                  onSelect={() => onSelectObject(o)}
-                  onDelete={() => onDeleteObject(o)}
-                  title={`Reselect ${o.label}`}
-                  deleteLabel={`Delete ${o.label}`}
-                />
-              ))}
+              {objects.map((o) => {
+                // Shape rows get ▲/▼. `objects` lists shapes in the engine's
+                // draw order (bottom → top), so the id list IS the z-order and
+                // the same helper the hook uses decides which arrow is live.
+                const restack = onMoveShape && o.type === "shape";
+                return (
+                  <ReselectBar
+                    key={o.key}
+                    label={o.label}
+                    onSelect={() => onSelectObject(o)}
+                    onDelete={() => onDeleteObject(o)}
+                    title={`Reselect ${o.label}`}
+                    deleteLabel={`Delete ${o.label}`}
+                    onMoveUp={
+                      restack
+                        ? (shift) => void onMoveShape(o.id, zMoveFor(true, shift))
+                        : undefined
+                    }
+                    onMoveDown={
+                      restack
+                        ? (shift) => void onMoveShape(o.id, zMoveFor(false, shift))
+                        : undefined
+                    }
+                    canMoveUp={zTargetIndex(shapeIds, o.id, "forward") !== null}
+                    canMoveDown={zTargetIndex(shapeIds, o.id, "backward") !== null}
+                    moveUpLabel={`Bring ${o.label} forward`}
+                    moveDownLabel={`Send ${o.label} backward`}
+                  />
+                );
+              })}
             </div>
           </section>
         )}

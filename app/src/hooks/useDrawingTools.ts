@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { zTargetIndex, type ZMove } from "@/lib/shapeZOrder";
 import type { ToolType, ToolSettings } from "@/lib/types";
 import type { ImageHorseTool } from "stamp_tool";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
@@ -359,6 +360,13 @@ export function useDrawingTools({
 
   // Live shape annotations (for the Reselect list + canvas hit-test).
   const [shapes, setShapes] = useState<ShapeMeta[]>([]);
+  // Mirror for callbacks that must read the CURRENT draw order without being
+  // re-created on every refresh (`moveShape`, and the keydown effect that
+  // calls it). Same reason `editStateRef` exists beside `editState`.
+  const shapesRef = useRef<ShapeMeta[]>([]);
+  useEffect(() => {
+    shapesRef.current = shapes;
+  }, [shapes]);
   // ADR-024 Stage 3.5. `try/catch` keeps working around the await: a rejected
   // engine call lands in the same catch that a malformed JSON string does, and
   // the fallback is the same empty list.
@@ -602,6 +610,29 @@ export function useDrawingTools({
     [toolRef, commitEdit, flushToCanvas],
   );
 
+  /** Restack a live shape — bring forward / send backward / to front / to
+   *  back. One "Reorder Shape" history step; resolves false (and touches
+   *  nothing) when the move is already satisfied. Z-order is the engine's
+   *  list order, so this is one `move_shape_annotation` call — ADR-044. */
+  const moveShape = useCallback(
+    async (id: number, dir: ZMove): Promise<boolean> => {
+      const tool = toolRef.current;
+      if (!tool) return false;
+      const to = zTargetIndex(
+        shapesRef.current.map((s) => s.id),
+        id,
+        dir,
+      );
+      if (to === null) return false;
+      if (!(await tool.move_shape_annotation(id, to))) return false;
+      flushToCanvas();
+      syncState();
+      await refreshShapes();
+      return true;
+    },
+    [toolRef, flushToCanvas, syncState, refreshShapes],
+  );
+
   /** Delete a live shape (from the Reselect list X). One history step. */
   const removeShape = useCallback(
     async (id: number) => {
@@ -777,6 +808,19 @@ export function useDrawingTools({
           // there is nothing to snap — just drop it.
           cancelEdit();
         }
+      } else if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        (e.code === "ArrowUp" || e.code === "ArrowDown") &&
+        es.editId != null
+      ) {
+        // Restack the SELECTED committed shape. Ctrl+Shift+↑/↓ one step, add
+        // Alt to go all the way. The bracket chords were the obvious choice
+        // and every one of them is taken — Ctrl+[ ] is brush size and
+        // Ctrl+Shift+[ ] is LAYER front/back — so shapes get the arrows.
+        e.preventDefault();
+        const up = e.code === "ArrowUp";
+        void moveShape(es.editId, e.altKey ? (up ? "front" : "back") : up ? "forward" : "backward");
       } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "z" || e.key === "Z")) {
         // Ctrl+Z with an uncommitted change: the change the user SEES is the
         // pending one, and it is not in the engine. Letting the engine undo
@@ -793,7 +837,7 @@ export function useDrawingTools({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [editState, commitEdit, cancelEdit, removeShape]);
+  }, [editState, commitEdit, cancelEdit, removeShape, moveShape]);
 
   // Escape releases a pending crop selection (Edit & Transform tool) without
   // applying it — bound only while a crop rect actually exists.
@@ -1054,6 +1098,7 @@ export function useDrawingTools({
     refreshShapes,
     selectShape,
     removeShape,
+    moveShape,
   };
 }
 

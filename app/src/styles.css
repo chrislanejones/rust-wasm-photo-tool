@@ -1077,6 +1077,35 @@ textarea:focus-visible {
   opacity: 1;
 }
 
+/* ▲/▼ restack arrows on shape rows — same hover-reveal as the ✕, and a
+   disabled arrow stays visible-but-dim so "this is already on top" reads as
+   a state rather than a missing button. Keyboard focus reveals it too:
+   hover-only reveal would hide a focusable control from Tab users. */
+.history-zmove {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+}
+.full-width-badge:hover .history-zmove,
+.history-zmove:focus-visible {
+  opacity: 1;
+}
+.history-zmove:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+.history-zmove:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
 .history-dot {
   width: 8px;
   height: 8px;

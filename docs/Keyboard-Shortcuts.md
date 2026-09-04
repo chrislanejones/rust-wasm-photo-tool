@@ -59,6 +59,24 @@ Reset Zoom — that is a different chord.)
 | `Ctrl + V`         | Paste image into the active layer |
 | `Alt + D`          | Delete all images |
 
+## Shapes (with a shape selected)
+
+Select a shape first (click it, or pick it from Review → Reselect). Shapes
+stack in the order they were drawn; these change that order. The bracket
+chords were the obvious home and all four are taken — `Ctrl + [` / `]` is
+brush size and `Ctrl + Shift + [` / `]` is layer front/back — so shapes use
+the arrows.
+
+| Keys                          | Action |
+|-------------------------------|--------|
+| `Ctrl + Shift + ↑`            | Bring the selected shape forward one step |
+| `Ctrl + Shift + ↓`            | Send the selected shape backward one step |
+| `Ctrl + Shift + Alt + ↑`      | Bring the selected shape to the front |
+| `Ctrl + Shift + Alt + ↓`      | Send the selected shape to the back |
+
+The same four live on each shape row in Review → Reselect as ▲ / ▼
+(Shift-click for all the way). Each is one undo step.
+
 ## Layers
 
 | Shortcut               | Action |
