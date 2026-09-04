@@ -11,6 +11,7 @@ import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useCloneStamp } from "@/hooks/useCloneStamp";
 import { useBrushPreview } from "@/hooks/useBrushPreview";
 import { useDrawingTools } from "@/hooks/useDrawingTools";
+import { useShapeZOrderMenu } from "@/hooks/useShapeZOrderMenu";
 import { useEmojiTool } from "@/hooks/useEmojiTool";
 import { useMoveLayerTool } from "@/hooks/useMoveLayerTool";
 import { usePastePlacementTool } from "@/hooks/usePastePlacementTool";
@@ -62,6 +63,7 @@ import type { PlacementCell } from "@/components/PlacementGrid";
 import { CanvasArea } from "@/features/canvas/CanvasArea";
 import { GridThumbnails } from "@/features/canvas/GridThumbnails";
 import { ReviewPanel } from "@/features/canvas/ReviewPanel";
+import { ShapeZOrderMenuItems } from "@/features/canvas/ShapeZOrderMenuItems";
 import type { ReselectObject } from "@/features/canvas/ReviewPanel";
 import { GalleryBar, type PhotoEntry } from "@/features/gallery/GalleryBar";
 import { UploadDialog } from "@/features/upload/UploadDialog";
@@ -1693,6 +1695,15 @@ export function AppShell() {
     return items;
   }, [textTool.annotations, drawingTools.shapes]);
 
+  // Right-click stacking. Reads the shape under the CURSOR rather than the
+  // selected one, so it restacks what you aimed at -- the row buttons in
+  // Reselect and the Ctrl+Shift+arrow chords both act on the selection.
+  const shapeZMenu = useShapeZOrderMenu({
+    shapes: drawingTools.shapes,
+    shapeAtClient: drawingTools.shapeAtClient,
+    moveShape: drawingTools.moveShape,
+  });
+
   // Keep the Reselect list fresh after any history mutation or photo switch
   // (undo/redo/jump/load all change the live overlays under the hood).
   useEffect(() => {
@@ -3252,12 +3263,13 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      <ContextMenu>
+      <ContextMenu onOpenChange={shapeZMenu.onOpenChange}>
         <ContextMenuTrigger asChild>
           <motion.main
             id="main-canvas"
             aria-label="Image canvas"
             tabIndex={-1}
+            onContextMenu={shapeZMenu.onContextMenu}
             animate={{
               // Compact mode: clear the master bar (left). Wide: two-sided push.
               marginLeft: bp.dock
@@ -3551,6 +3563,11 @@ export function AppShell() {
             <CommandIcon className="h-4 w-4 mr-2" /> Command Palette
             <ContextMenuShortcut>Alt+,</ContextMenuShortcut>
           </ContextMenuItem>
+          {/* Shape stacking. Renders only when the right-click landed on a
+              shape on the active layer, so it sits above the general actions
+              the way object actions do in other editors -- and is simply
+              absent on empty canvas. */}
+          <ShapeZOrderMenuItems menu={shapeZMenu} />
           <ContextMenuSeparator />
           <ContextMenuItem onClick={stamp.undo} disabled={!canUndo}>
             <Undo className="h-4 w-4 mr-2" /> Undo

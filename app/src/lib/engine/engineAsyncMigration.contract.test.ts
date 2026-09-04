@@ -700,11 +700,21 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // trio above: the boolean gates a flush + resync + shape refresh, and an
     // un-awaited Promise is always truthy, so the panel would repaint and
     // re-read on a move the engine refused. Gate numbers unchanged.
+    //
+    // #62 (right-click menu) — 126 -> 127: `shapeAtClient` in
+    // `useDrawingTools.ts` adds ONE awaited `shape_annotation_at`. Born
+    // awaited and value-consuming — it RETURNS the id the canvas context menu
+    // decides on, so it could never have been fire-and-forget; an un-awaited
+    // Promise here is truthy and `>= 0` on a Promise is false, which would
+    // offer the four stacking moves on empty canvas and hide them on a hit.
+    // It is deliberately the same engine call the left-click path uses, so a
+    // right-click targets the shape a click would select. Gate numbers below
+    // (5 exempt / 0 unawaited / 0 truthy) unchanged again.
     ).toBe(5);
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(126);
+    expect(gate.awaited, "cumulative converted sites").toBe(127);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
