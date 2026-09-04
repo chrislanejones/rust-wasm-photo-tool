@@ -78,6 +78,72 @@ rediscovered.
 Related: the same active-layer scoping is the crosstalk finding from
 2026-08-18 — annotation getters and hit-tests are active-layer-only while the
 canvas renders every visible layer.
+## OPEN — #62 is not a TS item: the shape z-order primitive does not exist (2026-09-04)
+
+#62 has been carried as "the biggest purely-TS item left, and the engine half
+(#29) has been done since before the handoff." **Both halves of that are
+wrong**, checked before writing code.
+
+Every shape method the engine exposes:
+
+```
+draw_shape          add_shape_annotation     update_shape_annotation
+remove_shape_annotation      restore_shape_annotation
+set_editing_shape   get_shape_annotations    shape_annotation_at
+shape_annotation_count
+```
+
+**There is no reorder of any kind** — no bring-to-front, send-to-back, or move.
+`#29`'s "DONE" mark still has no code behind it, which is the same conclusion
+reached on 2026-08-21. Layer z-order shipped that day (`move_layer`); SHAPE
+z-order never existed. The two keep getting conflated.
+
+### The good news: it is a small change
+
+Z-order **is** Vec order. `shape_annotations: Vec<ShapeAnnotation>`
+(`layer.rs:86`), rendered in order at `layer.rs:217`:
+
+```rust
+for s in &layer.shape_annotations { … }
+```
+
+So the primitive is one method moving an element within a Vec — four UI actions
+(front / forward / backward / back) over one engine call:
+
+```rust
+pub fn move_shape_annotation(&mut self, id: u32, to: usize) -> bool
+```
+
+### And it need NOT force an OP_FORMAT_VERSION bump
+
+Shapes ARE recorded in the op log (`ops.rs:318`), so the obvious reading is that
+a reorder needs a new `Op` variant and a 5→6 bump — which would make it #68,
+with an ADR and a dexie migration.
+
+**There is a documented precedent that avoids this.** `remove_object`
+(`selection.rs:643`) snaps history like any other action but *deliberately does
+not record an op-log entry*; `oplog_engine_in_sync` catches the mismatch on the
+next op-log undo attempt and falls back to snapshot undo, "safely and silently
+— never a wrong replay." Same pattern as `rotate_90_cw`, `resize_canvas` and
+`set_artboard_border`.
+
+A shape reorder can follow that: snap history, skip the op-log, no format
+change, no migration.
+
+### What this means for scheduling
+
+| | |
+|---|---|
+| Purely TS? | **No** — needs one Rust method |
+| Needs a format bump? | **No**, if it follows the `remove_object` precedent |
+| Needs an ADR? | Probably yes — "reorder is deliberately not replayable" is a decision |
+| Where it belongs | the engine sitting (#71, #68, #66, #70, #65) — shares one size-band check and bench |
+
+⚠️ **Pattern worth noticing.** This is the third backlog item in one session
+whose "small TS job" scoping did not survive contact with the code — #63
+(needs engine counts), #62 (needs an engine primitive), and earlier #71 (blocked
+on an engine export). The backlog is systematically optimistic about what is TS
+and what is Rust. Check the engine surface before estimating.
 
 ## OPEN — no Content-Security-Policy on either site (2026-09-03)
 
