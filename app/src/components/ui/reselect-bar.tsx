@@ -37,8 +37,25 @@ export interface ReselectBarProps {
   title?: string;
   /** aria-label for the ✕ button. Default "Delete". */
   deleteLabel?: string;
+  /** Restack controls (▲ / ▼), shown only when provided — shape rows have a
+   *  draw order, text rows do not. The handler receives `shiftKey` so a
+   *  Shift-click can mean "all the way" (ADR-044, shape z-order). */
+  onMoveUp?: (shiftKey: boolean) => void;
+  onMoveDown?: (shiftKey: boolean) => void;
+  /** False disables the matching arrow — the row is already at that end. */
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  /** aria-labels for the arrows (icon-only buttons need one — #64). */
+  moveUpLabel?: string;
+  moveDownLabel?: string;
   className?: string;
 }
+
+const ChevronGlyph = ({ up }: { up: boolean }) => (
+  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d={up ? "M2.5 7.5L6 4l3.5 3.5" : "M2.5 4.5L6 8l3.5-3.5"} />
+  </svg>
+);
 
 const DeleteGlyph = () => (
   <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -58,6 +75,12 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       disabled = false,
       title,
       deleteLabel = "Delete",
+      onMoveUp,
+      onMoveDown,
+      canMoveUp = true,
+      canMoveDown = true,
+      moveUpLabel = "Bring forward",
+      moveDownLabel = "Send backward",
       className,
     },
     ref,
@@ -95,6 +118,36 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
           <span className="history-index">{index}</span>
         )}
         <span className="large-badge">{label}</span>
+        {onMoveUp && (
+          <button
+            type="button"
+            className="history-zmove"
+            aria-label={moveUpLabel}
+            title={`${moveUpLabel} (Shift: to front)`}
+            disabled={disabled || !canMoveUp}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!disabled && canMoveUp) onMoveUp(e.shiftKey);
+            }}
+          >
+            <ChevronGlyph up />
+          </button>
+        )}
+        {onMoveDown && (
+          <button
+            type="button"
+            className="history-zmove"
+            aria-label={moveDownLabel}
+            title={`${moveDownLabel} (Shift: to back)`}
+            disabled={disabled || !canMoveDown}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!disabled && canMoveDown) onMoveDown(e.shiftKey);
+            }}
+          >
+            <ChevronGlyph up={false} />
+          </button>
+        )}
         {onDelete && (
           <button
             type="button"

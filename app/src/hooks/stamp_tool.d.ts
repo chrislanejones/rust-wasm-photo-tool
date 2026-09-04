@@ -1156,6 +1156,11 @@ declare module "stamp_tool" {
     ): boolean;
     /** Remove a shape. Pushes a "Delete Shape" history step. */
     remove_shape_annotation(id: number): boolean;
+    /** Move a shape to index `to` in the active layer's draw order (0 = back;
+     *  `to` saturates at the top, so `0xffffffff` means "to front"). Pushes a
+     *  "Reorder Shape" history step; a no-op returns false and pushes nothing.
+     *  Deliberately NOT op-logged — ADR-044. */
+    move_shape_annotation(id: number, to: number): boolean;
     /** Align a committed text/shape annotation's bbox to a canvas edge/center.
      *  mode ∈ left|centerH|right|top|middleV|bottom. Caller flushes to re-render. */
     align_annotation(

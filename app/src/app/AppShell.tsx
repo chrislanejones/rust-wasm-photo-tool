@@ -3658,6 +3658,7 @@ export function AppShell() {
             objects={reselectObjects}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
+            onMoveShape={drawingTools.moveShape}
             userMode={effectiveUserMode}
             layers={stamp.state.layers}
             onAddLayer={() => stamp.addLayer()}
