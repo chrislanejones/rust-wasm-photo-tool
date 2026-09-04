@@ -40,13 +40,9 @@ the log.
 
 **−** A reorder is **not replayable from the op log.** A document rebuilt purely
 from the log gets shapes back in log order.
-**−** That cost is bounded but not zero: **`oplog_engine_in_sync` compares the
-composite pixel hash** (`lib.rs:1572`), so a reorder that changes what the user
-sees changes that hash, the next op-log undo declines, and snapshot undo takes
-over — the documented safe fallback. A reorder that does *not* change the
-composite is one where z-order was visually irrelevant. The check catches
-exactly the cases that matter, but it catches them by **breaking the log for the
-session**, which costs op-log undo's cheaper path.
+**−** A reorder therefore **breaks the op log for the session** (see the
+correction below), so undo falls back to the snapshot path. That is the
+documented safe fallback, and it costs op-log undo's cheaper path.
 **−** One more engine call the JS must not spam: it snaps history per move, so a
 "bring forward" held down would push one entry per step.
 
@@ -59,6 +55,42 @@ session**, which costs op-log undo's cheaper path.
 2. **Make reorder emit `ShapeEdit` for the affected shapes.** Does nothing —
    `ShapeParams` has no order field, so the emitted params are identical and the
    reconciler skips them.
+
+## Correction — 2026-09-04, before this ADR was accepted
+
+**The pixel-hash argument this ADR originally rested on was wrong, and the
+first version of the code shipped a data-loss bug because of it.**
+
+The claim was: `oplog_engine_in_sync` compares the composite pixel hash, so a
+reorder that changes what the user sees is caught and falls back to snapshot
+undo, and one that does not change the composite "did not matter".
+
+The second half is false. Reordering two shapes that share a stroke/fill colour
+leaves the composite **byte-identical** — the guard sees nothing and op-log undo
+proceeds. And it proceeds on a broken invariant: `move_shape_annotation` calls
+`snap()` (one snapshot) while the reconciler emits **zero ops**, which breaks the
+"one recorded op ↔ one snapshot" lockstep `try_oplog_undo` relies on and
+documents. That undo then pops one snapshot *and* seeks the log back one op —
+rewinding the previous REAL op. Observed in the browser and pinned in
+`tests/shape_z_order.rs::op_log_undo_of_a_reorder_keeps_every_shape`:
+
+    three shapes [1,2,3] → bring #1 forward → [2,1,3] → undo → [1]
+
+The reorder survives and **the most recently added shape is destroyed.**
+
+Why the original test suite missed it: every test in `shape_z_order.rs` drove a
+bare `ImageHorseTool`, where `oplog_use_for_undo` is false and undo can only take
+the snapshot path — `lib.rs` says exactly this beside `try_oplog_undo`. The one
+composite test used three *different* solid fills, so it only ever exercised the
+branch where the guard does fire.
+
+**Fix:** `move_shape_annotation` now sets `oplog_broken` explicitly, which is what
+the field's own doc already anticipated ("or by an explicitly unloggable path").
+The decision to record no op still stands — what changes is that the log is told
+it is now stale instead of being assumed safe.
+
+The pre-mortem below is unchanged and still the thing to watch, but note its
+warning sign arrived within hours rather than six months.
 
 ## Pre-mortem
 

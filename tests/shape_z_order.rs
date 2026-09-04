@@ -5,11 +5,14 @@
 //! add / update / remove / restore / hit-test / count, with no reorder of any
 //! kind. #29's "DONE" mark had no code behind it.
 //!
-//! ADR-044: this deliberately records no op-log entry. See the doc comment on
-//! `move_shape_annotation` for why that is safe rather than lossy — the short
-//! version is that `oplog_engine_in_sync` compares the composite pixel hash, so
-//! a reorder that changes what you see is caught and falls back to snapshot
-//! undo, and one that does not change the composite did not matter.
+//! ADR-044: this deliberately records no op-log entry, and therefore marks the
+//! op log BROKEN so undo takes the snapshot path.
+//!
+//! The ADR originally argued the composite pixel hash made that unnecessary.
+//! It does not: two shapes sharing a colour composite identically, so the hash
+//! guard sees nothing while the snapshot/op lockstep is already broken — and
+//! the undo then destroys the newest shape. See the ADR's Correction section
+//! and `op_log_undo_of_a_reorder_keeps_every_shape` at the bottom of this file.
 use stamp_tool::ImageHorseTool;
 
 const W: u32 = 40;
@@ -119,10 +122,12 @@ fn a_real_move_is_undoable() {
     );
 }
 
-/// The property the whole feature exists for: reordering OVERLAPPING shapes
-/// changes the rendered pixels. This is also what makes the no-op-log decision
-/// safe — `oplog_engine_in_sync` hashes the composite, so this change is
-/// exactly what it detects.
+/// The property the whole feature exists for: reordering OVERLAPPING shapes of
+/// DIFFERENT colours changes the rendered pixels.
+///
+/// Note what this does NOT establish: that the composite hash is a sufficient
+/// guard for the op-log path. Same-coloured shapes reorder to an identical
+/// composite — that case is covered separately below.
 #[test]
 fn reordering_overlapping_shapes_changes_the_composite() {
     let mut t = tool();
@@ -138,5 +143,77 @@ fn reordering_overlapping_shapes_changes_the_composite() {
         before, after,
         "moving an overlapping shape to the back left the composite identical — \
          either the shapes are not overlapping or draw order is not Vec order"
+    );
+}
+
+/// Three overlapping shapes in ONE colour. Reordering them leaves the composite
+/// byte-identical, which is precisely the case `oplog_engine_in_sync` cannot
+/// see — `three()` above uses three different solid fills, so every reorder
+/// there trips the hash guard and never reaches the op-log undo branch.
+fn three_same_colour(t: &mut ImageHorseTool) -> (u32, u32, u32) {
+    let mut add = |x: f64, y: f64| {
+        t.add_shape_annotation(
+            0,
+            x,
+            y,
+            x + 20.0,
+            y + 20.0,
+            "#ff0000",
+            2.0,
+            0,
+            1,
+            "#ff0000",
+            "#ff0000",
+            0,
+            0,
+        )
+    };
+    let a = add(2.0, 2.0);
+    let b = add(6.0, 6.0);
+    let c = add(10.0, 10.0);
+    (a, b, c)
+}
+
+/// Undo down the OP-LOG path, which is what the app actually runs.
+///
+/// Every other test in this file drives a bare tool, where `oplog_use_for_undo`
+/// is false and undo can only take the snapshot path — `lib.rs` says so itself
+/// beside `try_oplog_undo` ("the unit tests could not see that because a bare
+/// test tool has no started log and never reaches this branch").
+///
+/// A reorder emits ZERO ops: the reconciler matches shapes by id and
+/// `ShapeParams` carries no order field (ADR-044). But `snap()` still pushes a
+/// snapshot, which breaks the "one recorded op ↔ one snapshot" lockstep
+/// `try_oplog_undo` relies on. Undo then rewinds the previous REAL op and
+/// destroys the most recently added shape, while leaving the reorder in place.
+#[test]
+fn op_log_undo_of_a_reorder_keeps_every_shape() {
+    let mut t = tool();
+    t.set_oplog_undo(true);
+    let (a, b, c) = three_same_colour(&mut t);
+    assert_eq!(order(&t), vec![a, b, c]);
+
+    t.recomposite();
+    let before = t.composite_hash_hex();
+    assert!(
+        t.move_shape_annotation(a, 1),
+        "bring the bottom shape forward"
+    );
+    assert_eq!(order(&t), vec![b, a, c]);
+    t.recomposite();
+    // Precondition, and the whole reason this case is dangerous: the guard that
+    // is supposed to protect the op-log path sees nothing here.
+    assert_eq!(
+        before,
+        t.composite_hash_hex(),
+        "same-coloured shapes should composite identically after a reorder — \
+         if this fires the test no longer covers the unguarded branch"
+    );
+
+    t.undo();
+    assert_eq!(
+        order(&t),
+        vec![a, b, c],
+        "op-log undo of a reorder destroyed a shape or left the reorder applied"
     );
 }
