@@ -38,6 +38,46 @@ Or clear it in Site configuration → Build & deploy → Build command.
 
 Same shape as the `wasm-pack: latest` drift that cost a night: two sources of
 truth for one build, and the invisible one is the one that rots.
+## OPEN — #63 is NOT display-only: the per-layer annotation state does not exist (2026-09-04)
+
+#63 has been scoped for months as "display-only, from state the rows already
+receive, no new store subscriptions." **That premise is false**, checked before
+writing any code.
+
+The Review panel's only annotation state is `reselectObjects`
+(`AppShell.tsx:1666`), built from `textTool.annotations` and
+`drawingTools.shapes`. Both trace to engine getters that are **active-layer
+only** — `annotations.rs:1840`:
+
+```rust
+pub fn get_text_annotations(&self) -> String {
+    annotations_to_json(&self.layers[self.active].text_annotations)
+}
+```
+
+So the panel holds the ACTIVE layer's annotations and nothing else. A per-layer
+badge has no state to render, and `get_layers()` (`layer.rs:848`) carries
+`{id,name,kind,visible,opacity,active,hasMask,overlay}` — no counts.
+
+| Option | What it costs | Verdict |
+|---|---|---|
+| **A.** Add `textCount`/`shapeCount` to `get_layers()` | two integers in one format string at `layer.rs:852` — **but it is Rust**, so wasm rebuild, size band (ADR-037), toolchain (ADR-038), bench | **the right fix** |
+| **B.** Call `get_layer_text_annotations(i)` + `get_layer_shape_annotations(i)` per layer from TS | those exist today (`layer.rs:1621`, `:1629`), but it is **2N async worker round-trips per refresh** | forbidden — this is the per-stroke re-render the fake progress bar was removed to stop |
+| **C.** Derive from what the panel already has | impossible — active-layer only | dead |
+
+**Recommendation: option A, but not on its own.** It is a small change that
+rebuilds the WASM, so it should ride with the engine sitting (#71, #68, #66,
+#70, #65) that already shares one size-band check, one toolchain exposure and
+one bench. Doing it alone spends a whole engine verification cycle on two
+integers.
+
+⚠️ Anyone picking up #63 as a "quick TS win" will get several hours in before
+finding this. That is why it is written down rather than left to be
+rediscovered.
+
+Related: the same active-layer scoping is the crosstalk finding from
+2026-08-18 — annotation getters and hit-tests are active-layer-only while the
+canvas renders every visible layer.
 
 ## OPEN — no Content-Security-Policy on either site (2026-09-03)
 
