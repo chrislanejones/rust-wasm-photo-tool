@@ -84,42 +84,41 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.65 — 2026-09-03
+### v8.66 — 2026-09-04
 
-**Skewed is the rare case.**
+**The hole you erased stops coming back black.**
 
-Dragging a corner of a selected image or layer now keeps its proportions, and
-holding Shift frees it. That is the opposite of what it used to do. Stretching a
-photo out of shape is the rare thing to want and the one that visibly damages
-the picture, so it is the one that costs a modifier — you cannot do it by
-accident any more, and the common case needs no keyboard at all.
+Erase something — the Magic Eraser, the eraser brush, a layer mask — then export
+as JPEG, and the hole came out as a black patch. JPEG has no transparency, so
+every see-through pixel has to be painted onto a colour before the file is
+written, and nothing on the export path was doing that. The browser encoder does
+not ask what you wanted; it writes black. Holes become white now, and PNG, WebP
+and AVIF keep their transparency untouched.
 
-Crop and the shapes are deliberately unchanged: choosing a rectangle is not the
-same as scaling a photograph, so an arbitrary shape stays the no-modifier case
-there. Edge handles are free everywhere, because a single-axis drag has no
-second axis to reconcile.
+Rulers and the grid overlay have moved out of Settings and into Edit → Rulers,
+where you reach for them mid-edit instead of going to configure the app. The
+tick labels can read in pixels, inches or centimetres. Inches and centimetres
+are worked out at 96 DPI — a web image has no real-world size of its own, so
+that is a stated convention rather than a promise about print, and the panel
+says so where you choose.
 
-The two thumbnails on the "Welcome back" screen showed the browser's
-broken-image icon instead of your photos. The screen built its preview images
-and then threw them away a moment later, before the page had drawn them, so
-every return visit greeted you with two grey placeholders. They are built and
-released together now, and the same fault is fixed in the resume dialog.
+Undo and Redo were greyed out so far they disappeared. Measured against the bar
+behind them, the disabled icons came to 1.33:1 in light mode — invisible rather
+than dimmed. Fading them was never going to work: the enabled colour was itself
+only 3:1, so every step down from it landed below the floor. Both states move up
+together instead, and a disabled button now reads as quiet rather than absent.
 
-The New Image panel is laid out as tiles — three across, icon above the label,
-matching the tool panels rather than looking like a different app. There is a
-fifth tile for Create AI Image, deliberately visible and disabled, so the shape
-of what is coming is honest rather than hidden. The row underneath is four plain
-icon buttons at one size: sign in, the website, GitHub and Codeberg.
+Three backlog items were opened this week expecting a small afternoon of
+TypeScript, and all three turned out to need the Rust engine instead: a
+per-layer annotation badge, shape z-order, and a layer-emptiness check. Rather
+than half-start any of them, each was measured and written up with the exact
+function it needs. They will ship together, sharing one engine rebuild.
 
-Two investigations that produced no code are written down rather than lost.
-Neither site sends a Content-Security-Policy — filed rather than patched,
-because a policy here has to allow the WebAssembly engine and its workers and
-would break image loading in production if guessed at. And the long-running
-report that painting hit every layer was measured at last: after cutting a
-selection to a new layer, a brush stroke changed exactly one layer's pixels and
-the other two were byte-identical. Cutting produces a full-size layer that sits
-on top, so a stroke on it covers everything below and reads as if it went
-everywhere. The pixels were always going to the right place.
+Five dependency updates landed. The Netlify build settings turned out to hold a
+stale copy of the build command — one that would compile the engine without its
+features, exactly the fault that shipped for ten releases in July. The file in
+the repository wins today, so nothing is broken; it is written down rather than
+quietly left.
 
 ## License
 

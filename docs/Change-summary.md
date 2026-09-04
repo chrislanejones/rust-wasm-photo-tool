@@ -9877,3 +9877,117 @@ does not describe its own contents. History was not rewritten.
 | `pnpm run build` | **succeeds** |
 
 No engine change — no `build:wasm`, crate untouched, size band unmoved.
+
+## v8.66 Change Summary — 2026-09-04
+
+The hole you erased stops coming back black. One user-visible fix that was
+blocked for five sessions, a panel that moved to where you actually use it, a
+contrast fix, and three backlog items honestly re-scoped.
+
+### #46 — a transparent hole exported as a black blob in JPEG
+
+Erase something (Magic Eraser, eraser brush, layer mask), export as JPEG, and
+the hole came out black. JPEG has no alpha channel, so a transparent pixel must
+be composited onto something before encoding, and nothing on the export path
+did that. Chrome's encoder writes `rgba(0,0,5,255)` — measured.
+
+**Black is not a wrong matte, it is the absence of one.** Drop the alpha channel
+without compositing and you get it by construction.
+
+⚠️ **Why it survived so long.** Two mitigations existed and both are
+BOUNDARY-shaped: Rust's tight-crop (`lib.rs:807`) removes transparent margin,
+and ADR-039's backing-canvas drop removes the artboard *around* the photo.
+Neither can reach a hole in the middle.
+
+The matte runs inside `encodeRgba()` before either backend, so the codec worker
+and the main-thread fallback cannot drift apart — they are the exact pair that
+drifted before. White, behind one constant. 9 tests; **4 die under mutation**.
+
+### Rulers & Grid moved to Edit, with units
+
+| | Before | After |
+|---|---|---|
+| Lives in | Settings tab | **Edit → Rulers** |
+| Tick units | pixels only | **px / inches / centimetres** |
+
+Inches and centimetres derive from a fixed **96 DPI**. A web image has no
+inherent physical size, so that is a stated convention, not a print promise —
+and the panel says so where the choice is made.
+
+The unit is a **lens, not a coordinate change**: `niceStep` returns image pixels
+whichever unit is chosen, so the overlay's projection is untouched. Inches
+ladder on binary fractions (1/16, 1/8, 1/4), centimetres on the metric ladder.
+
+⚠️ Edit already held a parked `ruler` sub-tool for a *measure* tool. "Ruler"
+beside "Rulers" is a coin toss, so the parked one is renamed **"Measure"**.
+
+⚠️ **A real bug caught by lint**: `guides.rulerUnit` was missing from the tick
+`useMemo` deps, so changing the unit would not have redrawn the ticks.
+
+### Disabled toolbar icons were invisible, not dimmed
+
+| disabled icon over `--bg-tertiary` | Light | Dark |
+|---|---|---|
+| `opacity-30` (shipped) | **1.33** | **1.56** |
+| `opacity-100` | 3.00 | 4.61 |
+
+That last row is the point: at full strength the old enabled colour was only
+3.00:1, so **no opacity** left a disabled state both dimmer and visible.
+
+| | Was | Now | Light | Dark |
+|---|---|---|---|---|
+| Enabled | `--text-muted` | `--text-secondary` | **5.75** | **7.67** |
+| Disabled | `opacity-30` | `--text-muted` @ 1.0 | **3.00** | **4.61** |
+
+⚠️ This brightens **enabled** icons everywhere too — deliberate, since the
+disabled state cannot be fixed while enabled sits at 3.00.
+
+### Three items re-scoped: all TS estimates, all actually engine
+
+| # | Scoped as | Actually needs |
+|---|---|---|
+| #71 | "small, TS-only" | `layer_is_empty(id)` export |
+| #63 | "display-only TS" | counts in `get_layers()` — the getters are active-layer-only (`annotations.rs:1840`) |
+| #62 | "biggest purely-TS item" | `move_shape_annotation()` — no reorder exists at all |
+
+**#29's "DONE" mark still has no code behind it.** Layer z-order shipped 08-21;
+*shape* z-order never existed, and the two keep getting conflated.
+
+The good news on #62: z-order **is** Vec order (`layer.rs:86`, rendered `:217`),
+and it need not force an `OP_FORMAT_VERSION` bump — `remove_object`
+(`selection.rs:643`) sets the precedent of snapping history while skipping the
+op log, letting `oplog_engine_in_sync` fall back to snapshot undo.
+
+All three will ship together, sharing one engine rebuild.
+
+### Also
+
+Five dependency bumps (react group, vitest, eslint-plugin-react-refresh, vite,
+@tailwindcss/vite). #67's cancellation test landed after weeks on an unpushed
+branch — **mutation-checked**, not merely green.
+
+⚠️ The Netlify UI holds a stale, pre-ADR-038 build command that would compile
+the engine **without its features** — the v7.36–v7.45 bug. `netlify.toml` wins
+today (live wasm 816,324 B, sentinel green), so nothing is broken; it is filed
+as a loaded gun.
+
+### Correction, still owed from v8.63–v8.64
+
+Commit `a6b2bfc` is titled for the status-bar contrast fix and **also contains
+the layer-swap flash**, because its branch was cut from that branch instead of
+from master. Both changes were reviewed and green; the defect is that the commit
+does not describe its own contents. History is pushed and was not rewritten.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** (app + marketing) |
+| `pnpm lint` | **0 errors**, 61 warnings |
+| `pnpm -C app test` | **679 passed**, 57 files |
+| `./scripts/guardrails.sh` | **OK** — dead-exports lowered 2 → 1 |
+| `cargo fmt --check` / `clippy -D warnings` | **clean** |
+| `cargo test --features tiles` | **17 suites ok** |
+| `pnpm run build` | **succeeds** |
+
+No engine change — no `build:wasm`, crate untouched, size band unmoved.

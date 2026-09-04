@@ -24,6 +24,33 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.66",
+    date: "2026-09-04",
+    headline: "The hole you erased stops coming back black",
+    entries: [
+      {
+        tag: "fix",
+        text: "Erase something \u2014 the Magic Eraser, the eraser brush, a layer mask \u2014 then export as JPEG, and the hole came out as a black patch. JPEG has no transparency, so every see-through pixel has to be painted onto a colour before the file is written, and nothing on the export path was doing that. The browser encoder does not ask what you wanted; it writes black. Holes now become white, and PNG, WebP and AVIF keep their transparency untouched. Black was never a wrong colour choice, incidentally \u2014 it is what you get when nothing chooses at all.",
+      },
+      {
+        tag: "ui",
+        text: "Rulers and the grid overlay have moved out of Settings and into Edit \u2192 Rulers, where you reach for them mid-edit instead of going to configure the app. The tick labels can now read in pixels, inches or centimetres. Inches and centimetres are worked out at 96 DPI \u2014 a web image has no real-world size of its own, so that is a stated convention rather than a promise about print, and the panel says so where you choose.",
+      },
+      {
+        tag: "fix",
+        text: "Undo and Redo were greyed out so far they disappeared. Measured against the bar behind them, the disabled icons came to 1.33:1 in light mode \u2014 invisible rather than dimmed. Fading them was never going to work: the enabled colour was itself only 3:1, so every step down from it landed below the floor. Both states move up together instead, and a disabled button now reads as quiet rather than absent.",
+      },
+      {
+        tag: "infra",
+        text: "Three backlog items were opened this week expecting a small afternoon of TypeScript, and all three turned out to need the Rust engine instead: a per-layer annotation badge, shape z-order, and a layer-emptiness check. Rather than half-start any of them, each was measured and written up with the exact function it needs and why the TypeScript route is closed. They will ship together, sharing one engine rebuild, because spending a whole verification cycle on two integers is the wrong trade and spending it on three primitives is the right one.",
+      },
+      {
+        tag: "infra",
+        text: "Five dependency updates landed, and the Netlify build settings turned out to hold a stale copy of the build command \u2014 one that would compile the engine without its features, exactly the fault that shipped for ten releases in July. The file in the repository wins today, so nothing is broken; it is written down as a loaded gun rather than quietly left.",
+      },
+    ],
+  },
+  {
     version: "v8.65",
     date: "2026-09-03",
     headline: "Skewed is the rare case",
