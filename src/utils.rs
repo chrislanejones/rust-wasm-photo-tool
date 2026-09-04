@@ -2,6 +2,33 @@
 //! Pure functions with no `ImageHorseTool` dependency; pulled out of `lib.rs`
 //! so the hot paths that use them live next to the engine, not the god object.
 
+/// A layer opacity from an untrusted source, made safe to put in JSON.
+///
+/// **`f64::clamp` is not enough, and that is the whole point of this function.**
+/// It is specified to return NaN when self is NaN, so `opacity.clamp(0.0, 1.0)`
+/// passes a NaN straight through. `get_layers()` then formats it as the bare
+/// token `NaN`, which is not JSON — `JSON.parse` throws, `useEngineCore`
+/// catches, and the layer array becomes `[]`. The user sees an empty layer
+/// panel and a document that looks like it lost every layer (#79).
+///
+/// Infinity was never the problem — `f64::INFINITY.clamp(0.0, 1.0)` is 1.0 —
+/// which is exactly why the NaN case looked guarded and was not. Both go
+/// through here so there is one rule instead of two behaviours.
+///
+/// Reachable from a `.ora` import, not just from the slider: `stackXml.ts`
+/// reads `opacity` off the file with `parseFloat`, and `parseFloat("abc")` is
+/// NaN. #79 was filed as "unreachable" on slider reasoning alone.
+///
+/// Falls back to 1.0 (fully visible): a layer you can see beats one you cannot,
+/// and a file with a broken opacity attribute has told us nothing about intent.
+pub(crate) fn sane_opacity(v: f64) -> f64 {
+    if v.is_finite() {
+        v.clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
+}
+
 /// Escape a string as a JSON string body (without surrounding quotes).
 pub(crate) fn json_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
