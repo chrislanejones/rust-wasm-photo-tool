@@ -223,6 +223,8 @@ export function LayerSettings({
                   {l.visible ? "" : " (hidden)"}
                   {l.hasMask ? " · masked" : ""}
                   {l.overlay ? " · tinted" : ""}
+                  {l.shapeCount > 0 ? ` · ${l.shapeCount} shape${l.shapeCount === 1 ? "" : "s"}` : ""}
+                  {l.textCount > 0 ? ` · ${l.textCount} text` : ""}
                 </option>
               ))}
             </select>
