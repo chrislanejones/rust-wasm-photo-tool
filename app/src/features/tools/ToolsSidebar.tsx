@@ -410,6 +410,7 @@ export function ToolsSidebar({
             mask={layerMask}
             overlay={layerOverlay}
             stampToolRef={stampToolRef}
+            undoCount={undoCount}
             imgW={imageWidth}
             imgH={imageHeight}
             canvasWidth={imageWidth}

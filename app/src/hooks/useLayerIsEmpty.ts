@@ -30,8 +30,12 @@ import type { LayerInfo } from "./useEngineCore";
 export function useLayerIsEmpty(
   stampToolRef: MutableRefObject<ImageHorseTool | null>,
   layers: LayerInfo[] | undefined,
-  /** Bump this when the pixels may have changed — `undoCount` is the one the
-   *  rest of the app already uses for "the document moved". */
+  /** Bump this when the document may have changed. Callers must include the
+   *  PIXEL counter (`undoCount`), not just a layer-metadata counter: paint,
+   *  erase and undo raise undo steps and move no layer metadata, so watching
+   *  `layerRevision` alone leaves this answer stale after an undo that empties
+   *  the active layer — measured in the browser, engine said empty while the
+   *  swatches stayed live. `LayerSettings` passes `undoCount + layerRevision`. */
   revision: number,
 ): boolean | undefined {
   const [isEmpty, setIsEmpty] = useState<boolean | undefined>(undefined);

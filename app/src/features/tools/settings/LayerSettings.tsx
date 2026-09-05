@@ -80,6 +80,10 @@ interface LayerSettingsProps {
    *  and two others from ToolsSidebar, so this adds no new plumbing and
    *  nothing in AppShell changes. */
   stampToolRef: React.MutableRefObject<ImageHorseTool | null>;
+  /** #71 — the PIXEL-change counter. `layerRevision` alone is not enough: it
+   *  moves only for the four non-snapping layer ops, so paint and undo are
+   *  invisible to it. ToolsSidebar already receives this. */
+  undoCount: number;
   disabled: boolean;
   /** Move-layer toggle — while on, canvas drags reposition the active layer. */
   moveActive: boolean;
@@ -128,6 +132,7 @@ interface LayerSettingsProps {
 export function LayerSettings({
   disabled,
   stampToolRef,
+  undoCount,
   moveActive,
   onToggleMove,
   onResizeLayer,
@@ -147,8 +152,24 @@ export function LayerSettings({
   const activeLayer = layers?.find((l) => l.active);
   // #71 — one question about ONE layer, re-asked when the document moves.
   // `undefined` while unknown, and an unknown answer disables nothing.
-  const undoCount = useGalleryStore((st) => st.layerRevision);
-  const activeLayerIsEmpty = useLayerIsEmpty(stampToolRef, layers, undoCount);
+  //
+  // BOTH counters, because they cover different halves of "the document moved"
+  // and neither is sufficient alone:
+  //   • `undoCount`     — pixels. Paint, erase, filters, UNDO, redo.
+  //   • `layerRevision` — the four layer ops that deliberately do NOT snap
+  //                       (select / visible / opacity / rename), so they raise
+  //                       no undo step and are invisible to `undoCount`.
+  // The first version watched only `layerRevision`, which meant the answer
+  // never refreshed when the PIXELS changed — an undo that emptied the active
+  // layer left the swatches enabled on a layer the engine already called
+  // empty. Verified in the browser, not reasoned about. Summing is safe:
+  // both are monotonic, so the sum only ever increases.
+  const layerRevision = useGalleryStore((st) => st.layerRevision);
+  const activeLayerIsEmpty = useLayerIsEmpty(
+    stampToolRef,
+    layers,
+    undoCount + layerRevision,
+  );
   // Guide state lives in the dedicated Zustand slice (shared with the canvas
   // overlay), so we read it directly rather than prop-drilling.
   const guides = useGuidesStore((s) => s.guides);
