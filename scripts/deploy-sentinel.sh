@@ -25,12 +25,41 @@
 set -uo pipefail
 
 SITE="${SENTINEL_SITE:-https://rust-wasm-photo-tool.netlify.app}"
-MIN_WASM="${SENTINEL_MIN_WASM:-780000}"
-MAX_WASM="${SENTINEL_MAX_WASM:-850000}"
-# Symbols that only exist when the engine is built --features tiles,patchmatch.
-# oplog_* is the tiles/op-log surface; remove_object is PatchMatch; rect_select
-# is the marquee. Miss any one and prod is not running what we shipped.
-REQUIRED_SYMBOLS=(oplog_ remove_object rect_select)
+MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
+MAX_WASM="${SENTINEL_MAX_WASM:-840000}"
+# Methods that only exist when the engine is built --features tiles,patchmatch.
+# `oplog_active` is the tiles/op-log surface; `remove_object` is PatchMatch.
+#
+# ⚠️ MATCHED AS DECLARATIONS, NOT AS BARE STRINGS — and that is the whole point.
+# This list used to be `(oplog_ remove_object rect_select)` grepped with a plain
+# `grep -q`, and ALL THREE were vacuous (measured 2026-09-05 against a real
+# featureless build):
+#   • `oplog_` matched a doc comment mentioning `oplog_engine_in_sync`
+#   • `remove_object` matched 2 doc comments that merely NAME it
+#   • `rect_select` is not feature-gated at all — it is in every build
+# So the export half of this sentinel PASSED on a featureless build, and the
+# size floor below was the only thing catching the failure this script exists
+# for (see project_netlify_featureless_wasm_bug). Same bug class CLAUDE.md
+# already documents for guardrails.sh: a text grep cannot tell code from prose.
+#
+# Matched as a DECLARATION: the name, an argument list, and an opening brace
+# (`remove_object() {`). A doc comment can name a symbol but cannot follow it
+# with a signature and a brace. Deliberately NOT anchored on indentation — the
+# live glue is a Vite chunk, and an indent anchor would false-fail the day the
+# minifier collapses whitespace.
+#
+# Verified against three real artifacts (2026-09-05): the live minified glue,
+# a raw featured `pkg/` glue, and a raw FEATURELESS one. Featured 1/1/1,
+# featureless 0/0/1 — the two gated symbols correctly absent.
+#
+# If this ever does misfire it fails CLOSED (a false alarm on a good deploy),
+# which is the right direction to be wrong for a sentinel; the old bare grep
+# failed OPEN and waved a featureless build through.
+REQUIRED_SYMBOLS=(oplog_active remove_object)
+# Not feature-gated, so it proves only that this is a real engine glue and not
+# that the features are on. Kept deliberately, listed separately so nobody
+# mistakes it for a feature check again.
+WIRED_SYMBOLS=(rect_select)
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -63,13 +92,13 @@ fetch "$SITE/assets/$glue" "$TMP/glue.js" || fail "could not fetch assets/$glue"
 echo "  glue       : $glue ($(stat -c%s "$TMP/glue.js") bytes)"
 
 missing=()
-for sym in "${REQUIRED_SYMBOLS[@]}"; do
-  grep -q "$sym" "$TMP/glue.js" || missing+=("$sym")
+for sym in "${REQUIRED_SYMBOLS[@]}" "${WIRED_SYMBOLS[@]}"; do
+  grep -qE "${sym}\([A-Za-z0-9_\$, ]*\)[[:space:]]*\{" "$TMP/glue.js" || missing+=("$sym")
 done
 if [ ${#missing[@]} -gt 0 ]; then
   fail "live glue is MISSING engine exports: ${missing[*]} — production is serving a featureless build (see netlify.toml --features tiles,patchmatch)"
 fi
-echo "  exports    : ${REQUIRED_SYMBOLS[*]} all present"
+echo "  exports    : ${REQUIRED_SYMBOLS[*]} ${WIRED_SYMBOLS[*]} all declared"
 
 wasm="$(grep -o 'stamp_tool_bg-[A-Za-z0-9_-]*\.wasm' "$TMP/glue.js" | head -1)"
 [ -n "$wasm" ] || fail "glue references no .wasm binary"
