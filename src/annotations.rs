@@ -1206,6 +1206,31 @@ impl ImageHorseTool {
             return false; // no-op — must not push a history entry
         }
         self.snap("Reorder Shape");
+        // EXPLICITLY UNLOGGABLE (ADR-044), and the log must be told so.
+        //
+        // The reconciler matches shapes by id and `ShapeParams` carries no
+        // order field, so a reorder emits ZERO ops — while the `snap()` above
+        // pushes a snapshot. That breaks the "one recorded op ↔ one snapshot"
+        // lockstep `try_oplog_undo` documents and relies on: it pops one
+        // snapshot AND seeks the log back one op, so the next undo would rewind
+        // the previous REAL op and DESTROY the most recently added shape while
+        // leaving the reorder applied.
+        //
+        // ADR-044 argued the pixel-hash guard (`oplog_engine_in_sync`) made
+        // this safe. It does not: reordering shapes that share a stroke/fill
+        // colour leaves the composite byte-identical, the guard sees nothing,
+        // and the op-log path proceeds on a broken lockstep. That is the exact
+        // case the ADR dismissed as "did not matter".
+        //
+        // Breaking the log routes undo down the snapshot path, which restores
+        // shape order correctly. Cost is the cheaper undo path for the rest of
+        // the session — the same cost the ADR already accepted for a reorder
+        // the guard DOES catch. Pinned by
+        // `op_log_undo_of_a_reorder_keeps_every_shape`.
+        #[cfg(feature = "tiles")]
+        {
+            self.oplog_broken = true;
+        }
         let shapes = &mut self.layers[self.active].shape_annotations;
         let s = shapes.remove(from);
         shapes.insert(to, s);

@@ -888,17 +888,47 @@ export function useDrawingTools({
     }
   }, [activeTool, commitEdit]);
 
-  const getCoords = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>): Point => {
+  // ONE definition of the viewport -> canvas-space transform. Both the drag
+  // path (`getCoords`) and the right-click path (`shapeAtClient`) go through
+  // it. This file already warns about rules that several surfaces re-derive
+  // and then disagree about; a second copy of this arithmetic is exactly that.
+  const clientToCanvas = useCallback(
+    (clientX: number, clientY: number): Point => {
       const canvas = canvasRef.current;
       if (!canvas) return { x: 0, y: 0 };
       const rect = canvas.getBoundingClientRect();
+      // A canvas laid out at zero size divides by zero and hands the engine a
+      // NaN -- and `f64::clamp` does NOT sanitise NaN (#79), so it would land
+      // in geometry rather than being rejected at the boundary.
+      if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
       return {
-        x: ((e.clientX - rect.left) * canvas.width) / rect.width,
-        y: ((e.clientY - rect.top) * canvas.height) / rect.height,
+        x: ((clientX - rect.left) * canvas.width) / rect.width,
+        y: ((clientY - rect.top) * canvas.height) / rect.height,
       };
     },
     [canvasRef],
+  );
+
+  const getCoords = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>): Point =>
+      clientToCanvas(e.clientX, e.clientY),
+    [clientToCanvas],
+  );
+
+  /** Hit-test the shape under a VIEWPORT point, for the canvas context menu,
+   *  where no drag is starting. Deliberately the SAME engine call the
+   *  left-click path uses, so a right-click targets the shape a left-click
+   *  would have selected. `shape_annotation_at`, `get_shape_annotations` and
+   *  `move_shape_annotation` are all scoped to `layers[active]`, so an id this
+   *  returns is always one `moveShape` can actually restack -- a shape that is
+   *  visible but lives on another layer misses here, which is the honest
+   *  answer (#50) rather than a menu item that would silently do nothing. */
+  const shapeAtClient = useCallback(
+    async (clientX: number, clientY: number): Promise<number> => {
+      const p = clientToCanvas(clientX, clientY);
+      return (await toolRef.current?.shape_annotation_at(p.x, p.y)) ?? -1;
+    },
+    [clientToCanvas, toolRef],
   );
 
   const onMouseDown = useCallback(
@@ -1099,6 +1129,7 @@ export function useDrawingTools({
     selectShape,
     removeShape,
     moveShape,
+    shapeAtClient,
   };
 }
 
