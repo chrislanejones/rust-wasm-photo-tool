@@ -82,6 +82,13 @@ export interface LayerInfo {
    *  until Applied. Session-lived: like `hasMask`, it does not survive a reload
    *  (`push_restored_layer` restores pixels + annotations only). */
   overlay: LayerColorOverlay | null;
+  /** How many live (non-destructive) TEXT annotations this layer carries.
+   *  Scoped to THIS layer, not to the active one — see the engine test
+   *  `counts_are_scoped_to_their_own_layer_not_the_active_one`. */
+  textCount: number;
+  /** How many live (non-destructive) SHAPE annotations this layer carries.
+   *  Same scoping guarantee as `textCount`. */
+  shapeCount: number;
 }
 
 /** A layer's Color Overlay style, mirrored from the Rust `get_layers()` JSON. */

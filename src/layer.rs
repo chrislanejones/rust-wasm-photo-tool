@@ -837,11 +837,23 @@ impl ImageHorseTool {
     }
 
     /// JSON array of the layer stack, bottom → top:
-    /// `[{id,name,kind,visible,opacity,active,hasMask,overlay}]`.
+    /// `[{id,name,kind,visible,opacity,active,hasMask,overlay,textCount,shapeCount}]`.
     /// `overlay` is `null` or `{color:"#rrggbb",opacity:0..1}` — the layer's
     /// non-destructive Color Overlay style.
     /// `kind` is `"canvas"` for the artboard fill, `"content"` otherwise — the
     /// UI labels and gates on this rather than matching the name.
+    ///
+    /// `textCount` / `shapeCount` are the layer's live (non-destructive)
+    /// annotation counts. They are here — rather than behind their own getter —
+    /// because they are `Vec::len()`, which reads a field and touches no pixels.
+    ///
+    /// ⚠️ **That freeness is the whole reason they qualify, and it is why #71
+    /// must NOT follow them here.** This function runs inside `capture_ui_state`,
+    /// which `syncState` reaches from 199 call sites including per-stroke paths.
+    /// An O(1) field read is free at that rate; an alpha scan (what #71's
+    /// "is this layer empty" needs, measured at 1.8 ms on an empty layer) would
+    /// become a per-stroke cost. #71 wants its own `layer_is_empty(&self, i)`
+    /// that callers reach for deliberately, not a field on this hot struct.
     pub fn get_layers(&self) -> String {
         let mut out = String::from("[");
         for (i, l) in self.layers.iter().enumerate() {
@@ -849,7 +861,7 @@ impl ImageHorseTool {
                 out.push(',');
             }
             out.push_str(&format!(
-                "{{\"id\":{},\"name\":\"{}\",\"kind\":\"{}\",\"visible\":{},\"opacity\":{},\"active\":{},\"hasMask\":{},\"overlay\":{}}}",
+                "{{\"id\":{},\"name\":\"{}\",\"kind\":\"{}\",\"visible\":{},\"opacity\":{},\"active\":{},\"hasMask\":{},\"overlay\":{},\"textCount\":{},\"shapeCount\":{}}}",
                 l.id,
                 json_escape(&l.name),
                 if l.is_canvas() { "canvas" } else { "content" },
@@ -868,6 +880,8 @@ impl ImageHorseTool {
                         ov.r, ov.g, ov.b, ov.opacity
                     ),
                 },
+                l.text_annotations.len(),
+                l.shape_annotations.len(),
             ));
         }
         out.push(']');
