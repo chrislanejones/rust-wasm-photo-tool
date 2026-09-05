@@ -13,6 +13,10 @@ interface Props {
    * swatches. Defaults to true so all pickers share the global user palette.
    */
   allowCustom?: boolean;
+  /** Greys out every swatch and the "+" button, and stops them being
+   *  keyboard-reachable. The CALLER owns the explanation — a disabled control
+   *  with no stated reason is the thing this repo's a11y pass keeps finding. */
+  disabled?: boolean;
 }
 
 export function ColorSwatchGrid({
@@ -21,6 +25,7 @@ export function ColorSwatchGrid({
   onChange,
   label = "Color",
   allowCustom = true,
+  disabled = false,
 }: Props) {
   const { userColors, addColor, removeColor } = useUserColors();
   const [adding, setAdding] = useState(false);
@@ -88,6 +93,7 @@ export function ColorSwatchGrid({
             color={color}
             active={value === color}
             onClick={() => onChange(color)}
+            disabled={disabled}
           />
         ))}
         {allowCustom &&
@@ -98,19 +104,24 @@ export function ColorSwatchGrid({
               active={value === color}
               onClick={() => onChange(color)}
               onRemove={() => removeColor(color)}
+              disabled={disabled}
             />
           ))}
         {allowCustom && (
           <button
             type="button"
             onClick={() => setAdding((v) => !v)}
+            disabled={disabled}
             aria-label="Add custom color"
             className={[
               "flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all",
               adding
                 ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
                 : "border-dashed border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:border-theme-foreground/50",
-            ].join(" ")}
+              disabled && "opacity-40 pointer-events-none",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -171,9 +182,10 @@ interface SwatchProps {
   active: boolean;
   onClick: () => void;
   onRemove?: () => void;
+  disabled?: boolean;
 }
 
-function Swatch({ color, active, onClick, onRemove }: SwatchProps) {
+function Swatch({ color, active, onClick, onRemove, disabled }: SwatchProps) {
   // The "transparent" entry is the transparent backing canvas: render the same
   // transparency checkerboard the canvas itself shows (`.checkerboard-canvas`,
   // styles.css — also used by CanvasArea) instead of a flat panel-coloured
@@ -185,9 +197,11 @@ function Swatch({ color, active, onClick, onRemove }: SwatchProps) {
       <button
         type="button"
         onClick={onClick}
+        disabled={disabled}
         className={[
           "w-7 h-7 rounded-full border-2 border-transparent transition-all overflow-hidden",
           isTransparent && "checkerboard-canvas",
+          disabled && "opacity-40 pointer-events-none",
           active
             ? "scale-110 ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
             : "hover:scale-105",

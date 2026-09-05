@@ -1193,6 +1193,57 @@ impl ImageHorseTool {
     /// `is_layer_source` branch already clears the whole buffer and pastes
     /// the resampled snapshot at the dest rect, so a cropped snapshot needs
     /// no commit changes.
+    /// Does this layer hold any non-transparent pixel? (#71)
+    ///
+    /// `index` is the stack position, bottom → top — the same order
+    /// [`get_layers`](Self::get_layers) emits, so the UI can pass the array
+    /// index it already has. Out of range answers `true`: a layer that is not
+    /// there holds nothing.
+    ///
+    /// Pure `&self`, early-exit, no side effects. That is the whole point.
+    /// [`begin_layer_resize_preview`] already scans alpha, and was tried as
+    /// the probe for this — it is unusable for it twice over: it needs the
+    /// tight bounding box, so it cannot stop at the first opaque pixel, and it
+    /// SETS `paste_preview` as a side effect. This is a different algorithm
+    /// answering a different question, not an extraction of that one; the two
+    /// are meant to stay separate.
+    ///
+    /// ⚠️ **NOT a field on `get_layers()`.** That runs inside
+    /// `capture_ui_state`, which `syncState` reaches from 199 call sites
+    /// including per-stroke paths, so everything on it must be O(1) — which is
+    /// why the annotation counts (#63) could ride there and this cannot. Ask
+    /// this deliberately, for one layer, when the document changes.
+    ///
+    /// Alpha only, and deliberately ignores the mask: a fully-hiding mask
+    /// makes a layer invisible, not empty, and the Color Overlay this gates is
+    /// clipped to the layer's own alpha and applied BEFORE the mask (ADR-041).
+    /// Un-masking must not change the answer.
+    ///
+    /// Scans eight bytes at a time (two pixels) and tests both alpha lanes
+    /// with one mask, so a transparent layer costs a word read per two pixels
+    /// instead of a byte read per pixel. Measured 4.0 ms in wasm on the
+    /// empty-layer worst case, against a ~10 ms bar — which is why #71 needs
+    /// no cache and no dirty flag.
+    pub fn layer_is_empty(&self, index: usize) -> bool {
+        let Some(layer) = self.layers.get(index) else {
+            return true;
+        };
+        let data = &layer.buf.data;
+        // RGBA little-endian: alpha is byte 3 of each pixel, so bytes 3 and 7
+        // of each 8-byte word. Any bit set in either lane means content.
+        const ALPHA2: u64 = 0xFF00_0000_FF00_0000;
+        let mut chunks = data.chunks_exact(8);
+        for w in &mut chunks {
+            let word = u64::from_le_bytes([w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]]);
+            if word & ALPHA2 != 0 {
+                return false;
+            }
+        }
+        // Tail: a final pixel when the buffer is an odd number of pixels long,
+        // and any trailing bytes a truncated buffer left behind.
+        chunks.remainder().chunks_exact(4).all(|px| px[3] == 0)
+    }
+
     pub fn begin_layer_resize_preview(&mut self) -> Vec<i32> {
         if self.active >= self.layers.len() {
             return Vec::new();

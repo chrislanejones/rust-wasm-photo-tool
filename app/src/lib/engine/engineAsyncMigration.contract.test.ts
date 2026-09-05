@@ -710,11 +710,20 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // It is deliberately the same engine call the left-click path uses, so a
     // right-click targets the shape a click would select. Gate numbers below
     // (5 exempt / 0 unawaited / 0 truthy) unchanged again.
+    //
+    // #71 — 127 -> 128: `useLayerIsEmpty.ts` adds ONE awaited
+    // `layer_is_empty`. Born awaited and value-consuming: the boolean decides
+    // whether the Color Overlay swatches are disabled, and an un-awaited
+    // Promise is truthy — which would disable the swatches on EVERY layer,
+    // including the ones with pixels, and the reason line would claim the
+    // layer is blank when it is not. The call is deliberately for ONE layer
+    // rather than a map over the stack (that shape is what caused the v7.81
+    // batch-export data loss). Gate numbers unchanged again.
     ).toBe(5);
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(127);
+    expect(gate.awaited, "cumulative converted sites").toBe(128);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

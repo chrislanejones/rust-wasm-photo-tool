@@ -18,6 +18,9 @@ import { ReselectBar } from "@/components/ui/reselect-bar";
 import { SectionHeader } from "@/components/ui/section-header";
 import { CanvasResize } from "@/components/CanvasResize";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
+import { useLayerIsEmpty } from "@/hooks/useLayerIsEmpty";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import type { ImageHorseTool } from "stamp_tool";
 import {
   GUIDE_COLORS,
   OVERLAY_COLORS,
@@ -72,6 +75,11 @@ export interface LayerOverlayControls {
 }
 
 interface LayerSettingsProps {
+  /** #71 — the engine, so the Color Overlay section can ask whether the
+   *  selected layer has any pixels to tint. Already threaded to TextSettings
+   *  and two others from ToolsSidebar, so this adds no new plumbing and
+   *  nothing in AppShell changes. */
+  stampToolRef: React.MutableRefObject<ImageHorseTool | null>;
   disabled: boolean;
   /** Move-layer toggle — while on, canvas drags reposition the active layer. */
   moveActive: boolean;
@@ -119,6 +127,7 @@ interface LayerSettingsProps {
  */
 export function LayerSettings({
   disabled,
+  stampToolRef,
   moveActive,
   onToggleMove,
   onResizeLayer,
@@ -136,6 +145,10 @@ export function LayerSettings({
   section,
 }: LayerSettingsProps) {
   const activeLayer = layers?.find((l) => l.active);
+  // #71 — one question about ONE layer, re-asked when the document moves.
+  // `undefined` while unknown, and an unknown answer disables nothing.
+  const undoCount = useGalleryStore((st) => st.layerRevision);
+  const activeLayerIsEmpty = useLayerIsEmpty(stampToolRef, layers, undoCount);
   // Guide state lives in the dedicated Zustand slice (shared with the canvas
   // overlay), so we read it directly rather than prop-drilling.
   const guides = useGuidesStore((s) => s.guides);
@@ -366,6 +379,7 @@ export function LayerSettings({
               label="Overlay Color"
               colors={OVERLAY_COLORS}
               value={overlayColorOf(activeLayer)}
+              disabled={disabled || activeLayerIsEmpty === true}
               onChange={(color) =>
                 overlay.onSet(
                   activeLayer.id,
@@ -374,6 +388,21 @@ export function LayerSettings({
                 )
               }
             />
+            {/* #71 — the reason, not just the grey. An overlay is clipped to
+                the layer's own alpha (ADR-041 "tints, never fills"), so on a
+                layer with no pixels it is a no-op: the swatch would light up
+                and nothing would happen. Only shown when the engine has
+                actually answered — `undefined` means not-yet-known and
+                disables nothing. */}
+            {activeLayerIsEmpty === true && (
+              <p
+                className="text-2xs text-theme-muted-foreground"
+                role="note"
+              >
+                This layer has no pixels yet, so there is nothing to tint.
+                Paint or paste something onto it first.
+              </p>
+            )}
 
             {/* Strength + the two one-shot actions only exist once there IS
                 an overlay — a slider for a style that isn't on would be a
