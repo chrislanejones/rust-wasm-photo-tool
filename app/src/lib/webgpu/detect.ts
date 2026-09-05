@@ -14,10 +14,17 @@
 // pull `wgpu` into `stamp_tool` and keep everything behind the WASM boundary.
 // That is very likely foreclosed by a constraint the repo already enforces:
 // `scripts/deploy-sentinel.sh` fails any deploy whose wasm falls outside
-// 700–800 KB, and the crate currently sits at ~761 KB. wgpu plus its shader
-// translation layer does not fit in the ~39 KB of headroom — not close. Raising
+// 800,000–840,000 B, and the crate currently sits at 816,971 B (measured
+// 2026-09-05, byte-identical local and deployed). wgpu plus its shader
+// translation layer does not fit in the ~23 KB of headroom — not close. Raising
 // the band is a real decision, not a footnote, so this module keeps the GPU on
-// the JS side and hands the engine's pixels to it. See ADR-030.
+// the JS side and hands the engine's pixels to it. See ADR-030, ADR-045.
+//
+// The numbers above were 700–800 KB / ~761 KB until 2026-09-05 and had been
+// stale since ADR-037 moved the band. The CONCLUSION never changed — wgpu has
+// never come close to fitting — but the arithmetic supporting it was wrong, and
+// a right answer resting on wrong figures is one edit away from becoming a
+// wrong one.
 //
 // Nothing here throws. Every failure path returns a reason string, because the
 // interesting question during Phase 0 is *why* a machine can't run it.
