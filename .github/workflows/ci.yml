@@ -53,7 +53,13 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.4.0
         with:
           version: v0.15.0
-      - run: wasm-pack build --target web --out-dir pkg
+      # Through the one wrapper every builder uses (scripts/build-wasm.sh): it
+      # refuses any wasm-opt other than binaryen 117 on PATH, refuses an env
+      # RUSTFLAGS, and proves the artifact was actually rewritten. ADR-038's
+      # correction explains why the OPTIMIZER needed pinning after rustc and
+      # wasm-pack already were. IH_WASM_FEATURES="" keeps this build
+      # feature-free, as the comment above says it must.
+      - run: IH_WASM_FEATURES= ./scripts/build-wasm.sh
 
   web:
     name: Frontend (typecheck + build)
