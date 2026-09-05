@@ -426,11 +426,18 @@ pub enum Op {
     /// Set a text annotation's wrap width in px (0 = don't wrap, size the box
     /// to the text). v8.40.
     ///
-    /// ⚠️ MUST STAY LAST. postcard encodes an enum as `varint(variant index)
-    /// ++ payload`, so this variant's index is what makes v2 op bytes decode
-    /// unchanged under v3 — inserting anything above it would renumber the
-    /// variants already written to users' disks and silently mis-decode them.
-    /// Append new variants; never insert.
+    /// ⚠️ INDEX IS PERSISTED — never insert above this. postcard encodes an
+    /// enum as `varint(variant index) ++ payload`, so this variant's index is
+    /// what makes v2 op bytes decode unchanged under v3 — inserting anything
+    /// above it would renumber the variants already written to users' disks
+    /// and silently mis-decode them. Append new variants; never insert.
+    ///
+    /// (#69) This used to say "MUST STAY LAST", which was true when written
+    /// and then quietly stopped being true: `TextBoxHeight`, `TextPerspective`
+    /// and `PerspectiveWarp` were each APPENDED after it — correctly — and the
+    /// comment was not updated. The rule was never "last"; it is "append
+    /// only", and it applies to every variant in this enum equally, because
+    /// each one's index is on disk the moment a log containing it is saved.
     ///
     /// Carried as its own op rather than a field on [`TextParams`] for the
     /// same reason: a new field would move every byte after it in `TextAdd`
