@@ -8,6 +8,11 @@ Everything runs from one workflow, [`.github/workflows/ci.yml`](../.github/workf
 
 Deploys are **not** driven by Actions — the hosts build on push themselves. CI mirrors those builds so a break fails here first.
 
+> **Before adding or trusting a gate, read [`vacuous-checks.md`](vacuous-checks.md).**
+> This repo has produced eight checks that were green because they could not
+> fail — including one in this file's own deploy sentinel, which passed on a
+> real featureless build for its entire life.
+
 ## Jobs
 
 ### Build & quality
