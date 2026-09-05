@@ -57,7 +57,8 @@
     cargo install wasm-pack --version 0.15.0 --locked &&
     ./scripts/build-wasm.sh &&
     pnpm install &&
-    pnpm --filter stamp-tool build
+    pnpm --filter stamp-tool build &&
+    ./scripts/write-build-info.sh www-dist
   """
   publish = "www-dist"
 

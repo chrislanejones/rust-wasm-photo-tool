@@ -128,6 +128,9 @@ apart so it cannot be mistaken for a feature check again.
    needs CI plumbing (artifact or job output threaded into a separate workflow),
    which is a bigger change than a bound, and an unattended run is the wrong
    place to redesign a gate. **Recommended as the successor to this ADR.**
+   *(Done — **ADR-046**. It does NOT make the band redundant: the band answers
+   "is this plausibly the engine at all" without needing `build-info.json`, so
+   both are kept. And the expectation could not be a stored digest — see #69.)*
 2. **Pin binaryen explicitly**, or make `build:wasm` refuse to run when a
    foreign `wasm-opt` is on `PATH`. Attractive, and the clean fix for the
    local/prod divergence. Deferred with 1: both are "how the build is pinned"
