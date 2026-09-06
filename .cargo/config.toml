@@ -11,13 +11,28 @@
 #
 # The remaps make the binary a function of the source rather than of the
 # machine that built it. Cargo embeds absolute registry paths in panic
-# locations; ours differ between this laptop (`/home/clj`) and Netlify
-# (`/opt/buildhome`), which is the 139 B gap ADR-038 measured and could not
-# close. Both prefixes are listed because each is a no-op where it does not
-# match, so one file serves both builders.
+# locations; ours differ between this laptop (`/home/clj`), Netlify
+# (`/opt/buildhome`) and the GitHub Actions runner (`/home/runner`), which is
+# the 139 B gap ADR-038 measured and could not close. Every prefix is listed
+# because each is a no-op where it does not match, so one file serves all
+# three builders.
+#
+# ⚠️ THE LIST MUST NAME EVERY BUILDER, and it did not. It shipped with two
+# entries and CI is a third — caught 2026-09-06 by ADR-046's tier-2 check on
+# its FIRST real run: Netlify and this laptop both produced
+# `ffc8d7d320cccba6…` for commit 4125360 while CI produced `b62fa7e43442a5e5…`
+# for the same commit. Production was never affected (tier 1 passed: the live
+# site served exactly the binary its own build wrote); the divergence was
+# CI-only, and invisible before the hash check existed.
+#
+# Adding a builder means adding a line here. There is no wildcard — rustflags
+# does not expand `$CARGO_HOME` — so a new CI provider or a renamed home
+# directory silently reintroduces the drift. The tier-2 check is what catches
+# it, which is the argument for keeping that check fail-loud.
 [target.wasm32-unknown-unknown]
 rustflags = [
   "-C", "target-feature=+simd128",
   "--remap-path-prefix=/home/clj/.cargo/registry=/cargo-registry",
   "--remap-path-prefix=/opt/buildhome/.cargo/registry=/cargo-registry",
+  "--remap-path-prefix=/home/runner/.cargo/registry=/cargo-registry",
 ]
