@@ -9991,3 +9991,108 @@ does not describe its own contents. History is pushed and was not rewritten.
 | `pnpm run build` | **succeeds** |
 
 No engine change — no `build:wasm`, crate untouched, size band unmoved.
+
+---
+
+## v8.67 Change Summary — 2026-09-05
+
+**Shape z-order, and the undo bug the first version of it shipped.** Six commits
+since v8.66, four of them from the 2026-09-04 sessions.
+
+### Shape z-order (#62)
+
+| Piece | Detail |
+|---|---|
+| Engine | `move_shape_annotation(id, to)` — z-order IS `Vec` order, which `render_layer` already iterates |
+| UI | four items in the canvas right-click menu; `Ctrl+Shift+↑`/`↓` for the chords |
+| Menu state | topmost → both forward moves disabled; bottom → both back; empty canvas → zero z-order items, the other 12 intact |
+| ADR | **044** — a reorder is deliberately not replayable |
+
+⚠️ **Every bracket chord was already taken**, so shapes use `Ctrl+Shift+↑/↓`.
+The Reselect row buttons use **Shift** where the chords use **Alt** — a
+pre-existing inconsistency, filed, not fixed here.
+
+### The data-loss bug that rode in with it, and did not ship
+
+A reorder followed by undo **destroyed the newest shape** and left the reorder
+applied: `[1,2,3]` → bring #1 forward → `[2,1,3]` → undo → **`[1]`**.
+
+`move_shape_annotation` called `snap()` — one snapshot — while the op-log
+reconciler emitted **zero ops**, because it matches shapes by id and
+`ShapeParams` carries no order field. That breaks the one-op-one-snapshot
+lockstep `try_oplog_undo` depends on: it pops a snapshot *and* seeks the log
+back one op, so the undo rewound the previous real edit instead of the reorder.
+
+⚠️ **ADR-044's central safety argument was false.** It held that the composite
+pixel-hash guard made the no-op-log decision safe. Two shapes sharing a colour
+composite **byte-identically** after a swap — verified in the browser,
+`composite_hash_hex` unchanged at `94be559de15fc519` across a reorder — so the
+guard never fires and the broken lockstep proceeds. The ADR now carries a
+Correction.
+
+⚠️ **All seven tests in `shape_z_order.rs` drove a bare `ImageHorseTool`**,
+where `oplog_use_for_undo` is false and undo can only take the snapshot path —
+which works correctly. **A Rust test that never calls `set_oplog_undo(true)`
+says nothing about the path the app runs.**
+
+Fixed by marking the log broken on a reorder, so undo falls back to the
+snapshot path. Regression test confirmed failing before the fix.
+
+### A malformed `.ora` no longer empties the layer panel (#79)
+
+`parseFloat("abc")` is NaN, and an OpenRaster import reads opacity out of the
+file. ⚠️ **`f64::clamp` does not sanitise NaN** — it is specified to return NaN
+when self is NaN. Infinity *is* handled, which is why this looked guarded. The
+NaN then formats as the bare token `NaN`, which is not JSON, so `JSON.parse`
+threw, the caller caught, and `layers` became `[]` — the whole panel emptied and
+the document looked like it had lost every layer. Sanitised at the engine
+boundary, where the JSON is owned.
+
+### The engine stopped depending on who built it (#70)
+
+Cargo embeds absolute registry paths in panic locations, and they differed
+between this laptop (`/home/clj`) and Netlify (`/opt/buildhome`) — **139 B**,
+which made a local size measurement unable to predict the shipped one.
+`--remap-path-prefix` for both builders, in `.cargo/config.toml` so every
+`wasm-pack build` picks it up without touching a build command.
+
+### Also
+
+- The downloadable `system-architecture.mermaid` behind `/architecture` caught
+  up to v8.66; it had been stale since **v7.10 (July 2026)** while the visible
+  page was corrected months ago. ⚠️ **A bare `%%` line silently breaks a mermaid
+  file** — mermaid strips comments with `[^\n]+`, which requires at least one
+  character after the marker.
+- Backlog findings recorded for #71, #63 and #62 — each filed as a small
+  TypeScript job and each measured to need the Rust engine instead.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `cargo fmt --check` / `clippy -D warnings` | **clean**, with and without `--features tiles` |
+| `cargo test` | **249 passed** |
+| `cargo test --features tiles` | **362 passed** |
+| `pnpm -C app exec tsc --noEmit` | **clean** |
+| `pnpm -C app test` | **685 passed**, 58 files |
+| `pnpm lint` | **0 errors** |
+| `./scripts/guardrails.sh` | **OK**, at baseline |
+| `pnpm run build` | **succeeds** |
+
+Live wasm **816,971 B**, inside the 780,000–850,000 sentinel band.
+
+⚠️ The local `build:wasm` reports **816,968 B** — three bytes short of the
+shipped number, and not a rounding error. The two builds ran different
+optimizers: `wasm-pack` uses a `wasm-opt` from `PATH` when one exists and
+downloads its own otherwise, and those were binaryen 116 and 117. The binaries
+differ in **456,523 byte positions**; the sizes merely landed close. Quote the
+816,971 figure, and see the follow-up work pinning the optimizer.
+
+### QC
+
+`imagehorse-qc` §1–2 against the production build: boots logged-out with **0
+console errors**, sample images load, shapes draw, undo works. The z-order
+regression was re-verified on the production build with the op-log path **live**
+(`oplog_active: true`) and three same-coloured shapes — the exact configuration
+that defeated the old guard: `[1,2,3]` → reorder → `[2,1,3]` → undo →
+**`[1,2,3]`**, zero shapes lost.

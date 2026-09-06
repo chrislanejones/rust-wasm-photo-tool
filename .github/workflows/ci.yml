@@ -20,6 +20,11 @@ jobs:
     name: Rust / WASM
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule' # no point rebuilding on the cron
+    outputs:
+      # The SHIPPED configuration's sha256, for the deploy sentinel's tier-2
+      # reproducibility check (ADR-046): CI's build of this commit must equal
+      # Netlify's build of this commit, byte for byte.
+      wasm_sha256: ${{ steps.wasm.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
       # Toolchain comes from rust-toolchain.toml (ADR-038), not from a floating
@@ -53,7 +58,21 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.4.0
         with:
           version: v0.15.0
-      - run: wasm-pack build --target web --out-dir pkg
+      # Through the one wrapper every builder uses (scripts/build-wasm.sh): it
+      # refuses any wasm-opt other than binaryen 117 on PATH, refuses an env
+      # RUSTFLAGS, and proves the artifact was actually rewritten. ADR-038's
+      # correction explains why the OPTIMIZER needed pinning after rustc and
+      # wasm-pack already were. IH_WASM_FEATURES="" keeps this build
+      # feature-free, as the comment above says it must.
+      - run: IH_WASM_FEATURES= ./scripts/build-wasm.sh
+      # And the SHIPPED configuration (tiles,patchmatch), whose sha256 the
+      # deploy sentinel compares against Netlify's build of the same commit.
+      # Second build, ~1 min: the cost of proving two machines agree.
+      - name: Build the shipped configuration and record its sha256
+        id: wasm
+        run: |
+          ./scripts/build-wasm.sh
+          echo "sha256=$(sha256sum pkg/stamp_tool_bg.wasm | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
   web:
     name: Frontend (typecheck + build)
@@ -120,9 +139,17 @@ jobs:
   deploy-sentinel:
     name: Deploy sentinel (live prod engine)
     runs-on: ubuntu-latest
+    # `needs` for the tier-2 expectation; `always()` so the scheduled run —
+    # where `rust` is skipped and the outputs are empty — still checks the
+    # live site (tier 2 then reports itself skipped, tier 1 still runs).
+    needs: [rust]
+    if: always()
     steps:
       - uses: actions/checkout@v4
       - run: ./scripts/deploy-sentinel.sh
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+          EXPECTED_WASM_SHA256: ${{ needs.rust.outputs.wasm_sha256 }}
 
   marketing:
     name: Marketing build (mirrors Vercel /marketing root)
