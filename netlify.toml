@@ -55,7 +55,7 @@
     curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none &&
     source $HOME/.cargo/env &&
     cargo install wasm-pack --version 0.15.0 --locked &&
-    wasm-pack build --target web -- --features tiles,patchmatch &&
+    ./scripts/build-wasm.sh &&
     pnpm install &&
     pnpm --filter stamp-tool build
   """

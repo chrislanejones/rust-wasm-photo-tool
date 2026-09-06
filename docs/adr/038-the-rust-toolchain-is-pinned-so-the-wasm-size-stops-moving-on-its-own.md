@@ -40,8 +40,10 @@ whatever the file names and prints it into the log.
   tells anyone that 1.97.1 is old; the previous regime at least drifted forward.
   Dependabot does not watch `rust-toolchain.toml`.
 - Contributors get a toolchain download on first build in this repo.
-- Local still cannot byte-match production — the remaining 139 B is embedded
-  build paths, and closing it would need `--remap-path-prefix`. Not attempted.
+- ~~Local still cannot byte-match production — the remaining 139 B is embedded
+  build paths, and closing it would need `--remap-path-prefix`. Not attempted.~~
+  **Superseded 2026-09-05 — see the correction below.** The remap landed (#70)
+  and local now DOES byte-match production, once the optimizer is held constant.
 
 ## Alternatives rejected
 
@@ -51,7 +53,8 @@ whatever the file names and prints it into the log.
    compilers — worse than today's problem, because it looks fixed.
 3. **`--remap-path-prefix` to make builds byte-reproducible.** Solves a
    different problem (reproducibility, not drift) and touches every build's
-   panic messages. Filed, not taken.
+   panic messages. Filed, not taken. *(Taken later as #70 — and it worked, see
+   the correction below.)*
 
 ## Pre-mortem
 
@@ -66,3 +69,40 @@ happen.
 Early warning sign to watch for: a build failure whose fix is described as
 "just use stable", or any diff that deletes this file without an accompanying
 release note about the new wasm size.
+
+## Correction — 2026-09-05
+
+This ADR measured a **139 B** local/deployed gap and attributed 135 B to
+embedded registry paths and 4 B to nothing it could name. Both halves are now
+resolved, and the second was not what it looked like.
+
+| Component | This ADR said | Measured 2026-09-05 |
+|---|---|---|
+| Registry paths | 135 B | **0** — #70's `--remap-path-prefix` removed them from both builds |
+| "Unexplained" | 4 B | **never a constant** — it was the OPTIMIZER |
+
+`wasm-pack` runs `wasm-opt` last, and uses whichever `wasm-opt` is on PATH
+before falling back to the copy it fetches. This laptop had binaryen **116**
+on PATH; wasm-pack 0.15.0 fetches **117**, which is what CI and Netlify — with
+no binaryen installed — actually used. Two optimizers on identical input
+produced binaries differing in **456,523 byte positions** whose sizes happened
+to land 3 B apart. So "4 unexplained bytes" was a size delta between two
+entirely different binaries, read as a near-match because the totals were
+close.
+
+Hold the optimizer constant and **local == deployed, byte for byte**
+(816,971 B, sha256 `24c103c7…`, 0 differing bytes). Two consecutive local
+builds are also bit-identical.
+
+**The pin this ADR established was therefore necessary and not sufficient**:
+rustc pinned, wasm-pack pinned, and the binary could still differ because the
+tool that rewrites every byte of it was not. `scripts/build-wasm.sh` now
+refuses to run with any `wasm-opt` other than 117 on PATH, and every build
+entry point (package.json, netlify.toml, CI) goes through it. ADR-045 narrows
+the sentinel band on the strength of this; its recommended successor is an
+exact-hash assertion, which reproducibility makes possible for the first time.
+
+The pre-mortem above stands unchanged — a stale pin is still the likeliest
+way this goes wrong — with one addition: **the second-likeliest is a
+developer with binaryen on PATH who never sees the wrapper's error because
+they typed `wasm-pack build` directly.**
