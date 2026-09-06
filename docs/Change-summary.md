@@ -10096,3 +10096,110 @@ regression was re-verified on the production build with the op-log path **live**
 (`oplog_active: true`) and three same-coloured shapes — the exact configuration
 that defeated the old guard: `[1,2,3]` → reorder → `[2,1,3]` → undo →
 **`[1,2,3]`**, zero shapes lost.
+
+---
+
+## v8.68 Change Summary — 2026-09-06
+
+**Eleven commits, ten merged PRs, and one build finding that only existed
+because a new check went looking.** Two user-visible changes; the rest is the
+build becoming something you can make claims about.
+
+### What a user sees
+
+| Change | Detail |
+|---|---|
+| Annotation counts on layer rows (#63) | `textCount` / `shapeCount` in `get_layers()`, rendered beside the mask badge. Only when non-zero |
+| Colour Overlay disables on an empty layer (#71) | with a stated reason, not just grey. New engine primitive `layer_is_empty(&self, index)` |
+
+Both are display-only on the TypeScript side — no new store subscriptions.
+
+⚠️ **`layer_is_empty` is deliberately NOT a field on `get_layers()`.** That
+function runs inside `capture_ui_state`, which `syncState` reaches from **199
+call sites** including per-stroke paths. The annotation counts can ride there
+because `Vec::len()` is O(1); a **4.0 ms** alpha scan cannot. #63 and #71 look
+like one change and are not (ADR-047).
+
+### The build stopped depending on which machine ran it
+
+| Piece | What it does |
+|---|---|
+| `scripts/build-wasm.sh` (#65's PR) | the ONE way to build the engine — package.json, netlify.toml and CI all call it. Pins wasm-pack 0.15.0, refuses any `wasm-opt` but binaryen 117, refuses an env `RUSTFLAGS`, and asserts the artifact was actually rewritten |
+| Sentinel band 780k–850k → **800k–840k** | ADR-045. Floor now sits **79,096 B above a measured featureless build** rather than an estimate |
+| `build-info.json` + two-tier hash check | ADR-046. The deploy publishes the sha256 of the asset it wrote; the sentinel asserts the site serves that file, and that CI's independent build of the same commit produced the same bytes |
+
+**Local, CI and Netlify now produce the identical binary: 817,392 B, sha256
+`ffc8d7d320cccba6…`.**
+
+### ⚠️ Three checks were found to be vacuous, and one caught a real bug
+
+**The sentinel's export check had never worked.** All three symbols it grepped
+for matched a real featureless build — `oplog_` and `remove_object` via **doc
+comments naming them**, and `rect_select` because it is not feature-gated at
+all. The size floor had been doing the entire job alone since the script was
+written. Symbols are now matched as declarations (`NAME(args) {`), verified
+1/1/1 on a featured glue and **0/0/1** on a featureless one.
+
+**ADR-038's "4 unexplained bytes" were never a constant.** They were
+`wasm-opt` version drift: `wasm-pack` uses a `wasm-opt` from `PATH` if one
+exists and downloads its own otherwise, and those were binaryen 116 and 117.
+The two binaries differ in **456,523 byte positions**; only the totals landed
+close, which is why it read as a rounding error across two ADRs.
+
+**And the new hash check went red on master on its first real run — correctly.**
+The `--remap-path-prefix` list from v8.67 named two builders, this laptop and
+Netlify. GitHub Actions is a third (`/home/runner`), so CI's binary kept its
+absolute registry paths. Production was never affected — tier 1 passed
+throughout, meaning the live site always served exactly what Netlify built.
+Fixed by adding the third prefix; CI's hash moved from `b62fa7e4…` to
+`ffc8d7d3…`, which is the proof.
+
+⚠️ **There is no wildcard** — `rustflags` does not expand `$CARGO_HOME` — so a
+new CI provider or a renamed home directory reintroduces this silently. The
+tier-2 check is what catches it.
+
+### Docs
+
+- **`docs/vacuous-checks.md`** — eight gates that were green because they could
+  not fail, sorted into three families with their evidence and one rule each.
+  Tracked, because `CLAUDE.md` is gitignored and an edit there survives nothing.
+- **`docs/backlog-numbering-audit.md`** — this repo has zero GitHub issues, so
+  every `#NN` renders as a pull request. Six real collisions, one orphan, five
+  false positives that look like backlog items and are not. Two migrations
+  drafted; neither applied — the choice is Chris's.
+- `#77` filed (investigated, not a bug), the cut-to-layer UX question split out
+  of the closed `#72`, `#29` marked resolved, and `/architecture` corrected from
+  5 stores to 7.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `cargo fmt --check` / `clippy -D warnings` | **clean**, with and without `--features tiles` |
+| `cargo test` | **266 passed** |
+| `cargo test --features tiles` | **379 passed** |
+| `pnpm -C app exec tsc --noEmit` | **clean** (app + marketing) |
+| `pnpm -C app test` | **685 passed**, 58 files |
+| `pnpm lint` | **0 errors** |
+| `./scripts/guardrails.sh` | **OK**, at baseline |
+| `pnpm run build` | **succeeds** |
+
+wasm **816,971 → 817,392 B (+421)**: +163 for the annotation counts, +258 for
+`layer_is_empty`, and 0 for the comment fix — the individual deltas sum exactly.
+Inside the new 800k–840k band. SIMD intact: `--enable-simd` declared, **4,742**
+v128 opcodes, unchanged.
+
+### QC
+
+`imagehorse-qc` §1–2 against the production build: boots logged-out with **0
+console errors**; sample images load; the Colour Overlay swatches verified
+against the ENGINE, not the DOM alone — empty layer **12/12 disabled** with the
+reason, paint enables all 12, and undo re-disables all 12 with the engine
+agreeing.
+
+⚠️ That last case is in the list because it **failed** when first tried, during
+QC and before merge. The predicate watched a layer-metadata counter that paint
+and undo never move, so an undo that emptied the active layer left the swatches
+live. The earlier check had missed it by **navigating between observations** —
+navigation remounts the component and re-runs the effect on mount, which hides
+a stale dependency completely.

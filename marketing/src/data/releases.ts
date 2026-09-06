@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.68",
+    date: "2026-09-06",
+    headline: "Layer rows say what they hold",
+    entries: [
+      {
+        tag: "feature",
+        text: "Every layer row now shows how many shapes and text boxes it carries, beside the mask badge it already had. The numbers only appear when there is something to count, so an ordinary photo layer stays as quiet as before.",
+      },
+      {
+        tag: "ui",
+        text: "The Colour Overlay tints a layer clipped to its own pixels, which means on a layer with nothing on it the swatches were offering an effect that could not happen \u2014 you picked a colour and nothing changed. They are disabled there now, with a line saying why rather than just going grey. Paint something on the layer and they come back; undo that paint and they go away again.",
+      },
+      {
+        tag: "rust",
+        text: "The engine binary now comes out byte-for-byte identical whether it is compiled on a laptop, in CI, or on the deploy server. That sounds like housekeeping and is not: until now nobody could say for certain that the engine running on the site was the engine that had been tested, because three machines produced three slightly different binaries from the same source. They differed only in the build machine's own directory paths, baked into the file by the compiler. Those are gone, the tool that optimises the binary is pinned to one version, and the deploy now publishes a fingerprint of what it built so the site can be checked against it.",
+      },
+      {
+        tag: "infra",
+        text: "That new check caught something on its first real run: the build server and the laptop agreed, and CI did not. One path had been missed when the fix went in. The check was right, the correction was one line, and the whole point is that it was noticed at all \u2014 the previous check could not see a difference of this size, and a separate audit this week found three checks that had been passing because they were incapable of failing.",
+      },
+    ],
+  },
+  {
     version: "v8.67",
     date: "2026-09-05",
     headline: "Shapes stack the way you tell them to",

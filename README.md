@@ -84,37 +84,35 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.67 — 2026-09-05
+### v8.68 — 2026-09-06
 
-**Shapes stack the way you tell them to, and undo stops eating one.**
+**Layer rows say what they hold, and the Colour Overlay stops offering to tint
+nothing.**
 
-Shapes now have a front-to-back order you control. Right-click any shape for
-Bring to Front, Bring Forward, Send Backward and Send to Back, or use
-`Ctrl+Shift+↑` and `Ctrl+Shift+↓` — every bracket chord was already taken. The
-menu only offers the moves that can actually happen: the topmost shape gets no
-forward options, the bottom one no backward ones.
+Every layer row now shows how many shapes and text boxes it carries, beside the
+mask badge it already had. The numbers only appear when there is something to
+count, so an ordinary photo layer stays as quiet as before.
 
-The first version of that shipped a bug bad enough to be worth describing.
-Reorder a shape, press undo, and the newest shape was gone — not restored to
-its old position, gone, with the reorder still applied. Undo tracks edits by
-pairing each one with a snapshot, and a reorder was taking a snapshot without
-registering an edit. One press then rewound the wrong step. It never reached a
-release; it was caught the same day it was written, and the reorder now marks
-itself as the kind of change that has to restore from the snapshot directly.
+The Colour Overlay tints a layer clipped to its own pixels, which means on a
+layer with nothing on it the swatches were offering an effect that could not
+happen — you picked a colour and nothing changed. They are disabled there now,
+with a line saying why rather than just going grey. Paint something on the
+layer and they come back; undo that paint and they go away again.
 
-A layer file with a damaged opacity value could empty the entire layers panel.
-Importing an OpenRaster file reads opacity out of the document, and a
-non-numeric value became NaN. Clamping does not fix NaN — it hands it straight
-back — and the panel reads its layers as JSON, which has no way to write that
-number. So one bad character in one attribute and every layer disappeared from
-the list. The engine now sanitises the value where it enters.
+The rest of this release is the build, and it is worth one paragraph. The
+engine binary now comes out byte-for-byte identical whether it is compiled on a
+laptop, in CI, or on the deploy server. That sounds like housekeeping and is
+not: until now nobody could say for certain that the engine running on the site
+was the engine that had been tested, because three machines produced three
+slightly different binaries from the same source. They differed only in the
+build machine's own directory paths, baked into the file by the compiler. Those
+are gone, the tool that optimises the binary is pinned to one version, and the
+deploy now publishes a fingerprint of what it built so the site can be checked
+against it.
 
-The engine also stopped depending on which machine compiled it. Rust embeds the
-build machine's own directory paths in the binary, so the same source produced
-different bytes here and on the build server — 139 of them, which made it
-impossible to say whether a shipped engine was the one that was tested. Those
-paths are now rewritten to a fixed name, and local and production builds come
-out byte-for-byte identical.
+That check caught something on its first real run: the build server and the
+laptop agreed, and CI did not. One path had been missed. The check was right,
+the fix was one line, and the whole point is that it was noticed at all.
 
 
 ## License
