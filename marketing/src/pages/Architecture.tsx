@@ -194,7 +194,7 @@ export default function Architecture() {
             </article>
             <article className={node("demo free pro")}>
               <h4 className="node__title">Zustand State</h4>
-              <p className="node__sub">5 stores · atomic selectors</p>
+              <p className="node__sub">7 stores · atomic selectors</p>
             </article>
           </div>
 
