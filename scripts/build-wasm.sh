@@ -112,4 +112,16 @@ after="$(date -r "$OUT/stamp_tool_bg.wasm" +%s%N 2>/dev/null || echo 0)"
 
 size="$(stat -c %s "$OUT/stamp_tool_bg.wasm")"
 sha="$(sha256sum "$OUT/stamp_tool_bg.wasm" | cut -c1-16)"
+
+# Record what ACTUALLY built this artifact, for write-build-info.sh. Derived
+# here — not re-derived later — because the PATH swap above is local to this
+# process: a later `command -v wasm-opt` from a normal shell would report the
+# shadowed 116 and put a lie in build-info.json. pkg/ is gitignored.
+{
+  echo "IH_BUILD_WASM_OPT_VERSION=${wo:-$WASM_OPT_VERSION}"
+  echo "IH_BUILD_WASM_OPT_PATH=${wo_path:-fetched-by-wasm-pack}"
+  echo "IH_BUILD_WASM_PACK=$wp"
+  echo "IH_BUILD_RUSTC=$(rustc --version 2>/dev/null | awk '{print $2}')"
+  echo "IH_BUILD_FEATURES=${FEATURES:-}"
+} > "$OUT/.build-wasm.env"
 printf '\n\033[1;32m✓ build-wasm: %s B  sha256 %s…  features=%s\033[0m\n' "$size" "$sha" "${FEATURES:-<none>}"
