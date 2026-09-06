@@ -4,6 +4,57 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — should cut-to-layer produce a FULL-CANVAS layer? (2026-09-06)
+
+Split out of the closed #72 below, which proved the engine is correctly scoped
+and left this behind. It is a design decision and has never been made.
+
+`selection_to_new_layer` clones the ENTIRE source layer and clears outside the
+selection (`selection.rs:605`), so the new layer is a full-canvas buffer sitting
+above the source. Paint on it and the stroke composites over everything beneath,
+which is what made three sessions believe paint was landing on every layer.
+
+| Option | Consequence |
+|---|---|
+| **Keep full-canvas** (today) | simple, and every stroke on the new layer covers what is below — reads as "it hit everything" |
+| **Crop to the selection bounds** | the layer is the size of what you cut; needs an offset per layer, which the engine has no concept of |
+| **Keep full-canvas, make it legible** | no engine change — the Layers panel could show that the layer spans the canvas |
+
+⚠️ **Not a bug. Do not re-open the pixel hunt** — the engine writes to exactly
+one layer per stroke, proven three independent ways (per-layer PNG hashes on
+08-28, the code, and a live drive on 09-03).
+
+**Still owed: one two-minute human check.** Paint after a cut, toggle the new
+layer off, confirm the stroke goes with it. Every check so far used
+`select_all()`, because the worker proxy exposes no rect or wand select.
+
+## OPEN — #77: the Smart Brush reads the composite. Investigated — NOT a bug (2026-09-06)
+
+Filed here because it was raised as a cross-layer read in the paint path and
+had no entry of its own. **Investigated 2026-09-06: intentional, correct, and
+safe. It should be reworded, not fixed.**
+
+One read site, `paint.rs:300`, in `paint_begin`: the Smart Brush builds its
+edge cost map from `composite_cache` once per stroke. A Sobel pass per dab
+would be unusable, so once per stroke is the design.
+
+**Reading the composite is right.** Containment should follow the edges the
+user can SEE, and what the user sees is the composite. Reading only the active
+layer would break the commonest case outright — painting on a new empty layer
+above a photo, where the active layer has no edges at all and containment would
+do nothing.
+
+**Not a panic risk.** `sobel_magnitude` guards explicitly
+(`if w < 3 || h < 3 || buf.len() < w * h * 4 { return out; }`), so an empty or
+short cache yields an all-zero map: no containment, degrades to a normal brush.
+
+**Off by default twice over** — engine `smart_brush: false`, store
+`smartBrush: false`, plus `localStorage.ih_smart_edge === "1"`.
+
+**The only real question left is a design one:** should containment see layers
+ABOVE the active one? Everything else about the read is deliberate and
+documented at the call site.
+
 ## OPEN — #56: the Netlify UI holds a stale copy of the build command (2026-09-04)
 
 Read via `netlify api getSite`. `build_settings.cmd` in the Netlify UI is the
@@ -97,6 +148,14 @@ shape_annotation_count
 `#29`'s "DONE" mark still has no code behind it, which is the same conclusion
 reached on 2026-08-21. Layer z-order shipped that day (`move_layer`); SHAPE
 z-order never existed. The two keep getting conflated.
+
+> **RESOLVED in v8.67 (2026-09-05).** Shape z-order now exists:
+> `move_shape_annotation(id, to)` in the engine, four items in the canvas
+> right-click menu, and `Ctrl+Shift+↑`/`↓`. ADR-044 records why a reorder is
+> deliberately not replayable. So `#29`'s "DONE" mark is finally true — but it
+> was false for the three sessions that trusted it, and the lesson stands:
+> **a "DONE" mark in this file is a claim, not evidence.** The paragraph above
+> is kept unedited because it is the record of what was checked and when.
 
 ### The good news: it is a small change
 
@@ -335,8 +394,9 @@ check is still worth doing: paint after a cut, toggle the new layer off, and
 confirm the stroke goes with it.
 
 **What remains is a UX question, not a bug**: should cut-to-layer produce a
-full-canvas layer? Reword #72 accordingly rather than hunting for a pixel bug
-that measurement says is not there.
+full-canvas layer? That question is now filed as its own OPEN item below
+(2026-09-06) rather than living inside a closed bug, where nobody looking for
+open work would find it.
 
 ### Two probe traps, so the next person does not lose the time
 
