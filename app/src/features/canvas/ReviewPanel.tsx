@@ -14,6 +14,8 @@ import {
   MousePointerSquareDashed,
   Plus,
   Settings,
+  Shapes,
+  Type,
   Redo2,
   Undo2,
   X,
@@ -548,6 +550,43 @@ export function ReviewPanel({
                             title="Has a layer mask — edit it in the Layers tool (gear above)"
                           >
                             <Aperture className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                        {/* #63 — passive annotation counts, same shape as the
+                            mask badge above: it announces what the layer holds
+                            and offers no control. The numbers come straight
+                            from the `get_layers()` JSON this row already reads,
+                            so there is no new store subscription and no extra
+                            engine call. Rendered only when non-zero, so an
+                            ordinary photo layer stays uncluttered. */}
+                        {layer.shapeCount > 0 && (
+                          <span
+                            className="flex items-center gap-0.5 text-theme-muted-foreground"
+                            title={`${layer.shapeCount} shape${layer.shapeCount === 1 ? "" : "s"} on this layer`}
+                          >
+                            <Shapes className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span className="text-xs tabular-nums">
+                              {layer.shapeCount}
+                            </span>
+                            <span className="sr-only">
+                              {layer.shapeCount} shape
+                              {layer.shapeCount === 1 ? "" : "s"}
+                            </span>
+                          </span>
+                        )}
+                        {layer.textCount > 0 && (
+                          <span
+                            className="flex items-center gap-0.5 text-theme-muted-foreground"
+                            title={`${layer.textCount} text annotation${layer.textCount === 1 ? "" : "s"} on this layer`}
+                          >
+                            <Type className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span className="text-xs tabular-nums">
+                              {layer.textCount}
+                            </span>
+                            <span className="sr-only">
+                              {layer.textCount} text annotation
+                              {layer.textCount === 1 ? "" : "s"}
+                            </span>
                           </span>
                         )}
                         <Button

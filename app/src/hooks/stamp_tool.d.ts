@@ -885,9 +885,12 @@ declare module "stamp_tool" {
      *  decides whether the op log can describe the document (`isLogTrustworthy`). */
     content_layer_count(): number;
     /** JSON array bottom→top:
-     *  [{id,name,kind,visible,opacity,active,hasMask,overlay}].
+     *  [{id,name,kind,visible,opacity,active,hasMask,overlay,textCount,shapeCount}].
      *  `kind` is "canvas" for the artboard fill, "content" otherwise.
-     *  `overlay` is null or {color:"#rrggbb",opacity:0..1}. */
+     *  `overlay` is null or {color:"#rrggbb",opacity:0..1}.
+     *  `textCount`/`shapeCount` are THIS layer's live annotation counts — they
+     *  are `Vec::len()` reads, which is why they can ride on a struct this hot
+     *  (see the engine-side note: #71's alpha scan must NOT follow them). */
     get_layers(): string;
     /** Id of the active layer (receives all tool edits). */
     active_layer_id(): number;
