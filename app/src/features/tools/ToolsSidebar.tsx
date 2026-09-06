@@ -409,6 +409,8 @@ export function ToolsSidebar({
             onSelectLayer={onSelectLayer}
             mask={layerMask}
             overlay={layerOverlay}
+            stampToolRef={stampToolRef}
+            undoCount={undoCount}
             imgW={imageWidth}
             imgH={imageHeight}
             canvasWidth={imageWidth}

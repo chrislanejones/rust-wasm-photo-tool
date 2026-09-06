@@ -892,6 +892,14 @@ declare module "stamp_tool" {
      *  are `Vec::len()` reads, which is why they can ride on a struct this hot
      *  (see the engine-side note: #71's alpha scan must NOT follow them). */
     get_layers(): string;
+    /** #71 — does the layer at this stack index (bottom→top, the order
+     *  `get_layers()` emits) hold any non-transparent pixel? Out of range is
+     *  `true`. Pure and early-exit: ~4 ms on the empty-layer worst case.
+     *  Alpha only, and ignores the mask — a hiding mask makes a layer
+     *  invisible, not empty. ⚠️ NOT a field on `get_layers()`: that runs
+     *  inside `capture_ui_state` at 199 call sites including per-stroke
+     *  paths. Ask it deliberately, for one layer. */
+    layer_is_empty(index: number): boolean;
     /** Id of the active layer (receives all tool edits). */
     active_layer_id(): number;
     /** Add a transparent layer above the active one; it becomes active. Returns its id. */
