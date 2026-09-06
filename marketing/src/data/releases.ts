@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.67",
+    date: "2026-09-05",
+    headline: "Shapes stack the way you tell them to",
+    entries: [
+      {
+        tag: "feature",
+        text: "Shapes now have a front-to-back order you control. Right-click any shape for Bring to Front, Bring Forward, Send Backward and Send to Back, or use Ctrl+Shift+\u2191 and Ctrl+Shift+\u2193 \u2014 every bracket chord was already taken. The menu only offers the moves that can actually happen: the topmost shape gets no forward options, the bottom one no backward ones.",
+      },
+      {
+        tag: "fix",
+        text: "The first version of that shipped a bug worth describing. Reorder a shape, press undo, and the newest shape was gone \u2014 not moved back, gone, with the reorder still applied. Undo tracks edits by pairing each one with a snapshot, and a reorder was taking a snapshot without registering an edit, so one press rewound the wrong step. It never reached a release; it was caught the same day it was written. The safety check that was supposed to catch it could not: it compares what the canvas looks like before and after, and two shapes of the same colour swapping places look identical.",
+      },
+      {
+        tag: "fix",
+        text: "A layer file with a damaged opacity value could empty the entire layers panel. Importing an OpenRaster file reads opacity out of the document, and a non-numeric value became NaN. Clamping does not fix NaN \u2014 it hands it straight back \u2014 and the panel reads its layers as JSON, which has no way to write that number. One bad character in one attribute and every layer disappeared from the list. The engine now cleans the value where it comes in.",
+      },
+      {
+        tag: "rust",
+        text: "The engine stopped depending on which machine compiled it. Rust embeds the build machine's own directory paths in the binary, so the same source produced different bytes here and on the build server \u2014 139 of them, which made it impossible to say whether a shipped engine was the one that had been tested. Those paths are now rewritten to a fixed name, and local and production builds come out byte-for-byte identical.",
+      },
+    ],
+  },
+  {
     version: "v8.66",
     date: "2026-09-04",
     headline: "The hole you erased stops coming back black",

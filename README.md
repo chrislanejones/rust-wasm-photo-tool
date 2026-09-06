@@ -84,41 +84,38 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.66 — 2026-09-04
+### v8.67 — 2026-09-05
 
-**The hole you erased stops coming back black.**
+**Shapes stack the way you tell them to, and undo stops eating one.**
 
-Erase something — the Magic Eraser, the eraser brush, a layer mask — then export
-as JPEG, and the hole came out as a black patch. JPEG has no transparency, so
-every see-through pixel has to be painted onto a colour before the file is
-written, and nothing on the export path was doing that. The browser encoder does
-not ask what you wanted; it writes black. Holes become white now, and PNG, WebP
-and AVIF keep their transparency untouched.
+Shapes now have a front-to-back order you control. Right-click any shape for
+Bring to Front, Bring Forward, Send Backward and Send to Back, or use
+`Ctrl+Shift+↑` and `Ctrl+Shift+↓` — every bracket chord was already taken. The
+menu only offers the moves that can actually happen: the topmost shape gets no
+forward options, the bottom one no backward ones.
 
-Rulers and the grid overlay have moved out of Settings and into Edit → Rulers,
-where you reach for them mid-edit instead of going to configure the app. The
-tick labels can read in pixels, inches or centimetres. Inches and centimetres
-are worked out at 96 DPI — a web image has no real-world size of its own, so
-that is a stated convention rather than a promise about print, and the panel
-says so where you choose.
+The first version of that shipped a bug bad enough to be worth describing.
+Reorder a shape, press undo, and the newest shape was gone — not restored to
+its old position, gone, with the reorder still applied. Undo tracks edits by
+pairing each one with a snapshot, and a reorder was taking a snapshot without
+registering an edit. One press then rewound the wrong step. It never reached a
+release; it was caught the same day it was written, and the reorder now marks
+itself as the kind of change that has to restore from the snapshot directly.
 
-Undo and Redo were greyed out so far they disappeared. Measured against the bar
-behind them, the disabled icons came to 1.33:1 in light mode — invisible rather
-than dimmed. Fading them was never going to work: the enabled colour was itself
-only 3:1, so every step down from it landed below the floor. Both states move up
-together instead, and a disabled button now reads as quiet rather than absent.
+A layer file with a damaged opacity value could empty the entire layers panel.
+Importing an OpenRaster file reads opacity out of the document, and a
+non-numeric value became NaN. Clamping does not fix NaN — it hands it straight
+back — and the panel reads its layers as JSON, which has no way to write that
+number. So one bad character in one attribute and every layer disappeared from
+the list. The engine now sanitises the value where it enters.
 
-Three backlog items were opened this week expecting a small afternoon of
-TypeScript, and all three turned out to need the Rust engine instead: a
-per-layer annotation badge, shape z-order, and a layer-emptiness check. Rather
-than half-start any of them, each was measured and written up with the exact
-function it needs. They will ship together, sharing one engine rebuild.
+The engine also stopped depending on which machine compiled it. Rust embeds the
+build machine's own directory paths in the binary, so the same source produced
+different bytes here and on the build server — 139 of them, which made it
+impossible to say whether a shipped engine was the one that was tested. Those
+paths are now rewritten to a fixed name, and local and production builds come
+out byte-for-byte identical.
 
-Five dependency updates landed. The Netlify build settings turned out to hold a
-stale copy of the build command — one that would compile the engine without its
-features, exactly the fault that shipped for ten releases in July. The file in
-the repository wins today, so nothing is broken; it is written down rather than
-quietly left.
 
 ## License
 
