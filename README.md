@@ -84,35 +84,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.68 — 2026-09-06
+### v8.69 — 2026-09-07
 
-**Layer rows say what they hold, and the Colour Overlay stops offering to tint
-nothing.**
+**A panel that fits, and a status bar that stays where you left it.**
 
-Every layer row now shows how many shapes and text boxes it carries, beside the
-mask badge it already had. The numbers only appear when there is something to
-count, so an ordinary photo layer stays as quiet as before.
+Edit → Rulers is now **Rulers and Grid**, which is what it has always done. The
+half-built **Measure** entry beside it is gone — it was a placeholder from
+before the overlay shipped, and two things called Ruler and Rulers sitting next
+to each other was never going to help anyone.
 
-The Colour Overlay tints a layer clipped to its own pixels, which means on a
-layer with nothing on it the swatches were offering an effect that could not
-happen — you picked a colour and nothing changed. They are disabled there now,
-with a line saying why rather than just going grey. Paint something on the
-layer and they come back; undo that paint and they go away again.
+The panel itself was too wide for the sidebar it lives in: the third grid
+layout button hung off the right edge, and long explanatory paragraphs above
+each control pushed everything down. Those paragraphs now live behind the
+lightbulb icons, where the rest of the app keeps its explanations, and the
+controls use the same button groups the paint tools do. It fits.
 
-The rest of this release is the build, and it is worth one paragraph. The
-engine binary now comes out byte-for-byte identical whether it is compiled on a
-laptop, in CI, or on the deploy server. That sounds like housekeeping and is
-not: until now nobody could say for certain that the engine running on the site
-was the engine that had been tested, because three machines produced three
-slightly different binaries from the same source. They differed only in the
-build machine's own directory paths, baked into the file by the compiler. Those
-are gone, the tool that optimises the binary is pinned to one version, and the
-deploy now publishes a fingerprint of what it built so the site can be checked
-against it.
+The status bar has a fixed shape now. On a desktop it shows six hints: two for
+the tool you are holding, two that rotate through the rest, and the last two —
+Alt+/ for the shortcut list and Alt+, for the command palette — always in the
+same place. On a tablet-width window it drops to two, and Alt+/ keeps the last
+slot. The point is that the two ways into everything else stop moving around.
 
-That check caught something on its first real run: the build server and the
-laptop agreed, and CI did not. One path had been missed. The check was right,
-the fix was one line, and the whole point is that it was noticed at all.
+Layer rows got their annotation counts back out. They arrived in v8.68 as small
+numbers on every row, and a row that already carries a name, an eye, five
+buttons, a mask badge and an opacity slider has no room for two more. The counts
+now sit in one line under the list, describing the layer you actually have
+selected: "Photo · 2 shapes · 1 text".
 
 
 ## License

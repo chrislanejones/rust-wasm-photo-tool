@@ -10203,3 +10203,108 @@ and undo never move, so an undo that emptied the active layer left the swatches
 live. The earlier check had missed it by **navigating between observations** —
 navigation remounts the component and re-runs the effect on mount, which hides
 a stale dependency completely.
+
+---
+
+## v8.69 Change Summary — 2026-09-07
+
+**Four UI corrections from a user-test pass.** No engine change — the crate is
+untouched, so the wasm is byte-identical to v8.68 and needs no rebuild.
+
+### Rulers and Grid (#56 follow-up)
+
+| Change | Detail |
+|---|---|
+| `Edit → Rulers` | renamed **"Rulers and Grid"** — what it has always done |
+| `Edit → Measure` | **removed** |
+| The panel | rebuilt on the shared tool-panel primitives |
+
+**Measure was a placeholder for what Rulers became.** Its own comment recorded
+the history: it started as "Ruler" — a coming-soon drag-to-measure — and was
+renamed only to stop it colliding with "Rulers" in the same list. The overlay
+has since shipped, so the entry described nothing. Verified unreferenced
+anywhere else before removing it.
+
+### ⚠️ The panel did not fit, and the reason was the prose
+
+The third grid-layout button was **clipped off the right edge** of the sidebar.
+Two causes, both from the panel using its own UI instead of the house set:
+
+- **Full-width `ToggleButtonGroup` rows.** They squeeze N buttons into one row;
+  three layout tiles at 260px do not fit. Replaced with `ToolButtonGroup`, which
+  wraps on a `columns` grid — the same component the Stroke Stabilizer uses.
+- **An `<h3>` + explanatory `<p>` above every control.** Those are now in
+  `SectionHeader` lightbulb tooltips, which is where this app has kept its
+  explanations since the no-toolbar-paragraphs rule. The panel body is
+  button-only again.
+
+Colour moved to the shared `ColorSwatchGrid` with `allowCustom={false}` — a grid
+overlay has to read against an arbitrary photo, so that is a functional palette,
+not a creative one, and offering the user's saved paint colours there would be
+the wrong list.
+
+Measured after: **0 clipped buttons, 0 inline paragraphs, 3 lightbulbs** at a
+260px panel width.
+
+### The status bar has a fixed shape
+
+Both cycling mechanisms were already working and both are kept — the leading
+slots follow the active tool, the middle ones rotate through the pool every
+three minutes. What changed is that the shape is now fixed per size:
+
+| Slot | Desktop (≥1000px) | Compact / tablet (<1000px) |
+|---|---|---|
+| 1 | tool | rotating pool |
+| 2 | tool | **`Alt+/` locked** |
+| 3 | rotating pool | — |
+| 4 | rotating pool | — |
+| 5 | **`Alt+/` locked** | — |
+| 6 | **`Alt+,` locked** | — |
+
+The two locked slots are the point: a hint you reach for should be at the same
+address every time. On compact the *tool* hints are dropped rather than the
+locked ones — the tool you are holding is already visible in the sidebar,
+whereas the two ways into everything else are advertised nowhere but here.
+
+⚠️ **`Alt+,` had to leave the rotation pool.** It was in `BASE_HINTS`, and a
+hint that is both pinned and in the pool renders twice.
+
+Verified at 940 / 1000 / 1920 px: correct count at each, no overlap with the
+size/zoom readouts and no wrapping — including 1000px, the tightest desktop
+width, where all six still fit.
+
+### The annotation counts moved out of the layer rows
+
+v8.68 put them on every row as icon+number chips. A layer row already carries a
+name, an eye, five buttons, a mask badge and an opacity slider; two more numbers
+made it unreadable at 260px.
+
+They are now one line under the list, about the **selected** layer only —
+`Photo · 2 shapes · 1 text`, or `no shapes or text` when it is empty. Same data,
+same `get_layers()` JSON the rows already read, so still no new subscription and
+no extra engine call. It answers "what is on the layer I am working in" instead
+of decorating nine rows with the answer about eight of them.
+
+Empty layers now say so explicitly; the blank a zero-count row used to leave was
+indistinguishable from a row that had not loaded.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** (app + marketing) |
+| `pnpm -C app test` | **685 passed**, 58 files |
+| `pnpm lint` | **0 errors** |
+| `./scripts/guardrails.sh` | **OK**, at baseline |
+| `cargo fmt --check` | clean |
+| `pnpm run build` | **succeeds** |
+
+**No Rust change** — `src/` and `Cargo.toml` untouched, so no `build:wasm` and
+the size band is unmoved at 817,392 B.
+
+### QC
+
+Driven on the production build: `Rulers and Grid` present and `Measure` absent
+in the Edit sub-tool row; the panel measured with zero clipped buttons; the
+status bar counted at three widths; and the layer summary read `Photo · 1 shape`
+after drawing one, with zero count chips left on the rows.

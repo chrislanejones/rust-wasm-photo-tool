@@ -14,8 +14,6 @@ import {
   MousePointerSquareDashed,
   Plus,
   Settings,
-  Shapes,
-  Type,
   Redo2,
   Undo2,
   X,
@@ -194,6 +192,10 @@ export function ReviewPanel({
   const canAddLayer = layersUnlocked && layers.length < layerLimit;
   // Render top → bottom (the array is bottom → top), the way every editor shows it.
   const layersTopDown = [...layers].reverse();
+  // The selected layer, for the summary bar under the list. `active` is the
+  // engine's own flag in the `get_layers()` JSON — the same field the rows
+  // highlight on — so this cannot drift from what the list shows as selected.
+  const activeLayer = layers.find((l) => l.active);
 
   // Shape ids in draw order (bottom → top) — `objects` carries shapes in the
   // order `get_shape_annotations()` returns them, which IS the z-order.
@@ -552,43 +554,6 @@ export function ReviewPanel({
                             <Aperture className="h-3.5 w-3.5" />
                           </span>
                         )}
-                        {/* #63 — passive annotation counts, same shape as the
-                            mask badge above: it announces what the layer holds
-                            and offers no control. The numbers come straight
-                            from the `get_layers()` JSON this row already reads,
-                            so there is no new store subscription and no extra
-                            engine call. Rendered only when non-zero, so an
-                            ordinary photo layer stays uncluttered. */}
-                        {layer.shapeCount > 0 && (
-                          <span
-                            className="flex items-center gap-0.5 text-theme-muted-foreground"
-                            title={`${layer.shapeCount} shape${layer.shapeCount === 1 ? "" : "s"} on this layer`}
-                          >
-                            <Shapes className="h-3.5 w-3.5" aria-hidden="true" />
-                            <span className="text-xs tabular-nums">
-                              {layer.shapeCount}
-                            </span>
-                            <span className="sr-only">
-                              {layer.shapeCount} shape
-                              {layer.shapeCount === 1 ? "" : "s"}
-                            </span>
-                          </span>
-                        )}
-                        {layer.textCount > 0 && (
-                          <span
-                            className="flex items-center gap-0.5 text-theme-muted-foreground"
-                            title={`${layer.textCount} text annotation${layer.textCount === 1 ? "" : "s"} on this layer`}
-                          >
-                            <Type className="h-3.5 w-3.5" aria-hidden="true" />
-                            <span className="text-xs tabular-nums">
-                              {layer.textCount}
-                            </span>
-                            <span className="sr-only">
-                              {layer.textCount} text annotation
-                              {layer.textCount === 1 ? "" : "s"}
-                            </span>
-                          </span>
-                        )}
                         <Button
                           size="xs"
                           title="Duplicate layer"
@@ -644,6 +609,46 @@ export function ReviewPanel({
                   );
                 })}
               </ul>
+            )}
+
+            {/* #63, moved — the counts were per-row chips and the row could not
+                take them: it already carries a name, an eye, five buttons, a
+                mask badge and an opacity slider. Two more numbers on every row
+                is six things competing at 260px wide.
+                
+                So they live here instead: ONE line, about the SELECTED layer
+                only. Same data, same `get_layers()` JSON the rows already read
+                — no new subscription, no extra engine call — but it answers
+                "what is on the layer I am working in" rather than decorating
+                nine rows with the answer to a question nobody asked about
+                eight of them.
+                
+                Reads as prose ("2 shapes · 1 text") rather than icon+number
+                chips, because at this size a labelled word is faster than an
+                icon you have to decode. Empty layers say so explicitly — the
+                blank a zero-count row used to leave was indistinguishable from
+                a row that had not loaded. */}
+            {activeLayer && (
+              <div className="layers-summary" title={`What is on ${activeLayer.name}`}>
+                <span className="layers-summary-name">{activeLayer.name}</span>
+                <span className="layers-summary-sep" aria-hidden="true">
+                  ·
+                </span>
+                <span className="layers-summary-items">
+                  {activeLayer.shapeCount === 0 && activeLayer.textCount === 0
+                    ? "no shapes or text"
+                    : [
+                        activeLayer.shapeCount > 0
+                          ? `${activeLayer.shapeCount} shape${activeLayer.shapeCount === 1 ? "" : "s"}`
+                          : null,
+                        activeLayer.textCount > 0
+                          ? `${activeLayer.textCount} text`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                </span>
+              </div>
             )}
           </section>
         )}

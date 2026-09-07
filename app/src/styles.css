@@ -904,6 +904,43 @@ textarea:focus-visible {
   text-align: right;
 }
 
+/* The layer summary bar — one line under the list saying what is on the
+   SELECTED layer. It replaced per-row count chips: the rows already carry a
+   name, an eye, five buttons, a mask badge and an opacity slider, and at 260px
+   two more numbers per row was six things competing.
+
+   Separated from the list by a top border rather than a gap, so it reads as a
+   footer belonging to the list rather than a floating sixth row. `min-width: 0`
+   + `truncate` on the name half: a long layer name must shorten rather than
+   push the counts off the edge — the counts are the point of the bar. */
+.layers-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 8px 2px;
+  border-top: 1px solid var(--border);
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
+}
+
+.layers-summary-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layers-summary-sep {
+  opacity: 0.5;
+}
+
+.layers-summary-items {
+  white-space: nowrap;
+}
+
 /* Mask controls for the active, masked layer — hide/reveal toggle + invert /
    apply / remove, on their own row under the opacity slider. */
 .layer-mask-bar {

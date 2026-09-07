@@ -592,25 +592,11 @@ const editGroup: ToolGroupDefinition = {
       // mid-edit). Shares `tool: "arrow"` with Guides and Layers — the same
       // pattern those two already use — and picks its panel by `section`.
       id: "rulers",
-      label: "Rulers",
+      label: "Rulers and Grid",
       description: "Top and left rulers, plus a grid overlay for composition",
       icon: Ruler,
       tool: "arrow",
       keywords: ["rulers", "ruler", "grid", "guides", "units", "inches", "cm", "golden ratio"],
-    },
-    {
-      // RENAMED from "Ruler" to "Measure". Two entries called Ruler and Rulers
-      // sitting next to each other is a coin toss for the reader, and
-      // "Measure" is the more honest name for the thing anyway: it is a drag
-      // tool that reports a distance, not a ruler bar. Coming Soon carries no
-      // `tool`, so it is unreachable by route and palette by TYPE.
-      id: "measure",
-      label: "Measure",
-      description: "Measure distances and angles on the image",
-      icon: Ruler,
-      comingSoon: true,
-      note: "Measuring isn't built yet",
-      keywords: ["measure", "ruler", "distance", "angle", "dimension"],
     },
   ],
 };

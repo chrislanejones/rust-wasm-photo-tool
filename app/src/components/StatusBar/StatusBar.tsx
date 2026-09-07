@@ -7,6 +7,7 @@ import { ExternalLink } from "lucide-react";
 import type { CloneStampState } from "@/hooks/useCloneStamp";
 import { formatBytes } from "@/lib/format";
 import { useUploadDimensions } from "@/hooks/useUploadDimensions";
+import { useBreakpoint } from "@/lib/useBreakpoint";
 
 export interface ShortcutHint {
   keys: string;
@@ -19,7 +20,6 @@ export interface ShortcutHint {
 const BASE_HINTS: ShortcutHint[] = [
   { keys: "Ctrl+Z", label: "undo" },
   { keys: "Ctrl+Shift+Z", label: "redo" },
-  { keys: "Alt+,", label: "commands" },
   { keys: "Space", label: "pan" },
   { keys: "PgUp/Dn", label: "photos" },
   { keys: "Alt+Scroll", label: "zoom" },
@@ -29,10 +29,36 @@ const BASE_HINTS: ShortcutHint[] = [
   { keys: "Alt+, → copy link", label: "share this view" },
 ];
 
-/** Always pinned in the last slot — never cycles or swaps. */
-const PINNED_HINT: ShortcutHint = { keys: "Alt+/", label: "shortcuts" };
+/** The tail of the bar, pinned so the last slots are always in the same place.
+ *  Neither cycles and neither is ever swapped out for a tool hint — the point
+ *  is muscle memory: the two ways into everything else live at a fixed address.
+ *
+ *  ⚠️ Both are deliberately ABSENT from `BASE_HINTS`. A hint that is pinned and
+ *  also in the rotation pool renders twice. */
+const PINNED_SHORTCUTS: ShortcutHint = { keys: "Alt+/", label: "shortcuts" };
+const PINNED_COMMANDS: ShortcutHint = { keys: "Alt+,", label: "commands" };
 
-const CYCLE_MS = 3 * 60 * 1000; // rotate the interface-hint slot every 3 minutes
+const CYCLE_MS = 3 * 60 * 1000; // rotate the interface-hint slots every 3 minutes
+
+/** The bar has a fixed shape at each size, and the shape is the point — a hint
+ *  you reach for should be in the same place every time you look.
+ *
+ *      DESKTOP (≥ BP_COMPACT), six slots
+ *        1–2  the active TOOL's own shortcuts
+ *        3–4  the rotating pool (BASE_HINTS)
+ *          5  Alt+/  locked
+ *          6  Alt+,  locked
+ *
+ *      COMPACT / TABLET (< BP_COMPACT), two slots
+ *          1  the rotating pool
+ *          2  Alt+/  locked
+ *
+ *  On compact the tool hints are dropped rather than the locked ones: the tool
+ *  you are holding is already visible in the sidebar, whereas the two ways into
+ *  everything else are not advertised anywhere except here. */
+const TOOL_SLOTS_DESKTOP = 2;
+const BASE_SLOTS_DESKTOP = 2;
+const BASE_SLOTS_COMPACT = 1;
 
 const MARKETING_URL = "https://image-horse.vercel.app";
 
@@ -63,25 +89,45 @@ export function StatusBar({
   // see the hook for why `entry.origWidth` is NOT the upload size.
   const uploadDims = useUploadDimensions();
 
-  // Rotate the interface-hint slot every 3 minutes. The first three slots
-  // change (two tool-related, one interface-related cycling); Alt+/ is
-  // always pinned last.
+  // TWO things vary here, and they are independent:
+  //   • the TOOL — `activeToolHint` / `activeToolHint2` change the moment the
+  //     active tool does, so the first slots follow what you are holding.
+  //   • TIME — the remaining slots rotate through BASE_HINTS every 3 minutes,
+  //     so the bar eventually shows you everything rather than the same two
+  //     shortcuts forever.
+  // The LOCKED TAIL participates in neither. `Alt+/` is last at every size;
+  // `Alt+,` follows it on desktop only.
+  const { compact } = useBreakpoint();
+  const locked: ShortcutHint[] = compact
+    ? [PINNED_SHORTCUTS]
+    : [PINNED_SHORTCUTS, PINNED_COMMANDS];
   const [cycle, setCycle] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => setCycle((c) => c + 1), CYCLE_MS);
     return () => window.clearInterval(id);
   }, []);
 
+  // Tool slots first — desktop only. Compact drops them (see the slot map).
   const dynamic: ShortcutHint[] = [];
-  if (activeToolHint) dynamic.push(activeToolHint);
-  if (activeToolHint2 && !dynamic.some((d) => d.label === activeToolHint2.label)) {
-    dynamic.push(activeToolHint2);
+  if (!compact) {
+    if (activeToolHint) dynamic.push(activeToolHint);
+    if (activeToolHint2 && !dynamic.some((d) => d.label === activeToolHint2.label)) {
+      dynamic.push(activeToolHint2);
+    }
+    dynamic.splice(TOOL_SLOTS_DESKTOP);
   }
-  for (let i = 0; dynamic.length < 3 && i < BASE_HINTS.length; i++) {
+
+  // Then the rotating pool. A tool with fewer than two shortcuts leaves its
+  // slot free and the pool takes it, so the row is never short — the same
+  // fall-through the second tool slot has always had.
+  const fillTo = compact
+    ? BASE_SLOTS_COMPACT
+    : TOOL_SLOTS_DESKTOP + BASE_SLOTS_DESKTOP;
+  for (let i = 0; dynamic.length < fillTo && i < BASE_HINTS.length; i++) {
     const h = BASE_HINTS[(cycle + i) % BASE_HINTS.length];
     if (!dynamic.some((d) => d.label === h.label)) dynamic.push(h);
   }
-  const hints: ShortcutHint[] = [...dynamic.slice(0, 3), PINNED_HINT];
+  const hints: ShortcutHint[] = [...dynamic.slice(0, fillTo), ...locked];
   return (
     <footer className="status-bar">
       <div className="status-section">

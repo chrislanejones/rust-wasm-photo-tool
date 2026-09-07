@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.69",
+    date: "2026-09-07",
+    headline: "A panel that fits, and a status bar that stays put",
+    entries: [
+      {
+        tag: "ui",
+        text: "Edit \u2192 Rulers is now Rulers and Grid, which is what it has always done. The half-built Measure entry beside it is gone \u2014 it was a placeholder from before the overlay shipped, and two things called Ruler and Rulers sitting next to each other was never going to help anyone.",
+      },
+      {
+        tag: "fix",
+        text: "That panel was too wide for the sidebar it lives in: the third grid layout button hung off the right edge, and a paragraph of explanation above each control pushed everything down. The paragraphs now live behind the lightbulb icons, where the rest of the app keeps its explanations, and the controls use the same button groups the paint tools do. It fits.",
+      },
+      {
+        tag: "ui",
+        text: "The status bar has a fixed shape now. On a desktop it shows six hints: two for the tool you are holding, two that rotate through the rest, and the last two \u2014 Alt+/ for the shortcut list and Alt+, for the command palette \u2014 always in the same place. On a tablet-width window it drops to two, and Alt+/ keeps the last slot. The point is that the two ways into everything else stop moving around.",
+      },
+      {
+        tag: "fix",
+        text: "Layer rows got their annotation counts back out. They arrived last release as small numbers on every row, and a row that already carries a name, an eye, five buttons, a mask badge and an opacity slider has no room for two more. The counts now sit in one line under the list, describing the layer you actually have selected.",
+      },
+    ],
+  },
+  {
     version: "v8.68",
     date: "2026-09-06",
     headline: "Layer rows say what they hold",

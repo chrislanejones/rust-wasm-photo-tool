@@ -1,17 +1,32 @@
 import { Frame, Grid3x3, LayoutGrid, Ruler } from "lucide-react";
 import { SizeSlider } from "@/components/SizeSlider";
-import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
+import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
+import { SectionHeader } from "@/components/ui/section-header";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { GridKind, Preferences, RulerUnit } from "@/lib/preferences";
 
 /**
- * Settings → Rulers & Grids pane. Non-destructive canvas overlays persisted via
- * `lib/preferences.ts` (`usePreferences`, localStorage key `image-horse-prefs`):
- * - Rulers — top + left pixel rulers whose tick labels track the zoom level.
- * - Grid — a composition/alignment overlay in one of three layouts:
- *     • "square" — uniform px squares (driven by `gridSpacing`).
- *     • "golden" — golden-ratio guide lines (no parameters).
- *     • "grid"   — an N×M division (driven by `gridCols` / `gridRows`).
- *   Color + opacity apply to every layout.
+ * Rulers & Grid — non-destructive canvas overlays persisted via
+ * `lib/preferences.ts` (`usePreferences`, localStorage `image-horse-prefs`):
+ * - Rulers — top + left rulers whose tick labels track the zoom level.
+ * - Grid — a composition overlay: uniform squares, golden-ratio guides, or an
+ *   N×M division. Colour + opacity apply to every layout.
+ *
+ * ⚠️ RENDERED IN TWO PLACES AT TWO WIDTHS: the Settings modal (wide) and the
+ * tool sidebar (narrow, Edit → Rulers and Grid). It is built for the NARROW
+ * one, because that is the one that breaks — the previous version used
+ * full-width `ToggleButtonGroup` rows and the third Layout button was clipped
+ * off the right edge in the sidebar.
+ *
+ * So it uses the same primitives every other tool panel uses rather than its
+ * own: `SectionHeader` for the title + lightbulb, `ToolButtonGroup` for the
+ * pick-one rows (the Stroke Stabilizer pattern — it wraps on a `columns` grid
+ * instead of one squeezed row), and `ColorSwatchGrid` for the colour.
+ *
+ * And the prose is in the lightbulbs, not the panel. A tool panel is
+ * button-only; the explanation hides behind the info icon (`SectionHeader`'s
+ * own doc says so, and the paragraphs here were what pushed the controls out
+ * of the visible area).
  */
 interface RulersGridsPaneProps {
   /** The draft being edited (owned by the Settings modal). */
@@ -20,19 +35,33 @@ interface RulersGridsPaneProps {
   onChange: (patch: Partial<Preferences>) => void;
 }
 
-const RULER_UNIT_CHOICES: { unit: RulerUnit; label: string }[] = [
-  { unit: "px", label: "Pixels" },
-  { unit: "in", label: "Inches" },
-  { unit: "cm", label: "Centimetres" },
+const RULER_TOGGLE = [
+  { id: "off" as const, label: "Off", icon: Ruler },
+  { id: "on" as const, label: "On", icon: Ruler },
 ];
 
-const GRID_LAYOUTS: { kind: GridKind; label: string; icon: typeof Grid3x3 }[] = [
-  { kind: "square", label: "Square", icon: Grid3x3 },
-  { kind: "golden", label: "Golden", icon: Frame },
-  { kind: "grid", label: "Grid", icon: LayoutGrid },
+const RULER_UNITS: { id: RulerUnit; label: string }[] = [
+  { id: "px", label: "Pixels" },
+  { id: "in", label: "Inches" },
+  { id: "cm", label: "Cm" },
 ];
 
-const GRID_COLORS: string[] = [
+const GRID_TOGGLE = [
+  { id: "off" as const, label: "Off", icon: Grid3x3 },
+  { id: "on" as const, label: "On", icon: Grid3x3 },
+];
+
+const GRID_LAYOUTS: { id: GridKind; label: string; icon: typeof Grid3x3 }[] = [
+  { id: "square", label: "Square", icon: Grid3x3 },
+  { id: "golden", label: "Golden", icon: Frame },
+  { id: "grid", label: "Grid", icon: LayoutGrid },
+];
+
+/** Fixed, high-contrast set — a grid overlay has to read against an arbitrary
+ *  photo, so this is a functional palette, not a creative one. `allowCustom`
+ *  is off for that reason: the user's saved paint colours are the wrong list
+ *  to offer here. */
+const GRID_COLORS: readonly string[] = [
   "#ffffff",
   "#000000",
   "#ef4444",
@@ -42,102 +71,84 @@ const GRID_COLORS: string[] = [
 
 export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">Rulers</h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            Top + left rulers along the canvas; tick labels track zoom.
-          </p>
-        </div>
-        <ToggleButtonGroup
-          fill
-          items={[
-            {
-              key: "rulers-off",
-              icon: Ruler,
-              label: "Off",
-              active: !value.rulers,
-              onToggle: () => onChange({ rulers: false }),
-            },
-            {
-              key: "rulers-on",
-              icon: Ruler,
-              label: "On",
-              active: value.rulers,
-              onToggle: () => onChange({ rulers: true }),
-            },
-          ]}
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <SectionHeader
+          title="Rulers"
+          info={
+            <>
+              Top and left rulers along the canvas; the tick labels track the
+              zoom level. Inches and centimetres are derived at 96&nbsp;DPI — a
+              web image has no physical size of its own, so that is a fixed
+              convention rather than a print measurement.
+            </>
+          }
         />
-        {/* Units. Hidden while rulers are off — a unit picker for an invisible
-            ruler is a control with no visible effect, which is how a panel
-            starts feeling broken. */}
+        <ToolButtonGroup
+          options={RULER_TOGGLE}
+          value={value.rulers ? "on" : "off"}
+          onChange={(id) => onChange({ rulers: id === "on" })}
+        />
+        {/* Units stay hidden while the rulers are off — a unit picker for an
+            invisible ruler is a control with no visible effect, which is how a
+            panel starts feeling broken. */}
         {value.rulers && (
-          <div className="space-y-2">
-            <ToggleButtonGroup
-              fill
-              items={RULER_UNIT_CHOICES.map(({ unit, label }) => ({
-                key: `unit-${unit}`,
-                icon: Ruler,
-                label,
-                active: value.rulerUnit === unit,
-                onToggle: () => onChange({ rulerUnit: unit }),
-              }))}
-            />
-            <p className="text-2xs leading-relaxed text-text-muted">
-              Inches and centimetres are derived at 96&nbsp;DPI — a web image has
-              no physical size of its own, so this is a fixed convention rather
-              than a print measurement.
-            </p>
-          </div>
+          <ToolButtonGroup
+            label="Units"
+            options={RULER_UNITS}
+            columns={3}
+            value={value.rulerUnit}
+            onChange={(id) => onChange({ rulerUnit: id })}
+          />
         )}
-      </section>
+      </div>
 
-      <section className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">Grid</h3>
-          <p className="mt-1 text-xs leading-relaxed text-text-muted">
-            A non-destructive overlay to guide composition and alignment.
-          </p>
-        </div>
-        <ToggleButtonGroup
-          fill
-          items={[
-            {
-              key: "grid-off",
-              icon: Grid3x3,
-              label: "Off",
-              active: !value.grid,
-              onToggle: () => onChange({ grid: false }),
-            },
-            {
-              key: "grid-on",
-              icon: Grid3x3,
-              label: "On",
-              active: value.grid,
-              onToggle: () => onChange({ grid: true }),
-            },
-          ]}
+      <div className="space-y-2">
+        <SectionHeader
+          title="Grid"
+          info={
+            <>
+              A non-destructive overlay to guide composition and alignment. It
+              is drawn over the canvas and never touches the image, so it is
+              absent from every export.
+            </>
+          }
         />
-      </section>
+        <ToolButtonGroup
+          options={GRID_TOGGLE}
+          value={value.grid ? "on" : "off"}
+          onChange={(id) => onChange({ grid: id === "on" })}
+        />
+      </div>
 
       {value.grid && (
-        <section className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary">Layout</h3>
-            <p className="mt-1 text-xs leading-relaxed text-text-muted">
-              Uniform squares, golden-ratio guides, or a fixed column × row split.
-            </p>
-          </div>
-          <ToggleButtonGroup
-            fill
-            items={GRID_LAYOUTS.map(({ kind, label, icon }) => ({
-              key: kind,
-              icon,
-              label,
-              active: value.gridKind === kind,
-              onToggle: () => onChange({ gridKind: kind }),
-            }))}
+        <div className="space-y-2">
+          <SectionHeader
+            title="Layout"
+            info={
+              <>
+                <strong className="font-semibold text-theme-foreground">
+                  Square
+                </strong>{" "}
+                lays uniform squares at the spacing you set.{" "}
+                <strong className="font-semibold text-theme-foreground">
+                  Golden
+                </strong>{" "}
+                draws golden-ratio guides and takes no parameters.{" "}
+                <strong className="font-semibold text-theme-foreground">
+                  Grid
+                </strong>{" "}
+                divides the canvas into a fixed column × row split. Colour and
+                opacity apply to all three.
+              </>
+            }
+          />
+          <ToolButtonGroup
+            options={GRID_LAYOUTS}
+            columns={3}
+            stacked
+            value={value.gridKind}
+            onChange={(id) => onChange({ gridKind: id })}
           />
 
           {value.gridKind === "square" && (
@@ -175,30 +186,13 @@ export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
             </>
           )}
 
-          {value.gridKind === "golden" && (
-            <p className="text-xs text-text-muted">
-              Golden-ratio lines have no parameters.
-            </p>
-          )}
-
-          <div className="space-y-1.5">
-            <span className="text-2xs text-text-muted">Color</span>
-            <div className="flex gap-2">
-              {GRID_COLORS.map((hex) => (
-                <button
-                  key={hex}
-                  type="button"
-                  onClick={() => onChange({ gridColor: hex })}
-                  aria-label={`Grid color ${hex}`}
-                  className={
-                    "h-7 w-7 rounded-md border border-border" +
-                    (value.gridColor === hex ? " ring-2 ring-border-active" : "")
-                  }
-                  style={{ background: hex }}
-                />
-              ))}
-            </div>
-          </div>
+          <ColorSwatchGrid
+            label="Color"
+            colors={GRID_COLORS}
+            value={value.gridColor}
+            onChange={(hex) => onChange({ gridColor: hex })}
+            allowCustom={false}
+          />
 
           <SizeSlider
             label="Opacity"
@@ -209,7 +203,7 @@ export function RulersGridsPane({ value, onChange }: RulersGridsPaneProps) {
             step={5}
             unit="%"
           />
-        </section>
+        </div>
       )}
     </div>
   );
