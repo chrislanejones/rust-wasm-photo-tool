@@ -74,10 +74,12 @@ describing a build made with 117.
   deliberate and predates this (`ci.yml`), so neither can be dropped.
 - `build-info.json` is a public file naming the commit and toolchain. It says
   nothing that `git log` and the binary itself do not already say.
-- **Currently fail-OPEN when `build-info.json` is absent**, so the first deploy
+- ~~**Currently fail-OPEN when `build-info.json` is absent**, so the first deploy
   after this merges is not blocked by a file the previous deploy never wrote.
   That is a hole, and it is deliberate and temporary — flip to `fail()` once a
-  post-merge deploy is confirmed live. Left as the one follow-up.
+  post-merge deploy is confirmed live. Left as the one follow-up.~~
+  **CLOSED 2026-09-07 — see the correction below.** It was open for exactly one
+  release.
 - ⚠️ **A 200 is not proof a file exists.** Netlify's SPA fallback serves
   `index.html` for any unknown path, so `curl -f` on a missing
   `build-info.json` succeeds and returns HTML. Verified against the real site:
@@ -110,3 +112,44 @@ log for a deploy that is not from before 2026-09-05.**
 Second most likely: someone adds a build step after `write-build-info.sh` that
 rewrites or re-optimizes the published wasm, so tier 1 fails on every deploy
 and gets disabled rather than reordered. `write-build-info.sh` must stay last.
+
+## Correction — 2026-09-07: fail-closed, and the three states
+
+The fail-open hole above is closed. It existed for exactly one release: v8.68
+was the first deploy that could write `build-info.json`, and it did.
+
+The flip is not a one-word change, because a missing file has **three
+distinguishable shapes** and they mean different things:
+
+| What came back | State | Verdict |
+|---|---|---|
+| a body starting `{` | `json` | proceed to tiers 1 and 2 |
+| a body that is not JSON | `notjson` | **fail** — the SPA fallback answered, so the file is not on the server |
+| the fetch itself failed | `absent` | **fail** — a real 404, or the host is unreachable |
+
+Collapsing the last two was the original mistake and it cost a healthy deploy:
+Netlify serves `index.html` for any unknown path, so `curl -f` succeeds and
+hands back HTML. An earlier version read that as "present but malformed" and
+failed a live site that was fine.
+
+**Each failure names the next step**, in the order the causes actually occur:
+the publish step did not run (`write-build-info.sh` is the LAST line of
+netlify.toml's command, so anything failing earlier skips it while still
+publishing the site), the file landed outside the publish dir, or a
+redirect/rewrite is catching the path. A message that says only "missing" gets
+bypassed.
+
+**The deploy-lag skip is untouched and was re-verified.** Tier 2 still reports
+itself skipped when CI's commit differs from the live one — that is normal on
+every push and must never become a failure.
+
+Proven against seven cases before shipping — four for the file states (valid,
+SPA-fallback HTML, absent on a fallback host, absent on a strict-404 host) and
+three for tier 2 (runs and passes on a matching commit, skips on deploy lag,
+fails on the same commit with different bytes) — then once more against the
+real production site, where both tiers ran and passed.
+
+⚠️ **A pass while a check is SKIPPED is not a pass for that check.** During the
+merge run a fix PR's sentinel showed green while tier 2 had skipped itself on a
+commit mismatch; the green said nothing about the fix. Every case above asserts
+*which* path executed, not just the exit code.
