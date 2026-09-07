@@ -130,10 +130,33 @@ live_sha="$(sha256sum "$TMP/engine.wasm" | cut -d' ' -f1)"
 # index.html for ANY unknown path, so `curl -f` on a missing build-info.json
 # succeeds and hands back HTML. Checked against the real site 2026-09-05: it
 # returned the app shell, and an earlier version of this block read that as
-# "present but malformed" and failed a perfectly healthy deploy. Require the
-# body to actually be JSON before believing in it.
-if fetch "$SITE/build-info.json" "$TMP/build-info.json" 2>/dev/null &&
-   [ "$(head -c 1 "$TMP/build-info.json")" = "{" ]; then
+# "present but malformed" and failed a perfectly healthy deploy.
+#
+# So there are THREE outcomes, not two, and they are kept apart deliberately —
+# each one means a different thing is broken and needs a different fix:
+#
+#   valid JSON      → proceed to tiers 1 and 2
+#   fetched, not JSON → the SPA fallback answered. The file is NOT on the
+#                       server; something served the app shell in its place.
+#   fetch failed      → a real 404/network failure on a host with no fallback.
+#
+# FAIL-CLOSED as of 2026-09-07. It was fail-open for exactly one release —
+# the deploy before ADR-046 shipped could not have written the file — and
+# v8.68 was that deploy. ADR-046's own pre-mortem names leaving this open as
+# the likeliest way the whole check rots: the ABSENT line scrolls past in a
+# green log and nobody notices the assertions stopped running.
+build_info_state=""
+if fetch "$SITE/build-info.json" "$TMP/build-info.json" 2>/dev/null; then
+  if [ "$(head -c 1 "$TMP/build-info.json")" = "{" ]; then
+    build_info_state="json"
+  else
+    build_info_state="notjson"
+  fi
+else
+  build_info_state="absent"
+fi
+
+if [ "$build_info_state" = "json" ]; then
   bi() { grep -oE "\"$1\": *\"[^\"]*\"" "$TMP/build-info.json" | head -1 | sed -E 's/.*: *"([^"]*)"/\1/'; }
   bi_commit="$(bi commit)"; bi_sha="$(bi wasm_sha256)"; bi_asset="$(bi wasm_asset)"
   bi_binaryen="$(bi binaryen)"; bi_rustc="$(bi rustc)"; bi_features="$(bi features)"
@@ -179,11 +202,28 @@ if fetch "$SITE/build-info.json" "$TMP/build-info.json" 2>/dev/null &&
   else
     echo "  tier 2     : skipped — no CI expectation in the environment (scheduled run, or run by hand)"
   fi
+elif [ "$build_info_state" = "notjson" ]; then
+  got="$(head -c 60 "$TMP/build-info.json" | tr '\n' ' ')"
+  fail "build-info.json did not come back as JSON — the server answered with
+  something else, which on Netlify means the SPA FALLBACK served index.html
+  because the file is not there.
+  first bytes: ${got}
+  The engine itself may be perfectly fine; what is broken is the deploy's
+  record of what it built, so tiers 1 and 2 cannot run at all. In order:
+    1. did the build run \`scripts/write-build-info.sh\`? It is the LAST step of
+       netlify.toml's command — a failure earlier in that chain skips it while
+       still publishing the site
+    2. is it landing somewhere other than the publish dir? It writes to
+       www-dist/build-info.json and netlify.toml publishes www-dist
+    3. is a redirect or rewrite rule catching /build-info.json before the
+       static file does?"
 else
-  # Fail-OPEN only for the transition: a deploy from before this check has no
-  # build-info.json. Once the first post-#69 deploy is confirmed live, flip
-  # this to fail() — a missing file then means the publish step is broken.
-  echo "  build-info : ABSENT (missing, or the SPA fallback answered with HTML) — this deploy predates the exact-hash check (ADR-046); tiers 1–2 skipped. Flip to fail-closed once a post-check deploy is live."
+  fail "build-info.json could not be fetched from $SITE at all (404, or the
+  host is unreachable — this is the no-SPA-fallback shape of the same
+  problem).
+  Same three causes as above: the publish step did not run, the file landed
+  outside the publish dir, or routing is eating the path. If the site itself
+  is down, that is the real story and this line is a symptom."
 fi
 
 if [ "$size" -lt "$MIN_WASM" ]; then
