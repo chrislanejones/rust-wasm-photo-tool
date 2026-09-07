@@ -90,16 +90,30 @@
 #   'wasm-unsafe-eval'  in script-src. The engine is WebAssembly, and
 #                       instantiating it counts as eval to CSP. Without this the
 #                       canvas never comes up at all.
-#   worker-src 'self'   NOT `blob:`. Both workers are built by Vite's
-#                       `new Worker(new URL(..., import.meta.url))` pattern,
-#                       which emits SAME-ORIGIN asset files — verified against
-#                       the shipped bundle 2026-09-07:
-#                         /assets/engine.worker-BxZey_uo.js  200
-#                         /assets/codec.worker-BC0cZvq4.js   200
-#                       `blob:` was assumed necessary and is not. It is left out
-#                       on purpose: adding it "just in case" is how a policy
-#                       stops meaning anything, and report-only is precisely
-#                       where a wrong guess surfaces safely.
+#   worker-src 'self' blob:
+#                       OUR two workers are same-origin — Vite's
+#                       `new Worker(new URL(..., import.meta.url))` emits asset
+#                       files, verified 2026-09-07 (engine.worker-*.js and
+#                       codec.worker-*.js both 200). So `'self'` covers the
+#                       engine and `blob:` is NOT for us.
+#                       ⚠️ `blob:` is here for CLERK, which builds its own
+#                       workers from blob URLs — found by the report stream on
+#                       the first real page load, not by reading our code.
+#                       Neither the code inventory nor the bundle grep would
+#                       ever have shown this: it happens inside a third-party
+#                       script at runtime.
+#
+# ⚠️ THE INLINE SCRIPT HASH. app/index.html carries ONE inline <script> — the
+# anti-FOUC theme setter, which has to be inline or the page flashes the wrong
+# theme before first paint. It is allowed by SHA-256 hash rather than
+# 'unsafe-inline', because 'unsafe-inline' would re-open script injection for
+# the sake of twelve lines.
+#
+# The hash is brittle BY DESIGN: change one character of that script — even
+# whitespace — and the hash no longer matches, and under an enforcing policy the
+# theme setter silently stops running. `pnpm -C app test` has a guard that
+# recomputes it from index.html and fails if this file disagrees, so the drift
+# is caught in CI rather than as a flash of the wrong theme in production.
 #
 # CONNECT-SRC ORIGINS — inventoried from a real live session's resource timing,
 # not from imports:
@@ -125,12 +139,12 @@
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
     Content-Security-Policy-Report-Only = """\
 default-src 'self'; \
-script-src 'self' 'wasm-unsafe-eval'; \
+script-src 'self' 'wasm-unsafe-eval' 'sha256-2kzO0RCVLXlFIInFPo4scxTQKGqCV5AmH72rPA4nFK8=' https://*.clerk.accounts.dev; \
 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
 font-src 'self' https://fonts.gstatic.com data:; \
 img-src 'self' blob: data: https://f1avkyiqgj.ufs.sh https://*.ufs.sh; \
 connect-src 'self' blob: data: https://*.clerk.accounts.dev https://*.convex.cloud wss://*.convex.cloud https://*.ufs.sh https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; \
-worker-src 'self'; \
+worker-src 'self' blob:; \
 frame-src 'self' https://*.clerk.accounts.dev; \
 object-src 'none'; \
 base-uri 'self'; \
