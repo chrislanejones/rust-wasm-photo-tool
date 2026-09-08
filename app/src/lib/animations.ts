@@ -151,7 +151,8 @@ export const hoverReveal: Variants = {
   shown: { opacity: 1, transition: { duration: 0.15 } },
 };
 
-// How long a freshly opened panel keeps offering its corner close. After this
-// the button unmounts — a panel you have settled into stops asking — and it
-// comes back with the panel, since mount is panel-open. (Chris, 2026-09-08.)
+// How long a panel keeps offering its corner close, measured from the last
+// time the pointer entered it (or from open). A panel you have settled into
+// stops asking; leave and come back, or reopen it, and the clock restarts.
+// (Chris, 2026-09-08.)
 export const PANEL_CLOSE_REVEAL_MS = 40_000;

@@ -33,7 +33,10 @@ export function DimensionFields({
   onToggleLock,
 }: Props) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
+      {/* space-y-2.5, not 4: the slider box carries ~7px of thumb room below
+          the visible track, so 10px here lands the visual gap to width/height
+          at ~17 — the same distance the Method dropdown sits from Quality. */}
       {/* Scale slider — proportional percent of the original dimensions. */}
       <SizeSlider
         label="Scale"

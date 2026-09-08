@@ -25,8 +25,9 @@ import { cn } from "@/lib/utils";
  * While hidden it is `pointer-events: none`, so an invisible button is not a
  * phantom click target on the corner.
  *
- * RETIRES after PANEL_CLOSE_REVEAL_MS (40 s): a panel you have settled into
- * stops offering to close. Mount is panel-open, so reopening restarts it.
+ * RETIRES after PANEL_CLOSE_REVEAL_MS (40 s) in the panel: one you have
+ * settled into stops offering to close. Leaving and coming back restarts the
+ * clock, and so does reopening the panel (mount is panel-open).
  *
  * Icon-only, so the accessible name is an `aria-label` (#64). Closing sets the
  * panel's `show*` flag false; the top bar's toggle brings it back and already
@@ -51,26 +52,43 @@ export function PanelCloseButton({ label, onClose, className }: PanelCloseButton
   const [retired, setRetired] = useState(false);
 
   // The panel is the hover surface; listen to it rather than ask it to tell us.
+  // The 40 s clock is measured from the LAST pointerenter (or from mount, for a
+  // panel that opens under a still cursor): entering un-retires and restarts
+  // it, leaving cancels it, firing retires it. So "clicks away and comes back"
+  // gets a fresh 40 s (Chris, 2026-09-08), and so does reopening the panel.
+  const timer = useRef<number | null>(null);
   useEffect(() => {
     const host = wrapRef.current?.parentElement;
     if (!host) return;
-    const on = () => setHovered(true);
-    const off = () => setHovered(false);
+    const arm = () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setRetired(true), PANEL_CLOSE_REVEAL_MS);
+    };
+    const on = () => {
+      setRetired(false);
+      setHovered(true);
+      arm();
+    };
+    const off = () => {
+      setHovered(false);
+      if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = null;
+    };
     host.addEventListener("pointerenter", on);
     host.addEventListener("pointerleave", off);
+    arm();
     return () => {
       host.removeEventListener("pointerenter", on);
       host.removeEventListener("pointerleave", off);
+      if (timer.current !== null) window.clearTimeout(timer.current);
     };
   }, []);
 
-  useEffect(() => {
-    const t = window.setTimeout(() => setRetired(true), PANEL_CLOSE_REVEAL_MS);
-    return () => window.clearTimeout(t);
-  }, []);
-
-  if (retired) return null;
-  const shown = hovered || focused;
+  // Retired suppresses the HOVER reveal only. It does not unmount — that would
+  // tear down the very listeners that un-retire it on the next entry — and
+  // keyboard focus still reveals it, because retirement is a pointer-idleness
+  // idea and a control that only exists under a mouse is unreachable otherwise.
+  const shown = focused || (hovered && !retired);
 
   return (
     <motion.div

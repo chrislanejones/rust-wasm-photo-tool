@@ -17,6 +17,11 @@ import type { ExportFormat } from "@/lib/exportImage";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 
+/** The seam between this panel's sections — the same rule its footer draws,
+ *  and the same `border-t border-theme-sidebar-border` four other settings
+ *  panels use for theirs. */
+const SECTION_SEP = "border-t border-theme-sidebar-border pt-4";
+
 /** Resampling method → Rust filter code (see `resize_with_filter`). */
 const FILTER_CODE = {
   lanczos3: 3,
@@ -387,8 +392,10 @@ export function ResizeSettings({
 
         {/* Header → first control is 16px in every section, the spacing
             Select › Magic Wand › Tolerance already uses; the merge had left
-            it at 32 here and 39 under Compress. */}
-        <div className="space-y-4">
+            it at 32 here and 39 under Compress. The border is this panel's own
+            footer rule (and four other panels' section seam) — one line
+            between the scores, Resize and Compress. */}
+        <div className={`space-y-4 ${SECTION_SEP}`}>
         <SectionHeader
           title="Resize"
           info="Sets new pixel dimensions. The lock keeps the aspect ratio; the percent slider scales width and height proportionally. Apply Resize changes dimensions only — Apply Compression &amp; Resize commits both."
@@ -407,7 +414,7 @@ export function ResizeSettings({
 
         </div>
 
-        <div className="space-y-4">
+        <div className={`space-y-4 ${SECTION_SEP}`}>
         <SectionHeader
           title="Compress"
           info="Shrinks the file size: pick a resample Method and output Format, then drag Quality. The two scores above preview the pending output — Apply Compression &amp; Resize commits it."
