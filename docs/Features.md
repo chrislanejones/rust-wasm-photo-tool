@@ -11,7 +11,7 @@
 - **Security tab** — EXIF keep/strip moved out of Compress into Settings → Security as a saved preference (applies to every export path); GPS / capture-time / lens stays or goes by your choice
 - **Responsive / snapped windows** — one shared `useBreakpoint` hook: below ~1000px the top bar goes icon-only, below ~900px the side panels float as overlay drawers (scrim, one at a time) instead of crushing the canvas, below ~600px a "wider window" notice. Reduce Motion suppresses the layout slides
 - **Keyboard accessibility** — Skip-to-canvas link, landmark roles + labels (toolbar / panels / canvas), accessible names on the tool buttons, and Escape-to-close + `role="dialog"` semantics on the modals; on top of the existing tool / number / Alt shortcuts
-- **Resize** — Bilinear-scaled resize fully in WASM; no canvas round-trip
+- **Resize & Compress** — one tile, one panel. Both halves move the same two numbers (Web Performance Gain and PageSpeed Insights Score read dimensions AND format/quality together), so they share a panel the way Squoosh does: the scores on top, then Resize, then Compress. Resampling is fully in WASM with no canvas round-trip. One Apply button, named for what is pending — "Apply Resize" when only the dimensions moved, "Apply Compression" when only quality/format/method moved, "Apply Compression & Resize" when both did. Dimensions-only re-saves in the photo's own format at full quality, so the quality slider is left alone
 - **Levels** — Brightness (−100% to +100%), contrast (0% to 300%); each adjustment is a separate undo snapshot
 - **Histogram** — live RGB / Luma scope in the Review panel, computed in Rust (`calculate_histogram`) straight from the composite buffer — no per-frame offscreen-canvas sampling
 - **Fast integer compositing** — all alpha blending (`blend_pixel`, `blend_over`) uses integer source-over math instead of per-pixel float `÷255.0`, verified identical to the old result within ±1
@@ -33,7 +33,7 @@
 ### UI (React)
 
 - **Animated Panels** — Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)
-- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), **Batch Image Editor** (bulk logo stamp + grid mosaic view), Eraser (relabeled from AI)
+- **Tool Grid** — 10 tools with gradient icons: Clone Stamp, Resize & Compress, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), **Batch Image Editor** (bulk logo stamp + grid mosaic view), Eraser (relabeled from AI)
 - **Tab Switchers** — Stamp (Clone / Stamps / Emojis), Shapes (Shapes / Arrows), Paint (Paint / Blur Brush / Pen), Effects (Levels / Color Picker) via shared `TabGroup` component
 - **Spacebar Pan** — Hold Space for grab-to-pan; all tool handlers bypassed during pan
 - **A/B Compare Slider** — Squoosh-style draggable divider; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned

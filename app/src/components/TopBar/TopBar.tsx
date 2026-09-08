@@ -166,15 +166,26 @@ export function TopBar({
         transition={reduceMotion ? instantTransition : panelSpacingTransition}
       >
         <div className="pointer-events-auto">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border">
+          <div
+            className={
+              compact
+                ? // COMPACT: no groups. Every button is a direct child of one
+                  // row and `justify-between` spreads them across the bar —
+                  // the pills, the dividers and the three-column grid all go.
+                  // (Chris, 2026-09-08: "remove the button groups and just make
+                  // top buttons with space-between".)
+                  "flex items-center justify-between px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border"
+                : "grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 bg-bg-secondary/90 backdrop-blur-sm rounded-xl border border-border"
+            }
+          >
             {/* Left cluster: Undo/Redo + Zoom, anchored left. Below BP_COMPACT
                 Undo/Redo drop out (they live in the Review panel + Ctrl+Z),
                 leaving Zoom as the left cluster. */}
-            <div className="flex items-center gap-3 min-w-0">
+            <div className={compact ? "contents" : "flex items-center gap-3 min-w-0"}>
             {!narrow && (
               <>
                 {/* Undo / Redo — see the shape note on the Zoom group below. */}
-                <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
+                <div className={compact ? "contents" : "flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0"}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <IconButton
@@ -182,6 +193,7 @@ export function TopBar({
                         label="Undo"
                         onClick={onUndo}
                         disabled={!canUndo}
+                        standalone={compact}
                       />
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
@@ -196,6 +208,7 @@ export function TopBar({
                         label="Redo"
                         onClick={onRedo}
                         disabled={!canRedo}
+                        standalone={compact}
                       />
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
@@ -205,7 +218,7 @@ export function TopBar({
                   </Tooltip>
                 </div>
 
-                <div className="w-px h-6 bg-border shrink-0" />
+                {!compact && <div className="w-px h-6 bg-border shrink-0" />}
               </>
             )}
 
@@ -223,12 +236,13 @@ export function TopBar({
                     widgets. Note the buttons and their container do NOT share
                     a radius, and should not: 6px inside 10px is the nesting,
                     and it is the panel's, not an invention here. */}
-                <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
+                <div className={compact ? "flex items-center gap-1 shrink-0" : "flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0"}>
                   <IconButton
                     icon={ZoomOut}
                     label="Zoom out"
                     onClick={onZoomOut}
                     disabled={zoom <= 0.25}
+                    standalone={compact}
                   />
                   {/* Show the % whenever there's room: wide, or narrow (where
                       Undo/Redo dropped out and freed space). Hidden only in the
@@ -243,6 +257,7 @@ export function TopBar({
                     label="Zoom in"
                     onClick={onZoomIn}
                     disabled={zoom >= 4}
+                    standalone={compact}
                   />
                 </div>
               </TooltipTrigger>
@@ -257,10 +272,15 @@ export function TopBar({
 
             {/* Center cluster: the four panel toggles, flanked by dividers and
                 kept dead-centered on the bar by the grid's 1fr/auto/1fr cols. */}
-            <div className="flex items-center gap-3">
-              <div className="w-px h-6 bg-border shrink-0" />
-              <ToggleButtonGroup items={toggleButtons} compact={compact} equalWidth />
-              <div className="w-px h-6 bg-border shrink-0" />
+            <div className={compact ? "contents" : "flex items-center gap-3"}>
+              {!compact && <div className="w-px h-6 bg-border shrink-0" />}
+              <ToggleButtonGroup
+                items={toggleButtons}
+                compact={compact}
+                bare={compact}
+                equalWidth={!compact}
+              />
+              {!compact && <div className="w-px h-6 bg-border shrink-0" />}
             </div>
 
             {/* Right cluster: Settings + Clerk user menu, anchored right.
@@ -270,15 +290,15 @@ export function TopBar({
                 `p-1 rounded-lg bg-bg-tertiary` container as Undo/Redo and
                 Zoom, and `grouped` turns off their standalone fill so the
                 container's own shows through. */}
-            <div className="flex items-center justify-end min-w-0">
-              <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
+            <div className={compact ? "contents" : "flex items-center justify-end min-w-0"}>
+              <div className={compact ? "contents" : "flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0"}>
                 <SubscriptionButton
                   general={general}
                   superUser={superUser}
                   openRaster={openRaster}
-                  grouped
+                  grouped={!compact}
                 />
-                <UserMenu grouped />
+                <UserMenu grouped={!compact} />
               </div>
             </div>
           </div>

@@ -719,7 +719,9 @@ textarea:focus-visible {
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* was hidden — clipping now lives on the panel's inner wrapper so the corner
+     close button can sit half outside the shell (see PanelCloseButton). */
+  overflow: visible;
   box-shadow: var(--shadow-panel);
 }
 

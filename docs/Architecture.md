@@ -197,7 +197,7 @@ tree at v8.61:
 | | Status at v8.61 | Where |
 | --- | --- | --- |
 | `ToolModule` type | **Exists** | `app/src/features/tools/toolModules.ts:40` |
-| Registered modules | **5** — Paint, Resize, Adjust, Select, Perspective | `TOOL_MODULES`, same file |
+| Registered modules | **5** — Paint, Resize & Compress, Adjust, Select, Perspective | `TOOL_MODULES`, same file |
 | `features/tools/modules/` directory | **Does not exist** | — |
 | AppShell imports `TOOL_MODULES` | **No** | nothing routes through the registry |
 | Tool hooks hand-wired in AppShell | **Still 7** | `AppShell.tsx:14-22` |

@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+import { hoverPop } from "@/lib/animations";
 import { HOVER_RING, TILE_DISABLED, TILE_IDLE, TILE_SELECTED } from "@/lib/styles";
 
 interface Props {
@@ -27,7 +29,8 @@ interface Props {
  */
 export function ToolButton({ icon: Icon, label, active, disabled = false, onClick }: Props) {
   return (
-    <button
+    <motion.button
+      whileHover="hover"
       onClick={onClick}
       disabled={disabled}
       aria-disabled={disabled}
@@ -48,7 +51,14 @@ export function ToolButton({ icon: Icon, label, active, disabled = false, onClic
             ].join(" "),
       ].join(" ")}
     >
-      <Icon className="h-[55%] w-[55%] transition-transform duration-200 ease-out group-hover:scale-110" />
-    </button>
+      {/* The pop is `hoverPop` in lib/animations.ts — one definition for every
+          icon that grows under a hover. Nothing here carries a scale. */}
+      <motion.span
+        variants={hoverPop}
+        className="flex h-[55%] w-[55%] items-center justify-center"
+      >
+        <Icon className="h-full w-full" />
+      </motion.span>
+    </motion.button>
   );
 }

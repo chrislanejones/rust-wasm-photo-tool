@@ -114,7 +114,7 @@ import {
   applyExifToVerbatim,
 } from "@/lib/exif";
 import { pinLabelText } from "@/lib/pinLabel";
-import { PANEL_OPEN_GUTTER } from "@/lib/layout";
+import { PANEL_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
 import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
@@ -774,6 +774,15 @@ export function AppShell() {
   const setShowGallery = useUIStore((s) => s.setShowGallery);
   const showHistory = useUIStore((s) => s.showHistory);
   const setShowHistory = useUIStore((s) => s.setShowHistory);
+  // The three panels' hover-reveal close (PanelCloseButton) exists ONLY in the
+  // wide desktop layout, where they float beside the canvas and the top bar
+  // toggle is what brings one back. Everywhere else the chrome owns open/close
+  // — the dock's tab strip, the narrow overlay drawers, and the compact top
+  // bar (both side panels open under BP_TIGHT) — so a corner X there is a
+  // second, competing way to do the same thing. Chris, 2026-09-08: "don't let
+  // the closing work in that compact/tablet mode".
+  const panelsClosable =
+    !bp.dock && !bp.narrow && !(bp.width < BP_TIGHT && showTools && showHistory);
   // Small-window notice: dismissed for this stretch of being too-small; reset
   // once the window grows back so it re-appears if they snap small again.
   const smallNoticeDismissed = useUIStore((s) => s.smallNoticeDismissed);
@@ -3157,6 +3166,7 @@ export function AppShell() {
             onRulersChange={(p) => applyPreferences({ ...prefs, ...p })}
             embedded={bp.dock}
             onClose={() => setShowTools(false)}
+            closable={panelsClosable}
             activeTool={activeTool}
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
@@ -3640,6 +3650,7 @@ export function AppShell() {
             onSelect={handleSelectPhoto}
             onRemove={(id) => setDeletePhotoId(id)}
             onClose={() => setShowGallery(false)}
+            closable={panelsClosable}
             showTools={showTools}
             showHistory={showHistory}
             reduceMotion={prefs.reduceMotion}
@@ -3668,6 +3679,7 @@ export function AppShell() {
             onJump={stamp.jumpToHistory}
             onDelete={stamp.deleteHistoryEntry}
             onClose={() => setShowHistory(false)}
+            closable={panelsClosable}
             onUndo={stamp.undo}
             canUndo={canUndo}
             onRedo={stamp.redo}

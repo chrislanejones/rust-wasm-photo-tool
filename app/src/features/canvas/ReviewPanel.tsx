@@ -28,6 +28,7 @@ import { slideFromRight } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { ReselectBar } from "@/components/ui/reselect-bar";
+import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { useLayerSwapFlash } from "@/hooks/useLayerSwapFlash";
 import { TIERS } from "@/lib/tiers";
@@ -95,6 +96,10 @@ interface Props {
   /** Embedded mode: render as a plain flex column (no fixed `.review-panel`
    *  chrome / slide animation) so it can fill the compact master bar. */
   embedded?: boolean;
+  /** Show the hover-reveal close in the top-left corner. Wide desktop layout
+   *  only — AppShell passes false whenever the dock, the narrow drawers or the
+   *  compact top bar are in play, where the chrome owns open/close instead. */
+  closable?: boolean;
 }
 
 const DeleteGlyph = () => (
@@ -121,6 +126,7 @@ const TOGGLES: {
 ];
 
 export function ReviewPanel({
+  onClose,
   history,
   onJump,
   onDelete,
@@ -148,6 +154,7 @@ export function ReviewPanel({
   histogramSignature,
   histogramPhotoKey,
   embedded = false,
+  closable = false,
 }: Props) {
   // Which body sections are open. The body splits its height evenly among the
   // open sections (1 → full, 2 → halves, 3 → thirds), each with its own header
@@ -218,10 +225,17 @@ export function ReviewPanel({
         embedded
           ? // Compact master-bar content box: flush below the 48px chrome.
             "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
-          : "review-panel"
+          : "review-panel group"
       }
     >
-      {/* No title/close — the four section toggles below are the header. */}
+      {/* No title — the four section toggles below are the header. The close
+          is the hover-reveal X in the corner, same glyph as each section's own
+          close; the top bar's Review toggle brings the panel back. */}
+      {closable && <PanelCloseButton label="Close Review" onClose={onClose} />}
+      {/* The clip lives HERE, not on the fixed shell: the shell must let the
+          corner close button hang half outside it, and this wrapper keeps the
+          rounded corners trimming the scrolling content exactly as before. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
 
       {/* ── Section toggles — same multi-select button group the top bar
           uses for Upload / Tools / Gallery. ───────────────────────────── */}
@@ -678,6 +692,7 @@ export function ReviewPanel({
             />
           </section>
         )}
+      </div>
       </div>
     </motion.aside>
   );

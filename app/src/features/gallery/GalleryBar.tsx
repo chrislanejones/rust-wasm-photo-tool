@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter } from "@/lib/animations";
+import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter, hoverPop } from "@/lib/animations";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
+import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
@@ -36,6 +37,10 @@ interface Props {
   onSelect: (entry: PhotoEntry) => void;
   onRemove: (id: string) => void;
   onClose: () => void;
+  /** Show the hover-reveal close in the top-left corner. Wide desktop layout
+   *  only — AppShell passes false whenever the dock, the narrow drawers or the
+   *  compact top bar are in play, where the chrome owns open/close instead. */
+  closable?: boolean;
   showTools: boolean;
   showHistory: boolean;
   /** Reduce Motion preference — when on, skip the margin-slide animation. */
@@ -123,6 +128,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       <TooltipTrigger asChild>
         <motion.div
           data-id={entry.id}
+          whileHover="hover"
           role="button"
           tabIndex={0}
           aria-label={`Select photo ${entry.name}`}
@@ -160,8 +166,11 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           below, where the reasoning lives. The claim is true now; it was not
           when it was written. */}
       <div className="absolute inset-0 checkerboard rounded-lg" />
-      <img
+      {/* The image pops inside the clipped card — hoverPop from lib/animations.ts,
+          the same definition the tool tiles use. */}
+      <motion.img
         ref={imgRef}
+        variants={hoverPop}
         src={thumbUrl || undefined}
         alt={entry.name}
         draggable={false}
@@ -360,6 +369,7 @@ function GalleryCount({
 }
 
 export function GalleryBar({
+  onClose,
   photos,
   activeId,
   onSelect,
@@ -368,6 +378,7 @@ export function GalleryBar({
   showHistory,
   reduceMotion,
   narrow,
+  closable = false,
   compressionProgress,
   compressionSavings,
   modifiedPhotos,
@@ -459,9 +470,13 @@ export function GalleryBar({
         className={
           vertical
             ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-            : "pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
+            : "group pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
         }
       >
+        {/* Hover the bar and a close appears top-left; the top bar's Gallery
+            toggle brings it back. The docked (vertical) form is closed from the
+            master bar's tabs instead. */}
+        {closable && <PanelCloseButton label="Close Gallery" onClose={onClose} />}
         <div className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "p-4"}>
           <div
             className={

@@ -53,7 +53,6 @@ import type {
   BrushMode,
   EraserMode,
   PerspectiveMode,
-  ResizeMode,
   SelectionKind,
   ShapesMode,
   StampSubMode,
@@ -126,10 +125,9 @@ const MODE_ACCESS: Partial<Record<ToolType, ModeAccess>> = {
     select: (s) => s.brushMode,
     set: (m) => useToolStore.getState().setBrushMode(m as BrushMode),
   },
-  compress: {
-    select: (s) => s.resizeMode,
-    set: (m) => useToolStore.getState().setResizeMode(m as ResizeMode),
-  },
+  // compress has no MODE_ACCESS row: single-mode since Compress and Resize
+  // merged onto one tile — both feed the same two scores, so the sub-mode
+  // toggle (and `resizeMode`) went away with it.
   // crop has no MODE_ACCESS row: single-mode again since Select split out.
   select: {
     select: (s) => s.selectionKind,

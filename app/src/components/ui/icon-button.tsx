@@ -1,4 +1,6 @@
 import { forwardRef } from "react";
+import { motion, type HTMLMotionProps } from "framer-motion";
+import { hoverPop } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 import { HOVER_RING } from "@/lib/styles";
 
@@ -60,7 +62,10 @@ import { HOVER_RING } from "@/lib/styles";
  * than its own toggle group and is what "the buttons are too tall" was.
  */
 export interface IconButtonProps
-  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+  // HTMLMotionProps, not ButtonHTMLAttributes: this is a motion.button now (the
+  // hover pop is a framer variant), and the two prop types disagree on the
+  // drag/animation event names — the motion one is the one that spreads clean.
+  extends Omit<HTMLMotionProps<"button">, "children"> {
   /** Any component that takes a className — lucide icons qualify, and so do
    *  the inline brand marks (GitHub, Codeberg) the New dialog's footer uses.
    *  The glyph is sized purely via className, never a lucide `size` prop, so
@@ -88,8 +93,9 @@ export interface IconButtonProps
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
   ({ icon: Icon, label, active = false, standalone = false, className, ...props }, ref) => (
-    <button
+    <motion.button
       ref={ref}
+      whileHover="hover"
       type="button"
       aria-label={label}
       aria-pressed={active || undefined}
@@ -128,8 +134,13 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       )}
       {...props}
     >
-      <Icon className="h-[18px] w-[18px] transition-transform duration-200 ease-out group-hover:scale-110" />
-    </button>
+      <motion.span
+        variants={hoverPop}
+        className="flex h-[18px] w-[18px] items-center justify-center"
+      >
+        <Icon className="h-full w-full" />
+      </motion.span>
+    </motion.button>
   ),
 );
 IconButton.displayName = "IconButton";

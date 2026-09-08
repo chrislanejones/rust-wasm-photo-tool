@@ -55,7 +55,6 @@ import {
   Pin,
   Pipette,
   Ruler,
-  Scaling,
   Scan,
   ScanEye,
   ScanText,
@@ -151,7 +150,8 @@ export interface ToolGroupDefinition {
 }
 
 // ── Enhance ──────────────────────────────────────────────────────────────────
-// Compress + Resize are the two existing `compress` sub-modes. Adjustments is
+// Compress + Resize are ONE sub-tool now (they were two `compress` sub-modes
+// until they merged onto a single panel). Adjustments is
 // the whole Effects panel. AI is the Replicate half of AISettings — the
 // `brush`/`magic` half of that same panel belongs to Create, which is the one
 // place a panel's own mode toggle crosses a group boundary (AMBIGUOUS-3).
@@ -163,22 +163,23 @@ const enhanceGroup: ToolGroupDefinition = {
   shortcutKey: "1",
   subTools: [
     {
+      // ONE tile, was two. Compress and Resize both move the SAME two numbers —
+      // Web Performance Gain and PageSpeed Insights Score read dimensions AND
+      // format/quality together — so splitting them put the scores under one
+      // tile and half their inputs under the other. Squoosh keeps the whole
+      // pipeline on one panel for the same reason. Keeps the `compress` id
+      // (shortcut `1`, the ToolType union and persistence all depend on it)
+      // and the Compress icon; the label leads with Resize because that is the
+      // order the pixels go through, and the panel is ordered to match.
       id: "compress",
-      label: "Compress",
-      description: "Shrink the file size — method, format and quality",
+      label: "Resize & Compress",
+      description: "Set new dimensions and shrink the file — one panel, both scores",
       icon: FileArchive,
       tool: "compress",
-      mode: "compress",
-      keywords: ["compress", "file size", "quality", "shrink", "optimise"],
-    },
-    {
-      id: "resize",
-      label: "Resize",
-      description: "Set new pixel dimensions, with or without the aspect lock",
-      icon: Scaling,
-      tool: "compress",
-      mode: "resize",
-      keywords: ["resize", "dimensions", "scale", "pixels", "width", "height"],
+      keywords: [
+        "compress", "file size", "quality", "shrink", "optimise",
+        "resize", "dimensions", "scale", "pixels", "width", "height",
+      ],
     },
     {
       id: "adjustments",

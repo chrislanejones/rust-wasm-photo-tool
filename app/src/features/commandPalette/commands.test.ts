@@ -23,7 +23,6 @@ beforeEach(() => {
     activeTool: "compress",
     activeSubTool: "enhance/compress",
     brushMode: "paint",
-    resizeMode: "compress",
     selectionKind: "wand",
     shapesMode: "shapes",
     eraserMode: "brush",
@@ -104,7 +103,9 @@ describe("entries come from the group registry", () => {
   it("labels a sub-tool 'Group › Sub-tool', never the legacy tool name", () => {
     const cmds = build();
     expect(byId(cmds, "sub.create.brush")!.label).toBe("Create › Brush");
-    expect(byId(cmds, "sub.enhance.compress")!.label).toBe("Enhance › Compress");
+    expect(byId(cmds, "sub.enhance.compress")!.label).toBe(
+      "Enhance › Resize & Compress",
+    );
     // The regression this replaces: the old loop produced "Paint › Paint".
     expect(cmds.some((c) => c.label === "Paint › Paint")).toBe(false);
     expect(cmds.some((c) => /^(\w+) › \1$/.test(c.label))).toBe(false);
