@@ -24,7 +24,7 @@ export const FEATURES: FeatureGroup[] = [
       { name: "Security tab", body: "EXIF keep/strip moved out of Compress into Settings → Security as a saved preference (applies to every export path); GPS / capture-time / lens stays or goes by your choice" },
       { name: "Responsive / snapped windows", body: "one shared useBreakpoint hook: below ~1000px the top bar goes icon-only, below ~900px the side panels float as overlay drawers (scrim, one at a time) instead of crushing the canvas, below ~600px a \"wider window\" notice. Reduce Motion suppresses the layout slides" },
       { name: "Keyboard accessibility", body: "Skip-to-canvas link, landmark roles + labels (toolbar / panels / canvas), accessible names on the tool buttons, and Escape-to-close + role=\"dialog\" semantics on the modals; on top of the existing tool / number / Alt shortcuts" },
-      { name: "Resize", body: "Bilinear-scaled resize fully in WASM; no canvas round-trip" },
+      { name: "Resize & Compress", body: "one tile, one panel. Both halves move the same two numbers (Web Performance Gain and PageSpeed Insights Score read dimensions AND format/quality together), so they share a panel the way Squoosh does: the scores on top, then Resize, then Compress. Resampling is fully in WASM with no canvas round-trip. One Apply button, named for what is pending — \"Apply Resize\" when only the dimensions moved, \"Apply Compression\" when only quality/format/method moved, \"Apply Compression & Resize\" when both did. Dimensions-only re-saves in the photo's own format at full quality, so the quality slider is left alone" },
       { name: "Levels", body: "Brightness (−100% to +100%), contrast (0% to 300%); each adjustment is a separate undo snapshot" },
       { name: "Histogram", body: "live RGB / Luma scope in the Review panel, computed in Rust (calculate_histogram) straight from the composite buffer — no per-frame offscreen-canvas sampling" },
       { name: "Fast integer compositing", body: "all alpha blending (blend_pixel, blend_over) uses integer source-over math instead of per-pixel float ÷255.0, verified identical to the old result within ±1" },
@@ -48,7 +48,7 @@ export const FEATURES: FeatureGroup[] = [
     name: "UI (React)",
     items: [
       { name: "Animated Panels", body: "Staggered entrance: TopBar → Sidebar → Gallery (Framer Motion springs)" },
-      { name: "Tool Grid", body: "10 tools with gradient icons: Clone Stamp, Resize, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), Batch Image Editor (bulk logo stamp + grid mosaic view), Eraser (relabeled from AI)" },
+      { name: "Tool Grid", body: "10 tools with gradient icons: Clone Stamp, Resize & Compress, Crop, Paint, Text, Arrows (FileText — coming soon), Shapes, Effects (Sparkles), Batch Image Editor (bulk logo stamp + grid mosaic view), Eraser (relabeled from AI)" },
       { name: "Tab Switchers", body: "Stamp (Clone / Stamps / Emojis), Shapes (Shapes / Arrows), Paint (Paint / Blur Brush / Pen), Effects (Levels / Color Picker) via shared TabGroup component" },
       { name: "Spacebar Pan", body: "Hold Space for grab-to-pan; all tool handlers bypassed during pan" },
       { name: "A/B Compare Slider", body: "Squoosh-style draggable divider; overlay is positioned exactly over the canvas bounding box (tracks zoom/pan via ResizeObserver) so before/after layers are always pixel-aligned" },

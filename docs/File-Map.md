@@ -207,8 +207,9 @@ app/src/
 │   │       ├── StampSettings.tsx     3-tab: Clone Stamp (size/hardness/opacity) +
 │   │       │                         Stamps (red-stamp presets) + Emojis (full picker + size)
 │   │       ├── TransformCropSettings.tsx  Flip, rotate; crop apply button
-│   │       ├── ResizeSettings.tsx    Width/height, aspect lock, format, quality, A/B compare,
-│   │       │                         auto-compress, lighthouse score
+│   │       ├── ResizeSettings.tsx    ONE panel: both scores, then Resize (width/height, aspect
+│   │       │                         lock), then Compress (method/format/quality). A/B compare,
+│   │       │                         auto-compress, and ONE Apply button named for what is pending
 │   │       ├── EffectsSettings.tsx   Tab-switched: Levels (brightness/contrast sliders) +
 │   │       │                         Color Picker (eyedropper, activates magnifier overlay)
 │   │       ├── ArrowSettings.tsx     Coming-soon panel (FileText icon); content moved to

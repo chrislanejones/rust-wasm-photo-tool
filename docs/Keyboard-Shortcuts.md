@@ -22,7 +22,7 @@
 
 | Shortcut  | Action |
 | --------- | ------ |
-| `1`       | Enhance group (Compress · Resize · Adjustments · AI) |
+| `1`       | Enhance group (Resize & Compress · Adjustments · AI) |
 | `2`       | Select group (Marquee · Magic Wand · Lasso · …) |
 | `3`       | Create group (Brush · Pen · Clone Stamp · Text · Shapes · …) |
 | `4`       | Edit group (Crop · Transform · Colour Picker · …) |
