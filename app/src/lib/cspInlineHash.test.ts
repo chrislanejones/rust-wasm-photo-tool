@@ -28,7 +28,16 @@ const ROOT = resolve(__dirname, "../../..");
 function inlineScripts(html: string): string[] {
   // Only `<script>` with no attributes — the ones a hash applies to. A
   // `<script src=…>` is covered by the origin allowlist instead.
-  return [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  //
+  // Case-INSENSITIVE, and the closing tag tolerates junk, because this regex is
+  // load-bearing for the count assertion below and browsers are far more
+  // forgiving than a naive pattern. `<SCRIPT>` is valid HTML and `</script foo>`
+  // closes a script in every browser; a pattern that missed either would report
+  // "exactly one inline script" while a second one sat there unhashed — the
+  // count check silently passing is the one failure this file exists to prevent.
+  return [...html.matchAll(/<script\s*>([\s\S]*?)<\/script\s*[^>]*>/gi)].map(
+    (m) => m[1],
+  );
 }
 
 const sha256 = (s: string) =>
