@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { canEncode } from "@/lib/encodeSupport";
 import { DimensionFields } from "@/components/DimensionFields";
 import { SizeSlider } from "@/components/SizeSlider";
-import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
-import type { ToolMode } from "@/components/ui/tool-mode-toggle";
+import { SectionHeader } from "@/components/ui/section-header";
 import {
   Tooltip,
   TooltipContent,
@@ -17,40 +16,6 @@ import { getWebPerfMetrics } from "@/lib/webPerf";
 import type { ExportFormat } from "@/lib/exportImage";
 import { useUIStore } from "@/stores/useUIStore";
 import { useGalleryStore } from "@/stores/useGalleryStore";
-import { useToolStore } from "@/stores/useToolStore";
-import type { ResizeMode } from "@/stores/useToolStore";
-
-/** Resize's sub-modes for the shared ToolModeToggle (icon tiles + per-mode
- *  SectionHeader title/info). Also consumed by the tool registry
- *  (features/tools/toolModules.ts) as the Resize module's `modes`. The mode
- *  union (`ResizeMode`) is canonical in `stores/useToolStore.ts`. */
-export const RESIZE_MODES: readonly ToolMode<ResizeMode>[] = [
-  {
-    id: "compress",
-    label: "Compress",
-    icon: FileArchive,
-    info: (
-      <>
-        Shrinks the file size: pick a resample Method and output Format,
-        then drag Quality. Web Performance Gain and PageSpeed Insights
-        Score preview the pending output — Apply Compression &amp; Resize
-        commits it.
-      </>
-    ),
-  },
-  {
-    id: "resize",
-    label: "Resize",
-    icon: Scaling,
-    info: (
-      <>
-        Sets new pixel dimensions. The lock keeps the aspect ratio; the
-        percent slider scales width and height proportionally. Apply
-        Compression &amp; Resize commits it.
-      </>
-    ),
-  },
-];
 
 /** Resampling method → Rust filter code (see `resize_with_filter`). */
 const FILTER_CODE = {
@@ -147,8 +112,6 @@ export function ResizeSettings({
   // Sub-mode lives in the tool store (like Paint's brushMode) so the command
   // palette's registry-derived `mode.compress.*` entries can deep-link to a
   // sub-mode. Was panel-local useState before Session 2.1.
-  const mode = useToolStore((s) => s.resizeMode);
-  const setMode = useToolStore((s) => s.setResizeMode);
   // A/B Compare stays locked until the user actually applies an edit —
   // either "Apply Compression & Resize" or "Auto Compress" — in this photo.
   // Pending (unapplied) changes no longer unlock it; there's nothing to
@@ -288,6 +251,23 @@ export function ResizeSettings({
     qualityChanged ||
     formatChanged ||
     methodChanged;
+  /** Compression alone — the mirror of `dimensionsChanged`. */
+  const compressionChanged = qualityChanged || formatChanged || methodChanged;
+  /** ONE apply button that names what it will actually do. Two buttons became
+   *  wrong the moment the tiles merged: "Apply Resize" and "Apply Compression &
+   *  Resize" sat next to each other, one of them almost always dark, and
+   *  neither label told you which of your pending changes it would commit.
+   *
+   *  Dimensions ONLY routes to `handleApplyResizeOnly`, which re-saves in the
+   *  photo's own format at full quality — the quality slider is deliberately
+   *  left alone, which is the whole reason that handler exists. Every other
+   *  case commits everything pending. */
+  const applyResizeOnly = dimensionsChanged && !compressionChanged;
+  const applyLabel = applyResizeOnly
+    ? "Apply Resize"
+    : compressionChanged && !dimensionsChanged
+      ? "Apply Compression"
+      : "Apply Compression & Resize";
   // A/B compare unlocks only after an edit is *applied* in this photo —
   // Apply Compression & Resize or Auto Compress (`appliedHere`), or an edit
   // already on the photo (`hasBeenModified`). Pending changes don't count.
@@ -344,194 +324,189 @@ export function ResizeSettings({
 
   return (
     <div className="flex flex-col h-full -mt-2">
-      {/* [Compress] | [Resize] — the shared ToolModeToggle (icon-top tiles +
-          title-below + body slot, same template as Paint). `mt-0` cancels the
-          toggle's baked-in -mt-2 (this panel's outer flex column already
-          carries it); `flex-1` keeps the shared footer pinned to the bottom
-          exactly like the old `space-y-8 flex-1 mt-2.5` content wrapper. */}
-      <ToolModeToggle
-        modes={RESIZE_MODES}
-        activeMode={mode}
-        onModeChange={setMode}
-        className="flex-1 mt-0"
-      >
-        {(m) =>
-          m === "resize" ? (
-            <DimensionFields
-              width={width}
-              height={height}
-              widthPercent={widthPercent}
-              lockAspect={lockAspect}
-              disabled={disabled}
-              onWidthChange={handleWidthChange}
-              onHeightChange={handleHeightChange}
-              onPercentChange={handlePercentChange}
-              onToggleLock={() => setLockAspect((v) => !v)}
-            />
-          ) : (
-            <>
-              {/* ── Method / Format side by side to save vertical space ── */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* ── Method ── */}
-                <div className="space-y-4">
-                  <label className="text-2xs text-theme-muted-foreground">
-                    Method
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={method}
-                      onChange={(e) => setMethod(e.target.value as ResampleMethod)}
-                      disabled={disabled}
-                      className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
-                    >
-                      {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
-                        <option key={m} value={m}>
-                          {METHOD_LABELS[m]}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-                  </div>
-                </div>
+      {/* ONE tile, not two. Compress and Resize were separate sub-modes
+          behind a ToolModeToggle, and both of them move the SAME two
+          numbers: Web Performance Gain and PageSpeed Insights Score are a
+          function of dimensions AND format/quality together. Split across
+          two tiles, the scores sat under one while half their inputs sat
+          under the other. Squoosh keeps the whole pipeline on one panel for
+          the same reason.
 
-                {/* ── Format ── */}
-                <div className="space-y-4">
-                  <label className="text-2xs text-theme-muted-foreground">
-                    Format
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={exportFormat}
-                      onChange={(e) =>
-                        onExportFormatChange(e.target.value as ExportFormat)
-                      }
-                      disabled={disabled}
-                      className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
-                    >
-                      {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
-                        <option key={f} value={f}>
-                          {FORMAT_LABELS[f]}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
-                  </div>
-                  {formatNote && (
-                    <p className="text-2xs text-theme-muted-foreground leading-snug">
-                      {formatNote}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* ── Quality ── */}
-              <SizeSlider
-                label="Quality"
-                labelInfo="Lower quality = smaller file. Drag & release — recalculates Web Performance Gain and PageSpeed Insights Score below."
-                value={quality}
-                onChange={handleQualityChange}
-                onCommit={onQualityCommit}
-                min={10}
-                max={100}
-                unit="%"
+          Order is scores -> resize -> compress: the readout you are steering
+          toward sits above the controls that steer it, and resize precedes
+          compress because that is the order the pixels actually go through. */}
+      <div className="flex-1 space-y-8 mt-2.5">
+        {/* ── Web Performance Gain ── */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-2xs">
+            <span className="flex items-center gap-1 text-theme-muted-foreground">
+              Web Performance Gain
+              <InfoTooltip
+                info="Estimated byte savings vs. the current file, based on the pending size/quality/format below."
+                label="Web Performance Gain"
               />
+            </span>
+            <span className="text-theme-foreground tabular-nums">
+              +{savingsPercent}%
+            </span>
+          </div>
+          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-700 ease-out ${trafficColor(savingsPercent)}`}
+              style={{ width: `${savingsPercent}%` }}
+            />
+          </div>
+        </div>
 
-              {/* EXIF keep/strip moved to Settings → Security. */}
+        {/* ── PageSpeed Insights Score ── */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-2xs">
+            <span className="flex items-center gap-1 text-theme-muted-foreground">
+              PageSpeed Insights Score
+              <InfoTooltip
+                info="Estimated Lighthouse score (0–100) for the pending output — weighs dimensions, format, and quality the way the real audit does."
+                label="PageSpeed Insights Score"
+              />
+            </span>
+            <span className="text-theme-foreground tabular-nums">
+              {lighthouseScore}%
+            </span>
+          </div>
+          <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-700 ease-out ${trafficColor(lighthouseScore)}`}
+              style={{ width: `${lighthouseScore}%` }}
+            />
+          </div>
+        </div>
 
-              {/* ── Web Performance Gain ── */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-2xs">
-                  <span className="flex items-center gap-1 text-theme-muted-foreground">
-                    Web Performance Gain
-                    <InfoTooltip
-                      info="Estimated byte savings vs. the current file, based on the pending size/quality/format below."
-                      label="Web Performance Gain"
-                    />
-                  </span>
-                  <span className="text-theme-foreground tabular-nums">
-                    +{savingsPercent}%
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-700 ease-out ${trafficColor(savingsPercent)}`}
-                    style={{ width: `${savingsPercent}%` }}
-                  />
-                </div>
-              </div>
+        <SectionHeader
+          title="Resize"
+          info="Sets new pixel dimensions. The lock keeps the aspect ratio; the percent slider scales width and height proportionally. Apply Resize changes dimensions only — Apply Compression &amp; Resize commits both."
+        />
+        <DimensionFields
+          width={width}
+          height={height}
+          widthPercent={widthPercent}
+          lockAspect={lockAspect}
+          disabled={disabled}
+          onWidthChange={handleWidthChange}
+          onHeightChange={handleHeightChange}
+          onPercentChange={handlePercentChange}
+          onToggleLock={() => setLockAspect((v) => !v)}
+        />
 
-              {/* ── PageSpeed Insights Score ── */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-2xs">
-                  <span className="flex items-center gap-1 text-theme-muted-foreground">
-                    PageSpeed Insights Score
-                    <InfoTooltip
-                      info="Estimated Lighthouse score (0–100) for the pending output — weighs dimensions, format, and quality the way the real audit does."
-                      label="PageSpeed Insights Score"
-                    />
-                  </span>
-                  <span className="text-theme-foreground tabular-nums">
-                    {lighthouseScore}%
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-theme-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-700 ease-out ${trafficColor(lighthouseScore)}`}
-                    style={{ width: `${lighthouseScore}%` }}
-                  />
-                </div>
-              </div>
-            </>
-          )
-        }
-      </ToolModeToggle>
+        <SectionHeader
+          title="Compress"
+          info="Shrinks the file size: pick a resample Method and output Format, then drag Quality. The two scores above preview the pending output — Apply Compression &amp; Resize commits it."
+        />
+        {/* ── Method / Format side by side to save vertical space ── */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* ── Method ── */}
+          <div className="space-y-4">
+            <label className="text-2xs text-theme-muted-foreground">
+              Method
+            </label>
+            <div className="relative">
+              <select
+                value={method}
+                onChange={(e) => setMethod(e.target.value as ResampleMethod)}
+                disabled={disabled}
+                className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+              >
+                {(Object.keys(METHOD_LABELS) as ResampleMethod[]).map((m) => (
+                  <option key={m} value={m}>
+                    {METHOD_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+            </div>
+          </div>
+
+          {/* ── Format ── */}
+          <div className="space-y-4">
+            <label className="text-2xs text-theme-muted-foreground">
+              Format
+            </label>
+            <div className="relative">
+              <select
+                value={exportFormat}
+                onChange={(e) =>
+                  onExportFormatChange(e.target.value as ExportFormat)
+                }
+                disabled={disabled}
+                className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
+              >
+                {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
+                  <option key={f} value={f}>
+                    {FORMAT_LABELS[f]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
+            </div>
+            {formatNote && (
+              <p className="text-2xs text-theme-muted-foreground leading-snug">
+                {formatNote}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Quality ── */}
+        <SizeSlider
+          label="Quality"
+          labelInfo="Lower quality = smaller file. Drag & release — recalculates Web Performance Gain and PageSpeed Insights Score below."
+          value={quality}
+          onChange={handleQualityChange}
+          onCommit={onQualityCommit}
+          min={10}
+          max={100}
+          unit="%"
+        />
+
+        {/* EXIF keep/strip moved to Settings → Security. */}
+
+      </div>
 
       {/* ── Bottom Buttons ── */}
       <div className="border-t border-theme-sidebar-border pt-4 mt-8 space-y-2">
-        {/* Resize WITHOUT re-compressing — enabled only when the pixel
-            dimensions actually differ, since that is all it applies.
-            RESIZE MODE ONLY: this footer sits outside the ToolModeToggle, so
-            without the gate the button also renders under the Compress tile —
-            a button whose own tooltip says it does NOT compress, offered while
-            the user is compressing. It read as merely disabled there (the
-            dimension fields live in the Resize tile, so `dimensionsChanged` is
-            usually false), which is why it went unnoticed; but the Compress
-            percent slider changes dimensions too, so it was reachable ENABLED
-            from the wrong tile. Its sibling below is deliberately NOT gated:
-            "Apply Compression & Resize" is the commit-everything action, and
-            it is what unlocks A/B Compare (`appliedHere`) from either tile. */}
-        {mode === "resize" && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>
-                <Button size="large"
-                  onClick={handleApplyResizeOnly}
-                  disabled={disabled || !dimensionsChanged}
-                  className="w-full"
-                >
+        {/* ONE apply button, labelled for what is actually pending. It says
+            "Apply Resize" when only the dimensions moved, "Apply Compression"
+            when only quality/format/method moved, and "Apply Compression &
+            Resize" when both did — which is also the disabled resting label,
+            because with nothing pending there is nothing to name. It is what
+            unlocks A/B Compare (`appliedHere`) in every case. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <Button size="large"
+                onClick={applyResizeOnly ? handleApplyResizeOnly : handleApplyResize}
+                disabled={disabled || !resizeChanged}
+                className="w-full"
+              >
+                {applyResizeOnly ? (
                   <Scaling className="h-4 w-4" />
-                  Apply Resize
-                </Button>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-[220px] text-center">
-              <p className="text-xs">
-                {dimensionsChanged
+                ) : (
+                  <FileArchive className="h-4 w-4" />
+                )}
+                {applyLabel}
+              </Button>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-[240px] text-center">
+            <p className="text-xs">
+              {!resizeChanged
+                ? "Change the dimensions, or the quality, format or method, and this commits it."
+                : applyResizeOnly
                   ? "Changes the pixel dimensions only — re-saved in this photo's own format at full quality, so the quality slider is left alone."
-                  : "Enter a different width or height first. This button applies the new dimensions and nothing else."}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        )}
-
-        <Button size="large"
-          onClick={handleApplyResize}
-          disabled={disabled || !resizeChanged}
-          className="w-full"
-        >
-          <Scaling className="h-4 w-4" />
-          Apply Compression &amp; Resize
-        </Button>
+                  : compressionChanged && !dimensionsChanged
+                    ? "Re-encodes at the chosen format and quality. The dimensions are unchanged."
+                    : "Commits both the new dimensions and the new format and quality."}
+            </p>
+          </TooltipContent>
+        </Tooltip>
 
         {/* A/B Compare — same Button size="large", locked until an edit is applied via
             Apply Compression & Resize or Auto Compress. Shows the active ring

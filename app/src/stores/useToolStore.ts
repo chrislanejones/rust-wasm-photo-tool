@@ -64,7 +64,6 @@ export const BATCH_MODES = ["logo", "text", "rename", "airename"] as const;
 export type BatchMode = (typeof BATCH_MODES)[number];
 /** Resize tool (legacy id `compress`) sub-modes: file-size compression
  *  (method/format/quality) vs pixel-dimension resize. */
-export type ResizeMode = "compress" | "resize";
 /** Marquee shape a `rect`/`ellipse` drag sweeps out. Derived from the active
  *  `SelectionKind` now rather than stored beside it — see the note there. */
 export type SelectionShape = "rect" | "ellipse";
@@ -129,7 +128,6 @@ export interface ToolState {
    *  restored from before this field existed. */
   activeSubTool: string;
   brushMode: BrushMode;
-  resizeMode: ResizeMode;
   selectionKind: SelectionKind;
   /** Edge-wall strength for `selectionKind: "edge"` (0..=255). Lower = more
    *  walls = tighter selection. */
@@ -197,7 +195,6 @@ export interface ToolState {
   removePickedColor: (hex: string) => void;
   clearPickedColors: () => void;
   setBrushMode: (v: SetArg<BrushMode>) => void;
-  setResizeMode: (v: SetArg<ResizeMode>) => void;
   setSelectionKind: (v: SetArg<SelectionKind>) => void;
   setEdgeThreshold: (v: SetArg<number>) => void;
   setSmartBrush: (v: SetArg<boolean>) => void;
@@ -225,12 +222,12 @@ export const useToolStore = create<ToolState>()(
   persist(
     (set) => ({
       activeTool: "compress",
-      // Matches `activeTool: "compress"` + `resizeMode: "compress"` below —
-      // Enhance › Compress. Kept as a literal rather than computed from the
-      // registry so the store keeps no import edge onto features/tools.
+      // Matches `activeTool: "compress"` — Enhance › Resize & Compress, which
+      // is single-mode since the two tiles merged. Kept as a literal rather
+      // than computed from the registry so the store keeps no import edge onto
+      // features/tools.
       activeSubTool: "enhance/compress",
       brushMode: "paint",
-      resizeMode: "compress",
       selectionKind: "wand",
       // 90/255: walls off hard outlines while ignoring film grain / JPEG noise.
       edgeThreshold: 90,
@@ -280,8 +277,6 @@ export const useToolStore = create<ToolState>()(
         })),
       clearPickedColors: () => set({ pickedColorHistory: [] }),
       setBrushMode: (v) => set((s) => ({ brushMode: resolveSet(v, s.brushMode) })),
-      setResizeMode: (v) =>
-        set((s) => ({ resizeMode: resolveSet(v, s.resizeMode) })),
       setSelectionKind: (v) =>
         set((s) => ({ selectionKind: resolveSet(v, s.selectionKind) })),
       setEdgeThreshold: (v) =>
