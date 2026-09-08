@@ -161,6 +161,80 @@ Two things are recommended regardless, and hold under any answer:
   extents — not that an option appeared in a dropdown. The current selector
   would pass that weaker test today.
 
+## DECIDED 2026-09-08 — the user brings the font
+
+Chris answered all three. The answer to the first reshapes the other two, and it
+is better than either option this ADR offered.
+
+| Question | Decision |
+|---|---|
+| Self-host or fetch from Google? | **Neither — the USER uploads the file** |
+| Runtime-loaded or embedded? | **Runtime**, and only fonts installed in a past session |
+| Premium enforceable? | **No. Ship it as a hint and say so** |
+
+**Nothing is fetched and nothing is bundled.** A Pro user picks a `.ttf`/`.otf`
+off their own disk — bought from Adobe, downloaded from Google Fonts, whatever
+they already have a licence for — and Image Horse stores it locally and hands
+the bytes to `ab_glyph`. That kills three problems at once:
+
+| Problem this ADR raised | Why it goes away |
+|---|---|
+| One embedded face misses the band by 3× | The font never enters the wasm |
+| Fetching sends the user's IP to Google | Nothing is fetched |
+| Redistributing a licensed face | We never ship or host it; the user supplies their own |
+
+The licence question moves to the user, which is where it belongs — they already
+hold whatever rights they hold. Worth one line of UI copy so they know that.
+
+### Copy for the Fonts section
+
+The privacy property is a feature, not an apology, and should read that way:
+
+> **Your fonts stay on your machine.**
+> Image Horse never fetches fonts from Google or anyone else — you add a font
+> file you already have, and it never leaves this browser. Fonts you add are
+> remembered for next time.
+
+### Premium gating is a hint, deliberately
+
+The whole flow — file picker, storage, rasterising — runs on the user's own
+machine. There is no server call, so there is nothing to put `requireUser` in
+front of. A free user who sets a flag in devtools gets the uploader.
+
+**That is accepted, not overlooked.** The marginal cost of an unauthorised font
+render is zero: their file, their disk, their CPU, no per-use spend. Contrast
+the AI path, where a bypass would spend real money at Replicate, which is why
+that one is gated server-side in `convex/aiJobs.ts`. Written down here so nobody
+later mistakes the Pro label for enforcement and builds on it.
+
+### What this decision newly owes
+
+None of these existed before the design changed, and all of them are cheap to
+get wrong:
+
+| Question | Why it bites |
+|---|---|
+| **A document opened without its font** | Saved art referencing an uploaded face, opened on another machine. Fall back to Liberation and warn, or refuse to render? Silent fallback is the one that looks like a bug |
+| **Storage lives in IndexedDB** | Font bytes are user data with no backup — the `dexie-migration` skill applies, no exceptions |
+| **A malformed file** | `FontRef::try_from_slice` returns a `Result`; a corrupt or hostile `.ttf` must surface an error, never panic in the engine |
+| **Size cap** | A CJK face runs to several MB. Needs a stated limit and a stated count |
+| **Not WOFF2** | `ab_glyph` needs TTF/OTF. The file picker should reject WOFF2 with a reason rather than failing opaquely |
+
+### Still true regardless
+
+The two recommendations above this section stand and are now the first
+implementation step: **fix the three-surface disagreement before adding
+anything**, and **assert rendered pixels changed, never that a dropdown gained
+an option.**
+
+### Unchanged by this decision
+
+The privacy claim on `/architecture` is still wrong today. `index.html` still
+loads DM Sans and JetBrains Mono from Google on every page load, and that has
+nothing to do with the text tool. **Self-hosting those two, or fixing the
+sentence, is a separate small job** — and it is now the only thing standing
+between the app and the claim being true.
+
 ## Consequences
 
 + "Other fonts aren't being added" has a cause: nothing was ever wired, and the
