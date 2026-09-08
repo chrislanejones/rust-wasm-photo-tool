@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter } from "@/lib/animations";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
+import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
@@ -360,6 +361,7 @@ function GalleryCount({
 }
 
 export function GalleryBar({
+  onClose,
   photos,
   activeId,
   onSelect,
@@ -459,9 +461,13 @@ export function GalleryBar({
         className={
           vertical
             ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-            : "pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
+            : "group pointer-events-auto bg-bg-secondary/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border"
         }
       >
+        {/* Hover the bar and a close appears top-left; the top bar's Gallery
+            toggle brings it back. The docked (vertical) form is closed from the
+            master bar's tabs instead. */}
+        {!vertical && <PanelCloseButton label="Close Gallery" onClose={onClose} />}
         <div className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "p-4"}>
           <div
             className={

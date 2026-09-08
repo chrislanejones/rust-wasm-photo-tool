@@ -32,6 +32,9 @@ interface ToggleButtonGroupProps {
   items: ToggleGroupItem[];
   /** Icon-only buttons (labels hidden) for tight layouts. */
   compact?: boolean;
+  /** No container pill: `display: contents`, so the buttons become direct
+   *  children of the parent row. See the compact top bar. */
+  bare?: boolean;
   /** Label-only buttons (icons hidden) so longer labels have room. */
   noIcons?: boolean;
   /** Stretch buttons to share the row width evenly. */
@@ -72,6 +75,7 @@ export function ToggleButtonGroup({
   noIcons = false,
   fill = false,
   equalWidth = false,
+  bare = false,
   className,
 }: ToggleButtonGroupProps) {
   return (
@@ -82,8 +86,16 @@ export function ToggleButtonGroup({
     // re-tune when a label changes.
     <div
       className={cn(
-        "gap-1 p-1 rounded-lg bg-bg-tertiary",
-        equalWidth ? "grid grid-flow-col auto-cols-fr" : "flex",
+        // `bare` drops the pill entirely: `contents` makes each button a
+        // direct child of whatever flex row the group sits in, so a
+        // `justify-between` parent spaces the buttons themselves. The compact
+        // top bar wants exactly that — no groups, just spread buttons.
+        bare
+          ? "contents"
+          : [
+              "gap-1 p-1 rounded-lg bg-bg-tertiary",
+              equalWidth ? "grid grid-flow-col auto-cols-fr" : "flex",
+            ],
         className,
       )}
     >
@@ -120,6 +132,9 @@ export function ToggleButtonGroup({
               active
                 ? "bg-bg-elevated text-text-primary shadow-md"
                 : "text-text-muted hover:text-text-primary hover:bg-bg-elevated",
+              // No pill behind a bare button, so it carries the idle fill
+              // itself — same rule as IconButton's `standalone`.
+              bare && !active && "bg-bg-tertiary",
               // Disabled wins over the hover styles above — without this the
               // ring and colour shift still fire on a button that does nothing.
               disabled && "pointer-events-none opacity-40",

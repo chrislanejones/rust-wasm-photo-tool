@@ -14,6 +14,7 @@ import { ToolGrid } from "./ToolGrid";
 import { SubtoolRow } from "./SubtoolRow";
 import { useActiveSubTool } from "./activateSubTool";
 import { StampSettingsPanel } from "./settings/StampSettings";
+import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import {
   LayerSettings,
@@ -159,6 +160,7 @@ interface ToolsSidebarProps {
 }
 
 export function ToolsSidebar({
+  onClose,
   rulersPrefs,
   onRulersChange,
   activeTool,
@@ -285,10 +287,14 @@ export function ToolsSidebar({
           ? // Compact master-bar content box: flush below the chrome (top 56 =
             // top-2 + 48px chrome), filling to the status bar.
             "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
-          : "fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
+          : "group fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
       }
       style={embedded ? { boxShadow: "var(--shadow-panel)" } : { boxShadow: "var(--shadow-panel)" }}
     >
+      {/* Hover the panel and a close appears in its top-left; the top bar's
+          Tools toggle brings it back. Not in the docked master bar, whose
+          tab strip already owns open/close. */}
+      {!embedded && <PanelCloseButton label="Close Tools" onClose={onClose} />}
       {/* Tool rail + the active tool's sub-tool rail. `layout` is what makes
           the body below slide rather than jump when the sub-row row-count
           changes (0 -> 1 -> 2 rows). */}

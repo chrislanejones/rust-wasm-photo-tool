@@ -28,6 +28,7 @@ import { slideFromRight } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { ReselectBar } from "@/components/ui/reselect-bar";
+import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { useLayerSwapFlash } from "@/hooks/useLayerSwapFlash";
 import { TIERS } from "@/lib/tiers";
@@ -121,6 +122,7 @@ const TOGGLES: {
 ];
 
 export function ReviewPanel({
+  onClose,
   history,
   onJump,
   onDelete,
@@ -218,10 +220,13 @@ export function ReviewPanel({
         embedded
           ? // Compact master-bar content box: flush below the 48px chrome.
             "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
-          : "review-panel"
+          : "review-panel group"
       }
     >
-      {/* No title/close — the four section toggles below are the header. */}
+      {/* No title — the four section toggles below are the header. The close
+          is the hover-reveal X in the corner, same glyph as each section's own
+          close; the top bar's Review toggle brings the panel back. */}
+      {!embedded && <PanelCloseButton label="Close Review" onClose={onClose} />}
 
       {/* ── Section toggles — same multi-select button group the top bar
           uses for Upload / Tools / Gallery. ───────────────────────────── */}
