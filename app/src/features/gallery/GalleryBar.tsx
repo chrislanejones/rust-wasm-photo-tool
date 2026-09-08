@@ -37,6 +37,10 @@ interface Props {
   onSelect: (entry: PhotoEntry) => void;
   onRemove: (id: string) => void;
   onClose: () => void;
+  /** Show the hover-reveal close in the top-left corner. Wide desktop layout
+   *  only — AppShell passes false whenever the dock, the narrow drawers or the
+   *  compact top bar are in play, where the chrome owns open/close instead. */
+  closable?: boolean;
   showTools: boolean;
   showHistory: boolean;
   /** Reduce Motion preference — when on, skip the margin-slide animation. */
@@ -370,6 +374,7 @@ export function GalleryBar({
   showHistory,
   reduceMotion,
   narrow,
+  closable = false,
   compressionProgress,
   compressionSavings,
   modifiedPhotos,
@@ -467,7 +472,7 @@ export function GalleryBar({
         {/* Hover the bar and a close appears top-left; the top bar's Gallery
             toggle brings it back. The docked (vertical) form is closed from the
             master bar's tabs instead. */}
-        {!vertical && <PanelCloseButton label="Close Gallery" onClose={onClose} />}
+        {closable && <PanelCloseButton label="Close Gallery" onClose={onClose} />}
         <div className={vertical ? "flex min-h-0 flex-1 flex-col p-3" : "p-4"}>
           <div
             className={

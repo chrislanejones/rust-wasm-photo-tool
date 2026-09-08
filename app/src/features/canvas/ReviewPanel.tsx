@@ -96,6 +96,10 @@ interface Props {
   /** Embedded mode: render as a plain flex column (no fixed `.review-panel`
    *  chrome / slide animation) so it can fill the compact master bar. */
   embedded?: boolean;
+  /** Show the hover-reveal close in the top-left corner. Wide desktop layout
+   *  only — AppShell passes false whenever the dock, the narrow drawers or the
+   *  compact top bar are in play, where the chrome owns open/close instead. */
+  closable?: boolean;
 }
 
 const DeleteGlyph = () => (
@@ -150,6 +154,7 @@ export function ReviewPanel({
   histogramSignature,
   histogramPhotoKey,
   embedded = false,
+  closable = false,
 }: Props) {
   // Which body sections are open. The body splits its height evenly among the
   // open sections (1 → full, 2 → halves, 3 → thirds), each with its own header
@@ -226,7 +231,11 @@ export function ReviewPanel({
       {/* No title — the four section toggles below are the header. The close
           is the hover-reveal X in the corner, same glyph as each section's own
           close; the top bar's Review toggle brings the panel back. */}
-      {!embedded && <PanelCloseButton label="Close Review" onClose={onClose} />}
+      {closable && <PanelCloseButton label="Close Review" onClose={onClose} />}
+      {/* The clip lives HERE, not on the fixed shell: the shell must let the
+          corner close button hang half outside it, and this wrapper keeps the
+          rounded corners trimming the scrolling content exactly as before. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
 
       {/* ── Section toggles — same multi-select button group the top bar
           uses for Upload / Tools / Gallery. ───────────────────────────── */}
@@ -683,6 +692,7 @@ export function ReviewPanel({
             />
           </section>
         )}
+      </div>
       </div>
     </motion.aside>
   );

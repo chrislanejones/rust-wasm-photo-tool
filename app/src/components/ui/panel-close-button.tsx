@@ -35,7 +35,18 @@ export function PanelCloseButton({ label, onClose, className }: PanelCloseButton
       onClick={onClose}
       aria-label={label}
       className={cn(
-        "absolute left-2 top-2",
+        // ON THE CORNER, not in it: -12px on both axes centres this 24px
+        // button on the panel's top-left vertex, half outside. Inside the
+        // panel it sat over whatever button was first — the tool grid's first
+        // tile, the Review section toggles — and a close that covers a control
+        // is worse than no close. (Chris, 2026-09-08: "on the cusp of the
+        // window, and not over a button".) Half-outside is why Tools and
+        // Review stopped clipping at their fixed shell and moved
+        // `overflow-hidden` to an inner wrapper; Gallery's card never clipped.
+        // No z-index: the guardrail admits only `z-[var(--z-*)]` tokens, none
+        // means "above this panel's content", and an absolute first child
+        // paints above its static siblings anyway — the click test proves it.
+        "absolute -left-3 -top-3 shadow-md",
         "opacity-0 transition-opacity duration-150",
         "group-hover:opacity-100 focus-visible:opacity-100",
         className,
