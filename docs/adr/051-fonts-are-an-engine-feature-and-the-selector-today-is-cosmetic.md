@@ -170,7 +170,7 @@ is better than either option this ADR offered.
 |---|---|
 | Self-host or fetch from Google? | **Neither — the USER uploads the file** |
 | Runtime-loaded or embedded? | **Runtime**, and only fonts installed in a past session |
-| Premium enforceable? | **No. Ship it as a hint and say so** |
+| Premium enforceable? | **Upload is FREE. Sync is Pro, enforced server-side** |
 
 **Nothing is fetched and nothing is bundled.** A Pro user picks a `.ttf`/`.otf`
 off their own disk — bought from Adobe, downloaded from Google Fonts, whatever
@@ -195,17 +195,35 @@ The privacy property is a feature, not an apology, and should read that way:
 > file you already have, and it never leaves this browser. Fonts you add are
 > remembered for next time.
 
-### Premium gating is a hint, deliberately
+### Upload is free; sync is the Pro feature
 
-The whole flow — file picker, storage, rasterising — runs on the user's own
-machine. There is no server call, so there is nothing to put `requireUser` in
-front of. A free user who sets a flag in devtools gets the uploader.
+The gating question had no good answer while the Pro feature was the upload
+itself. Uploading is entirely client-side — file picker, IndexedDB, `ab_glyph`,
+all on the user's machine — so no server call exists to put `requireUser` in
+front of, and a devtools flag would defeat any label we put on it.
 
-**That is accepted, not overlooked.** The marginal cost of an unauthorised font
-render is zero: their file, their disk, their CPU, no per-use spend. Contrast
-the AI path, where a bypass would spend real money at Replicate, which is why
-that one is gated server-side in `convex/aiJobs.ts`. Written down here so nobody
-later mistakes the Pro label for enforcement and builds on it.
+**So the upload is free, for everyone, ungated.** It costs us nothing: their
+file, their disk, their CPU. Gating it would have meant shipping a lock that
+does not lock, and writing a comment explaining that it does not lock.
+
+**Pro is font sync**, and that one is real:
+
+| Feature | Server involved? | Enforceable? | Costs us |
+|---|---|---|---|
+| Upload a font locally | No | **No** | $0 |
+| **Fonts follow you across devices** | **Yes** — Convex | **Yes** | Storage |
+
+The same property makes both calls obvious. The upload consumes nothing of
+ours, which is why it cannot be gated and why it does not need to be. Sync
+consumes storage, which is exactly why it is worth protecting and why
+`requireUser` has something to stand in front of — the same shape as
+`convex/aiJobs.ts`, and enforced the same way.
+
+It is also the better pitch. "Add your own fonts" is a checkbox; "your fonts
+follow you to every device" is a reason to pay. And it retires the worst item
+on the list below: **a Pro user opening their work on another machine has the
+font there.** Free users keep the fallback path, which turns a limitation into
+an honest upgrade reason rather than a missing feature.
 
 ### What this decision newly owes
 
@@ -214,11 +232,13 @@ get wrong:
 
 | Question | Why it bites |
 |---|---|
-| **A document opened without its font** | Saved art referencing an uploaded face, opened on another machine. Fall back to Liberation and warn, or refuse to render? Silent fallback is the one that looks like a bug |
+| **A document opened without its font** | Still open for FREE users, and solved for Pro by sync. Fall back to Liberation and warn, or refuse? Silent fallback is the one that looks like a bug |
 | **Storage lives in IndexedDB** | Font bytes are user data with no backup — the `dexie-migration` skill applies, no exceptions |
 | **A malformed file** | `FontRef::try_from_slice` returns a `Result`; a corrupt or hostile `.ttf` must surface an error, never panic in the engine |
 | **Size cap** | A CJK face runs to several MB. Needs a stated limit and a stated count |
 | **Not WOFF2** | `ab_glyph` needs TTF/OTF. The file picker should reject WOFF2 with a reason rather than failing opaquely |
+| **Sync needs a Convex table** | Font blobs are a schema change and a storage cost — a per-user size and count cap has to exist before the first upload, not after |
+| **Upgrade and downgrade paths** | A free user who uploaded locally then subscribes: do their fonts push up? A Pro user who lapses: do synced fonts stay readable locally? Both need an answer or support gets them |
 
 ### Still true regardless
 
