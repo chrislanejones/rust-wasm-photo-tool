@@ -84,33 +84,43 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.69 — 2026-09-07
+### v8.70 — 2026-09-08
 
-**A panel that fits, and a status bar that stays where you left it.**
+**The app sends security headers now, and the content security policy is
+watching before it starts blocking.**
 
-Edit → Rulers is now **Rulers and Grid**, which is what it has always done. The
-half-built **Measure** entry beside it is gone — it was a placeholder from
-before the overlay shipped, and two things called Ruler and Rulers sitting next
-to each other was never going to help anyone.
+Three headers ship enforcing. `X-Content-Type-Options: nosniff` stops the
+browser guessing at a file's type, a `Referrer-Policy` keeps full URLs from
+leaking to other sites, and a `Permissions-Policy` turns off camera,
+microphone, geolocation and ad-topic sharing, none of which this app has ever
+asked for. Nothing about the editor changes.
 
-The panel itself was too wide for the sidebar it lives in: the third grid
-layout button hung off the right edge, and long explanatory paragraphs above
-each control pushed everything down. Those paragraphs now live behind the
-lightbulb icons, where the rest of the app keeps its explanations, and the
-controls use the same button groups the paint tools do. It fits.
+The content security policy itself only reports. A wrong policy is invisible
+to every gate here — nothing local serves headers — and then it breaks the
+editor in production and nowhere else, so it watches first. That caution has
+already paid: the first real page load turned up three things that reading the
+bundle had missed, the best of them Clerk quietly building its own workers from
+blob URLs at runtime.
 
-The status bar has a fixed shape now. On a desktop it shows six hints: two for
-the tool you are holding, two that rotate through the rest, and the last two —
-Alt+/ for the shortcut list and Alt+, for the command palette — always in the
-same place. On a tablet-width window it drops to two, and Alt+/ keeps the last
-slot. The point is that the two ways into everything else stop moving around.
+One entry came back out. `cdn.jsdelivr.net` was allowed because the emoji
+picker looked like it fetched its data from there. Opening the picker settles
+it — Create → Stamp → Emoji, and note it is Emoji, singular, because the tool
+called `emoji` is Batch — and the whole set renders without a single request
+leaving the page. The data is compiled in. Two of the four addresses in that
+library are images anyway, which the policy governs under a different rule, so
+the line was never doing anything.
 
-Layer rows got their annotation counts back out. They arrived in v8.68 as small
-numbers on every row, and a row that already carries a name, an eye, five
-buttons, a mask badge and an opacity slider has no room for two more. The counts
-now sit in one line under the list, describing the layer you actually have
-selected: "Photo · 2 shapes · 1 text".
+The deploy check that guards the engine now fails closed. It compares the
+WebAssembly the site serves against a record the build writes about itself, and
+until now a missing record counted as a pass so the first deploy would not be
+blocked. One is live, so absence is now a failure.
 
+Nothing user-facing, but written down at last: the GPU blur was measured
+against the engine's own. On this laptop the GPU wins at every size tried — 93
+ms against 8 at 1024 pixels, and 645 ms against 12 at the widest blur radius.
+Almost none of that is the shader; it is the cost of moving pixels to the card
+and back. Nothing uses it yet. The numbers exist so the decision can be made on
+numbers.
 
 ## License
 

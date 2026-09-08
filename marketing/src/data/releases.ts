@@ -24,6 +24,33 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.70",
+    date: "2026-09-08",
+    headline: "Security headers ship, and the policy watches before it blocks",
+    entries: [
+      {
+        tag: "infra",
+        text: "Three security headers now go out with every response. X-Content-Type-Options stops the browser guessing at a file's type, a Referrer-Policy keeps full URLs from leaking to other sites, and a Permissions-Policy turns off camera, microphone, geolocation and ad-topic sharing \u2014 none of which this app has ever asked for. Nothing about the editor changes.",
+      },
+      {
+        tag: "infra",
+        text: "The content security policy only reports for now. A wrong policy is invisible to every gate here, because nothing local serves headers, and then it breaks the editor in production and nowhere else \u2014 so it watches first. That paid off immediately: the first real page load turned up three things reading the bundle had missed, the best of them Clerk quietly building its own workers from blob URLs at runtime.",
+      },
+      {
+        tag: "fix",
+        text: "One address came back out of the policy. cdn.jsdelivr.net was allowed because the emoji picker looked like it fetched its data from there. Opening the picker settles it \u2014 Create, then Stamp, then Emoji \u2014 and the whole set renders without a single request leaving the page, because the data is compiled in.",
+      },
+      {
+        tag: "infra",
+        text: "The deploy check that guards the engine now fails closed. It compares the WebAssembly the site serves against a record the build writes about itself, and a missing record used to count as a pass so the first deploy would not be blocked. One is live now, so absence is a failure.",
+      },
+      {
+        tag: "perf",
+        text: "The GPU blur was measured against the engine's own, which had never been done. On this laptop the GPU wins at every size tried: 93 ms against 8 at 1024 pixels, and 645 ms against 12 at the widest blur radius. Almost none of that is the shader \u2014 it is the cost of moving pixels to the card and back. Nothing uses it yet; the numbers exist so the decision can be made on numbers.",
+      },
+    ],
+  },
+  {
     version: "v8.69",
     date: "2026-09-07",
     headline: "A panel that fits, and a status bar that stays put",

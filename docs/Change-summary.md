@@ -10308,3 +10308,79 @@ Driven on the production build: `Rulers and Grid` present and `Measure` absent
 in the Edit sub-tool row; the panel measured with zero clipped buttons; the
 status bar counted at three widths; and the layer summary read `Photo · 1 shape`
 after drawing one, with zero count chips left on the rows.
+
+## v8.70 Change Summary — 2026-09-08
+
+**Security headers ship, the CSP watches, and the GPU blur finally has numbers.**
+
+| # | Change | Status |
+| --- | --- | --- |
+| 1 | `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` sent on every response | Enforcing |
+| 2 | Content-Security-Policy | **Report-only, on purpose** |
+| 3 | Three violations the report stream caught on the first real page load | Fixed |
+| 4 | `cdn.jsdelivr.net` removed from `connect-src` | Settled by opening the picker |
+| 5 | Deploy sentinel fails closed on a missing `build-info.json` | Complete |
+| 6 | WebGPU blur measured against the engine's SIMD blur (ADR-030) | Measured, nothing wired |
+| 7 | What activating the service worker would cost (ADR-049) | Investigated, not activated |
+
+### The CSP is report-only and stays that way
+
+Nothing local serves headers, so a wrong policy passes tsc, eslint, the build
+and the deploy sentinel, then breaks the editor in production and nowhere else.
+Report-only is where a wrong guess surfaces safely. It has already earned its
+keep: three violations turned up on the first real page load that reading the
+bundle had missed, including Clerk building workers from blob URLs at runtime —
+which is why `worker-src` now allows `blob:` for Clerk and not for us.
+
+### jsdelivr came back out
+
+The line was added with its own removal criterion attached, because the emoji
+picker had never been opened. It has now been. The entry point is
+Create → Stamp → **Emoji** — singular, and not the tool called `emoji`, which is
+Batch. Driven on a production build the picker rendered its whole set, 149
+buttons and real categories, and issued zero jsdelivr requests: the data set is
+a static import, so the library's runtime fetch is a fallback that never runs.
+Two of the four jsdelivr addresses are sprite images, which `img-src` governs
+rather than `connect-src`, so the entry never covered them in any configuration.
+
+### The GPU blur, measured
+
+Parity was re-confirmed byte-identical first, on real Intel Xe-LPG hardware,
+because timing a shader that disagrees is meaningless.
+
+| One image, radius 5 | Engine SIMD | GPU | Speedup |
+| --- | --- | --- | --- |
+| 512×512 | 31.5 ms | **5.9 ms** | 5.3× |
+| 1024×1024 | 93.3 ms | **8.0 ms** | 11.7× |
+| 2048×2048 | 512.4 ms | **29.1 ms** | 17.6× |
+
+There is no crossover — the GPU wins on a single image at every size. Radius
+decides the margin, because CPU cost grows with the radius while the GPU stays
+flat at around 11 ms: 6.7× at radius 1, **53.8×** at radius 30. Dispatch is only
+6.5 ms of a 29.1 ms call, so the shader is not the cost, the boundary is. Two
+free wins were found and deliberately left unapplied — the per-call `GPUDevice`
+costs 25.9 ms, and one full-buffer copy is unnecessary.
+
+⚠️ Headless Chromium in WSL2 hands out `google/swiftshader`, a CPU rasterizer,
+and `detect.ts` accepts it as a working GPU. A benchmark run there would have
+been CPU-against-CPU under a GPU heading and would have read as "no speedup".
+Check the adapter vendor before believing a number.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** |
+| `pnpm -C app test` | **687 passed**, 59 files |
+| `pnpm lint` | **0 errors** |
+| `./scripts/guardrails.sh` | **OK**, at baseline |
+| `cargo fmt --check` + `clippy --all-targets` + `cargo test` | clean |
+| `pnpm run build` | **succeeds** |
+
+**No Rust change** — `src/` and `Cargo.toml` untouched, so no `build:wasm` and
+the size band is unmoved at 817,392 B.
+
+### QC
+
+Not required: nothing under `src/`, `app/src/features/tools/`, the canvas or
+the engine changed since v8.69. The release is headers, docs and one new test.
