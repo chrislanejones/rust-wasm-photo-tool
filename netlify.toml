@@ -108,12 +108,17 @@
 #   *.convex.cloud + wss:         backend, both deployments this project uses
 #   ufs.sh                        UploadThing — the sample images load from it
 #   fonts.googleapis/gstatic      the font CSS and the font files
-#   cdn.jsdelivr.net              ⚠️ emoji-mart fetches its data set at runtime
-#                                 (`@emoji-mart/data@latest/sets/…`). Found in
-#                                 the shipped bundle, NOT reproduced in a live
-#                                 session — the emoji picker was not opened. If
-#                                 the report stream never mentions jsdelivr,
-#                                 this line can go.
+#   (cdn.jsdelivr.net is GONE — settled 2026-09-07 by opening the real picker.
+#    It is `stamp` → `Emoji`, NOT the `emoji` tool, which is Batch. Driven on a
+#    production build the picker rendered fully — 149 shadow-root buttons,
+#    real categories — and issued ZERO jsdelivr requests. All four jsdelivr URLs
+#    in the bundle are unreachable as configured: the data set is a `||`
+#    fallback that `data={data}` (a static import) short-circuits; the i18n
+#    fetch only runs for a non-`en` locale and no `locale` prop is passed. The
+#    other two are emoji-datasource SPRITE IMAGES for a non-native `set` — and
+#    those are img-src, not connect-src, so this entry never governed them.
+#    It protected nothing in any configuration. Re-add only alongside img-src
+#    if the picker is ever switched off `set: native`.)
 #
 # img-src needs `blob:` and `data:` — every thumbnail, preview and export is a
 # blob URL (URL.createObjectURL, 8 call sites).
@@ -129,7 +134,7 @@ script-src 'self' 'wasm-unsafe-eval'; \
 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
 font-src 'self' https://fonts.gstatic.com data:; \
 img-src 'self' blob: data: https://f1avkyiqgj.ufs.sh https://*.ufs.sh; \
-connect-src 'self' blob: data: https://*.clerk.accounts.dev https://*.convex.cloud wss://*.convex.cloud https://*.ufs.sh https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; \
+connect-src 'self' blob: data: https://*.clerk.accounts.dev https://*.convex.cloud wss://*.convex.cloud https://*.ufs.sh https://fonts.googleapis.com https://fonts.gstatic.com; \
 worker-src 'self'; \
 frame-src 'self' https://*.clerk.accounts.dev; \
 object-src 'none'; \
