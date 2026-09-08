@@ -1,4 +1,6 @@
 import { Fragment } from "react";
+import { motion } from "framer-motion";
+import { hoverPop } from "@/lib/animations";
 import type { LucideIcon } from "lucide-react";
 import {
   Tooltip,
@@ -101,7 +103,8 @@ export function ToggleButtonGroup({
     >
       {items.map(({ key, icon: Icon, label, active, onToggle, tooltip, disabled }) => {
         const button = (
-          <button
+          <motion.button
+            whileHover="hover"
             onClick={onToggle}
             disabled={disabled}
             title={tooltip ? undefined : label}
@@ -146,9 +149,18 @@ export function ToggleButtonGroup({
                 component, and they now read at the same weight whether or not
                 the label is showing. (14px here made the labelled ones look
                 like a different, smaller control than their icon-only twins.) */}
-            {!noIcons && <Icon className="h-[18px] w-[18px]" />}
+            {!noIcons && (
+              <motion.span
+                variants={hoverPop}
+                initial="rest"
+                animate="rest"
+                className="flex h-[18px] w-[18px] items-center justify-center"
+              >
+                <Icon className="h-full w-full" />
+              </motion.span>
+            )}
             {!compact && <span>{label}</span>}
-          </button>
+          </motion.button>
         );
 
         // Fragment (no DOM node) keeps the button a direct flex child so

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter } from "@/lib/animations";
+import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter, hoverPop } from "@/lib/animations";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -128,6 +128,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       <TooltipTrigger asChild>
         <motion.div
           data-id={entry.id}
+          whileHover="hover"
           role="button"
           tabIndex={0}
           aria-label={`Select photo ${entry.name}`}
@@ -165,8 +166,13 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           below, where the reasoning lives. The claim is true now; it was not
           when it was written. */}
       <div className="absolute inset-0 checkerboard rounded-lg" />
-      <img
+      {/* The image pops inside the clipped card — hoverPop from lib/animations.ts,
+          the same definition the tool tiles use. */}
+      <motion.img
         ref={imgRef}
+        variants={hoverPop}
+        initial="rest"
+        animate="rest"
         src={thumbUrl || undefined}
         alt={entry.name}
         draggable={false}

@@ -109,3 +109,30 @@ export const imageLoadBarProgress = {
   initial: { width: "0%" } as const,
   transition: { duration: 0.15, ease: "easeOut" as Easing },
 };
+
+// ── Hover pop ────────────────────────────────────────────────────────────────
+// The glyph inside a hovered control grows 10%. ONE definition: the tool rail
+// tiles (ToolButton), the sub-tool row (SubtoolRow), every IconButton in the
+// top bar, the ToggleButtonGroup icons (the Review panel's section toggles and
+// the bar's New/Tools/Gallery/Review/Export), and the gallery thumbnails all
+// read it from here.
+//
+// Until 2026-09-08 it was the same Tailwind string
+// (`transition-transform duration-200 ease-out group-hover:scale-110`) pasted
+// into three of those files and missing from the others. That also bypassed
+// Reduce Motion: a CSS hover transform is invisible to the <MotionConfig
+// reducedMotion> wrapper in AppShell that governs every other animation. As a
+// framer variant it is suppressed with the rest when the preference is on.
+//
+// Usage — the HOVERED element is the parent, the POPPING element is the child:
+//   <motion.button whileHover="hover">
+//     <motion.span variants={hoverPop} initial="rest" animate="rest">…</motion.span>
+//   </motion.button>
+// The `rest` on the child is explicit so a parent whose own `initial`/`animate`
+// are plain objects (the gallery cards use thumbEnter) still gives it a state
+// to return to when the hover ends.
+export const HOVER_POP_SCALE = 1.1;
+export const hoverPop: Variants = {
+  rest: { scale: 1, transition: quickSpring },
+  hover: { scale: HOVER_POP_SCALE, transition: quickSpring },
+};
