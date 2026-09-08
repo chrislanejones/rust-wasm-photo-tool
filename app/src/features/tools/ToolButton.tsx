@@ -55,8 +55,6 @@ export function ToolButton({ icon: Icon, label, active, disabled = false, onClic
           icon that grows under a hover. Nothing here carries a scale. */}
       <motion.span
         variants={hoverPop}
-        initial="rest"
-        animate="rest"
         className="flex h-[55%] w-[55%] items-center justify-center"
       >
         <Icon className="h-full w-full" />

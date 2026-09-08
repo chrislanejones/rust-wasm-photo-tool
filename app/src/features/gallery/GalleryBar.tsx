@@ -171,8 +171,6 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       <motion.img
         ref={imgRef}
         variants={hoverPop}
-        initial="rest"
-        animate="rest"
         src={thumbUrl || undefined}
         alt={entry.name}
         draggable={false}

@@ -126,13 +126,32 @@ export const imageLoadBarProgress = {
 //
 // Usage — the HOVERED element is the parent, the POPPING element is the child:
 //   <motion.button whileHover="hover">
-//     <motion.span variants={hoverPop} initial="rest" animate="rest">…</motion.span>
+//     <motion.span variants={hoverPop}>…</motion.span>
 //   </motion.button>
-// The `rest` on the child is explicit so a parent whose own `initial`/`animate`
-// are plain objects (the gallery cards use thumbEnter) still gives it a state
-// to return to when the hover ends.
-export const HOVER_POP_SCALE = 1.1;
+// The child carries ONLY `variants`. A child with its own `animate` prop opts
+// out of the parent's variant propagation — that is exactly how the first cut
+// of this shipped reading scale 1 under hover on every surface. On hover end
+// framer returns the child to its pre-hover value with its default spring.
+const HOVER_POP_SCALE = 1.1; // module-local on purpose: nothing outside reads a number
 export const hoverPop: Variants = {
   rest: { scale: 1, transition: quickSpring },
   hover: { scale: HOVER_POP_SCALE, transition: quickSpring },
 };
+
+// ── Panel close reveal ───────────────────────────────────────────────────────
+// The corner X on Tools / Gallery / Review (PanelCloseButton): hidden at rest,
+// shown while the panel is hovered or the button is focused. A framer variant
+// rather than a `group-hover:opacity-100` string so it sits under the same
+// <MotionConfig reducedMotion> as everything else. Driven by the button's own
+// state, NOT by `whileHover` on the panel — a hover label on the panel would
+// propagate to every tile icon inside it (they carry `hoverPop`), and the whole
+// rail would grow in unison whenever the panel was hovered.
+export const hoverReveal: Variants = {
+  hidden: { opacity: 0, transition: { duration: 0.15 } },
+  shown: { opacity: 1, transition: { duration: 0.15 } },
+};
+
+// How long a freshly opened panel keeps offering its corner close. After this
+// the button unmounts — a panel you have settled into stops asking — and it
+// comes back with the panel, since mount is panel-open. (Chris, 2026-09-08.)
+export const PANEL_CLOSE_REVEAL_MS = 40_000;

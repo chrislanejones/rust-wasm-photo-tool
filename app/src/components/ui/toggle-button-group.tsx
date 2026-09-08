@@ -152,8 +152,6 @@ export function ToggleButtonGroup({
             {!noIcons && (
               <motion.span
                 variants={hoverPop}
-                initial="rest"
-                animate="rest"
                 className="flex h-[18px] w-[18px] items-center justify-center"
               >
                 <Icon className="h-full w-full" />

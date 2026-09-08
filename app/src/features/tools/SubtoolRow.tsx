@@ -96,8 +96,6 @@ function SubtoolButton({
           {Icon ? (
             <motion.span
               variants={hoverPop}
-              initial="rest"
-              animate="rest"
               className="flex h-[55%] w-[55%] items-center justify-center"
             >
               <Icon className="h-full w-full" />
