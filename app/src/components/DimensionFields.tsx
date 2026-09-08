@@ -33,7 +33,7 @@ export function DimensionFields({
   onToggleLock,
 }: Props) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Scale slider — proportional percent of the original dimensions. */}
       <SizeSlider
         label="Scale"

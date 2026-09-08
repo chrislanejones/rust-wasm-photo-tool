@@ -336,6 +336,10 @@ export function ResizeSettings({
           toward sits above the controls that steer it, and resize precedes
           compress because that is the order the pixels actually go through. */}
       <div className="flex-1 space-y-8 mt-2.5">
+        {/* Both scores, 16px apart — what the compress body gave them before
+            the tiles merged (its ToolModeToggle slot was space-y-4). The
+            32px section gap below is between GROUPS, not inside one. */}
+        <div className="space-y-4">
         {/* ── Web Performance Gain ── */}
         <div className="space-y-4">
           <div className="flex items-center justify-between text-2xs">
@@ -379,7 +383,12 @@ export function ResizeSettings({
             />
           </div>
         </div>
+        </div>
 
+        {/* Header → first control is 16px in every section, the spacing
+            Select › Magic Wand › Tolerance already uses; the merge had left
+            it at 32 here and 39 under Compress. */}
+        <div className="space-y-4">
         <SectionHeader
           title="Resize"
           info="Sets new pixel dimensions. The lock keeps the aspect ratio; the percent slider scales width and height proportionally. Apply Resize changes dimensions only — Apply Compression &amp; Resize commits both."
@@ -396,6 +405,9 @@ export function ResizeSettings({
           onToggleLock={() => setLockAspect((v) => !v)}
         />
 
+        </div>
+
+        <div className="space-y-4">
         <SectionHeader
           title="Compress"
           info="Shrinks the file size: pick a resample Method and output Format, then drag Quality. The two scores above preview the pending output — Apply Compression &amp; Resize commits it."
@@ -404,7 +416,10 @@ export function ResizeSettings({
         <div className="grid grid-cols-2 gap-3">
           {/* ── Method ── */}
           <div className="space-y-4">
-            <label className="text-2xs text-theme-muted-foreground">
+            {/* `block`, or this floats ~7px: a bare inline <label> with
+                line-height 15 inside a block inheriting 24 sits low in the
+                strut's line box. SizeSlider's label row is flex and never had it. */}
+            <label className="block text-2xs text-theme-muted-foreground">
               Method
             </label>
             <div className="relative">
@@ -426,7 +441,10 @@ export function ResizeSettings({
 
           {/* ── Format ── */}
           <div className="space-y-4">
-            <label className="text-2xs text-theme-muted-foreground">
+            {/* `block`, or this floats ~7px: a bare inline <label> with
+                line-height 15 inside a block inheriting 24 sits low in the
+                strut's line box. SizeSlider's label row is flex and never had it. */}
+            <label className="block text-2xs text-theme-muted-foreground">
               Format
             </label>
             <div className="relative">
@@ -468,6 +486,7 @@ export function ResizeSettings({
 
         {/* EXIF keep/strip moved to Settings → Security. */}
 
+        </div>
       </div>
 
       {/* ── Bottom Buttons ── */}
@@ -484,7 +503,9 @@ export function ResizeSettings({
               <Button size="large"
                 onClick={applyResizeOnly ? handleApplyResizeOnly : handleApplyResize}
                 disabled={disabled || !resizeChanged}
-                className="w-full"
+                // The longest label is 26 characters; at this width it was
+                // breaking at the ampersand into two lines and a 38px button.
+                className="w-full whitespace-nowrap"
               >
                 {applyResizeOnly ? (
                   <Scaling className="h-4 w-4" />
