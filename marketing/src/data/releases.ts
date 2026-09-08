@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.71",
+    date: "2026-09-08",
+    headline: "Resize and Compress are one tile, and the panels close from their corner again",
+    entries: [
+      {
+        tag: "ui",
+        text: "Enhance → Resize & Compress is one panel now, ordered the way the pixels go: the two scores on top, then Resize, then Compress. Both halves move the same two numbers — Web Performance Gain and PageSpeed Insights Score read the dimensions and the format and quality together — so splitting them had put the readout under one tile and half of its inputs under the other. Squoosh keeps the whole pipeline on one panel for the same reason.",
+      },
+      {
+        tag: "ui",
+        text: "There is one Apply button, and it says what it will do: Apply Resize when only the dimensions changed, Apply Compression when only the quality, format or method did, Apply Compression & Resize when both did. Undo puts the quality slider back as well as the pixels.",
+      },
+      {
+        tag: "feature",
+        text: "Hover Tools, Gallery or Review and a small close appears on the panel's top corner, half outside it — the same X the Layers list uses, on the edge rather than over the first button. It shows for forty seconds after you enter the panel and then stops offering, and comes back when you do. The top bar's toggle brings a closed panel back. Below tablet width the panels keep their tabs and this does not appear.",
+      },
+      {
+        tag: "ui",
+        text: "When the window is narrow enough for the top bar to drop its labels, the bar is one flat row — no button groups, the controls spread evenly across it.",
+      },
+      {
+        tag: "fix",
+        text: "The icons pop when you hover a tool tile. That was already true; it now lives in one place, and the gallery thumbnails and the Review panel's toggles do it too. It also respects Reduce Motion, which the old version quietly did not.",
+      },
+      {
+        tag: "ui",
+        text: "The Enhance panel's spacing was measured against Select → Magic Wand → Tolerance and made to match: sixteen pixels from each heading to its first control, a rule between the scores, Resize and Compress, and the Scale slider as close to width and height as the Method dropdown sits to Quality.",
+      },
+    ],
+  },
+  {
     version: "v8.70",
     date: "2026-09-08",
     headline: "Security headers ship, and the policy watches before it blocks",

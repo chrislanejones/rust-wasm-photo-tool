@@ -84,43 +84,42 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.70 — 2026-09-08
+### v8.71 — 2026-09-08
 
-**The app sends security headers now, and the content security policy is
-watching before it starts blocking.**
+**Resize and Compress are one tile, and the side panels close from their
+corner again.**
 
-Three headers ship enforcing. `X-Content-Type-Options: nosniff` stops the
-browser guessing at a file's type, a `Referrer-Policy` keeps full URLs from
-leaking to other sites, and a `Permissions-Policy` turns off camera,
-microphone, geolocation and ad-topic sharing, none of which this app has ever
-asked for. Nothing about the editor changes.
+Enhance → Resize & Compress is a single panel now, ordered the way the pixels
+go: the two scores on top, then Resize, then Compress. Both halves move the
+same two numbers — Web Performance Gain and PageSpeed Insights Score read the
+dimensions and the format and quality together — so splitting them had put the
+readout under one tile and half of its inputs under the other. Squoosh keeps
+the whole pipeline on one panel for the same reason.
 
-The content security policy itself only reports. A wrong policy is invisible
-to every gate here — nothing local serves headers — and then it breaks the
-editor in production and nowhere else, so it watches first. That caution has
-already paid: the first real page load turned up three things that reading the
-bundle had missed, the best of them Clerk quietly building its own workers from
-blob URLs at runtime.
+There is one Apply button, and it says what it will do. Change only the
+dimensions and it reads Apply Resize; change only the quality, format or method
+and it reads Apply Compression; change both and it reads Apply Compression &
+Resize, which is also what it says while there is nothing to apply. Undo puts
+the quality slider back as well as the pixels.
 
-One entry came back out. `cdn.jsdelivr.net` was allowed because the emoji
-picker looked like it fetched its data from there. Opening the picker settles
-it — Create → Stamp → Emoji, and note it is Emoji, singular, because the tool
-called `emoji` is Batch — and the whole set renders without a single request
-leaving the page. The data is compiled in. Two of the four addresses in that
-library are images anyway, which the policy governs under a different rule, so
-the line was never doing anything.
+Hover Tools, Gallery or Review and a small close appears on the panel's top
+corner, half outside it — the same X the Layers list uses, sitting on the edge
+rather than over the first button. It shows for forty seconds after you enter
+the panel and then stops offering, and comes back when you do. The top bar's
+own toggle brings a closed panel back. Below tablet width the panels keep their
+tabs and this does not appear.
 
-The deploy check that guards the engine now fails closed. It compares the
-WebAssembly the site serves against a record the build writes about itself, and
-until now a missing record counted as a pass so the first deploy would not be
-blocked. One is live, so absence is now a failure.
+When the window is narrow enough for the top bar to drop its labels, the bar
+is one flat row now — no button groups, the controls spread evenly across it.
 
-Nothing user-facing, but written down at last: the GPU blur was measured
-against the engine's own. On this laptop the GPU wins at every size tried — 93
-ms against 8 at 1024 pixels, and 645 ms against 12 at the widest blur radius.
-Almost none of that is the shader; it is the cost of moving pixels to the card
-and back. Nothing uses it yet. The numbers exist so the decision can be made on
-numbers.
+The icons pop when you hover a tool tile. That was already true; it now lives
+in one place, and the gallery thumbnails and the Review panel's toggles do it
+too. It also respects Reduce Motion, which the old version quietly did not.
+
+The Enhance panel's spacing was measured against Select → Magic Wand →
+Tolerance and made to match: sixteen pixels from each heading to its first
+control, a rule between the scores, Resize and Compress, and the Scale slider
+sitting as close to width and height as the Method dropdown sits to Quality.
 
 ## License
 
