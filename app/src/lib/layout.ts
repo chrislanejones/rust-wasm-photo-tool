@@ -10,6 +10,13 @@
 const SIDE_PANEL_WIDTH = 260;
 export const PANEL_OPEN_GUTTER = SIDE_PANEL_WIDTH + 24; // 260 + 12 + 12 = 284
 
+/** How far the workspace lifts off the bottom when the Gallery strip is open.
+ *  The canvas host has always inset itself `showGallery ? 168 : 56`, so the
+ *  gutter IS that difference — defined once here and read by both the host and
+ *  main-content's marginBottom, so the gallery's height moves them together.
+ *  Wide layout only: in the dock the gallery is a column on the left. */
+export const GALLERY_OPEN_GUTTER = 112; // 168 - 56
+
 // ── Responsive breakpoints (window width, px) ────────────────────────────────
 // One source of truth for the top bar's collapse logic. Below BP_COMPACT the bar
 // goes icon-only and drops Undo/Redo (still reachable in the Review panel + via

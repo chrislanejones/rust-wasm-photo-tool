@@ -137,7 +137,7 @@ export function MasterBar({
       exit="exit"
       role="region"
       aria-label="Master bar"
-      className="fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center gap-0.5 overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-1.5"
+      className="fixed left-2 top-2 z-[var(--z-panel)] flex w-[252px] items-center justify-between overflow-hidden rounded-t-xl border border-b-0 border-border bg-bg-secondary p-1.5"
       style={{ height: MASTER_BAR_CHROME_H, boxShadow: "var(--shadow-panel)" }}
     >
       {/* New · Tools · Gallery · Review · Export, one run of five, then
@@ -158,13 +158,12 @@ export function MasterBar({
         onClick={onExport}
         disabled={!canExport}
       />
-      {/* Settings + user, in the same group the desktop top bar gives them.
-          They used to sit loose at the end of the strip — the only two controls
-          in either bar without a container. */}
-      <div className="ml-auto flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0">
-        {settingsSlot}
-        {userSlot}
-      </div>
+      {/* Settings + user, loose like everything else: this bar is ONE flat row
+          now, justify-between across the box and no group pills — the same rule
+          the desktop top bar follows in its compact band. Both slots arrive
+          standalone from AppShell so they carry their own fill. */}
+      {settingsSlot}
+      {userSlot}
     </motion.div>
   );
 }

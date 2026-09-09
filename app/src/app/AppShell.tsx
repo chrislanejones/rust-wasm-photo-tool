@@ -114,7 +114,7 @@ import {
   applyExifToVerbatim,
 } from "@/lib/exif";
 import { pinLabelText } from "@/lib/pinLabel";
-import { PANEL_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
+import { PANEL_OPEN_GUTTER, GALLERY_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
 import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
@@ -1979,6 +1979,16 @@ export function AppShell() {
   const newSurfaceOpen =
     showUpload || booting || (firstRun && !!resumeManifest);
 
+  // Is a start surface covering the workspace? Spelled exactly like the
+  // condition FirstRunScreen renders on below, so the compact chrome cannot
+  // disagree with the screen it hides behind. In the dock layout the master bar
+  // and its attached panel must not appear until this is false — they were
+  // offering Compress/Resize controls beside "Resume editing" for an image that
+  // did not exist yet (Chris, 2026-09-08). The wide layout is unaffected: there
+  // the start screen sits OVER the floating panels, which reads deliberately.
+  const startSurfaceOpen =
+    booting || (firstRun && (showUpload || !!resumeManifest));
+
   // Native Ctrl/Cmd+V paste of an image → open the import choice dialog.
   // Skipped while a New/start surface is up, or focus is in a text field.
   useEffect(() => {
@@ -3107,7 +3117,7 @@ export function AppShell() {
           AnimatePresence so the slide-out still works once the chunk is in. */}
       <Suspense fallback={null}>
         <AnimatePresence>
-          {bp.dock && showTopBar && (
+          {bp.dock && showTopBar && !startSurfaceOpen && (
             <MasterBar
               activeTab={masterTab}
               onTab={setMasterTab}
@@ -3120,10 +3130,12 @@ export function AppShell() {
                   general={general}
                   superUser={superUser}
                   openRaster={openRaster}
-                  grouped
+                  // Standalone: the master bar is one flat row with no pills now, so
+                  // each control carries its own fill (same as the compact top bar).
+                  grouped={false}
                 />
               }
-              userSlot={<UserMenu grouped />}
+              userSlot={<UserMenu grouped={false} />}
             />
           )}
         </AnimatePresence>
@@ -3160,7 +3172,7 @@ export function AppShell() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {(bp.dock ? masterTab === "tools" : showTools) && (
+        {(bp.dock ? masterTab === "tools" && !startSurfaceOpen : showTools) && (
           <ToolsSidebar
             rulersPrefs={prefs}
             onRulersChange={(p) => applyPreferences({ ...prefs, ...p })}
@@ -3289,6 +3301,12 @@ export function AppShell() {
                   : 0,
               marginRight:
                 !bp.dock && !bp.narrow && showHistory ? PANEL_OPEN_GUTTER : 0,
+              // Third side: the Gallery strip pushes the workspace UP the same way
+              // Tools and Review push it in. Wide only — in the dock the gallery
+              // is a column on the left, so a bottom gutter would be a gap
+              // under nothing. (Chris, 2026-09-08.)
+              marginBottom:
+                !bp.dock && !bp.narrow && showGallery ? GALLERY_OPEN_GUTTER : 0,
             }}
             transition={prefs.reduceMotion ? instantTransition : panelSpacingTransition}
             className="main-content focus:outline-none"
@@ -3319,7 +3337,8 @@ export function AppShell() {
                   style={{
                     position: "absolute",
                     top: showTopBar ? 80 : 12,
-                    bottom: showGallery ? 168 : 56,
+                    // Same constant main-content lifts by, so the two cannot drift.
+                    bottom: 56 + (showGallery ? GALLERY_OPEN_GUTTER : 0),
                     left: 12,
                     right: 12,
                     display: "flex",
@@ -3642,7 +3661,7 @@ export function AppShell() {
       {/* Gallery: horizontal bottom strip in wide mode; the SAME bar inverted
           to vertical (up/down arrows, all controls) in the compact Gallery tab. */}
       <AnimatePresence>
-        {(bp.dock ? masterTab === "gallery" : showGallery) && (
+        {(bp.dock ? masterTab === "gallery" && !startSurfaceOpen : showGallery) && (
           <GalleryBar
             vertical={bp.dock}
             photos={photos}
@@ -3672,7 +3691,7 @@ export function AppShell() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {(bp.dock ? masterTab === "review" : showHistory) && (
+        {(bp.dock ? masterTab === "review" && !startSurfaceOpen : showHistory) && (
           <ReviewPanel
             embedded={bp.dock}
             history={stamp.state.history}

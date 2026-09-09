@@ -321,7 +321,10 @@ export function ToolsSidebar({
 
       <motion.div
         layout
-        className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin"
+        // pb-8, not p-4 all round: the last run of buttons in a settings panel
+        // (Auto Compress & Resize, Compress Image, Compress All Images) ended
+        // 16px off the sidebar's bottom edge with nothing under it.
+        className="flex-1 overflow-y-auto p-4 pb-8 space-y-5 scrollbar-thin"
       >
         {activeTool === "compress" && (
           <ResizeSettings
