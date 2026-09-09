@@ -84,42 +84,38 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.71 — 2026-09-08
+### v8.72 — 2026-09-09
 
-**Resize and Compress are one tile, and the side panels close from their
-corner again.**
-
-Enhance → Resize & Compress is a single panel now, ordered the way the pixels
-go: the two scores on top, then Resize, then Compress. Both halves move the
-same two numbers — Web Performance Gain and PageSpeed Insights Score read the
-dimensions and the format and quality together — so splitting them had put the
-readout under one tile and half of its inputs under the other. Squoosh keeps
-the whole pipeline on one panel for the same reason.
-
-There is one Apply button, and it says what it will do. Change only the
-dimensions and it reads Apply Resize; change only the quality, format or method
-and it reads Apply Compression; change both and it reads Apply Compression &
-Resize, which is also what it says while there is nothing to apply. Undo puts
-the quality slider back as well as the pixels.
+**The panels close from their corner, the compact bar is one flat row, and the
+workspace makes room on all three sides.**
 
 Hover Tools, Gallery or Review and a small close appears on the panel's top
-corner, half outside it — the same X the Layers list uses, sitting on the edge
-rather than over the first button. It shows for forty seconds after you enter
-the panel and then stops offering, and comes back when you do. The top bar's
-own toggle brings a closed panel back. Below tablet width the panels keep their
-tabs and this does not appear.
+corner, half outside it — on the edge rather than over the first button. It
+shows for forty seconds after you enter the panel and then stops offering, and
+comes back when you do. The top bar's own toggle brings a closed panel back.
+Below tablet width the panels keep their tabs and this does not appear.
 
-When the window is narrow enough for the top bar to drop its labels, the bar
-is one flat row now — no button groups, the controls spread evenly across it.
+When the window is narrow enough for the top bar to drop its labels, that bar
+and the compact master bar are both one flat row now — no button groups, the
+controls spread evenly across.
 
-The icons pop when you hover a tool tile. That was already true; it now lives
-in one place, and the gallery thumbnails and the Review panel's toggles do it
-too. It also respects Reduce Motion, which the old version quietly did not.
+The checkerboard behind the canvas already moved aside for Tools and Review.
+It moves for the Gallery now too, and its edges feather instead of ending on a
+hard rectangle.
 
-The Enhance panel's spacing was measured against Select → Magic Wand →
-Tolerance and made to match: sixteen pixels from each heading to its first
-control, a rule between the scores, Resize and Compress, and the Scale slider
-sitting as close to width and height as the Method dropdown sits to Quality.
+Text fields had a black outline in light mode. They were never given a colour
+at all, so they fell back to the text colour — near-white in dark, which looked
+deliberate, and black in light, which did not. They wear the app's warm accent
+now, in both themes.
+
+In compact mode the tool panel no longer sits beside the welcome screen
+offering Compress and Resize for an image that does not exist yet.
+
+Two decisions are written down rather than built. The text box moving as you
+type turns out to be two separate defects, and only the rotated one is a bug —
+unrotated text has always been correct. And custom fonts need engine work
+rather than a settings page: the font picker that ships today changes the
+preview and not the result, which is worth knowing before anyone relies on it.
 
 ## License
 
