@@ -15,7 +15,7 @@
 // path drew it.
 
 import { gaussianBlurCpu } from "./blurReference";
-import { gaussianBlurGpu } from "./gpuBlur";
+import { gaussianBlurGpu, __resetGpuBlurContextForTest } from "./gpuBlur";
 import { probeWebGpu } from "./detect";
 
 export interface CaseResult {
@@ -143,7 +143,43 @@ export async function gpuBlurSelfTest(): Promise<SelfTestReport> {
   return { adapter: status.adapterInfo, cases, pass: cases.every((c) => c.pass) };
 }
 
+/**
+ * Device-loss recovery. The device and pipeline are cached across calls now,
+ * and a cache with no loss handling is strictly worse than acquiring per call —
+ * a lost device would fail every subsequent blur. `device.destroy()` resolves
+ * `device.lost`, which is the only way to exercise that path deliberately.
+ *
+ * Returns the same case run three times: warm (device cached), after the device
+ * is destroyed, and again. All three must be byte-identical to the CPU oracle,
+ * and the middle one is the one that would throw if the cache were not cleared.
+ */
+async function gpuBlurLostDeviceTest(): Promise<{
+  adapter: string;
+  runs: Array<{ label: string; maxDelta: number; ms: number; pass: boolean }>;
+  pass: boolean;
+}> {
+  const status = await probeWebGpu();
+  if (!status.ok) return { adapter: `unavailable: ${status.reason}`, runs: [], pass: false };
+  const px = makeImage(61, 37, 0x9e37_79b9);
+  const cpu = gaussianBlurCpu(px, 61, 37, 5);
+  const once = async (label: string) => {
+    const t = performance.now();
+    const { pixels } = await gaussianBlurGpu(px, 61, 37, 5);
+    const ms = Math.round((performance.now() - t) * 100) / 100;
+    let maxDelta = 0;
+    for (let i = 0; i < cpu.length; i++) maxDelta = Math.max(maxDelta, Math.abs(cpu[i] - pixels[i]));
+    return { label, maxDelta, ms, pass: maxDelta === 0 };
+  };
+  const runs = [await once("warm")];
+  __resetGpuBlurContextForTest(); // destroys the device -> resolves device.lost
+  runs.push(await once("after device destroyed"));
+  runs.push(await once("warm again"));
+  return { adapter: status.adapterInfo, runs, pass: runs.every((r) => r.pass) };
+}
+
 /** Attach to window so it can be driven from the console or automation. */
 export function installGpuBlurSelfTest(): void {
-  (globalThis as unknown as Record<string, unknown>).__ihGpuBlurSelfTest = gpuBlurSelfTest;
+  const g = globalThis as unknown as Record<string, unknown>;
+  g.__ihGpuBlurSelfTest = gpuBlurSelfTest;
+  g.__ihGpuBlurLostTest = gpuBlurLostDeviceTest;
 }

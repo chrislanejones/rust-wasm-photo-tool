@@ -68,8 +68,19 @@ interface GPUCommandEncoder {
   finish(): GPUCommandBuffer;
 }
 
+interface GPUDeviceLostInfo {
+  readonly reason: "destroyed" | "unknown";
+  readonly message: string;
+}
+
 interface GPUDevice {
   readonly queue: GPUQueue;
+  /** Resolves when the device dies — driver/GPU reset, or `destroy()`.
+   *  Added 2026-09-09 for the cached-device path in gpuBlur.ts: a cache with
+   *  no loss handling is strictly worse than acquiring per call. This file is
+   *  hand-written and partial by design (ADR-030), so a member missing here
+   *  means "not used yet", never "not in the API". */
+  readonly lost: Promise<GPUDeviceLostInfo>;
   createBuffer(d: { size: number; usage: number; mappedAtCreation?: boolean }): GPUBuffer;
   createShaderModule(d: { code: string }): GPUShaderModule;
   createComputePipeline(d: {
