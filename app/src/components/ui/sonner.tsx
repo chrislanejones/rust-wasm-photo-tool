@@ -7,7 +7,24 @@ export function Toaster(props: React.ComponentProps<typeof SonnerToaster>) {
     <SonnerToaster
       theme={theme}
       position="top-center"
-      offset={80}
+      // 80 -> 12. Eighty was chosen to CLEAR the TopBar (`fixed top-3`, ~58
+      // tall, so 12..70) and landed at 80..170 — squarely on the header of any
+      // `size="xl"` dialog, whose 80vh centred body starts at 10vh: 90px on a
+      // 900 viewport, 122px on a 1222. Chris hit it on Settings.
+      //
+      // TOP-RIGHT WAS THE OBVIOUS ALTERNATIVE AND IS WORSE. A viewport-anchored
+      // right-aligned toast lands on the DIALOG'S CLOSE BUTTON, which sits
+      // ~16px inside the 760px body's right edge — so it blocks the X at 1280,
+      // 1400 and 1600 wide, and only clears it around 1920. Covering the
+      // header is cosmetic; covering the way out is not, and "depends on your
+      // monitor" is not a resolution.
+      //
+      // Top-centre at 12 spans W/2±265, and the close button sits at W/2+364,
+      // so it never reaches it. What it does cover is the TopBar — which is
+      // `--z-topbar: 30`, behind the `--z-modal: 60` overlay whenever a dialog
+      // is open, i.e. inert in exactly the situation that prompted this. With
+      // no dialog open it overlays the pill for four seconds.
+      offset={12}
       closeButton
       duration={4000}
       toastOptions={{
