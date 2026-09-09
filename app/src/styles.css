@@ -1,3 +1,4 @@
+@import "./fonts.css";
 @import "tailwindcss";
 
 /* Tailwind v4 class-based dark mode. `.dark` on <html> selects the dark palette;
