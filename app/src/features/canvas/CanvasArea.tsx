@@ -30,7 +30,6 @@ import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
 import {
-  measureText,
   textInkOffset,
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
@@ -804,7 +803,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
     // ADR-024 b1 — PRIME THE TEXT-METRICS CACHE OFF THE RENDER PATH.
     //
-    // The text overlay below lays itself out from `measureText` and
+    // The text overlay below lays itself out from the canvas 2D context and
     // `textInkOffset`, during render, where nothing can `await`. Those two read
     // the cache and take a documented fallback on a miss (the JS-measured box).
     // This effect is what turns that miss into a one-frame event instead of a
@@ -2313,29 +2312,23 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
 
           const rotation = textInput.rotation ?? 0;
 
-          // Rotation pivot. Rust bakes the tile rotating around the centre of
-          // the (unrotated) text — and because its background padding is
-          // uniform, the padded-tile centre coincides with the text centre too.
-          // The overlay must rotate around that SAME point or committed text
-          // lands off-axis from the preview. Measure the Rust tile so the pivot
-          // matches exactly; fall back to the JS-measured box centre.
-          let pivotLocalX = boxW / 2;
-          let pivotLocalY = boxH / 2;
-          // Through the cache, not the engine. This is a RENDER-position read
-          // and a render pass cannot await, so it is one of the two sites
-          // Stage 3.5 cannot convert — see `textMetricsCache.ts`. The
-          // JS-measured box above stays as the miss fallback, which is exactly
-          // what it was before the engine was consulted here.
-          const measured = measureText(
-            hookResult.toolRef.current,
-            textInput.text || " ",
-            effFontSize,
-            effFontWeight === "bold",
-          );
-          if (measured && measured.length >= 2 && measured[0] > 0) {
-            pivotLocalX = (measured[0] * scaleX) / 2;
-            pivotLocalY = (measured[1] * scaleY) / 2;
-          }
+          // Rotation pivot — the box's TOP-LEFT, matching `text::rotated_tile_offset`
+          // in the engine (ADR-050). The overlay must rotate about the SAME point
+          // the commit does or the preview and the committed pixels disagree,
+          // which is a worse defect than the drift this fixed.
+          //
+          // ⚠️ MATCHED PAIR. If `rotated_tile_offset` ever changes anchor, this
+          // must change with it; `scripts/guardrails.sh` enforces that the two
+          // files move together.
+          //
+          // This used to be the tile CENTRE, measured out of the engine through
+          // `measureText` so the two agreed. That read is gone with it — the
+          // top-left is (0, 0) in the box's own frame, so nothing needs
+          // measuring. It was one of the two RENDER-PASS engine reads the
+          // Stage 3.5 note calls unconvertible (a render pass cannot await);
+          // there is now one.
+          const pivotLocalX = 0;
+          const pivotLocalY = 0;
           // Transform-origin for the box body + textarea (relative to their
           // shared top-left at sx,sy).
           const boxTransformOrigin = `${pivotLocalX}px ${pivotLocalY}px`;

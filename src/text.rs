@@ -364,6 +364,44 @@ pub fn measure(text: &str, font_size: f32, bold: bool) -> (u32, u32) {
     )
 }
 
+/// Where to place the tile [`rotate_pixels`] returns so that the UNROTATED
+/// tile's TOP-LEFT stays fixed under rotation.
+///
+/// ⚠️ THIS IS THE ANCHOR DECISION, and it is the whole of ADR-050. It used to
+/// be "keep the two tiles' CENTRES together", which reads as obviously correct
+/// and is not: the unrotated tile's centre is `tile_w / 2`, and `tile_w` grows
+/// with the text. So the pivot slid right as the user typed and the committed
+/// ink translated — measured at 30°, ink minX/minY went (107,104) → (118,67)
+/// for the same text getting longer. Top-left does not move when the tile
+/// grows, which is why it is the anchor now.
+///
+/// [`rotate_pixels`] maps the SOURCE centre onto the OUTPUT centre, so the
+/// source top-left lands at `R(-c_src) + c_dst` inside the output. Placing the
+/// tile at minus that puts the source top-left back on the anchor. Deriving it
+/// from the two centres rather than from the corner extrema is what makes the
+/// `+2` padding `rotate_pixels` adds cancel out on its own — a min-of-corners
+/// formulation has to know about that padding, and would silently go 1px wrong
+/// if it ever changed.
+///
+/// ⚠️ MATCHED PAIR: `CanvasArea.tsx` must pivot the DOM preview about the same
+/// point, or the preview and the committed pixels disagree — which is a worse
+/// defect than the drift this fixes. `scripts/guardrails.sh` enforces that the
+/// two change together.
+pub(crate) fn rotated_tile_offset(
+    w: u32,
+    h: u32,
+    new_w: u32,
+    new_h: u32,
+    angle_deg: f32,
+) -> (i32, i32) {
+    let a = angle_deg * std::f32::consts::PI / 180.0;
+    let (cos, sin) = (a.cos(), a.sin());
+    let (hw, hh) = (w as f32 / 2.0, h as f32 / 2.0);
+    let ox = hw * cos - hh * sin - new_w as f32 / 2.0;
+    let oy = hw * sin + hh * cos - new_h as f32 / 2.0;
+    (ox.round() as i32, oy.round() as i32)
+}
+
 /// Rotate an RGBA pixel buffer by `angle_deg` degrees. Positive is CLOCKWISE
 /// in screen coords (y-down) — the same direction as CSS `rotate(+deg)`, so
 /// callers pass the angle as-is to match the live preview (no negation).
