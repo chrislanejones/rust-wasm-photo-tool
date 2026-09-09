@@ -15,7 +15,6 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { getWebPerfMetrics } from "@/lib/webPerf";
 import type { ExportFormat } from "@/lib/exportImage";
 import { useUIStore } from "@/stores/useUIStore";
-import { useGalleryStore } from "@/stores/useGalleryStore";
 
 /** The seam between this panel's sections — the same rule its footer draws,
  *  and the same `border-t border-theme-sidebar-border` four other settings
@@ -46,6 +45,8 @@ const FORMAT_LABELS: Record<ExportFormat, string> = {
 
 interface ResizeSettingsProps {
   disabled: boolean;
+  /** An immutable upload baseline exists for the active photo. */
+  hasCompareBaseline: boolean;
   imageWidth: number;
   imageHeight: number;
   /** Current on-disk size of the active photo, in bytes (PageSpeed score). */
@@ -87,6 +88,7 @@ function trafficColor(score: number) {
 
 export function ResizeSettings({
   disabled,
+  hasCompareBaseline,
   imageWidth,
   imageHeight,
   currentByteSize,
@@ -109,7 +111,6 @@ export function ResizeSettings({
   // A/B compare view lives in the UI store; the active-image dirty flag in the
   // gallery store — both were prop-drilled from AppShell before stage 1.
   const compareActive = useUIStore((s) => s.compareActive);
-  const hasBeenModified = useGalleryStore((s) => s.hasBeenModified);
   const [width, setWidth] = useState(String(imageWidth));
   const [height, setHeight] = useState(String(imageHeight));
   const [lockAspect, setLockAspect] = useState(true);
@@ -121,7 +122,6 @@ export function ResizeSettings({
   // either "Apply Compression & Resize" or "Auto Compress" — in this photo.
   // Pending (unapplied) changes no longer unlock it; there's nothing to
   // compare against until something is committed. Reset per photo below.
-  const [appliedHere, setAppliedHere] = useState(false);
   const baseQualityRef = useRef(quality);
   const baseFormatRef = useRef(exportFormat);
   const baseMethodRef = useRef(method);
@@ -162,7 +162,6 @@ export function ResizeSettings({
     baseQualityRef.current = quality;
     baseFormatRef.current = exportFormat;
     baseMethodRef.current = method;
-    setAppliedHere(false);
   }, [imageWidth, imageHeight, activePhotoId]);
 
   const handleWidthChange = useCallback(
@@ -213,7 +212,6 @@ export function ResizeSettings({
       baseQualityRef.current = quality;
       baseFormatRef.current = exportFormat;
       baseMethodRef.current = method;
-      setAppliedHere(true);
     }
   };
 
@@ -228,13 +226,11 @@ export function ResizeSettings({
     if (w > 0 && h > 0 && (w !== imageWidth || h !== imageHeight)) {
       onResizeOnly(w, h, FILTER_CODE[method]);
       baseMethodRef.current = method;
-      setAppliedHere(true);
     }
   };
 
   const handleAutoCompress = (scope: "selected" | "all") => {
     onAutoCompress(scope);
-    setAppliedHere(true);
   };
 
   const handleQualityChange = (val: number) => {
@@ -273,10 +269,33 @@ export function ResizeSettings({
     : compressionChanged && !dimensionsChanged
       ? "Apply Compression"
       : "Apply Compression & Resize";
-  // A/B compare unlocks only after an edit is *applied* in this photo —
-  // Apply Compression & Resize or Auto Compress (`appliedHere`), or an edit
-  // already on the photo (`hasBeenModified`). Pending changes don't count.
-  const compareDisabled = disabled || !(hasBeenModified || appliedHere);
+  // A/B compare needs ONE thing: a baseline to compare against.
+  //
+  // ⚠️ IT USED TO ALSO REQUIRE `hasBeenModified || appliedHere`, and all three
+  // ways that went wrong are the same mistake — gating a durable capability on
+  // transient state:
+  //
+  //   • `appliedHere` is this component's own `useState`. Switch tools and back
+  //     and it is false again, so compare re-locked on a photo you had just
+  //     compressed.
+  //   • `hasBeenModified` is a SINGLE GLOBAL boolean, not per-photo, and it is
+  //     React state — a reload clears it. That is the same class of bug as the
+  //     v7.81 batch-export data loss, whose post-mortem sits in AppShell:
+  //     "Every one of those is TRANSIENT REACT STATE, and a page reload clears
+  //     all of them."
+  //   • Auto Compress deliberately never sets `hasBeenModified` (it must not
+  //     light the modified dot for a batch file op), so compare was locked
+  //     after it even though the comparison is perfectly meaningful.
+  //
+  // The baseline is `PhotoEntry.uploadKey` — contentAudit calls it "the
+  // immutable upload original (A/B baseline)" — falling back to `originalKey`
+  // for photos that predate it. Auto Compress repoints `originalKey` and leaves
+  // `uploadKey` alone, so the baseline survives every path.
+  //
+  // Comparing an unmodified photo now shows two identical images. That is a
+  // true answer, cheaply obtained, and far better than a button that is dark
+  // when the user knows they just changed something.
+  const compareDisabled = disabled || !hasCompareBaseline;
 
   // Web-performance indicators come from Rust (`web_perf_metrics`). The
   // PageSpeed Insights score is byte-aware: a big, still-uncompressed photo
@@ -503,7 +522,7 @@ export function ResizeSettings({
             when only quality/format/method moved, and "Apply Compression &
             Resize" when both did — which is also the disabled resting label,
             because with nothing pending there is nothing to name. It is what
-            unlocks A/B Compare (`appliedHere`) in every case. */}
+            commits in every case. */}
         <Tooltip>
           <TooltipTrigger asChild>
             <div>
@@ -560,8 +579,8 @@ export function ResizeSettings({
           {compareDisabled && (
             <TooltipContent side="bottom" className="max-w-[220px] text-center">
               <p className="text-xs">
-                Apply Compression &amp; Resize or Auto Compress first, then use
-                A/B compare to see the difference vs. the original.
+                A/B compare needs the photo&rsquo;s original upload, and this
+                one has none stored.
               </p>
             </TooltipContent>
           )}

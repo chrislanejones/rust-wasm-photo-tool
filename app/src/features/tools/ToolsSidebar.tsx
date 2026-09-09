@@ -115,6 +115,9 @@ interface ToolsSidebarProps {
   onQualityChange: (q: number) => void;
   onQualityCommit: (q: number) => void;
   onToggleCompare: () => void;
+  /** An immutable upload baseline exists for the active photo, so A/B compare
+   *  has something to show. See ResizeSettings' `compareDisabled`. */
+  hasCompareBaseline: boolean;
   onAutoCompress: (scope: "selected" | "all") => void;
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
@@ -212,6 +215,7 @@ export function ToolsSidebar({
   onQualityChange,
   onQualityCommit,
   onToggleCompare,
+  hasCompareBaseline,
   onAutoCompress,
   isCompressing,
   compressProgress,
@@ -343,6 +347,7 @@ export function ToolsSidebar({
             exportFormat={exportFormat}
             onExportFormatChange={onExportFormatChange ?? (() => {})}
             onToggleCompare={onToggleCompare}
+            hasCompareBaseline={hasCompareBaseline}
             onAutoCompress={onAutoCompress}
             isCompressing={isCompressing}
             compressProgress={compressProgress}

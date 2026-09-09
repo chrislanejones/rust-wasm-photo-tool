@@ -10,6 +10,7 @@ import { getOriginal } from "@/lib/dexie/originalsAdapter";
 import { readExifTiff, applyExifToReencoded } from "@/lib/exif";
 import { EXT, encodeRgba, extFromMime, includeCanvasInExport } from "@/lib/exportImage";
 import type { ExportFormat } from "@/lib/exportImage";
+import { compareBaselineKey } from "@/lib/compareBaseline";
 
 export function useCanvasActions({
   stamp,
@@ -225,7 +226,7 @@ export function useCanvasActions({
     // Keep → transplant the true original's EXIF (JPEG/WebP); strip → leave clean.
     let sourceTiff: Uint8Array<ArrayBuffer> | null = null;
     if (exifKeep && entry && (exportFormat === "jpeg" || exportFormat === "webp")) {
-      const orig = await getOriginal(entry.uploadKey ?? entry.originalKey);
+      const orig = await getOriginal(compareBaselineKey(entry) ?? "");
       if (orig) sourceTiff = readExifTiff(new Uint8Array(orig.bytes), orig.mimeType);
     }
     bytes = applyExifToReencoded(
