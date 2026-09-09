@@ -103,7 +103,7 @@ export function SizeSlider(props: SizeSliderProps) {
                   "flex items-center justify-center w-7 h-7 rounded-full transition-all",
                   isActive
                     ? "ring-2 ring-theme-ring ring-offset-1 ring-offset-theme-sidebar"
-                    : "hover:bg-theme-accent",
+                    : "hover:bg-theme-muted",
                 ].join(" ")}
                 aria-label={`${label} ${preset}${unit}`}
               >

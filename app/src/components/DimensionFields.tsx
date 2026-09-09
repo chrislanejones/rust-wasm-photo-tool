@@ -58,7 +58,7 @@ export function DimensionFields({
             onChange={(e) => onWidthChange(e.target.value)}
             min={1}
             disabled={disabled}
-            className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+            className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
           />
         </div>
         <div className="flex flex-1 flex-col gap-0.5">
@@ -69,7 +69,7 @@ export function DimensionFields({
             onChange={(e) => onHeightChange(e.target.value)}
             min={1}
             disabled={disabled}
-            className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+            className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
           />
         </div>
         <button
