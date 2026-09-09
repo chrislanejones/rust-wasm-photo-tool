@@ -48,7 +48,6 @@ function activeSubToolResolved() {
 function modeOfActiveTool(s: ReturnType<typeof useToolStore.getState>) {
   switch (s.activeTool) {
     case "brush": return s.brushMode;
-    case "compress": return s.resizeMode;
     case "select": return s.selectionKind;
     case "stamp": return s.stampSubMode;
     case "shapes": return s.shapesMode;
@@ -56,7 +55,7 @@ function modeOfActiveTool(s: ReturnType<typeof useToolStore.getState>) {
     case "text": return s.textMode;
     case "emoji": return s.batchMode;
     case "perspective": return s.perspectiveMode;
-    default: return undefined; // single-mode: effects, crop, arrow
+    default: return undefined; // single-mode: effects, crop, arrow, compress
   }
 }
 

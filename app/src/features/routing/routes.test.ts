@@ -75,7 +75,11 @@ describe("parseRoute — legacy redirects (one per shape we have ever written)",
   // in somebody's bookmarks.
   const LEGACY: [string, string, string][] = [
     ["#/tool/resize/compress", "enhance", "compress"],
-    ["#/tool/resize/resize", "enhance", "resize"],
+    // Compress and Resize merged onto one tile, so the old resize-mode URL
+    // resolves to the surviving `compress` sub-tool rather than 404ing —
+    // `subToolForToolMode` finds no exact mode match and falls through to the
+    // single mode-less entry. An old bookmark still lands somewhere correct.
+    ["#/tool/resize/resize", "enhance", "compress"],
     ["#/tool/compress/compress", "enhance", "compress"],
     ["#/tool/effects", "enhance", "adjustments"],
     ["#/tool/eraser/rembg", "enhance", "ai"],

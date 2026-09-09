@@ -35,9 +35,9 @@ export interface ToolDefinition {
 export const TOOLS: ToolDefinition[] = [
   {
     id: "compress",
-    label: "Resize",
-    tooltipTitle: "Compress & Resize",
-    description: "Shrink the file or change the pixel dimensions",
+    label: "Resize & Compress",
+    tooltipTitle: "Resize & Compress",
+    description: "Set new dimensions and shrink the file — one panel, both scores",
     icon: Shrink,
     shortcutKey: "1",
   },

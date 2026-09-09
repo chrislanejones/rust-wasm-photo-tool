@@ -25,7 +25,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { panelSpacingTransition } from "@/lib/animations";
+import { hoverPop, panelSpacingTransition } from "@/lib/animations";
 import {
   HOVER_RING,
   SUBTILE_DISABLED,
@@ -74,7 +74,8 @@ function SubtoolButton({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
+        <motion.button
+          whileHover="hover"
           type="button"
           onClick={onClick}
           disabled={disabled}
@@ -93,11 +94,16 @@ function SubtoolButton({
           ].join(" ")}
         >
           {Icon ? (
-            <Icon className="h-[55%] w-[55%] transition-transform duration-200 ease-out group-hover:scale-110" />
+            <motion.span
+              variants={hoverPop}
+              className="flex h-[55%] w-[55%] items-center justify-center"
+            >
+              <Icon className="h-full w-full" />
+            </motion.span>
           ) : (
             <span className="text-2xs font-semibold">{label.slice(0, 2)}</span>
           )}
-        </button>
+        </motion.button>
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={8}>
         <p className="text-xs font-semibold">{label}</p>

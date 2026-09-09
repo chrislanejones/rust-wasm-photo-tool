@@ -10384,3 +10384,71 @@ the size band is unmoved at 817,392 B.
 
 Not required: nothing under `src/`, `app/src/features/tools/`, the canvas or
 the engine changed since v8.69. The release is headers, docs and one new test.
+
+## v8.71 Change Summary — 2026-09-08
+
+**Resize and Compress are one tile, and the side panels close from their corner again.**
+
+| # | Change | Status |
+| --- | --- | --- |
+| 1 | Enhance → **Resize & Compress** — one tile, one panel: scores → Resize → Compress | Complete |
+| 2 | **One Apply button**, named for what is pending: Apply Resize / Apply Compression / Apply Compression & Resize | Complete |
+| 3 | Panel close X on Tools, Gallery, Review — the Layers X, on the corner, hover-reveal, **40 s** then retires, restarts on re-entry | Complete |
+| 4 | Close X gated to the wide desktop layout — not the dock, drawers or compact bar | Complete |
+| 5 | Compact top bar is one flat row, `justify-between`, no group pills | Complete |
+| 6 | Hover pop is **one definition** (`hoverPop`, `lib/animations.ts`); gallery thumbnails and Review toggles pop; honours Reduce Motion | Complete |
+| 7 | Enhance panel spacing matched to Select › Magic Wand › Tolerance; dividers between sections | Complete |
+
+### One tile, not two
+
+They were never two tools — both sub-tools were already `tool: "compress"` behind one `ToolModeToggle`, sharing the panel. Removing the divider put the readout the user is steering toward above the controls that steer it. `resizeMode` left the store (it was never in the `persist` allowlist, so nothing migrates); old `#/tool/resize/resize` bookmarks still resolve to the merged tile through `subToolForToolMode`'s mode-less fallthrough. The command palette needed nothing — it builds from `LIVE_SUB_TOOLS`.
+
+| Pending change | Button | Enabled |
+| --- | --- | --- |
+| Nothing | Apply Compression & Resize | disabled |
+| Quality / format / method | **Apply Compression** | yes |
+| Width / height / scale | **Apply Resize** | yes |
+| Both | **Apply Compression & Resize** | yes |
+
+Undo/redo verified on both paths in the browser: quality 75 → 50 → apply → undo restores **75** → redo **50**; resize 276 → 180 → undo **276** → redo **180**.
+
+### The close X
+
+The Layers list's own 20px X, centred on the panel's top-left vertex — at 24px, a panel 12px from the screen edge put it at 0–24 and touching the viewport; at 20px it spans 2–22. Tools and Review moved `overflow-hidden` to an inner wrapper so the shell can let it hang out. The reveal is `hoverReveal` in `animations.ts`, driven by the button reading its own parent's pointer events — a `whileHover` on the panel would propagate to every tile icon inside it. Keyboard focus reveals it; hidden, it is `pointer-events: none`.
+
+| Panel | Rest | Hover | Leave | Focus | Click closes | Top bar reopens |
+| --- | --- | --- | --- | --- | --- | --- |
+| Tools · Gallery · Review | 0 | **1** | 0 | **1** | ✓ | ✓ |
+
+Retirement proven on the page clock: shown on enter → hidden at 41 s while still inside → shown again on re-enter → still shown at +20 s → hidden at +41 s.
+
+### The hover pop
+
+It was the same Tailwind string in three files (`ToolButton`, `SubtoolRow`, `IconButton`) and absent from `ToggleButtonGroup`, so the two halves of the top bar disagreed. As `hoverPop` it also sits under the app's `<MotionConfig reducedMotion>`; a CSS hover transform was invisible to it, so the old pop kept animating for users who had asked it not to. Measured ~1.1 under hover on six surfaces, 1 at rest and after.
+
+### Spacing
+
+| Gap | Before | After | Reference |
+| --- | --- | --- | --- |
+| Score → score | 32 | **16** | pre-merge 16 |
+| Resize header → Scale | 32 | **16** | Tolerance 16 |
+| Compress header → Method | 39 | **16** | Tolerance 16 |
+| Scale slider → width row | 23 | **17** | Method select → Quality 16 |
+
+The stubborn 7px under Compress was a bare inline `<label>` floating in a 24px line box — `block` fixed it.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** |
+| `pnpm -C app test` | **687 passed**, 59 files |
+| `pnpm lint` | **0 errors** |
+| `./scripts/guardrails.sh` | **OK**, at baseline |
+| `pnpm run build` | **succeeds** |
+
+**No Rust change** — `src/` and `Cargo.toml` untouched, so no `build:wasm` and the size band is unmoved at 817,392 B.
+
+### QC
+
+`imagehorse-qc` was **not run** for this cut; the tile, the Apply states, undo/redo, the compact bar, the three close buttons, the retirement clock, the hover pop and the spacing were each driven in the browser on the production build with zero page errors, but the full pass is owed.

@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { PaintSettings, PAINT_MODES } from "./settings/PaintSettings";
 import type { PaintMode } from "./settings/PaintSettings";
-import { ResizeSettings, RESIZE_MODES } from "./settings/ResizeSettings";
+import { ResizeSettings } from "./settings/ResizeSettings";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import { SelectSettings, SELECT_MODES } from "./settings/SelectSettings";
 import {
@@ -29,7 +29,6 @@ import {
 } from "./settings/PerspectiveSettings";
 import type {
   PerspectiveMode,
-  ResizeMode,
   SelectionKind,
 } from "@/stores/useToolStore";
 
@@ -69,12 +68,16 @@ const paintModule: ToolModule<PaintMode> = {
 /** Resize/Compress — second registered module (tool-UI arc Session 2.1).
  *  Registered under its legacy id `compress` (shortcut `1` and the ToolType
  *  union depend on it); the display label has been "Resize" since
- *  toolConfig.ts. Sub-mode state lives in `useToolStore.resizeMode`. */
-const resizeModule: ToolModule<ResizeMode> = {
+ *  toolConfig.ts.
+ *
+ *  SINGLE-MODE since the Compress/Resize merge: both halves feed the same two
+ *  scores, so they share one panel and there is no sub-mode left to store.
+ *  `useToolStore.resizeMode` went with the toggle. */
+const resizeModule: ToolModule = {
   id: "compress", // legacy id — see ToolModule.id
-  label: "Resize",
+  label: "Resize & Compress",
   icon: Shrink,
-  modes: RESIZE_MODES,
+  modes: [],
   Settings: ResizeSettings,
 };
 

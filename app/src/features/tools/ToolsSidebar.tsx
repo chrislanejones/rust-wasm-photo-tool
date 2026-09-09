@@ -14,6 +14,7 @@ import { ToolGrid } from "./ToolGrid";
 import { SubtoolRow } from "./SubtoolRow";
 import { useActiveSubTool } from "./activateSubTool";
 import { StampSettingsPanel } from "./settings/StampSettings";
+import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { TransformCropSettings } from "./settings/TransformCropSettings";
 import {
   LayerSettings,
@@ -72,6 +73,10 @@ interface ToolsSidebarProps {
    *  positioning / panel chrome / slide animation) so it can fill the compact
    *  master bar's content area instead of floating as its own panel. */
   embedded?: boolean;
+  /** Show the hover-reveal close in the top-left corner. Wide desktop layout
+   *  only — AppShell passes false whenever the dock, the narrow drawers or the
+   *  compact top bar are in play, where the chrome owns open/close instead. */
+  closable?: boolean;
   /** Total photos in the gallery — drives the Compress panel's count. (It used
    *  to pluralize the Download footer's label too; Export moved to the bar.) */
   photoCount: number;
@@ -159,6 +164,7 @@ interface ToolsSidebarProps {
 }
 
 export function ToolsSidebar({
+  onClose,
   rulersPrefs,
   onRulersChange,
   activeTool,
@@ -175,6 +181,7 @@ export function ToolsSidebar({
   layerMask,
   layerOverlay,
   embedded = false,
+  closable = false,
   photoCount,
   exportFormat,
   onExportFormatChange,
@@ -285,10 +292,18 @@ export function ToolsSidebar({
           ? // Compact master-bar content box: flush below the chrome (top 56 =
             // top-2 + 48px chrome), filling to the status bar.
             "fixed left-2 top-[58px] bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[252px] rounded-b-xl border border-t-0 border-border bg-bg-secondary flex flex-col overflow-hidden"
-          : "fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col overflow-hidden"
+          : "group fixed left-3 top-3 bottom-[var(--panel-bottom)] z-[var(--z-panel)] w-[260px] rounded-xl bg-bg-secondary border border-border flex flex-col"
       }
       style={embedded ? { boxShadow: "var(--shadow-panel)" } : { boxShadow: "var(--shadow-panel)" }}
     >
+      {/* Hover the panel and a close appears in its top-left; the top bar's
+          Tools toggle brings it back. Not in the docked master bar, whose
+          tab strip already owns open/close. */}
+      {closable && <PanelCloseButton label="Close Tools" onClose={onClose} />}
+      {/* The clip lives HERE, not on the fixed shell: the shell must let the
+          corner close button hang half outside it, and this wrapper keeps the
+          rounded corners trimming the scrolling content exactly as before. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
       {/* Tool rail + the active tool's sub-tool rail. `layout` is what makes
           the body below slide rather than jump when the sub-row row-count
           changes (0 -> 1 -> 2 rows). */}
@@ -306,7 +321,10 @@ export function ToolsSidebar({
 
       <motion.div
         layout
-        className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin"
+        // pb-8, not p-4 all round: the last run of buttons in a settings panel
+        // (Auto Compress & Resize, Compress Image, Compress All Images) ended
+        // 16px off the sidebar's bottom edge with nothing under it.
+        className="flex-1 overflow-y-auto p-4 pb-8 space-y-5 scrollbar-thin"
       >
         {activeTool === "compress" && (
           <ResizeSettings
@@ -483,6 +501,7 @@ export function ToolsSidebar({
           fifth item in the bar's New · Tools · Gallery · Review run, in both
           the top bar and the compact master bar, which is where the other
           whole-app actions already are. Same handler, no footer. */}
+      </div>
     </motion.div>
   );
 }

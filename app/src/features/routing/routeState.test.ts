@@ -19,7 +19,6 @@ beforeEach(() => {
     activeTool: "compress",
     activeSubTool: "enhance/compress",
     brushMode: "paint",
-    resizeMode: "compress",
     selectionKind: "wand",
     shapesMode: "shapes",
     stampSubMode: "clone",
