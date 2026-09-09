@@ -10,6 +10,7 @@
 // enforces that rather than promising it. NIGHT JOB VI Phase 3 uses this to
 // measure whether an orphan sweeper is worth building at all.
 
+import { auditRotatedText, formatRotatedTextMarkdown } from "./rotatedTextAudit";
 import {
   auditContentStores,
   formatAuditMarkdown,
@@ -39,6 +40,17 @@ async function runArchiveCorruptionAudit(): Promise<ArchiveCorruptionResult> {
   return { report, markdown: formatArchiveCorruptionMarkdown(report) };
 }
 
+/** `await window.__ihRotatedTextAudit()` → { report, markdown }.
+ *
+ *  The one number ADR-050's migration decision needs: how many STORED text
+ *  annotations are rotated. Read-only by construction; it will not even open
+ *  the archive database unless `indexedDB.databases()` says it already
+ *  exists. */
+async function runRotatedTextAudit() {
+  const report = await auditRotatedText();
+  return { report, markdown: formatRotatedTextMarkdown(report) };
+}
+
 /** Attach to window so it can be driven from the console or automation. */
 export function installContentAudit(): void {
   (globalThis as unknown as Record<string, unknown>).__ihContentAudit = runContentAudit;
@@ -55,4 +67,19 @@ export function installContentAudit(): void {
 export function installArchiveCorruptionAudit(): void {
   (globalThis as unknown as Record<string, unknown>).__ihArchiveCorruptionAudit =
     runArchiveCorruptionAudit;
+}
+
+/** `await window.__ihRotatedTextAudit()` → { report, markdown }.
+ *
+ *  UNGATED, like the archive-corruption audit beside it and for the same
+ *  reason. It was first written into `installContentAudit`, which only runs
+ *  under `import.meta.env.DEV || webgpuEnabled()` — so it would have been
+ *  present everywhere EXCEPT the production profile whose annotations are the
+ *  entire point of counting. A probe hidden from the data it exists to measure
+ *  reports zero and looks like an answer.
+ *
+ *  Costs a function definition that reads integers off a read-only cursor. */
+export function installRotatedTextAudit(): void {
+  (globalThis as unknown as Record<string, unknown>).__ihRotatedTextAudit =
+    runRotatedTextAudit;
 }
