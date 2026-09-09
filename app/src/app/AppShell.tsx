@@ -2756,6 +2756,9 @@ export function AppShell() {
       >
         Skip to canvas
       </a>
+      {/* The app-background checkerboard — full viewport, underneath everything.
+          See .app-checkerboard in styles.css for why it is not on .canvas-wrapper. */}
+      <div aria-hidden="true" data-app-checkerboard className="app-checkerboard" />
       <AnimatePresence>
         {isImageLoading && (
           <motion.div
@@ -3120,10 +3123,12 @@ export function AppShell() {
                   general={general}
                   superUser={superUser}
                   openRaster={openRaster}
-                  grouped
+                  // Standalone: the master bar is one flat row with no pills now, so
+                  // each control carries its own fill (same as the compact top bar).
+                  grouped={false}
                 />
               }
-              userSlot={<UserMenu grouped />}
+              userSlot={<UserMenu grouped={false} />}
             />
           )}
         </AnimatePresence>
@@ -3330,7 +3335,7 @@ export function AppShell() {
                   }}
                 >
                   <div
-                    className="canvas-grid-host checkerboard-canvas"
+                    className="canvas-grid-host"
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(5, 1fr)",
