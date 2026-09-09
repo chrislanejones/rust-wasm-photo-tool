@@ -273,10 +273,41 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       <button
         onClick={(e) => { e.stopPropagation(); onToggleSelect(e.shiftKey); }}
         title={selected ? "Deselect" : "Select"}
+        /* ⚠️ `bg-accent` IS NOT THE BROWN, and that was the bug. Tailwind's
+           `accent` maps to `--accent-ui` — a pale cream SURFACE (#ece6db light,
+           #2b2b2b dark) — while the brand brown is `--accent` / `--primary`,
+           which has no `accent` utility. A white check on #ece6db measures
+           1.24:1: invisible in light mode. It survived because the same class
+           gives 14.16:1 in dark, so the bug only existed for half the users.
+
+           A BROWN CHIP WITH A DARK TICK was the obvious fix and measures
+           worse where it matters. The tick is fine (4.54:1 light), but the
+           CHIP is only 2.81:1 against a white card — so on the checkerboard
+           behind a transparent thumbnail the chip itself disappears, which is
+           the complaint this started from. A control you cannot find is not
+           improved by the tick inside it being legible.
+
+           So: `theme-primary-foreground` (#3a3128) as the CHIP with a white
+           tick. 12.73:1 for the tick AND 12.73:1 for the chip against the card,
+           and — because that token is the same value in both themes — the
+           control looks identical in light and dark instead of flipping. The
+           border stays `theme-primary` so the chip still echoes the brown ring
+           that marks a selected thumbnail.
+
+           ⚠️ Using a *-foreground token as a background is deliberate, not a
+           slip. This chip sits on an arbitrary PHOTO, so it needs a colour that
+           does not follow the panel — and that token is the only theme-stable
+           dark the palette has.
+
+           The unselected state stays a scrim-plus-border rather than a theme
+           colour: it sits on an arbitrary photo, so it needs to work against
+           unknown pixels rather than against the panel. The border is stronger
+           now, and the tick is faintly present instead of fully transparent so
+           the control reads as a checkbox before you hover it. */
         className={`absolute bottom-1 right-1 z-30 flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
           selected
-            ? "bg-accent border-accent text-white opacity-100"
-            : "bg-black/50 border-white/70 text-transparent"
+            ? "bg-theme-primary-foreground border-theme-primary text-white opacity-100"
+            : "bg-black/55 border-white/80 text-white/45"
         } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
       >
         <Check className="h-3 w-3" />
