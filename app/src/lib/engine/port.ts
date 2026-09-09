@@ -102,6 +102,11 @@ export function detachLivePort(): void {
 export function disposeLivePort(): void {
   livePort?.dispose();
   livePort = null;
+  // The start that was in flight belonged to the worker just terminated. Left
+  // set, the next `createLiveEngine` would await a promise for a document that
+  // no longer exists before deciding anything — and in a test, leak that wait
+  // into the following case.
+  livePortStarting = null;
   // The held element belonged to the worker that just died; a later port must
   // not be handed a canvas that was already transferred to a dead one.
   pendingCanvas = null;
@@ -111,6 +116,26 @@ export function disposeLivePort(): void {
  *  invariant at the top of this file is ONE PORT PER DOCUMENT — a second client
  *  would be a second queue, and `OpLog::append` records arrival order. */
 let livePort: EngineWorkerClient | null = null;
+
+/** The in-flight `init` / `reinit`, or null when the port is settled.
+ *
+ * ⚠️ WITHOUT THIS, TWO OVERLAPPING LOADS REFUSE EACH OTHER. `livePort` is
+ * assigned BEFORE its `init` is awaited, so a second load arriving in that
+ * window sees a truthy port and takes the `reinit` branch — against a worker
+ * whose `case "init"` has not finished its two awaits (`import("stamp_tool")`
+ * then `mod.default()`). The worker answers `{ ok: false, error: "reinit
+ * before init" }` and BOTH loads reject. Reproduced in `portInitRace.test.ts`.
+ *
+ * `createLiveEngine.test.ts` could never have caught it: its fake answers
+ * `init` and `reinit` identically and always `ok: true`, so it models a worker
+ * that is ready the instant it exists. A fake that cannot refuse cannot
+ * reproduce a refusal.
+ *
+ * Serialising here rather than inside `EngineWorkerClient` is deliberate — the
+ * client has the same shape internally (`this.worker = w` precedes its await),
+ * but this module is where ONE PORT PER DOCUMENT is decided, so this is where
+ * "which document is starting" belongs. */
+let livePortStarting: Promise<void> | null = null;
 
 /** The live worker client, for callers that need the port itself rather than
  *  the engine handle (a12.2 hands it the transferred `OffscreenCanvas`).
@@ -184,14 +209,35 @@ export async function createLiveEngine(spec: {
   // The invariant at the top of this file is unaffected: it demands ONE PORT PER
   // DOCUMENT, and one port serving documents in sequence is still one queue and
   // still FIFO. Reuse also removes a 715 ms cold start from every photo switch.
+  // Wait out any start already in flight before deciding init-vs-reinit —
+  // otherwise the decision is made against a port that is not yet what it
+  // claims to be. The rejection is swallowed rather than propagated: a failed
+  // start belongs to the OTHER caller, and this one is about to make its own
+  // attempt. `livePort` is cleared below if that start left nothing usable.
+  if (livePortStarting) {
+    await livePortStarting.catch(() => {});
+  }
   let port = livePort;
   if (port) {
-    await port.reinit(width, height);
+    livePortStarting = port.reinit(width, height);
   } else {
     port = new EngineWorkerClient();
     livePort = port;
-    await port.init(width, height);
+    livePortStarting = port.init(width, height);
   }
+  try {
+    await livePortStarting;
+  } catch (e) {
+    // A port that failed to start must not be left as `livePort`, or the next
+    // load takes the reuse branch into a worker that never came up and gets a
+    // second, more confusing failure.
+    if (livePort === port) {
+      livePort = null;
+      livePortStarting = null;
+    }
+    throw e;
+  }
+  livePortStarting = null;
   if (pixels) {
     // ⚠️ DELIBERATELY NOT TRANSFERRED, and the reason is a silent-corruption
     // hazard rather than a preference.
