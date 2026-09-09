@@ -41,8 +41,12 @@ interface UIState {
   showTools: boolean;
   showGallery: boolean;
   showHistory: boolean;
-  smallNoticeDismissed: boolean;
-  tabletNoticeDismissed: boolean;
+  /** Mobile-version heads-up (view/upload only, no editing) dismissed for this
+   *  stretch of being at phone width; re-armed when the window grows back. */
+  mobileNoticeDismissed: boolean;
+  /** Compact-version (snapped / split-screen dock) heads-up dismissed for this
+   *  stretch of being in the dock range; re-armed when the window grows back. */
+  compactNoticeDismissed: boolean;
   showShortcutModal: boolean;
   showCelebration: boolean;
   showDiagnostics: boolean;
@@ -101,8 +105,8 @@ interface UIState {
   setShowTools: (v: SetArg<boolean>) => void;
   setShowGallery: (v: SetArg<boolean>) => void;
   setShowHistory: (v: SetArg<boolean>) => void;
-  setSmallNoticeDismissed: (v: SetArg<boolean>) => void;
-  setTabletNoticeDismissed: (v: SetArg<boolean>) => void;
+  setMobileNoticeDismissed: (v: SetArg<boolean>) => void;
+  setCompactNoticeDismissed: (v: SetArg<boolean>) => void;
   setShowShortcutModal: (v: SetArg<boolean>) => void;
   setShowCelebration: (v: SetArg<boolean>) => void;
   setShowDiagnostics: (v: SetArg<boolean>) => void;
@@ -144,8 +148,8 @@ export const useUIStore = create<UIState>()(
       showTools: false,
       showGallery: false,
       showHistory: false,
-      smallNoticeDismissed: false,
-      tabletNoticeDismissed: false,
+      mobileNoticeDismissed: false,
+      compactNoticeDismissed: false,
       showShortcutModal: false,
       showCelebration: false,
       showDiagnostics: false,
@@ -177,10 +181,10 @@ export const useUIStore = create<UIState>()(
       setShowTools: (v) => set((s) => ({ showTools: resolveSet(v, s.showTools) })),
       setShowGallery: (v) => set((s) => ({ showGallery: resolveSet(v, s.showGallery) })),
       setShowHistory: (v) => set((s) => ({ showHistory: resolveSet(v, s.showHistory) })),
-      setSmallNoticeDismissed: (v) =>
-        set((s) => ({ smallNoticeDismissed: resolveSet(v, s.smallNoticeDismissed) })),
-      setTabletNoticeDismissed: (v) =>
-        set((s) => ({ tabletNoticeDismissed: resolveSet(v, s.tabletNoticeDismissed) })),
+      setMobileNoticeDismissed: (v) =>
+        set((s) => ({ mobileNoticeDismissed: resolveSet(v, s.mobileNoticeDismissed) })),
+      setCompactNoticeDismissed: (v) =>
+        set((s) => ({ compactNoticeDismissed: resolveSet(v, s.compactNoticeDismissed) })),
       setShowShortcutModal: (v) =>
         set((s) => ({ showShortcutModal: resolveSet(v, s.showShortcutModal) })),
       setShowCelebration: (v) =>

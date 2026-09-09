@@ -27,8 +27,8 @@ interface Props {
  * `ui/dialog`'s `DialogContent`, and the ~40 lines that used to sit here are
  * gone. Nothing about this modal's behaviour changed in the move.
  *
- * The old look is preserved deliberately, via the same two props
- * `SmallWindowNotice` uses: `--z-modal` (60) keeps it above dialog-level
+ * The old look is preserved deliberately, via two props: `--z-modal` (60)
+ * keeps it above dialog-level
  * surfaces (60 vs the primitive's default 50), and the backdrop keeps its
  * lighter 60% tint and blur instead of the primitive's flat 80%.
  *
