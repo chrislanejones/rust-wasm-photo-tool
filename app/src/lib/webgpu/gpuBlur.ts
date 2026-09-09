@@ -94,12 +94,72 @@ export interface GpuBlurResult {
 }
 
 /**
+ * The device and pipeline, kept between calls.
+ *
+ * WHY. Acquiring a `GPUDevice` and compiling the shader cost **25.9 ms** of a
+ * 44.7 ms call, measured on Intel Xe-LPG — the single largest line in the
+ * blur's budget and larger than the whole amortised call (8.0 ms at 1024²).
+ * The header used to say a persistent pipeline was "a speed optimisation …
+ * gated behind a zero-delta harness run". That gate has been met: five cases,
+ * max channel delta 0, on real hardware (ADR-030's Measurements).
+ *
+ * ⚠️ A DEVICE CAN BE LOST — driver reset, GPU reset, some platforms on tab
+ * background. A cached device that has been lost fails every later call, which
+ * is strictly worse than the per-call version it replaces. So `device.lost` is
+ * wired the moment the device is created: on loss the cache is dropped and the
+ * next call re-acquires. `device.destroy()` resolves that promise too, which is
+ * what makes the recovery path testable rather than theoretical.
+ */
+interface GpuContext {
+  device: GPUDevice;
+  pipeline: GPUComputePipeline;
+}
+let cached: GpuContext | null = null;
+let pending: Promise<GpuContext> | null = null;
+
+async function acquire(): Promise<GpuContext> {
+  if (cached) return cached;
+  // Collapse concurrent first calls onto one acquisition — two callers racing
+  // would otherwise build two devices and leak the loser.
+  if (pending) return pending;
+  pending = (async () => {
+    const adapter = await navigator.gpu!.requestAdapter();
+    if (!adapter) throw new Error("WebGPU unavailable: requestAdapter() returned null");
+    const device = await adapter.requestDevice();
+    // Wired BEFORE the context is published, so a loss that happens during
+    // setup still clears the cache rather than leaving a dead device in it.
+    void device.lost.then(() => {
+      if (cached?.device === device) cached = null;
+    });
+    const module = device.createShaderModule({ code: SHADER });
+    const pipeline = device.createComputePipeline({
+      layout: "auto",
+      compute: { module, entryPoint: "main" },
+    });
+    cached = { device, pipeline };
+    return cached;
+  })();
+  try {
+    return await pending;
+  } finally {
+    pending = null;
+  }
+}
+
+/** Drop the cached device. Exported for the harness — `device.destroy()`
+ *  resolves `device.lost`, which is how the recovery path is exercised. */
+export function __resetGpuBlurContextForTest(): void {
+  cached?.device.destroy();
+  cached = null;
+}
+
+/**
  * Blur `rgba` on the GPU. Throws with a readable reason if WebGPU is
  * unavailable; callers are expected to have checked `gpuUsable()` first.
  *
- * Creates and tears down its own device-side resources per call. That is
- * wasteful and intentional for now: a persistent pipeline is a speed
- * optimisation, and speed work is gated behind a zero-delta harness run.
+ * The device and pipeline are cached across calls (see above); the per-call
+ * buffers are still created and destroyed per call, which is correct — they
+ * are sized to the image.
  */
 export async function gaussianBlurGpu(
   rgba: Uint8ClampedArray,
@@ -110,8 +170,7 @@ export async function gaussianBlurGpu(
   const status = await probeWebGpu();
   if (!status.ok) throw new Error(`WebGPU unavailable: ${status.reason}`);
 
-  const adapter = await navigator.gpu!.requestAdapter();
-  const device = await adapter!.requestDevice();
+  const { device, pipeline } = await acquire();
   const t0 = performance.now();
 
   const kr = clampRadius(intensity);
@@ -123,7 +182,10 @@ export async function gaussianBlurGpu(
     device.createBuffer({ size: byteLen, usage });
 
   const srcBuf = mkStorage(GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
-  const midBuf = mkStorage(GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+  // Plain STORAGE: bound `read_write` in pass 1 and `read` in pass 2, so the
+  // mid -> midAsSrc copy this used to make is unnecessary. Verified
+  // byte-identical without it (max channel delta 0).
+  const midBuf = mkStorage(GPUBufferUsage.STORAGE);
   const dstBuf = mkStorage(GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
   const readBuf = device.createBuffer({
     size: byteLen,
@@ -155,12 +217,6 @@ export async function gaussianBlurGpu(
   const hParams = mkParams(0);
   const vParams = mkParams(1);
 
-  const module = device.createShaderModule({ code: SHADER });
-  const pipeline = device.createComputePipeline({
-    layout: "auto",
-    compute: { module, entryPoint: "main" },
-  });
-
   const bind = (a: GPUBuffer, b: GPUBuffer, p: GPUBuffer) =>
     device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
@@ -184,18 +240,11 @@ export async function gaussianBlurGpu(
     p.dispatchWorkgroups(gx, gy);
     p.end();
   }
-  // mid is COPY_SRC only, so it cannot also be the read source of pass 2 —
-  // copy it into a fresh readable storage buffer first.
-  const midAsSrc = device.createBuffer({
-    size: byteLen,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-  enc.copyBufferToBuffer(midBuf, 0, midAsSrc, 0, byteLen);
   // Pass 2: vertical, mid -> dst.
   {
     const p = enc.beginComputePass();
     p.setPipeline(pipeline);
-    p.setBindGroup(0, bind(midAsSrc, dstBuf, vParams));
+    p.setBindGroup(0, bind(midBuf, dstBuf, vParams));
     p.dispatchWorkgroups(gx, gy);
     p.end();
   }
@@ -207,8 +256,9 @@ export async function gaussianBlurGpu(
   readBuf.unmap();
   const elapsedMs = performance.now() - t0;
 
-  for (const b of [srcBuf, midBuf, midAsSrc, dstBuf, readBuf, kernelBuf, hParams, vParams]) b.destroy();
-  device.destroy();
+  // Per-call buffers go; the DEVICE stays. Destroying it here is what cost
+  // 25.9 ms on the next call.
+  for (const b of [srcBuf, midBuf, dstBuf, readBuf, kernelBuf, hParams, vParams]) b.destroy();
 
   return { pixels: out, elapsedMs };
 }
