@@ -719,11 +719,36 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // layer is blank when it is not. The call is deliberately for ONE layer
     // rather than a map over the stack (that shape is what caused the v7.81
     // batch-export data loss). Gate numbers unchanged again.
+    //
+    // ADR-030 (GPU blur first consumer) — 128 -> 132: `useTransforms.ts`'s
+    // `applyGlobalBlur` adds FOUR awaited sites inside its GPU branch —
+    // `width`, `height`, `active_layer_rgba`, `apply_blurred_layer_rgba`.
+    // All four are born awaited and value-consuming, and the last one is the
+    // dangerous shape this gate exists for: it returns FALSE when the layer
+    // was resized between the read and the write, and an un-awaited Promise
+    // is truthy — so the fallback would never fire and the canvas would keep
+    // a buffer the engine had already refused. The two dimension reads are
+    // awaited for the same reason, not for tidiness: under the worker proxy
+    // they are Promises, and `gaussianBlurGpu(src, Promise, Promise, r)`
+    // produces a garbage-sized dispatch rather than an error.
+    //
+    // ⚠️ These four run ONLY when `ih_webgpu` is on. The flag is checked
+    // SYNCHRONOUSLY before any of them, so the default path is unchanged and
+    // still crosses the boundary exactly once.
+    //
+    // ADR-030 (engine kernel) — 132 -> 133: a FIFTH awaited site in the same
+    // branch, `gaussian_kernel`. It exists because a JS-ported Gaussian kernel
+    // cannot be bit-exact — `build_gaussian_kernel` calls `f32::exp` and
+    // `Math.fround(Math.exp(x))` is the correctly-rounded f64 result instead.
+    // Measured on intel/xe-lpg, the ported kernel put the GPU 1 LSB off the
+    // engine on 3 bytes at 512² r5 and 10 at 1024² r5. Awaited for the usual
+    // reason: under the worker proxy it is a Promise, and handing a Promise to
+    // the shader as a kernel produces a garbage dispatch rather than an error.
     ).toBe(5);
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(128);
+    expect(gate.awaited, "cumulative converted sites").toBe(133);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

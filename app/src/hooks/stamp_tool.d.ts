@@ -493,6 +493,20 @@ declare module "stamp_tool" {
     /** Blur the whole image, snapshot included — geometry computed engine-side
      *  so the caller never measures width/height and hands them back. */
     blur_whole_image(intensity: number): void;
+    /** ACTIVE LAYER's raw RGBA — for the GPU blur hand-off (ADR-030). NOT the
+     *  composite: `get_image_data()` includes the artboard and annotations, and
+     *  storing that back as the layer bakes them into the photo. */
+    /** The engine's Gaussian kernel for `radius`. A method as well as the free
+     *  `gaussian_kernel` so the WORKER path can reach it — the main thread holds
+     *  only this proxy, and using the free function there would initialise a
+     *  second wasm instance for 61 floats. */
+    gaussian_kernel(radius: number): Float32Array;
+    active_layer_rgba(): Uint8Array;
+    /** Write a GPU-blurred buffer back into the ACTIVE layer, one snapshot,
+     *  same as `blur_whole_image`. Returns false and writes NOTHING on a length
+     *  mismatch (a resize landing between the read and the write) — the caller
+     *  falls back to the CPU path rather than painting a mis-sized buffer. */
+    apply_blurred_layer_rgba(pixels: Uint8Array): boolean;
     /** Pixelate (mosaic) a circular brush region into block_size px squares. */
     pixelate_region(
       cx: number,

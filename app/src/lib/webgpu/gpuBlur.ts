@@ -166,6 +166,22 @@ export async function gaussianBlurGpu(
   width: number,
   height: number,
   intensity: number,
+  /**
+   * The engine's own Gaussian kernel, when the caller can get one.
+   *
+   * ⚠️ PASS THIS IN PRODUCTION. Without it the fallback in `blurReference.ts`
+   * is used, and a PORTED kernel cannot be bit-exact — `build_gaussian_kernel`
+   * calls `f32::exp`, and `Math.fround(Math.exp(x))` is the correctly-rounded
+   * f64 result rather than f32's own exp. Measured on intel/xe-lpg: the ported
+   * kernel put GPU output 1 LSB off the engine on 3 bytes at 512² r5 and 10 at
+   * 1024² r5, while being exact at r30. A GPU path that disagrees with the CPU
+   * path makes the same document render differently depending on which drew it,
+   * which is the thing ADR-030 exists to prevent.
+   *
+   * Optional because the self-test and the bench drive this module without an
+   * engine handle; they wire the kernel through `setEngineKernel` instead.
+   */
+  kernelOverride?: Float32Array,
 ): Promise<GpuBlurResult> {
   const status = await probeWebGpu();
   if (!status.ok) throw new Error(`WebGPU unavailable: ${status.reason}`);
@@ -174,7 +190,7 @@ export async function gaussianBlurGpu(
   const t0 = performance.now();
 
   const kr = clampRadius(intensity);
-  const kernel = buildGaussianKernel(kr);
+  const kernel = kernelOverride ?? buildGaussianKernel(kr);
   const pxCount = width * height;
   const byteLen = pxCount * 4;
 
