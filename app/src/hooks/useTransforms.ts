@@ -311,6 +311,15 @@ export function useTransforms(engine: EngineCore) {
           // these return Promises, and a `void` return slot swallows one
           // without tsc noticing — the a8/a13 trap.
           const [w, h] = [await t.width(), await t.height()];
+          // The ENGINE's kernel, not the port. `build_gaussian_kernel` calls
+          // `f32::exp` and JavaScript cannot reproduce it — a ported kernel put
+          // the GPU 1 LSB off the engine on 3 bytes at 512² r5 (measured, ADR-030).
+          // Fetched here because this is the only layer holding an engine handle;
+          // under the worker proxy it is a Promise, hence the await.
+          const engineKernel =
+            typeof t.gaussian_kernel === "function"
+              ? await t.gaussian_kernel(kernelRadius)
+              : undefined;
           const src = await t.active_layer_rgba();
           // VIEWS, not copies, in both directions. The engine speaks
           // Uint8Array and gpuBlur speaks Uint8ClampedArray over the same
@@ -321,6 +330,7 @@ export function useTransforms(engine: EngineCore) {
             w,
             h,
             kernelRadius,
+            engineKernel,
           );
           // ⚠️ w/h were read, then awaited across. A resize landing in that gap
           // is the read-modify-write ADR-024 Stage 2 removed from this very

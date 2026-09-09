@@ -735,11 +735,20 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // ⚠️ These four run ONLY when `ih_webgpu` is on. The flag is checked
     // SYNCHRONOUSLY before any of them, so the default path is unchanged and
     // still crosses the boundary exactly once.
+    //
+    // ADR-030 (engine kernel) — 132 -> 133: a FIFTH awaited site in the same
+    // branch, `gaussian_kernel`. It exists because a JS-ported Gaussian kernel
+    // cannot be bit-exact — `build_gaussian_kernel` calls `f32::exp` and
+    // `Math.fround(Math.exp(x))` is the correctly-rounded f64 result instead.
+    // Measured on intel/xe-lpg, the ported kernel put the GPU 1 LSB off the
+    // engine on 3 bytes at 512² r5 and 10 at 1024² r5. Awaited for the usual
+    // reason: under the worker proxy it is a Promise, and handing a Promise to
+    // the shader as a kernel produces a garbage dispatch rather than an error.
     ).toBe(5);
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(132);
+    expect(gate.awaited, "cumulative converted sites").toBe(133);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

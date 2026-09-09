@@ -293,9 +293,17 @@ async function gpuBlurEngineParity(
 
   const mod = (await import("stamp_tool")) as unknown as {
     default: () => Promise<void>;
+    gaussian_kernel?: (r: number) => Float32Array;
     ImageHorseTool: new (w: number, h: number) => Record<string, (...a: never[]) => never>;
   };
   await mod.default();
+
+  // Same wiring as `gpuBlurSelfTest`: without it this harness compares against
+  // the PORTED kernel and reports "oracle drift" that is really its own.
+  const engineKernelFn = mod.gaussian_kernel;
+  if (typeof engineKernelFn === "function") {
+    setEngineKernel((r) => engineKernelFn(r));
+  }
 
   const seedImage = makeImage(width, height, 0x8577_1b3d);
   const make = () => {

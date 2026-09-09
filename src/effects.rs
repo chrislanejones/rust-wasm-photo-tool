@@ -93,6 +93,24 @@ impl ImageHorseTool {
     // PNG encode plus decode on a 4 MB buffer costs more than the whole GPU
     // win it would be paying for.
 
+    /// The engine's Gaussian kernel for `radius` — the same values
+    /// `blur_region` convolves with.
+    ///
+    /// ⚠️ A METHOD AS WELL AS THE FREE `gaussian_kernel`, and the duplication is
+    /// deliberate rather than sloppy. The free function is what the harnesses
+    /// use: they `import("stamp_tool")` directly and already initialise it. The
+    /// PRODUCTION caller cannot — under ADR-024's worker the engine lives on
+    /// another thread, and the only handle the main thread holds is this tool's
+    /// proxy. Reaching the free function from there would mean initialising a
+    /// SECOND wasm instance on the main thread, ~800 KB of linear memory, to
+    /// compute 61 floats.
+    ///
+    /// One implementation, two doors. Both delegate to
+    /// `filters::build_gaussian_kernel`, so they cannot disagree.
+    pub fn gaussian_kernel(&self, radius: u32) -> Vec<f32> {
+        crate::filters::build_gaussian_kernel(radius.clamp(1, 30))
+    }
+
     /// The ACTIVE layer's raw RGBA, for a pure-function pass that will hand the
     /// result straight back to [`Self::apply_blurred_layer_rgba`].
     pub fn active_layer_rgba(&self) -> Vec<u8> {
