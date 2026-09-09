@@ -1,7 +1,11 @@
 import type { Variants, Transition, Easing } from "framer-motion";
 
 // Standardized quick motion transition (200ms spring animation)
-export const quickSpring: Transition = {
+// Not exported any more, and that is the consolidation working: its last two
+// direct consumers were the two dialogs that now spread `dialogZoom`. It is
+// composed into the variants below and reached through them, which is what
+// stops a component picking a spring by hand and drifting from the rest.
+const quickSpring: Transition = {
   type: "spring",
   stiffness: 400,
   damping: 30,
@@ -78,6 +82,41 @@ export const panelSwap: Variants = {
   hidden: { opacity: 0, x: 12 },
   visible: { opacity: 1, x: 0, transition: { duration: 0.2 } },
   exit: { opacity: 0, x: -12, transition: { duration: 0.12 } },
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   WHAT DELIBERATELY IS NOT IN THIS FILE.
+   Audited 2026-09-09, when nine components still wrote framer props inline.
+   Five of those were real duplication and moved here. Four did not, and are
+   listed so the next audit does not "fix" them into worse code:
+
+     · AppShell's load-progress bar and canvas margins, and TopBar's panel
+       gutters — the animated value is COMPUTED from breakpoints and panel
+       state. A variant would have to receive the computed number anyway, so
+       extracting hides the logic and shares nothing.
+     · CelebrationDialog's confetti — every particle carries its own dx, dy,
+       rotation, duration and delay. That is per-item DATA, not a shared style.
+     · BrandRevealScreen's `reduceMotion ? 0 : 0.35`. It looks redundant beside
+       AppShell's <MotionConfig reducedMotion>, and it is not: `"always"` still
+       lets OPACITY animate, because a fade is not motion. Killing the duration
+       is what actually removes it for someone who asked for less motion.
+
+   A variant used once is indirection, not a single source of truth.
+   ────────────────────────────────────────────────────────────────────────── */
+
+// Modal / dialog entrance — the surface itself, not its backdrop.
+//
+// ⚠️ THIS EXISTED TWICE AND THE TWO HAD ALREADY DRIFTED: UploadDialog entered
+// from `scale: 0.95`, ObjectRemovalModal from `scale: 0.96`. Nobody chose
+// that difference and nobody could see it — which is the whole argument for a
+// named variant. `settingsPanelMotion` right below carries the same scar in
+// its own comment ("it had drifted into ~9 inline copies").
+//
+// Spread it — `{...dialogZoom}` — rather than copying the triple.
+export const dialogZoom = {
+  initial: { scale: 0.95, opacity: 0 },
+  animate: { scale: 1, opacity: 1, transition: quickSpring },
+  exit: { scale: 0.95, opacity: 0, transition: { duration: 0.12 } },
 };
 
 // Settings sub-feature panel enter/exit (Paint / Text / Resize sub-panels and

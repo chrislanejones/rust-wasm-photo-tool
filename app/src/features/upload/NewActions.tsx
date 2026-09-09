@@ -22,6 +22,7 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { Spinner } from "@/components/ui/spinner";
 import { panelSwap } from "@/lib/animations";
+import { FIELD_NUMERIC, FIELD_TEXTAREA } from "@/lib/styles";
 import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { IconButton } from "@/components/ui/icon-button";
@@ -457,7 +458,7 @@ export function NewActions({
                         setBlankW(e.target.value);
                         setBlankPreset("");
                       }}
-                      className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
+                      className={FIELD_NUMERIC}
                     />
                   </div>
                   <span className="pb-2 text-text-muted">×</span>
@@ -471,7 +472,7 @@ export function NewActions({
                         setBlankH(e.target.value);
                         setBlankPreset("");
                       }}
-                      className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
+                      className={FIELD_NUMERIC}
                     />
                   </div>
                 </div>
@@ -574,7 +575,7 @@ export function NewActions({
                     // it should show the shape of a good prompt, not restate
                     // the label.
                     placeholder="A rain-slicked Tokyo side street at dusk, neon signs reflected in the puddles, shot on 35mm"
-                    className="w-full resize-none rounded-lg bg-theme-muted border border-theme-border px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-theme-ring"
+                    className={FIELD_TEXTAREA}
                   />
                 </div>
 

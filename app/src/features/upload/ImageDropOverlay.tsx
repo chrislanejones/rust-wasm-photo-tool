@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ImageDown } from "lucide-react";
+import { fadeIn } from "@/lib/animations";
 
 /**
  * Full-window drop affordance shown while an image is dragged anywhere over the
@@ -14,10 +15,10 @@ export function ImageDropOverlay({ show }: { show: boolean }) {
       {show && (
         <motion.div
           className="image-drop-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
+          variants={fadeIn}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
           aria-hidden
         >
           {/* Spinning gradient border ring (hollow center via mask). */}

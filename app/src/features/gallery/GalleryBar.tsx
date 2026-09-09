@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter, hoverPop } from "@/lib/animations";
+import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -188,9 +188,10 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         {isCompressing && (
           <motion.div
             key="compressing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-lg overflow-hidden"
           >
             <div
@@ -225,9 +226,10 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         {isError && (
           <motion.div
             key="error"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-red-500/30"
           >
             <span className="text-white text-xs font-bold">!</span>
