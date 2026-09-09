@@ -100,6 +100,27 @@ interface SubToolBase {
   icon: React.ComponentType<{ className?: string }>;
   /** Fuzzy-search terms for the command palette, beyond the label. */
   keywords: string[];
+  /**
+   * Who can actually run this. Defaults to `"free"` when absent.
+   *
+   * ⚠️ THIS IS THE ONE PUBLISHER. Three consumers read it and nothing else
+   * does: the key badge on a tile, the consent line in a dialog, and the
+   * settings page that lists every feature able to leave the tab. Anything
+   * that hand-maintains a second list of "which features are Pro" is the
+   * fourth-copy problem this file's header already describes — ShortcutModal
+   * kept its own tool list and silently omitted Select for three releases.
+   */
+  tier?: "free" | "pro";
+  /**
+   * Does using this send anything off the machine? Defaults to `false`.
+   *
+   * ⚠️ THE MARKETING CLAIM RESTS ON THIS FIELD BEING HONEST. "Nothing leaves
+   * your tab by accident" is only writable if the set of things that DO leave
+   * is enumerated somewhere a human maintains deliberately. A feature that
+   * quietly gains a `fetch` without flipping this makes the sentence false,
+   * which is why `networkFlagCoverage.contract.test.ts` exists.
+   */
+  requiresNetwork?: boolean;
 }
 
 /** A sub-tool that resolves to something the app can actually do. */
@@ -206,6 +227,9 @@ const enhanceGroup: ToolGroupDefinition = {
         "ai", "background removal", "rembg", "object removal", "inpaint",
         "upscale", "replicate",
       ],
+      // Replicate-backed: the image is uploaded and a model runs on it.
+      tier: "pro",
+      requiresNetwork: true,
     },
   ],
 };
@@ -387,6 +411,10 @@ const createGroup: ToolGroupDefinition = {
       tool: "text",
       mode: "ocr",
       keywords: ["ocr", "read text", "extract", "scan", "recognise"],
+      // Replicate-backed too — `useAIJob`'s "ocr" job. Easy to miss, because
+      // it lives under Create with the drawing tools rather than next to AI.
+      tier: "pro",
+      requiresNetwork: true,
     },
     {
       id: "shapes",
