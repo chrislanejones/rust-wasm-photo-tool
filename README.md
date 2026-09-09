@@ -84,38 +84,44 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.72 — 2026-09-09
+### v8.73 — 2026-09-09
 
-**The panels close from their corner, the compact bar is one flat row, and the
-workspace makes room on all three sides.**
+**The GPU blur is wired and matches the engine exactly, the checker that was
+verifying it turned out never to have matched, and A/B compare stops locking
+itself.**
 
-Hover Tools, Gallery or Review and a small close appears on the panel's top
-corner, half outside it — on the edge rather than over the first button. It
-shows for forty seconds after you enter the panel and then stops offering, and
-comes back when you do. The top bar's own toggle brings a closed panel back.
-Below tablet width the panels keep their tabs and this does not appear.
+Compare after a compress or resize used to go dark when you switched tools and
+came back. It was asking the wrong question — whether you had edited — using
+state that a tool switch or a page reload wipes. It asks whether there is an
+original to compare against now, which is the thing it actually needs, so it
+stays available.
 
-When the window is narrow enough for the top bar to drop its labels, that bar
-and the compact master bar are both one flat row now — no button groups, the
-controls spread evenly across.
+The GPU blur is wired up behind a flag that is still off. On a real GPU it
+produces the same bytes as the engine, at every size tested, and falls back to
+the processor on every failure — no adapter, a software one, a lost device.
+Turning it on is a separate decision.
 
-The checkerboard behind the canvas already moved aside for Tools and Review.
-It moves for the Gallery now too, and its edges feather instead of ending on a
-hard rectangle.
+Finding that took fixing something older. The reference implementation the
+shader was checked against had never actually matched the engine: it added
+numbers at double precision where the engine uses single, and the disagreement
+only appears above 64×64 — which was the largest size the check ever ran. It
+passed for its whole life by never looking where the problem was.
 
-Text fields had a black outline in light mode. They were never given a colour
-at all, so they fell back to the text colour — near-white in dark, which looked
-deliberate, and black in light, which did not. They wear the app's warm accent
-now, in both themes.
+Rotated text is anchored at its top-left corner now. It was pivoting around the
+middle of its own box, and the box grows as you type, so the words drifted.
+Unrotated text was always correct and still is.
 
-In compact mode the tool panel no longer sits beside the welcome screen
-offering Compress and Resize for an image that does not exist yet.
+Two loads landing at once no longer cancel each other. Opening a photo while
+another is still loading made both fail.
 
-Two decisions are written down rather than built. The text box moving as you
-type turns out to be two separate defects, and only the rotated one is a bug —
-unrotated text has always been correct. And custom fonts need engine work
-rather than a settings page: the font picker that ships today changes the
-preview and not the result, which is worth knowing before anyone relies on it.
+The Diagnostics window was being fed on every single frame whether or not it was
+open — about fourteen round trips to the engine each time, one of them a
+full-image scan. It is fed when you are looking at it.
+
+Fonts are served from the app itself rather than fetched from Google, so the
+logged-out editor really does make no network calls. And several text fields
+had colours that were never defined, which meant thirteen places asked for a
+colour that did not exist.
 
 ## License
 

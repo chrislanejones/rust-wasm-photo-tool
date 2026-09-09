@@ -10522,3 +10522,31 @@ This activates nothing. The service worker still ships dark.
 ### QC
 
 `imagehorse-qc` was **not run** for this cut. Every changed surface was driven in the browser on the production build — the corner close in six states across three panels, the 40 s retirement on a page clock, both compact bars, the three gutters, the field ring in light and dark, and six hover-pop surfaces — all with zero page errors. The full pass is owed.
+
+## v8.73 Change Summary — 2026-09-09
+
+**The GPU blur is wired and byte-identical, the oracle that was checking it turned out never to have been, and A/B compare stops locking itself.**
+
+| # | Change | Status |
+| --- | --- | --- |
+| 1 | **A/B Compare stays available** after a compress or resize — it was gated on state a tool switch or reload wiped | Complete |
+| 2 | Rotated text is anchored at its **top-left**, not the centre of a tile that grows as you type | Complete |
+| 3 | WebGPU blur wired behind `ih_webgpu` — **byte-identical to the engine**, CPU fallback on every failure path | Complete, flag OFF |
+| 4 | GPU blur refuses a **software adapter** — "GPU on" could silently mean slower | Complete |
+| 5 | GPU device + pipeline cached, with `device.lost` recovery; redundant buffer copy dropped | Complete |
+| 6 | **The blur oracle was never bit-exact** — it accumulated f64 against the crate's f32, invisible below 64×64 | Fixed |
+| 7 | Two overlapping photo loads no longer refuse each other with "reinit before init" | Complete |
+| 8 | Diagnostics stopped sampling **every frame for a closed window** — ~14 engine calls per frame removed | Complete |
+| 9 | Toaster moved out of the dialog header | Complete |
+| 10 | DM Sans + JetBrains Mono **self-hosted** — the demo tier really makes no network calls | Complete |
+| 11 | Three theme tokens defined that emitted **no CSS at all** — 13 dead class references | Complete |
+| 12 | `window.__ihRotatedTextAudit()` — read-only count of stored rotated text | Complete |
+| 13 | `scripts/inert-class-audit.mjs` — finds colour classes that emit no rule | Complete |
+| 14 | Two matched-pair guardrails: rotation anchor, and blur engine ↔ oracle | Complete |
+| 15 | Five dependabot bumps landed as one lockfile write (vitest 4 → 5) | Complete |
+| 16 | ADR-050 **closed** — the audit measured zero rotated annotations, so no migration | Decided |
+| 17 | ADR-052 — the op log records six of sixty-seven operations | Filed |
+
+### QC
+
+`imagehorse-qc` was **not run** for this cut, and it is owed more than usual — canvas, tools and the engine all changed. What *was* driven in a real browser on the production build: the A/B compare regression reproduced on master and the fix verified (fresh load → compress → leave the panel → return, enabled throughout, overlay rendering); GPU-vs-engine parity at four sizes on `intel/xe-lpg`, all maxDelta 0; and the rotated-text anchor confirmed rendering on canvas. The rest of the suite is owed.

@@ -24,6 +24,49 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.73",
+    date: "2026-09-09",
+    headline: "The GPU blur matches the engine exactly, and A/B compare stops locking itself",
+    entries: [
+      {
+        tag: "fix",
+        text: "Compare after a compress or resize used to go dark when you switched tools and came back. It was asking whether you had edited, using state that a tool switch or a page reload wipes. It asks whether there is an original to compare against now, which is what it actually needs, so it stays available.",
+      },
+      {
+        tag: "feature",
+        text: "The GPU blur is wired up behind a flag that is still off. On a real GPU it produces the same bytes as the engine, at every size tested, and falls back to the processor on every failure — no adapter, a software one, a lost device. Turning it on is a separate decision.",
+      },
+      {
+        tag: "fix",
+        text: "The reference implementation the shader was checked against had never actually matched the engine: it added numbers at double precision where the engine uses single, and the disagreement only appears above 64×64 — which was the largest size the check ever ran. It passed for its whole life by never looking where the problem was.",
+      },
+      {
+        tag: "fix",
+        text: "Rotated text is anchored at its top-left corner now. It was pivoting around the middle of its own box, and the box grows as you type, so the words drifted. Unrotated text was always correct and still is.",
+      },
+      {
+        tag: "fix",
+        text: "Two loads landing at once no longer cancel each other. Opening a photo while another was still loading made both fail.",
+      },
+      {
+        tag: "perf",
+        text: "The Diagnostics window was being fed on every single frame whether or not it was open — about fourteen round trips to the engine each time, one of them a full-image scan. It is fed when you are looking at it.",
+      },
+      {
+        tag: "feature",
+        text: "Fonts are served from the app itself rather than fetched from Google, so the logged-out editor really does make no network calls.",
+      },
+      {
+        tag: "fix",
+        text: "Several text fields asked for colours that were never defined — thirteen places requesting a colour that did not exist.",
+      },
+      {
+        tag: "ui",
+        text: "The toaster moved up, out of the way of a dialog's header.",
+      },
+    ],
+  },
+  {
     version: "v8.72",
     date: "2026-09-09",
     headline: "The panels close from their corner, and the workspace makes room on three sides",
