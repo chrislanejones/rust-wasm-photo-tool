@@ -25,7 +25,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { hoverPop, panelSpacingTransition } from "@/lib/animations";
+import { hoverPop, springStandard } from "@/lib/animations";
 import {
   HOVER_RING,
   SUBTILE_DISABLED,
@@ -135,7 +135,7 @@ export function SubtoolRow({ disabled = false }: Props) {
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: "auto", opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          transition={panelSpacingTransition}
+          transition={springStandard}
           // `overflow-hidden` is what makes the height animation clip cleanly —
           // but it also clipped the hover ring off the tiles in the outer
           // columns and the bottom row. HOVER_RING is `ring-2` at

@@ -14,6 +14,7 @@
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Spinner } from "@/components/ui/spinner";
+import { springReveal } from "@/lib/animations";
 
 const horseLogo = "/Image-Horse-Logo.svg";
 
@@ -67,7 +68,7 @@ export function BrandRevealScreen({
               transition={
                 reduceMotion
                   ? { duration: 0 }
-                  : { type: "spring", stiffness: 260, damping: 28 }
+                  : springReveal
               }
               className="flex flex-col items-center"
             >

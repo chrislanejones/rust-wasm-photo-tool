@@ -311,7 +311,7 @@ export function ToolsSidebar({
       {/* Tool rail + the active tool's sub-tool rail. `layout` is what makes
           the body below slide rather than jump when the sub-row row-count
           changes (0 -> 1 -> 2 rows). */}
-      <motion.div layout className="px-4 pt-3 pb-4 border-b border-border">
+      <motion.div layout className="p-panel border-b border-border">
         <ToolGrid
           disabledGroups={{
             batch:
@@ -328,7 +328,7 @@ export function ToolsSidebar({
         // pb-8, not p-4 all round: the last run of buttons in a settings panel
         // (Auto Compress & Resize, Compress Image, Compress All Images) ended
         // 16px off the sidebar's bottom edge with nothing under it.
-        className="flex-1 overflow-y-auto p-4 pb-8 space-y-5 scrollbar-thin"
+        className="flex-1 overflow-y-auto p-panel pb-panel-floor space-y-5 scrollbar-thin"
       >
         {activeTool === "compress" && (
           <ResizeSettings

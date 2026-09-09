@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
+import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -214,7 +214,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ type: "spring", stiffness: 500, damping: 25 }}
+            transition={springPop}
             className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-emerald-500/30"
           >
             <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
@@ -467,7 +467,7 @@ export function GalleryBar({
                 marginRight: !narrow && showHistory ? PANEL_OPEN_GUTTER : 12,
               }
         }
-        transition={reduceMotion ? instantTransition : panelSpacingTransition}
+        transition={reduceMotion ? instantTransition : springStandard}
         style={vertical ? undefined : { position: "relative" }}
         className={
           vertical
@@ -631,7 +631,7 @@ export function GalleryBar({
                     // Two axes, two properties: items-start stops the ITEM
                     // stretching, content-start stops the TRACK stretching.
                     "grid w-full grid-cols-2 content-start items-start gap-x-3 gap-y-4 overflow-y-auto px-2 pt-3 pb-3"
-                  : "flex gap-2 overflow-x-auto py-1.5 pl-2"
+                  : "flex gap-2 overflow-x-auto py-1.5 px-2"
               }
               style={{ scrollbarWidth: "none" }}
             >

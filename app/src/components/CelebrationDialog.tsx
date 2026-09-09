@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { springBouncy } from "@/lib/animations";
 import { CELEBRATION_STATS } from "@/lib/celebrationStats";
 
 /** Shipping stats come from `celebrationStats.ts`, which is GENERATED from
@@ -193,7 +194,7 @@ export function CelebrationDialog({ open, onOpenChange }: Props) {
           <motion.div
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 18 }}
+            transition={springBouncy}
             className="flex flex-col items-center gap-1 py-1 text-center"
           >
             <div className="flex items-baseline gap-2">
