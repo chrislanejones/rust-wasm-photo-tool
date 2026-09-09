@@ -75,6 +75,55 @@ impl ImageHorseTool {
         self.blur_region(w / 2.0, h / 2.0, w.max(h), intensity);
     }
 
+    // ── GPU blur hand-off (ADR-030) ──────────────────────────────────────
+    //
+    // The GPU path lives in JS (`app/src/lib/webgpu/gpuBlur.ts`) because `wgpu`
+    // does not fit in the wasm size band — ADR-030 has the arithmetic. So the
+    // pixels have to leave the engine and come back, and these two methods are
+    // that door. They are deliberately a PAIR, deliberately named for the one
+    // operation they serve, and deliberately not a general pixel setter.
+    //
+    // ⚠️ WHY NOT `get_image_data()` FOR THE READ. That returns the COMPOSITE —
+    // artboard underneath, annotations rendered over. `blur_region` writes the
+    // ACTIVE LAYER's raw buffer. Blurring the composite and storing it as the
+    // layer would bake the canvas colour and every annotation into the photo,
+    // which looks right on screen exactly until you hide a layer.
+    //
+    // ⚠️ WHY NOT `get_layer_png()`. It is the only existing layer read, and a
+    // PNG encode plus decode on a 4 MB buffer costs more than the whole GPU
+    // win it would be paying for.
+
+    /// The ACTIVE layer's raw RGBA, for a pure-function pass that will hand the
+    /// result straight back to [`Self::apply_blurred_layer_rgba`].
+    pub fn active_layer_rgba(&self) -> Vec<u8> {
+        self.layers[self.active].buf.data.clone()
+    }
+
+    /// Write `pixels` back into the ACTIVE layer as the result of a blur, with
+    /// the same single history snapshot `blur_whole_image` takes.
+    ///
+    /// Returns `false` and writes NOTHING if the length does not match the
+    /// current layer — a resize landing between the read and the write is the
+    /// realistic way that happens, and the caller's answer is to fall back to
+    /// the CPU path rather than to paint a mis-sized buffer.
+    ///
+    /// ⚠️ The snapshot is taken only AFTER the length check passes. Snapping
+    /// first would leave a stray "Blur" entry in undo for an operation that
+    /// never happened — the one-op-one-snapshot lockstep that #60/#61 broke.
+    ///
+    /// ⚠️ This does NOT record an op, exactly like `blur_whole_image`. See
+    /// ADR-052: whole-image blur has never been in the log, the coverage check
+    /// (`undo_count > cursor`) notices, and resume falls to the archive, whose
+    /// baked pixels already carry the blur. The GPU changes nothing about that.
+    pub fn apply_blurred_layer_rgba(&mut self, pixels: &[u8]) -> bool {
+        if pixels.len() != self.layers[self.active].buf.data.len() {
+            return false;
+        }
+        self.snap("Blur");
+        self.layers[self.active].buf.data.copy_from_slice(pixels);
+        true
+    }
+
     // ── Effects brush: pixelate (mosaic) + solid redaction ───────────────
     // Sibling modes of the blur brush. Same brush footprint (radius = half the
     // brush-size slider); each mode paints destructively into the active layer.
@@ -224,4 +273,80 @@ impl ImageHorseTool {
     // Note: No end_blur_stroke needed — the snapshot is already saved.
     // Just call blur_region() repeatedly during the stroke, then
     // the next begin_blur_stroke() or other action creates a new snapshot.
+}
+
+#[cfg(test)]
+mod gpu_handoff_tests {
+    use crate::ImageHorseTool;
+
+    fn solid(w: u32, h: u32, v: [u8; 4]) -> Vec<u8> {
+        let mut out = Vec::with_capacity((w * h * 4) as usize);
+        for _ in 0..(w * h) {
+            out.extend_from_slice(&v);
+        }
+        out
+    }
+
+    fn tool() -> ImageHorseTool {
+        let mut t = ImageHorseTool::new(8, 8);
+        t.load_image(&solid(8, 8, [10, 20, 30, 255]));
+        t
+    }
+
+    /// The happy path: what comes out is what a GPU pass would chew on, and
+    /// what goes back in lands on the ACTIVE LAYER.
+    #[test]
+    fn round_trip_writes_the_returned_pixels_into_the_active_layer() {
+        let mut t = tool();
+        let mut px = t.active_layer_rgba();
+        assert_eq!(
+            px.len(),
+            8 * 8 * 4,
+            "the read must be the raw layer, not a PNG"
+        );
+        for chunk in px.chunks_mut(4) {
+            chunk[0] = 200;
+        }
+        assert!(t.apply_blurred_layer_rgba(&px));
+        assert_eq!(t.active_layer_rgba()[0], 200);
+    }
+
+    /// A resize landing between the read and the write is the realistic way a
+    /// length mismatch happens. The engine must refuse rather than paint a
+    /// mis-sized buffer, and the caller falls back to the CPU path.
+    #[test]
+    fn a_length_mismatch_is_refused_and_writes_nothing() {
+        let mut t = tool();
+        let before = t.active_layer_rgba();
+        assert!(
+            !t.apply_blurred_layer_rgba(&[0u8; 16]),
+            "short buffer must be refused"
+        );
+        assert!(
+            !t.apply_blurred_layer_rgba(&vec![0u8; 8 * 8 * 4 + 4]),
+            "long buffer must be refused"
+        );
+        assert_eq!(t.active_layer_rgba(), before, "a refused write still wrote");
+    }
+
+    /// ⚠️ THE SUBTLE ONE. Snapping before the length check would leave a stray
+    /// "Blur" entry in undo for an operation that never happened — the
+    /// one-op-one-snapshot lockstep that #60/#61 broke, in a new place.
+    #[test]
+    fn a_refused_write_takes_no_history_snapshot() {
+        let mut t = tool();
+        let before = t.undo_count();
+        assert!(!t.apply_blurred_layer_rgba(&[0u8; 16]));
+        assert_eq!(t.undo_count(), before, "a refused write still snapped");
+    }
+
+    /// And the accepted one takes exactly one, matching `blur_whole_image`.
+    #[test]
+    fn an_accepted_write_takes_exactly_one_snapshot() {
+        let mut t = tool();
+        let px = t.active_layer_rgba();
+        let before = t.undo_count();
+        assert!(t.apply_blurred_layer_rgba(&px));
+        assert_eq!(t.undo_count(), before + 1);
+    }
 }

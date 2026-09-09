@@ -231,9 +231,207 @@ async function gpuBlurLostDeviceTest(): Promise<{
   return { adapter: status.adapterInfo, runs, pass: runs.every((r) => r.pass) };
 }
 
+/**
+ * The GPU blur against the REAL ENGINE, through the exact call sequence
+ * `useTransforms.applyGlobalBlur` uses.
+ *
+ * ⚠️ WHY THIS EXISTS SEPARATELY FROM `gpuBlurSelfTest`. That one compares the
+ * shader against `blurReference.ts` — a faithful JS PORT of the Rust. A port is
+ * an oracle, not the thing itself, and ADR-030's whole pre-mortem is that the
+ * port and the engine drift with nothing to catch it. This compares against
+ * `stamp_tool` itself: same document, same intensity, one document blurred by
+ * `blur_whole_image` and one by the hand-off pair, then the two layer buffers
+ * differenced. If the port ever drifts from the crate, this notices and that
+ * one does not.
+ *
+ * It is also the only check that covers the HAND-OFF: `active_layer_rgba` must
+ * return the layer and not the composite, and `apply_blurred_layer_rgba` must
+ * land on the same buffer `blur_whole_image` writes. A shader that is perfect
+ * and a hand-off that reads the composite produce a beautiful wrong answer.
+ *
+ * The engine is imported lazily so this costs nothing unless it is called.
+ */
+async function gpuBlurEngineParity(
+  width = 512,
+  height = 512,
+  intensity = 5,
+): Promise<{
+  adapter: string;
+  width: number;
+  height: number;
+  intensity: number;
+  maxDelta: number;
+  differingBytes: number;
+  cpuMs: number;
+  gpuMs: number;
+  speedup: number;
+  pass: boolean;
+  note?: string;
+  samples?: Array<{ x: number; y: number; ch: number; cpu: number; gpu: number; edgeDist: number }>;
+  oracleVsEngineMax?: number;
+  oracleVsEngineBytes?: number;
+  oracleVsGpuMax?: number;
+  verdict?: string;
+  minEdgeDist?: number;
+  maxEdgeDist?: number;
+}> {
+  const fail = (note: string) => ({
+    adapter: "n/a",
+    width,
+    height,
+    intensity,
+    maxDelta: -1,
+    differingBytes: -1,
+    cpuMs: -1,
+    gpuMs: -1,
+    speedup: -1,
+    pass: false,
+    note,
+  });
+  const status = await probeWebGpu();
+  if (!status.ok) return fail(`WebGPU unavailable: ${status.reason}`);
+
+  const mod = (await import("stamp_tool")) as unknown as {
+    default: () => Promise<void>;
+    ImageHorseTool: new (w: number, h: number) => Record<string, (...a: never[]) => never>;
+  };
+  await mod.default();
+
+  const seedImage = makeImage(width, height, 0x8577_1b3d);
+  const make = () => {
+    const t = mod.ImageHorseTool ? new mod.ImageHorseTool(width, height) : null;
+    if (!t) return null;
+    (t as unknown as { load_image: (p: Uint8Array) => void }).load_image(
+      new Uint8Array(seedImage.buffer, seedImage.byteOffset, seedImage.length),
+    );
+    return t as unknown as {
+      blur_whole_image: (i: number) => void;
+      active_layer_rgba: () => Uint8Array;
+      apply_blurred_layer_rgba: (p: Uint8Array) => boolean;
+      free?: () => void;
+    };
+  };
+
+  const cpuTool = make();
+  const gpuTool = make();
+  if (!cpuTool || !gpuTool) return fail("could not construct ImageHorseTool");
+  if (typeof gpuTool.active_layer_rgba !== "function") {
+    return fail("engine has no active_layer_rgba — build:wasm after the Rust change");
+  }
+
+  const t0 = performance.now();
+  cpuTool.blur_whole_image(intensity);
+  const cpuMs = Math.round((performance.now() - t0) * 100) / 100;
+  const cpuOut = cpuTool.active_layer_rgba();
+
+  // EXACTLY the sequence applyGlobalBlur runs.
+  const t1 = performance.now();
+  const src = gpuTool.active_layer_rgba();
+  const { pixels } = await gaussianBlurGpu(
+    new Uint8ClampedArray(src.buffer, src.byteOffset, src.length),
+    width,
+    height,
+    intensity,
+  );
+  const applied = gpuTool.apply_blurred_layer_rgba(
+    new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.length),
+  );
+  const gpuMs = Math.round((performance.now() - t1) * 100) / 100;
+  if (!applied) return fail("apply_blurred_layer_rgba refused the buffer");
+  const gpuOut = gpuTool.active_layer_rgba();
+
+  let maxDelta = 0;
+  let differingBytes = 0;
+  // WHERE, not just how many. A parity failure reported as a bare count is
+  // almost unactionable; edge pixels and interior pixels have completely
+  // different causes (boundary handling vs arithmetic).
+  const samples: Array<{
+    x: number;
+    y: number;
+    ch: number;
+    cpu: number;
+    gpu: number;
+    edgeDist: number;
+  }> = [];
+  for (let i = 0; i < cpuOut.length; i++) {
+    const d = Math.abs(cpuOut[i] - gpuOut[i]);
+    if (d !== 0) {
+      differingBytes++;
+      if (samples.length < 24) {
+        const px = i >> 2;
+        const x = px % width;
+        const y = (px / width) | 0;
+        samples.push({
+          x,
+          y,
+          ch: i & 3,
+          cpu: cpuOut[i],
+          gpu: gpuOut[i],
+          edgeDist: Math.min(x, y, width - 1 - x, height - 1 - y),
+        });
+      }
+    }
+    if (d > maxDelta) maxDelta = d;
+  }
+  // ── ISOLATION: which pair actually disagrees? ──────────────────────────
+  // A GPU-vs-engine difference has two candidate causes and they need
+  // different fixes:
+  //   (a) the JS ORACLE has drifted from the crate — ADR-030's pre-mortem,
+  //       and `gpuBlurSelfTest` cannot see it because the oracle is what it
+  //       compares against;
+  //   (b) the REGION path differs from a whole-buffer blur — `blur_whole_image`
+  //       goes through `gaussian_blur_region` with scratch buffers and a
+  //       bounding box, and the GPU blurs the buffer flat.
+  // Comparing the engine against the oracle, CPU to CPU with no GPU in the
+  // picture, tells them apart: a difference here is (a), no difference is (b).
+  const oracle = gaussianBlurCpu(seedImage, width, height, intensity);
+  let oracleVsEngineMax = 0;
+  let oracleVsEngineBytes = 0;
+  for (let i = 0; i < cpuOut.length; i++) {
+    const d = Math.abs(cpuOut[i] - oracle[i]);
+    if (d !== 0) oracleVsEngineBytes++;
+    if (d > oracleVsEngineMax) oracleVsEngineMax = d;
+  }
+  let oracleVsGpuMax = 0;
+  for (let i = 0; i < gpuOut.length; i++) {
+    const d = Math.abs(gpuOut[i] - oracle[i]);
+    if (d > oracleVsGpuMax) oracleVsGpuMax = d;
+  }
+
+  cpuTool.free?.();
+  gpuTool.free?.();
+  return {
+    adapter: status.adapterInfo,
+    width,
+    height,
+    intensity,
+    maxDelta,
+    differingBytes,
+    cpuMs,
+    gpuMs,
+    speedup: gpuMs > 0 ? Math.round((cpuMs / gpuMs) * 10) / 10 : -1,
+    pass: maxDelta === 0,
+    samples,
+    oracleVsEngineMax,
+    oracleVsEngineBytes,
+    oracleVsGpuMax,
+    verdict:
+      oracleVsEngineMax > 0
+        ? "ORACLE DRIFT — blurReference.ts disagrees with the crate (ADR-030's pre-mortem)"
+        : oracleVsGpuMax > 0
+          ? "SHADER — gpuBlur disagrees with the oracle it was written against"
+          : maxDelta > 0
+            ? "REGION PATH — oracle matches both, so blur_whole_image's region machinery differs"
+            : "all three agree",
+    minEdgeDist: samples.length ? Math.min(...samples.map((s2) => s2.edgeDist)) : -1,
+    maxEdgeDist: samples.length ? Math.max(...samples.map((s2) => s2.edgeDist)) : -1,
+  };
+}
+
 /** Attach to window so it can be driven from the console or automation. */
 export function installGpuBlurSelfTest(): void {
   const g = globalThis as unknown as Record<string, unknown>;
   g.__ihGpuBlurSelfTest = gpuBlurSelfTest;
   g.__ihGpuBlurLostTest = gpuBlurLostDeviceTest;
+  g.__ihGpuBlurEngineParity = gpuBlurEngineParity;
 }

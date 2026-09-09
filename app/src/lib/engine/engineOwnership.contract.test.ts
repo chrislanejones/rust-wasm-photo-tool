@@ -101,6 +101,11 @@ const THROWAWAY_ENGINES: Record<string, string> = {
     "compositeSavedEdit — rebuilds a saved edit's layer stack to render one photo during a batch export",
   "features/tools/settings/BatchSettings.tsx":
     "batch operations render each photo in turn without opening it",
+  "lib/webgpu/selfTest.ts":
+    "gpuBlurEngineParity builds two disposable engines — one blurred by " +
+    "blur_whole_image, one by the GPU hand-off — and diffs their layer buffers. " +
+    "Neither is a document the user has open, and it only runs when a console " +
+    "calls __ihGpuBlurEngineParity()",
 };
 
 // The LIVE document's engine. Two entries, and the second one is the whole

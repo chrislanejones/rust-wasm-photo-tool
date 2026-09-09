@@ -8,7 +8,9 @@
 // The flips remap the clone-source mirror (sourcePosRef) instead of dropping
 // it; every other transform invalidates it — a stale source after a rotate
 // would point at the wrong pixels.
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
+import { webgpuEnabled, gpuUsable } from "@/lib/webgpu/detect";
+import { gaussianBlurGpu } from "@/lib/webgpu/gpuBlur";
 import type { EngineCore } from "./useEngineCore";
 
 export function useTransforms(engine: EngineCore) {
@@ -248,7 +250,12 @@ export function useTransforms(engine: EngineCore) {
    * by the wasm-bindgen ABI and clamped up to a radius-1 kernel, i.e. a
    * visually imperceptible blur. Map the fraction onto the 1..30 radius range
    * before crossing into WASM. One "Blur" history snapshot per call.
+   *
+   * Runs on the GPU when `ih_webgpu` is on AND the machine has a real adapter;
+   * CPU otherwise and on every failure. See the body and ADR-030.
    */
+  // One GPU blur at a time — see the guard in the body.
+  const gpuBlurInFlight = useRef(false);
   const applyGlobalBlur = useCallback(
     (intensity: number) => {
       const t = toolRef.current;
@@ -261,11 +268,81 @@ export function useTransforms(engine: EngineCore) {
       // landing in the gap blurs the new image around the old image's centre.
       // `blur_whole_image` computes the geometry where the dimensions live, so
       // there is no gap to narrow. Same snapshot, same kernel, same result.
-      t.blur_whole_image(kernelRadius);
-      flushToCanvas();
-      syncState();
+      const cpu = () => {
+        t.blur_whole_image(kernelRadius);
+        flushToCanvas();
+        syncState();
+      };
+
+      // ── GPU path (ADR-030), opt-in and fallback-covered ────────────────
+      //
+      // `webgpuEnabled()` first, and it is the SYNCHRONOUS localStorage read on
+      // purpose. `gpuUsable()` awaits an adapter probe, so checking it first
+      // would push the DEFAULT path — flag off, which is everyone — behind an
+      // await it has never had. Off stays exactly as fast as it is today.
+      //
+      // Whole-image blur is the only place the GPU can help: the effects BRUSH
+      // stamps dabs far below the 23.2 ms transfer floor and `gaussianBlurGpu`
+      // has no region concept at all. ADR-030 has the measurements.
+      //
+      // ⚠️ EVERY failure falls back to the CPU, and that is permanent, not a
+      // spike affordance — no adapter, a software adapter, a lost device, a
+      // dispatch error, an older engine without the hand-off methods. A GPU
+      // path in this app needs a CPU twin forever.
+      if (!webgpuEnabled() || typeof t.active_layer_rgba !== "function") {
+        cpu();
+        return;
+      }
+      if (gpuBlurInFlight.current) {
+        // A second call while one is in flight would race two async writes onto
+        // the same layer and could land them out of order. The CPU path is
+        // synchronous and cannot, so it takes over rather than queueing.
+        cpu();
+        return;
+      }
+      gpuBlurInFlight.current = true;
+      void (async () => {
+        try {
+          if (!(await gpuUsable())) {
+            cpu();
+            return;
+          }
+          // Every engine call is awaited because under ADR-024's worker proxy
+          // these return Promises, and a `void` return slot swallows one
+          // without tsc noticing — the a8/a13 trap.
+          const [w, h] = [await t.width(), await t.height()];
+          const src = await t.active_layer_rgba();
+          // VIEWS, not copies, in both directions. The engine speaks
+          // Uint8Array and gpuBlur speaks Uint8ClampedArray over the same
+          // bytes; a `new Uint8ClampedArray(src)` would duplicate 4 MB twice
+          // per blur and hand back a slice of the win it was paying for.
+          const { pixels } = await gaussianBlurGpu(
+            new Uint8ClampedArray(src.buffer, src.byteOffset, src.length),
+            w,
+            h,
+            kernelRadius,
+          );
+          // ⚠️ w/h were read, then awaited across. A resize landing in that gap
+          // is the read-modify-write ADR-024 Stage 2 removed from this very
+          // function — it cannot be removed here, because the pixels have to
+          // leave the engine. It is CAUGHT instead: the engine refuses a buffer
+          // whose length no longer matches the layer, writes nothing, takes no
+          // snapshot, and we redo it on the CPU.
+          const out = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.length);
+          if (!(await t.apply_blurred_layer_rgba(out))) {
+            cpu();
+            return;
+          }
+          flushToCanvas();
+          syncState();
+        } catch {
+          cpu();
+        } finally {
+          gpuBlurInFlight.current = false;
+        }
+      })();
     },
-    [toolRef, flushToCanvas, syncState],
+    [toolRef, flushToCanvas, syncState, gpuBlurInFlight],
   );
 
   /**
