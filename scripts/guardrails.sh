@@ -206,12 +206,53 @@ check "librs-lines" 5183 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_libr
 # Baseline 2 on 2026-08-27, both same-file-only and both safe to pay down:
 #   app/src/lib/exportImage.ts     formatCarriesAlpha
 #   app/src/lib/webgpu/selfTest.ts gpuBlurSelfTest
+#
+# 1 -> 0 on 2026-09-09: `gpuBlurSelfTest` lost its `export` keyword. Paid down,
+# not waved through — and worth reading, because the audit had ALREADY stopped
+# flagging it for the wrong reason. A comment in blurReference.ts spells the
+# name, and this audit counts an identifier appearing in any other file's TEXT
+# as an external reference, comments included (PARKING_LOT). So it reported an
+# improvement that a reworded comment would silently undo. The export is now
+# genuinely gone, so the zero is real.
 n_deadexp=$(node scripts/dead-exports-audit.mjs | sed -n 's/^TOTAL: //p')
 if [ -z "$n_deadexp" ]; then
   echo "FATAL: dead-exports-audit printed no TOTAL — treat as broken, not as zero." >&2
   exit 1
 fi
-check "dead-exports" 1 "exported and never used (scripts/dead-exports-audit.mjs)" "$n_deadexp"
+check "dead-exports" 0 "exported and never used (scripts/dead-exports-audit.mjs)" "$n_deadexp"
+
+# ── MATCHED PAIR: the blur oracle (ADR-030) ──
+# `src/simd/blur.rs` (what the engine actually runs) and
+# `app/src/lib/webgpu/blurReference.ts` (the oracle the GPU shader is checked
+# against) must describe the same arithmetic. When they drift, `gpuBlurSelfTest`
+# keeps reporting PASS — it compares the shader against the ORACLE, so a wrong
+# oracle is invisible to the only check that would notice.
+#
+# This pair has already cost a night. The oracle was never bit-exact: it
+# accumulated at f64 while the crate accumulates at f32, and the disagreement
+# only appears above 64x64, which was the harness's largest case.
+#
+# Same scoping rule as the anchor pair below: match a changed line carrying the
+# blur's actual arithmetic, not any edit to the file, so a comment cannot turn
+# this red.
+blur_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
+if [ -z "$blur_base" ]; then
+  echo "  skip blur-oracle-pair: no origin/master to diff against (runs in CI)"
+else
+  rust_blur=$(git diff "$blur_base" -- src/simd/blur.rs \
+    | grep -cE '^[+-].*(f32x4_add|f32x4_mul|\.round\(\)|kernel\[)' || true)
+  ts_blur=$(git diff "$blur_base" -- app/src/lib/webgpu/blurReference.ts \
+    | grep -cE '^[+-].*(F\(|Math\.fround|kernel\[|buildGaussianKernel)' || true)
+  if [ "$rust_blur" -gt 0 ] && [ "$ts_blur" -eq 0 ]; then
+    echo "FAIL blur-oracle-pair: src/simd/blur.rs changed, blurReference.ts did not."
+    echo "     The oracle is what gpuBlurSelfTest compares the shader against, so a"
+    echo "     stale oracle makes that harness report PASS while the shader is wrong."
+    echo "     Change both, or say why in the commit (ADR-030)."
+    fail=1
+  else
+    echo "  ok blur-oracle-pair (engine hunks: $rust_blur, oracle hunks: $ts_blur)"
+  fi
+fi
 
 # ── MATCHED PAIR: the rotated-text anchor (ADR-050) ──
 # `text::rotated_tile_offset` (Rust, where the commit is anchored) and

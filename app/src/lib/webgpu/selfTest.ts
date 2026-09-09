@@ -14,7 +14,7 @@
 // is "close enough" makes the same document look different depending on which
 // path drew it.
 
-import { gaussianBlurCpu } from "./blurReference";
+import { gaussianBlurCpu, setEngineKernel, hasEngineKernel } from "./blurReference";
 import { gaussianBlurGpu, __resetGpuBlurContextForTest } from "./gpuBlur";
 import { probeWebGpu } from "./detect";
 
@@ -37,6 +37,10 @@ export interface CaseResult {
 
 export interface SelfTestReport {
   adapter: string;
+  /** "engine" = exact. "ported" = the fround fallback, which cannot be
+   *  bit-exact (`f32::exp`), so a non-zero delta may be the KERNEL rather than
+   *  the shader. A report that does not say which was used is not evidence. */
+  kernelSource: "engine" | "ported";
   cases: CaseResult[];
   pass: boolean;
 }
@@ -123,11 +127,40 @@ async function runCase(
  * intentionally unoptimised, and correctness lives at the edges and in the
  * rounding, not at scale.
  */
-export async function gpuBlurSelfTest(): Promise<SelfTestReport> {
+// Not exported: `installGpuBlurSelfTest` below is the only caller, and it is in
+// this file. Dropping the keyword is what makes the `dead-exports` count HONESTLY
+// zero — the audit had stopped flagging it because a comment in blurReference.ts
+// happens to spell the name, and that audit counts a name in prose as a
+// reference (see PARKING_LOT). Banking that as an improvement would have locked
+// in a number that reverts the moment someone rewords a comment.
+async function gpuBlurSelfTest(): Promise<SelfTestReport> {
   const status = await probeWebGpu();
   if (!status.ok) {
-    return { adapter: `unavailable: ${status.reason}`, cases: [], pass: false };
+    return {
+      adapter: `unavailable: ${status.reason}`,
+      kernelSource: hasEngineKernel() ? "engine" : "ported",
+      cases: [],
+      pass: false,
+    };
   }
+  // THE KERNEL COMES FROM THE ENGINE, not from a port — `f32::exp` has no
+  // JavaScript equivalent, so a ported kernel drifts by 1 LSB on long kernels
+  // and no amount of `Math.fround` closes it. See blurReference.ts's header.
+  // Without this the report still runs, and says so, because a delta measured
+  // against an approximate kernel is not evidence about the shader.
+  try {
+    const mod = (await import("stamp_tool")) as unknown as {
+      default: () => Promise<void>;
+      gaussian_kernel: (r: number) => Float32Array;
+    };
+    await mod.default();
+    if (typeof mod.gaussian_kernel === "function") {
+      setEngineKernel((r) => mod.gaussian_kernel(r));
+    }
+  } catch {
+    // Left unwired on purpose — `kernelSource` below reports which was used.
+  }
+
   const cases: CaseResult[] = [];
   // radius 1 — the smallest kernel, where an off-by-one in the span shows up
   cases.push(await runCase("noise 64x64 r1", makeImage(64, 64, 0x1234_5678), 64, 64, 1));
@@ -140,7 +173,28 @@ export async function gpuBlurSelfTest(): Promise<SelfTestReport> {
   // the documented ceiling
   cases.push(await runCase("noise 40x40 r30 (max)", makeImage(40, 40, 0x0bad_f00d), 40, 40, 30));
 
-  return { adapter: status.adapterInfo, cases, pass: cases.every((c) => c.pass) };
+  // ── PAST 64x64, which is where this harness used to stop ──────────────────
+  //
+  // ⚠️ EVERY CASE ABOVE IS 64x64 OR SMALLER, AND THAT WAS THE BUG. The oracle
+  // accumulated at f64 while the crate accumulates at f32, and the disagreement
+  // is a ~15-per-megapixel tie-break — so at 16,384 channels it simply never
+  // fired. This harness reported "max channel delta 0" for its whole life while
+  // the real divergence sat one size step away. A correctness harness whose
+  // largest case is the largest size at which the bug is invisible is not a
+  // harness.
+  //
+  // These are slow (the oracle is deliberately unoptimised) and they are worth
+  // it: 512² is 1,048,576 channels, two orders of magnitude past the old
+  // ceiling, and radius 30 there is where the kernel-length error concentrates.
+  cases.push(await runCase("noise 512x512 r5", makeImage(512, 512, 0x8577_1b3d), 512, 512, 5));
+  cases.push(await runCase("noise 512x512 r30", makeImage(512, 512, 0x51de_57ab), 512, 512, 30));
+
+  return {
+    adapter: status.adapterInfo,
+    kernelSource: hasEngineKernel() ? "engine" : "ported",
+    cases,
+    pass: cases.every((c) => c.pass),
+  };
 }
 
 /**

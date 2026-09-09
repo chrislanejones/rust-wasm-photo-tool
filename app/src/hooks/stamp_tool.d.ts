@@ -4,6 +4,15 @@ declare module "stamp_tool" {
   /** Gallery photo cap for an account tier ("demo" | "loggedIn" | "paid"). */
   export function photo_limit(tier: string): number;
 
+  /** The engine's Gaussian kernel for `radius` (clamped 1..=30).
+   *
+   *  ⚠️ Exists because a JS PORT of it cannot be bit-exact: `build_gaussian_kernel`
+   *  calls `f32::exp`, and `Math.fround(Math.exp(x))` is the correctly-rounded
+   *  f64 result, not f32's own exp. The kernel is an INPUT to the blur, so
+   *  sharing it leaves only the arithmetic under test — which `Math.fround`
+   *  emulates exactly. See blurReference.ts. */
+  export function gaussian_kernel(radius: number): Float32Array;
+
   /** Solid-color RGBA image, PNG-encoded (blank canvas). r/g/b/a are 0..=255
    *  (a = 0 → fully transparent surface). */
   export function blank_png(
