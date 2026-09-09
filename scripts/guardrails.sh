@@ -213,6 +213,48 @@ if [ -z "$n_deadexp" ]; then
 fi
 check "dead-exports" 1 "exported and never used (scripts/dead-exports-audit.mjs)" "$n_deadexp"
 
+# ── MATCHED PAIR: the rotated-text anchor (ADR-050) ──
+# `text::rotated_tile_offset` (Rust, where the commit is anchored) and
+# `pivotLocal*` in CanvasArea.tsx (where the PREVIEW is anchored) must describe
+# the same pivot. If they disagree the preview and the committed pixels drift
+# apart — a worse defect than the one ADR-050 fixed, and invisible to every
+# other gate here: both sides compile, both sides pass their own tests, and
+# nothing in this repo renders a saved rotated annotation and compares it to a
+# stored expectation.
+#
+# ⚠️ SCOPED TO THE FORMULA, not to the files. Firing on any edit to either file
+# would make a comment change go red, which is the failure mode this script has
+# already had once (a comment that spelled a violation while explaining it).
+# So it looks for a changed line carrying the actual trig, and only then asks
+# whether the TS pivot moved with it.
+#
+# ⚠️ TWO-DOT DIFF, on purpose. `$base...HEAD` compares COMMITS and reported
+# "0 hunks" while the change sat uncommitted in the working tree — the check
+# would have passed on the very commit it was written for. `git diff $base`
+# includes the working tree, which is what a pre-push guard needs to see.
+#
+# ⚠️ NEEDS A BASE REF, so it cannot run in a bare local checkout. It SAYS so
+# rather than passing quietly — a co-change check that silently no-ops is worth
+# less than no check, and "verified in one environment" is this repo's most
+# expensive recurring mistake.
+pair_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
+if [ -z "$pair_base" ]; then
+  echo "  skip rotated-anchor-pair: no origin/master to diff against (runs in CI)"
+else
+  formula_changed=$(git diff "$pair_base" -- src/text.rs \
+    | grep -cE '^[+-].*(hw \* cos|hw \* sin|hh \* cos|hh \* sin)' || true)
+  pivot_changed=$(git diff "$pair_base" -- app/src/features/canvas/CanvasArea.tsx \
+    | grep -cE '^[+-].*pivotLocal' || true)
+  if [ "$formula_changed" -gt 0 ] && [ "$pivot_changed" -eq 0 ]; then
+    echo "FAIL rotated-anchor-pair: text::rotated_tile_offset changed, CanvasArea's pivotLocal* did not."
+    echo "     The engine anchors the COMMIT and CanvasArea anchors the PREVIEW."
+    echo "     Change both, or the preview stops matching what gets baked (ADR-050)."
+    fail=1
+  else
+    echo "  ok rotated-anchor-pair (formula hunks: $formula_changed, pivot hunks: $pivot_changed)"
+  fi
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo
   echo "Guardrails FAILED: a count went up. Fix the new violations — raising a"
