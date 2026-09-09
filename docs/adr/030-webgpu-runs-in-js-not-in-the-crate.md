@@ -9,11 +9,20 @@ filter exactly, before anything depends on it. The repo's standing invariant is
 `stamp_tool`", which points at pulling `wgpu` into the Rust crate.
 
 One number rules that out for now. `scripts/deploy-sentinel.sh` fails any deploy
-whose wasm falls outside **700–800 KB**, and the crate is at **761,213 B** —
-about 39 KB of headroom. `wgpu` plus its shader-translation layer is far larger
-than that, so taking it means raising the band, and the band is the check that
-caught five weeks of featureless production builds. That is a decision in its
-own right, not a side effect of a spike.
+whose wasm falls outside **800,000–840,000 B**, and the crate is at
+**816,971 B** — about 23 KB of headroom. `wgpu` plus its shader-translation
+layer is far larger than that, so taking it means raising the band, and the
+band is the check that caught five weeks of featureless production builds. That
+is a decision in its own right, not a side effect of a spike.
+
+⚠️ Those two figures were **700–800 KB / 761,213 B** until 2026-09-09, which was
+the band ADR-037 set and the size the crate was at in August. ADR-045 narrowed
+the band and the crate has grown since. The conclusion never moved — `wgpu` has
+never been within an order of magnitude of fitting — but the arithmetic
+supporting it was stale, and this ADR's own pre-mortem names "the sentinel band
+is widened for an unrelated reason" as the way the argument quietly dies. An
+argument resting on wrong figures is one edit away from becoming a wrong one.
+`detect.ts` carried the corrected numbers from 2026-09-05; this file did not.
 
 ## Decision
 
@@ -31,7 +40,7 @@ comparing the shader against a faithful port of the Rust blur.
 
 ## Consequences
 
-+ Zero wasm growth: the crate is untouched at 761,213 B, and the deploy sentinel
++ Zero wasm growth: the crate is untouched at 816,971 B, and the deploy sentinel
   band does not have to move.
 + Phase 0 is proven, not assumed: five cases, **max channel delta 0** across
   41,128 channels on Intel Xe-LPG, including an all-clamp 5×5 at radius 12 and
@@ -45,6 +54,12 @@ comparing the shader against a faithful port of the Rust blur.
   there is no WebGPU in jsdom or on GitHub's runners.
 - The spike carries a hand-written `webgpu-types.d.ts` instead of
   `@webgpu/types`, so the type surface is partial and can be subtly wrong.
+  ⚠️ **That file's own tripwire has now fired.** Its header says "if you find
+  yourself widening this file rather than deleting it, that is the signal to
+  take the dependency instead" — and shipping the device cache required adding
+  `GPUDevice.lost`, because the narrow surface did not have it. One widening is
+  not yet a pattern, so the dependency is not taken here; a second one should
+  settle it. Left as an open decision rather than a silent habit.
 
 ## Alternatives rejected
 
@@ -157,6 +172,89 @@ created with plain `STORAGE` binds as `read_write` in pass 1 and `read` in
 pass 2 with no copy at all. Verified: **max channel delta 0** without it. That
 is one full-image GPU-to-GPU copy per blur, deleted for free.
 
+### Acted on — 2026-09-09
+
+The three items above that this ADR raised but deliberately did not build.
+Nothing here changes a default: `ih_webgpu` is still opt-in and the GPU path
+is still reachable only from the self-test.
+
+| Raised | Where | Status |
+|---|---|---|
+| Device created per call — 25.9 ms of a 44.7 ms call | Defect 1 | **Shipped** (#92) |
+| `midBuf` → `midAsSrc` copy is unnecessary | Defect 2 | **Shipped** (#92) |
+| `GpuStatus` should refuse a software adapter | Hazard, below | **Shipped** (#94) |
+
+**The device cache brought a failure mode with it.** A `GPUDevice` can be lost —
+driver reset, GPU reset, some platforms on tab background — and a *cached*
+device that has been lost fails every later call, which is strictly worse than
+the per-call version it replaced. So `device.lost` is wired before the context
+is published, and a loss drops the cache so the next call re-acquires. That path
+is exercised rather than assumed: `device.destroy()` resolves `device.lost`, and
+the harness run reads **warm 4.7 ms → destroyed 53.8 ms → warm again 4.6 ms**,
+max channel delta 0 throughout, on `intel/xe-lpg`. The middle number is the
+re-acquisition; without the loss handling that run throws.
+
+**The software-adapter refusal is now the product's, not just the harness's.**
+The guard was only ever in `scripts/webgpu-blur-bench.js`, which protected the
+*measurement*. The user was left with the mirror-image bug: set `ih_webgpu=1` on
+a machine with no GPU and you silently got a slower editor with no way to tell.
+`probeWebGpu` now returns `ok: false` with the adapter named in the reason, so
+the Feature Flags panel reads `unavailable — software adapter
+(google/swiftshader) …` instead of `available`.
+
+It matches `swiftshader`, `llvmpipe` and `lavapipe` as substrings of
+`"<vendor>/<architecture>"`, lowercased, rather than as exact field pairs. Only
+`google/swiftshader` has been observed; for the Mesa names, *which field they
+land in* is a guess, and a guess about the field is how a check ends up never
+firing. Microsoft's WARP is deliberately **not** matched — `warp` is four
+characters, too short to substring safely — so a Windows machine with no GPU
+still falls through. That gap is written down rather than closed with a match
+that might be wrong.
+
+Pinned by `detect.test.ts`, which asserts on `GpuStatus` out of the real
+`probeWebGpu` rather than on the matcher, and killed three mutants: the guard
+never firing, the guard always firing, and — the one that matters — the matcher
+left correct with its call site cut.
+
+### Where a GPU blur could actually plug in
+
+The measurements above time a **whole-image** blur, because that is what
+`gaussianBlurGpu` does: it takes a buffer and a size, and has no region or
+bounding-box concept at all. The engine's blur is region-based. So before any
+integration question, the routes have to be separated:
+
+| Route | Engine entry | Shape | In the op log? |
+|---|---|---|---|
+| Effects **brush**, live drag | `effect_move` → `apply_effect_dab` → `blur_region` | many dabs, radius = brush | **Yes** — `Op::Blur { points, … }` at `effect_up` |
+| **Whole-image** blur, Effects panel | `applyGlobalBlur` → `blur_whole_image` | one call, radius = `max(w,h)` | **No** |
+| **Replay** on undo/reload | `ops.rs` `Op::Blur` → one `gaussian_blur_region` per dab | pure Rust, synchronous | it *is* the log |
+
+Three things follow, and they point the opposite way to what the speedups
+suggest.
+
+**The GPU can only serve the middle row.** The brush path stamps dabs far below
+the transfer floor — an upload-and-read-back control with nothing computed costs
+23.2 ms at 2048² — and `gaussianBlurGpu` cannot express a dab anyway. The replay
+path is synchronous Rust inside wasm and cannot await a JS promise without
+restructuring replay itself. Whole-image blur is the whole of the opportunity.
+
+**That is also the good news.** Whole-image blur is not recorded as an op, so a
+GPU implementation of it inherits **no replay-parity obligation** — there is no
+CPU replay of that operation to disagree with. This ADR's sharpest consequence
+("two implementations of one filter must agree forever, and no CI can check it")
+applies to the *brush*, which is the path the GPU cannot take. The two do not
+overlap.
+
+**Unrecorded is not unsafe here.** `blur_whole_image` calls `snap("Blur")`, so
+snapshot undo has an entry, and the log's composite-hash check (ADR-013) catches
+the divergence on the next undo and hands over. That is the designed fallback,
+not a hole.
+
+⚠️ **Not verified:** what a reload does with a whole-image blur — that is the
+archive/pixel persistence path, not the op log, and it was not measured here.
+Anyone taking the integration further should start by answering it, because "the
+GPU blur has no parity obligation" holds only for as long as that stays true.
+
 ### ⚠️ The measurement hazard that nearly produced a wrong answer
 
 This was very nearly benchmarked on a **software rasterizer**, and the result
@@ -187,7 +285,13 @@ if (info?.vendor === "google" && info?.architecture === "swiftshader")
   return { ok: false, reason: "software adapter (SwiftShader) — slower than the engine" };
 ```
 
-Not applied here; this ADR measures, it does not build.
+**Applied 2026-09-09** (#94), widened from the exact pair above to a substring
+match — see "Acted on" for why the exact-pair form was the more fragile of the
+two. The guard now exists twice: in `detect.ts` for the product and in
+`webgpu-blur-bench.js` for the measurement. The bench script is pasted into a
+console and cannot import, so the copies are kept in step by comment, which is
+the weakest kind of link — if a third caller ever needs it, that is the moment
+to move the list somewhere both can reach.
 
 ### What this does not settle
 
