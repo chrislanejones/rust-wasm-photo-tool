@@ -119,6 +119,7 @@ import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore, isMarqueeKind } from "@/stores/useToolStore";
+import { compareBaselineKey } from "@/lib/compareBaseline";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 import { useGuidesStore } from "@/stores/useGuidesStore";
@@ -583,8 +584,7 @@ export function AppShell() {
 
   // ── Compare: fetch original from IndexedDB when slider activates ───────────
   const activeEntry = photos.find((p) => p.id === activePhotoId) ?? null;
-  const activeOriginalKey =
-    activeEntry?.uploadKey ?? activeEntry?.originalKey ?? null;
+  const activeOriginalKey = compareBaselineKey(activeEntry);
 
   // Settings → Import / Export (.ora): live-tool access, threaded through
   // both TopBar and the compact MasterBar's settingsSlot.
@@ -3214,6 +3214,7 @@ export function AppShell() {
             onQualityChange={handleQualityChange}
             onQualityCommit={handleQualityCommit}
             onToggleCompare={handleToggleCompare}
+            hasCompareBaseline={!!activeOriginalKey}
             onAutoCompress={handleAutoCompress}
             isCompressing={compressProgress.running}
             compressProgress={compressProgress}

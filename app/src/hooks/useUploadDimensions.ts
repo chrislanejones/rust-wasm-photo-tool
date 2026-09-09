@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGalleryStore } from "@/stores/useGalleryStore";
 import { getOriginalDimensions } from "@/lib/dexie/originalsAdapter";
+import { compareBaselineKey } from "@/lib/compareBaseline";
 
 /**
  * The active photo's dimensions **as uploaded** — the number the status bar
@@ -30,7 +31,7 @@ export function useUploadDimensions(): { width: number; height: number } | null 
   // The upload baseline, or the current original for gallery entries old enough
   // to predate `uploadKey`. Those report the current stored size — still the
   // best available answer, and better than showing nothing.
-  const key = entry?.uploadKey ?? entry?.originalKey ?? null;
+  const key = compareBaselineKey(entry);
 
   useEffect(() => {
     if (!key) {
