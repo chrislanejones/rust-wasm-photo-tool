@@ -18,6 +18,7 @@ import {
   getOplogPersistStats,
   getOplogStats,
   getTilesDirtyCount,
+  setDiagnosticsListening,
   getWasmMemoryBytes,
   type OplogPersistStats,
   type OplogStats,
@@ -243,6 +244,26 @@ export function useDiagnostics(active: boolean): DiagnosticsSnapshot {
     build();
     const id = window.setInterval(build, TIER1_INTERVAL_MS);
     return () => window.clearInterval(id);
+  }, [active]);
+
+  // ── Tell the engine somebody is reading ────────────────────────────────
+  //
+  // The tile-dirty count and the op-log stats are published by
+  // `flushToCanvas`, which is the PER-FRAME path — ~14 engine calls, one of
+  // them a full-image diff, and behind the worker every one a postMessage
+  // round trip. Collecting them for a closed window was ~0.9 ms of every
+  // 16.7 ms frame.
+  //
+  // Declaring interest here rather than gating inside the engine keeps the
+  // question where its answer lives: this hook IS the consumer, and `active`
+  // is already "open AND this tab is visible".
+  //
+  // The false → true edge samples once inside `setDiagnosticsListening`, so
+  // the first render after opening shows real numbers instead of whatever the
+  // last edit happened to leave behind.
+  useEffect(() => {
+    setDiagnosticsListening(active);
+    return () => setDiagnosticsListening(false);
   }, [active]);
 
   // ── Interaction tracking: pointer activity on a <canvas>, ~500ms window ─
