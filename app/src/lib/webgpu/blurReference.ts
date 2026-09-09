@@ -20,22 +20,80 @@
 //      our purposes: it would not match the CPU path, so the two renderers
 //      would disagree about the same document.
 //
-// Rounding: Rust's `f32::round()` is half-away-from-zero. All values here are
-// non-negative, so `Math.round` (half-up) agrees on every input we produce.
+// Rounding: the SIMD path stores via `f32x4_add(acc, 0.5)` then a truncating
+// convert, so `Math.trunc(fround(x + 0.5))` is the faithful form. `f32::round()`
+// in the scalar fallback agrees with it for the non-negative values a normalised
+// kernel produces.
+//
+// ⚠️ THIS FILE WAS WRONG FOR ITS WHOLE LIFE, in a way its own header could not
+// see. It claimed to be a "line-by-line port", and it was — of the OPERATIONS.
+// It was not a port of the PRECISION. The crate accumulates in f32; JavaScript
+// has no f32 arithmetic, so `r += src[i] * wt` accumulated at DOUBLE precision
+// and disagreed with the engine wherever a sum landed near a .5 tie.
+//
+// Measured against the live engine on 2026-09-09: ~15 differing bytes per
+// megapixel at delta 1, and ZERO at 64x64 — which was the largest case in
+// `gpuBlurSelfTest`. The harness's biggest test was the biggest size at which
+// the bug was invisible, which is why this survived from the beginning.
+//
+// TWO fixes were needed and neither alone was enough:
+//   1. `Math.fround` on every multiply and every add (3 bytes -> 1 at 256²).
+//   2. The kernel comes from the ENGINE (`gaussian_kernel`), not from a port.
+//      `build_gaussian_kernel` calls `f32::exp`, and `Math.fround(Math.exp(x))`
+//      is the correctly-rounded f64 result rather than f32's own exp. That gap
+//      is NOT closable in JavaScript, and it grows with kernel length: exact at
+//      radius 1, 4 bytes per megapixel at radius 30.
+//
+// So the kernel is treated as an INPUT rather than a thing to re-derive. That
+// is also what makes this an oracle for the SHADER: both take the same kernel,
+// so a difference is arithmetic, which is the only thing under test.
 
-/** `build_gaussian_kernel` — length 2*radius+1, normalised to sum 1. */
+/** The engine's kernel, once resolved. See `setEngineKernel`. */
+let engineKernel: ((radius: number) => Float32Array) | null = null;
+
+/**
+ * Hand this module the engine's `gaussian_kernel` export.
+ *
+ * ⚠️ NOT named `useEngineKernel`, which is what it was first called. In a React
+ * codebase the `use` prefix means "hook", and eslint's rules-of-hooks correctly
+ * errored on it being called from a plain async function.
+ *
+ * ⚠️ CALL THIS BEFORE COMPARING ANYTHING. Without it the fallback below is used,
+ * and the fallback CANNOT be bit-exact — see the header. It is kept so this file
+ * still works in jsdom, where there is no engine, for the tests that only need a
+ * plausible kernel rather than the engine's one.
+ */
+export function setEngineKernel(fn: (radius: number) => Float32Array): void {
+  engineKernel = fn;
+}
+
+/** True when the engine's kernel is in use, i.e. when a delta of 0 is meaningful. */
+export function hasEngineKernel(): boolean {
+  return engineKernel !== null;
+}
+
+const F = Math.fround;
+
+/**
+ * `build_gaussian_kernel` — length 2*radius+1, normalised to sum 1.
+ *
+ * Prefers the ENGINE's kernel. The fround-emulated fallback is as close as
+ * JavaScript can get and is still not exact, because `f32::exp` has no JS
+ * equivalent: exact at radius 1, ~4 bytes per megapixel adrift at radius 30.
+ */
 export function buildGaussianKernel(radius: number): Float32Array {
   const r = Math.trunc(radius);
-  const sigma = Math.max(r, 1) / 2;
-  const twoSigmaSq = 2 * sigma * sigma;
+  if (engineKernel) return engineKernel(r);
+  const sigma = F(Math.max(r, 1) / 2);
+  const twoSigmaSq = F(2 * F(sigma * sigma));
   const k = new Float32Array(2 * r + 1);
   let sum = 0;
   for (let i = -r; i <= r; i++) {
-    const v = Math.exp(-(i * i) / twoSigmaSq);
+    const v = F(Math.exp(F(-F(i * i) / twoSigmaSq)));
     k[i + r] = v;
-    sum += v;
+    sum = F(sum + v);
   }
-  for (let i = 0; i < k.length; i++) k[i] /= sum;
+  for (let i = 0; i < k.length; i++) k[i] = F(k[i] / sum);
   return k;
 }
 
@@ -55,6 +113,8 @@ function pass(
 ): void {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
+      // f32 accumulators, emulated. The crate uses `0.0f32` and a plain
+      // `+=`; JavaScript's `+=` is f64, which is the bug this file had.
       let r = 0, g = 0, b = 0, a = 0;
       for (let ki = -kr; ki <= kr; ki++) {
         // Clamp to edge — the only boundary rule the engine uses.
@@ -62,17 +122,20 @@ function pass(
         const sy = horizontal ? y : Math.min(h - 1, Math.max(0, y + ki));
         const si = (sy * w + sx) * 4;
         const wt = kernel[ki + kr];
-        r += src[si] * wt;
-        g += src[si + 1] * wt;
-        b += src[si + 2] * wt;
-        a += src[si + 3] * wt;
+        r = F(r + F(src[si] * wt));
+        g = F(g + F(src[si + 1] * wt));
+        b = F(b + F(src[si + 2] * wt));
+        a = F(a + F(src[si + 3] * wt));
       }
       const di = (y * w + x) * 4;
       // Round + clamp to u8 HERE, between passes. See note 3 above.
-      dst[di] = Math.min(255, Math.max(0, Math.round(r)));
-      dst[di + 1] = Math.min(255, Math.max(0, Math.round(g)));
-      dst[di + 2] = Math.min(255, Math.max(0, Math.round(b)));
-      dst[di + 3] = Math.min(255, Math.max(0, Math.round(a)));
+      // `trunc(fround(x + 0.5))` mirrors `simd/pixel.rs::store_px`, which adds
+      // 0.5 in f32 lanes and then truncate-converts. Not `Math.round`, which
+      // does the add at f64.
+      dst[di] = Math.min(255, Math.max(0, Math.trunc(F(r + 0.5))));
+      dst[di + 1] = Math.min(255, Math.max(0, Math.trunc(F(g + 0.5))));
+      dst[di + 2] = Math.min(255, Math.max(0, Math.trunc(F(b + 0.5))));
+      dst[di + 3] = Math.min(255, Math.max(0, Math.trunc(F(a + 0.5))));
     }
   }
 }

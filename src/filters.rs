@@ -52,6 +52,29 @@ pub fn sharpen(data: &mut [u8], width: u32, height: u32, amount: f64) {
     crate::simd::color::unsharp_combine(data, &blurred, amount);
 }
 
+/// The engine's Gaussian kernel for `radius`, handed to JS so a checker does not
+/// have to PORT it — which turns out to be impossible to do exactly.
+///
+/// ⚠️ THIS EXISTS BECAUSE A PORT CANNOT BE BIT-EXACT. `build_gaussian_kernel`
+/// computes `f32::exp`, and JavaScript has no f32 arithmetic at all: the closest
+/// it can do is `Math.fround(Math.exp(x))`, which is the CORRECTLY-ROUNDED f64
+/// result, while `f32::exp` is a different function with its own error bound.
+/// They agree on most inputs and not on all — measured 2026-09-09 against the
+/// live engine, a fround-emulated port matched at radius 1 and drifted by 1 LSB
+/// on 4 bytes per megapixel at radius 30, growing with the kernel length.
+///
+/// The kernel is an INPUT to the blur, not the thing under test. Sharing it
+/// removes an unrelated source of divergence and leaves `blurReference.ts` and
+/// the WGSL shader comparing the arithmetic they actually implement — which
+/// `Math.fround` CAN emulate exactly, because add and multiply are correctly
+/// rounded in both languages.
+///
+/// Read-only and allocation-light (61 f32s at the radius-30 ceiling).
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn gaussian_kernel(radius: u32) -> Vec<f32> {
+    build_gaussian_kernel(radius.clamp(1, 30))
+}
+
 /// Build a 1D Gaussian kernel of the given radius.
 /// Kernel size = 2*radius + 1.
 pub fn build_gaussian_kernel(radius: u32) -> Vec<f32> {
