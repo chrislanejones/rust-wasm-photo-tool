@@ -1,9 +1,10 @@
 # ADR-050: Rotated text drifts because it is anchored by its own tile's centre
-Date: 2026-09-08   Status: draft
+Date: 2026-09-08   Status: draft — anchor SHIPPED 2026-09-09 (#99), migration DECLINED on measurement
 
 Filed against "the text bounding box moves/resizes as you type". Reproduced,
-mechanism found, **fix deliberately not applied** — it changes how every saved
-rotated text annotation renders, which is Chris's call, not a bug-fix.
+mechanism found, and now SHIPPED — see "Resolved" at the end. The fix changes
+how every saved rotated text annotation renders, which is why it waited on a
+count rather than on an opinion.
 
 ## Context
 
@@ -121,3 +122,56 @@ Early warning sign: a bug report that rotated text "jumped" after an update, or
 any change to `rotate_pixels` landing without a matching change to
 `pivotLocalX` in `CanvasArea.tsx`. Those two are a matched pair now, and like
 `blurReference.ts` before them, nothing enforces it.
+
+## Resolved — 2026-09-09
+
+**Anchor: TOP-LEFT.** Chris's reasoning: predictability is the point — a box
+stays where you dragged it. Shipped in #99.
+
+**Migration: NOT DONE, on measurement.** The rule was "migrate if the count is
+anything but zero". The count was taken on the production origin
+(`rust-wasm-photo-tool.netlify.app`, the host the marketing site links to — no
+custom domain exists) with `window.__ihRotatedTextAudit()` (#100):
+
+| | |
+|---|---|
+| Photos with a stored archive | 5 |
+| Text annotations | 2 |
+| **Rotated (\|deg\| >= 0.5)** | **0** |
+| Estimated to shift visibly | 0 |
+| Annotations in op-log keyframes | **0** — the Dexie store is empty |
+
+That last row is why the archive count is the whole picture rather than half of
+it: text annotations can also live postcard-encoded in keyframes, and on this
+profile there are none.
+
+⚠️ **A thin sample, stated as one.** Two text annotations is not a survey. This
+says "nothing on this profile moves", not "no rotated text exists anywhere". The
+cost of being wrong is the one already priced above — some saved rotated text
+renders in a new position, once. The audit ships (#100), so the number can be
+re-taken on any profile at any time rather than re-derived.
+
+**Two corrections to this ADR's own costing**, both found while building the fix:
+
+1. The migration was priced as "a text-annotation format bump + `dexie-migration`".
+   It is cheaper than that. `restore_text_annotation` does not take
+   `tile_offset_x/y`, and `editPersistence.ts` strips `tile_*` on save
+   *because it is re-rendered on restore*. So the old-to-new delta is a pure
+   function of fields already stored: no per-annotation data is needed, only a
+   version marker — and the archive record has none today (the existing
+   `formatVersion` is on `PhotoOplogManifest`/`Chunk`, the op-log path).
+2. The blast radius is smaller than the `-5°` default in `text.rs` suggests.
+   Red stamps go through `commit_red_stamp`, which renders, scales and
+   `paste_region`s — **baked pixels, not text annotations**. An anchor change
+   moves none of them.
+
+**The pre-mortem's second failure mode is now closed.** It warned the anchor
+could change "without the migration, because the diff is small and the breakage
+is invisible in every gate". The matched-pair guardrail
+(`rotated-anchor-pair` in `scripts/guardrails.sh`, #99) fails when
+`text::rotated_tile_offset` changes without `CanvasArea`'s `pivotLocal*`,
+scoped to the lines carrying the trig so a comment cannot turn it red. Proven
+to fail before it was believed.
+
+The first failure mode — "it sat in Draft because nobody wanted to own 'saved
+documents move'" — was closed by measuring instead of deciding.
