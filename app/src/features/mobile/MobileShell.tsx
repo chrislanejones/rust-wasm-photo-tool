@@ -58,18 +58,11 @@ function MobileThumb({
   }, [entry.thumbBlob]);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       aria-label={`View photo ${entry.name}`}
       className="photo-thumb photo-thumb-grid relative"
       onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
     >
       <div className="absolute inset-0 checkerboard rounded-lg" />
       <img
@@ -83,11 +76,11 @@ function MobileThumb({
       />
       {loading && (
         <Skeleton
-          className="absolute inset-0 z-10 rounded-lg"
+          className="absolute inset-0 z-[var(--z-canvas-overlay)] rounded-lg"
           aria-label={`Loading ${entry.name}`}
         />
       )}
-    </div>
+    </button>
   );
 }
 
@@ -159,13 +152,13 @@ function MobileViewer({
   const meta = [dims, formatBytes(photo.byteSize)].filter(Boolean).join(" · ");
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col bg-black">
+    <div className="absolute inset-0 z-[var(--z-mobile-viewer)] flex flex-col bg-bg-primary">
       <div className="flex items-center gap-2 px-3 py-2.5">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">
+          <p className="truncate text-sm font-semibold text-text-primary">
             {photo.name}
           </p>
-          <p className="text-xs text-white/60">
+          <p className="text-xs text-text-muted">
             {index + 1} of {photos.length}
             {meta ? ` · ${meta}` : ""}
           </p>
@@ -210,20 +203,22 @@ function MobileViewer({
 
         {photos.length > 1 && (
           <>
-            <button
+            <Button
+              size="large"
               onClick={() => goto(-1)}
               aria-label="Previous photo"
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white/90"
+              className="absolute left-2 top-1/2 -translate-y-1/2"
             >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
-            <button
+              <ChevronLeft />
+            </Button>
+            <Button
+              size="large"
               onClick={() => goto(1)}
               aria-label="Next photo"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white/90"
+              className="absolute right-2 top-1/2 -translate-y-1/2"
             >
-              <ChevronRight className="h-6 w-6" />
-            </button>
+              <ChevronRight />
+            </Button>
           </>
         )}
       </div>
