@@ -249,6 +249,17 @@
   --color-theme-muted: var(--bg-elevated);
   --color-theme-muted-foreground: var(--muted-foreground);
   --color-theme-sidebar-border: var(--border);
+  /* The border on TEXT FIELDS (width/height, the New-dialog fields) and the
+     colour swatches. It was never defined, so `border-theme-border` generated
+     no rule and the bare `border` utility beside it fell back to currentColor:
+     near-white in dark (which read as a deliberate cream outline and hid the
+     bug) and #2a2622 in light, i.e. a black box. --ring is #c98f3f light and
+     #fcdfc2 dark, so light gets the colour Chris asked for and dark keeps what
+     it already looked like. (Chris, 2026-09-08.)
+     ⚠️ Four siblings are still undefined and still fall through the same way:
+     --color-theme-accent (the FILL on those same inputs), --color-theme-
+     background, --color-theme-chart, --color-theme-sidebar-muted. */
+  --color-theme-border: var(--ring);
   --color-theme-chart4: #f0a060;
 }
 
