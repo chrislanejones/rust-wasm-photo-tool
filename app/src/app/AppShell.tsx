@@ -114,7 +114,7 @@ import {
   applyExifToVerbatim,
 } from "@/lib/exif";
 import { pinLabelText } from "@/lib/pinLabel";
-import { PANEL_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
+import { PANEL_OPEN_GUTTER, GALLERY_OPEN_GUTTER, BP_TIGHT } from "@/lib/layout";
 import { makeThumbnail } from "@/lib/workingCopy";
 import { clearWorkingCopyCache } from "@/lib/workingCopyCache";
 import { useUIStore } from "@/stores/useUIStore";
@@ -2766,9 +2766,6 @@ export function AppShell() {
       >
         Skip to canvas
       </a>
-      {/* The app-background checkerboard — full viewport, underneath everything.
-          See .app-checkerboard in styles.css for why it is not on .canvas-wrapper. */}
-      <div aria-hidden="true" data-app-checkerboard className="app-checkerboard" />
       <AnimatePresence>
         {isImageLoading && (
           <motion.div
@@ -3304,6 +3301,12 @@ export function AppShell() {
                   : 0,
               marginRight:
                 !bp.dock && !bp.narrow && showHistory ? PANEL_OPEN_GUTTER : 0,
+              // Third side: the Gallery strip pushes the workspace UP the same way
+              // Tools and Review push it in. Wide only — in the dock the gallery
+              // is a column on the left, so a bottom gutter would be a gap
+              // under nothing. (Chris, 2026-09-08.)
+              marginBottom:
+                !bp.dock && !bp.narrow && showGallery ? GALLERY_OPEN_GUTTER : 0,
             }}
             transition={prefs.reduceMotion ? instantTransition : panelSpacingTransition}
             className="main-content focus:outline-none"
@@ -3334,7 +3337,8 @@ export function AppShell() {
                   style={{
                     position: "absolute",
                     top: showTopBar ? 80 : 12,
-                    bottom: showGallery ? 168 : 56,
+                    // Same constant main-content lifts by, so the two cannot drift.
+                    bottom: 56 + (showGallery ? GALLERY_OPEN_GUTTER : 0),
                     left: 12,
                     right: 12,
                     display: "flex",
@@ -3345,7 +3349,7 @@ export function AppShell() {
                   }}
                 >
                   <div
-                    className="canvas-grid-host"
+                    className="canvas-grid-host checkerboard-canvas"
                     style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(5, 1fr)",

@@ -423,22 +423,6 @@ body {
   align-items: center;
   justify-content: center;
   padding: 32px;
-  /* The checkerboard used to be painted HERE, but this box is inset: 0 of
-     main-content, whose margins animate by PANEL_OPEN_GUTTER when Tools or
-     Review are open — so the pattern shrank with the panels. It now lives on
-     .app-checkerboard, one fixed full-viewport layer underneath everything. */
-  background: transparent;
-}
-/* The app-background checkerboard: one fixed layer the size of the viewport,
-   rendered first inside .app-shell so every panel, bar and the canvas host
-   paint above it. Full width and height whether Tools, Gallery and Review
-   are open or closed (Chris, 2026-09-08). The background block below is the
-   one that used to sit on .canvas-wrapper — moved, not retyped, so the cell
-   size and phase are unchanged. */
-.app-checkerboard {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
   background: var(--bg-primary);
   /* subtle checkerboard */
   background-image:
