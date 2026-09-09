@@ -17,14 +17,13 @@
 // That is the honest seam — the state shape is the contract, and the state
 // shape includes the source.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDiagnosticsSampler } from "./useDiagnosticsSampler";
 import type { RefObject, MouseEvent } from "react";
 import type { ImageHorseTool, UiStateCapture } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
 import { onOplogFlush } from "@/lib/oplogPersistence";
 import { checkBuildSkew } from "@/lib/pwa/skew";
 import {
-  registerOplogStats,
-  registerTilesDirtyCount,
   registerWasmMemory,
 } from "@/lib/resourceMonitor";
 import { restoreLayerStack } from "@/lib/restoreLayerStack";
@@ -36,7 +35,6 @@ import {
   previewLiveCanvas,
   sizeLiveCanvas,
 } from "@/lib/engine/port";
-import { syncOplog, tryTilesFlush } from "@/lib/tilesFlush";
 import { useAnnotationStore } from "@/stores/useAnnotationStore";
 
 /** Decode a PNG Uint8Array → raw RGBA via an OffscreenCanvas. */
@@ -404,6 +402,8 @@ export function useEngineCore(
     });
   }, []);
 
+  const sampleDiagnostics = useDiagnosticsSampler(toolRef);
+
   const flushToCanvas = useCallback(() => {
     const t = toolRef.current;
     const canvas = canvasRef.current;
@@ -418,11 +418,11 @@ export function useEngineCore(
     // The local/worker choice is inside `blitLiveEngine`, not here. The contract
     // test allows exactly two modules to read the flag, and a call site that
     // branches on it has re-exposed the choice Stage 3.5 exists to hide.
-    tryTilesFlush(t).then(registerTilesDirtyCount).catch(() => {});
-    syncOplog(t).then(registerOplogStats).catch(() => {});
+    // Only when the Diagnostics window is open — see useDiagnosticsSampler.
+    sampleDiagnostics(t);
     void onOplogFlush(t);
     blitLiveEngine(t, canvas, wasmMemoryRef.current, backbufferRef);
-  }, [canvasRef]);
+  }, [canvasRef, sampleDiagnostics]);
 
   const getCanvasCoords = useCallback(
     (e: MouseEvent<HTMLCanvasElement> | globalThis.MouseEvent) => {
