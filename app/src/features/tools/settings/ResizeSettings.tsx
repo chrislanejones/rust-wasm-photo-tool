@@ -516,7 +516,11 @@ export function ResizeSettings({
       </div>
 
       {/* ── Bottom Buttons ── */}
-      <div className="border-t border-theme-sidebar-border pt-4 mt-8 space-y-2">
+      {/* `mt-panel`, not `mt-8`: 32px above this rule left a band of dead space
+          under the Quality slider while the rule itself sat nowhere near either
+          neighbour. One panel inset on each side of the rule reads as a
+          separator rather than a gap. */}
+      <div className="border-t border-theme-sidebar-border pt-panel mt-panel space-y-2">
         {/* ONE apply button, labelled for what is actually pending. It says
             "Apply Resize" when only the dimensions moved, "Apply Compression"
             when only quality/format/method moved, and "Apply Compression &
