@@ -2,20 +2,20 @@ import { test, expect, type Page } from "@playwright/test";
 import { join } from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The Resize tool's footer sits OUTSIDE its ToolModeToggle, so every button in
-// it renders under both tiles unless something says otherwise. "Apply Resize"
-// therefore appeared while the user was in Compress — a button whose own
-// tooltip says it does not compress, offered mid-compression.
+// Resize and Compress are ONE tile since v8.71 (#89), with a single adaptive
+// Apply whose label says what it will commit:
 //
-// It hid for months because it is disabled unless the pixel dimensions
-// changed, and the dimension fields live in the Resize tile: greyed out reads
-// as "not for me right now", not "wrong panel". The Compress percent slider
-// changes dimensions too, so it was reachable ENABLED from the wrong tile.
+//   nothing changed          "Apply Compression & Resize", disabled
+//   dimensions only          "Apply Resize"
+//   format / quality only    "Apply Compression"
+//   both                     "Apply Compression & Resize"
 //
-// Its sibling is deliberately NOT gated: "Apply Compression & Resize" is the
-// commit-everything action and the one that unlocks A/B Compare, so it belongs
-// under both tiles. This spec pins BOTH halves of that asymmetry — a future
-// tidy-up that gates them together would be a regression.
+// This spec used to pin the OLD shape — two tiles, and "Apply Resize" hidden
+// under Compress — and had been failing since the tiles merged. What it still
+// needs to pin is the part that matters to a user: the button never offers a
+// resize when nothing has been resized, and it says "Apply Resize" the moment
+// a dimension changes. A future refactor that made the label static would
+// pass every other gate.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FIXTURE_PNG = join(__dirname, "fixtures", "checker.png");
@@ -52,46 +52,38 @@ async function importFixture(page: Page): Promise<void> {
   await page.waitForTimeout(1000);
 }
 
-test("Apply Resize renders under the Resize tile only", async ({ page }) => {
+test("the Resize & Compress Apply says what it will commit", async ({ page }) => {
   await blockExternalNetwork(page);
   await page.goto("/");
   await importFixture(page);
 
-  // Compress and Resize are sub-tools of the ENHANCE group, not Edit.
   await page.getByRole("button", { name: "Enhance", exact: true }).first().click();
   await page.waitForTimeout(500);
-  await page.getByRole("button", { name: "Compress", exact: true }).first().click();
+  await page.getByRole("button", { name: "Resize & Compress", exact: true }).first().click();
   await page.waitForTimeout(900);
 
   const applyResize = page.getByRole("button", { name: /^Apply Resize$/ });
-  const applyBoth = page.getByRole("button", { name: /Apply Compression & Resize/ });
+  const applyBoth = page.getByRole("button", { name: /^Apply Compression & Resize$/ });
 
-  // ── Compress tile: the resize-only button must be absent.
-  expect(await applyResize.count(), "Apply Resize must NOT render in Compress").toBe(0);
-  expect(await applyBoth.count(), "Apply Compression & Resize stays in Compress").toBe(1);
+  // ── At rest: the commit-everything label, disabled, and NO resize offered.
+  expect(await applyResize.count(), "Apply Resize must not render before a dimension changes").toBe(0);
+  await expect(applyBoth, "the at-rest label is Apply Compression & Resize").toHaveCount(1);
+  await expect(applyBoth.first(), "nothing to commit yet, so it is disabled").toBeDisabled();
 
-  // ── Resize tile: it comes back, and its sibling is still there too.
-  await page.getByRole("button", { name: "Resize", exact: true }).first().click();
-  await page.waitForTimeout(900);
-  expect(await applyResize.count(), "Apply Resize must render in Resize").toBe(1);
-  expect(await applyBoth.count(), "Apply Compression & Resize stays in Resize").toBe(1);
+  // ── Change a dimension: the same button now reads Apply Resize and is live.
+  // `width` is a real <label> since #114, so the field is reachable by name.
+  const width = page.getByLabel("width", { exact: true });
+  const current = Number(await width.inputValue());
+  expect(current, "the width field carries the photo's width").toBeGreaterThan(0);
+  await width.fill(String(Math.max(1, Math.round(current / 2))));
+  await page.waitForTimeout(400);
 
-  // ── The shared footer still lays out: gating in place must not collapse the
-  // full-width buttons. Both tiles should report the same geometry.
-  const width = async (re: RegExp) =>
-    page.evaluate((src) => {
-      const rx = new RegExp(src);
-      const b = Array.from(document.querySelectorAll("button")).find((x) =>
-        rx.test((x.textContent ?? "").trim()),
-      );
-      const r = b?.getBoundingClientRect();
-      return r ? Math.round(r.width) : 0;
-    }, re.source);
+  await expect(applyResize, "dimensions changed → Apply Resize").toHaveCount(1);
+  await expect(applyResize.first()).toBeEnabled();
+  expect(await applyBoth.count(), "and the combined label steps aside").toBe(0);
 
-  const resizeW = await width(/^Apply Resize$/);
-  const bothW = await width(/Apply Compression/);
-  console.log(`[placement] Resize tile widths — Apply Resize ${resizeW}px, Apply Both ${bothW}px`);
-  expect(resizeW, "Apply Resize is full-width").toBeGreaterThan(100);
-  expect(bothW, "Apply Compression & Resize is full-width").toBeGreaterThan(100);
-  expect(Math.abs(resizeW - bothW), "the two footer buttons match width").toBeLessThanOrEqual(2);
+  // ── Still full-width: gating the label must not collapse the footer button.
+  const w = await applyResize.first().evaluate((b) => Math.round(b.getBoundingClientRect().width));
+  console.log(`[placement] Apply Resize width ${w}px`);
+  expect(w, "Apply Resize is full-width").toBeGreaterThan(100);
 });
