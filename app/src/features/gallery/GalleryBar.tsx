@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
-import { DevelopPaper } from "./DevelopPaper";
+import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn, thumbDevelop } from "@/lib/animations";
+import { useThumbDevelop } from "./useThumbDevelop";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Info } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -101,13 +101,12 @@ interface ThumbProps {
 function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, vertical }: ThumbProps) {
   const [thumbUrl, setThumbUrl] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
-  // Feeds the develop paper: it may not clear until the pixels are decoded.
-  const [imgReady, setImgReady] = useState(false);
+  // Black and white until the pixels are decoded AND it is this tile's turn.
+  const develop = useThumbDevelop(entry.thumbBlob);
 
   useEffect(() => {
     const url = URL.createObjectURL(entry.thumbBlob);
     setThumbUrl(url);
-    setImgReady(false);
     return () => URL.revokeObjectURL(url);
   }, [entry.thumbBlob]);
 
@@ -173,21 +172,21 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           when it was written. */}
       <div className="absolute inset-0 checkerboard rounded-lg" />
       {/* The image pops inside the clipped card — hoverPop from lib/animations.ts,
-          the same definition the tool tiles use. */}
+          the same definition the tool tiles use — and comes into colour from
+          black and white as it lands: thumbDevelop, same file. */}
       <motion.img
         ref={imgRef}
         variants={hoverPop}
+        initial={thumbDevelop.mono}
+        animate={develop.colour ? thumbDevelop.colour : thumbDevelop.mono}
         src={thumbUrl || undefined}
         alt={entry.name}
         draggable={false}
         decoding="async"
         loading="lazy"
-        onLoad={() => setImgReady(true)}
-        onError={() => setImgReady(true)}
+        onLoad={develop.onImgReady}
+        onError={develop.onImgReady}
       />
-
-      {/* The white paper — a Polaroid coming up. See DevelopPaper.tsx. */}
-      <DevelopPaper thumbBlob={entry.thumbBlob} name={entry.name} imgReady={imgReady} />
 
       <AnimatePresence>
         {isCompressing && (
@@ -335,7 +334,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
  * "Delete Selected" when nothing is selected is how people delete the wrong
  * thing. The scope is in the button text, always:
  *
- *   nothing selected   Auto Compress & Resize (i) [Image on Canvas] [All Images]
+ *   nothing selected   Auto Compress & Resize (i) [Canvas Image] [All Images]
  *                      │ [Delete All] [Export or Share Image]
  *   one selected       Auto Compress & Resize (i) [Selected Image]
  *                      | [Unselect] [Delete Image] [Export or Share Image]
@@ -456,7 +455,7 @@ function GalleryActions({
             ) : (
               <>
                 <Button size="large" onClick={() => onAutoCompress("selected")} className={btn}>
-                  Image on Canvas
+                  Canvas Image
                 </Button>
                 {totalCount > 1 && (
                   <Button size="large" onClick={() => onAutoCompress("all")} className={btn}>

@@ -1,4 +1,4 @@
-import type { Variants, Transition, Easing } from "framer-motion";
+import type { Variants, Transition, Easing, TargetAndTransition } from "framer-motion";
 
 // Standardized quick motion transition (200ms spring animation)
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -182,42 +182,35 @@ export const thumbEnter = (i: number) => ({
 });
 
 /**
- * THUMBNAIL "DEVELOP" — a Polaroid coming up: white paper to picture, the
- * top edge sweeping down. Asked for on 2026-09-10 because paste → New
- * Gallery Image felt slow: the tile sat as a grey skeleton until the
- * thumbnail decoded, and a skeleton says "waiting", not "arriving".
+ * THUMBNAIL "DEVELOP" — the picture arrives in black and white and comes into
+ * colour. It is the IMAGE that changes, so nothing happens behind it: a first
+ * cut painted white paper over the tile and swept it open, and Chris could
+ * not see what was going on. The pop (`thumbEnter`, above) is untouched — he
+ * likes that one.
  *
- * Three numbers, and deliberately only three:
+ * Two numbers, and deliberately only two:
  *
- *  - MIN_MS: every tile takes at least this long to come up, EVEN WHEN the
- *    image is ready instantly. A 30 ms flash reads as a glitch; a quarter of
- *    a second reads as a photo developing. Tune here, nowhere else.
- *  - STAGGER_MS: tiles that mount together come up left to right, each
- *    starting this long after the previous — succession, not a wall.
- *  - the keyframes: fast to most of the way, then a slow crawl. If the image
- *    is still not decoded when the fast part ends, the crawl is what the eye
- *    sees — the develop visibly SLOWS rather than freezing — and the last of
- *    the paper goes the moment the pixels arrive.
+ *  - MIN_MS: the fade's own duration, so a tile cannot come into colour sooner
+ *    than this after its turn — EVEN WHEN the pixels were ready instantly. A
+ *    30 ms flash reads as a glitch; a quarter of a second reads as a photo
+ *    arriving. Tune here, nowhere else.
+ *  - HANDOFF: tiles that mount together take turns left to right; tile N
+ *    starts when tile N-1 is this far through its fade. 0.8 = "image 0 at
+ *    80% done, start image 1" — succession, not a wall.
+ *
+ * A slow image simply stays black and white until its pixels are decoded,
+ * then fades. `useThumbDevelop` in features/gallery decides WHEN; this file
+ * decides only what it looks like.
  */
-export const THUMB_DEVELOP_MIN_MS = 240;
-/** The hand-off point: tile N starts when tile N-1 is this far through its
- *  minimum develop. 0.8 = "image 0 at 80% done, start image 1". */
+const THUMB_DEVELOP_MIN_MS = 240;
 const THUMB_DEVELOP_HANDOFF = 0.8;
 export const THUMB_DEVELOP_STAGGER_MS = Math.round(THUMB_DEVELOP_MIN_MS * THUMB_DEVELOP_HANDOFF);
-export const thumbDevelop: Variants = {
-  /** White paper fully covering the picture. */
-  covered: { clipPath: "inset(0% 0 0 0)" },
-  /** 80% open at exactly MIN_MS (times[1] * duration == 0.24 s), then a slow
-   *  crawl toward 92% for as long as the image keeps us waiting. */
-  developing: {
-    clipPath: ["inset(0% 0 0 0)", "inset(80% 0 0 0)", "inset(92% 0 0 0)"],
-    transition: { duration: 3.0, times: [0, 0.08, 1], ease: ["easeOut", "linear"] },
-  },
-  /** The rest of the paper, gone in one short move once both the pixels and MIN_MS are in. */
-  revealed: {
-    clipPath: "inset(100% 0 0 0)",
-    transition: { duration: 0.09, ease: "easeIn" },
-  },
+export const thumbDevelop: { mono: TargetAndTransition; colour: TargetAndTransition } = {
+  /** Decoded or not, a tile starts here. */
+  mono: { filter: "grayscale(1)" },
+  /** Into colour over exactly MIN_MS. A fade is not motion, so it runs under
+   *  Reduce Motion too — see the BrandRevealScreen note above. */
+  colour: { filter: "grayscale(0)", transition: { duration: THUMB_DEVELOP_MIN_MS / 1000, ease: "easeOut" } },
 };
 
 // Top-of-screen image loading progress bar
