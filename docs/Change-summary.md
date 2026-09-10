@@ -10550,3 +10550,29 @@ This activates nothing. The service worker still ships dark.
 ### QC
 
 `imagehorse-qc` was **not run** for this cut, and it is owed more than usual — canvas, tools and the engine all changed. What *was* driven in a real browser on the production build: the A/B compare regression reproduced on master and the fix verified (fresh load → compress → leave the panel → return, enabled throughout, overlay rendering); GPU-vs-engine parity at four sizes on `intel/xe-lpg`, all maxDelta 0; and the rotated-text anchor confirmed rendering on canvas. The rest of the suite is owed.
+
+## v8.74 Change Summary — 2026-09-10
+
+**Photos develop as they land, the gallery bar says what it will act on, and phone widths get a real mobile version.**
+
+| # | Change | Status |
+| --- | --- | --- |
+| 1 | Thumbnails **develop like a Polaroid** — white paper sweeps open top to bottom; every tile ≥ 240 ms even when instant; tiles queue left to right at the 80% hand-off; a late image slows the develop rather than freezing it | Complete |
+| 2 | **Mobile version below 600px** — add from library or camera, browse the gallery, pick editing up on a bigger screen; replaces the too-small notice | Complete |
+| 3 | Gallery bar in **three arrangements** (nothing / one / many selected) with the scope in every label; Clone Stamp's "Alt+Click to set source" box removed, the lightbulb carries it | Complete |
+| 4 | **Auto Compress & Resize moved** from Enhance › Resize & Compress into the gallery bar; sits under the actions in compact, after the status bar's rule on desktop — "All Images │ Delete All" | Complete |
+| 5 | Compact gallery: thumbnails **20px apart** (were 12/16); action tiles use the Selection panel's grid | Complete |
+| 6 | "Gallery View" placeholder removed; status bar drops its trailing zoom % | Complete |
+| 7 | Delete confirm reads **singular** when one photo is selected | Complete |
+| 8 | **Create AI Image** opens a real dialog; Generate disabled with a visible reason; ratio presets flagged as placeholders in body and code | Complete, no model |
+| 9 | Font selector **disabled with reason** — one face, Liberation Sans; textarea previews in the committed face, no snap on commit | Complete |
+| 10 | Import preview frame **hugs the image** — 22px of matting instead of two thirds bare checkerboard | Complete |
+| 11 | Four unlabelled Resize controls (scale, quality, width, height) get **real names** — WCAG 4.1.2 | Complete |
+| 12 | `blur-shader-pair` guardrail — the engine blur and the WGSL shader are the third matched pair; proven to fail, pass, and ignore comments | Complete |
+| 13 | CodeQL: all four open alerts dismissed with reasons — one pattern, a literal reaching a name containing `salt` in deterministic PRNGs | Closed |
+| 14 | Orphan backlog `#66` retired | Complete |
+| 15 | Five props that only Auto Compress used deleted from the ResizeSettings → ToolsSidebar → AppShell chain | Complete |
+
+### QC
+
+`imagehorse-qc` **was run on v8.73**, the first full pass since the browser wall came down. Sections 1, 3 (partial), 4 pass. Two findings: **F-2** — four unlabelled Resize controls — is fixed in this cut (#11). **F-1 is open and pre-existing**: on a never-edited 800×600 import the status bar reads `Original: 800×600 | 820×620 | 100%`, and a resize to width 400 exports 396×298 — the gaps differ (−20, −4), so it is not one constant, and no `+20` exists in the engine or CanvasArea. Export of an untouched photo is a correct 800×600. Undo is healthy: two operations, one Ctrl+Z, exactly one step back. B7 (rotated text survives a reload) **closed** through the real UI. The service-worker harness passes 5/5 on this tree.

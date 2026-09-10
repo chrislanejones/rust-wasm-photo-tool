@@ -84,44 +84,44 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.73 — 2026-09-09
+### v8.74 — 2026-09-10
 
-**The GPU blur is wired and matches the engine exactly, the checker that was
-verifying it turned out never to have matched, and A/B compare stops locking
-itself.**
+**Photos develop as they land, the gallery bar says what it will act on, and
+phone widths get a real mobile version.**
 
-Compare after a compress or resize used to go dark when you switched tools and
-came back. It was asking the wrong question — whether you had edited — using
-state that a tool switch or a page reload wipes. It asks whether there is an
-original to compare against now, which is the thing it actually needs, so it
-stays available.
+A pasted or dropped photo used to sit as a grey block until its thumbnail was
+ready. It now comes up like a Polaroid — white paper that sweeps open from the
+top — and every tile takes at least a quarter of a second even when the pixels
+are instant, because a thirty-millisecond flash reads as a glitch. Several at
+once come up left to right, each starting when the one before it is most of
+the way there. If a photo is slow, the develop visibly slows with it rather
+than freezing.
 
-The GPU blur is wired up behind a flag that is still off. On a real GPU it
-produces the same bytes as the engine, at every size tested, and falls back to
-the processor on every failure — no adapter, a software one, a lost device.
-Turning it on is a separate decision.
+The gallery bar has three arrangements now, one for nothing selected, one
+selected, many selected, and the scope is always in the button text — "Delete
+Image" or "Delete All", never a "Delete Selected" sitting there with nothing
+selected. Auto Compress & Resize moved out of the Enhance panel and into the
+bar, beside the photos it acts on. The confirm you get for one photo now says
+one photo. In the compact layout the thumbnails have room between them, and
+the bar uses the same tile grid the Selection panel does.
 
-Finding that took fixing something older. The reference implementation the
-shader was checked against had never actually matched the engine: it added
-numbers at double precision where the engine uses single, and the disagreement
-only appears above 64×64 — which was the largest size the check ever ran. It
-passed for its whole life by never looking where the problem was.
+Below 600 pixels wide Image Horse is now a real mobile version: add photos
+from your library or camera, browse the gallery, and pick the editing up on a
+bigger screen. It replaces the notice that used to say the window was too
+small.
 
-Rotated text is anchored at its top-left corner now. It was pivoting around the
-middle of its own box, and the box grows as you type, so the words drifted.
-Unrotated text was always correct and still is.
+Create AI Image opens a real dialog — prompt, reference images, a plain
+sentence about what leaves your tab. Generate is off, and says why: there is
+no model chosen yet, and a button that does nothing is worse than one that
+tells you. The font selector stops promising faces the engine cannot draw —
+it lists the one it has, and the text you type previews in that face, so
+nothing snaps on commit. Four resize controls that read as "spin button" to a
+screen reader have names.
 
-Two loads landing at once no longer cancel each other. Opening a photo while
-another is still loading made both fail.
-
-The Diagnostics window was being fed on every single frame whether or not it was
-open — about fourteen round trips to the engine each time, one of them a
-full-image scan. It is fed when you are looking at it.
-
-Fonts are served from the app itself rather than fetched from Google, so the
-logged-out editor really does make no network calls. And several text fields
-had colours that were never defined, which meant thirteen places asked for a
-colour that did not exist.
+Known and open: on a freshly imported photo the status bar reports a working
+size 20 pixels larger than the file on each axis, and a resize to an exact
+width exports a few pixels under it. Export of an untouched photo is correct.
+Being looked at.
 
 ## License
 

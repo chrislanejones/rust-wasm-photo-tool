@@ -24,6 +24,41 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.74",
+    date: "2026-09-10",
+    headline: "Photos develop as they land, the gallery bar says what it will act on, and phone widths get a real mobile version",
+    entries: [
+      {
+        tag: "feature",
+        text: "A pasted or dropped photo used to sit as a grey block until its thumbnail was ready. It comes up like a Polaroid now — white paper that sweeps open from the top — and every tile takes at least a quarter of a second even when the pixels are instant, because a thirty-millisecond flash reads as a glitch. Several at once come up left to right. A slow photo slows the develop rather than freezing it.",
+      },
+      {
+        tag: "feature",
+        text: "Below 600 pixels wide Image Horse is a real mobile version: add photos from your library or camera, browse the gallery, and pick the editing up on a bigger screen. It replaces the notice that used to say the window was too small.",
+      },
+      {
+        tag: "ui",
+        text: "The gallery bar has three arrangements — nothing, one, many selected — and the scope is always in the button text. Auto Compress & Resize moved out of the Enhance panel and into the bar, beside the photos it acts on. The confirm for one photo says one photo. Compact thumbnails have room between them.",
+      },
+      {
+        tag: "feature",
+        text: "Create AI Image opens a real dialog — prompt, reference images, and a plain sentence about what leaves your tab. Generate is off and says why: no model is chosen yet, and a button that does nothing is worse than one that tells you.",
+      },
+      {
+        tag: "fix",
+        text: "The font selector stops promising faces the engine cannot draw. It lists the one it has, and the text you type previews in that face, so nothing snaps on commit.",
+      },
+      {
+        tag: "fix",
+        text: "Four resize controls that read as \"spin button\" to a screen reader have names, and clicking the word focuses the field.",
+      },
+      {
+        tag: "infra",
+        text: "A third matched-pair guardrail ties the engine blur to the GPU shader — the edge that nearly shipped a one-bit difference in production. All four CodeQL alerts closed: one pattern, a literal reaching a name containing salt in a deterministic random generator.",
+      },
+    ],
+  },
+  {
     version: "v8.73",
     date: "2026-09-09",
     headline: "The GPU blur matches the engine exactly, and A/B compare stops locking itself",
