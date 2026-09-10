@@ -1124,9 +1124,20 @@ textarea:focus-visible {
 
 /* Import-dialog preview thumbnail. */
 .import-preview {
+  /* THE FRAME HUGS THE IMAGE. It used to be a full-width flex row with the
+     image left-aligned and capped at 140px tall, so a 1080x720 photo sat about
+     210px wide in a ~680px box and the remaining two thirds were bare
+     checkerboard — which reads as "the right half of this image is
+     transparent" rather than as matting. `width: fit-content` sizes the frame
+     from the image, so the checkerboard is only ever visible THROUGH real
+     alpha, which is the only thing it was ever meant to show. */
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
   padding: 10px;
   border-radius: 10px;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
@@ -1144,13 +1155,23 @@ textarea:focus-visible {
   background-color: #d0d0d0;
 }
 .import-preview img {
-  max-height: 140px;
+  display: block;
+  /* Taller than the old 140px: the frame no longer has to leave room beside
+     the image for the dimensions chip, so the preview can use the space. */
+  max-height: 200px;
   max-width: 100%;
+  width: auto;
+  height: auto;
   border-radius: 6px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 .import-preview-dims {
-  margin-left: auto;
+  /* Sits ON the image, bottom-right. It was `margin-left: auto` in the flex
+     row, which is what forced the frame full-width in the first place — taking
+     it out of flow is what lets the frame hug. */
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
   font: 600 11px var(--font-mono, ui-monospace, monospace);
   color: var(--text-secondary, #333);
   background: var(--bg-elevated, rgba(255, 255, 255, 0.9));
