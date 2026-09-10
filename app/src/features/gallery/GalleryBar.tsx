@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
-import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
+import { DevelopPaper } from "./DevelopPaper";
+import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Info } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
-import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes } from "@/lib/format";
 import { TIERS } from "@/lib/tiers";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
@@ -99,14 +99,15 @@ interface ThumbProps {
 }
 
 function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, vertical }: ThumbProps) {
-  const [loading, setLoading] = useState(true);
   const [thumbUrl, setThumbUrl] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
+  // Feeds the develop paper: it may not clear until the pixels are decoded.
+  const [imgReady, setImgReady] = useState(false);
 
   useEffect(() => {
     const url = URL.createObjectURL(entry.thumbBlob);
     setThumbUrl(url);
-    setLoading(true);
+    setImgReady(false);
     return () => URL.revokeObjectURL(url);
   }, [entry.thumbBlob]);
 
@@ -181,13 +182,12 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         draggable={false}
         decoding="async"
         loading="lazy"
-        onLoad={() => setLoading(false)}
-        onError={() => setLoading(false)}
+        onLoad={() => setImgReady(true)}
+        onError={() => setImgReady(true)}
       />
 
-      {loading && (
-        <Skeleton className="absolute inset-0 z-10 rounded-lg" aria-label={`Loading ${entry.name}`} />
-      )}
+      {/* The white paper — a Polaroid coming up. See DevelopPaper.tsx. */}
+      <DevelopPaper thumbBlob={entry.thumbBlob} name={entry.name} imgReady={imgReady} />
 
       <AnimatePresence>
         {isCompressing && (
@@ -336,7 +336,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
  * thing. The scope is in the button text, always:
  *
  *   nothing selected   Auto Compress & Resize (i) [Image on Canvas] [All Images]
- *                      | [Gallery View (off)] [Delete All] [Export or Share Image]
+ *                      │ [Delete All] [Export or Share Image]
  *   one selected       Auto Compress & Resize (i) [Selected Image]
  *                      | [Unselect] [Delete Image] [Export or Share Image]
  *   many selected      Auto Compress & Resize (i) [Selected Images]
@@ -381,34 +381,14 @@ function GalleryActions({
   /** Compact stacks icon over label, so the label must not be hidden there. */
   const label = vertical ? "inline" : "hidden sm:inline";
 
-  return (
-    <div
-      className={
-        vertical
-          ? "flex flex-col gap-3"
-          : "flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5"
-      }
-    >
-      {/* ── selection / delete / export ──
-          FIRST, and Auto Compress goes underneath in both layouts: the
-          per-photo actions are what a selection changes, so they sit closest
-          to the thumbnails, and the compress block reads as the footer of the
-          bar rather than its headline. */}
+  const actions = (
+    <>
+      {/* ── selection / delete / export ── */}
       <div className={actionRow}>
-        {some ? (
-          onClearSelection && (
-            <Button size="large" onClick={onClearSelection} title="Clear selection" className={actionBtn}>
-              <SquareX className="h-3.5 w-3.5" />
-              <span className={label}>Unselect</span>
-            </Button>
-          )
-        ) : (
-          /* Placeholder for the grid/gallery view that does not exist yet. It is
-             rendered disabled rather than omitted so the row keeps its shape as
-             a selection comes and goes. */
-          <Button size="large" disabled title="Gallery view is not available yet" className={actionBtn}>
-            <Copy className="h-3.5 w-3.5" />
-            <span className={label}>Gallery View</span>
+        {some && onClearSelection && (
+          <Button size="large" onClick={onClearSelection} title="Clear selection" className={actionBtn}>
+            <SquareX className="h-3.5 w-3.5" />
+            <span className={label}>Unselect</span>
           </Button>
         )}
 
@@ -435,17 +415,12 @@ function GalleryActions({
           </Button>
         )}
       </div>
+    </>
+  );
 
-      {/* The rule between the actions and the compress block.
-          Horizontal only — stacked, the gap already separates them. */}
-      {!vertical && (
-        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border sm:block" />
-      )}
-
-      {/* ── Auto Compress & Resize — LAST in both layouts ──
-          Moved here from Enhance › Resize & Compress, which is where it used to
-          live; it acts on the gallery's selection, so it belongs beside the
-          thumbnails rather than in a tool panel. */}
+  const compress = (
+    <>
+      {/* ── Auto Compress & Resize — moved here from Enhance › Resize & Compress ── */}
       {onAutoCompress && (
         <div
           className={
@@ -493,6 +468,24 @@ function GalleryActions({
           </div>
         </div>
       )}
+    </>
+  );
+
+  return (
+    <div
+      className={
+        vertical
+          ? "flex flex-col gap-3"
+          : "flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5"
+      }
+    >
+      {/* DESKTOP reads left to right: compress scope, then the status bar's own
+          vertical rule, then the actions — "All Images │ Delete All". COMPACT
+          stacks the actions on top and the compress block underneath, with a
+          border instead of a rule. Same two blocks, two orders. */}
+      {vertical ? actions : compress}
+      {!vertical && <span aria-hidden className="status-divider shrink-0" />}
+      {vertical ? compress : actions}
     </div>
   );
 }
