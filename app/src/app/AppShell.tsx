@@ -27,8 +27,9 @@ import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
-import { SmallWindowNotice } from "@/components/SmallWindowNotice";
-import { TabletVersionNotice } from "@/components/TabletVersionNotice";
+import { MobileVersionNotice } from "@/components/MobileVersionNotice";
+import { CompactVersionNotice } from "@/components/CompactVersionNotice";
+import { MobileShell } from "@/features/mobile/MobileShell";
 import { MASTER_BAR_WIDTH } from "@/components/master-bar/constants";
 // Code-split: the compact-mode master bar only loads the first time the window
 // goes ≤1000px, so desktop sessions never download its chunk.
@@ -783,14 +784,14 @@ export function AppShell() {
   // the closing work in that compact/tablet mode".
   const panelsClosable =
     !bp.dock && !bp.narrow && !(bp.width < BP_TIGHT && showTools && showHistory);
-  // Small-window notice: dismissed for this stretch of being too-small; reset
-  // once the window grows back so it re-appears if they snap small again.
-  const smallNoticeDismissed = useUIStore((s) => s.smallNoticeDismissed);
-  const setSmallNoticeDismissed = useUIStore((s) => s.setSmallNoticeDismissed);
-  // "Use split screen / tablet version" nudge: dismissed for this stretch of
-  // being snapped narrow; re-armed once the window grows back wide.
-  const tabletNoticeDismissed = useUIStore((s) => s.tabletNoticeDismissed);
-  const setTabletNoticeDismissed = useUIStore((s) => s.setTabletNoticeDismissed);
+  // Mobile-version notice (upload & view only): dismissed for this stretch of
+  // being at phone width; reset once the window grows back so it re-appears.
+  const mobileNoticeDismissed = useUIStore((s) => s.mobileNoticeDismissed);
+  const setMobileNoticeDismissed = useUIStore((s) => s.setMobileNoticeDismissed);
+  // Compact-version (snapped / split-screen dock) nudge: dismissed for this
+  // stretch of being snapped narrow; re-armed once the window grows back wide.
+  const compactNoticeDismissed = useUIStore((s) => s.compactNoticeDismissed);
+  const setCompactNoticeDismissed = useUIStore((s) => s.setCompactNoticeDismissed);
   // Most-recently-opened side panel — narrow mode closes the *other* one.
   const lastPanelRef = useRef<"tools" | "history" | null>(null);
   const showShortcutModal = useUIStore((s) => s.showShortcutModal);
@@ -815,13 +816,18 @@ export function AppShell() {
       else setShowHistory(false);
     }
   }, [bp.narrow, showTools, showHistory]);
-  // Re-arm the too-small notice once the window is wide enough again.
+  // Re-arm the mobile-version notice once the window is wide enough again.
   useEffect(() => {
-    if (!bp.tooSmall) setSmallNoticeDismissed(false);
-  }, [bp.tooSmall]);
-  // Re-arm the split-screen/tablet nudge once the window leaves the dock range.
+    if (!bp.mobile) setMobileNoticeDismissed(false);
+  }, [bp.mobile]);
+  // Mobile version: there is no Resume prompt — the gallery IS the surface, so
+  // a saved session just reopens. (Desktop keeps the anonymous Resume screen.)
   useEffect(() => {
-    if (!bp.dock) setTabletNoticeDismissed(false);
+    if (bp.mobile && resumeManifest) handleResumeSession();
+  }, [bp.mobile, resumeManifest, handleResumeSession]);
+  // Re-arm the compact-version nudge once the window leaves the dock range.
+  useEffect(() => {
+    if (!bp.dock) setCompactNoticeDismissed(false);
   }, [bp.dock]);
   useEffect(() => {
     installConsoleCapture();
@@ -2807,17 +2813,34 @@ export function AppShell() {
         )}
       </AnimatePresence>
 
-      {/* Too-small window (< BP_MIN): a dismissible notice, not a layout fork. */}
-      {bp.tooSmall && !smallNoticeDismissed && (
-        <SmallWindowNotice onDismiss={() => setSmallNoticeDismissed(true)} />
+      {/* Phone width (< BP_MOBILE): the MOBILE VERSION takes over — upload,
+          add, and view the gallery, no editing. An opaque layer over all the
+          editor chrome (z --z-mobile), below dialogs so the shared per-image
+          delete confirm and the notice below still land on top. The editor
+          keeps running underneath, so state (engine, autosave, manifest) is
+          exactly what a widened window resumes into. */}
+      {bp.mobile && (
+        <MobileShell
+          photos={photos}
+          maxPhotos={maxPhotos}
+          booting={booting}
+          onAddFiles={(files) => void handleAddPhotos(files)}
+          onRequestDelete={setDeletePhotoId}
+        />
       )}
-
-      {/* Snapped/narrow (≤ ~1000px, but not too-small): nudge toward the
-          split-screen / tablet version before the compact dock layout. */}
-      <TabletVersionNotice
-        open={bp.dock && !bp.tooSmall && !tabletNoticeDismissed}
+      <MobileVersionNotice
+        open={bp.mobile && !booting && !mobileNoticeDismissed}
         onOpenChange={(o) => {
-          if (!o) setTabletNoticeDismissed(true);
+          if (!o) setMobileNoticeDismissed(true);
+        }}
+      />
+
+      {/* Snapped/narrow (≤ ~1000px, but not phone width): heads-up that the
+          compact version (the split-screen dock layout) has taken over. */}
+      <CompactVersionNotice
+        open={bp.dock && !bp.mobile && !compactNoticeDismissed}
+        onOpenChange={(o) => {
+          if (!o) setCompactNoticeDismissed(true);
         }}
       />
 
@@ -2825,9 +2848,10 @@ export function AppShell() {
           while booting, then the spinner fades, the logo eases up, and EITHER
           the New actions or the Welcome-back content reveal — same entrance for
           both. Auto-reopen just fades it out. Mid-session "New" uses the compact
-          UploadDialog below. */}
+          UploadDialog below. Not on mobile: MobileShell owns the whole surface
+          there (its own splash, its own empty state, auto-resume). */}
       <FirstRunScreen
-        show={booting || (firstRun && (showUpload || !!resumeManifest))}
+        show={!bp.mobile && (booting || (firstRun && (showUpload || !!resumeManifest)))}
         phase={booting ? "loading" : "ready"}
         reduceMotion={prefs.reduceMotion}
       >
@@ -2845,7 +2869,7 @@ export function AppShell() {
       </FirstRunScreen>
 
       <UploadDialog
-        open={showUpload && !resumeManifest && !booting && !firstRun}
+        open={!bp.mobile && showUpload && !resumeManifest && !booting && !firstRun}
         onClose={() => setShowUpload(false)}
         onFiles={handleAddPhotos}
         canClose={photos.length > 0}

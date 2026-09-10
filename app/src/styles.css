@@ -45,6 +45,8 @@
   --z-compare: 20; /* compare slider handle, NEW pill */
   --z-topbar: 30; /* floating top bar */
   --z-panel: 40; /* Tools / Gallery / Review side panels + status bar */
+  --z-mobile: 48; /* mobile version (MobileShell) — covers all editor chrome, below dialogs so the shared confirms/notices land on top */
+  --z-mobile-viewer: 49; /* mobile single-photo viewer — above the mobile grid, still under dialogs */
   --z-dialog: 50; /* dialogs, dropdowns, tooltips, magnifier */
   --z-modal: 60; /* modals layered above dialogs */
   --z-progress: 100; /* top load-progress bar */

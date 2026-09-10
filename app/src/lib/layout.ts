@@ -26,7 +26,9 @@ export const BP_COMPACT = 1000;
 export const BP_TIGHT = 1200;
 // Below BP_NARROW the side panels stop pushing the canvas and float as overlay
 // drawers (one open at a time, behind a scrim) so a snapped half-screen window
-// keeps a usable canvas. Below BP_MIN the window is too small to edit
-// comfortably and <SmallWindowNotice/> appears.
+// keeps a usable canvas. Below BP_MOBILE the editor is too small to use at all,
+// so the app switches to the mobile version — a view/upload-only surface
+// (<MobileShell/>), not a smaller editor. This replaced the old BP_MIN
+// "too small, widen the window" notice.
 export const BP_NARROW = 900;
-export const BP_MIN = 600;
+export const BP_MOBILE = 600;
