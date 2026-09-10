@@ -3182,7 +3182,6 @@ export function AppShell() {
             activeTool={activeTool}
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
-            hasSource={stamp.state.hasSource}
             photoCount={photos.length}
             exportFormat={exportFormat}
             onExportFormatChange={setExportFormat}
@@ -3683,6 +3682,7 @@ export function AppShell() {
             onDeleteSelected={() => setDeleteSelectedOpen(true)}
             onDuplicateSelected={handleDuplicateSelected}
             onExportSelected={handleExportClick}
+            onAutoCompress={handleAutoCompress}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelectPhoto}
             onSelectRange={selectRangePhotos}

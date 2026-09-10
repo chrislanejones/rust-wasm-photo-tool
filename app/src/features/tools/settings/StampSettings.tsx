@@ -16,7 +16,6 @@ const EMOJI_SIZE_PRESETS = [32, 48, 64, 96] as const;
 interface StampSettingsPanelProps {
   settings: StampSettings;
   onChange: (s: StampSettings) => void;
-  hasSource: boolean;
   emoji?: string;
   emojiSize?: number;
   onEmojiChange?: (e: string) => void;
@@ -63,7 +62,6 @@ const STAMP_TOOL_MODES: readonly ToolMode<StampMode>[] = [
 export function StampSettingsPanel({
   settings,
   onChange,
-  hasSource,
   emoji = "",
   emojiSize = 48,
   onEmojiChange,
@@ -108,14 +106,6 @@ export function StampSettingsPanel({
           case "clone":
             return (
               <>
-                <div className="flex justify-center gap-2 px-3 py-4 rounded-lg text-xs full-width-badge type-current">
-                  <span className="large-badge">
-                    {hasSource
-                      ? "Source set — click to paint"
-                      : "Alt+Click to set source"}
-                  </span>
-                </div>
-
                 {/* Brush Size */}
                 <SizeSlider
                   label="Brush Size"
