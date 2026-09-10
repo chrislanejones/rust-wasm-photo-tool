@@ -2732,7 +2732,11 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   fontSize: fs,
                   fontWeight: effFontWeight,
                   color: effTextColor,
-                  fontFamily: textSettings.fontFamily ?? "'Liberation Sans', Arial, sans-serif",
+                  // THE FACE THE ENGINE WILL COMMIT, not the one the panel picked:
+                  // `render_text` takes no font, so every box becomes Liberation
+                  // Sans on commit. Previewing in another face showed glyphs a box
+                  // was not measured for (+26.3% wide in monospace, ADR-051).
+                  fontFamily: "'Liberation Sans', Arial, sans-serif",
                   lineHeight: 1.3,
                   padding: `${TEXT_OVERLAY_PAD_Y}px ${TEXT_OVERLAY_PAD_X}px`,
                   background: "transparent",
