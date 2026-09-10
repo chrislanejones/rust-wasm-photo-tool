@@ -10,7 +10,8 @@ import { defineConfig, devices } from "@playwright/test";
 // Run with: pnpm run test:e2e:sw
 //
 // Port 4312 (4311 = default harness, 4200 = the user's own dev port).
-const PORT = 4312;
+// Same escape hatch as playwright.config.ts: `PW_SW_PORT=4901 pnpm run test:e2e:sw`.
+const PORT = Number(process.env.PW_SW_PORT ?? 4312);
 const BASE_URL = `http://localhost:${PORT}`;
 
 // Same PUBLIC placeholder env as playwright.config.ts (see the rationale

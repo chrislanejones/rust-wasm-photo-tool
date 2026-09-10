@@ -8,7 +8,9 @@ import { defineConfig, devices } from "@playwright/test";
 // preview server via `webServer` below, so the gate is self-contained.
 //
 // Port 4310+ per session rules (4200 is the user's own dev port).
-const PORT = 4311;
+// Overridable because Windows reserves port ranges under WSL2 and 4311 has
+// landed in one; `PW_PORT=4902 pnpm exec playwright test` sidesteps it.
+const PORT = Number(process.env.PW_PORT ?? 4311);
 const BASE_URL = `http://localhost:${PORT}`;
 
 // The app always mounts the Convex/Clerk providers — logged-out demo mode still

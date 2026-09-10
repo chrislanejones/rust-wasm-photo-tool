@@ -337,12 +337,11 @@ test.describe("imagehorse-qc v8.41", () => {
       };
     });
 
-    // Two steps, not one: the toolbar button opens a "Download, Copy, or Share"
-    // dialog, and the export only happens on that dialog's own primary action.
-    await page
-      .getByRole("button", { name: /^Download & Share/ })
-      .first()
-      .click();
+    // Two steps, not one: the top bar's Export button opens a "Download, Copy,
+    // or Share" dialog, and the export only happens on that dialog's own
+    // primary action. (It was a "Download & Share" footer in the tool panel
+    // until v8.59; this spec kept clicking the old one for six weeks.)
+    await page.getByRole("button", { name: "Export", exact: true }).first().click();
 
     const dialog = page.locator('[role="dialog"]');
     await expect(dialog, "the share dialog opened").toBeVisible({ timeout: 10_000 });
