@@ -25,7 +25,7 @@ import { canEncode } from "@/lib/encodeSupport";
 import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
-import { panelSpacingTransition, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
+import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
 import { useBreakpoint } from "@/lib/useBreakpoint";
 import { SmallWindowNotice } from "@/components/SmallWindowNotice";
 import { TabletVersionNotice } from "@/components/TabletVersionNotice";
@@ -3308,7 +3308,7 @@ export function AppShell() {
               marginBottom:
                 !bp.dock && !bp.narrow && showGallery ? GALLERY_OPEN_GUTTER : 0,
             }}
-            transition={prefs.reduceMotion ? instantTransition : panelSpacingTransition}
+            transition={prefs.reduceMotion ? instantTransition : springStandard}
             className="main-content focus:outline-none"
             style={{ position: "relative" }}
           >

@@ -5,7 +5,7 @@
 import { useEffect, useCallback, useState } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { X } from "lucide-react";
-import { fadeIn, quickSpring } from "@/lib/animations";
+import { dialogZoom, fadeIn } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
 import { NewActions } from "@/features/upload/NewActions";
 
@@ -64,10 +64,7 @@ export function UploadDialog({
           onClick={handleTryClose}
         >
           <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={quickSpring}
+            {...dialogZoom}
             className="relative w-full max-w-lg mx-4"
             onClick={(e) => e.stopPropagation()}
           >

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { slideFromBottom, slideFromLeft, panelSpacingTransition, instantTransition, thumbEnter, hoverPop } from "@/lib/animations";
+import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Copy, Info } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -193,9 +193,10 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         {isCompressing && (
           <motion.div
             key="compressing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-lg overflow-hidden"
           >
             <div
@@ -218,7 +219,7 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ type: "spring", stiffness: 500, damping: 25 }}
+            transition={springPop}
             className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-emerald-500/30"
           >
             <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
@@ -230,9 +231,10 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
         {isError && (
           <motion.div
             key="error"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-red-500/30"
           >
             <span className="text-white text-xs font-bold">!</span>
@@ -276,10 +278,41 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
       <button
         onClick={(e) => { e.stopPropagation(); onToggleSelect(e.shiftKey); }}
         title={selected ? "Deselect" : "Select"}
+        /* ⚠️ `bg-accent` IS NOT THE BROWN, and that was the bug. Tailwind's
+           `accent` maps to `--accent-ui` — a pale cream SURFACE (#ece6db light,
+           #2b2b2b dark) — while the brand brown is `--accent` / `--primary`,
+           which has no `accent` utility. A white check on #ece6db measures
+           1.24:1: invisible in light mode. It survived because the same class
+           gives 14.16:1 in dark, so the bug only existed for half the users.
+
+           A BROWN CHIP WITH A DARK TICK was the obvious fix and measures
+           worse where it matters. The tick is fine (4.54:1 light), but the
+           CHIP is only 2.81:1 against a white card — so on the checkerboard
+           behind a transparent thumbnail the chip itself disappears, which is
+           the complaint this started from. A control you cannot find is not
+           improved by the tick inside it being legible.
+
+           So: `theme-primary-foreground` (#3a3128) as the CHIP with a white
+           tick. 12.73:1 for the tick AND 12.73:1 for the chip against the card,
+           and — because that token is the same value in both themes — the
+           control looks identical in light and dark instead of flipping. The
+           border stays `theme-primary` so the chip still echoes the brown ring
+           that marks a selected thumbnail.
+
+           ⚠️ Using a *-foreground token as a background is deliberate, not a
+           slip. This chip sits on an arbitrary PHOTO, so it needs a colour that
+           does not follow the panel — and that token is the only theme-stable
+           dark the palette has.
+
+           The unselected state stays a scrim-plus-border rather than a theme
+           colour: it sits on an arbitrary photo, so it needs to work against
+           unknown pixels rather than against the panel. The border is stronger
+           now, and the tick is faintly present instead of fully transparent so
+           the control reads as a checkbox before you hover it. */
         className={`absolute bottom-1 right-1 z-30 flex h-5 w-5 items-center justify-center rounded-md border transition-all ${
           selected
-            ? "bg-accent border-accent text-white opacity-100"
-            : "bg-black/50 border-white/70 text-transparent"
+            ? "bg-theme-primary-foreground border-theme-primary text-white opacity-100"
+            : "bg-black/55 border-white/80 text-white/45"
         } ${selectionActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
       >
         <Check className="h-3 w-3" />
@@ -618,7 +651,7 @@ export function GalleryBar({
                 marginRight: !narrow && showHistory ? PANEL_OPEN_GUTTER : 12,
               }
         }
-        transition={reduceMotion ? instantTransition : panelSpacingTransition}
+        transition={reduceMotion ? instantTransition : springStandard}
         style={vertical ? undefined : { position: "relative" }}
         className={
           vertical
@@ -733,7 +766,7 @@ export function GalleryBar({
                     // Two axes, two properties: items-start stops the ITEM
                     // stretching, content-start stops the TRACK stretching.
                     "grid w-full grid-cols-2 content-start items-start gap-x-3 gap-y-4 overflow-y-auto px-2 pt-3 pb-3"
-                  : "flex gap-2 overflow-x-auto py-1.5 pl-2"
+                  : "flex gap-2 overflow-x-auto py-1.5 px-2"
               }
               style={{ scrollbarWidth: "none" }}
             >

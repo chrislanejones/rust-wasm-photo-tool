@@ -296,6 +296,44 @@ else
   fi
 fi
 
+# -- MATCHED PAIR: the engine blur and the WGSL shader (ADR-030) --
+# The THIRD side of the same triangle. `blur-oracle-pair` above ties the engine
+# to the TS oracle; this ties the engine to the shader that actually runs on the
+# GPU. Two pairs left the third edge unguarded, and that edge is the one that
+# nearly shipped: during the #101 rebase the GPU path was still carrying a
+# ported kernel and would have differed from the engine by 1 LSB IN PRODUCTION.
+# That is precisely the defect ADR-030 exists to prevent, and nothing checked it.
+#
+# The shader must agree with `src/simd/blur.rs` on two things: how samples are
+# accumulated, and how a float is turned back into a byte. The second is subtle
+# on purpose -- the shader floors (x + 0.5) rather than calling the WGSL round(),
+# because that one rounds half to even and the engine does not. An edit that
+# "tidies" it back to round() is invisible to every other gate here.
+#
+# Same scoping rule as its two siblings: match a changed line carrying the real
+# arithmetic, never any edit to the file, so prose cannot turn this red.
+#
+# Two-dot diff, so the working tree counts -- a pre-push guard that only sees
+# committed work passes on the very change it was written for.
+shader_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
+if [ -z "$shader_base" ]; then
+  echo "  skip blur-shader-pair: no origin/master to diff against (runs in CI)"
+else
+  rust_arith=$(git diff "$shader_base" -- src/simd/blur.rs \
+    | grep -cE '^[+-].*(f32x4_add|f32x4_mul|\.round\(\)|kernel\[)' || true)
+  wgsl_arith=$(git diff "$shader_base" -- app/src/lib/webgpu/gpuBlur.ts \
+    | grep -cE '^[+-].*(acc = acc \+|kernel\[|floor\(c\.|clamp\(floor)' || true)
+  if [ "$rust_arith" -gt 0 ] && [ "$wgsl_arith" -eq 0 ]; then
+    echo "FAIL blur-shader-pair: src/simd/blur.rs changed, the WGSL shader did not."
+    echo "     The engine and the shader must round and accumulate identically, or"
+    echo "     the GPU path differs from the CPU one by a least-significant bit and"
+    echo "     only a byte-compare would ever notice. Change both, or say why (ADR-030)."
+    fail=1
+  else
+    echo "  ok blur-shader-pair (engine hunks: $rust_arith, shader hunks: $wgsl_arith)"
+  fi
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo
   echo "Guardrails FAILED: a count went up. Fix the new violations — raising a"

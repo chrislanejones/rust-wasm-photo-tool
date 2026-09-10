@@ -15,10 +15,14 @@ import {
   ChevronLeft,
   Link,
   Sparkles,
+  KeyRound,
+  Plus,
+  X,
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Spinner } from "@/components/ui/spinner";
 import { panelSwap } from "@/lib/animations";
+import { FIELD_NUMERIC, FIELD_TEXTAREA } from "@/lib/styles";
 import { Button } from "@/components/ui/button";
 import { ActionTile } from "@/components/ui/action-tile";
 import { IconButton } from "@/components/ui/icon-button";
@@ -28,6 +32,12 @@ import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { TEXT_COLORS } from "@/lib/colors";
 import { parseColor } from "@/lib/colorParser";
 import { fetchTestImages, TEST_IMAGE_COUNT } from "@/lib/testImages";
+import {
+  ASPECT_RATIOS,
+  MAX_ATTACHMENTS,
+  consentSentence,
+  rejectReason,
+} from "./aiImageDraft";
 import { isSvgFile } from "@/lib/rasterizeSvg";
 
 interface SizePreset {
@@ -150,6 +160,27 @@ interface Props {
   onBlankModeChange?: (active: boolean) => void;
 }
 
+/**
+ * ⚠️ GENERATE IS NOT WIRED, AND SAYING SO BEFORE THE CLICK IS THE POINT.
+ *
+ * There is no text-to-image job type in the backend — `convex/aiJobs.ts`
+ * accepts rembg | upscale | inpaint | ocr | alt and nothing else. Wiring a
+ * network path to a job type that does not exist would fail at the far end
+ * with something unhelpful.
+ *
+ * So Generate is DISABLED and this reason renders next to it, rather than the
+ * button being enabled with a toast on click. A toast arrives after someone
+ * has already written a prompt; a disabled button with a visible reason costs
+ * them nothing. The button is the one control in this dialog that cannot do
+ * its job, and it should be the one control that looks like it.
+ *
+ * Everything above it is real: the prompt, the references, the downscale
+ * limits and the consent sentence all work and are testable. That is the
+ * increment. When the job type lands, delete this and wire `onClick`.
+ */
+const GENERATE_BLOCKED_REASON =
+  "Image generation isn't connected yet — the model still needs choosing.";
+
 export function NewActions({
   onFiles,
   onFilesAdded,
@@ -169,6 +200,56 @@ export function NewActions({
   const [loadingTest, setLoadingTest] = useState(false);
   // New Canvas setup panel (swaps out the upload buttons when active).
   const [blankMode, setBlankMode] = useState(false);
+  // Create AI Image — step 2 of this same menu, which is why its left button is
+  // Back rather than Cancel: it returns here, it does not abandon the flow.
+  const [aiMode, setAiMode] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiRatio, setAiRatio] = useState<string>(ASPECT_RATIOS[0].id);
+  const [aiRefs, setAiRefs] = useState<{ name: string; url: string }[]>([]);
+  const aiRefInputRef = useRef<HTMLInputElement>(null);
+  const aiPromptRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Revoke every preview URL and clear the draft. Created and revoked in the
+   *  SAME place — a memo/effect split here is what breaks thumbnails under
+   *  StrictMode, and the object-URL rule in this repo is explicit about it. */
+  const closeAiMode = useCallback(() => {
+    setAiRefs((prev) => {
+      for (const r of prev) URL.revokeObjectURL(r.url);
+      return [];
+    });
+    setAiPrompt("");
+    setAiMode(false);
+  }, []);
+
+  const removeAiRef = useCallback((index: number) => {
+    setAiRefs((prev) => {
+      const gone = prev[index];
+      if (gone) URL.revokeObjectURL(gone.url);
+      return prev.filter((_, i) => i !== index);
+    });
+  }, []);
+
+  /** Accept files up to the cap, refusing each with a REASON rather than
+   *  silently dropping it — a picker that ignores half your selection with no
+   *  explanation is worse than one that says why. */
+  const addAiRefs = useCallback((list: FileList | null) => {
+    if (!list) return;
+    setAiRefs((prev) => {
+      const next = [...prev];
+      for (const f of Array.from(list)) {
+        const reason = rejectReason(f, next.length);
+        if (reason) {
+          toast.error(reason);
+          continue;
+        }
+        next.push({ name: f.name, url: URL.createObjectURL(f) });
+      }
+      return next;
+    });
+    if (aiRefInputRef.current) aiRefInputRef.current.value = "";
+  }, []);
+
+
   const [blankW, setBlankW] = useState("1500");
   const [blankH, setBlankH] = useState("1000");
   const [bgColor, setBgColor] = useState("#ffffff");
@@ -381,7 +462,7 @@ export function NewActions({
                         setBlankW(e.target.value);
                         setBlankPreset("");
                       }}
-                      className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
+                      className={FIELD_NUMERIC}
                     />
                   </div>
                   <span className="pb-2 text-text-muted">×</span>
@@ -395,7 +476,7 @@ export function NewActions({
                         setBlankH(e.target.value);
                         setBlankPreset("");
                       }}
-                      className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
+                      className={FIELD_NUMERIC}
                     />
                   </div>
                 </div>
@@ -471,6 +552,148 @@ export function NewActions({
                   </Button>
                 </div>
               </motion.div>
+            ) : aiMode ? (
+              <motion.div
+                key="ai"
+                variants={panelSwap}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="flex flex-col gap-4"
+              >
+                {/* ── Create AI Image ──────────────────────────────────────
+                    Step 2 of THIS menu, in the same frame as New Canvas —
+                    same width, same footer geometry, same swap animation. The
+                    left button is Back, not Cancel, because it returns here.
+                    Esc dismisses the whole flow, which the surrounding dialog
+                    already handles. */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-text-secondary">Prompt</span>
+                  <textarea
+                    ref={aiPromptRef}
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    rows={4}
+                    // A real example rather than "Describe your image…". The
+                    // placeholder is the only instruction most people read, so
+                    // it should show the shape of a good prompt, not restate
+                    // the label.
+                    placeholder="A rain-slicked Tokyo side street at dusk, neon signs reflected in the puddles, shot on 35mm"
+                    className={FIELD_TEXTAREA}
+                  />
+                </div>
+
+                {/* Reference images — file picker now. Picking from the
+                    gallery is a different path entirely (those pixels are
+                    already decoded in IndexedDB and need no re-upload) and is
+                    queued rather than half-built here. */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-text-secondary">
+                      Reference images <span className="text-text-muted">(optional)</span>
+                    </span>
+                    <span className="text-2xs text-text-muted tabular-nums">
+                      {aiRefs.length} / {MAX_ATTACHMENTS}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {aiRefs.map((r, i) => (
+                      <div
+                        key={r.url}
+                        className="relative h-16 w-16 overflow-hidden rounded-lg border border-theme-border"
+                      >
+                        <img src={r.url} alt={r.name} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          aria-label={`Remove ${r.name}`}
+                          onClick={() => removeAiRef(i)}
+                          className="absolute right-0.5 top-0.5 rounded bg-bg-secondary/80 p-0.5 text-text-primary hover:bg-bg-secondary"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {aiRefs.length < MAX_ATTACHMENTS && (
+                      <button
+                        type="button"
+                        onClick={() => aiRefInputRef.current?.click()}
+                        aria-label="Add a reference image"
+                        className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-theme-border text-text-muted transition-colors hover:border-theme-ring hover:text-text-secondary"
+                      >
+                        <Plus className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={aiRefInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => addAiRefs(e.target.files)}
+                  />
+                </div>
+
+                {/* Aspect ratio. ⚠️ PROVISIONAL — see ASPECT_RATIOS. No
+                    text-to-image job type exists yet, so no model has been
+                    chosen, so this list is a placeholder to be replaced by
+                    whatever the backend actually supports. */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-text-secondary">Aspect ratio</span>
+                  <div className="flex flex-wrap gap-2">
+                    {ASPECT_RATIOS.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        aria-pressed={aiRatio === r.id}
+                        onClick={() => setAiRatio(r.id)}
+                        className={`rounded-lg border px-3 py-1.5 text-xs tabular-nums transition-colors ${
+                          aiRatio === r.id
+                            ? "border-theme-primary/40 bg-theme-primary/15 text-theme-primary"
+                            : "border-theme-border text-text-secondary hover:text-text-primary"
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* THE CONSENT LINE. This is the first feature where data
+                    leaves the tab, and the claim "nothing leaves your tab by
+                    accident" survives it — a user typing a prompt and pressing
+                    Generate is not an accident. It survives only if the
+                    leaving is legible BEFORE the click, so the sentence is
+                    here, and it is DYNAMIC because attachments change what is
+                    true. */}
+                <p className="rounded-lg border border-theme-border bg-theme-muted/40 px-3 py-2 text-2xs leading-relaxed text-text-secondary">
+                  {consentSentence(aiRefs.length)}
+                </p>
+
+                {/* WHY GENERATE CANNOT FIRE, SAID BEFORE THE CLICK rather
+                    than in a toast after it. See GENERATE_BLOCKED_REASON. The
+                    button below is really `disabled`, so this line is the only
+                    thing explaining it — it is not decoration. */}
+                <p className="text-2xs leading-relaxed text-text-secondary">
+                  {GENERATE_BLOCKED_REASON}
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button size="large" onClick={closeAiMode} className="w-full">
+                    <ChevronLeft className="h-4 w-4" />
+                    Back
+                  </Button>
+                  <Button
+                    size="large"
+                    disabled
+                    title={GENERATE_BLOCKED_REASON}
+                    className="w-full"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Generate Image
+                  </Button>
+                </div>
+              </motion.div>
             ) : (
               <motion.div
                 key="default"
@@ -511,12 +734,29 @@ export function NewActions({
                     onClick={() => setBlankMode(true)}
                     title="Start with a new canvas"
                   />
-                  <ActionTile
-                    icon={Sparkles}
-                    label="Create AI Image"
-                    disabled
-                    title="Coming soon"
-                  />
+                  {/* ⚠️ NOT DISABLED, deliberately. A greyed tile teaches
+                      people the feature does not exist. This opens for
+                      everyone; the gate is on Generate, so a free user sees
+                      the whole flow, composes a prompt, and meets the upsell
+                      at the moment they understand what they would be buying.
+                      The key says which it is before they start. */}
+                  <div className="relative flex flex-1">
+                    <ActionTile
+                      icon={Sparkles}
+                      label="Create AI Image"
+                      onClick={() => setAiMode(true)}
+                      title="Generate an image from a description (Pro)"
+                    />
+                    <span
+                      aria-hidden
+                      // Top-left of the tile, left of the icon, on the optical
+                      // line of the icon's top rather than the tile's corner.
+                      className="pointer-events-none absolute left-1.5 top-1.5 text-theme-primary"
+                    >
+                      <KeyRound className="h-3 w-3" />
+                    </span>
+                    <span className="sr-only">Pro feature</span>
+                  </div>
                 </div>
 
                 {/* Dotted drop zone — highlights + nudges when an image is

@@ -1,19 +1,67 @@
 import type { Variants, Transition, Easing } from "framer-motion";
 
 // Standardized quick motion transition (200ms spring animation)
-export const quickSpring: Transition = {
+/* ─────────────────────────────────────────────────────────────────────────────
+   THE SPRING SCALE — five tunings, named for how they FEEL.
+
+   ⚠️ THERE WERE SEVEN, AND TWO OF THEM WERE THE SAME. `springStandard` and
+   `panelSpacingTransition` were byte-identical (400/30/0.8) under two names —
+   one named for its character, one for a use case — so a component picked
+   whichever word it happened to read first. Two more were typed inline at
+   500/25 and 340/26.
+
+   Nobody chose five tunings. But three of them ARE genuinely different feels,
+   and flattening them into one would change how the app moves — which is a
+   design decision, not a refactor. So the duplicate is gone and the survivors
+   are named, which makes the set visible enough to argue about later.
+
+   Named for CHARACTER, not for a caller. "Panel spacing" describes where the
+   old one was used, and a name like that is why the duplicate happened: a
+   dialog author reads it, decides it is not about them, and writes their own.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** Small things that should arrive with a snap — a badge, a count, a pip. */
+export const springPop: Transition = {
+  type: "spring",
+  stiffness: 500,
+  damping: 25,
+};
+
+/** The default. Panels, dialogs, layout shifts — anything with area. */
+export const springStandard: Transition = {
   type: "spring",
   stiffness: 400,
   damping: 30,
   mass: 0.8,
 };
 
-// Panel spacing animation for layout adjustments
-export const panelSpacingTransition: Transition = {
+/** A larger surface easing in, where a snap would feel like a jolt. */
+export const springSoft: Transition = {
   type: "spring",
-  stiffness: 400,
-  damping: 30,
-  mass: 0.8,
+  stiffness: 340,
+  damping: 26,
+};
+
+/** A one-off arrival with visible bounce — the celebration dialog's hero
+ *  number. Softer stiffness, low damping, so it overshoots and settles. */
+export const springBouncy: Transition = {
+  type: "spring",
+  stiffness: 260,
+  damping: 18,
+};
+
+/** The brand reveal. Same stiffness as `springBouncy`, more damping, so it
+ *  arrives without the overshoot.
+ *
+ *  ⚠️ THESE TWO DIFFER ONLY IN DAMPING (18 vs 28) and that is exactly the shape
+ *  a typo takes. Both are kept at their measured values because changing either
+ *  changes how a moment FEELS, which is Chris's call and not a refactor's — but
+ *  they are named here rather than left inline so the question is at least
+ *  askable. If they should be one spring, this is where that happens. */
+export const springReveal: Transition = {
+  type: "spring",
+  stiffness: 260,
+  damping: 28,
 };
 
 // Instant (no-motion) transition — swap in for the spring/tween transitions
@@ -30,7 +78,7 @@ export const slideFromLeft: Variants = {
   visible: {
     x: 0,
     opacity: 1,
-    transition: quickSpring,
+    transition: springStandard,
   },
   exit: { x: "-100%", opacity: 0, transition: { duration: 0.15 } },
 };
@@ -40,7 +88,7 @@ export const slideFromRight: Variants = {
   visible: {
     x: 0,
     opacity: 1,
-    transition: quickSpring,
+    transition: springStandard,
   },
   exit: { x: "100%", opacity: 0, transition: { duration: 0.15 } },
 };
@@ -50,7 +98,7 @@ export const slideFromTop: Variants = {
   visible: {
     y: 0,
     opacity: 1,
-    transition: quickSpring,
+    transition: springStandard,
   },
   exit: { y: "-100%", opacity: 0, transition: { duration: 0.15 } },
 };
@@ -60,7 +108,7 @@ export const slideFromBottom: Variants = {
   visible: {
     y: 0,
     opacity: 1,
-    transition: quickSpring,
+    transition: springStandard,
   },
   exit: { y: "100%", opacity: 0, transition: { duration: 0.15 } },
 };
@@ -80,14 +128,49 @@ export const panelSwap: Variants = {
   exit: { opacity: 0, x: -12, transition: { duration: 0.12 } },
 };
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   WHAT DELIBERATELY IS NOT IN THIS FILE.
+   Audited 2026-09-09, when nine components still wrote framer props inline.
+   Five of those were real duplication and moved here. Four did not, and are
+   listed so the next audit does not "fix" them into worse code:
+
+     · AppShell's load-progress bar and canvas margins, and TopBar's panel
+       gutters — the animated value is COMPUTED from breakpoints and panel
+       state. A variant would have to receive the computed number anyway, so
+       extracting hides the logic and shares nothing.
+     · CelebrationDialog's confetti — every particle carries its own dx, dy,
+       rotation, duration and delay. That is per-item DATA, not a shared style.
+     · BrandRevealScreen's `reduceMotion ? 0 : 0.35`. It looks redundant beside
+       AppShell's <MotionConfig reducedMotion>, and it is not: `"always"` still
+       lets OPACITY animate, because a fade is not motion. Killing the duration
+       is what actually removes it for someone who asked for less motion.
+
+   A variant used once is indirection, not a single source of truth.
+   ────────────────────────────────────────────────────────────────────────── */
+
+// Modal / dialog entrance — the surface itself, not its backdrop.
+//
+// ⚠️ THIS EXISTED TWICE AND THE TWO HAD ALREADY DRIFTED: UploadDialog entered
+// from `scale: 0.95`, ObjectRemovalModal from `scale: 0.96`. Nobody chose
+// that difference and nobody could see it — which is the whole argument for a
+// named variant. `settingsPanelMotion` right below carries the same scar in
+// its own comment ("it had drifted into ~9 inline copies").
+//
+// Spread it — `{...dialogZoom}` — rather than copying the triple.
+export const dialogZoom = {
+  initial: { scale: 0.95, opacity: 0 },
+  animate: { scale: 1, opacity: 1, transition: springStandard },
+  exit: { scale: 0.95, opacity: 0, transition: { duration: 0.12 } },
+};
+
 // Settings sub-feature panel enter/exit (Paint / Text / Resize sub-panels and
 // ImageMetaPanel). Spread onto the `motion.div` — `{...settingsPanelMotion}` —
 // instead of hand-copying the same initial/animate/exit triple (it had drifted
-// into ~9 inline copies). Enter is the shared `quickSpring`; exit is a quick
+// into ~9 inline copies). Enter is the shared `springStandard`; exit is a quick
 // 120ms fade-up.
 export const settingsPanelMotion = {
   initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: quickSpring },
+  animate: { opacity: 1, y: 0, transition: springStandard },
   exit: { opacity: 0, y: -8, transition: { duration: 0.12 } },
 } as const;
 
@@ -134,8 +217,8 @@ export const imageLoadBarProgress = {
 // framer returns the child to its pre-hover value with its default spring.
 const HOVER_POP_SCALE = 1.1; // module-local on purpose: nothing outside reads a number
 export const hoverPop: Variants = {
-  rest: { scale: 1, transition: quickSpring },
-  hover: { scale: HOVER_POP_SCALE, transition: quickSpring },
+  rest: { scale: 1, transition: springStandard },
+  hover: { scale: HOVER_POP_SCALE, transition: springStandard },
 };
 
 // ── Panel close reveal ───────────────────────────────────────────────────────

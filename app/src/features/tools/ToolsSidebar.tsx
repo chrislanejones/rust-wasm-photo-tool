@@ -305,11 +305,17 @@ export function ToolsSidebar({
       {/* The clip lives HERE, not on the fixed shell: the shell must let the
           corner close button hang half outside it, and this wrapper keeps the
           rounded corners trimming the scrolling content exactly as before. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
+      {/* ⚠️ THE BOTTOM FLOOR LIVES HERE, not on the scrolling body. A scroll
+          container's `padding-bottom` is not honoured at the end of its
+          overflow content, and neither is an `::after` spacer — measured both:
+          with 32px set, the last button's bottom and the card's bottom edge
+          were 1px apart. This wrapper does not scroll, so its padding always
+          renders, and the buttons get the same inset the header has. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit] pb-panel">
       {/* Tool rail + the active tool's sub-tool rail. `layout` is what makes
           the body below slide rather than jump when the sub-row row-count
           changes (0 -> 1 -> 2 rows). */}
-      <motion.div layout className="px-4 pt-3 pb-4 border-b border-border">
+      <motion.div layout className="p-panel border-b border-border">
         <ToolGrid
           disabledGroups={{
             batch:
@@ -326,7 +332,7 @@ export function ToolsSidebar({
         // pb-8, not p-4 all round: the last run of buttons in a settings panel
         // (Auto Compress & Resize, Compress Image, Compress All Images) ended
         // 16px off the sidebar's bottom edge with nothing under it.
-        className="flex-1 overflow-y-auto p-4 pb-8 space-y-5 scrollbar-thin"
+        className="flex-1 overflow-y-auto p-panel space-y-5 scrollbar-thin"
       >
         {activeTool === "compress" && (
           <ResizeSettings
