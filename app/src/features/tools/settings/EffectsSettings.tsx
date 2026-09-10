@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Wand2, Flame, Cloud, Moon, Sparkles } from "lucide-react";
 import type { ToolSettings } from "@/lib/types";
 import { SizeSlider } from "@/components/SizeSlider";
-import { ActionTile } from "@/components/ui/action-tile";
 import { SectionHeader } from "@/components/ui/section-header";
+import { ToolButton } from "@/components/ui/tool-button";
 
 interface EffectsSettingsProps {
   settings: ToolSettings;
@@ -22,11 +22,23 @@ interface EffectsSettingsProps {
   activePhotoId?: string | null;
 }
 
+/**
+ * FIVE TILES IN ONE 3-COLUMN GRID, the same shape as Select's
+ * All / Deselect / Delete / Copy / Cut — two rows out of a five-item grid, the
+ * last cell empty. 4x Upscale sits in it as a disabled fifth rather than in a
+ * "Coming Soon" card of its own: it is one of the things you can do to a
+ * photo, and a greyed tile beside four live ones says "not yet" without
+ * spending a whole row to say it.
+ *
+ * `upscale: true` marks the one with no numbers — the others apply brightness
+ * and contrast in a single undo-able step.
+ */
 const PRESETS = [
-  { label: "Enhance",  Icon: Wand2, brightness: 0.08,  contrast: 1.25 },
-  { label: "Vivid",    Icon: Flame, brightness: 0,      contrast: 1.5  },
-  { label: "Fade",     Icon: Cloud, brightness: 0.06,   contrast: 0.72 },
-  { label: "Dark",     Icon: Moon,  brightness: -0.12,  contrast: 1.1  },
+  { label: "Enhance",     Icon: Wand2,    brightness: 0.08,  contrast: 1.25 },
+  { label: "Vivid",       Icon: Flame,    brightness: 0,     contrast: 1.5  },
+  { label: "Fade",        Icon: Cloud,    brightness: 0.06,  contrast: 0.72 },
+  { label: "Dark",        Icon: Moon,     brightness: -0.12, contrast: 1.1  },
+  { label: "4x Upscale",  Icon: Sparkles, upscale: true },
 ] as const;
 
 export function EffectsSettings({
@@ -295,38 +307,39 @@ export function EffectsSettings({
         </div>
       )}
 
-      {/* Quick Presets */}
-      <div className="space-y-3 pt-2 border-t border-theme-sidebar-border">
+      {/* Quick Adjust — five tiles, 3 columns, like Select's action grid. */}
+      <div className="space-y-2 pt-2 border-t border-theme-sidebar-border">
         <SectionHeader
           title="Quick Adjust"
-          info="One-shot adjustments. Each is undo-able."
+          info={
+            <>
+              One-shot adjustments, each a single undo-able step. Enhance lifts
+              contrast a little, Vivid pushes it hard, Fade flattens it, Dark
+              drops the exposure. <strong>4x Upscale</strong> is not connected
+              yet — it needs a model, so it stays greyed rather than pretending.
+            </>
+          }
         />
-        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
-          {PRESETS.map(({ label, Icon, brightness: b, contrast: c }) => (
-            <ActionTile
-              key={label}
-              icon={Icon}
-              label={label}
-              disabled={!imageReady}
-              onClick={() => applyPreset(b, c)}
-            />
+        <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
+          {PRESETS.map((preset) => (
+            <ToolButton
+              key={preset.label}
+              stacked
+              disabled={"upscale" in preset ? true : !imageReady}
+              title={
+                "upscale" in preset
+                  ? "4x Upscale isn't connected yet — it needs a model"
+                  : `Apply ${preset.label}`
+              }
+              onClick={
+                "upscale" in preset
+                  ? undefined
+                  : () => applyPreset(preset.brightness, preset.contrast)
+              }
+            >
+              <preset.Icon /> {preset.label}
+            </ToolButton>
           ))}
-        </div>
-      </div>
-
-      {/* AI Upscale — Real-ESRGAN, not wired yet (moved from the AI tool
-          panel; belongs beside the other pixel-level effects). */}
-      <div className="flex items-start gap-3 p-3 rounded-lg bg-bg-elevated/50 border border-border/50 opacity-60">
-        <Sparkles className="h-5 w-5 shrink-0 text-text-primary/80" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold font-mono text-text-muted">
-              4x Upscale
-            </span>
-            <span className="rounded-full bg-theme-muted/40 px-2 py-0.5 text-2xs font-bold uppercase tracking-wider text-theme-foreground/70">
-              Coming Soon
-            </span>
-          </div>
         </div>
       </div>
     </div>

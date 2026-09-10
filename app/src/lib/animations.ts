@@ -182,35 +182,48 @@ export const thumbEnter = (i: number) => ({
 });
 
 /**
- * THUMBNAIL "DEVELOP" — the picture arrives in black and white and comes into
- * colour. It is the IMAGE that changes, so nothing happens behind it: a first
- * cut painted white paper over the tile and swept it open, and Chris could
- * not see what was going on. The pop (`thumbEnter`, above) is untouched — he
- * likes that one.
+ * THUMBNAIL "DEVELOP" — the picture arrives black and white, HOLDS there long
+ * enough to be read as a black-and-white photo, then comes into colour.
  *
- * Two numbers, and deliberately only two:
+ * ⚠️ THE HOLD IS THE WHOLE POINT, and its absence is why the first cut looked
+ * broken. That version faded straight from grayscale(1) to grayscale(0) over
+ * 240 ms, so the image was fully grey for about 33 ms — measured, frame by
+ * frame — and spent the rest mid-wash. On a 99 px tile that is not a black and
+ * white photo turning colour; it is a flicker nobody sees. Holding first is
+ * what makes it legible.
  *
- *  - MIN_MS: the fade's own duration, so a tile cannot come into colour sooner
- *    than this after its turn — EVEN WHEN the pixels were ready instantly. A
- *    30 ms flash reads as a glitch; a quarter of a second reads as a photo
- *    arriving. Tune here, nowhere else.
- *  - HANDOFF: tiles that mount together take turns left to right; tile N
- *    starts when tile N-1 is this far through its fade. 0.8 = "image 0 at
- *    80% done, start image 1" — succession, not a wall.
+ *  - LEAD: the gallery draws, THEN the pictures start. Without it the first
+ *    tile develops in the same frame the panel appears and the two read as one
+ *    muddled event.
+ *  - HOLD: fully black and white, and long enough to register.
+ *  - FADE: the colouring itself.
+ *  - HANDOFF: tile N starts when tile N-1 is this far through — left to right,
+ *    succession rather than a wall.
  *
- * A slow image simply stays black and white until its pixels are decoded,
- * then fades. `useThumbDevelop` in features/gallery decides WHEN; this file
- * decides only what it looks like.
+ * A fade is not motion, so this runs under Reduce Motion too — see the
+ * BrandRevealScreen note above.
  */
-const THUMB_DEVELOP_MIN_MS = 240;
+const THUMB_DEVELOP_LEAD_MS = 120;
+const THUMB_DEVELOP_HOLD_MS = 150;
+const THUMB_DEVELOP_FADE_MS = 190;
 const THUMB_DEVELOP_HANDOFF = 0.8;
-export const THUMB_DEVELOP_STAGGER_MS = Math.round(THUMB_DEVELOP_MIN_MS * THUMB_DEVELOP_HANDOFF);
+/** Total per tile — the minimum a photo takes to arrive, however fast it decoded. */
+const THUMB_DEVELOP_TOTAL_MS = THUMB_DEVELOP_HOLD_MS + THUMB_DEVELOP_FADE_MS;
+export const THUMB_DEVELOP_LEAD = THUMB_DEVELOP_LEAD_MS;
+export const THUMB_DEVELOP_STAGGER_MS = Math.round(THUMB_DEVELOP_TOTAL_MS * THUMB_DEVELOP_HANDOFF);
 export const thumbDevelop: { mono: TargetAndTransition; colour: TargetAndTransition } = {
-  /** Decoded or not, a tile starts here. */
+  /** Where every tile starts, and where it stays until its turn. */
   mono: { filter: "grayscale(1)" },
-  /** Into colour over exactly MIN_MS. A fade is not motion, so it runs under
-   *  Reduce Motion too — see the BrandRevealScreen note above. */
-  colour: { filter: "grayscale(0)", transition: { duration: THUMB_DEVELOP_MIN_MS / 1000, ease: "easeOut" } },
+  /** Hold, then colour. Two keyframes at the same value give the hold; `times`
+   *  puts the second at HOLD/TOTAL so the fade owns only the remainder. */
+  colour: {
+    filter: ["grayscale(1)", "grayscale(1)", "grayscale(0)"],
+    transition: {
+      duration: THUMB_DEVELOP_TOTAL_MS / 1000,
+      times: [0, THUMB_DEVELOP_HOLD_MS / THUMB_DEVELOP_TOTAL_MS, 1],
+      ease: "easeOut",
+    },
+  },
 };
 
 // Top-of-screen image loading progress bar

@@ -9,12 +9,19 @@ export interface ToolButtonOption<T extends string> {
 
 interface Props<T extends string> {
   options: readonly ToolButtonOption<T>[];
-  value: T;
+  /** The selected id. OMIT IT for an ACTION group — buttons that do something
+   *  rather than pick something, so no tile is ever lit (the gallery's
+   *  Auto Compress scope). `undefined === opt.id` is false for every option,
+   *  which is exactly the wanted behaviour. */
+  value?: T;
   onChange: (id: T) => void;
   /** Column count for the grid. Defaults to 2. */
   columns?: 2 | 3 | 4 | 5;
-  /** Optional small label rendered above the grid. */
-  label?: string;
+  /** Optional small label rendered above the grid. A ReactNode, not a string,
+   *  so a caller can put an icon and a lightbulb beside the words. */
+  label?: React.ReactNode;
+  /** Centre the label over the grid instead of aligning it left. */
+  labelAlign?: "start" | "center";
   /** Icon-on-top, text-below tiles (vs the default icon-left row). */
   stacked?: boolean;
   /** Disable every tile (e.g. no image loaded). Default false. */
@@ -40,16 +47,25 @@ export function ToolButtonGroup<T extends string>({
   onChange,
   columns = 2,
   label,
+  labelAlign = "start",
   stacked = false,
   disabled = false,
   className,
 }: Props<T>) {
   return (
     <div className={cn("space-y-2", className)}>
+      {/* A div, not a <label>: it was never associated with a control (no
+          htmlFor), so it carried no semantics — and it can now hold a
+          lightbulb, which must not be nested inside a label element. */}
       {label && (
-        <label className="text-2xs text-theme-muted-foreground">
+        <div
+          className={cn(
+            "flex items-center gap-1.5 text-2xs text-theme-muted-foreground",
+            labelAlign === "center" && "justify-center",
+          )}
+        >
           {label}
-        </label>
+        </div>
       )}
       {/* grid-auto-rows:1fr equalizes every row to the tallest, so a longer
           label (e.g. "Hand-drawn") makes all buttons that size — not just its
