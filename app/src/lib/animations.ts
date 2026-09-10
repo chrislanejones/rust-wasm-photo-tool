@@ -181,6 +181,45 @@ export const thumbEnter = (i: number) => ({
   transition: { duration: 0.2, delay: i * 0.05 },
 });
 
+/**
+ * THUMBNAIL "DEVELOP" — a Polaroid coming up: white paper to picture, the
+ * top edge sweeping down. Asked for on 2026-09-10 because paste → New
+ * Gallery Image felt slow: the tile sat as a grey skeleton until the
+ * thumbnail decoded, and a skeleton says "waiting", not "arriving".
+ *
+ * Three numbers, and deliberately only three:
+ *
+ *  - MIN_MS: every tile takes at least this long to come up, EVEN WHEN the
+ *    image is ready instantly. A 30 ms flash reads as a glitch; a quarter of
+ *    a second reads as a photo developing. Tune here, nowhere else.
+ *  - STAGGER_MS: tiles that mount together come up left to right, each
+ *    starting this long after the previous — succession, not a wall.
+ *  - the keyframes: fast to most of the way, then a slow crawl. If the image
+ *    is still not decoded when the fast part ends, the crawl is what the eye
+ *    sees — the develop visibly SLOWS rather than freezing — and the last of
+ *    the paper goes the moment the pixels arrive.
+ */
+export const THUMB_DEVELOP_MIN_MS = 240;
+/** The hand-off point: tile N starts when tile N-1 is this far through its
+ *  minimum develop. 0.8 = "image 0 at 80% done, start image 1". */
+const THUMB_DEVELOP_HANDOFF = 0.8;
+export const THUMB_DEVELOP_STAGGER_MS = Math.round(THUMB_DEVELOP_MIN_MS * THUMB_DEVELOP_HANDOFF);
+export const thumbDevelop: Variants = {
+  /** White paper fully covering the picture. */
+  covered: { clipPath: "inset(0% 0 0 0)" },
+  /** 80% open at exactly MIN_MS (times[1] * duration == 0.24 s), then a slow
+   *  crawl toward 92% for as long as the image keeps us waiting. */
+  developing: {
+    clipPath: ["inset(0% 0 0 0)", "inset(80% 0 0 0)", "inset(92% 0 0 0)"],
+    transition: { duration: 3.0, times: [0, 0.08, 1], ease: ["easeOut", "linear"] },
+  },
+  /** The rest of the paper, gone in one short move once both the pixels and MIN_MS are in. */
+  revealed: {
+    clipPath: "inset(100% 0 0 0)",
+    transition: { duration: 0.09, ease: "easeIn" },
+  },
+};
+
 // Top-of-screen image loading progress bar
 export const imageLoadBarFade: Variants = {
   hidden: { opacity: 0 },

@@ -169,11 +169,12 @@ export function StatusBar({
             <span className="status-divider" />
           </>
         )}
+        {/* The zoom percentage used to end this row. Removed 2026-09-10 at
+            Chris's request — the canvas size beside it is the number that
+            matters, and Alt+Scroll's hint on the left already says zoom. */}
         <span className="status-zoom" title="Dimensions of the canvas as it is now">
           {state.width && state.height ? `${state.width}×${state.height}` : "—"}
         </span>
-        <span className="status-divider" />
-        <span className="status-zoom">{Math.round(state.zoom * 100)}%</span>
       </div>
     </footer>
   );
