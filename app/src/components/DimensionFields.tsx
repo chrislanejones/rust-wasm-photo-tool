@@ -1,5 +1,6 @@
 import { Lock, Unlock } from "lucide-react";
 import { SizeSlider } from "@/components/SizeSlider";
+import { FIELD_NUMERIC } from "@/lib/styles";
 
 interface Props {
   /** Width / height as strings (controlled — lets the field hold transient input). */
@@ -58,7 +59,7 @@ export function DimensionFields({
             onChange={(e) => onWidthChange(e.target.value)}
             min={1}
             disabled={disabled}
-            className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
+            className={FIELD_NUMERIC}
           />
         </div>
         <div className="flex flex-1 flex-col gap-0.5">
@@ -69,7 +70,7 @@ export function DimensionFields({
             onChange={(e) => onHeightChange(e.target.value)}
             min={1}
             disabled={disabled}
-            className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
+            className={FIELD_NUMERIC}
           />
         </div>
         <button

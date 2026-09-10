@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { X, Eraser, Undo2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { fadeIn, quickSpring } from "@/lib/animations";
+import { dialogZoom, fadeIn } from "@/lib/animations";
 
 interface Props {
   open: boolean;
@@ -163,10 +163,7 @@ export function ObjectRemovalModal({
             role="dialog"
             aria-modal="true"
             aria-label="Object Removal"
-            initial={{ scale: 0.96, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.96, opacity: 0 }}
-            transition={quickSpring}
+            {...dialogZoom}
             onClick={(e) => e.stopPropagation()}
             className="flex max-h-[90vh] w-[min(720px,95vw)] flex-col overflow-hidden rounded-xl border border-border bg-background text-text-primary shadow-2xl"
           >

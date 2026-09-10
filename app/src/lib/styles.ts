@@ -12,6 +12,48 @@ export const HOVER_RING =
   "hover:ring-2 hover:ring-theme-primary/60 hover:ring-offset-2 hover:ring-offset-theme-sidebar";
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   TEXT FIELDS — the one definition behind every typed-into surface.
+
+   ⚠️ THIS EXISTED FIVE TIMES BEFORE IT EXISTED ONCE. The New Canvas width and
+   height boxes, the Compress panel's width and height boxes, and the AI prompt
+   all carried their own copy of the same string. Four of them were
+   byte-identical and the fifth had drifted — which is how the drift shows up:
+   not as a disagreement anyone notices, but as one field quietly having a
+   feature the others do not.
+
+   ⚠️ AND THE FEATURE THE FOUR WERE MISSING WAS THE FOCUS RING. They set a
+   background, a border and a text colour, and stopped. Tabbing into the New
+   Canvas width box moved focus with nothing on screen to say so — a WCAG 2.1
+   AA failure ("focus visible") on a field you are expected to type a number
+   into. Consolidating here fixes that as a side effect, which is the argument
+   for consolidating: one definition can be made correct once.
+
+   Uses `theme-ring`, the same warm accent Chris asked for on field borders,
+   so the ring and the border are the same colour family rather than two
+   accents fighting.
+
+   NOT a `ui/input` component, deliberately — there is no input primitive in
+   this repo and 29 inputs/textareas would want migrating to one. That is its
+   own session (PARKING_LOT); this is the class string those 29 could adopt
+   incrementally, and the five that share a look today already have.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** Every text field: surface, border, type colour, and a visible focus ring.
+ *  Not exported — the two below are the ones components use, and a third
+ *  spelling of "a field" is how the drift this replaces started. */
+const FIELD_BASE =
+  "w-full rounded-lg bg-theme-muted border border-theme-border text-text-primary " +
+  "placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-theme-ring";
+
+/** A short numeric field — width, height, a quality figure. `tabular-nums` so
+ *  digits do not reflow as you type, which is what makes a spinner feel loose. */
+export const FIELD_NUMERIC = `${FIELD_BASE} px-2 py-1.5 text-sm tabular-nums`;
+
+/** A multi-line field. `resize-none` because the dialogs size their own panels
+ *  and a user-dragged corner fights the layout. */
+export const FIELD_TEXTAREA = `${FIELD_BASE} resize-none px-3 py-2 text-sm`;
+
+/* ─────────────────────────────────────────────────────────────────────────────
    TOOL-TILE SELECTION — the ToolGrid rail tile and the SubtoolRow tile.
 
    THREE affordances land on these same two elements, so each one gets its own

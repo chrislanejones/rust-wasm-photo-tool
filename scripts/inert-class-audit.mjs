@@ -49,6 +49,7 @@ const ALLOW = new Map([
   ["border-carries-state", "prose — a comment explaining that the border carries selection state"],
   ["ring-vs-box", "prose — a comment contrasting ring hit-testing with box hit-testing"],
   ["text-annotations-changed", "a window CustomEvent name (CLAUDE.md Stage 3 is removing it)"],
+  ["text-to-image", "prose — the job type the AI dialog does not have yet"],
 ]);
 
 function sourceFiles(dir) {

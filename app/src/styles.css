@@ -305,6 +305,29 @@
    new (collapses the old 8/9/10/11px band); xs/sm/base match Tailwind v4
    defaults and are pinned for clarity; lg/2xl override with clamp(). */
 @theme {
+  /* ── Panel edge inset ──────────────────────────────────────────────────────
+     ONE number for how far a panel's content sits from its own border, minted
+     as a Tailwind utility (`p-panel`, `pt-panel`, …) so a component asks for
+     "the panel inset" rather than picking a number.
+
+     ⚠️ MEASURED BEFORE IT WAS CHOSEN. The three panels did not agree: the Tools
+     header was 12px on top and 16px on its other three sides, its body was 16
+     with a deliberate 32 at the bottom, and the Gallery was a clean 16 with an
+     8px-left / 0px-right strip inside it. Nobody picked the 12 or the lone 8 —
+     they are what a `pt-3` next to a `px-4` produces when the two are typed at
+     different times.
+
+     16px is the value the majority already used, so this standardises DOWN to
+     what was mostly true rather than inventing a fourth number.
+
+     ⚠️ THE 32px AT THE BOTTOM OF THE TOOLS BODY IS NOT A MISTAKE and is left
+     alone: Chris asked for that air specifically, because the Compress buttons
+     sat too close to the panel's bottom edge. `--spacing-panel-floor` names it
+     so the next person tidying edges does not "fix" it back.
+     ─────────────────────────────────────────────────────────────────────── */
+  --spacing-panel: 1rem;        /* 16px — every panel edge */
+  --spacing-panel-floor: 2rem;  /* 32px — the deliberate footer air */
+
   --text-2xs: 0.625rem;   /* 10px */
   --text-xs: 0.75rem;     /* 12px */
   --text-sm: 0.875rem;    /* 14px */

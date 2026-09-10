@@ -1,6 +1,6 @@
 // app/src/components/TopBar/TopBar.tsx
 import { motion } from "framer-motion";
-import { slideFromTop, panelSpacingTransition, instantTransition } from "@/lib/animations";
+import { slideFromTop, springStandard, instantTransition } from "@/lib/animations";
 import { PANEL_OPEN_GUTTER, BP_COMPACT, BP_TIGHT } from "@/lib/layout";
 import {
   Tooltip,
@@ -163,7 +163,7 @@ export function TopBar({
           paddingLeft: !drawerMode && showTools ? PANEL_OPEN_GUTTER : 12,
           paddingRight: !drawerMode && showHistory ? PANEL_OPEN_GUTTER : 12,
         }}
-        transition={reduceMotion ? instantTransition : panelSpacingTransition}
+        transition={reduceMotion ? instantTransition : springStandard}
       >
         <div className="pointer-events-auto">
           <div
