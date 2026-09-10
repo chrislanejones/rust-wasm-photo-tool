@@ -2728,3 +2728,42 @@ pixel — a2's own verification was predicted (503, 771) vs actual (504, 771). A
   extend the existing `compact` collapse so the Undo/Redo pill (or the divider
   and gaps) also drops in the BP_TIGHT band, the way `narrow` already does.
   Both change where the toggles sit — Chris's call, not a passing edit.
+
+---
+
+## `dead-exports-audit.mjs` counts a name in a COMMENT as a reference
+
+Found 2026-09-09 while adding `detect.test.ts`. Not fixed — adjacent to that
+session's target, and the audit's baseline is a blocking CI ratchet, so
+changing what it counts is its own change with its own numbers.
+
+The audit decides an export is used by testing whether any *other* file's raw
+text contains the identifier:
+
+```js
+const word = new RegExp(`\\b${name}\\b`);
+for (const [other, otherText] of source) {
+  if (!word.test(otherText)) continue;
+  ...
+  else external++;
+}
+```
+
+No comment stripping, and `.test.ts` files are skipped only as *sources* of
+exports — they still count as *referrers*. So a same-file-only export escapes
+the report if its name appears anywhere, including in prose.
+
+Reproduced by accident: `softwareAdapterMarker` was exported and used only
+inside `detect.ts`, and the audit passed because a comment in `detect.test.ts`
+explained why the tests deliberately do **not** call it. A comment saying "we
+never use this" is what convinced the audit it was used. The export has since
+been dropped, so the count is honest again by luck, not by the check.
+
+Same family as the `guardrails.sh` hazard already in CLAUDE.md — a text grep
+that cannot tell a comment from code. The difference is the direction of the
+failure: guardrails goes RED on prose (loud, annoying, safe), this one goes
+GREEN on prose (quiet, and it is the direction that lets things through).
+
+Fix when someone is next in that file: strip `//` and `/* */` before matching,
+then re-baseline. Expect the count to RISE, and expect some of the new entries
+to be real.

@@ -28,10 +28,50 @@
 //
 // Nothing here throws. Every failure path returns a reason string, because the
 // interesting question during Phase 0 is *why* a machine can't run it.
+//
+// ⚠️ "CAN run it" IS NOT "SHOULD run it". A software rasterizer passes every
+// question this module used to ask and then loses to the engine it was meant
+// to beat, so `probeWebGpu` refuses one — see SOFTWARE_ADAPTER_MARKERS below.
 
 export type GpuStatus =
   | { ok: true; adapterInfo: string; limits: { maxTextureDimension2D: number; maxComputeWorkgroupSizeX: number; maxStorageBufferBindingSize: number } }
   | { ok: false; reason: string };
+
+/**
+ * Names that identify a CPU rasterizer wearing a GPU label.
+ *
+ * ⚠️ THIS IS A CORRECTNESS-OF-THE-ANSWER GUARD, NOT A CAPABILITY CHECK. A
+ * software adapter answers every other question in this module correctly: it
+ * returns a device, it reports limits, it runs the shader, and it produces
+ * byte-identical output. What it does not do is go faster than the engine —
+ * it IS the CPU, with a copy in and a copy out on top. ADR-030 measured the
+ * hazard from the other side: benchmarking `google/swiftshader` would have
+ * read as "WebGPU is not worth it" and killed the arc on a false negative.
+ * The product has the mirror-image bug — a user with no GPU who sets
+ * `ih_webgpu=1` silently gets a SLOWER editor and no way to tell.
+ *
+ * MATCHED AS A SUBSTRING of `"<vendor>/<architecture>"`, lowercased, rather
+ * than as an exact field pair. Only `google/swiftshader` has actually been
+ * observed here (WSL2 headless Chromium under `--enable-unsafe-webgpu`); for
+ * the Mesa pair the field each name lands in is a guess, and a guess about
+ * WHICH FIELD produces a check that silently never fires. Matching the name
+ * wherever it appears does not depend on guessing right. The names are long
+ * and unambiguous — no hardware adapter is called "llvmpipe".
+ *
+ * Deliberately NOT listed: Microsoft's WARP, whose architecture string is the
+ * bare word `warp`. Four characters is too short to substring-match without
+ * risking a real adapter, and it has never been seen from this repo. A Windows
+ * machine with no GPU therefore still falls through this guard — a known gap,
+ * written down rather than papered over with a match that might be wrong.
+ */
+const SOFTWARE_ADAPTER_MARKERS = ["swiftshader", "llvmpipe", "lavapipe"] as const;
+
+/** `null` when the adapter looks like real hardware, else the marker that matched.
+ *  Not exported: the tests drive `probeWebGpu`, not this, on purpose. */
+function softwareAdapterMarker(vendor: string, architecture: string): string | null {
+  const identity = `${vendor}/${architecture}`.toLowerCase();
+  return SOFTWARE_ADAPTER_MARKERS.find((m) => identity.includes(m)) ?? null;
+}
 
 /** The switch, read fresh each call so a tab can be flipped without a rebuild. */
 export function webgpuEnabled(): boolean {
@@ -73,9 +113,25 @@ export function probeWebGpu(): Promise<GpuStatus> {
       const device = await adapter.requestDevice();
       if (!device) return { ok: false, reason: "requestDevice() returned nothing" };
       const info = (adapter as GPUAdapter & { info?: GPUAdapterInfo }).info;
+      const vendor = info?.vendor ?? "?";
+      const architecture = info?.architecture ?? "?";
+      // Refuse a software adapter — see SOFTWARE_ADAPTER_MARKERS. The identity
+      // goes in the reason so the Feature Flags panel still shows WHAT was
+      // found; "unavailable" with no name would be a worse diagnostic than the
+      // silent `ok: true` this replaces.
+      const software = softwareAdapterMarker(vendor, architecture);
+      if (software) {
+        // We asked for a device and have just decided not to use it. gpuBlur
+        // acquires its own, so nothing downstream holds this one.
+        device.destroy();
+        return {
+          ok: false,
+          reason: `software adapter (${vendor}/${architecture}) — a CPU rasterizer, slower than the SIMD engine, so the GPU path is refused`,
+        };
+      }
       return {
         ok: true,
-        adapterInfo: info ? `${info.vendor ?? "?"}/${info.architecture ?? "?"}` : "unknown adapter",
+        adapterInfo: info ? `${vendor}/${architecture}` : "unknown adapter",
         limits: {
           maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
           maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,

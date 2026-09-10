@@ -578,10 +578,14 @@ pub(crate) fn build_annotation_tile(
         }
         // `rotate_pixels(+θ)` is clockwise — matches the CSS preview.
         let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, rotation_deg as f32);
-        let cx = tile_w as i32 / 2;
-        let cy = tile_h as i32 / 2;
-        let off_x = cx - rotated.width as i32 / 2;
-        let off_y = cy - rotated.height as i32 / 2;
+        // TOP-LEFT anchor, not centre — see `text::rotated_tile_offset` (ADR-050).
+        let (off_x, off_y) = crate::text::rotated_tile_offset(
+            tile_w,
+            tile_h,
+            rotated.width,
+            rotated.height,
+            rotation_deg as f32,
+        );
         return (rotated.pixels, rotated.width, rotated.height, off_x, off_y);
     }
 
@@ -738,10 +742,14 @@ pub(crate) fn build_annotation_tile(
     // Rotate the composed tile (background + text together). Pass the angle
     // as-is: rotate_pixels(+θ) is clockwise, matching the CSS preview.
     let rotated = crate::text::rotate_pixels(&tile, tile_w, tile_h, rotation_deg as f32);
-    let cx = tile_w as i32 / 2;
-    let cy = tile_h as i32 / 2;
-    let off_x = cx - rotated.width as i32 / 2;
-    let off_y = cy - rotated.height as i32 / 2;
+    // TOP-LEFT anchor, not centre — see `text::rotated_tile_offset` (ADR-050).
+    let (off_x, off_y) = crate::text::rotated_tile_offset(
+        tile_w,
+        tile_h,
+        rotated.width,
+        rotated.height,
+        rotation_deg as f32,
+    );
     (rotated.pixels, rotated.width, rotated.height, off_x, off_y)
 }
 
@@ -1920,6 +1928,87 @@ mod tests {
         let data = tool.get_image_data();
         let i = ((y * tool.width + x) * 4) as usize;
         [data[i], data[i + 1], data[i + 2], data[i + 3]]
+    }
+
+    // ── Rotated text anchor (ADR-050) ────────────────────────────────────
+
+    /// Ink bounding box of the composite — where the drawn pixels actually
+    /// START. This is the measurement that caught the bug: the ANNOTATION's
+    /// stored (x, y) never moved, so anything asserting on that would have
+    /// passed throughout. Only the pixels moved.
+    fn ink_min(tool: &ImageHorseTool) -> Option<(u32, u32)> {
+        let data = tool.get_image_data();
+        let (mut mx, mut my) = (u32::MAX, u32::MAX);
+        for y in 0..tool.height {
+            for x in 0..tool.width {
+                let i = ((y * tool.width + x) * 4) as usize;
+                // The canvas starts white; ink is anything darker.
+                if data[i] < 200 || data[i + 1] < 200 || data[i + 2] < 200 {
+                    mx = mx.min(x);
+                    my = my.min(y);
+                }
+            }
+        }
+        (mx != u32::MAX).then_some((mx, my))
+    }
+
+    fn text_at_angle(text: &str, deg: f64) -> Option<(u32, u32)> {
+        let mut t = ImageHorseTool::new(600, 400);
+        t.load_image(&solid(600, 400, [255, 255, 255, 255]));
+        // (text, font_size, r, g, b, bold, x, y, rotation_deg, background_kind,
+        //  bg_r, bg_g, bg_b, bg_a, bg_padding, bg_corner_radius, bg_tail)
+        t.add_text_annotation(
+            text, 24.0, 0, 0, 0, false, 100, 100, deg, 0, 0, 0, 0, 0, 0, 0, 0,
+        );
+        ink_min(&t)
+    }
+
+    /// THE ADR-050 REGRESSION. Rotation used to pivot about the unrotated
+    /// tile's CENTRE, and that centre is `tile_w / 2` — a function of the
+    /// text's own length. So typing moved the committed ink: measured at 30°,
+    /// ink minX/minY went (107, 104) -> (118, 67) for the same text getting
+    /// four times longer.
+    ///
+    /// ⚠️ The obvious test — assert the annotation's stored (x, y) — is
+    /// VACUOUS here. (x, y) was always stable; the tile OFFSET moved under it.
+    /// Assert on pixels or assert on nothing.
+    #[test]
+    fn rotated_text_ink_origin_does_not_move_as_the_text_grows() {
+        let short = text_at_angle("AAA", 30.0).expect("short text drew ink"); // allow: rust-panic
+        let long = text_at_angle("AAA AAA AAA AAA", 30.0).expect("long text drew ink"); // allow: rust-panic
+        assert_eq!(
+            short, long,
+            "rotated ink origin moved as the text grew: {short:?} -> {long:?} \
+             (ADR-050 — the pivot must not depend on tile width)"
+        );
+    }
+
+    /// The control. If 0° ever starts drifting too, the test above would still
+    /// pass while the feature was broken for everyone.
+    #[test]
+    fn unrotated_text_ink_origin_was_already_stable_and_stays_so() {
+        let short = text_at_angle("AAA", 0.0).expect("short text drew ink"); // allow: rust-panic
+        let long = text_at_angle("AAA AAA AAA AAA", 0.0).expect("long text drew ink"); // allow: rust-panic
+        assert_eq!(
+            short, long,
+            "unrotated ink origin moved: {short:?} -> {long:?}"
+        );
+    }
+
+    /// Rotating by zero must be the identity the early-return already assumes,
+    /// and the offset helper must agree with it — otherwise text jumps the
+    /// instant a user nudges the angle off 0.
+    #[test]
+    fn offset_helper_is_continuous_across_the_zero_angle_early_return() {
+        // A hair over the 0.5 deg early-return threshold: the offset here must
+        // be within a pixel of the (0, 0) the early return hands back.
+        let (w, h) = (200u32, 60u32);
+        let rot = crate::text::rotate_pixels(&vec![0u8; (w * h * 4) as usize], w, h, 0.6);
+        let (ox, oy) = crate::text::rotated_tile_offset(w, h, rot.width, rot.height, 0.6);
+        assert!(
+            ox.abs() <= 2 && oy.abs() <= 2,
+            "offset jumps at the early-return boundary: ({ox}, {oy})"
+        );
     }
 
     // ── Colour overlay (Photoshop's Color Overlay layer style) ───────────

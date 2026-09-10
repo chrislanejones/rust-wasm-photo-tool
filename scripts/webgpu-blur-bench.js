@@ -106,11 +106,21 @@ fn main(@builtin(global_invocation_id) gid:vec3<u32>){
     const vendor = String(info.vendor ?? "?"), arch = String(info.architecture ?? "?");
 
     // THE GUARD. A software adapter answers every other question correctly.
-    const software = vendor === "google" && arch === "swiftshader";
+    //
+    // ⚠️ SECOND COPY. The product carries the same list in
+    // `app/src/lib/webgpu/detect.ts` (SOFTWARE_ADAPTER_MARKERS), which is the
+    // one with the reasoning and the tests. This file is pasted into a console
+    // and cannot import it, so the two are kept in step by hand — if you change
+    // one, change the other. This used to be the exact pair
+    // `google/swiftshader`, which let lavapipe and llvmpipe through and would
+    // have produced CPU-vs-CPU numbers under a GPU heading on any Linux box
+    // without a driver.
+    const software = ["swiftshader", "llvmpipe", "lavapipe"]
+      .some((m) => `${vendor}/${arch}`.toLowerCase().includes(m));
     if (software && !opts.iAcceptSoftwareAdapterNumbersAreMeaningless) {
       return {
         fatal: `adapter is ${vendor}/${arch} — a CPU rasterizer, not a GPU.`,
-        why: "Timings against SwiftShader are CPU-vs-CPU and will read as 'no speedup'. Run this on a machine with a real adapter.",
+        why: "Timings against a software rasterizer are CPU-vs-CPU and will read as 'no speedup'. Run this on a machine with a real adapter.",
       };
     }
 

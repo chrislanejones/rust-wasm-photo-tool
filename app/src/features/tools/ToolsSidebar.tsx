@@ -115,6 +115,9 @@ interface ToolsSidebarProps {
   onQualityChange: (q: number) => void;
   onQualityCommit: (q: number) => void;
   onToggleCompare: () => void;
+  /** An immutable upload baseline exists for the active photo, so A/B compare
+   *  has something to show. See ResizeSettings' `compareDisabled`. */
+  hasCompareBaseline: boolean;
   onAutoCompress: (scope: "selected" | "all") => void;
   isCompressing: boolean;
   compressProgress: { completed: number; total: number };
@@ -212,6 +215,7 @@ export function ToolsSidebar({
   onQualityChange,
   onQualityCommit,
   onToggleCompare,
+  hasCompareBaseline,
   onAutoCompress,
   isCompressing,
   compressProgress,
@@ -321,7 +325,10 @@ export function ToolsSidebar({
 
       <motion.div
         layout
-        className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin"
+        // pb-8, not p-4 all round: the last run of buttons in a settings panel
+        // (Auto Compress & Resize, Compress Image, Compress All Images) ended
+        // 16px off the sidebar's bottom edge with nothing under it.
+        className="flex-1 overflow-y-auto p-4 pb-8 space-y-5 scrollbar-thin"
       >
         {activeTool === "compress" && (
           <ResizeSettings
@@ -340,6 +347,7 @@ export function ToolsSidebar({
             exportFormat={exportFormat}
             onExportFormatChange={onExportFormatChange ?? (() => {})}
             onToggleCompare={onToggleCompare}
+            hasCompareBaseline={hasCompareBaseline}
             onAutoCompress={onAutoCompress}
             isCompressing={isCompressing}
             compressProgress={compressProgress}

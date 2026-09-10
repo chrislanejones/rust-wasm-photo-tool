@@ -206,12 +206,95 @@ check "librs-lines" 5183 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_libr
 # Baseline 2 on 2026-08-27, both same-file-only and both safe to pay down:
 #   app/src/lib/exportImage.ts     formatCarriesAlpha
 #   app/src/lib/webgpu/selfTest.ts gpuBlurSelfTest
+#
+# 1 -> 0 on 2026-09-09: `gpuBlurSelfTest` lost its `export` keyword. Paid down,
+# not waved through — and worth reading, because the audit had ALREADY stopped
+# flagging it for the wrong reason. A comment in blurReference.ts spells the
+# name, and this audit counts an identifier appearing in any other file's TEXT
+# as an external reference, comments included (PARKING_LOT). So it reported an
+# improvement that a reworded comment would silently undo. The export is now
+# genuinely gone, so the zero is real.
 n_deadexp=$(node scripts/dead-exports-audit.mjs | sed -n 's/^TOTAL: //p')
 if [ -z "$n_deadexp" ]; then
   echo "FATAL: dead-exports-audit printed no TOTAL — treat as broken, not as zero." >&2
   exit 1
 fi
-check "dead-exports" 1 "exported and never used (scripts/dead-exports-audit.mjs)" "$n_deadexp"
+check "dead-exports" 0 "exported and never used (scripts/dead-exports-audit.mjs)" "$n_deadexp"
+
+# ── MATCHED PAIR: the blur oracle (ADR-030) ──
+# `src/simd/blur.rs` (what the engine actually runs) and
+# `app/src/lib/webgpu/blurReference.ts` (the oracle the GPU shader is checked
+# against) must describe the same arithmetic. When they drift, `gpuBlurSelfTest`
+# keeps reporting PASS — it compares the shader against the ORACLE, so a wrong
+# oracle is invisible to the only check that would notice.
+#
+# This pair has already cost a night. The oracle was never bit-exact: it
+# accumulated at f64 while the crate accumulates at f32, and the disagreement
+# only appears above 64x64, which was the harness's largest case.
+#
+# Same scoping rule as the anchor pair below: match a changed line carrying the
+# blur's actual arithmetic, not any edit to the file, so a comment cannot turn
+# this red.
+blur_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
+if [ -z "$blur_base" ]; then
+  echo "  skip blur-oracle-pair: no origin/master to diff against (runs in CI)"
+else
+  rust_blur=$(git diff "$blur_base" -- src/simd/blur.rs \
+    | grep -cE '^[+-].*(f32x4_add|f32x4_mul|\.round\(\)|kernel\[)' || true)
+  ts_blur=$(git diff "$blur_base" -- app/src/lib/webgpu/blurReference.ts \
+    | grep -cE '^[+-].*(F\(|Math\.fround|kernel\[|buildGaussianKernel)' || true)
+  if [ "$rust_blur" -gt 0 ] && [ "$ts_blur" -eq 0 ]; then
+    echo "FAIL blur-oracle-pair: src/simd/blur.rs changed, blurReference.ts did not."
+    echo "     The oracle is what gpuBlurSelfTest compares the shader against, so a"
+    echo "     stale oracle makes that harness report PASS while the shader is wrong."
+    echo "     Change both, or say why in the commit (ADR-030)."
+    fail=1
+  else
+    echo "  ok blur-oracle-pair (engine hunks: $rust_blur, oracle hunks: $ts_blur)"
+  fi
+fi
+
+# ── MATCHED PAIR: the rotated-text anchor (ADR-050) ──
+# `text::rotated_tile_offset` (Rust, where the commit is anchored) and
+# `pivotLocal*` in CanvasArea.tsx (where the PREVIEW is anchored) must describe
+# the same pivot. If they disagree the preview and the committed pixels drift
+# apart — a worse defect than the one ADR-050 fixed, and invisible to every
+# other gate here: both sides compile, both sides pass their own tests, and
+# nothing in this repo renders a saved rotated annotation and compares it to a
+# stored expectation.
+#
+# ⚠️ SCOPED TO THE FORMULA, not to the files. Firing on any edit to either file
+# would make a comment change go red, which is the failure mode this script has
+# already had once (a comment that spelled a violation while explaining it).
+# So it looks for a changed line carrying the actual trig, and only then asks
+# whether the TS pivot moved with it.
+#
+# ⚠️ TWO-DOT DIFF, on purpose. `$base...HEAD` compares COMMITS and reported
+# "0 hunks" while the change sat uncommitted in the working tree — the check
+# would have passed on the very commit it was written for. `git diff $base`
+# includes the working tree, which is what a pre-push guard needs to see.
+#
+# ⚠️ NEEDS A BASE REF, so it cannot run in a bare local checkout. It SAYS so
+# rather than passing quietly — a co-change check that silently no-ops is worth
+# less than no check, and "verified in one environment" is this repo's most
+# expensive recurring mistake.
+pair_base=$(git merge-base origin/master HEAD 2>/dev/null || true)
+if [ -z "$pair_base" ]; then
+  echo "  skip rotated-anchor-pair: no origin/master to diff against (runs in CI)"
+else
+  formula_changed=$(git diff "$pair_base" -- src/text.rs \
+    | grep -cE '^[+-].*(hw \* cos|hw \* sin|hh \* cos|hh \* sin)' || true)
+  pivot_changed=$(git diff "$pair_base" -- app/src/features/canvas/CanvasArea.tsx \
+    | grep -cE '^[+-].*pivotLocal' || true)
+  if [ "$formula_changed" -gt 0 ] && [ "$pivot_changed" -eq 0 ]; then
+    echo "FAIL rotated-anchor-pair: text::rotated_tile_offset changed, CanvasArea's pivotLocal* did not."
+    echo "     The engine anchors the COMMIT and CanvasArea anchors the PREVIEW."
+    echo "     Change both, or the preview stops matching what gets baked (ADR-050)."
+    fail=1
+  else
+    echo "  ok rotated-anchor-pair (formula hunks: $formula_changed, pivot hunks: $pivot_changed)"
+  fi
+fi
 
 if [ "$fail" -ne 0 ]; then
   echo

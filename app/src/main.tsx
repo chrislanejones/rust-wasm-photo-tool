@@ -10,6 +10,7 @@ import { webgpuEnabled } from "@/lib/webgpu/detect";
 import {
   installContentAudit,
   installArchiveCorruptionAudit,
+  installRotatedTextAudit,
 } from "@/lib/contentAuditInstall";
 import { installSaveGuardProbe } from "@/lib/engineDocument";
 import { installUploadBudgetProbe } from "@/lib/uploadBudget";
@@ -40,6 +41,14 @@ installSaveGuardProbe();
 // checking are the ones on a real production profile, written by builds that
 // shipped before the ownership guard existed. It reports and never repairs.
 installArchiveCorruptionAudit();
+
+// `window.__ihRotatedTextAudit()` — counts STORED rotated text annotations, the
+// number ADR-050's migration go/no-go depends on. Ungated for the same reason
+// as the line above: the archive worth counting is a real production profile,
+// and this was first written behind the DEV gate, where it would have been
+// present everywhere except there. Read-only, and it refuses to open the
+// archive database at all unless `indexedDB.databases()` already lists it.
+installRotatedTextAudit();
 
 // `window.__ihUploadBudget()` — the cloud-upload rate limiter's state. Ungated
 // for the same reason as the others: a limiter nobody can observe is

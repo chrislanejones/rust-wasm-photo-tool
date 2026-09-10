@@ -10452,3 +10452,101 @@ The stubborn 7px under Compress was a bare inline `<label>` floating in a 24px l
 ### QC
 
 `imagehorse-qc` was **not run** for this cut; the tile, the Apply states, undo/redo, the compact bar, the three close buttons, the retirement clock, the hover pop and the spacing were each driven in the browser on the production build with zero page errors, but the full pass is owed.
+
+## v8.72 Change Summary — 2026-09-09
+
+**Panel corner closes, flat compact bars, a workspace that makes room on three sides, and two decisions filed.**
+
+| # | Change | Status |
+| --- | --- | --- |
+| 1 | Hover-reveal close on Tools / Gallery / Review — the Layers X, on the corner, 40 s then retires, restarts on re-entry | Complete |
+| 2 | Close gated to the wide desktop layout — not the dock, drawers or compact bar | Complete |
+| 3 | Compact top bar **and** docked master bar are one flat row, `justify-between`, no group pills | Complete |
+| 4 | Checkerboard makes room for the **Gallery** as well as Tools and Review | Complete |
+| 5 | Checkerboard edges feather over 72px instead of ending on a hard rectangle | Complete |
+| 6 | `--color-theme-border` **defined** — text-field borders were falling back to `currentColor` | Complete |
+| 7 | Compact chrome stays away until the start screen clears | Complete |
+| 8 | Settings-panel footer gets 40px of air (was 16) | Complete |
+| 9 | Hover pop is one definition; gallery thumbs + Review toggles pop; honours Reduce Motion | Complete |
+| 10 | **Service worker e2e now runs in CI** — five tests that had never run automatically | Complete |
+| 11 | ADR-050 — rotated text anchor (Draft) | Filed, not built |
+| 12 | ADR-051 — fonts are an engine feature (Draft) | Filed, not built |
+
+### The black ring was a missing token
+
+`--color-theme-border` was never defined, so Tailwind generated no rule for `border-theme-border` and the bare `border` utility beside it fell back to `currentColor` — near-white in dark, which read as a deliberate cream outline and hid the bug for months, and `#2a2622` in light, which read as a black box.
+
+All ten call sites are interactive controls, so the accent family is right; full strength is not — it would spend the loudest colour on a resting boundary and ring every colour swatch in orange. Defined as `color-mix(in srgb, var(--primary) 60%, transparent)`: `rgba(201,143,63,0.6)` light, `rgba(252,223,194,0.6)` dark.
+
+⚠️ Four siblings are still undefined and deliberately untouched, each a visual decision rather than a bug fix: `--color-theme-accent` (the *fill* on those same inputs), `--color-theme-background`, `--color-theme-chart`, `--color-theme-sidebar-muted`.
+
+### Three gutters, and a feather
+
+`main-content` already animated `marginLeft` for Tools and `marginRight` for Review; the Gallery had no equivalent, so the pattern ran under the bottom strip. It animates `marginBottom` by `GALLERY_OPEN_GUTTER` now, derived rather than typed twice — the canvas host has always inset itself `showGallery ? 168 : 56`, so the gutter **is** that difference, and both read the same constant.
+
+| Panels open | Checkerboard |
+| --- | --- |
+| none | 1500 × 964 |
+| Tools | **1216** × 964 |
+| Review | **1216** × 964 |
+| Gallery | 1500 × **852** |
+| all three | **932 × 852** |
+
+The pattern moved to `.canvas-wrapper::before` so it can be masked without masking the canvas — a mask on the wrapper would fade the image with it. Stacking is deliberate: `::before` z-index 0, the existing vignette `::after` z-index auto and later in tree order, `.main-canvas` z-index 1. Pattern, vignette, image.
+
+### The service worker's tests finally run
+
+`e2e/sw/` held five tests — registration, precache contents, offline reload, and both build-skew cases — and `ci.yml` had nine jobs, none of which ran Playwright. They run now, on a dark-default build *and* a `VITE_ENABLE_SW=1` build, because either half alone is misleading. **Verified firing on master**, not just passing on the PR: run `34310594627`, 13 jobs, all success.
+
+This activates nothing. The service worker still ships dark.
+
+### Two decisions filed, neither built
+
+**ADR-050** — "the text box moves as you type" is two defects. Unrotated text is correct: origin fixed across a 4× length change. Rotated text translates in committed pixels — `rotate_pixels` rotates about `cx = w/2`, so the anchor is a function of the text's own length. The fix moves every saved rotated annotation with nothing to migrate them, so it is a decision, not a patch.
+
+**ADR-051** — the engine renders text via `ab_glyph` and `render_text` takes **no font parameter**; the twelve-entry picker changes the preview and not the result. One more embedded face misses the wasm size band by ~3×. Decided: the user uploads their own TTF/OTF, upload free, **sync is Pro**.
+
+### Gates
+
+| Gate | Result |
+|---|---|
+| `pnpm -C app exec tsc --noEmit` | **clean** (app + marketing) |
+| `pnpm -C app test` | **687 passed**, 59 files |
+| `pnpm lint` | **0 errors** |
+| `./scripts/guardrails.sh` | **OK**, at baseline |
+| `cargo fmt` / `clippy --all-targets` / `test` | clean |
+| `pnpm run build` + marketing build | **succeed** |
+
+**No Rust change** — `src/` and `Cargo.toml` untouched, so no `build:wasm` and the size band is unmoved at 817,392 B.
+
+### QC
+
+`imagehorse-qc` was **not run** for this cut. Every changed surface was driven in the browser on the production build — the corner close in six states across three panels, the 40 s retirement on a page clock, both compact bars, the three gutters, the field ring in light and dark, and six hover-pop surfaces — all with zero page errors. The full pass is owed.
+
+## v8.73 Change Summary — 2026-09-09
+
+**The GPU blur is wired and byte-identical, the oracle that was checking it turned out never to have been, and A/B compare stops locking itself.**
+
+| # | Change | Status |
+| --- | --- | --- |
+| 1 | **A/B Compare stays available** after a compress or resize — it was gated on state a tool switch or reload wiped | Complete |
+| 2 | Rotated text is anchored at its **top-left**, not the centre of a tile that grows as you type | Complete |
+| 3 | WebGPU blur wired behind `ih_webgpu` — **byte-identical to the engine**, CPU fallback on every failure path | Complete, flag OFF |
+| 4 | GPU blur refuses a **software adapter** — "GPU on" could silently mean slower | Complete |
+| 5 | GPU device + pipeline cached, with `device.lost` recovery; redundant buffer copy dropped | Complete |
+| 6 | **The blur oracle was never bit-exact** — it accumulated f64 against the crate's f32, invisible below 64×64 | Fixed |
+| 7 | Two overlapping photo loads no longer refuse each other with "reinit before init" | Complete |
+| 8 | Diagnostics stopped sampling **every frame for a closed window** — ~14 engine calls per frame removed | Complete |
+| 9 | Toaster moved out of the dialog header | Complete |
+| 10 | DM Sans + JetBrains Mono **self-hosted** — the demo tier really makes no network calls | Complete |
+| 11 | Three theme tokens defined that emitted **no CSS at all** — 13 dead class references | Complete |
+| 12 | `window.__ihRotatedTextAudit()` — read-only count of stored rotated text | Complete |
+| 13 | `scripts/inert-class-audit.mjs` — finds colour classes that emit no rule | Complete |
+| 14 | Two matched-pair guardrails: rotation anchor, and blur engine ↔ oracle | Complete |
+| 15 | Five dependabot bumps landed as one lockfile write (vitest 4 → 5) | Complete |
+| 16 | ADR-050 **closed** — the audit measured zero rotated annotations, so no migration | Decided |
+| 17 | ADR-052 — the op log records six of sixty-seven operations | Filed |
+
+### QC
+
+`imagehorse-qc` was **not run** for this cut, and it is owed more than usual — canvas, tools and the engine all changed. What *was* driven in a real browser on the production build: the A/B compare regression reproduced on master and the fix verified (fresh load → compress → leave the panel → return, enabled throughout, overlay rendering); GPU-vs-engine parity at four sizes on `intel/xe-lpg`, all maxDelta 0; and the rotated-text anchor confirmed rendering on canvas. The rest of the suite is owed.

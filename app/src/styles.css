@@ -1,3 +1,4 @@
+@import "./fonts.css";
 @import "tailwindcss";
 
 /* Tailwind v4 class-based dark mode. `.dark` on <html> selects the dark palette;
@@ -251,7 +252,53 @@
   --color-theme-muted: var(--bg-elevated);
   --color-theme-muted-foreground: var(--muted-foreground);
   --color-theme-sidebar-border: var(--border);
+  /* The border on TEXT FIELDS (width/height, the New-dialog fields) and the
+     colour swatches. It was never defined, so `border-theme-border` generated
+     no rule and the bare `border` utility beside it fell back to currentColor:
+     near-white in dark (which read as a deliberate cream outline and hid the
+     bug) and #2a2622 in light, i.e. a black box. --ring is #c98f3f light and
+     #fcdfc2 dark, so light gets the colour Chris asked for and dark keeps what
+     it already looked like. (Chris, 2026-09-08.)
+     The three real siblings are now defined below. --color-theme-chart was
+     also listed here and is NOT a gap: nothing references it, so no rule was
+     ever missing. (Chris, 2026-09-08; siblings closed 2026-09-09.) */
+  --color-theme-border: color-mix(in srgb, var(--primary) 60%, transparent);
   --color-theme-chart4: #f0a060;
+
+  /* ── The three that emitted NO RULE AT ALL ────────────────────────────────
+     Verified against the built CSS, not the source: `.bg-theme-accent`,
+     `.bg-theme-background` and `.text-theme-sidebar-muted` appeared nowhere in
+     www-dist. Tailwind v4 only mints a utility from a token that exists, so
+     thirteen class references were inert — an input with no fill, a wash that
+     never washed, and helper text that silently inherited.
+
+     ⚠️ NOT var(--accent), and this is the whole reason these are separate
+     lines rather than one alias. The brand gold #c98f3f is the right accent
+     for a RING (Chris asked for it there), but as TEXT in light mode it
+     measures **2.81:1 on white** and **2.45:1 on --background** — failing not
+     just AA's 4.5:1 for body text but the 3:1 large-text floor as well. Six of
+     the eleven `theme-accent` references are `text-`, one of them
+     `text-2xs font-semibold` on white. Pointing the token at the gold would
+     have replaced "inherits, therefore readable" with "branded, therefore
+     not", and no gate in this repo would have said a word.
+
+     --secondary-foreground is the same warm family and passes everywhere:
+     #5c4326 light (8.02:1 on --background, 9.19:1 on bg-elevated) and #fcdfc2
+     dark (14.70:1 / 11.11:1).
+
+     Likewise --color-theme-sidebar-muted is --muted-foreground, NOT the
+     name-matching --text-muted: that one is #8a8175 in light and measures
+     **3.65:1** on the sidebar, which fails AA for the `text-xs` helper line it
+     would have coloured. --muted-foreground is 6.99:1 light / 8.56:1 dark.
+     The token whose NAME matches is not always the token whose CONTRAST does.
+
+     The five `bg-theme-accent` references moved to `bg-theme-muted` instead of
+     being served from here — they are an input FILL, which wants a surface and
+     not an accent. One token cannot be both a 6xl hero number and the inside
+     of a text field. */
+  --color-theme-accent: var(--secondary-foreground);
+  --color-theme-background: var(--background);
+  --color-theme-sidebar-muted: var(--muted-foreground);
 }
 
 /* ── Typography scale (Task 1) — 6 steps; only lg / 2xl are fluid. A regular
@@ -415,19 +462,48 @@ body {
   justify-content: center;
   padding: 32px;
   background: var(--bg-primary);
+}
+/* The checkerboard, feathered. It lives on ::before rather than on the wrapper
+   because a mask on .canvas-wrapper would fade the CANVAS with it — the image
+   is a child. Two crossed linear gradients composited to `intersect` soften all
+   four edges over --cb-feather, so the pattern dissolves into --bg-primary
+   instead of ending on a hard rectangle. (Chris, 2026-09-08.)
+
+   STACKING, deliberately: this is z-index 0; the vignette ::after below is
+   z-index auto and later in tree order, so it paints over this; .main-canvas is
+   z-index var(--z-canvas) = 1 and paints over both. Pattern, vignette, image.
+   `position: absolute` also keeps it out of the wrapper's flex flow, so it is
+   never a flex item and the canvas stays centred. */
+.canvas-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  --cb-feather: 72px;
   /* subtle checkerboard */
   background-image:
-    linear-gradient(45deg, var(--bg-tertiary) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--bg-tertiary) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--bg-tertiary) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--bg-tertiary) 75%);
+  linear-gradient(45deg, var(--bg-tertiary) 25%, transparent 25%),
+  linear-gradient(-45deg, var(--bg-tertiary) 25%, transparent 25%),
+  linear-gradient(45deg, transparent 75%, var(--bg-tertiary) 75%),
+  linear-gradient(-45deg, transparent 75%, var(--bg-tertiary) 75%);
   background-size: 24px 24px;
   background-position:
-    0 0,
-    0 12px,
-    12px -12px,
-    -12px 0;
+  0 0,
+  0 12px,
+  12px -12px,
+  -12px 0;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0, #000 var(--cb-feather), #000 calc(100% - var(--cb-feather)), transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 var(--cb-feather), #000 calc(100% - var(--cb-feather)), transparent 100%);
+  mask-image:
+    linear-gradient(to right, transparent 0, #000 var(--cb-feather), #000 calc(100% - var(--cb-feather)), transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 var(--cb-feather), #000 calc(100% - var(--cb-feather)), transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
 }
+
+
 
 .main-canvas {
   max-width: 100%;

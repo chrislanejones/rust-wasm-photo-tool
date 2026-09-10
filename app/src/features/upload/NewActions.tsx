@@ -381,7 +381,7 @@ export function NewActions({
                         setBlankW(e.target.value);
                         setBlankPreset("");
                       }}
-                      className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+                      className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
                     />
                   </div>
                   <span className="pb-2 text-text-muted">×</span>
@@ -395,7 +395,7 @@ export function NewActions({
                         setBlankH(e.target.value);
                         setBlankPreset("");
                       }}
-                      className="w-full px-2 py-1.5 rounded-lg bg-theme-accent border border-theme-border text-text-primary text-sm tabular-nums"
+                      className="w-full px-2 py-1.5 rounded-lg bg-theme-muted border border-theme-border text-text-primary text-sm tabular-nums"
                     />
                   </div>
                 </div>
