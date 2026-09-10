@@ -36,7 +36,7 @@ resolves all of them to a PR regardless.
 | #63 | per-layer annotation counts | yes — `PARKING_LOT.md:41` | **#63 OPEN** — *opened tonight, for #65* | **collision, created tonight** |
 | #64 | *(no backlog item)* | — | **#64 OPEN** — *opened tonight, for #63* | — |
 | #65 | wasm sentinel band | **only inside a list** until tonight's commit | none yet | undefined-but-used |
-| #66 | **nothing — no definition in docs OR git** | **no** | none yet | **orphan number** |
+| #66 | **nothing — no definition in docs OR git** | **no** | none yet | **RETIRED 2026-09-10** — citations removed from PARKING_LOT |
 | #68 | op-format bump for shape order | yes — ADR-044 closed it with no code | none yet | ok |
 | #70 | remap cargo registry paths | yes — commit `6c4f42a` | none yet | ok |
 | #71 | layer emptiness scan | yes — `PARKING_LOT.md:148` | none yet | ok |
@@ -122,7 +122,11 @@ commit and stops the bleeding; B is the real fix and deserves to be done
 properly rather than at 4am. Doing A first does not make B harder — B replaces
 the numbers wholesale either way.
 
-**Whichever is chosen, `#66` should be resolved first**: it is cited in four
-places as a member of the engine sitting and defined nowhere. Either it names
-real work that was never written down, or it is a typo that has been copied
-forward four times. Nobody can migrate a number whose meaning is unknown.
+**`#66` is resolved — RETIRED 2026-09-10.** It was cited as a member of the
+engine sitting and defined nowhere, in docs or in git. Nothing was lost by
+dropping it: a number with no definition names no work. Both citations are gone
+from PARKING_LOT, so the engine sitting is now `#71, #68, #70, #65`.
+
+The two `#66` strings still in the tree are correct and must stay: this row, and
+`vacuous-checks.md`, where `#66` is a **pull request** number — a different
+namespace that happens to collide, which is itself the argument for Migration B.

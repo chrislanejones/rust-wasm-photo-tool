@@ -117,8 +117,8 @@ badge has no state to render, and `get_layers()` (`layer.rs:848`) carries
 | **C.** Derive from what the panel already has | impossible — active-layer only | dead |
 
 **Recommendation: option A, but not on its own.** It is a small change that
-rebuilds the WASM, so it should ride with the engine sitting (#71, #68, #66,
-#70, #65) that already shares one size-band check, one toolchain exposure and
+rebuilds the WASM, so it should ride with the engine sitting (#71, #68, #70,
+#65) that already shares one size-band check, one toolchain exposure and
 one bench. Doing it alone spends a whole engine verification cycle on two
 integers.
 
@@ -196,7 +196,7 @@ change, no migration.
 | Purely TS? | **No** — needs one Rust method |
 | Needs a format bump? | **No**, if it follows the `remove_object` precedent |
 | Needs an ADR? | Probably yes — "reorder is deliberately not replayable" is a decision |
-| Where it belongs | the engine sitting (#71, #68, #66, #70, #65) — shares one size-band check and bench |
+| Where it belongs | the engine sitting (#71, #68, #70, #65) — shares one size-band check and bench |
 
 ⚠️ **Pattern worth noticing.** This is the third backlog item in one session
 whose "small TS job" scoping did not survive contact with the code — #63
