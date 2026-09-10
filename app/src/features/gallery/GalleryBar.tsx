@@ -368,20 +368,89 @@ function GalleryActions({
   const many = selectedCount > 1;
   const btn = "px-2.5 py-1.5 text-xs";
 
+  /**
+   * COMPACT USES THE SELECTION PANEL'S SHAPE: an equal-height grid of tiles,
+   * icon above label, three to a row — the same read as Select's
+   * All / Deselect / Delete / Copy / Cut. Wide keeps the single inline row,
+   * where there is space for icon-beside-label.
+   */
+  const actionRow = vertical
+    ? "grid grid-cols-3 gap-2 [grid-auto-rows:1fr] [&>button]:h-full [&>button]:w-full [&>button]:flex-col [&>button]:gap-1"
+    : "flex items-center gap-1.5";
+  const actionBtn = vertical ? "px-1.5 py-2 text-2xs" : btn;
+  /** Compact stacks icon over label, so the label must not be hidden there. */
+  const label = vertical ? "inline" : "hidden sm:inline";
+
   return (
     <div
       className={
         vertical
-          ? "flex flex-col gap-2"
+          ? "flex flex-col gap-3"
           : "flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5"
       }
     >
-      {/* ── Auto Compress & Resize ── */}
+      {/* ── selection / delete / export ──
+          FIRST, and Auto Compress goes underneath in both layouts: the
+          per-photo actions are what a selection changes, so they sit closest
+          to the thumbnails, and the compress block reads as the footer of the
+          bar rather than its headline. */}
+      <div className={actionRow}>
+        {some ? (
+          onClearSelection && (
+            <Button size="large" onClick={onClearSelection} title="Clear selection" className={actionBtn}>
+              <SquareX className="h-3.5 w-3.5" />
+              <span className={label}>Unselect</span>
+            </Button>
+          )
+        ) : (
+          /* Placeholder for the grid/gallery view that does not exist yet. It is
+             rendered disabled rather than omitted so the row keeps its shape as
+             a selection comes and goes. */
+          <Button size="large" disabled title="Gallery view is not available yet" className={actionBtn}>
+            <Copy className="h-3.5 w-3.5" />
+            <span className={label}>Gallery View</span>
+          </Button>
+        )}
+
+        {some
+          ? onDeleteSelected && (
+              <Button size="large" onClick={onDeleteSelected} title={many ? "Delete selected images" : "Delete this image"} className={actionBtn}>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className={label}>{many ? "Delete Selected" : vertical ? "Delete" : "Delete Image"}</span>
+              </Button>
+            )
+          : onDeleteAll && (
+              <Button size="large" onClick={onDeleteAll} title="Delete all images" className={actionBtn}>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className={label}>Delete All</span>
+              </Button>
+            )}
+
+        {onExportSelected && (
+          <Button size="large" onClick={onExportSelected} title={many ? "Export or share images" : "Export or share image"} className={actionBtn}>
+            <Download className="h-3.5 w-3.5" />
+            <span className={label}>
+              {vertical ? "Export" : many ? "Export or Share Images" : "Export or Share Image"}
+            </span>
+          </Button>
+        )}
+      </div>
+
+      {/* The rule between the actions and the compress block.
+          Horizontal only — stacked, the gap already separates them. */}
+      {!vertical && (
+        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border sm:block" />
+      )}
+
+      {/* ── Auto Compress & Resize — LAST in both layouts ──
+          Moved here from Enhance › Resize & Compress, which is where it used to
+          live; it acts on the gallery's selection, so it belongs beside the
+          thumbnails rather than in a tool panel. */}
       {onAutoCompress && (
         <div
           className={
             vertical
-              ? "flex flex-col gap-1.5"
+              ? "flex flex-col gap-1.5 border-t border-theme-border pt-2.5"
               : "flex flex-wrap items-center gap-1.5"
           }
         >
@@ -424,53 +493,6 @@ function GalleryActions({
           </div>
         </div>
       )}
-
-      {/* The rule between the compress scope and the destructive/export half.
-          Horizontal only — stacked, the gap already separates them. */}
-      {!vertical && (
-        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border sm:block" />
-      )}
-
-      {/* ── selection / delete / export ── */}
-      <div className={vertical ? "grid grid-cols-2 gap-1.5 [&>button]:w-full" : "flex items-center gap-1.5"}>
-        {some ? (
-          onClearSelection && (
-            <Button size="large" onClick={onClearSelection} title="Clear selection" className={btn}>
-              <SquareX className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Unselect</span>
-            </Button>
-          )
-        ) : (
-          /* Placeholder for the grid/gallery view that does not exist yet. It is
-             rendered disabled rather than omitted so the row keeps its shape as
-             a selection comes and goes. */
-          <Button size="large" disabled title="Gallery view is not available yet" className={btn}>
-            <Copy className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Gallery View</span>
-          </Button>
-        )}
-
-        {some
-          ? onDeleteSelected && (
-              <Button size="large" onClick={onDeleteSelected} title={many ? "Delete selected images" : "Delete this image"} className={btn}>
-                <Trash2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{many ? "Delete Selected" : "Delete Image"}</span>
-              </Button>
-            )
-          : onDeleteAll && (
-              <Button size="large" onClick={onDeleteAll} title="Delete all images" className={btn}>
-                <Trash2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Delete All</span>
-              </Button>
-            )}
-
-        {onExportSelected && (
-          <Button size="large" onClick={onExportSelected} title={many ? "Export or share images" : "Export or share image"} className={btn}>
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{many ? "Export or Share Images" : "Export or Share Image"}</span>
-          </Button>
-        )}
-      </div>
     </div>
   );
 }
@@ -765,7 +787,17 @@ export function GalleryBar({
                     //
                     // Two axes, two properties: items-start stops the ITEM
                     // stretching, content-start stops the TRACK stretching.
-                    "grid w-full grid-cols-2 content-start items-start gap-x-3 gap-y-4 overflow-y-auto px-2 pt-3 pb-3"
+                    // ⚠️ GAPS, not padding. Reported as "images stacked together
+                    // too closely" in compact. Measured before changing: 99px
+                    // tiles with only 12px between columns and 16px between
+                    // rows, and the tile's own hover ring is painted INSIDE its
+                    // border, so nothing else was holding them apart. The
+                    // selected/active ring needs somewhere to land, and two
+                    // photos 12px apart read as one strip rather than two
+                    // pictures. Now 20px both ways, with the side padding
+                    // raised to match so the left column is not tighter to the
+                    // panel edge than it is to its neighbour.
+                    "grid w-full grid-cols-2 content-start items-start gap-x-5 gap-y-5 overflow-y-auto px-3 pt-3 pb-3"
                   : "flex gap-2 overflow-x-auto py-1.5 px-2"
               }
               style={{ scrollbarWidth: "none" }}
