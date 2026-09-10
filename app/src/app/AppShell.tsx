@@ -3184,7 +3184,6 @@ export function AppShell() {
             activeTool={activeTool}
             stampSettings={stampSettings}
             onStampSettingsChange={handleStampSettingsChange}
-            photoCount={photos.length}
             exportFormat={exportFormat}
             onExportFormatChange={setExportFormat}
             onFlipH={stamp.flipHorizontal}
@@ -3216,10 +3215,7 @@ export function AppShell() {
             onQualityCommit={handleQualityCommit}
             onToggleCompare={handleToggleCompare}
             hasCompareBaseline={!!activeOriginalKey}
-            onAutoCompress={handleAutoCompress}
-            isCompressing={compressProgress.running}
             compressProgress={compressProgress}
-            selectedCount={selectedIds.size}
             onApplyCrop={drawingTools.applyCrop}
             onSetCropSelection={drawingTools.setCropSelection}
             cropRatio={cropRatio}

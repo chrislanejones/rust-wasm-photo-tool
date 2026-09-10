@@ -78,7 +78,6 @@ interface ToolsSidebarProps {
   closable?: boolean;
   /** Total photos in the gallery — drives the Compress panel's count. (It used
    *  to pluralize the Download footer's label too; Export moved to the bar.) */
-  photoCount: number;
   exportFormat: ExportFormat;
   onExportFormatChange?: (f: ExportFormat) => void;
   onFlipH: () => void;
@@ -117,11 +116,7 @@ interface ToolsSidebarProps {
   /** An immutable upload baseline exists for the active photo, so A/B compare
    *  has something to show. See ResizeSettings' `compareDisabled`. */
   hasCompareBaseline: boolean;
-  onAutoCompress: (scope: "selected" | "all") => void;
-  isCompressing: boolean;
   compressProgress: { completed: number; total: number };
-  /** Number of gallery photos currently selected (drives "Compress Selected"). */
-  selectedCount: number;
   onApplyCrop?: () => void;
   /** Allows the Crop tool ratio buttons to drop a centred crop selection
    *  computed in Rust. Optional — omit to disable ratio buttons. */
@@ -183,7 +178,6 @@ export function ToolsSidebar({
   layerOverlay,
   embedded = false,
   closable = false,
-  photoCount,
   exportFormat,
   onExportFormatChange,
   onFlipH,
@@ -214,10 +208,7 @@ export function ToolsSidebar({
   onQualityCommit,
   onToggleCompare,
   hasCompareBaseline,
-  onAutoCompress,
-  isCompressing,
   compressProgress,
-  selectedCount,
   onApplyCrop,
   onSetCropSelection,
   cropRatio,
@@ -352,11 +343,7 @@ export function ToolsSidebar({
             onExportFormatChange={onExportFormatChange ?? (() => {})}
             onToggleCompare={onToggleCompare}
             hasCompareBaseline={hasCompareBaseline}
-            onAutoCompress={onAutoCompress}
-            isCompressing={isCompressing}
             compressProgress={compressProgress}
-            selectedCount={selectedCount}
-            totalCount={photoCount}
           />
         )}
 

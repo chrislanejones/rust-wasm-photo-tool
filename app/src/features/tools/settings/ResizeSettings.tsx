@@ -1,6 +1,6 @@
 // ===== FILE: app/src/features/tools/settings/ResizeSettings.tsx =====
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SlidersHorizontal, Zap, Scaling, ChevronDown, FileArchive } from "lucide-react";
+import { SlidersHorizontal, Scaling, ChevronDown, FileArchive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { canEncode } from "@/lib/encodeSupport";
 import { DimensionFields } from "@/components/DimensionFields";
@@ -70,14 +70,7 @@ interface ResizeSettingsProps {
   exportFormat: ExportFormat;
   onExportFormatChange: (f: ExportFormat) => void;
   onToggleCompare: () => void;
-  /** Run Auto Compress over the current selection, or over the whole gallery. */
-  onAutoCompress: (scope: "selected" | "all") => void;
-  isCompressing: boolean;
   compressProgress: { completed: number; total: number };
-  /** Number of selected gallery photos; >0 switches to "Compress Selected". */
-  selectedCount: number;
-  /** Total photos in the gallery; the "All Images" button hides when ≤ 1. */
-  totalCount: number;
 }
 
 function trafficColor(score: number) {
@@ -103,10 +96,6 @@ export function ResizeSettings({
   exportFormat,
   onExportFormatChange,
   onToggleCompare,
-  onAutoCompress,
-  isCompressing,
-  selectedCount,
-  totalCount,
 }: ResizeSettingsProps) {
   // A/B compare view lives in the UI store; the active-image dirty flag in the
   // gallery store — both were prop-drilled from AppShell before stage 1.
@@ -229,9 +218,6 @@ export function ResizeSettings({
     }
   };
 
-  const handleAutoCompress = (scope: "selected" | "all") => {
-    onAutoCompress(scope);
-  };
 
   const handleQualityChange = (val: number) => {
     onQualityChange(val);
@@ -590,58 +576,6 @@ export function ResizeSettings({
           )}
         </Tooltip>
 
-        <hr className="border-theme-sidebar-border" />
-
-        {/* ── Auto Compress & Resize: labelled section with explicit scope buttons.
-            The name says "& Resize" because that is what it does — since v7.22 it
-            also shrinks anything over 2500px on a side. Calling it "Auto Compress"
-            hid a resize from the person clicking it. ── */}
-        <div className="flex items-center justify-center gap-1.5 text-xs font-semibold font-mono text-theme-muted-foreground">
-          <Zap className="h-3.5 w-3.5" />
-          Auto Compress &amp; Resize
-          <InfoTooltip
-            label="Auto Compress & Resize"
-            info={
-              <>
-                One click, aiming at a web-ready file (~200&nbsp;KB): it re-encodes the
-                photo, and if either side is over <strong>2500&nbsp;px</strong> it scales the
-                image down as well — big photos can&rsquo;t hit a PageSpeed-grade size on
-                quality alone.
-                <br />
-                <br />
-                It stops at 1280&nbsp;px on the long edge, so it will never shrink a photo to
-                mush chasing the target. The green badge on the thumbnail shows what you
-                saved.
-              </>
-            }
-          />
-        </div>
-        {/* Compression progress is surfaced via a sonner toast, not inline.
-            "Compress Image" compresses whatever is in the ring — enabled as long
-            as a photo is active (disabled handles the empty-gallery case). The
-            "All Images" button is hidden when the gallery holds a single image. */}
-        <div className={totalCount > 1 ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
-          <Button size="large"
-            onClick={() => handleAutoCompress("selected")}
-            disabled={disabled || isCompressing}
-            className="w-full"
-          >
-            {isCompressing
-              ? "Compressing…"
-              : selectedCount > 1
-                ? "Compress Images"
-                : "Compress Image"}
-          </Button>
-          {totalCount > 1 && (
-            <Button size="large"
-              onClick={() => handleAutoCompress("all")}
-              disabled={disabled || isCompressing}
-              className="w-full"
-            >
-              {isCompressing ? "Compressing…" : "Compress All Images"}
-            </Button>
-          )}
-        </div>
       </div>
     </div>
   );
