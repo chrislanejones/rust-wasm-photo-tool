@@ -50,7 +50,6 @@ interface ToolsSidebarProps {
   activeTool: ToolType;
   stampSettings: StampSettingsType;
   onStampSettingsChange: (s: StampSettingsType) => void;
-  hasSource: boolean;
   /** Place the selected object into one of the nine grid cells (Text / Shape). */
   onPlace?: (cell: PlacementCell) => void;
   /** Kind of the currently-selected object — gates the placement grid to the
@@ -173,7 +172,6 @@ export function ToolsSidebar({
   activeTool,
   stampSettings,
   onStampSettingsChange,
-  hasSource,
   onPlace,
   selectedKind,
   selection,
@@ -397,7 +395,6 @@ export function ToolsSidebar({
           <StampSettingsPanel
             settings={stampSettings}
             onChange={onStampSettingsChange}
-            hasSource={hasSource}
             activeMode={stampSubMode}
             onModeChange={onStampSubModeChange}
             emoji={stampEmoji}

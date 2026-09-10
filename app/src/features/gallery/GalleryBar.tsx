@@ -5,6 +5,7 @@ import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, 
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes } from "@/lib/format";
@@ -58,6 +59,10 @@ interface Props {
   onDeleteSelected?: () => void;
   /** Export the currently-selected photos as a ZIP. */
   onExportSelected?: () => void;
+  /** Auto Compress & Resize — the same handler the Resize panel calls, so the
+   *  two surfaces cannot drift. "selected" means the active photo when nothing
+   *  is selected. */
+  onAutoCompress?: (scope: "selected" | "all") => void;
   /** Duplicate the currently-selected photos. */
   onDuplicateSelected?: () => void;
   /** Currently-selected photo ids (lifted to the parent). */
@@ -322,6 +327,154 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
   );
 }
 
+/**
+ * The gallery's right-hand action bar.
+ *
+ * THREE ARRANGEMENTS, ONE FOR EACH SELECTION STATE, because the same button
+ * means different things depending on what is selected and a label that says
+ * "Delete Selected" when nothing is selected is how people delete the wrong
+ * thing. The scope is in the button text, always:
+ *
+ *   nothing selected   Auto Compress & Resize (i) [Image on Canvas] [All Images]
+ *                      | [Gallery View (off)] [Delete All] [Export or Share Image]
+ *   one selected       Auto Compress & Resize (i) [Selected Image]
+ *                      | [Unselect] [Delete Image] [Export or Share Image]
+ *   many selected      Auto Compress & Resize (i) [Selected Images]
+ *                      | [Unselect] [Delete Selected] [Export or Share Images]
+ *
+ * Nothing here is new behaviour — every handler already existed. `onAutoCompress`
+ * is the same one the Resize panel calls, so the two surfaces cannot drift.
+ */
+function GalleryActions({
+  selectedCount,
+  totalCount,
+  vertical,
+  onAutoCompress,
+  onClearSelection,
+  onDeleteAll,
+  onDeleteSelected,
+  onExportSelected,
+}: {
+  selectedCount: number;
+  totalCount: number;
+  vertical?: boolean;
+  onAutoCompress?: (scope: "selected" | "all") => void;
+  onClearSelection?: () => void;
+  onDeleteAll?: () => void;
+  onDeleteSelected?: () => void;
+  onExportSelected?: () => void;
+}) {
+  const some = selectedCount > 0;
+  const many = selectedCount > 1;
+  const btn = "px-2.5 py-1.5 text-xs";
+
+  return (
+    <div
+      className={
+        vertical
+          ? "flex flex-col gap-2"
+          : "flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5"
+      }
+    >
+      {/* ── Auto Compress & Resize ── */}
+      {onAutoCompress && (
+        <div
+          className={
+            vertical
+              ? "flex flex-col gap-1.5"
+              : "flex flex-wrap items-center gap-1.5"
+          }
+        >
+          <span className="flex items-center gap-1.5 text-xs font-semibold font-mono text-text-muted">
+            <Zap className="h-3.5 w-3.5" />
+            Auto Compress &amp; Resize
+            <InfoTooltip
+              label="Auto Compress & Resize"
+              info={
+                <>
+                  One click, aiming at a web-ready file (~200&nbsp;KB): it re-encodes
+                  the photo, and if either side is over <strong>2500&nbsp;px</strong> it
+                  scales the image down as well.
+                  <br />
+                  <br />
+                  It stops at 1280&nbsp;px on the long edge, so it will never shrink a
+                  photo to mush chasing the target. The green badge on the thumbnail
+                  shows what you saved.
+                </>
+              }
+            />
+          </span>
+          <div className={vertical ? "grid grid-cols-2 gap-1.5 [&>button]:w-full" : "flex items-center gap-1.5"}>
+            {some ? (
+              <Button size="large" onClick={() => onAutoCompress("selected")} className={btn}>
+                {many ? "Selected Images" : "Selected Image"}
+              </Button>
+            ) : (
+              <>
+                <Button size="large" onClick={() => onAutoCompress("selected")} className={btn}>
+                  Image on Canvas
+                </Button>
+                {totalCount > 1 && (
+                  <Button size="large" onClick={() => onAutoCompress("all")} className={btn}>
+                    All Images
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* The rule between the compress scope and the destructive/export half.
+          Horizontal only — stacked, the gap already separates them. */}
+      {!vertical && (
+        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border sm:block" />
+      )}
+
+      {/* ── selection / delete / export ── */}
+      <div className={vertical ? "grid grid-cols-2 gap-1.5 [&>button]:w-full" : "flex items-center gap-1.5"}>
+        {some ? (
+          onClearSelection && (
+            <Button size="large" onClick={onClearSelection} title="Clear selection" className={btn}>
+              <SquareX className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Unselect</span>
+            </Button>
+          )
+        ) : (
+          /* Placeholder for the grid/gallery view that does not exist yet. It is
+             rendered disabled rather than omitted so the row keeps its shape as
+             a selection comes and goes. */
+          <Button size="large" disabled title="Gallery view is not available yet" className={btn}>
+            <Copy className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Gallery View</span>
+          </Button>
+        )}
+
+        {some
+          ? onDeleteSelected && (
+              <Button size="large" onClick={onDeleteSelected} title={many ? "Delete selected images" : "Delete this image"} className={btn}>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{many ? "Delete Selected" : "Delete Image"}</span>
+              </Button>
+            )
+          : onDeleteAll && (
+              <Button size="large" onClick={onDeleteAll} title="Delete all images" className={btn}>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Delete All</span>
+              </Button>
+            )}
+
+        {onExportSelected && (
+          <Button size="large" onClick={onExportSelected} title={many ? "Export or share images" : "Export or share image"} className={btn}>
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{many ? "Export or Share Images" : "Export or Share Image"}</span>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** The gallery count readout — "Selected: # of #" while selecting, otherwise
  *  "# of # — # max (i)". Rendered in the header (horizontal) or as a footer
  *  (vertical / master bar). */
@@ -419,7 +572,7 @@ export function GalleryBar({
   onDeleteAll,
   onDeleteSelected,
   onExportSelected,
-  onDuplicateSelected,
+  onAutoCompress,
   selectedIds,
   onToggleSelect,
   onSelectRange,
@@ -530,65 +683,16 @@ export function GalleryBar({
                 maxPhotos={maxPhotos}
               />
             )}
-            <div
-              className={
-                vertical
-                  ? // Even 2-up grid of full-width action buttons (no ragged wrap).
-                    "grid grid-cols-2 gap-1.5 [&>button]:w-full"
-                  : "flex items-center gap-1"
-              }
-            >
-              {selectionActive && onExportSelected && (
-                <Button size="large"
-                  onClick={onExportSelected}
-                  title="Export selected images"
-                  className="px-2.5 py-1.5 text-xs"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Export Selected</span>
-                </Button>
-              )}
-              {selectionActive && onDuplicateSelected && (
-                <Button size="large"
-                  onClick={onDuplicateSelected}
-                  title="Duplicate selected images"
-                  className="px-2.5 py-1.5 text-xs"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Duplicate</span>
-                </Button>
-              )}
-              {selectionActive && onDeleteSelected && (
-                <Button size="large"
-                  onClick={onDeleteSelected}
-                  title="Delete selected images"
-                  className="px-2.5 py-1.5 text-xs"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Delete Selected</span>
-                </Button>
-              )}
-              {onDeleteAll && (
-                <Button size="large"
-                  onClick={onDeleteAll}
-                  title="Delete all images"
-                  className="px-2.5 py-1.5 text-xs"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Delete All</span>
-                </Button>
-              )}
-              {selectionActive && onClearSelection && (
-                <Button size="large"
-                  onClick={onClearSelection}
-                  title="Clear selection"
-                  className="px-2.5 py-1.5 text-xs"
-                >
-                  <SquareX className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Unselect</span>
-                </Button>
-              )}
-            </div>
+            <GalleryActions
+              selectedCount={selectedIds.size}
+              totalCount={photos.length}
+              vertical={vertical}
+              onAutoCompress={onAutoCompress}
+              onClearSelection={onClearSelection}
+              onDeleteAll={onDeleteAll}
+              onDeleteSelected={onDeleteSelected}
+              onExportSelected={onExportSelected}
+            />
           </div>
 
           <div
