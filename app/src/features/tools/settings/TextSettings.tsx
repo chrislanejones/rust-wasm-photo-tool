@@ -12,23 +12,30 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { Spinner } from "@/components/ui/spinner";
 import { useAIJob } from "@/hooks/useAIJob";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { useToolStore } from "@/stores/useToolStore";
 import type { TextMode } from "@/stores/useToolStore";
 
-const FONT_FAMILIES = [
-  { label: "Sans Serif", value: "sans-serif" },
-  { label: "Serif", value: "serif" },
-  { label: "Monospace", value: "monospace" },
-  { label: "Arial", value: "Arial, sans-serif" },
-  { label: "Georgia", value: "Georgia, serif" },
-  { label: "Times New Roman", value: "Times New Roman, serif" },
-  { label: "Courier New", value: "Courier New, monospace" },
-  { label: "Verdana", value: "Verdana, sans-serif" },
-  { label: "Impact", value: "Impact, sans-serif" },
-  { label: "Comic Sans", value: "Comic Sans MS, cursive" },
-  { label: "Trebuchet", value: "Trebuchet MS, sans-serif" },
-  { label: "Palatino", value: "Palatino, serif" },
-] as const;
+/**
+ * ⚠️ ONE FACE, AND THE SELECTOR SAYS SO.
+ *
+ * Text is rasterised inside the engine (`src/text.rs`, ab_glyph) with the one
+ * family compiled in: Liberation Sans. `render_text` takes no font parameter,
+ * so no choice made here has ever reached the pixels. This used to be a
+ * twelve-entry list — Georgia, Impact, Comic Sans… — and picking one changed
+ * the textarea's glyphs and nothing else: on commit the text snapped back to
+ * Liberation Sans. A control that changes the preview and not the result is
+ * worse than one that does nothing visible, because it teaches people the
+ * feature works.
+ *
+ * So the select is disabled with the reason next to it, the same shape as
+ * Generate in the AI dialog. When fonts arrive (ADR-051: the user brings a
+ * .ttf/.otf and the engine takes a font id) this becomes the real list.
+ */
+const TEXT_FACE = {
+  label: "Liberation Sans",
+  value: "'Liberation Sans', Arial, sans-serif",
+} as const;
 
 const FONT_SIZE_PRESETS = [16, 32, 48, 72] as const;
 
@@ -179,23 +186,35 @@ export function TextSettings({
               variant="numbers"
             />
 
-            {/* Font Family */}
+            {/* Font Family — disabled, and it says why. See TEXT_FACE. */}
             <div className="space-y-4">
-              <label className="text-2xs text-theme-muted-foreground">
-                Font Family
-              </label>
+              <div className="flex items-center gap-1.5">
+                <label className="text-2xs text-theme-muted-foreground">
+                  Font Family
+                </label>
+                <InfoTooltip
+                  label="Font Family"
+                  info={
+                    <>
+                      Text is drawn by the engine, not the browser, and the engine
+                      has one face built in: <strong>Liberation Sans</strong>. The
+                      families that used to be listed here only changed the preview
+                      — on commit the text always came out in this one. Bringing
+                      your own .ttf / .otf is the plan (ADR-051).
+                    </>
+                  }
+                />
+              </div>
               <div className="relative">
                 <select
-                  value={settings.fontFamily ?? "sans-serif"}
-                  onChange={(e) => onChange({ ...settings, fontFamily: e.target.value })}
-                  className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-pointer"
-                  style={{ fontFamily: settings.fontFamily ?? "sans-serif" }}
+                  disabled
+                  defaultValue={TEXT_FACE.value}
+                  className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-not-allowed"
+                  style={{ fontFamily: TEXT_FACE.value }}
                 >
-                  {FONT_FAMILIES.map((f) => (
-                    <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
-                      {f.label}
-                    </option>
-                  ))}
+                  <option value={TEXT_FACE.value} style={{ fontFamily: TEXT_FACE.value }}>
+                    {TEXT_FACE.label}
+                  </option>
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
               </div>
