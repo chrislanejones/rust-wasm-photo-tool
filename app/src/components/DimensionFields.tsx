@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Lock, Unlock } from "lucide-react";
 import { SizeSlider } from "@/components/SizeSlider";
 import { FIELD_NUMERIC } from "@/lib/styles";
@@ -33,6 +34,9 @@ export function DimensionFields({
   onPercentChange,
   onToggleLock,
 }: Props) {
+  const widthId = useId();
+  const heightId = useId();
+
   return (
     <div className="space-y-2.5">
       {/* space-y-2.5, not 4: the slider box carries ~7px of thumb room below
@@ -49,11 +53,19 @@ export function DimensionFields({
         disabled={disabled}
       />
 
-      {/* Dimensions: width / height / lock-aspect on one row. */}
+      {/* Dimensions: width / height / lock-aspect on one row.
+          ⚠️ REAL <label htmlFor>, not a <span>. These were spans, so the visible
+          word "width" sat next to the field without being attached to it: it
+          read correctly on screen and announced as a bare "spin button", and
+          clicking the word did nothing. `useId` because this component renders
+          in more than one panel, so a hardcoded id would collide. */}
       <div className="flex items-end gap-2">
         <div className="flex flex-1 flex-col gap-0.5">
-          <span className="text-xs text-text-secondary">width</span>
+          <label htmlFor={widthId} className="text-xs text-text-secondary">
+            width
+          </label>
           <input
+            id={widthId}
             type="number"
             value={width}
             onChange={(e) => onWidthChange(e.target.value)}
@@ -63,8 +75,11 @@ export function DimensionFields({
           />
         </div>
         <div className="flex flex-1 flex-col gap-0.5">
-          <span className="text-xs text-text-secondary">height</span>
+          <label htmlFor={heightId} className="text-xs text-text-secondary">
+            height
+          </label>
           <input
+            id={heightId}
             type="number"
             value={height}
             onChange={(e) => onHeightChange(e.target.value)}

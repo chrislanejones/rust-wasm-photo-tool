@@ -127,6 +127,7 @@ export function SizeSlider(props: SizeSliderProps) {
         </div>
         <input
           type="range"
+          aria-label={label}
           min={0}
           max={100}
           step={1}
@@ -146,6 +147,7 @@ export function SizeSlider(props: SizeSliderProps) {
       {labelRow}
       <input
         type="range"
+        aria-label={label}
         min={min}
         max={max}
         step={step}
