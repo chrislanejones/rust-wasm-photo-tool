@@ -160,6 +160,27 @@ interface Props {
   onBlankModeChange?: (active: boolean) => void;
 }
 
+/**
+ * ⚠️ GENERATE IS NOT WIRED, AND SAYING SO BEFORE THE CLICK IS THE POINT.
+ *
+ * There is no text-to-image job type in the backend — `convex/aiJobs.ts`
+ * accepts rembg | upscale | inpaint | ocr | alt and nothing else. Wiring a
+ * network path to a job type that does not exist would fail at the far end
+ * with something unhelpful.
+ *
+ * So Generate is DISABLED and this reason renders next to it, rather than the
+ * button being enabled with a toast on click. A toast arrives after someone
+ * has already written a prompt; a disabled button with a visible reason costs
+ * them nothing. The button is the one control in this dialog that cannot do
+ * its job, and it should be the one control that looks like it.
+ *
+ * Everything above it is real: the prompt, the references, the downscale
+ * limits and the consent sentence all work and are testable. That is the
+ * increment. When the job type lands, delete this and wire `onClick`.
+ */
+const GENERATE_BLOCKED_REASON =
+  "Image generation isn't connected yet — the model still needs choosing.";
+
 export function NewActions({
   onFiles,
   onFilesAdded,
@@ -228,23 +249,6 @@ export function NewActions({
     if (aiRefInputRef.current) aiRefInputRef.current.value = "";
   }, []);
 
-  /**
-   * ⚠️ NOT WIRED, AND SAYING SO IS THE POINT.
-   *
-   * There is no text-to-image job type in the backend — `convex/aiJobs.ts`
-   * accepts rembg | upscale | inpaint | ocr | alt. Wiring a network path to a
-   * job type that does not exist would fail at the far end with something
-   * unhelpful; the honest interim is a message that names the missing piece.
-   *
-   * Everything up to this point is real: the prompt, the references, the
-   * downscale limits and the consent sentence all work and are testable. That
-   * is the increment.
-   */
-  const generateAiImage = useCallback(() => {
-    toast("Image generation is not connected yet", {
-      description: "The dialog is here; the model still needs choosing.",
-    });
-  }, []);
 
   const [blankW, setBlankW] = useState("1500");
   const [blankH, setBlankH] = useState("1000");
@@ -666,6 +670,14 @@ export function NewActions({
                   {consentSentence(aiRefs.length)}
                 </p>
 
+                {/* WHY GENERATE CANNOT FIRE, SAID BEFORE THE CLICK rather
+                    than in a toast after it. See GENERATE_BLOCKED_REASON. The
+                    button below is really `disabled`, so this line is the only
+                    thing explaining it — it is not decoration. */}
+                <p className="text-2xs leading-relaxed text-text-secondary">
+                  {GENERATE_BLOCKED_REASON}
+                </p>
+
                 <div className="grid grid-cols-2 gap-3">
                   <Button size="large" onClick={closeAiMode} className="w-full">
                     <ChevronLeft className="h-4 w-4" />
@@ -673,8 +685,8 @@ export function NewActions({
                   </Button>
                   <Button
                     size="large"
-                    onClick={generateAiImage}
-                    disabled={!aiPrompt.trim()}
+                    disabled
+                    title={GENERATE_BLOCKED_REASON}
                     className="w-full"
                   >
                     <Sparkles className="h-4 w-4" />
