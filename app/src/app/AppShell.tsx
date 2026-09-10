@@ -2991,13 +2991,15 @@ export function AppShell() {
       <Dialog open={deleteSelectedOpen} onOpenChange={setDeleteSelectedOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete selected images?</DialogTitle>
+            <DialogTitle>
+              {selectedIds.size === 1 ? "Delete this image?" : "Delete selected images?"}
+            </DialogTitle>
           </DialogHeader>
           <DialogBody>
             <DialogDescription>
-              This removes the {selectedIds.size} selected image
-              {selectedIds.size !== 1 ? "s" : ""} and their edit history. This
-              cannot be undone.
+              {selectedIds.size === 1
+                ? "This removes the selected image and its edit history. This cannot be undone."
+                : `This removes the ${selectedIds.size} selected images and their edit history. This cannot be undone.`}
             </DialogDescription>
           </DialogBody>
           <DialogFooter>
@@ -3012,7 +3014,7 @@ export function AppShell() {
               className={`flex-1 ${CONFIRM_DESTRUCTIVE}`}
             >
               <Trash2 className="h-4 w-4" />
-              Delete selected
+              {selectedIds.size === 1 ? "Delete image" : "Delete selected"}
             </Button>
           </DialogFooter>
         </DialogContent>
