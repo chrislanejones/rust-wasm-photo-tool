@@ -2,14 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { useThumbDevelop } from "./useThumbDevelop";
-import { Check, Zap, Images, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Info } from "lucide-react";
+import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { TinyNumberBox } from "@/components/ui/tiny-number-box";
+import { GalleryCount } from "./GalleryCount";
 import { formatBytes } from "@/lib/format";
-import { TIERS } from "@/lib/tiers";
 import { PANEL_OPEN_GUTTER } from "@/lib/layout";
 
 export interface PhotoEntry {
@@ -354,6 +353,7 @@ function GalleryActions({
   onDeleteAll,
   onDeleteSelected,
   onExportSelected,
+  only,
 }: {
   selectedCount: number;
   totalCount: number;
@@ -363,6 +363,10 @@ function GalleryActions({
   onDeleteAll?: () => void;
   onDeleteSelected?: () => void;
   onExportSelected?: () => void;
+  /** Render ONE half. The horizontal header places the compress block and the
+   *  action block in separate grid columns, so it asks for them one at a time;
+   *  compact renders both and stacks them. */
+  only?: "compress" | "actions";
 }) {
   const some = selectedCount > 0;
   const many = selectedCount > 1;
@@ -448,7 +452,21 @@ function GalleryActions({
               </>
             }
           />
-          <div className={vertical ? "grid grid-cols-2 gap-1.5 [&>button]:w-full" : "flex items-center gap-1.5"}>
+          {/* GRID, not a flex row: `auto-cols-fr` gives Compress Image and
+              Compress All the SAME width whatever their labels measure, and
+              `justify-center` centres the pair as a block. A flex row sized
+              each button to its own text, so the two sat off-centre and
+              visibly mismatched.
+              COMPACT STACKS. One column, full-width buttons — the vertical
+              bar has no room to put two beside each other without clipping
+              the labels. */}
+          <div
+            className={
+              vertical
+                ? "grid grid-cols-1 gap-1.5 [&>button]:w-full"
+                : "grid grid-flow-col auto-cols-fr justify-center gap-1.5 [&>button]:w-full"
+            }
+          >
             {some ? (
               <Button size="large" onClick={() => onAutoCompress("selected")} title="Compress the selected photos" className={btn}>
                 <Zap className="h-3.5 w-3.5" />
@@ -460,9 +478,14 @@ function GalleryActions({
                   <Zap className="h-3.5 w-3.5" />
                   <span className={label}>Compress Image</span>
                 </Button>
+                {/* Bolt, not the gallery icon. All three of these run the SAME
+                    operation and differ only in scope, so the icon is the verb
+                    ("compress") and the label is the scope — the gallery icon
+                    made Compress All read as a different kind of action than
+                    the button beside it. */}
                 {totalCount > 1 && (
                   <Button size="large" onClick={() => onAutoCompress("all")} title="Compress every photo in the gallery" className={btn}>
-                    <Images className="h-3.5 w-3.5" />
+                    <Zap className="h-3.5 w-3.5" />
                     <span className={label}>Compress All</span>
                   </Button>
                 )}
@@ -474,6 +497,10 @@ function GalleryActions({
     </>
   );
 
+  // One half only — the horizontal grid asks for each column separately.
+  if (only === "compress") return compress;
+  if (only === "actions") return actions;
+
   return (
     <div
       className={
@@ -482,93 +509,13 @@ function GalleryActions({
           : "flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5"
       }
     >
-      {/* DESKTOP reads left to right: compress scope, then the status bar's own
-          vertical rule, then the actions — "All Images │ Delete All". COMPACT
-          stacks the actions on top and the compress block underneath, with a
-          border instead of a rule. Same two blocks, two orders. */}
+      {/* COMPACT stacks the actions on top and the compress block underneath,
+          with a border instead of a rule. The horizontal arrangement is the
+          header's three-column grid (see GalleryBar), not this. */}
       {vertical ? actions : compress}
       {!vertical && <span aria-hidden className="status-divider shrink-0" />}
       {vertical ? compress : actions}
     </div>
-  );
-}
-
-/** The gallery count readout — "Selected: # of #" while selecting, otherwise
- *  "# of # — # max (i)". Rendered in the header (horizontal) or as a footer
- *  (vertical / master bar). */
-function GalleryCount({
-  selectionActive,
-  selectedCount,
-  total,
-  maxPhotos,
-}: {
-  selectionActive: boolean;
-  selectedCount: number;
-  total: number;
-  maxPhotos?: number;
-}) {
-  return (
-    <h2 className="flex items-center gap-2 text-xs font-semibold">
-      <span className="flex items-center gap-1 text-xs font-normal text-text-muted">
-        {selectionActive ? (
-          <>
-            <span>Selected:</span>
-            <TinyNumberBox>{selectedCount}</TinyNumberBox>
-            <span>of</span>
-            <TinyNumberBox>{total}</TinyNumberBox>
-          </>
-        ) : (
-          <>
-            <TinyNumberBox>{total}</TinyNumberBox>
-            <span>of</span>
-            <TinyNumberBox>{total}</TinyNumberBox>
-            {maxPhotos != null && (
-              <>
-                <span>—</span>
-                <TinyNumberBox>{maxPhotos}</TinyNumberBox>
-                <span>max</span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Why this limit?"
-                      className="text-text-muted hover:text-text-primary transition-colors"
-                    >
-                      <Info className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="font-semibold mb-1.5">
-                      Gallery photos per session
-                    </p>
-                    <ul className="space-y-1 text-xs">
-                      <li className="flex items-center justify-between gap-6">
-                        <span>Logged out</span>
-                        <span className="font-mono tabular-nums">
-                          {TIERS.demo.galleryLimit}
-                        </span>
-                      </li>
-                      <li className="flex items-center justify-between gap-6">
-                        <span>Logged in</span>
-                        <span className="font-mono tabular-nums">
-                          {TIERS.loggedIn.galleryLimit}
-                        </span>
-                      </li>
-                      <li className="flex items-center justify-between gap-6">
-                        <span>Paid · {TIERS.paid.tag}</span>
-                        <span className="font-mono tabular-nums">
-                          {TIERS.paid.galleryLimit}
-                        </span>
-                      </li>
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-              </>
-            )}
-          </>
-        )}
-      </span>
-    </h2>
   );
 }
 
@@ -688,29 +635,61 @@ export function GalleryBar({
                 ? // Divider + padding so the photos never crowd the count/actions
                   // (the header grows when a selection appears).
                   "mb-3 flex flex-col gap-2 border-b border-border pb-3"
-                : "flex items-center justify-between mb-3"
+                : // THREE COLUMNS: count · compress · actions. `1fr auto 1fr`
+                  // rather than `grid-cols-3` so the middle is centred on the
+                  // BAR, not on whatever width the other two happened to leave
+                  // — with equal thirds the compress block drifted whenever the
+                  // count grew ("Selected: 3 of 12") or an action appeared.
+                  // The sides take only what they need and push nothing.
+                  "grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 mb-3"
             }
           >
-            {/* Horizontal: count sits left of the actions. Vertical: it moves
-                to a footer at the bottom of the bar (rendered below). */}
+            {/* Horizontal: count far left. Vertical: it moves to a footer at
+                the bottom of the bar (rendered below). */}
             {!vertical && (
-              <GalleryCount
-                selectionActive={selectionActive}
-                selectedCount={selectedIds.size}
-                total={photos.length}
-                maxPhotos={maxPhotos}
-              />
+              <div className="justify-self-start">
+                <GalleryCount
+                  selectionActive={selectionActive}
+                  selectedCount={selectedIds.size}
+                  total={photos.length}
+                  maxPhotos={maxPhotos}
+                />
+              </div>
             )}
-            <GalleryActions
-              selectedCount={selectedIds.size}
-              totalCount={photos.length}
-              vertical={vertical}
-              onAutoCompress={onAutoCompress}
-              onClearSelection={onClearSelection}
-              onDeleteAll={onDeleteAll}
-              onDeleteSelected={onDeleteSelected}
-              onExportSelected={onExportSelected}
-            />
+            {vertical ? (
+              <GalleryActions
+                selectedCount={selectedIds.size}
+                totalCount={photos.length}
+                vertical
+                onAutoCompress={onAutoCompress}
+                onClearSelection={onClearSelection}
+                onDeleteAll={onDeleteAll}
+                onDeleteSelected={onDeleteSelected}
+                onExportSelected={onExportSelected}
+              />
+            ) : (
+              <>
+                <div className="justify-self-center">
+                  <GalleryActions
+                    only="compress"
+                    selectedCount={selectedIds.size}
+                    totalCount={photos.length}
+                    onAutoCompress={onAutoCompress}
+                  />
+                </div>
+                <div className="justify-self-end">
+                  <GalleryActions
+                    only="actions"
+                    selectedCount={selectedIds.size}
+                    totalCount={photos.length}
+                    onClearSelection={onClearSelection}
+                    onDeleteAll={onDeleteAll}
+                    onDeleteSelected={onDeleteSelected}
+                    onExportSelected={onExportSelected}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <div

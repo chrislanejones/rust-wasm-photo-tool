@@ -1143,6 +1143,80 @@ impl ImageHorseTool {
         true
     }
 
+    /// Duplicate a text annotation, offset by `(dx, dy)`. Returns the new
+    /// id, or -1 when no annotation carries `id` (sentinel, not Option —
+    /// wasm-bindgen's Option support is uneven, the same reason
+    /// `text_annotation_at` uses one).
+    ///
+    /// CLONES THE STRUCT rather than re-adding from its fields, and that is
+    /// the whole point of doing this in the engine. `TextAnnotation` carries
+    /// 34 fields — perspective quad, three background colours, six shadow
+    /// parameters, the built tile and its offsets. Rebuilding one through
+    /// `add_text_annotation` means restating every one of them across the
+    /// JS boundary, and the day a 35th field is added, every such call site
+    /// silently drops it and the copy quietly loses a property. A `clone()`
+    /// cannot: it is complete by construction, now and after the next field
+    /// lands.
+    ///
+    /// The tile travels with the clone, so no text is re-rasterized — the
+    /// glyphs are identical, only the position differs.
+    pub fn duplicate_text_annotation(&mut self, id: u32, dx: i32, dy: i32) -> i32 {
+        let Some(src) = self.layers[self.active]
+            .text_annotations
+            .iter()
+            .find(|a| a.id == id)
+        else {
+            return -1;
+        };
+        let mut copy = src.clone();
+        self.snap("Duplicate Text");
+        let new_id = self.next_text_id;
+        self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
+        copy.id = new_id;
+        copy.x += dx;
+        copy.y += dy;
+        self.layers[self.active].text_annotations.push(copy);
+        self.recomposite();
+        new_id as i32
+    }
+
+    /// Duplicate a shape annotation, offset by `(dx, dy)`. Returns the new
+    /// id, or -1 when `id` matches nothing. Same clone-not-rebuild reasoning
+    /// as `duplicate_text_annotation` above.
+    ///
+    /// `points` is offset alongside the endpoint pair because a polyline /
+    /// hand-drawn shape stores its path there and `move_shape_annotation`
+    /// already treats the two as one geometry — a copy that moved only the
+    /// endpoints would tear the path away from its own bounding box.
+    ///
+    /// Appends, so the copy lands on TOP of the draw order (shapes render
+    /// bottom-to-top), which is where a just-made duplicate belongs.
+    pub fn duplicate_shape_annotation(&mut self, id: u32, dx: f64, dy: f64) -> i32 {
+        let Some(src) = self.layers[self.active]
+            .shape_annotations
+            .iter()
+            .find(|s| s.id == id)
+        else {
+            return -1;
+        };
+        let mut copy = src.clone();
+        self.snap("Duplicate Shape");
+        let new_id = self.next_shape_id;
+        self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
+        copy.id = new_id;
+        copy.x0 += dx;
+        copy.y0 += dy;
+        copy.x1 += dx;
+        copy.y1 += dy;
+        for p in copy.points.iter_mut() {
+            p.0 += dx;
+            p.1 += dy;
+        }
+        self.layers[self.active].shape_annotations.push(copy);
+        self.recomposite();
+        new_id as i32
+    }
+
     /// Remove a shape annotation. Pushes a "Delete Shape" snapshot so undo
     /// restores it. Returns true if found.
     pub fn remove_shape_annotation(&mut self, id: u32) -> bool {

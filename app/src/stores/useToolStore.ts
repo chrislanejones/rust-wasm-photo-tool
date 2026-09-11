@@ -146,6 +146,11 @@ export interface ToolState {
   /** Mask paint value (0 = hide/black, 255 = reveal/white). */
   maskPaintValue: number;
   colorPickerActive: boolean;
+  /** Shape id whose directional duplicate pad is open (Review → Reselect
+   *  d-pad), or null. NOT PERSISTED — `partialize` is an allowlist and this
+   *  stays out of it: a pad open across a reload would point at whatever
+   *  shape happened to get that id. */
+  duplicatePadId: number | null;
   /** Recently eyedroppered colours, newest first, de-duplicated, capped.
    *
    *  NOT PERSISTED — same reasoning as `activeSubTool`: `partialize` below is
@@ -203,6 +208,7 @@ export interface ToolState {
   setMaskEditing: (v: SetArg<boolean>) => void;
   setMaskPaintValue: (v: SetArg<number>) => void;
   setColorPickerActive: (v: SetArg<boolean>) => void;
+  setDuplicatePadId: (v: SetArg<number | null>) => void;
   setStampSubMode: (v: SetArg<StampSubMode>) => void;
   setShapesMode: (v: SetArg<ShapesMode>) => void;
   setEraserMode: (v: SetArg<EraserMode>) => void;
@@ -237,6 +243,7 @@ export const useToolStore = create<ToolState>()(
       maskEditing: false,
       maskPaintValue: 0,
       colorPickerActive: false,
+      duplicatePadId: null,
       pickedColorHistory: [],
       stampSubMode: "clone",
       shapesMode: "shapes",
@@ -290,6 +297,8 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ maskPaintValue: resolveSet(v, s.maskPaintValue) })),
       setColorPickerActive: (v) =>
         set((s) => ({ colorPickerActive: resolveSet(v, s.colorPickerActive) })),
+      setDuplicatePadId: (v) =>
+        set((s) => ({ duplicatePadId: resolveSet(v, s.duplicatePadId) })),
       setStampSubMode: (v) =>
         set((s) => ({ stampSubMode: resolveSet(v, s.stampSubMode) })),
       setShapesMode: (v) => set((s) => ({ shapesMode: resolveSet(v, s.shapesMode) })),

@@ -1,5 +1,7 @@
 import { forwardRef, type KeyboardEvent, type ReactNode } from "react";
+import { Copy, GamepadDirectional } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ChevronGlyph, DeleteGlyph, RowAction } from "@/components/ui/row-actions";
 
 /**
  * A full-width, clickable "reselect" bar — a labelled row with an optional
@@ -12,9 +14,17 @@ import { cn } from "@/lib/utils";
  * type History entries); omit it for a plain jump-to-state row with no ✕
  * (History's "current"/"redo" entries).
  *
- * Visual: reuses the existing `.full-width-badge .type-*` / `.history-dot` /
- * `.large-badge` / `.history-delete` classes (styles.css), plus an
- * `.is-selected` highlight for lists that keep a persistent selection.
+ * Visual: reuses the existing `.full-width-badge .type-*` / `.large-badge` /
+ * `.history-delete` classes (styles.css), plus an `.is-selected` highlight
+ * for lists that keep a persistent selection.
+ *
+ * The coloured dot is gone (2026-09-11): the leading slot is the INDEX, and a
+ * dot beside a number said the same thing twice. `type-*` still colours the
+ * row itself, so the state it carried is not lost.
+ *
+ * Trailing buttons live in one `.row-actions` cluster, hidden until the row is
+ * hovered OR focus enters it. The focus half is not optional — hover-only
+ * reveal hides a focusable control from every keyboard user.
  *
  * a11y: the bar is a `role="button"` (Enter/Space → select; Delete/Backspace →
  * delete when a delete handler is present); the ✕ is a real `<button>` with an
@@ -23,8 +33,19 @@ import { cn } from "@/lib/utils";
 export interface ReselectBarProps {
   /** Row label (text/shape name, "H · 120px", a history step's label…). */
   label: ReactNode;
-  /** Leading index number, e.g. a History entry's step index. Omit to skip it. */
+  /** Leading slot: a History step index, a Reselect ordinal, or — in `lg` —
+   *  a layer's name. Omit to skip it. */
   index?: ReactNode;
+  /** `lg` is the Layers list: a taller row whose leading slot carries a name
+   *  rather than a number, and which may render `children` beneath itself. */
+  size?: "sm" | "lg";
+  /** Extra trailing buttons, rendered inside `.row-actions` BEFORE the
+   *  built-in duplicate/delete. Lets a caller (Layers) bring its own without
+   *  a second row component drifting away from this one. */
+  actions?: ReactNode;
+  /** Rendered below the row inside the same badge — the Layers opacity
+   *  slider. It stays inside so it inherits the row's selected/hover state. */
+  children?: ReactNode;
   /** Row colour/dot variant — `.full-width-badge.type-*`. Default "redo". */
   type?: "undo" | "redo" | "current";
   /** Persistent-selection highlight (lists without selection just omit it). */
@@ -32,6 +53,26 @@ export interface ReselectBarProps {
   onSelect: () => void;
   /** Omit entirely for the no-✕ variant. */
   onDelete?: () => void;
+  /** Duplicate affordance, rendered immediately BEFORE the ✕. Omit for rows
+   *  that cannot be duplicated (History entries, guides) — only placed
+   *  objects have a meaningful copy. */
+  onDuplicate?: () => void;
+  /** aria-label for the duplicate button. Default "Duplicate". */
+  duplicateLabel?: string;
+  /** Directional (d-pad) affordance, leftmost of the trailing three. Pass
+   *  `true` to render it DISABLED — a placeholder for nudging the object from
+   *  the row, which has no handler yet. Passing a function is not supported on
+   *  purpose: a live control should arrive with its behaviour, not be switched
+   *  on by a caller guessing what it does. */
+  showDirectional?: boolean;
+  /** LIVE directional control — opens/closes the duplicate pad for this row.
+   *  When present it wins over `showDirectional`. Only rect/circle rows get
+   *  one; the rest keep the disabled placeholder. */
+  onDirectional?: () => void;
+  /** Whether this row's pad is the open one (aria-pressed + accent). */
+  directionalActive?: boolean;
+  /** aria-label for the directional button. Default "Duplicate pad". */
+  directionalLabel?: string;
   disabled?: boolean;
   /** Title/tooltip for the row. */
   title?: string;
@@ -51,30 +92,27 @@ export interface ReselectBarProps {
   className?: string;
 }
 
-const ChevronGlyph = ({ up }: { up: boolean }) => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d={up ? "M2.5 7.5L6 4l3.5 3.5" : "M2.5 4.5L6 8l3.5-3.5"} />
-  </svg>
-);
-
-const DeleteGlyph = () => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M2 2l8 8M10 2l-8 8" />
-  </svg>
-);
-
 export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
   (
     {
       label,
       index,
+      size = "sm",
+      actions,
+      children,
       type = "redo",
       selected = false,
       onSelect,
       onDelete,
+      onDuplicate,
       disabled = false,
       title,
       deleteLabel = "Delete",
+      duplicateLabel = "Duplicate",
+      showDirectional = false,
+      onDirectional,
+      directionalActive = false,
+      directionalLabel = "Duplicate pad",
       onMoveUp,
       onMoveDown,
       canMoveUp = true,
@@ -93,6 +131,11 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       } else if ((e.key === "Delete" || e.key === "Backspace") && onDelete) {
         e.preventDefault();
         onDelete();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && onDuplicate) {
+        // Keyboard parity with the ✕, which already answers Delete/Backspace.
+        // An icon-only button that only works with a mouse is half a control.
+        e.preventDefault();
+        onDuplicate();
       }
     };
 
@@ -108,60 +151,73 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
         onKeyDown={onKeyDown}
         className={cn(
           `full-width-badge type-${type}`,
+          size === "lg" && "full-width-badge-lg",
           selected && "is-selected",
           disabled && "is-disabled",
           className,
         )}
       >
-        <span className="history-dot" />
-        {index !== undefined && (
-          <span className="history-index">{index}</span>
-        )}
+        {index !== undefined && <span className="history-index">{index}</span>}
         <span className="large-badge">{label}</span>
-        {onMoveUp && (
-          <button
-            type="button"
-            className="history-zmove"
-            aria-label={moveUpLabel}
-            title={`${moveUpLabel} (Shift: to front)`}
-            disabled={disabled || !canMoveUp}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!disabled && canMoveUp) onMoveUp(e.shiftKey);
-            }}
-          >
-            <ChevronGlyph up />
-          </button>
-        )}
-        {onMoveDown && (
-          <button
-            type="button"
-            className="history-zmove"
-            aria-label={moveDownLabel}
-            title={`${moveDownLabel} (Shift: to back)`}
-            disabled={disabled || !canMoveDown}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!disabled && canMoveDown) onMoveDown(e.shiftKey);
-            }}
-          >
-            <ChevronGlyph up={false} />
-          </button>
-        )}
-        {onDelete && (
-          <button
-            type="button"
-            className="history-delete"
-            aria-label={deleteLabel}
-            disabled={disabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!disabled) onDelete();
-            }}
-          >
-            <DeleteGlyph />
-          </button>
-        )}
+        <div className="row-actions">
+          {actions}
+          {onMoveUp && (
+            <RowAction
+              label={`${moveUpLabel} (Shift: to front)`}
+              disabled={disabled || !canMoveUp}
+              onClick={(e) => onMoveUp(e.shiftKey)}
+            >
+              <ChevronGlyph up />
+            </RowAction>
+          )}
+          {onMoveDown && (
+            <RowAction
+              label={`${moveDownLabel} (Shift: to back)`}
+              disabled={disabled || !canMoveDown}
+              onClick={(e) => onMoveDown(e.shiftKey)}
+            >
+              <ChevronGlyph up={false} />
+            </RowAction>
+          )}
+          {/* The trailing three, in this order and always visible: directional
+              placeholder, duplicate, delete. Delete stays rightmost, where it
+              has always been. */}
+          {onDirectional ? (
+            <RowAction
+              icon={GamepadDirectional}
+              label={directionalActive ? `Close ${directionalLabel.toLowerCase()}` : directionalLabel}
+              pressed={directionalActive}
+              disabled={disabled}
+              onClick={onDirectional}
+            />
+          ) : (
+            showDirectional && (
+              /* Permanently disabled — see `showDirectional`. Its label says so,
+                 rather than reading as a control that is merely unavailable. */
+              <RowAction
+                icon={GamepadDirectional}
+                label={`${directionalLabel} — rectangles and circles only`}
+              />
+            )
+          )}
+          {onDuplicate && (
+            <RowAction
+              icon={Copy}
+              label={duplicateLabel}
+              disabled={disabled}
+              onClick={onDuplicate}
+            />
+          )}
+          {onDelete && (
+            <RowAction
+              icon={DeleteGlyph}
+              label={deleteLabel}
+              disabled={disabled}
+              onClick={onDelete}
+            />
+          )}
+        </div>
+        {children}
       </div>
     );
   },

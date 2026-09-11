@@ -320,10 +320,16 @@ export function ToolsSidebar({
 
       <motion.div
         layout
-        // pb-8, not p-4 all round: the last run of buttons in a settings panel
-        // (Auto Compress & Resize, Compress Image, Compress All Images) ended
-        // 16px off the sidebar's bottom edge with nothing under it.
-        className="flex-1 overflow-y-auto p-panel space-y-5 scrollbar-thin"
+        // `pb-1.5`, not the full panel inset: a panel's last run of buttons
+        // (Apply Compression & Resize, Show A/B Compare) sits the same 6px off
+        // the bottom edge that the master bar's own buttons sit off theirs, so
+        // the two chrome edges agree instead of each picking a number
+        // (Chris, 2026-09-11 — "follow the reference of top bar, button to
+        // edge"). This reverses the older ask for MORE air down here; the
+        // comment that described it named a `pb-8` that was no longer in the
+        // class, and the 32px token it pointed at was never applied to
+        // anything.
+        className="flex-1 overflow-y-auto px-panel pt-panel pb-1.5 space-y-5 scrollbar-thin"
       >
         {activeTool === "compress" && (
           <ResizeSettings

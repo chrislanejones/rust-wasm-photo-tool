@@ -24,3 +24,29 @@ pub const DEFAULT_MAX_HISTORY_BYTES: usize = 512 * 1024 * 1024; // 512 MB
 pub fn clamp_max_history(n: usize) -> usize {
     n.clamp(MIN_MAX_HISTORY, MAX_MAX_HISTORY)
 }
+
+// ── Account tiers ───────────────────────────────────────────────────────────
+// Moved out of lib.rs: this module already owns "policy — defaults, bounds and
+// clamping", and a per-tier gallery cap is exactly that. lib.rs is under a line
+// ratchet that may only go down, so policy constants belong out here.
+
+use wasm_bindgen::prelude::*;
+
+/// Maximum number of gallery photos allowed for a given account tier.
+///
+/// Single source of truth for the gallery cap, shared by the upload gate
+/// (`handleAddPhotos`) and the gallery UI on the JS side.
+///
+/// - `"demo"`     — anonymous / not signed in → **12**
+/// - `"loggedIn"` — free account             → **24**
+/// - `"paid"`     — Pro (coming soon)         → **100**
+///
+/// Unknown tiers fall back to the most restrictive demo limit.
+#[wasm_bindgen]
+pub fn photo_limit(tier: &str) -> u32 {
+    match tier {
+        "loggedIn" => 24,
+        "paid" => 100,
+        _ => 12,
+    }
+}

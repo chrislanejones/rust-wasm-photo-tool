@@ -8,6 +8,7 @@
 // importers change during the split. What genuinely belongs to the clone
 // stamp (mouse handlers, source arming/disarming) stays here at the bottom.
 import { useCallback, useRef } from "react";
+import { useToolStore } from "@/stores/useToolStore";
 import type { RefObject, MouseEvent } from "react";
 import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
@@ -25,6 +26,15 @@ export type {
 
 export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
   const engine = useEngineCore(canvasRef);
+  // Read from the store rather than threaded down as an argument: this hook
+  // takes only a canvas ref, and every other consumer of the stabilizer
+  // (paint, eraser, blur) reads the SAME `paintStabilizer` field. One dial.
+  const stabilizer = useToolStore((st) => st.toolSettings.paintStabilizer);
+  const stabilizerRef = useRef(stabilizer);
+  stabilizerRef.current = stabilizer;
+  /** Last RAW cursor of the stroke — `end_stroke` needs it so the leash can
+   *  catch up to where the pointer actually was, not to its trailing tip. */
+  const lastRawRef = useRef<{ x: number; y: number } | null>(null);
   const {
     state,
     toolRef,
@@ -137,7 +147,8 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
       // buffer the early moves, not to reorder these two lines.
       if (!(await t.has_source()) || sourceDisarmedRef.current) return;
       isDrawingRef.current = true;
-      t.begin_stroke(x, y);
+      lastRawRef.current = { x, y };
+      t.begin_stroke(x, y, stabilizerRef.current);
       flushToCanvas();
     },
     [toolRef, sourcePosRef, sourceDisarmedRef, isDrawingRef, getCanvasCoords, flushToCanvas, syncState],
@@ -181,10 +192,11 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
         const t = toolRef.current;
         if (!t) return false;
         // Awaited: the resolved reply IS the backpressure — the next move is
-        // not sent until the engine has serviced this one. Returns nothing,
-        // so the coalescer schedules a (rAF-gated) flush for every landed
-        // segment, same cadence the old per-move scheduleStampFlush had.
-        await t.continue_stroke(x, y);
+        // not sent until the engine has serviced this one. The BOOL is the
+        // stabilizer's: false means the cursor never cleared the leash, so
+        // nothing was stamped and the coalescer skips the flush entirely.
+        lastRawRef.current = { x, y };
+        return await t.continue_stroke(x, y);
       });
     },
     [toolRef, isDrawingRef, getCanvasCoords, strokeSched],
@@ -200,7 +212,12 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     // inside the committed stroke — then flush directly so the committed
     // stroke is published even if the scheduled frame never came.
     strokeSched.strokeEnd();
-    toolRef.current?.end_stroke();
+    // The RAW cursor, not the stabilized tip: end_stroke flushes the leash
+    // against it, and handing it the tip would make that a no-op and drop the
+    // last leash-length of the stroke.
+    const raw = lastRawRef.current;
+    toolRef.current?.end_stroke(raw?.x ?? 0, raw?.y ?? 0);
+    lastRawRef.current = null;
     flushToCanvas();
     syncState();
   }, [toolRef, isDrawingRef, strokeSched, flushToCanvas, syncState]);
@@ -217,9 +234,14 @@ export function useCloneStamp(canvasRef: RefObject<HTMLCanvasElement | null>) {
     if (isDrawingRef.current) {
       isDrawingRef.current = false;
       // Same order as onMouseUp: drop the unsent move before end_stroke, so
-      // no stale coordinate leaks past the teardown into the next stroke.
+      // no stale coordinate leaks past the teardown into the next stroke. The
+      // stabilizer flushes to the last raw cursor here too — an abort mid-drag
+      // still commits the stroke, so it must not end a leash short — and the
+      // tip is cleared either way, so no tip survives a tool switch.
       strokeSched.strokeEnd();
-      toolRef.current?.end_stroke();
+      const raw = lastRawRef.current;
+      toolRef.current?.end_stroke(raw?.x ?? 0, raw?.y ?? 0);
+      lastRawRef.current = null;
     }
     if (!sourceDisarmedRef.current || sourcePosRef.current) {
       sourceDisarmedRef.current = true;

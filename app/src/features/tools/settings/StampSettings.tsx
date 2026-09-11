@@ -4,6 +4,8 @@ import data from "@emoji-mart/data";
 import { Copy, Stamp as StampIcon, Smile } from "lucide-react";
 import type { StampSettings } from "@/lib/types";
 import { SizeSlider } from "@/components/SizeSlider";
+import { StabilizerRow } from "./StabilizerRow";
+import { useToolStore } from "@/stores/useToolStore";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { useResolvedTheme } from "@/lib/useTheme";
@@ -73,6 +75,11 @@ export function StampSettingsPanel({
   const mode = activeMode ?? internalMode;
   const emojiTheme = useResolvedTheme();
   const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
+  // The stroke stabilizer is a ToolSettings field shared by paint, eraser,
+  // blur and the clone stamp; this panel is handed StampSettings, so it reads
+  // and writes the one shared field directly rather than growing a copy.
+  const stabilizer = useToolStore((st) => st.toolSettings.paintStabilizer);
+  const setToolSettings = useToolStore((st) => st.setToolSettings);
 
   const handleModeChange = (id: string) => {
     const m = id as StampMode;
@@ -144,6 +151,18 @@ export function StampSettingsPanel({
                   presets={OPACITY_PRESETS}
                   variant="numbers"
                   unit="%"
+                />
+
+                {/* Reads the STORE, not `settings`: the stabilizer lives on
+                    ToolSettings (shared with paint, eraser and blur) while
+                    this panel is handed StampSettings. One dial everywhere is
+                    the whole point, so it must not be copied onto a second
+                    settings object to make a prop line up. */}
+                <StabilizerRow
+                  value={stabilizer}
+                  onChange={(paintStabilizer) =>
+                    setToolSettings((p) => ({ ...p, paintStabilizer }))
+                  }
                 />
               </>
             );
