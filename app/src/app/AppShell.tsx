@@ -1903,6 +1903,22 @@ export function AppShell() {
         file = await rasterizeSvgToPng(file);
         source = file;
       }
+
+      // AN EMPTY WORKSPACE NEVER ASKS — the same rule a multi-image paste
+      // already follows above ("a stack never asks"). Two of this dialog's
+      // three choices stack or merge onto a layer, and with no image open
+      // there is no layer to stack onto: both tiles render disabled and the
+      // only live choice is the gallery. Asking a question with one possible
+      // answer is not a choice, it is a click in the way (Chris, 2026-09-10).
+      //
+      // Gated on the ACTIVE PHOTO, not on gallery length: the layer tiles are
+      // disabled by `hasActivePhoto` at the render site, so this matches
+      // exactly what the dialog would have offered.
+      if (activePhotoId === null) {
+        await handleAddPhotos([file]);
+        return;
+      }
+
       const { pixels, w, h } = await decodeImageSource(source);
       const previewUrl = URL.createObjectURL(source);
       setImportImage((prev) => {
@@ -1913,7 +1929,7 @@ export function AppShell() {
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast.error(`Couldn't read image: ${msg}`);
     }
-  }, []);
+  }, [activePhotoId, handleAddPhotos]);
 
   const handlePasteFromClipboard = useCallback(
     async (items?: DataTransferItemList | null) => {
