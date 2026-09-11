@@ -25,6 +25,7 @@ import { getWorkingCopy, putWorkingCopy } from "@/lib/workingCopyCache";
 import { logDiagnostic } from "@/lib/diagnosticsLog";
 import { clearGalleryManifest } from "@/lib/galleryManifest";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
+import { isHeicFile, convertHeicToWebp, HeicDecodeError } from "@/lib/heic";
 import { flushPendingOplogSave, setActiveOplogPhoto } from "@/lib/oplogPersistence";
 import { setEngineDocument } from "@/lib/engineDocument";
 import { whenStrokeIdle } from "@/lib/strokeGate";
@@ -367,8 +368,14 @@ export function useImageSession({
         try {
           // SVGs never enter the pipeline as vectors — rasterize to a PNG File
           // at the boundary (lib/rasterizeSvg), so the stored gallery original
-          // is pixels too. Everything below sees the PNG.
-          const f = isSvgFile(raw) ? await rasterizeSvgToPng(raw) : raw;
+          // is pixels too. HEICs get the same treatment for the same reason,
+          // re-encoded to WebP with their EXIF carried over (lib/heic).
+          // Everything below sees the converted file.
+          const f = isSvgFile(raw)
+            ? await rasterizeSvgToPng(raw)
+            : isHeicFile(raw)
+              ? await convertHeicToWebp(raw)
+              : raw;
           const t0 = performance.now();
           const working = await makeWorkingCopy(f);
           logDiagnostic(
@@ -454,7 +461,7 @@ export function useImageSession({
           const insecureOrigin =
             !window.isSecureContext && typeof crypto?.subtle === "undefined";
           toast.error(
-            err instanceof ImageTooLargeError
+            err instanceof ImageTooLargeError || err instanceof HeicDecodeError
               ? `${raw.name}: ${err.message}`
               : insecureOrigin
                 ? `Can't save images on an insecure page. ${location.protocol}//${location.host} isn't a secure context, so the browser withholds the crypto API used to store originals. Use https, or localhost.`

@@ -1,36 +1,25 @@
 // Downscale uploads to a working resolution and produce a small gallery thumbnail.
 
 import { thumbnailViaWorker } from "@/lib/codecWorkerClient";
+import { exceedsPixelBudget, tooLargeMessage } from "@/lib/imageLimits";
 
 const WORKING_MAX_EDGE = 2048;
 const THUMB_MAX_EDGE = 256;
 
-/**
- * Hard ceiling on source resolution. A decompression bomb or a genuinely huge
- * image can OOM the tab during the full-res `createImageBitmap` decode below,
- * before any downscale applies. We can't size-limit the decode without parsing
- * headers, so we reject just after the probe -- turning a silent crash into a
- * catchable error the caller can surface as a toast.
- *
- * 100 MP (~12000x8333) clears every consumer camera (<=50 MP today) with
- * headroom while still blocking pathological inputs.
- */
-const MAX_SOURCE_MEGAPIXELS = 100;
+// The source-resolution ceiling itself lives in lib/imageLimits.ts — the HEIC
+// decoder enforces the same one from inside the codec worker, which cannot
+// import this module (it would nest a worker inside a worker).
 
 export class ImageTooLargeError extends Error {
   constructor(width: number, height: number) {
-    super(
-      `Image is too large to open (${width}x${height}, ` +
-        `${Math.round((width * height) / 1_000_000)} MP). ` +
-        `The limit is ${MAX_SOURCE_MEGAPIXELS} MP.`,
-    );
+    super(tooLargeMessage(width, height));
     this.name = "ImageTooLargeError";
   }
 }
 
 /** Throw if `bitmap` exceeds the source-pixel ceiling. Closes it on rejection. */
-function assertWithinPixelBudget(bitmap: ImageBitmap): void {
-  if (bitmap.width * bitmap.height > MAX_SOURCE_MEGAPIXELS * 1_000_000) {
+export function assertWithinPixelBudget(bitmap: ImageBitmap): void {
+  if (exceedsPixelBudget(bitmap.width, bitmap.height)) {
     const { width, height } = bitmap;
     bitmap.close();
     throw new ImageTooLargeError(width, height);

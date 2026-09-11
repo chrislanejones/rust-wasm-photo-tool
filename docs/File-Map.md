@@ -253,6 +253,25 @@ app/src/
     ├── originalsStore.ts             Content-addressed IndexedDB store for original photo bytes;
     │                                 keyed by SHA-256 hex via crypto.subtle; putOriginal /
     │                                 getOriginal / getOriginalAsBlobUrl / deleteOriginal
+    ├── heic.ts                       HEIC/HEIF import boundary — isHeicFile() (mime OR extension:
+    │                                 Chrome/Firefox send an empty type for .heic), looksLikeHeicBytes()
+    │                                 (ftyp brand sniff, with an AVIF veto), convertHeicToWebp():
+    │                                 native decode where the browser has one (Safari), otherwise the
+    │                                 codec worker, then the source EXIF transplanted into the WebP.
+    │                                 Nothing downstream ever sees a .heic
+    ├── heicCodec.ts                  The libheif decode itself, DOM-free so it runs inside the codec
+    │                                 worker — where it MUST run: libheif inits with a synchronous
+    │                                 WebAssembly.Module, which browsers forbid on the main thread
+    │                                 above 4 KB. Dynamic import, so the ~2 MB chunk is fetched only
+    │                                 when a HEIC actually arrives
+    ├── heicExif.ts                   Reads the EXIF item out of a HEIF container (meta → iinf → iloc
+    │                                 walk, ISO/IEC 14496-12) so camera/GPS metadata survives the
+    │                                 re-encode. Best effort: every unexpected shape returns null
+    ├── imageLimits.ts                The 100 MP source-resolution ceiling and its wording, shared by
+    │                                 workingCopy.ts and the HEIC decoder (which cannot import
+    │                                 workingCopy — that would nest a worker inside a worker)
+    ├── libheif-js.d.ts               Hand-written types for the one libheif-js entry point used; the
+    │                                 package's own .d.ts describes the raw Emscripten surface
     ├── workingCopy.ts                makeWorkingCopy() — decodes + downscales to ≤2048px long edge
     │                                 via createImageBitmap; makeThumbnailFromPixels() builds the
     │                                 256px WebP thumb from those already-decoded pixels (Rust

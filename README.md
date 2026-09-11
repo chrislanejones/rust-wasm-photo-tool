@@ -54,6 +54,7 @@ Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investig
 - **Sonner** — Toast notifications
 - **emoji-mart** — Emoji picker (stamp tool)
 - **JSZip** — Client-side ZIP (batch export)
+- **libheif-js** — HEIC/HEIF decoding (LGPL-3.0, WASM), dynamically imported inside the codec worker so a session that never opens an iPhone photo never fetches it
 - **IndexedDB** — Local-first storage (originals, edits, gallery); **Dexie** content layer + Zustand persist adapter
 - **Convex** — Real-time database + auth + serverless functions
 - **Clerk** — Authentication, wired to Convex through `ConvexProviderWithClerk` (`convex/react-clerk`)

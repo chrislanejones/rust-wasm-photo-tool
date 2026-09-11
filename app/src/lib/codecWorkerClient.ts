@@ -146,3 +146,24 @@ export async function thumbnailViaWorker(
     return null;
   }
 }
+
+/**
+ * Decode a HEIC/HEIF file and re-encode it as WebP, on the worker. Returns
+ * null ONLY when the worker could not be started at all — there is no
+ * main-thread fallback for this one, because libheif cannot run on the main
+ * thread (codec.worker.ts says why), so the caller surfaces an error instead.
+ * On success the input buffer is DETACHED.
+ *
+ * Unlike the two above, a post-probe failure here does NOT disable the worker:
+ * the overwhelmingly likely cause is one unreadable HEIC, and killing the
+ * worker over it would push every later thumbnail and encode back onto the UI
+ * thread for the rest of the session. The error propagates to the caller,
+ * which is the only one that can tell the user which file failed.
+ */
+export async function heicToWebpViaWorker(
+  bytes: Uint8Array,
+  quality: number,
+): Promise<{ blob: Blob; width: number; height: number } | null> {
+  if (!(await ensureReady()) || !api) return null;
+  return api.heicToWebp(Comlink.transfer(bytes, [bytes.buffer]), quality);
+}

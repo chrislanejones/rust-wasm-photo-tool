@@ -14,6 +14,7 @@ import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { PlacementGrid, type PlacementCell } from "@/components/PlacementGrid";
 import { TEXT_COLORS } from "@/lib/colors";
+import { isHeicFile, convertHeicToWebp } from "@/lib/heic";
 import { getOriginal, putOriginal } from "@/lib/dexie/originalsAdapter";
 import { deleteReplacedOriginal } from "@/lib/originalRefs";
 import { useGalleryStore } from "@/stores/useGalleryStore";
@@ -105,9 +106,12 @@ function computeOffset(
 /**
  * Decode an image file to an ImageBitmap. `createImageBitmap(file)` is
  * unreliable for SVGs (some browsers fail outright), so when the file looks
- * like an SVG we rasterize via an `<img>` element + OffscreenCanvas instead.
+ * like an SVG we rasterize via an `<img>` element + OffscreenCanvas instead —
+ * and it cannot read a HEIC at all outside Safari, so those go through the
+ * same WebP conversion the gallery import uses (lib/heic).
  */
 async function decodeImageFile(file: File): Promise<ImageBitmap> {
+  if (isHeicFile(file)) return createImageBitmap(await convertHeicToWebp(file));
   const isSvg = file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
   if (!isSvg) return createImageBitmap(file);
 
@@ -247,8 +251,10 @@ export function BatchSettings({
   const handleFile = useCallback(
     async (file: File) => {
       setErrorMsg(null);
-      if (!file.type.startsWith("image/")) {
-        setErrorMsg("Pick an image file (PNG, JPG, WebP, SVG).");
+      // isHeicFile before the mime check: Chrome and Firefox hand over an
+      // empty type for a .heic, so the mime test alone rejects iPhone photos.
+      if (!file.type.startsWith("image/") && !isHeicFile(file)) {
+        setErrorMsg("Pick an image file (PNG, JPG, WebP, HEIC, SVG).");
         return;
       }
       try {
@@ -626,7 +632,7 @@ export function BatchSettings({
             <p className="text-2xs text-theme-muted-foreground leading-relaxed">
               Drop a logo or click to pick.
               <br />
-              PNG, JPG, WebP, SVG.
+              PNG, JPG, WebP, HEIC, SVG.
             </p>
           </div>
         ) : (
@@ -656,7 +662,7 @@ export function BatchSettings({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,image/svg+xml,.svg"
+          accept="image/*,image/svg+xml,.svg,.heic,.heif,.hif"
           className="hidden"
           onChange={onFileInputChange}
         />

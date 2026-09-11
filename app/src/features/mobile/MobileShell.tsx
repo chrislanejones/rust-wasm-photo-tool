@@ -25,6 +25,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { formatBytes } from "@/lib/format";
 import { getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
 import { isSvgFile } from "@/lib/rasterizeSvg";
+import { isHeicFile } from "@/lib/heic";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 
 const horseLogo = "/Image-Horse-Logo.svg";
@@ -292,13 +293,13 @@ export function MobileShell({
   }, [viewerId, photos]);
 
   // Same image filter as NewActions.processFiles: the mime check plus
-  // isSvgFile for .svg files whose source hands over an empty mime
-  // (handleAddPhotos rasterizes those at the boundary).
+  // isSvgFile / isHeicFile for .svg and .heic files whose source hands over an
+  // empty mime (handleAddPhotos converts both at the boundary).
   const handlePicked = useCallback(
     (list: FileList | null) => {
       if (!list) return;
       const images = Array.from(list).filter(
-        (f) => f.type.startsWith("image/") || isSvgFile(f),
+        (f) => f.type.startsWith("image/") || isSvgFile(f) || isHeicFile(f),
       );
       if (images.length) onAddFiles(images);
     },
@@ -346,7 +347,7 @@ export function MobileShell({
               Add Images
             </Button>
             <p className="text-xs text-text-secondary">
-              Supports PNG, JPG, GIF, WebP, AVIF, SVG
+              Supports PNG, JPG, GIF, WebP, AVIF, HEIC, SVG
             </p>
           </div>
         </div>
@@ -381,7 +382,7 @@ export function MobileShell({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,.svg"
+        accept="image/*,.svg,.heic,.heif,.hif"
         multiple
         className="hidden"
         onChange={(e) => {

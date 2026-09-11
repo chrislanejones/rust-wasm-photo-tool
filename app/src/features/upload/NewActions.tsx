@@ -39,6 +39,7 @@ import {
   rejectReason,
 } from "./aiImageDraft";
 import { isSvgFile } from "@/lib/rasterizeSvg";
+import { isHeicFile } from "@/lib/heic";
 
 interface SizePreset {
   id: string;
@@ -266,10 +267,11 @@ export function NewActions({
 
   const processFiles = useCallback(
     (files: File[]) => {
-      // isSvgFile catches .svg files whose source hands over an empty mime;
-      // the session's handleAddPhotos rasterizes them to PNG at the boundary.
+      // isSvgFile / isHeicFile catch .svg and .heic files whose source hands
+      // over an empty mime (the norm for HEIC outside Safari); the session's
+      // handleAddPhotos converts both to pixels at the boundary.
       const images = files.filter(
-        (f) => f.type.startsWith("image/") || isSvgFile(f),
+        (f) => f.type.startsWith("image/") || isSvgFile(f) || isHeicFile(f),
       );
       if (images.length) {
         onFiles(images);
@@ -779,7 +781,7 @@ export function NewActions({
                     <Upload className="h-7 w-7 text-text-muted" />
                   </div>
                   <p className="text-xs text-text-secondary">
-                    Supports PNG, JPG, GIF, WebP, AVIF, SVG
+                    Supports PNG, JPG, GIF, WebP, AVIF, HEIC, SVG
                   </p>
                 </div>
               </motion.div>
@@ -791,7 +793,7 @@ export function NewActions({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,.svg"
+        accept="image/*,.svg,.heic,.heif,.hif"
         multiple
         className="hidden"
         onChange={(e) => {

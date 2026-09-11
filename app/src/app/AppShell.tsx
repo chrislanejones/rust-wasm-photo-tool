@@ -80,6 +80,7 @@ import {
 } from "@/lib/galleryManifest";
 import { getPhotoLimit } from "@/lib/photoLimits";
 import { isSvgFile, rasterizeSvgToPng } from "@/lib/rasterizeSvg";
+import { isHeicFile, convertHeicToWebp } from "@/lib/heic";
 import { hasReplicateAI, TIERS, userModeForTier } from "@/lib/tiers";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
@@ -1821,8 +1822,13 @@ export function AppShell() {
     try {
       // SVGs are rasterized to PNG at the boundary (createImageBitmap can't
       // decode them, and raw SVG never enters the pipeline — lib/rasterizeSvg).
+      // HEICs are re-encoded to WebP at the same boundary, and for the same
+      // reason: no browser but Safari can decode one (lib/heic).
       if (isSvgFile(file)) {
         file = await rasterizeSvgToPng(file);
+        source = file;
+      } else if (isHeicFile(file)) {
+        file = await convertHeicToWebp(file);
         source = file;
       }
 
@@ -1989,9 +1995,11 @@ export function AppShell() {
       e.preventDefault(); // stop the browser from navigating to the image
       depth = 0;
       setIsDraggingImage(false);
-      // isSvgFile catches .svg drops whose source hands over an empty mime.
+      // isSvgFile / isHeicFile catch .svg and .heic drops whose source hands
+      // over an empty mime — and for HEIC that is the COMMON case, since
+      // Chrome and Firefox have no mime for a format they can't display.
       const files = Array.from(e.dataTransfer?.files ?? []).filter(
-        (f) => f.type.startsWith("image/") || isSvgFile(f),
+        (f) => f.type.startsWith("image/") || isSvgFile(f) || isHeicFile(f),
       );
       if (files.length === 0) {
         toast.error("That doesn't look like an image");
