@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
-import { DevelopPaper } from "./DevelopPaper";
-import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Info } from "lucide-react";
+import { useThumbDevelop } from "./useThumbDevelop";
+import { Check, Zap, Images, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Info } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -101,13 +101,13 @@ interface ThumbProps {
 function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, isModified, selected, selectionActive, onToggleSelect, vertical }: ThumbProps) {
   const [thumbUrl, setThumbUrl] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
-  // Feeds the develop paper: it may not clear until the pixels are decoded.
-  const [imgReady, setImgReady] = useState(false);
+  // Black and white until the pixels are decoded AND it is this tile's turn —
+  // but only for a photo that just arrived; a restored one starts in colour.
+  const develop = useThumbDevelop(entry.id, entry.thumbBlob);
 
   useEffect(() => {
     const url = URL.createObjectURL(entry.thumbBlob);
     setThumbUrl(url);
-    setImgReady(false);
     return () => URL.revokeObjectURL(url);
   }, [entry.thumbBlob]);
 
@@ -173,21 +173,21 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
           when it was written. */}
       <div className="absolute inset-0 checkerboard rounded-lg" />
       {/* The image pops inside the clipped card — hoverPop from lib/animations.ts,
-          the same definition the tool tiles use. */}
+          the same definition the tool tiles use — and comes into colour from
+          black and white as it lands: thumbDevelop, same file. */}
       <motion.img
         ref={imgRef}
         variants={hoverPop}
+        initial={develop.initial}
+        animate={develop.animate}
         src={thumbUrl || undefined}
         alt={entry.name}
         draggable={false}
         decoding="async"
         loading="lazy"
-        onLoad={() => setImgReady(true)}
-        onError={() => setImgReady(true)}
+        onLoad={develop.onImgReady}
+        onError={develop.onImgReady}
       />
-
-      {/* The white paper — a Polaroid coming up. See DevelopPaper.tsx. */}
-      <DevelopPaper thumbBlob={entry.thumbBlob} name={entry.name} imgReady={imgReady} />
 
       <AnimatePresence>
         {isCompressing && (
@@ -335,12 +335,12 @@ function Thumb({ entry, index, isActive, onSelect, onRemove, progress, savings, 
  * "Delete Selected" when nothing is selected is how people delete the wrong
  * thing. The scope is in the button text, always:
  *
- *   nothing selected   Auto Compress & Resize (i) [Image on Canvas] [All Images]
+ *   nothing selected   (i) [Compress Image] [Compress All]
  *                      │ [Delete All] [Export or Share Image]
- *   one selected       Auto Compress & Resize (i) [Selected Image]
- *                      | [Unselect] [Delete Image] [Export or Share Image]
- *   many selected      Auto Compress & Resize (i) [Selected Images]
- *                      | [Unselect] [Delete Selected] [Export or Share Images]
+ *   one selected       (i) [Compress Selected]
+ *                      │ [Unselect] [Delete Image] [Export or Share Image]
+ *   many selected      (i) [Compress Selected]
+ *                      │ [Unselect] [Delete Selected] [Export or Share Images]
  *
  * Nothing here is new behaviour — every handler already existed. `onAutoCompress`
  * is the same one the Resize panel calls, so the two surfaces cannot drift.
@@ -420,7 +420,11 @@ function GalleryActions({
 
   const compress = (
     <>
-      {/* ── Auto Compress & Resize — moved here from Enhance › Resize & Compress ── */}
+      {/* ── Compress — moved here from Enhance › Resize & Compress ──
+          Plain Buttons, matching Delete All and Export beside them. There is no
+          heading: the lightbulb carries what "compress" means here, which is
+          the no-permanent-paragraphs rule the tool panels already follow, and
+          the button text says the scope so a title would only repeat it. */}
       {onAutoCompress && (
         <div
           className={
@@ -429,38 +433,37 @@ function GalleryActions({
               : "flex flex-wrap items-center gap-1.5"
           }
         >
-          <span className="flex items-center gap-1.5 text-xs font-semibold font-mono text-text-muted">
-            <Zap className="h-3.5 w-3.5" />
-            Auto Compress &amp; Resize
-            <InfoTooltip
-              label="Auto Compress & Resize"
-              info={
-                <>
-                  One click, aiming at a web-ready file (~200&nbsp;KB): it re-encodes
-                  the photo, and if either side is over <strong>2500&nbsp;px</strong> it
-                  scales the image down as well.
-                  <br />
-                  <br />
-                  It stops at 1280&nbsp;px on the long edge, so it will never shrink a
-                  photo to mush chasing the target. The green badge on the thumbnail
-                  shows what you saved.
-                </>
-              }
-            />
-          </span>
+          <InfoTooltip
+            label="Compress"
+            info={
+              <>
+                One click, aiming at a web-ready file (~200&nbsp;KB): it re-encodes
+                the photo, and if either side is over <strong>2500&nbsp;px</strong> it
+                scales the image down as well.
+                <br />
+                <br />
+                It stops at 1280&nbsp;px on the long edge, so it will never shrink a
+                photo to mush chasing the target. The green badge on the thumbnail
+                shows what you saved.
+              </>
+            }
+          />
           <div className={vertical ? "grid grid-cols-2 gap-1.5 [&>button]:w-full" : "flex items-center gap-1.5"}>
             {some ? (
-              <Button size="large" onClick={() => onAutoCompress("selected")} className={btn}>
-                {many ? "Selected Images" : "Selected Image"}
+              <Button size="large" onClick={() => onAutoCompress("selected")} title="Compress the selected photos" className={btn}>
+                <Zap className="h-3.5 w-3.5" />
+                <span className={label}>Compress Selected</span>
               </Button>
             ) : (
               <>
-                <Button size="large" onClick={() => onAutoCompress("selected")} className={btn}>
-                  Image on Canvas
+                <Button size="large" onClick={() => onAutoCompress("selected")} title="Compress the photo on the canvas" className={btn}>
+                  <Zap className="h-3.5 w-3.5" />
+                  <span className={label}>Compress Image</span>
                 </Button>
                 {totalCount > 1 && (
-                  <Button size="large" onClick={() => onAutoCompress("all")} className={btn}>
-                    All Images
+                  <Button size="large" onClick={() => onAutoCompress("all")} title="Compress every photo in the gallery" className={btn}>
+                    <Images className="h-3.5 w-3.5" />
+                    <span className={label}>Compress All</span>
                   </Button>
                 )}
               </>

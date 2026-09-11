@@ -1,4 +1,4 @@
-import type { Variants, Transition, Easing } from "framer-motion";
+import type { Variants, Transition, Easing, TargetAndTransition } from "framer-motion";
 
 // Standardized quick motion transition (200ms spring animation)
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -182,41 +182,47 @@ export const thumbEnter = (i: number) => ({
 });
 
 /**
- * THUMBNAIL "DEVELOP" — a Polaroid coming up: white paper to picture, the
- * top edge sweeping down. Asked for on 2026-09-10 because paste → New
- * Gallery Image felt slow: the tile sat as a grey skeleton until the
- * thumbnail decoded, and a skeleton says "waiting", not "arriving".
+ * THUMBNAIL "DEVELOP" — the picture arrives black and white, HOLDS there long
+ * enough to be read as a black-and-white photo, then comes into colour.
  *
- * Three numbers, and deliberately only three:
+ * ⚠️ THE HOLD IS THE WHOLE POINT, and its absence is why the first cut looked
+ * broken. That version faded straight from grayscale(1) to grayscale(0) over
+ * 240 ms, so the image was fully grey for about 33 ms — measured, frame by
+ * frame — and spent the rest mid-wash. On a 99 px tile that is not a black and
+ * white photo turning colour; it is a flicker nobody sees. Holding first is
+ * what makes it legible.
  *
- *  - MIN_MS: every tile takes at least this long to come up, EVEN WHEN the
- *    image is ready instantly. A 30 ms flash reads as a glitch; a quarter of
- *    a second reads as a photo developing. Tune here, nowhere else.
- *  - STAGGER_MS: tiles that mount together come up left to right, each
- *    starting this long after the previous — succession, not a wall.
- *  - the keyframes: fast to most of the way, then a slow crawl. If the image
- *    is still not decoded when the fast part ends, the crawl is what the eye
- *    sees — the develop visibly SLOWS rather than freezing — and the last of
- *    the paper goes the moment the pixels arrive.
+ *  - LEAD: the gallery draws, THEN the pictures start. Without it the first
+ *    tile develops in the same frame the panel appears and the two read as one
+ *    muddled event.
+ *  - HOLD: fully black and white, and long enough to register.
+ *  - FADE: the colouring itself.
+ *  - HANDOFF: tile N starts when tile N-1 is this far through — left to right,
+ *    succession rather than a wall.
+ *
+ * A fade is not motion, so this runs under Reduce Motion too — see the
+ * BrandRevealScreen note above.
  */
-export const THUMB_DEVELOP_MIN_MS = 240;
-/** The hand-off point: tile N starts when tile N-1 is this far through its
- *  minimum develop. 0.8 = "image 0 at 80% done, start image 1". */
+const THUMB_DEVELOP_LEAD_MS = 120;
+const THUMB_DEVELOP_HOLD_MS = 150;
+const THUMB_DEVELOP_FADE_MS = 190;
 const THUMB_DEVELOP_HANDOFF = 0.8;
-export const THUMB_DEVELOP_STAGGER_MS = Math.round(THUMB_DEVELOP_MIN_MS * THUMB_DEVELOP_HANDOFF);
-export const thumbDevelop: Variants = {
-  /** White paper fully covering the picture. */
-  covered: { clipPath: "inset(0% 0 0 0)" },
-  /** 80% open at exactly MIN_MS (times[1] * duration == 0.24 s), then a slow
-   *  crawl toward 92% for as long as the image keeps us waiting. */
-  developing: {
-    clipPath: ["inset(0% 0 0 0)", "inset(80% 0 0 0)", "inset(92% 0 0 0)"],
-    transition: { duration: 3.0, times: [0, 0.08, 1], ease: ["easeOut", "linear"] },
-  },
-  /** The rest of the paper, gone in one short move once both the pixels and MIN_MS are in. */
-  revealed: {
-    clipPath: "inset(100% 0 0 0)",
-    transition: { duration: 0.09, ease: "easeIn" },
+/** Total per tile — the minimum a photo takes to arrive, however fast it decoded. */
+const THUMB_DEVELOP_TOTAL_MS = THUMB_DEVELOP_HOLD_MS + THUMB_DEVELOP_FADE_MS;
+export const THUMB_DEVELOP_LEAD = THUMB_DEVELOP_LEAD_MS;
+export const THUMB_DEVELOP_STAGGER_MS = Math.round(THUMB_DEVELOP_TOTAL_MS * THUMB_DEVELOP_HANDOFF);
+export const thumbDevelop: { mono: TargetAndTransition; colour: TargetAndTransition } = {
+  /** Where every tile starts, and where it stays until its turn. */
+  mono: { filter: "grayscale(1)" },
+  /** Hold, then colour. Two keyframes at the same value give the hold; `times`
+   *  puts the second at HOLD/TOTAL so the fade owns only the remainder. */
+  colour: {
+    filter: ["grayscale(1)", "grayscale(1)", "grayscale(0)"],
+    transition: {
+      duration: THUMB_DEVELOP_TOTAL_MS / 1000,
+      times: [0, THUMB_DEVELOP_HOLD_MS / THUMB_DEVELOP_TOTAL_MS, 1],
+      ease: "easeOut",
+    },
   },
 };
 
