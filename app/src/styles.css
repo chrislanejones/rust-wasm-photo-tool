@@ -322,13 +322,17 @@
      16px is the value the majority already used, so this standardises DOWN to
      what was mostly true rather than inventing a fourth number.
 
-     ⚠️ THE 32px AT THE BOTTOM OF THE TOOLS BODY IS NOT A MISTAKE and is left
-     alone: Chris asked for that air specifically, because the Compress buttons
-     sat too close to the panel's bottom edge. `--spacing-panel-floor` names it
-     so the next person tidying edges does not "fix" it back.
+     ⚠️ THE FOOTER AIR IS GONE, and the token with it (2026-09-11). A note here
+     used to say 32px at the bottom of the Tools body was deliberate, at Chris's
+     request, because the Compress buttons sat too close to the edge. Two things
+     were true by the time anyone looked: the class it described (`pb-8`) was no
+     longer on the element, and `--spacing-panel-floor` was referenced by
+     nothing — a documented decision with no code under it. Chris has since
+     asked for the opposite ("follow the reference of top bar, button to edge"),
+     so the Tools body now ends in `pb-1.5` = 6px, matching the master bar's own
+     `p-1.5`. The two chrome edges agree rather than each picking a number.
      ─────────────────────────────────────────────────────────────────────── */
-  --spacing-panel: 1rem;        /* 16px — every panel edge */
-  --spacing-panel-floor: 2rem;  /* 32px — the deliberate footer air */
+  --spacing-panel: 1rem;        /* 16px — every panel edge except that floor */
 
   --text-2xs: 0.625rem;   /* 10px */
   --text-xs: 0.75rem;     /* 12px */
