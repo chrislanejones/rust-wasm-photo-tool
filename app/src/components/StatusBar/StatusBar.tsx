@@ -70,6 +70,10 @@ interface Props {
   state: CloneStampState;
   /** Active photo's file size in bytes; shown as a human-readable size. */
   fileSize?: number;
+  /** The PHOTO's size (#81) — NOT the document's. Omitted falls back to the
+   *  document, which is what this showed before, so nothing flickers on load. */
+  photoWidth?: number;
+  photoHeight?: number;
   /** Digit-key shortcut for the currently-active tool (1st dynamic slot). */
   activeToolHint?: ShortcutHint;
   /** The active tool's own distinctive action shortcut, when it has one (2nd
@@ -81,6 +85,8 @@ interface Props {
 export function StatusBar({
   state,
   fileSize,
+  photoWidth,
+  photoHeight,
   activeToolHint,
   activeToolHint2,
 }: Props) {
@@ -88,6 +94,13 @@ export function StatusBar({
   // Read from the gallery store rather than two more props out of AppShell —
   // see the hook for why `entry.origWidth` is NOT the upload size.
   const uploadDims = useUploadDimensions();
+  // #81 — the PHOTO's size, passed in rather than asked for here: AppShell
+  // already holds the engine and the same numbers feed the Resize panel, so
+  // one hook answers both and they cannot disagree. `state.width/height` is
+  // the DOCUMENT, which on a default artboard import is photo + 2 ×
+  // canvasPadding — a number 20px bigger than the file that was opened.
+  const photoW = photoWidth ?? state.width;
+  const photoH = photoHeight ?? state.height;
 
   // TWO things vary here, and they are independent:
   //   • the TOOL — `activeToolHint` / `activeToolHint2` change the moment the
@@ -172,10 +185,16 @@ export function StatusBar({
         {/* The zoom percentage used to end this row. Removed 2026-09-10 at
             Chris's request — the canvas size beside it is the number that
             matters, and Alt+Scroll's hint on the left already says zoom. */}
-        {/* Labelled to match "Original:" beside it. The bare number read as a
-            second, untitled dimension with no way to tell what it measured. */}
-        <span className="status-zoom" title="Dimensions of the canvas as it is now">
-          Current: {state.width && state.height ? `${state.width}×${state.height}` : "—"}
+        {/* "Photo:", not "Current:" (#81). The label was honest only while the
+            number was the document AND the document was photo + padding. It now
+            reports the PHOTO's own bounds, so it says which thing it measured —
+            which is the question that started this: a freshly imported 800×600
+            file read 820×620 and nothing said why.
+
+            Falls back to the document until the engine has answered, which is
+            what this showed before #81, so nothing flickers on load. */}
+        <span className="status-zoom" title="Size of the photo itself, not the canvas it sits on">
+          Photo: {photoW && photoH ? `${photoW}×${photoH}` : "—"}
         </span>
       </div>
     </footer>

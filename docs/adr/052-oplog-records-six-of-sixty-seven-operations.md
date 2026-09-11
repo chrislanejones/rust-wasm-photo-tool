@@ -1,5 +1,5 @@
 # ADR-052: The op log records six of the engine's operation families, and the rest break it
-Date: 2026-09-09   Status: draft
+Date: 2026-09-09   Status: draft (decision extended 2026-09-11 — part 2 built, part 3 proposed)
 
 ## Context
 
@@ -73,9 +73,34 @@ the UI to call. They are ops for features the engine does not have.
 
 ## Decision
 
-Record nothing new yet. Write down that the log's real coverage is six families
-out of sixty-seven sites, that the gap degrades undo depth rather than
+Two parts, and the second is now built.
+
+**1. Record nothing new yet** — write down that the log's real coverage is six
+families out of sixty-seven sites, that the gap degrades undo depth rather than
 corrupting data, and that closing it is a per-operation cost.
+
+**2. Make the degradation visible, which needs no format change** — DONE
+(2026-09-11). `session/useOplogHealth.ts` warns once per document, on the
+healthy → broken transition, that undo has fallen back to snapshots. This was
+already named below as "the cheapest real improvement"; it is correct whichever
+way part 3 lands, so it did not wait for it.
+
+**3. PROPOSED, not yet decided: record the six tonal adjustments.** This ADR
+originally stopped at "not yet" without saying what the next step should be,
+which left item 37 and everything behind it with no direction. The proposal is
+to record them, for a reason that is about the backlog rather than about the
+log: leaving them unrecorded blocks **AA (macro / batch recording)** outright,
+and it is almost certainly why **#8 (Time Machine DAG)** sits under "not doing"
+with no ADR and no recorded reason — a branching history needs cheap branches,
+and snapshot undo gives about five steps on a 24 MP photo. You cannot build a
+DAG on a log that goes permanently stale the first time somebody moves a
+slider.
+
+So the choice is not "six ops now or six ops later". It is "six ops, or those
+two items stay refused forever and the survey only made the refusal legible".
+The cost is unchanged from what "Alternatives rejected" #1 says — six params,
+six parity tests, a format bump and a `dexie-migration` question — and that is
+a session of its own, not a rider on this one.
 
 Adding an op is not one line. Each new variant needs a `Params` type, an
 `apply` that calls the engine's own kernel rather than a re-derivation (the
@@ -96,7 +121,9 @@ sooner than it used to.
 + The two unreachable variants are settled: never wired, and not the fix for
   the adjustments even if they were.
 - **The gap is still open, and this ADR does not close it.** A user who edits a
-  12 MP photo and moves one slider drops to ~10 undo steps and is not told.
+  12 MP photo and moves one slider drops to ~10 undo steps — but as of
+  2026-09-11 they ARE told, which was the half of this that needed no format
+  change. The depth is still lost; the silence is not.
 - `oplog_broken` staying sticky for the session is now a documented choice
   rather than an unexamined one, which makes it harder to revisit casually.
 - Writing the survey without the fix risks the survey being mistaken for the
