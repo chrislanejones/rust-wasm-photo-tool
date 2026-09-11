@@ -759,7 +759,12 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // AppShell into useDuplicatePad (−2) and the directional pad added a
     // third awaited `duplicate_shape_annotation` (+3). Same -1 sentinel, same
     // reason to await.
-    expect(gate.awaited, "cumulative converted sites").toBe(136);
+    // #81 — 136 -> 137: `photo_bounds` in `usePhotoBounds`. Born awaited and
+    // value-consuming: behind the worker it returns a Promise, and a Promise
+    // has no `.length` and no indices, so an un-awaited read would silently
+    // produce `undefined` bounds and fall back to the document — the exact
+    // number this change exists to stop reporting.
+    expect(gate.awaited, "cumulative converted sites").toBe(137);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

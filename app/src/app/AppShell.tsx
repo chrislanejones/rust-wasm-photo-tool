@@ -86,6 +86,7 @@ import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
 import { useDuplicatePad } from "./session/useDuplicatePad";
+import { usePhotoBounds } from "@/hooks/usePhotoBounds";
 import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
@@ -1833,6 +1834,17 @@ export function AppShell() {
   // live in the session hook, not here — AppShell is being dismantled
   // (CLAUDE.md), and the first cut of this handler sat in this file.
   const duplicatePad = useDuplicatePad(stamp, drawingTools, textTool, bumpAnnotations);
+
+  // #81 — the PHOTO's size, not the document's. Both the status bar and the
+  // Resize panel read THIS, so the number you are shown and the number an
+  // exact width is measured against cannot disagree. Re-asked on every pixel
+  // change (undoCount) and every layer-metadata change (layerRevision), since
+  // a resize, an undo and a flatten all move these bounds.
+  const photoLayerRevision = useGalleryStore((s) => s.layerRevision);
+  const photoBounds = usePhotoBounds(
+    stamp.toolRef,
+    stamp.state.undoCount + photoLayerRevision,
+  );
   // Mounted through CanvasArea's generic render-prop so CanvasArea stays
   // ignorant of the pad (and inside its max-lines cap).
   const renderDuplicatePad = useCallback(
@@ -3260,8 +3272,11 @@ export function AppShell() {
             onResizeCanvas={(w, h) => void handleResizeCanvas(w, h)}
             onRemoveCanvas={() => void handleRemoveCanvas()}
             canRemoveCanvas={backgroundLayerId !== undefined}
-            imageWidth={stamp.state.width}
-            imageHeight={stamp.state.height}
+            // The PHOTO, falling back to the document until the engine has
+            // answered — which is what this showed before #81 anyway, so
+            // nothing flickers.
+            imageWidth={photoBounds?.width ?? stamp.state.width}
+            imageHeight={photoBounds?.height ?? stamp.state.height}
             currentByteSize={activeEntry?.byteSize ?? 0}
             currentMime={activeEntry?.mimeType}
             originalByteSize={activeEntry?.originalByteSize ?? 0}
@@ -3791,6 +3806,8 @@ export function AppShell() {
 
       {photos.length > 0 && (
         <StatusBar
+          photoWidth={photoBounds?.width}
+          photoHeight={photoBounds?.height}
           state={stamp.state}
           fileSize={photos.find((p) => p.id === activePhotoId)?.byteSize}
           activeToolHint={

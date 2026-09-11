@@ -3162,30 +3162,10 @@ impl ImageHorseTool {
         let photo_idx = self.layers.iter().position(|l| !l.is_canvas()).unwrap_or(0);
 
         // Tight non-transparent bounding box of the photo layer = its native
-        // size and position within the current document.
-        let (bx, by, pw, ph) = {
-            let data = &self.layers[photo_idx].buf.data;
-            let (mut minx, mut miny, mut maxx, mut maxy) = (u32::MAX, u32::MAX, 0u32, 0u32);
-            let mut found = false;
-            for y in 0..oh {
-                let row = (y * ow) as usize * 4;
-                for x in 0..ow {
-                    if data[row + x as usize * 4 + 3] != 0 {
-                        found = true;
-                        minx = minx.min(x);
-                        miny = miny.min(y);
-                        maxx = maxx.max(x);
-                        maxy = maxy.max(y);
-                    }
-                }
-            }
-            if found {
-                (minx, miny, maxx - minx + 1, maxy - miny + 1)
-            } else {
-                // Fully transparent photo layer — fall back to the whole canvas.
-                (0, 0, ow, oh)
-            }
-        };
+        // size and position within the current document. Shared with
+        // `photo_bounds` so the number the status bar reports and the number
+        // the artboard is rebuilt from cannot disagree.
+        let (bx, by, pw, ph) = self.layer_content_bbox(photo_idx);
 
         let new_w = pw + 2 * pad;
         let new_h = ph + 2 * pad;
