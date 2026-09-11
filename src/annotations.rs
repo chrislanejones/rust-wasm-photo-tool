@@ -132,6 +132,11 @@ pub struct ShapeAnnotation {
     pub fill_angle: u16,
     /// Mosaic block size in px for `fill_kind == 3` (pixelate). 0 → default 16.
     pub fill_block: u32,
+    /// Corner radius in px for rectangles (kind 0): 0 = square corners. The
+    /// renderer clamps it to half the shorter side (a huge radius on a small
+    /// box becomes a pill, not an inverted corner). Ignored by every other
+    /// kind — a circle has no corners and a line has no area.
+    pub corner_radius: u32,
 }
 /// Apply the reflow width to `text`, ready for a tile build. Every path that
 /// rasterises text goes through this so wrapping cannot be applied in one
@@ -363,7 +368,7 @@ pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
         }
         pts.push(']');
         out.push_str(&format!(
-            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"points\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"corner_radius\":{},\"points\":{}}}",
             s.id, s.kind,
             s.x0, s.y0, s.x1, s.y1,
             s.r, s.g, s.b,
@@ -376,6 +381,7 @@ pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
             s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a,
             s.fill_angle,
             s.fill_block,
+            s.corner_radius,
             pts,
         ));
     }
@@ -404,9 +410,24 @@ pub(crate) fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnota
             [s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a],
             s.fill_angle,
             s.fill_block,
+            s.corner_radius as f64,
         );
     }
     match s.kind {
+        // A rectangle with a corner radius strokes through the rounded path;
+        // radius 0 falls through to `draw_shape`'s sharp rectangle below.
+        0 if s.corner_radius > 0 => crate::drawing::draw_rounded_rect(
+            data,
+            w,
+            h,
+            s.x0,
+            s.y0,
+            s.x1,
+            s.y1,
+            s.corner_radius as f64,
+            color,
+            s.stroke_width,
+        ),
         4 => crate::drawing::draw_arrow(
             data,
             w,
@@ -573,7 +594,8 @@ impl ImageHorseTool {
 
     /// Add a new shape/arrow annotation. `kind`: 0=rect,1=circle,2=line,
     /// 3=handCircle,4=arrow. Pushes an "Add Shape"/"Add Arrow" snapshot so
-    /// undo removes it. Returns the new id.
+    /// undo removes it. Returns the new id. `corner_radius` (px) rounds a
+    /// rectangle's corners; 0 = square, and other kinds ignore it.
     pub fn add_shape_annotation(
         &mut self,
         kind: u8,
@@ -589,6 +611,7 @@ impl ImageHorseTool {
         fill2_hex: &str,
         fill_angle: u16,
         fill_block: u32,
+        corner_radius: u32,
     ) -> u32 {
         self.snap(if kind == 4 { "Add Arrow" } else { "Add Shape" });
         let c = drawing::parse_hex_color(color_hex);
@@ -624,6 +647,7 @@ impl ImageHorseTool {
                 fill2_a: f2[3],
                 fill_angle,
                 fill_block,
+                corner_radius,
             });
         id
     }
@@ -655,6 +679,7 @@ impl ImageHorseTool {
         fill2_a: u8,
         fill_angle: u16,
         fill_block: u32,
+        corner_radius: u32,
     ) -> u32 {
         let id = self.next_shape_id;
         self.next_shape_id = self.next_shape_id.wrapping_add(1).max(1);
@@ -686,6 +711,7 @@ impl ImageHorseTool {
                 fill2_a,
                 fill_angle,
                 fill_block,
+                corner_radius,
             });
         id
     }
@@ -1004,6 +1030,7 @@ impl ImageHorseTool {
         fill2_hex: &str,
         fill_angle: u16,
         fill_block: u32,
+        corner_radius: u32,
     ) -> bool {
         if !self.layers[self.active]
             .shape_annotations
@@ -1042,6 +1069,7 @@ impl ImageHorseTool {
             s.fill2_a = f2[3];
             s.fill_angle = fill_angle;
             s.fill_block = fill_block;
+            s.corner_radius = corner_radius;
         }
         true
     }
@@ -2001,7 +2029,7 @@ mod hit_test_tests {
         let mut t = ImageHorseTool::new(200, 200);
         let [x0, y0, x1, y1] = bbox;
         let id = t.add_shape_annotation(
-            kind, x0, y0, x1, y1, "#ff0000", 2.0, 0, fill_kind, "#00ff00", "#0000ff", 0, 0,
+            kind, x0, y0, x1, y1, "#ff0000", 2.0, 0, fill_kind, "#00ff00", "#0000ff", 0, 0, 0,
         );
         (t, id as i32)
     }
@@ -2101,7 +2129,7 @@ mod hit_test_tests {
     fn inner_shape_is_selectable_through_the_outer_ones_interior() {
         let (mut t, outer) = tool_with(0, [10.0, 10.0, 190.0, 190.0], 0);
         let inner = t.add_shape_annotation(
-            0, 60.0, 60.0, 120.0, 120.0, "#ff0000", 2.0, 0, 0, "#000", "#000", 0, 0,
+            0, 60.0, 60.0, 120.0, 120.0, "#ff0000", 2.0, 0, 0, "#000", "#000", 0, 0, 0,
         ) as i32;
         assert_eq!(t.shape_annotation_at(60.0, 90.0), inner, "inner stroke");
         assert_eq!(t.shape_annotation_at(10.0, 90.0), outer, "outer stroke");

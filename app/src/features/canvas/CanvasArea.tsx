@@ -228,6 +228,8 @@ interface Props {
     fillColor: string;
     fillColor2: string;
     gradientAngle: number;
+    /** Rectangle corner radius (px, canvas space); 0 = square. */
+    cornerRadius: number;
   };
   /** Bézier pen tool (Paint → Pen sub-mode). When active, an interactive
    *  pen overlay captures the canvas; finished paths commit via onPenCommit. */
@@ -2046,18 +2048,30 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
               />
             );
           } else {
-            // rect
+            // rect. Rust parity: the corner radius is clamped to half the
+            // shorter side, so the preview pills out exactly where the
+            // committed pixels will.
+            const rCanvas = Math.min(
+              Math.max(0, eff.cornerRadius ?? 0),
+              (bx1 - bx0) / 2,
+              (by1 - by0) / 2,
+            );
+            const rx = rCanvas * sx;
+            const ry = rCanvas * sy;
             preview = (
               <>
                 {gradientDef}
                 <rect
-                  x={vx} y={vy} width={vw} height={vh}
+                  x={vx} y={vy} width={vw} height={vh} rx={rx} ry={ry}
                   fill={fillAttr} stroke={color} strokeWidth={strokeW} strokeLinejoin="round"
                 />
               </>
             );
             bodyHit = (
-              <rect x={vx} y={vy} width={vw} height={vh} fill="transparent" {...bodyProps} />
+              <rect
+                x={vx} y={vy} width={vw} height={vh} rx={rx} ry={ry}
+                fill="transparent" {...bodyProps}
+              />
             );
           }
 

@@ -71,6 +71,9 @@ export interface DrawEditState {
     gradientAngle: number;
     /** Mosaic block size (px) for fillMode "pixelate". */
     fillBlock: number;
+    /** Rectangle corner radius (px). 0 = square. Captured on reselect like
+     *  the fill so a move/resize keeps the box's own rounding. */
+    cornerRadius: number;
   };
 }
 
@@ -139,6 +142,8 @@ export function panelStylePatch(
   if (next.gradientAngle !== prev.gradientAngle)
     patch.gradientAngle = next.gradientAngle;
   if (next.fillBlock !== prev.fillBlock) patch.fillBlock = next.fillBlock;
+  if (next.cornerRadius !== prev.cornerRadius)
+    patch.cornerRadius = next.cornerRadius;
   return Object.keys(patch).length === 0 ? null : patch;
 }
 
@@ -167,6 +172,8 @@ export interface ShapeMeta {
   fill_angle: number;
   /** Mosaic block size (px) for fill_kind 3 (pixelate). */
   fill_block: number;
+  /** Rectangle corner radius (px); 0 = square. Absent from pre-v8.75 JSON. */
+  corner_radius?: number;
   /** Polyline vertices (kind 6) as [[x,y],…]. */
   points: number[][];
 }
@@ -420,6 +427,7 @@ export function useDrawingTools({
     const fillColor2 = es.style?.fillColor2 ?? s.fillColor2;
     const gradientAngle = es.style?.gradientAngle ?? s.gradientAngle;
     const fillBlock = es.style?.fillBlock ?? s.fillBlock;
+    const cornerRadius = es.style?.cornerRadius ?? s.cornerRadius;
     const canFill = kind === 0 || kind === 1;
     const fillKind = canFill
       ? fillMode === "solid"
@@ -434,6 +442,10 @@ export function useDrawingTools({
     const fill2Hex = fillColor2 ?? "#000000";
     const fillAngle = gradientAngle ?? 0;
     const fillBlockVal = fillBlock ?? 16;
+    // Corner rounding is a rectangle's alone — every other kind commits 0 so
+    // a pin or circle never carries a stray radius into its JSON.
+    const cornerRadiusVal =
+      kind === 0 ? Math.max(0, Math.round(cornerRadius ?? 0)) : 0;
     if (es.editId != null) {
       // Re-selection committed without a drag → just un-hide it, no history.
       if (!editDirtyRef.current) {
@@ -457,6 +469,7 @@ export function useDrawingTools({
         fill2Hex,
         fillAngle,
         fillBlockVal,
+        cornerRadiusVal,
       );
       tool.set_editing_shape(-1);
     } else {
@@ -474,6 +487,7 @@ export function useDrawingTools({
         fill2Hex,
         fillAngle,
         fillBlockVal,
+        cornerRadiusVal,
       );
       // The just-drawn shape becomes the Align/Placement target, so the
       // grid (and numpad 1-9) can place it immediately after drawing.
@@ -563,6 +577,7 @@ export function useDrawingTools({
           fillColor2: rgbToHex(sh.fill2_r, sh.fill2_g, sh.fill2_b),
           gradientAngle: sh.fill_angle,
           fillBlock: sh.fill_block ?? 16,
+          cornerRadius: sh.corner_radius ?? 0,
         },
       };
       tool.set_editing_shape(id);
@@ -593,6 +608,7 @@ export function useDrawingTools({
         fillColor2: next.style!.fillColor2,
         gradientAngle: next.style!.gradientAngle,
         fillBlock: next.style!.fillBlock,
+        cornerRadius: next.style!.cornerRadius,
       };
       prevStyleSettingsRef.current = synced;
       useToolStore.getState().setToolSettings((p) => ({ ...p, ...synced }));
@@ -1030,6 +1046,7 @@ export function useDrawingTools({
           settings.shape ?? "rect",
           settings.strokeColor,
           settings.strokeWidth,
+          settings.cornerRadius ?? 0,
         );
       } else if (activeTool === "crop") {
         // If a ratio is locked, snap the drag rect via Rust; otherwise free.
@@ -1196,6 +1213,7 @@ function drawShapePreview(
   shape: string,
   color: string,
   width: number,
+  cornerRadius = 0,
 ) {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
@@ -1210,9 +1228,18 @@ function drawShapePreview(
   ctx.beginPath();
 
   switch (shape) {
-    case "rect":
-      ctx.strokeRect(x, y, w, h);
+    case "rect": {
+      // Rust parity: the radius never exceeds half the shorter side, so a big
+      // radius on a small drag previews as a pill, exactly as it will commit.
+      const r = Math.min(Math.max(0, cornerRadius), w / 2, h / 2);
+      if (r <= 0) {
+        ctx.strokeRect(x, y, w, h);
+      } else {
+        ctx.roundRect(x, y, w, h, r);
+        ctx.stroke();
+      }
       break;
+    }
 
     case "circle": {
       const r = Math.min(w, h) / 2;

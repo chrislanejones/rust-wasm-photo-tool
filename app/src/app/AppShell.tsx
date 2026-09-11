@@ -3451,6 +3451,7 @@ export function AppShell() {
                             fillColor: toolSettings.fillColor,
                             fillColor2: toolSettings.fillColor2,
                             gradientAngle: toolSettings.gradientAngle,
+                            cornerRadius: toolSettings.cornerRadius,
                           }}
                           penActive={penActive}
                           penColor={toolSettings.strokeColor}
@@ -3584,6 +3585,7 @@ export function AppShell() {
                         fillColor: toolSettings.fillColor,
                         fillColor2: toolSettings.fillColor2,
                         gradientAngle: toolSettings.gradientAngle,
+                        cornerRadius: toolSettings.cornerRadius,
                       }}
                       penActive={penActive}
                       penColor={toolSettings.strokeColor}

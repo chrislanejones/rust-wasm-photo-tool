@@ -120,6 +120,7 @@ export async function restoreLayerStack(
           s.fill2_r ?? 0, s.fill2_g ?? 0, s.fill2_b ?? 0, s.fill2_a ?? 0,
           s.fill_angle ?? 0,
           s.fill_block ?? 0,
+          s.corner_radius ?? 0,
         );
       }
     }

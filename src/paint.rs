@@ -1228,7 +1228,7 @@ mod magic_eraser_brush_tests {
 
         // A filled rectangle in a colour nothing else in the image uses.
         t.add_shape_annotation(
-            0, 8.0, 8.0, 32.0, 32.0, "#0000ff", 2.0, 0, 1, "#0000ff", "#0000ff", 0, 0,
+            0, 8.0, 8.0, 32.0, 32.0, "#0000ff", 2.0, 0, 1, "#0000ff", "#0000ff", 0, 0, 0,
         );
 
         let with_overlay = t.get_image_data();

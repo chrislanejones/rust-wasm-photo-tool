@@ -47,7 +47,7 @@ fn shape_annotations_scale_with_a_resampling_resize() {
     let mut t = tool_200();
     // A rect centred on the canvas.
     t.add_shape_annotation(
-        0, 90.0, 90.0, 110.0, 110.0, "#000000", 4.0, 0, 0, "#000000", "#000000", 0, 0,
+        0, 90.0, 90.0, 110.0, 110.0, "#000000", 4.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     );
     t.resize_with_filter(100, 100, 1);
 
@@ -96,7 +96,7 @@ fn the_cached_text_tile_is_rebuilt_at_the_new_size() {
 fn stroke_width_scales_but_never_vanishes() {
     let mut t = tool_200();
     t.add_shape_annotation(
-        0, 10.0, 10.0, 20.0, 20.0, "#000000", 8.0, 0, 0, "#000000", "#000000", 0, 0,
+        0, 10.0, 10.0, 20.0, 20.0, "#000000", 8.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     );
     t.resize_with_filter(100, 100, 1);
     assert_eq!(
@@ -115,7 +115,7 @@ fn stroke_width_scales_but_never_vanishes() {
 fn non_uniform_resize_scales_each_axis_independently() {
     let mut t = tool_200();
     t.add_shape_annotation(
-        0, 100.0, 100.0, 120.0, 140.0, "#000000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        0, 100.0, 100.0, 120.0, 140.0, "#000000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     );
     // Width halves, height quarters.
     t.resize_with_filter(100, 50, 1);
@@ -130,7 +130,7 @@ fn non_uniform_resize_scales_each_axis_independently() {
 fn upscaling_moves_annotations_outward_too() {
     let mut t = tool_200();
     t.add_shape_annotation(
-        0, 50.0, 50.0, 60.0, 60.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0,
+        0, 50.0, 50.0, 60.0, 60.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     );
     t.resize_with_filter(400, 400, 1);
     let j = t.get_shape_annotations();
@@ -142,7 +142,7 @@ fn upscaling_moves_annotations_outward_too() {
 fn a_degenerate_resize_is_a_no_op_and_never_divides_by_zero() {
     let mut t = tool_200();
     t.add_shape_annotation(
-        0, 10.0, 10.0, 20.0, 20.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0,
+        0, 10.0, 10.0, 20.0, 20.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     );
     t.resize_with_filter(0, 50, 1);
     assert_eq!(

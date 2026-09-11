@@ -591,7 +591,7 @@ mod capture_tests {
         let mut t = ImageHorseTool::new(24, 16);
         t.load_image(&solid(24, 16, [10, 20, 30, 255]));
         t.add_shape_annotation(
-            0, 2.0, 2.0, 10.0, 10.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0,
+            0, 2.0, 2.0, 10.0, 10.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0, 0,
         );
 
         let blob = t.capture_state();
@@ -766,7 +766,7 @@ mod capture_tests {
         t.load_image(&solid(40, 40, [0, 0, 0, 0]));
         t.add_layer("Art");
         t.add_shape_annotation(
-            0, 5.0, 6.0, 20.0, 14.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0,
+            0, 5.0, 6.0, 20.0, 14.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0, 0,
         );
         t.flatten_text_annotations();
 
@@ -799,7 +799,7 @@ mod capture_tests {
         t.load_image(&solid(64, 48, [0, 0, 0, 0]));
         t.add_layer("Art");
         t.add_shape_annotation(
-            0, 8.0, 4.0, 30.0, 22.0, "#00ff00", 2.0, 0, 1, "#00ff00", "#00ff00", 0, 0,
+            0, 8.0, 4.0, 30.0, 22.0, "#00ff00", 2.0, 0, 1, "#00ff00", "#00ff00", 0, 0, 0,
         );
         t.flatten_text_annotations();
 
@@ -843,13 +843,13 @@ mod capture_tests {
         t.add_layer("Art"); // >1 layer, so the exclude-Background path is live
                             // Paint a small opaque square, then a larger one, and watch the crop.
         t.add_shape_annotation(
-            0, 4.0, 4.0, 10.0, 10.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0,
+            0, 4.0, 4.0, 10.0, 10.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0, 0,
         );
         t.flatten_text_annotations();
         let small = t.capture_composite_excluding_background();
 
         t.add_shape_annotation(
-            0, 4.0, 4.0, 30.0, 30.0, "#00ff00", 2.0, 0, 1, "#00ff00", "#00ff00", 0, 0,
+            0, 4.0, 4.0, 30.0, 30.0, "#00ff00", 2.0, 0, 1, "#00ff00", "#00ff00", 0, 0, 0,
         );
         t.flatten_text_annotations();
         let big = t.capture_composite_excluding_background();
@@ -890,7 +890,7 @@ mod capture_tests {
         t.set_zoom(2.5); // zoom: 1.0 -> 2.5
         t.set_export_quality(37); // quality: default -> 37
         t.add_shape_annotation(
-            0, 2.0, 2.0, 8.0, 8.0, "#00ff00", 2.0, 0, 1, "#00ff00", "#00ff00", 0, 0,
+            0, 2.0, 2.0, 8.0, 8.0, "#00ff00", 2.0, 0, 1, "#00ff00", "#00ff00", 0, 0, 0,
         );
 
         // Prove the setup actually moved things, or the assertions below are
@@ -1099,10 +1099,10 @@ mod capture_tests {
         // that returned a hardcoded or off-by-one id would still pass against
         // the first annotation ever added.
         t.add_shape_annotation(
-            0, 100.0, 100.0, 110.0, 110.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            0, 100.0, 100.0, 110.0, 110.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         t.add_shape_annotation(
-            0, 112.0, 112.0, 120.0, 120.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            0, 112.0, 112.0, 120.0, 120.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         let pen_id = t.add_bezier_annotation(&PEN_PTS, "#00ff00", 3.0, 0, "#000000");
 
@@ -1163,7 +1163,7 @@ mod capture_tests {
         // shadow what is drawn inside it (see the twin below). A solid fill is
         // ink all the way across and still covers the path.
         t.add_shape_annotation(
-            0, 5.0, 5.0, 95.0, 95.0, "#ff0000", 2.0, 0, 1, "#000000", "#000000", 0, 0,
+            0, 5.0, 5.0, 95.0, 95.0, "#ff0000", 2.0, 0, 1, "#000000", "#000000", 0, 0, 0,
         );
 
         let hit = t.capture_pen_hit(HIT.0, HIT.1);
@@ -1189,7 +1189,7 @@ mod capture_tests {
         t.load_image(&solid(128, 128, [10, 20, 30, 255]));
         let pen_id = t.add_bezier_annotation(&PEN_PTS, "#00ff00", 3.0, 0, "#000000");
         t.add_shape_annotation(
-            0, 5.0, 5.0, 95.0, 95.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            0, 5.0, 5.0, 95.0, 95.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
 
         let hit = t.capture_pen_hit(HIT.0, HIT.1);
@@ -1234,7 +1234,7 @@ mod capture_tests {
         let mut t = ImageHorseTool::new(128, 128);
         t.load_image(&solid(128, 128, [10, 20, 30, 255]));
         t.add_shape_annotation(
-            0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            0, 20.0, 20.0, 60.0, 60.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
 
         // Probe the rect's LEFT STROKE (x = 20), not its centre: an unfilled

@@ -10551,6 +10551,16 @@ This activates nothing. The service worker still ships dark.
 
 `imagehorse-qc` was **not run** for this cut, and it is owed more than usual — canvas, tools and the engine all changed. What *was* driven in a real browser on the production build: the A/B compare regression reproduced on master and the fix verified (fresh load → compress → leave the panel → return, enabled throughout, overlay rendering); GPU-vs-engine parity at four sizes on `intel/xe-lpg`, all maxDelta 0; and the rotated-text anchor confirmed rendering on canvas. The rest of the suite is owed.
 
+## v8.75 Change Summary — 2026-09-11
+
+**Rectangles get a corner radius.**
+
+| # | Change | Status |
+| --- | --- | --- |
+| 1 | **Rounded rectangles** — Shapes › Rectangle gains a **Corner Radius** slider (0 = square, px in canvas space). The engine clamps it to half the box's shorter side, so a large radius on a small box pills out instead of inverting; the fill (solid / gradient / pixelate) and the stroke share one clamp so they can never disagree on where the corner is. Live-editable on a reselected rectangle like colour and fill (`panelStylePatch` carries it); previewed with `roundRect` on the rubber band and `rx`/`ry` on the SVG edit overlay | Complete |
+| 2 | Persistence: `corner_radius` in the shapes JSON, `PersistedShape`, and both restore paths (absent on older saves → 0). Op log at **v6**: `ShapeParams::corner_radius` is `#[serde(skip)]` and rides as the appended `Op::ShapeCornerRadius` plus a seventh trailing element of `encode_annotations` — the v3/v4/v5 recipe, applied to the shape list for the first time. v5 blobs and op bytes decode unchanged (`v5_blobs_still_decode_under_v6`, `v5_op_bytes_still_decode_under_v6`) | Complete |
+| 3 | `tests/shape_corner_radius.rs` — the corner is actually cut (fill and stroke), the radius lands in the annotation data, survives restore, updates in place, and undoes as one step; a circle with a radius set renders identically to one without | Complete |
+
 ## v8.74 Change Summary — 2026-09-10
 
 **Photos develop as they land, the gallery bar says what it will act on, and phone widths get a real mobile version.**

@@ -1146,6 +1146,7 @@ declare module "stamp_tool" {
       fill2_hex: string,
       fill_angle: number,
       fill_block: number,
+      corner_radius: number,
     ): number;
     /** Restore a persisted shape WITHOUT pushing history (load path). Colours are raw bytes. */
     restore_shape_annotation(
@@ -1170,6 +1171,7 @@ declare module "stamp_tool" {
       fill2_a: number,
       fill_angle: number,
       fill_block: number,
+      corner_radius: number,
     ): number;
     /** Update a shape in full (geometry + style). Pushes an "Edit Shape" history step. */
     update_shape_annotation(
@@ -1187,6 +1189,7 @@ declare module "stamp_tool" {
       fill2_hex: string,
       fill_angle: number,
       fill_block: number,
+      corner_radius: number,
     ): boolean;
     /** Remove a shape. Pushes a "Delete Shape" history step. */
     remove_shape_annotation(id: number): boolean;

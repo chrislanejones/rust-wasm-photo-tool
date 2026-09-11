@@ -32,6 +32,7 @@ function settings(over: Partial<ToolSettings> = {}): ToolSettings {
     fillColor2: "#ffffff",
     gradientAngle: 0,
     fillBlock: 16,
+    cornerRadius: 0,
     ...over,
   } as ToolSettings;
 }
@@ -87,6 +88,17 @@ describe("panelStylePatch", () => {
     expect(panelStylePatch(settings(), settings({ fillBlock: 32 }))).toEqual({
       fillBlock: 32,
     });
+  });
+
+  it("carries the corner radius, so a reselected square can be rounded", () => {
+    // Same contract as the fill controls: the slider must reach a committed
+    // rectangle through the diff, and must not when it did not move.
+    expect(panelStylePatch(settings(), settings({ cornerRadius: 12 }))).toEqual({
+      cornerRadius: 12,
+    });
+    expect(
+      panelStylePatch(settings({ cornerRadius: 12 }), settings({ cornerRadius: 12 })),
+    ).toBeNull();
   });
 
   it("carries the arrow style", () => {

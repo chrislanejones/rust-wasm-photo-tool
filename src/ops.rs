@@ -106,7 +106,14 @@ use serde::{Deserialize, Serialize};
 /// quads. A v4 document decodes with every quad at the identity — "no
 /// perspective", which is exactly what a v4 document meant. Pinned by
 /// `v4_blobs_still_decode_under_v5`.
-pub const OP_FORMAT_VERSION: u8 = 5;
+///
+/// v6 (v8.75, rounded rectangles) is the same move a fourth time, on the
+/// SHAPE side for the first time: one APPENDED `Op` variant
+/// (`ShapeCornerRadius`) and a seventh trailing element on the annotation
+/// tuple carrying the per-shape corner radii. A v5 document decodes with
+/// every radius at 0 — square corners, which is exactly what a v5 rectangle
+/// meant. Pinned by `v5_blobs_still_decode_under_v6`.
+pub const OP_FORMAT_VERSION: u8 = 6;
 
 /// Number of ops between keyframe snapshots. Replay restores the nearest
 /// keyframe at or before the target, then applies the remainder.
@@ -273,6 +280,17 @@ pub struct ShapeParams {
     pub fill2_a: u8,
     pub fill_angle: u16,
     pub fill_block: u32,
+    /// Rectangle corner radius in px (0 = square corners). v8.75.
+    ///
+    /// ⚠️ `#[serde(skip)]` is load-bearing here for the identical reason it is
+    /// on `TextParams::wrap_width` — read that comment, it applies word for
+    /// word to the `ShapeAdd` / `ShapeEdit` payloads already persisted. The
+    /// radius travels beside the struct instead: as the seventh element of
+    /// `encode_annotations`, and as [`Op::ShapeCornerRadius`] in the log.
+    /// Deserialises to 0, which is exactly what every pre-v8.75 rectangle
+    /// meant.
+    #[serde(skip)]
+    pub corner_radius: u32,
 }
 
 impl TextParams {
@@ -343,6 +361,7 @@ impl ShapeParams {
             fill2_a: s.fill2_a,
             fill_angle: s.fill_angle,
             fill_block: s.fill_block,
+            corner_radius: s.corner_radius,
         }
     }
 
@@ -375,6 +394,7 @@ impl ShapeParams {
             fill2_a: self.fill2_a,
             fill_angle: self.fill_angle,
             fill_block: self.fill_block,
+            corner_radius: self.corner_radius,
         }
     }
 }
@@ -469,6 +489,16 @@ pub enum Op {
     ///
     /// Appended after [`Op::TextPerspective`]; same rule, same reason.
     PerspectiveWarp { rect: Rect, quad: [(f32, f32); 4] },
+    /// v8.75 — a rectangle's corner radius in px (0 = square corners).
+    ///
+    /// Appended after [`Op::PerspectiveWarp`], for the reason spelled out on
+    /// [`Op::TextWrap`]: postcard indexes enum variants positionally, so
+    /// appending is invisible to every op already on a user's disk and
+    /// inserting would renumber all of them. Carried as its own op rather
+    /// than a [`ShapeParams`] field for the same reason — a new struct field
+    /// would shift every byte after it in the `ShapeAdd`/`ShapeEdit` payloads
+    /// already persisted.
+    ShapeCornerRadius { id: u32, radius: u32 },
 }
 
 impl Op {
@@ -502,6 +532,9 @@ impl Op {
             // and the History panel is where they go to find and re-select it.
             Op::TextPerspective { .. } => "Perspective",
             Op::PerspectiveWarp { .. } => "Perspective",
+            // Borrows "Edit Shape" the way TextWrap borrows "Edit Text": to the
+            // user, rounding a box's corners IS editing the shape.
+            Op::ShapeCornerRadius { .. } => "Edit Shape",
         }
     }
 }
@@ -651,10 +684,14 @@ pub fn encode_annotations(
     // lets `decode_annotations` read both. Parallel to `texts` by index.
     // v4 appends the box heights the same way, one element further out.
     // v5 appends the corner quads one element further out again.
+    // v6 appends the per-SHAPE corner radii — parallel to `shapes` by index.
     let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
     let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
     let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
-    if let Ok(body) = postcard::to_allocvec(&(texts, shapes, canvas, &wraps, &heights, &quads)) {
+    let radii: Vec<u32> = shapes.iter().map(|s| s.corner_radius).collect();
+    if let Ok(body) =
+        postcard::to_allocvec(&(texts, shapes, canvas, &wraps, &heights, &quads, &radii))
+    {
         out.extend_from_slice(&body);
     }
     out
@@ -683,6 +720,34 @@ pub fn decode_annotations(
     // out of bytes at the element it never wrote, so the fallback fires and
     // the missing values default to 0 — "size the box to the text" on both
     // axes, which is precisely what a v2 or v3 document meant.
+    type V6 = (
+        Vec<TextParams>,
+        Vec<ShapeParams>,
+        Option<CanvasParams>,
+        Vec<u32>,
+        Vec<u32>,
+        Vec<[(f32, f32); 4]>,
+        Vec<u32>,
+    );
+    if let Ok((mut texts, mut shapes, canvas, wraps, heights, quads, radii)) =
+        postcard::from_bytes::<V6>(body)
+    {
+        for (t, w) in texts.iter_mut().zip(wraps) {
+            t.wrap_width = w;
+        }
+        for (t, h) in texts.iter_mut().zip(heights) {
+            t.box_height = h;
+        }
+        for (t, q) in texts.iter_mut().zip(quads) {
+            t.perspective = default_quad_if_unset(q);
+        }
+        for (s, r) in shapes.iter_mut().zip(radii) {
+            s.corner_radius = r;
+        }
+        return Ok((texts, shapes, canvas));
+    }
+    // v5 and older wrote no radii element at all — every rectangle is square,
+    // which is what `#[serde(skip)]` already leaves `corner_radius` at (0).
     type V5 = (
         Vec<TextParams>,
         Vec<ShapeParams>,
@@ -1131,6 +1196,11 @@ pub fn apply(op: &Op, doc: &mut Document) {
         Op::ShapeRemove { id } => {
             doc.shapes.retain(|s| s.id != *id);
         }
+        Op::ShapeCornerRadius { id, radius } => {
+            if let Some(s) = doc.shapes.iter_mut().find(|s| s.id == *id) {
+                s.corner_radius = *radius;
+            }
+        }
         Op::LayerMove { layer: _, dx, dy } => {
             if *dx == 0 && *dy == 0 {
                 return;
@@ -1496,6 +1566,7 @@ mod tests {
             fill2_a: 0,
             fill_angle: 0,
             fill_block: 0,
+            corner_radius: 0,
         }
     }
 
@@ -1548,6 +1619,7 @@ mod tests {
             }),
             Op::TextRemove { id: 1 },
             Op::ShapeAdd(test_shape(2)),
+            Op::ShapeCornerRadius { id: 2, radius: 12 },
             Op::ShapeRemove { id: 2 },
             Op::LayerMove {
                 layer: 0,
@@ -2126,6 +2198,37 @@ mod v2_migration_tests {
         }
     }
 
+    fn a_shape(id: u32) -> ShapeParams {
+        ShapeParams {
+            id,
+            kind: 0,
+            x0: 4.0,
+            y0: 4.0,
+            x1: 28.0,
+            y1: 20.0,
+            r: 255,
+            g: 0,
+            b: 0,
+            stroke_width: 2.0,
+            arrow_style: 0,
+            number: 0,
+            label_kind: 0,
+            points: Vec::new(),
+            fill_kind: 1,
+            fill_r: 0,
+            fill_g: 128,
+            fill_b: 255,
+            fill_a: 200,
+            fill2_r: 0,
+            fill2_g: 0,
+            fill2_b: 0,
+            fill2_a: 0,
+            fill_angle: 0,
+            fill_block: 0,
+            corner_radius: 0,
+        }
+    }
+
     /// A v2 writer emitted `[2] ++ postcard((texts, shapes, canvas))` — the
     /// 3-tuple, with no wrap widths. Reconstructed here byte-for-byte.
     fn v2_annotation_blob(texts: &[TextParams]) -> Vec<u8> {
@@ -2427,6 +2530,115 @@ mod v2_migration_tests {
             postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
             "perspective must not appear on the wire"
         );
+    }
+
+    /// A v5 writer emitted `[5] ++ postcard((texts, shapes, canvas, wraps,
+    /// heights, quads))` — the 6-tuple, with no shape radii. Reconstructed
+    /// byte-for-byte.
+    fn v5_annotation_blob(texts: &[TextParams], shapes: &[ShapeParams]) -> Vec<u8> {
+        let mut out = vec![5u8];
+        let canvas: Option<CanvasParams> = None;
+        let wraps: Vec<u32> = texts.iter().map(|t| t.wrap_width).collect();
+        let heights: Vec<u32> = texts.iter().map(|t| t.box_height).collect();
+        let quads: Vec<[(f32, f32); 4]> = texts.iter().map(|t| t.perspective).collect();
+        out.extend_from_slice(
+            &postcard::to_allocvec(&(texts, shapes, &canvas, &wraps, &heights, &quads)).unwrap(), // allow: rust-panic
+        );
+        out
+    }
+
+    #[test]
+    fn v5_blobs_still_decode_under_v6() {
+        // The load-bearing one, for the fourth time — and the first time the
+        // SHAPE list is the one that grew. Anyone who has opened the app since
+        // v8.42 has v5 blobs in IndexedDB.
+        let mut t = a_text(7);
+        t.wrap_width = 240;
+        t.box_height = 310;
+        t.perspective = a_quad();
+        let (got, shapes, canvas) = decode_annotations(&v5_annotation_blob(&[t], &[a_shape(3)]))
+            .expect("a v5 annotation blob must still decode — users' logs depend on it"); // allow: rust-panic
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].wrap_width, 240, "the v5 width survives the step");
+        assert_eq!(got[0].box_height, 310, "the v5 height survives the step");
+        assert_eq!(
+            got[0].perspective,
+            a_quad(),
+            "the v5 quad survives the step"
+        );
+        assert_eq!(shapes.len(), 1);
+        assert_eq!(shapes[0].id, 3);
+        assert_eq!(
+            shapes[0].corner_radius, 0,
+            "a v5 rectangle meant 'square corners'"
+        );
+        assert!(canvas.is_none());
+    }
+
+    #[test]
+    fn v6_blobs_round_trip_the_corner_radius() {
+        let mut s = a_shape(4);
+        s.corner_radius = 18;
+        let blob = encode_annotations(&[a_text(9)], &[a_shape(3), s], None);
+        assert_eq!(blob[0], OP_FORMAT_VERSION, "writes the current version");
+        let (_, got, _) = decode_annotations(&blob).unwrap(); // allow: rust-panic
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].corner_radius, 0, "untouched");
+        assert_eq!(got[1].corner_radius, 18, "v6 carries the radius");
+    }
+
+    #[test]
+    fn v5_op_bytes_still_decode_under_v6() {
+        // Appending `ShapeCornerRadius` must not renumber the variants already
+        // on disk — `PerspectiveWarp` was appended last before it, so it is
+        // the one that would break first.
+        for op in [
+            Op::ShapeAdd(a_shape(1)),
+            Op::ShapeRemove { id: 3 },
+            Op::TextPerspective {
+                id: 5,
+                quad: a_quad(),
+            },
+            Op::PerspectiveWarp {
+                rect: Rect {
+                    x: 1,
+                    y: 2,
+                    w: 3,
+                    h: 4,
+                },
+                quad: a_quad(),
+            },
+        ] {
+            let mut v5_bytes = vec![5u8];
+            v5_bytes.extend_from_slice(&postcard::to_allocvec(&op).unwrap()); // allow: rust-panic
+            let decoded = decode_op(&v5_bytes)
+                .unwrap_or_else(|e| panic!("v5 bytes for {:?} rejected: {e:?}", op.label())); // allow: rust-panic
+            assert_eq!(decoded, op, "v5 op must mean the same thing under v6");
+        }
+    }
+
+    #[test]
+    fn shape_params_wire_layout_is_unchanged_by_the_corner_radius_field() {
+        // Same measurement as the three text fields. A regression here shifts
+        // every persisted ShapeAdd/ShapeEdit payload in every user's IndexedDB.
+        let a = a_shape(4);
+        let mut b = a_shape(4);
+        b.corner_radius = 18;
+        assert_eq!(
+            postcard::to_allocvec(&a).unwrap(), // allow: rust-panic
+            postcard::to_allocvec(&b).unwrap(), // allow: rust-panic
+            "corner_radius must not appear on the wire"
+        );
+    }
+
+    #[test]
+    fn shape_corner_radius_op_applies_to_the_right_shape() {
+        let mut doc = Document::new(32, 32);
+        doc.shapes.push(a_shape(1));
+        doc.shapes.push(a_shape(2));
+        apply(&Op::ShapeCornerRadius { id: 2, radius: 9 }, &mut doc);
+        assert_eq!(doc.shapes[0].corner_radius, 0, "untouched");
+        assert_eq!(doc.shapes[1].corner_radius, 9);
     }
 
     #[test]

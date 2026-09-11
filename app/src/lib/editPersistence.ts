@@ -150,6 +150,8 @@ export interface PersistedShape {
   fill_angle?: number;
   /** Mosaic block size (px) for fill_kind 3 (pixelate). Absent on older saves. */
   fill_block?: number;
+  /** Rectangle corner radius (px); 0 = square. Absent on pre-v8.75 saves. */
+  corner_radius?: number;
   /** Polyline vertices (kind 6) as [[x,y],…]. */
   points?: number[][];
 }

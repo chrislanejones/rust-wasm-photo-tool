@@ -59,6 +59,9 @@ export interface ToolSettings extends StampSettings {
   fillColor2: string;      // gradient stop 1 (hex)
   gradientAngle: number;   // degrees: 0 →, 45 ↘, 90 ↓, 135 ↙
   fillBlock: number;       // mosaic block size (px) for fillMode "pixelate"
+  /** Rectangle corner radius (px, canvas space). 0 = square corners. The engine
+   *  clamps it to half the box's shorter side; other shapes ignore it. */
+  cornerRadius: number;
 
   // Effects (was Blur) — the Paint tool's Blur Brush + the Levels panel.
   /** Blur-brush effect: "gaussian" softens, "pixelate" mosaics, "solid" redacts. */

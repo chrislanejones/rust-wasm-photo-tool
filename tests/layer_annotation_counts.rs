@@ -55,7 +55,7 @@ fn field_of(json: &str, id: u32, key: &str) -> i64 {
 
 fn add_a_shape(t: &mut ImageHorseTool) -> u32 {
     t.add_shape_annotation(
-        0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+        0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
     )
 }
 

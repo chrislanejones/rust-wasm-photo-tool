@@ -41,6 +41,10 @@ const ARROW_STYLES = [
 
 const STROKE_WIDTH_PRESETS = [2, 4, 6, 8] as const;
 
+/** Corner-radius slider ceiling (canvas px). Generous enough to pill a
+ *  200px-tall callout box; anything larger is clamped by the box itself. */
+const CORNER_RADIUS_MAX = 100;
+
 const FILL_MODES = [
   { id: "none",     label: "None"     },
   { id: "solid",    label: "Solid"    },
@@ -128,6 +132,22 @@ export function ShapesSettings({ settings, onChange, activeMode, onModeChange, o
                     value={currentShape}
                     onChange={(id) => onChange({ ...settings, shape: id })}
                   />
+
+                  {/* Corner Radius — rectangles only (0 = square corners). The
+                      engine clamps it to half the box's shorter side, so a big
+                      radius on a small box rounds into a pill rather than
+                      inverting. Live-updates a reselected rectangle like the
+                      other style controls (panelStylePatch carries it). */}
+                  {currentShape === "rect" && (
+                    <SizeSlider
+                      label="Corner Radius"
+                      value={settings.cornerRadius ?? 0}
+                      min={0}
+                      max={CORNER_RADIUS_MAX}
+                      unit="px"
+                      onChange={(v) => onChange({ ...settings, cornerRadius: v })}
+                    />
+                  )}
 
                   {/* Stroke Width */}
                   <SizeSlider

@@ -519,6 +519,7 @@ pub fn fill_shape(
     c1: [u8; 4],
     angle_deg: u16,
     fill_block: u32,
+    corner_radius: f64,
 ) {
     let wi = w as i32;
     let hi = h as i32;
@@ -530,6 +531,41 @@ pub fn fill_shape(
     let cy = (miny + maxy) * 0.5;
     // Circle radius matches draw_shape's clean circle: min of the half-extents.
     let radius = ((maxx - minx) * 0.5).min((maxy - miny) * 0.5);
+    // Rounded rectangle (shape 0 with a corner radius). Clamped to half the
+    // shorter side — the same clamp `draw_rounded_rect` applies to the stroke,
+    // so the fill and its outline always agree on where the corner is.
+    let rad = if shape == 0 {
+        clamp_corner_radius(corner_radius, minx, miny, maxx, maxy)
+    } else {
+        0.0
+    };
+    // Pixel-centre inside test shared by every fill kind: the circle's disc,
+    // or the rect's bbox minus whatever the four corner arcs cut away.
+    let inside = |fx: f64, fy: f64| -> bool {
+        if shape == 1 {
+            let dx = fx - cx;
+            let dy = fy - cy;
+            return (dx * dx + dy * dy).sqrt() <= radius;
+        }
+        if rad <= 0.0 {
+            return true;
+        }
+        let ddx = if fx < minx + rad {
+            minx + rad - fx
+        } else if fx > maxx - rad {
+            fx - (maxx - rad)
+        } else {
+            0.0
+        };
+        let ddy = if fy < miny + rad {
+            miny + rad - fy
+        } else if fy > maxy - rad {
+            fy - (maxy - rad)
+        } else {
+            0.0
+        };
+        ddx * ddx + ddy * ddy <= rad * rad
+    };
 
     let px0 = (minx.floor() as i32).max(0);
     let py0 = (miny.floor() as i32).max(0);
@@ -581,12 +617,8 @@ pub fn fill_shape(
                             if xx < px0 || xx > px1 || yy < py0 || yy > py1 {
                                 continue;
                             }
-                            if shape == 1 {
-                                let dx = xx as f64 + 0.5 - cx;
-                                let dy = yy as f64 + 0.5 - cy;
-                                if (dx * dx + dy * dy).sqrt() > radius {
-                                    continue;
-                                }
+                            if !inside(xx as f64 + 0.5, yy as f64 + 0.5) {
+                                continue;
                             }
                             let i = ((yy * wi + xx) * 4) as usize;
                             data[i..i + 4].copy_from_slice(&avg);
@@ -619,12 +651,8 @@ pub fn fill_shape(
         for px in px0..=px1 {
             let fx = px as f64 + 0.5;
             let fy = py as f64 + 0.5;
-            if shape == 1 {
-                let dx = fx - cx;
-                let dy = fy - cy;
-                if (dx * dx + dy * dy).sqrt() > radius {
-                    continue;
-                }
+            if !inside(fx, fy) {
+                continue;
             }
             let col = if fill_kind == 2 {
                 let t = ((proj(fx, fy) - pmin) / span).clamp(0.0, 1.0);
@@ -634,6 +662,78 @@ pub fn fill_shape(
             };
             let idx = ((py * wi + px) * 4) as usize;
             blend_pixel(data, idx, col);
+        }
+    }
+}
+
+/// The corner radius a rectangle can actually carry: never more than half its
+/// shorter side, so a large radius on a small box degrades to a pill / circle
+/// rather than inverting the corners. Shared by the fill and the stroke so the
+/// two can never disagree about where the corner starts.
+fn clamp_corner_radius(radius: f64, minx: f64, miny: f64, maxx: f64, maxy: f64) -> f64 {
+    radius
+        .max(0.0)
+        .min(((maxx - minx) * 0.5).min((maxy - miny) * 0.5))
+}
+
+/// Stroke a rectangle with rounded corners: four straight edges shortened by
+/// the radius, joined by quarter arcs walked as short segments — the same
+/// polyline-arc approach `draw_shape`'s circle uses, so the two match in
+/// weight and anti-aliasing. `radius` is clamped to half the shorter side (see
+/// `clamp_corner_radius`); a radius of 0 is exactly `draw_shape`'s sharp
+/// rectangle, so the two paths agree at the boundary.
+pub fn draw_rounded_rect(
+    data: &mut [u8],
+    w: u32,
+    h: u32,
+    from_x: f64,
+    from_y: f64,
+    to_x: f64,
+    to_y: f64,
+    radius: f64,
+    color: [u8; 4],
+    stroke_width: f64,
+) {
+    let x0 = from_x.min(to_x);
+    let y0 = from_y.min(to_y);
+    let x1 = from_x.max(to_x);
+    let y1 = from_y.max(to_y);
+    let r = clamp_corner_radius(radius, x0, y0, x1, y1);
+    if r <= 0.0 {
+        draw_shape(data, w, h, x0, y0, x1, y1, 0, color, stroke_width);
+        return;
+    }
+    let wi = w as i32;
+    let hi = h as i32;
+    // The four straight runs, each pulled in by `r` at both ends.
+    draw_line_thick(data, wi, hi, x0 + r, y0, x1 - r, y0, color, stroke_width);
+    draw_line_thick(data, wi, hi, x1, y0 + r, x1, y1 - r, color, stroke_width);
+    draw_line_thick(data, wi, hi, x1 - r, y1, x0 + r, y1, color, stroke_width);
+    draw_line_thick(data, wi, hi, x0, y1 - r, x0, y0 + r, color, stroke_width);
+    // Quarter arcs, clockwise from the top-right corner (y points down, so
+    // -90° is "up"). Segment count scales with the radius like the circle's.
+    let segments = (r.ceil() as i32).max(12);
+    let corners = [
+        (x1 - r, y0 + r, -PI / 2.0),
+        (x1 - r, y1 - r, 0.0),
+        (x0 + r, y1 - r, PI / 2.0),
+        (x0 + r, y0 + r, PI),
+    ];
+    for (cx, cy, start) in corners {
+        for i in 0..segments {
+            let a0 = start + (PI / 2.0) * (i as f64) / (segments as f64);
+            let a1 = start + (PI / 2.0) * ((i + 1) as f64) / (segments as f64);
+            draw_line_thick(
+                data,
+                wi,
+                hi,
+                cx + r * a0.cos(),
+                cy + r * a0.sin(),
+                cx + r * a1.cos(),
+                cy + r * a1.sin(),
+                color,
+                stroke_width,
+            );
         }
     }
 }

@@ -1515,10 +1515,37 @@ impl ImageHorseTool {
             }
             for s in &layer.shape_annotations {
                 let params = crate::ops::ShapeParams::from_annotation(s);
+                // ⚠️ `ShapeParams::corner_radius` is `#[serde(skip)]` (it has
+                // to be — see the field's comment), so `ShapeAdd`/`ShapeEdit`
+                // physically CANNOT carry it. It rides as its own
+                // `ShapeCornerRadius` op — the TextWrap recipe above, applied
+                // to shapes — or replay rebuilds the rectangle square, the
+                // composite hash diverges, and the log marks itself broken.
                 match log_doc.shapes.iter().find(|p| p.id == s.id) {
-                    None => pending.push(crate::ops::Op::ShapeAdd(params)),
-                    Some(p) if *p != params => pending.push(crate::ops::Op::ShapeEdit(params)),
-                    _ => {}
+                    None => {
+                        let radius = params.corner_radius;
+                        pending.push(crate::ops::Op::ShapeAdd(params));
+                        if radius != 0 {
+                            pending.push(crate::ops::Op::ShapeCornerRadius { id: s.id, radius });
+                        }
+                    }
+                    Some(p) => {
+                        if p.corner_radius != params.corner_radius {
+                            pending.push(crate::ops::Op::ShapeCornerRadius {
+                                id: s.id,
+                                radius: params.corner_radius,
+                            });
+                        }
+                        // Compare everything EXCEPT the skipped field, which
+                        // the branch above already accounted for — otherwise a
+                        // radius-only change would also emit a redundant
+                        // ShapeEdit.
+                        let mut without_radius = p.clone();
+                        without_radius.corner_radius = params.corner_radius;
+                        if without_radius != params {
+                            pending.push(crate::ops::Op::ShapeEdit(params));
+                        }
+                    }
                 }
             }
         }
@@ -4284,7 +4311,7 @@ mod layer_tests {
         t.load_image(&solid(20, 20, [255, 255, 255, 255]));
         // Rect (4,4)-(16,16), solid blue fill (kind 1), thin black stroke.
         t.add_shape_annotation(
-            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 1, "#0000ff", "#000000", 0, 0,
+            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 1, "#0000ff", "#000000", 0, 0, 0,
         );
         let p = px(&t, 10, 10); // interior centre
         assert_eq!(
@@ -4300,7 +4327,7 @@ mod layer_tests {
         t.load_image(&solid(20, 20, [255, 255, 255, 255]));
         // fill_kind 0 = none → interior stays white.
         t.add_shape_annotation(
-            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0,
+            0, 4.0, 4.0, 16.0, 16.0, "#000000", 1.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         assert_eq!(px(&t, 10, 10), [255, 255, 255, 255]);
     }
@@ -4312,7 +4339,7 @@ mod layer_tests {
         // Horizontal (angle 0) gradient red→green across a wide rect; no stroke
         // bleed in the centre band we sample.
         t.add_shape_annotation(
-            0, 2.0, 2.0, 38.0, 38.0, "#000000", 1.0, 0, 2, "#ff0000", "#00ff00", 0, 0,
+            0, 2.0, 2.0, 38.0, 38.0, "#000000", 1.0, 0, 2, "#ff0000", "#00ff00", 0, 0, 0,
         );
         let left = px(&t, 6, 20);
         let right = px(&t, 34, 20);
@@ -4453,7 +4480,7 @@ mod layer_tests {
         t.load_image(&data);
         // Whole-image rect, pixelate fill (kind 3), one 16px block → one cell.
         t.add_shape_annotation(
-            0, 0.0, 0.0, 15.0, 15.0, "#000000", 0.0, 0, 3, "#000000", "#000000", 0, 16,
+            0, 0.0, 0.0, 15.0, 15.0, "#000000", 0.0, 0, 3, "#000000", "#000000", 0, 16, 0,
         );
         let a = px(&t, 2, 8);
         let b = px(&t, 13, 8);
@@ -4468,7 +4495,7 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(16, 16);
         t.load_image(&solid(16, 16, [0, 0, 0, 255]));
         t.add_shape_annotation(
-            0, 1.0, 1.0, 10.0, 10.0, "#000000", 1.0, 0, 3, "#000000", "#000000", 0, 24,
+            0, 1.0, 1.0, 10.0, 10.0, "#000000", 1.0, 0, 3, "#000000", "#000000", 0, 24, 0,
         );
         let json = t.get_layer_shape_annotations(0);
         assert!(json.contains("\"fill_block\":24"), "got {json}");
@@ -4689,7 +4716,7 @@ mod layer_persistence_tests {
         t.load_image(&solid(16, 16, [0, 0, 0, 255]));
         // Shape on the base layer (active = 0).
         t.add_shape_annotation(
-            0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            0, 1.0, 1.0, 5.0, 5.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         // New empty top layer.
         t.add_layer("top");
@@ -4743,7 +4770,7 @@ mod layer_persistence_tests {
         let mut t = ImageHorseTool::new(200, 200);
         t.load_image(&solid(200, 200, [255, 255, 255, 255]));
         t.add_shape_annotation(
-            6, 20.0, 40.0, 60.0, 80.0, "#000000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            6, 20.0, 40.0, 60.0, 80.0, "#000000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         t.layers[t.active].shape_annotations[0].points = vec![(20.0, 40.0), (60.0, 80.0)];
 
@@ -4787,7 +4814,7 @@ mod layer_persistence_tests {
             "hi", 12.0, 255, 255, 255, false, 15, 12, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
         );
         t.add_shape_annotation(
-            1, 5.0, 5.0, 8.0, 8.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
+            1, 5.0, 5.0, 8.0, 8.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0, 0,
         );
         // Crop a 10x10 rect starting at (5,5) — annotations must shift by
         // (-5,-5) to stay anchored to the same photo content, matching the
