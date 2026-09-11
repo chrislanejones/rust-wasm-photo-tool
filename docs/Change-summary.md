@@ -10576,3 +10576,28 @@ This activates nothing. The service worker still ships dark.
 ### QC
 
 `imagehorse-qc` **was run on v8.73**, the first full pass since the browser wall came down. Sections 1, 3 (partial), 4 pass. Two findings: **F-2** — four unlabelled Resize controls — is fixed in this cut (#11). **F-1 is open and pre-existing**: on a never-edited 800×600 import the status bar reads `Original: 800×600 | 820×620 | 100%`, and a resize to width 400 exports 396×298 — the gaps differ (−20, −4), so it is not one constant, and no `+20` exists in the engine or CanvasArea. Export of an untouched photo is a correct 800×600. Undo is healthy: two operations, one Ctrl+Z, exactly one step back. B7 (rotated text survives a reload) **closed** through the real UI. The service-worker harness passes 5/5 on this tree.
+
+## v8.75 Change Summary — 2026-09-11
+
+**Shapes duplicate in any direction, the Stroke Stabilizer steadies every brush, and the lists stop disagreeing with each other.**
+
+| Area | Change |
+| --- | --- |
+| **Reselect** | A rectangle or circle row's d-pad opens a duplicate pad — four ⊕ around the shape on the canvas. Each press lays another same-sized copy further out that way; each direction counts on its own, so ← twice gives two marching left and a later ↑ goes above the original, not above the last copy. Rectangles and circles only; other kinds keep a disabled placeholder. |
+| **Reselect** | Any placed text or shape can be duplicated from its row. The copy is made by cloning the object inside the engine rather than rebuilding it from a property list, so a shadow, rotation, background or perspective warp cannot be silently dropped. |
+| **Stroke Stabilizer** | Reaches the Eraser, the blur brush, pixelate, redact and the clone stamp, from the single existing setting. The Eraser had been honouring it all along with no control in the panel to switch it on. |
+| **Stroke Stabilizer** | On the clone stamp the source offset is preserved exactly — a lagging tip samples a source lagging by the same vector, so the smoothing changes the path and nothing else. |
+| **Lists** | History, Reselect and Layers are one row component instead of three that had drifted. Buttons sit in one tight cluster; the coloured dots are gone in favour of the numbers already beside them; Reselect rows are numbered. |
+| **Lists** | History and Reselect hide their row buttons until hover **or keyboard focus** — focus reveals the whole cluster, so nothing is hidden from a Tab user. Layers keeps its buttons visible: they are used constantly and the eye reports a state rather than only offering an action. |
+| **Gallery** | The bar header is three columns — count left, compress centred, actions right. Centred on the bar rather than on the leftover space, so the compress pair stops shifting when a selection appears. |
+| **Gallery** | The count's (i) is a lightbulb, matching every other explanation in the app. |
+| **Import** | Dropping or pasting an image with nothing open goes straight to the gallery. The choice dialog offers three options, two of which need an open image, so it was asking a question with one possible answer. |
+| **Status bar** | The second dimension is labelled `Current:`. It reports the document, which includes the canvas border. |
+| **Eraser** | The panel header says "Eraser", not "Brush" above a field called Brush Size; the field is "Eraser Size". |
+| **Mobile** | The viewer can save a photo to the device. The notice says so, having previously claimed only uploading and browsing. |
+| **Engine** | The stabilizer is its own module (`src/stabilizer.rs`) with the leash table exported to JS as `stabilizer_leash`, so the pen overlay cannot grow a second copy of the numbers. Paint's pixels are unchanged — `tests/replay_parity.rs` is the proof. |
+| **Engine** | `duplicate_text_annotation` / `duplicate_shape_annotation` clone the struct, covered by a test that walks every emitted field rather than a hand-listed set. |
+| **Colour** | The "+" on a colour swatch opens a full picker — hue wheel or SV rectangle, with hex/RGB/HSL fields that track each other, and a before/after split over a checkerboard. Saved colours live in a palette that is localStorage when logged out and a Convex `user_colors` table when signed in, so the logged-out path never touches the network. |
+| **Fixes** | Two files that existed nowhere in master were landed, and a PR-sweep e2e spec's dead selector repaired — it was reporting a harness miss as a 120s product failure. |
+
+wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.

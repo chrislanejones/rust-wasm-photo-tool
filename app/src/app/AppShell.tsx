@@ -86,6 +86,8 @@ import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
 import { useDuplicatePad } from "./session/useDuplicatePad";
+import { usePenActions } from "./session/usePenActions";
+import { useCanvasOps } from "./session/useCanvasOps";
 import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
@@ -857,131 +859,16 @@ export function AppShell() {
   // State lives in useAnnotationStore, not here — AppShell gains nothing new.
   const penEditRequest = useAnnotationStore((s) => s.penEditRequest);
   const requestPenEdit = useAnnotationStore((s) => s.requestPenEdit);
-  const clearPenEditRequest = useAnnotationStore((s) => s.clearPenEditRequest);
-  // ADR-024 Stage 3.5, the PenOverlay redesign (`docs/pen-overlay-async-design.md`).
-  // This is the site whose RETURN VALUE is the contract, which is why it outlived
-  // every other conversion: `PenOverlay.finish()` uses the new id to keep the
-  // path selected, so an un-awaited version hands it a Promise and the path you
-  // just drew silently stops being selected.
-  const handlePenCommit = useCallback(
-    async (flatPoints: number[]) => {
-      const tool = stamp.toolRef.current;
-      if (!tool || flatPoints.length < 8) return; // need ≥ 2 anchors
-      // Any path with a background colour fills its interior — Rust's fill_polygon
-      // auto-closes the flattened curve, so an open curve OR a full (closed) loop
-      // both fill. (Previously this was gated on an explicit `close`, so a curve
-      // or circle finished without closing never filled.)
-      const fillKind = toolSettings.fillMode !== "none" ? 1 : 0;
-      const id = await tool.add_bezier_annotation(
-        new Float64Array(flatPoints),
-        toolSettings.strokeColor,
-        toolSettings.strokeWidth,
-        fillKind,
-        toolSettings.fillColor,
-      );
-      // Liveness, a13's guard, checked AFTER the await: `reset()` nulls
-      // `toolRef.current` on a photo switch and nothing here calls `tool.free()`,
-      // so a commit issued against the OUTGOING document still resolves. FIFO
-      // puts the annotation on the photo that was open when the pen drew it —
-      // which is what we want — but the id is meaningless to the NEW document,
-      // and returning it would have the overlay call `set_editing_shape` on a
-      // photo that never had this path. Drop it and leave the new photo alone.
-      if (stamp.toolRef.current !== tool) return;
-      stamp.flushToCanvas();
-      stamp.syncState();
-      // Hand the id back so the overlay can keep the path selected. Without it
-      // a finished path was immediately deselected, and the Reselect list was
-      // the only way back to its colour and Background.
-      return id;
-    },
-    [
-      stamp,
-      toolSettings.strokeColor,
-      toolSettings.strokeWidth,
-      toolSettings.fillMode,
-      toolSettings.fillColor,
-    ],
-  );
-
-  // Pen re-edit (Stage 3b): hit-test → load a committed kind-7 path → reshape →
-  // commit. The baked copy is hidden via set_editing_shape while editing.
-  const handlePenHitTest = useCallback(
-    async (ix: number, iy: number): Promise<{ id: number; points: number[] } | null> => {
-      const tool = stamp.toolRef.current;
-      if (!tool) return null;
-      // ADR-024 Stage 3.5, a7 — ATOMIC CAPTURE. This was
-      // `shape_annotation_at()` then `get_shape_annotations()`, with the id
-      // from the first used to index into the second. Two reads describing one
-      // document state: behind the worker a shape deleted between them makes
-      // the lookup miss, this return null, and clicking a pen path do nothing
-      // at all — no throw, nothing in the console. `capture_pen_hit` does both
-      // under one `&self`, so there is no between.
-      const hit = await tool.capture_pen_hit(ix, iy);
-      try {
-        // Liveness (a13), inside the `try` so the capture is still freed. A hit
-        // resolved against the outgoing photo names a shape id that does not
-        // exist on the new one; loading it would hide a stranger's annotation.
-        if (stamp.toolRef.current !== tool) return null;
-        // -1 covers both "nothing there" and "the topmost shape there is not a
-        // pen path" — the engine keeps the topmost-then-check rule this call
-        // site used to apply itself via `kind === 7`.
-        if (hit.id < 0) return null;
-        return { id: hit.id, points: Array.from(hit.points) };
-      } finally {
-        hit.free();
-      }
-    },
-    [stamp],
-  );
-  const handlePenEditStart = useCallback(
-    (id: number) => {
-      const tool = stamp.toolRef.current;
-      if (!tool) return;
-      tool.set_editing_shape(id); // hide the baked path; the overlay shows it
-      stamp.flushToCanvas();
-      stamp.syncState();
-    },
-    [stamp],
-  );
-  const handlePenEditCommit = useCallback(
-    (id: number, flatPoints: number[]) => {
-      const tool = stamp.toolRef.current;
-      if (!tool) return;
-      // Re-committing a reselected path adopts the current Paint→Pen panel
-      // style, so changing the Background (or stroke) restyles a path you
-      // already drew — including filling one committed with Background: None.
-      const fillKind = toolSettings.fillMode !== "none" ? 1 : 0;
-      tool.update_bezier_annotation(
-        id,
-        new Float64Array(flatPoints),
-        toolSettings.strokeColor,
-        toolSettings.strokeWidth,
-        fillKind,
-        toolSettings.fillColor,
-      );
-      tool.set_editing_shape(-1);
-      stamp.flushToCanvas();
-      stamp.syncState();
-    },
-    [
-      stamp,
-      toolSettings.strokeColor,
-      toolSettings.strokeWidth,
-      toolSettings.fillMode,
-      toolSettings.fillColor,
-    ],
-  );
-  const handlePenEditCancel = useCallback(() => {
-    const tool = stamp.toolRef.current;
-    if (!tool) return;
-    tool.set_editing_shape(-1);
-    stamp.flushToCanvas();
-    stamp.syncState();
-  }, [stamp]);
-  // One-shot: the overlay has taken the reselected path, so drop the request.
-  // The store action is already stable, so it can be passed straight down — an
-  // inline arrow here would re-run the overlay's load effect on every render.
-  const handlePenEditRequestHandled = clearPenEditRequest;
+  // Pen handlers live in their own session hook (#45) — one domain, one set
+  // of dependencies, and AppShell is under a line cap it was already over.
+  const {
+    handlePenCommit,
+    handlePenHitTest,
+    handlePenEditStart,
+    handlePenEditCommit,
+    handlePenEditCancel,
+    handlePenEditRequestHandled,
+  } = usePenActions(stamp, toolSettings);
 
   useEffect(() => {
     if (activeTool !== "crop") setColorPickerActive(false);
@@ -2290,77 +2177,19 @@ export function AppShell() {
    * the user's chosen backing color (transparent ⇒ checkerboard). Undoable
    * (resize_canvas pushes history) and persisted like any other canvas edit.
    */
-  const handleResizeCanvas = useCallback(
-    async (w: number, h: number) => {
-      if (w < 1 || h < 1) return;
-      const bg = canvasBgToRgba(prefs.canvasBgColor);
-      stamp.resizeCanvas(w, h, 4 /* centre */, bg.r, bg.g, bg.b, bg.a);
-      setHasBeenModified(true);
-      if (activePhotoId) {
-        setModifiedPhotos((prev) =>
-          prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
-        );
-      }
-      await persistActiveCanvas();
-    },
-    [stamp, prefs.canvasBgColor, activePhotoId, persistActiveCanvas],
-  );
-
-  // The "Remove Canvas" companion to Resize Canvas — deletes the artboard's
-  // Canvas layer outright (not a resize-to-zero-padding; the user chose
-  // "delete the layer" over "shrink to native size" when this was scoped).
-  // Only ever meaningful on an artboard doc (Canvas + Photo, or more);
-  // `remove_layer` itself already refuses to drop the last remaining layer.
-  //
-  // Selected by `kind`, not name (ADR-016). The old `name === "Background"`
-  // match was a live bug: with the artboard OFF, `load_image` names the PHOTO
-  // "Background" — so Remove Canvas would have deleted the user's image. On a
-  // document with no Canvas, this is now correctly undefined and the action
-  // no-ops.
-  const backgroundLayerId = stamp.state.layers.find(
-    (l) => l.kind === "canvas",
-  )?.id;
-  const handleRemoveCanvas = useCallback(async () => {
-    if (backgroundLayerId === undefined) return;
-    stamp.removeLayer(backgroundLayerId);
-    setHasBeenModified(true);
-    if (activePhotoId) {
-      setModifiedPhotos((prev) =>
-        prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
-      );
-    }
-    await persistActiveCanvas();
-  }, [stamp, backgroundLayerId, activePhotoId, persistActiveCanvas]);
-
-  // ── Live "Canvas border" / "Backing color" re-apply ────────────────────────
-  // Changing the border (canvasPadding) or backing color (canvasBgColor), or
-  // toggling "Canvas on import" (canvasArtboard) on, while a photo is loaded
-  // re-normalizes the CURRENT document to the artboard via the IDEMPOTENT,
-  // ABSOLUTE Rust `set_artboard_border`: the doc becomes exactly photo + 2×pad,
-  // photo centred, backing refilled — regardless of the doc's current size. This
-  // is what kills the "jumbo" canvas: hitting 10px always yields a 10px border
-  // (never a delta), and it applies to EVERY loaded doc (fresh, gallery, AI),
-  // not just a fresh artboard import.
-  //
-  // Keyed only on the prefs (not hasImage / stamp.state): the initial load
-  // applies the border through `loadImageFromPixels`, so this effect handles
-  // only subsequent pref changes — it never fires on a load and so can't loop
-  // (set_artboard_border changes stamp.state, not the prefs it depends on).
-  // Border prefs commit on the Settings "Apply" (draft model), so persisting
-  // per change doesn't thrash IndexedDB.
-  useEffect(() => {
-    if (!prefs.canvasArtboard || !hasImage) return;
-    const bg = canvasBgToRgba(prefs.canvasBgColor);
-    stamp.setArtboardBorder(prefs.canvasPadding, bg.r, bg.g, bg.b, bg.a);
-    setHasBeenModified(true);
-    if (activePhotoId) {
-      setModifiedPhotos((prev) =>
-        prev.has(activePhotoId) ? prev : new Set(prev).add(activePhotoId),
-      );
-    }
-    void persistActiveCanvas();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefs.canvasPadding, prefs.canvasBgColor, prefs.canvasArtboard]);
+  // Artboard operations — resize, remove, and the live border re-apply — live
+  // in their own session hook (#45). One domain: the MOUNT, never the photo.
+  const { handleResizeCanvas, handleRemoveCanvas, backgroundLayerId } = useCanvasOps({
+    stamp,
+    prefs,
+    // `stamp.state.ready` directly: AppShell's own `hasImage` is declared
+    // several hundred lines below this call, and this is the same expression.
+    hasImage: stamp.state.ready,
+    activePhotoId,
+    setHasBeenModified,
+    setModifiedPhotos,
+    persistActiveCanvas,
+  });
 
   const handleAutoCompress = useCallback(
     async (scope: "selected" | "all" = "all") => {

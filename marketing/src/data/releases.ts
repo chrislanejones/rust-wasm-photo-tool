@@ -24,6 +24,49 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.75",
+    date: "2026-09-11",
+    headline: "Shapes duplicate in any direction, the Stroke Stabilizer steadies every brush, and the lists stop disagreeing with each other",
+    entries: [
+      {
+        tag: "feature",
+        text: "Pick a rectangle or a circle out of Reselect and press the d-pad on its row: four plus buttons appear around the shape on the canvas. Press one and you get another copy of the same size, clear of the original, in that direction. Press the left one twice and you get two marching left. Each side counts on its own, so a press upward afterwards goes above the original rather than above the last copy — which is what you want when you are building a diagram out of repeated boxes.",
+      },
+      {
+        tag: "feature",
+        text: "Any placed text or shape can be duplicated straight from its row in Reselect. The copy is made by cloning the object inside the engine rather than rebuilding it from a list of properties, so a shadow, a rotation, a background or a perspective warp cannot be quietly left behind.",
+      },
+      {
+        tag: "feature",
+        text: "The Stroke Stabilizer used to reach only the Paint brush. It now steadies the Eraser, the blur brush, pixelate, redact and the clone stamp, from the one setting — turn it on because your hand shakes and it is on everywhere. The Eraser had been honouring it all along; there was simply no control in the panel to switch it on.",
+      },
+      {
+        tag: "rust",
+        text: "On the clone stamp the source offset is kept exactly: a lagging tip samples a source lagging by the same vector, so the smoothing changes the path and nothing else. The stabilizer is now its own engine module with its leash table exported to the browser, so no second copy of the numbers can drift.",
+      },
+      {
+        tag: "ui",
+        text: "History, Reselect and the Layers list are one component instead of three that had drifted apart. Row buttons sit together in one cluster and the coloured dots are gone in favour of the numbers already beside them. History and Reselect keep their buttons out of sight until you hover or tab into a row; Layers keeps its visible, because those get used constantly and the eye is reporting a state rather than only offering an action.",
+      },
+      {
+        tag: "ui",
+        text: "The gallery bar's header is three columns — the count on the left, the compress buttons centred, the actions on the right — and the compress pair is centred on the bar rather than on the space left over, so it stops shifting when a selection appears.",
+      },
+      {
+        tag: "fix",
+        text: "Dropping an image with nothing open goes straight to the gallery instead of opening a dialog whose other two choices both need an image already open. The status bar's second number is labelled. The Eraser panel says Eraser rather than Brush above a field called Brush Size.",
+      },
+      {
+        tag: "feature",
+        text: "The \"+\" on any colour swatch opens a real colour picker — a hue wheel or a saturation/brightness rectangle, with hex, RGB and HSL fields that all track each other and a before/after split over a checkerboard. Colours you keep land in a palette that follows you: saved on your device when you are logged out, synced to your account when you are signed in.",
+      },
+      {
+        tag: "feature",
+        text: "The mobile version can save a photo to your device, which the notice now says — it previously claimed only uploading and browsing.",
+      },
+    ],
+  },
+  {
     version: "v8.74",
     date: "2026-09-10",
     headline: "Photos develop as they land, the gallery bar says what it will act on, and phone widths get a real mobile version",
