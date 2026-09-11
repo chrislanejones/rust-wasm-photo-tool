@@ -49,6 +49,7 @@ import {
   Scissors,
 } from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -220,49 +221,63 @@ export function SelectSettings({
             </>
           }
         />
-        <div className="grid grid-cols-3 gap-2 [grid-auto-rows:1fr]">
-          <ToolButton
-            stacked
-            disabled={disabled}
-            onClick={selection.onSelectAll}
-            title="Select all (Alt+A)"
-          >
-            <BoxSelect /> All
-          </ToolButton>
-          <ToolButton
-            stacked
-            disabled={disabled || !selection.active}
-            onClick={selection.onDeselect}
-            title="Deselect (Alt+D)"
-          >
-            <SquareDashed /> Deselect
-          </ToolButton>
-          <ToolButton
-            stacked
-            disabled={disabled || !selection.active}
-            onClick={selection.onDelete}
-            title="Delete selection"
-          >
-            <Trash2 /> Delete
-          </ToolButton>
-          <ToolButton
-            stacked
-            disabled={disabled || !selection.active}
-            onClick={selection.onNewLayerCopy}
-            title="Copy selection to a new layer (Ctrl+J)"
-          >
-            <CopyPlus /> Copy
-          </ToolButton>
-          <ToolButton
-            stacked
-            disabled={disabled || !selection.active}
-            onClick={selection.onNewLayerCut}
-            title="Cut selection to a new layer (Ctrl+Shift+J)"
-          >
-            <Scissors /> Cut
-          </ToolButton>
-          {/* third cell of row two intentionally empty */}
-        </div>
+        {/* One ToolButtonGroup in ACTION mode (no `value`, so no tile ever
+            lights) instead of five hand-rolled ToolButtons in a 3-column grid
+            with a dead sixth cell. Same primitive the rest of the app's
+            "row of tiles" controls use, so Selection stops being the one
+            bespoke grid in this panel.
+
+            Per-option `disabled` is what made this possible: All works with
+            nothing selected, the other four do not, and before this the group
+            only had a single group-wide flag. */}
+        <ToolButtonGroup<"all" | "deselect" | "delete" | "copy" | "cut">
+          columns={5}
+          stacked
+          disabled={disabled}
+          onChange={(id) => {
+            if (id === "all") selection.onSelectAll();
+            else if (id === "deselect") selection.onDeselect();
+            else if (id === "delete") selection.onDelete();
+            else if (id === "copy") selection.onNewLayerCopy();
+            else if (id === "cut") selection.onNewLayerCut();
+          }}
+          options={[
+            {
+              id: "all",
+              label: "All",
+              icon: BoxSelect,
+              title: "Select all (Alt+A)",
+            },
+            {
+              id: "deselect",
+              label: "Deselect",
+              icon: SquareDashed,
+              disabled: !selection.active,
+              title: "Deselect (Alt+D)",
+            },
+            {
+              id: "delete",
+              label: "Delete",
+              icon: Trash2,
+              disabled: !selection.active,
+              title: "Delete selection",
+            },
+            {
+              id: "copy",
+              label: "Copy",
+              icon: CopyPlus,
+              disabled: !selection.active,
+              title: "Copy selection to a new layer (Ctrl+J)",
+            },
+            {
+              id: "cut",
+              label: "Cut",
+              icon: Scissors,
+              disabled: !selection.active,
+              title: "Cut selection to a new layer (Ctrl+Shift+J)",
+            },
+          ]}
+        />
       </div>
 
       {/* ── Remove Object (PatchMatch) ──────────────────────────────────────

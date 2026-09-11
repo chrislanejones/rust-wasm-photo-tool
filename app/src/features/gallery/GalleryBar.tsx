@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { slideFromBottom, slideFromLeft, springStandard, springPop, instantTransition, thumbEnter, hoverPop, fadeIn } from "@/lib/animations";
 import { useThumbDevelop } from "./useThumbDevelop";
-import { Check, Zap, Images, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Info } from "lucide-react";
+import { Check, Zap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2, Download, SquareX, Info } from "lucide-react";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -460,9 +460,14 @@ function GalleryActions({
                   <Zap className="h-3.5 w-3.5" />
                   <span className={label}>Compress Image</span>
                 </Button>
+                {/* Bolt, not the gallery icon. All three of these run the SAME
+                    operation and differ only in scope, so the icon is the verb
+                    ("compress") and the label is the scope — the gallery icon
+                    made Compress All read as a different kind of action than
+                    the button beside it. */}
                 {totalCount > 1 && (
                   <Button size="large" onClick={() => onAutoCompress("all")} title="Compress every photo in the gallery" className={btn}>
-                    <Images className="h-3.5 w-3.5" />
+                    <Zap className="h-3.5 w-3.5" />
                     <span className={label}>Compress All</span>
                   </Button>
                 )}
