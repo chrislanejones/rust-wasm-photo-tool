@@ -19,11 +19,13 @@ export interface ToggleGroupItem {
   /** Whether this button is currently on (multiple may be on at once). */
   active: boolean;
   onToggle: () => void;
-  /** Greys the button out and drops it from the tab order. Added for Export,
-   *  which is the one item in the top bar's cluster that is an ACTION rather
-   *  than a toggle — it fires a download instead of turning a panel on, so it
-   *  passes `active: false` permanently and needs a way to say "not yet"
-   *  when there is no image to export. */
+  /** Greys the button out and drops it from the tab order. Added for the top
+   *  bar's Export, which was an ACTION sitting in a group of toggles and
+   *  needed a way to say "not yet" when there was no image to export. Export
+   *  left for the right cluster's icon pair on 2026-09-11, so no caller passes
+   *  this today — it stays because "this toggle is unavailable right now" is a
+   *  state any of these groups can land in, and re-deriving it costs more than
+   *  the six lines. */
   disabled?: boolean;
   /** Optional rich hover tooltip (e.g. label + keyboard shortcut). When
    *  omitted the label is used as a plain `title`. */
@@ -43,7 +45,7 @@ interface ToggleButtonGroupProps {
   fill?: boolean;
   /** Give every button the SAME width — the width of the widest label —
    *  instead of letting each shrink to its own text. Use when the labels are
-   *  uneven enough that the short ones read as mistakes ("New" beside
+   *  uneven enough that the short ones read as mistakes ("Tools" beside
    *  "Gallery"). Distinct from `fill`, which is about consuming leftover row
    *  space: `fill` in a shrink-to-fit row leaves the widest button at its own
    *  content width and only pads the rest, so it does NOT equalize. */
@@ -66,8 +68,8 @@ interface ToggleButtonGroupProps {
    that was wrong, not the panel. */
 
 /**
- * A pill-style group of multi-select toggle buttons — the Upload / Tools /
- * Gallery cluster in the top bar and the History / Reselect / Layers cluster
+ * A pill-style group of multi-select toggle buttons — the Tools / Gallery /
+ * Review cluster in the top bar and the History / Reselect / Layers cluster
  * in the Review panel share this component. "Multi-select" because each button
  * toggles on/off independently; any number can be active at once.
  */
@@ -144,7 +146,7 @@ export function ToggleButtonGroup({
             )}
           >
             {/* ONE glyph size, labelled or not: 18px, matching the top bar's
-                IconButton. The top bar's New/Tools/Gallery/Review and the
+                IconButton. The top bar's Tools/Gallery/Review and the
                 Review panel's History/Layers/Reselect/Histogram are the same
                 component, and they now read at the same weight whether or not
                 the label is showing. (14px here made the labelled ones look

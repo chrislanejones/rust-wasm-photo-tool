@@ -932,6 +932,18 @@ declare module "stamp_tool" {
     // ── Layers (Photoshop-style stack) ──
     /** Recompute the cached composite of all visible layers (call before reading data_ptr). */
     recomposite(): void;
+    /** The PHOTO's bounds inside the document: `[x, y, w, h]` in image px.
+     *
+     *  NOT the document size. A default import is an artboard — a Canvas fill
+     *  with the photo centred — so the document is `photo + 2 * canvasPadding`.
+     *
+     *  Decided STRUCTURALLY: a Canvas layer present means the photo is mounted
+     *  and its own bounds are the answer; no Canvas means the document was
+     *  flattened (or the Canvas removed) and the document IS the picture. A
+     *  pixel-based rule gets the flatten case wrong — the default canvas fill
+     *  is transparent, so the flattened layer's non-transparent box is still
+     *  just the photo. Pinned by tests/photo_bounds.rs. */
+    photo_bounds(): Uint32Array;
     /** Every layer in the stack, Canvas included — what the Layers panel shows. */
     layer_count(): number;
     /** True once an unrecorded edit desynced the op log — snapshot undo only,

@@ -242,7 +242,7 @@ export const imageLoadBarProgress = {
 // The glyph inside a hovered control grows 10%. ONE definition: the tool rail
 // tiles (ToolButton), the sub-tool row (SubtoolRow), every IconButton in the
 // top bar, the ToggleButtonGroup icons (the Review panel's section toggles and
-// the bar's New/Tools/Gallery/Review/Export), and the gallery thumbnails all
+// the bar's Tools/Gallery/Review), and the gallery thumbnails all
 // read it from here.
 //
 // Until 2026-09-08 it was the same Tailwind string

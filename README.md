@@ -84,44 +84,59 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.74 — 2026-09-10
+### v8.75 — 2026-09-11
 
-**Photos develop as they land, the gallery bar says what it will act on, and
-phone widths get a real mobile version.**
+**Shapes duplicate in any direction, the Stroke Stabilizer steadies every
+brush, and the lists stop disagreeing with each other.**
 
-A pasted or dropped photo used to sit as a grey block until its thumbnail was
-ready. It now comes up like a Polaroid — white paper that sweeps open from the
-top — and every tile takes at least a quarter of a second even when the pixels
-are instant, because a thirty-millisecond flash reads as a glitch. Several at
-once come up left to right, each starting when the one before it is most of
-the way there. If a photo is slow, the develop visibly slows with it rather
-than freezing.
+Pick a rectangle or a circle out of Review → Reselect and press the d-pad on
+its row: four ⊕ appear around the shape on the canvas. Press one and you get
+another copy of the same size, clear of the original, in that direction. Press
+the left one twice and you get two marching left. Each side counts on its own,
+so a press upward afterwards goes above the original rather than above the
+last copy — which is what you want when you are building a diagram out of
+repeated boxes.
 
-The gallery bar has three arrangements now, one for nothing selected, one
-selected, many selected, and the scope is always in the button text — "Delete
-Image" or "Delete All", never a "Delete Selected" sitting there with nothing
-selected. Auto Compress & Resize moved out of the Enhance panel and into the
-bar, beside the photos it acts on. The confirm you get for one photo now says
-one photo. In the compact layout the thumbnails have room between them, and
-the bar uses the same tile grid the Selection panel does.
+Any placed text or shape can also be duplicated straight from its row. The
+copy is made inside the engine by cloning the object rather than rebuilding it
+from a list of properties, so nothing about it can be quietly left behind — a
+shadow, a rotation, a background, a perspective warp all come with it.
 
-Below 600 pixels wide Image Horse is now a real mobile version: add photos
-from your library or camera, browse the gallery, and pick the editing up on a
-bigger screen. It replaces the notice that used to say the window was too
-small.
+The Stroke Stabilizer used to reach only the Paint brush. It now steadies the
+Eraser, the blur brush, pixelate, redact and the clone stamp, from the one
+setting — turn it on because your hand shakes and it is on everywhere. The
+Eraser had in fact been honouring it all along; there was simply no control in
+the panel to switch it on. On the clone stamp the source offset is kept
+exactly, so the smoothing changes the path and nothing else.
 
-Create AI Image opens a real dialog — prompt, reference images, a plain
-sentence about what leaves your tab. Generate is off, and says why: there is
-no model chosen yet, and a button that does nothing is worse than one that
-tells you. The font selector stops promising faces the engine cannot draw —
-it lists the one it has, and the text you type previews in that face, so
-nothing snaps on commit. Four resize controls that read as "spin button" to a
-screen reader have names.
+History, Reselect and the Layers list are one component now instead of three
+that had drifted apart. Row buttons sit together in one cluster, the coloured
+dots are gone in favour of the numbers that were already beside them, and
+Reselect rows are numbered too. History and Reselect keep their buttons out of
+sight until you hover or tab into a row; the Layers list keeps its visible,
+because those get used constantly and the eye is reporting a state, not just
+offering an action.
 
-Known and open: on a freshly imported photo the status bar reports a working
-size 20 pixels larger than the file on each axis, and a resize to an exact
-width exports a few pixels under it. Export of an untouched photo is correct.
-Being looked at.
+The gallery bar's header is three columns — the count on the left, the
+compress buttons centred, the actions on the right — and the compress pair is
+centred on the bar rather than on the space left over, so it stops shifting
+when a selection appears.
+
+The "+" on any colour swatch opens a real colour picker — a hue wheel or a
+saturation/brightness rectangle, with hex, RGB and HSL fields that all track
+each other. Colours you keep land in a palette that follows you: saved locally
+when you are logged out, synced to your account when you are signed in.
+
+Smaller things: dropping an image with nothing open goes straight to the
+gallery instead of asking a question with one possible answer; the status
+bar's second number is labelled; the Eraser panel says "Eraser" rather than
+"Brush" above a field called Brush Size; and the mobile version can save a
+photo to your device, which the notice now says.
+
+Known and open: on a freshly imported photo the status bar reports the
+document size, which includes the canvas border, and a resize to an exact
+width applies that width to the document rather than the picture. Export of an
+untouched photo is correct.
 
 ## License
 
