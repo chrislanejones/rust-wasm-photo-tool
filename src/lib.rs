@@ -2167,7 +2167,7 @@ impl ImageHorseTool {
 
     // ── Stroke lifecycle ────────────────────────────────────────────────
 
-    pub fn begin_stroke(&mut self, dest_x: f64, dest_y: f64) {
+    pub fn begin_stroke(&mut self, dest_x: f64, dest_y: f64, stab: &str) {
         let w = self.width as i32;
         let h = self.height as i32;
         let snap = self.make_snapshot(&format!("Stamp {}", self.stamp.stroke_counter + 1));
@@ -2181,18 +2181,29 @@ impl ImageHorseTool {
             dest_x,
             dest_y,
             snap,
+            stab,
         );
     }
 
-    pub fn continue_stroke(&mut self, dest_x: f64, dest_y: f64) {
+    pub fn continue_stroke(&mut self, dest_x: f64, dest_y: f64) -> bool {
         let w = self.width as i32;
         let h = self.height as i32;
         self.stamp
-            .continue_stroke(&mut self.layers[self.active].buf.data, w, h, dest_x, dest_y);
+            .continue_stroke(&mut self.layers[self.active].buf.data, w, h, dest_x, dest_y)
     }
 
-    pub fn end_stroke(&mut self) {
-        self.stamp.end_stroke(&mut self.hist);
+    pub fn end_stroke(&mut self, raw_x: f64, raw_y: f64) {
+        let w = self.width as i32;
+        let h = self.height as i32;
+        let active = self.active;
+        self.stamp.end_stroke(
+            &mut self.layers[active].buf.data,
+            w,
+            h,
+            raw_x,
+            raw_y,
+            &mut self.hist,
+        );
     }
 
     /// Set the undo-history depth (clamped to 50–1000). Trims the oldest

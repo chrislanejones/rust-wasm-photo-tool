@@ -231,7 +231,11 @@ export function SelectSettings({
             nothing selected, the other four do not, and before this the group
             only had a single group-wide flag. */}
         <ToolButtonGroup<"all" | "deselect" | "delete" | "copy" | "cut">
-          columns={5}
+          // THREE ACROSS, not five. Five squeezed "Deselect" and "Delete" into
+          // a sidebar column that has no room for them; three keeps the labels
+          // readable and leaves the last cell of row two empty, which is how
+          // this section has always looked (Chris, 2026-09-11).
+          columns={3}
           stacked
           disabled={disabled}
           onChange={(id) => {

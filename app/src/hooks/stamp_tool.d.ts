@@ -311,9 +311,16 @@ declare module "stamp_tool" {
     set_zoom(z: number): void;
     get_zoom(): number;
     adjust_zoom(delta: number): void;
-    begin_stroke(dest_x: number, dest_y: number): void;
-    continue_stroke(dest_x: number, dest_y: number): void;
-    end_stroke(): void;
+    /** `stab` is the stroke-stabilizer level ("off"|"low"|"med"|"high") —
+     *  the same leash the paint and blur engines use. */
+    begin_stroke(dest_x: number, dest_y: number, stab: string): void;
+    /** False when the cursor is still inside the stabilizer's leash and
+     *  nothing was stamped, so the coalescer can skip its flush. */
+    continue_stroke(dest_x: number, dest_y: number): boolean;
+    /** `raw_x`/`raw_y` are the TRUE cursor at mouse-up, so the leash can catch
+     *  up before the stroke closes. Passing the stabilized tip instead makes
+     *  the catch-up a no-op and silently drops the stroke's tail. */
+    end_stroke(raw_x: number, raw_y: number): void;
     set_max_history(n: number): void;
     undo(): boolean;
     redo(): boolean;
