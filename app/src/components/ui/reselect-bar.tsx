@@ -46,7 +46,13 @@ export interface ReselectBarProps {
    *  purpose: a live control should arrive with its behaviour, not be switched
    *  on by a caller guessing what it does. */
   showDirectional?: boolean;
-  /** aria-label for the directional button. Default "Move". */
+  /** LIVE directional control — opens/closes the duplicate pad for this row.
+   *  When present it wins over `showDirectional`. Only rect/circle rows get
+   *  one; the rest keep the disabled placeholder. */
+  onDirectional?: () => void;
+  /** Whether this row's pad is the open one (aria-pressed + accent). */
+  directionalActive?: boolean;
+  /** aria-label for the directional button. Default "Duplicate pad". */
   directionalLabel?: string;
   disabled?: boolean;
   /** Title/tooltip for the row. */
@@ -82,7 +88,9 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       deleteLabel = "Delete",
       duplicateLabel = "Duplicate",
       showDirectional = false,
-      directionalLabel = "Move",
+      onDirectional,
+      directionalActive = false,
+      directionalLabel = "Duplicate pad",
       onMoveUp,
       onMoveDown,
       canMoveUp = true,
@@ -152,13 +160,23 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
         {/* The trailing three, in this order and always visible: directional
             placeholder, duplicate, delete. Delete stays rightmost, where it
             has always been. */}
-        {showDirectional && (
-          /* Permanently disabled — see `showDirectional`. Its label says so,
-             rather than reading as a control that is merely unavailable now. */
+        {onDirectional ? (
           <RowAction
             icon={GamepadDirectional}
-            label={`${directionalLabel} — not available yet`}
+            label={directionalActive ? `Close ${directionalLabel.toLowerCase()}` : directionalLabel}
+            pressed={directionalActive}
+            disabled={disabled}
+            onClick={onDirectional}
           />
+        ) : (
+          showDirectional && (
+            /* Permanently disabled — see `showDirectional`. Its label says so,
+               rather than reading as a control that is merely unavailable. */
+            <RowAction
+              icon={GamepadDirectional}
+              label={`${directionalLabel} — rectangles and circles only`}
+            />
+          )
         )}
         {onDuplicate && (
           <RowAction

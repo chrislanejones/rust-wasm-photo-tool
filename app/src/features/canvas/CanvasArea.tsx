@@ -29,6 +29,7 @@ import { PerspectiveOverlay } from "./PerspectiveOverlay";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
+import type { OverlayFrame } from "./overlayFrame";
 import {
   textInkOffset,
   primeTextMetrics,
@@ -203,6 +204,8 @@ interface Props {
    *  hover highlight is drawn over the one whose id matches
    *  `hoveredAnnotationId`. */
   annotations?: AnnotationBox[];
+  /** Mount an extra overlay inside the canvas frame without touching this file (see overlayFrame.ts). */
+  renderOverlay?: (frame: OverlayFrame) => React.ReactNode;
   hoveredAnnotationId?: number | null;
   /** Mousemove handler used to drive the hover highlight while the text
    *  tool is active. */
@@ -445,6 +448,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onTextFontSizeChange,
       onTextRotationChange,
       annotations,
+      renderOverlay,
       hoveredAnnotationId,
       onCanvasHover,
       cropSelection,
@@ -1374,6 +1378,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     };
 
     const { width: imgW, height: imgH } = hookResult.state;
+    const overlayFrame: OverlayFrame = { width: imgW, height: imgH, cssWidth: canvasCss?.w, cssHeight: canvasCss?.h, panOffset, zoom };
 
     // Draggable image guides (read the store directly — non-destructive overlay,
     // independent of the rulers/grid pref).
@@ -1501,16 +1506,9 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             which made this hook a second writer to the engine's own output
             surface — see ADR-024 "Stage 4's real scope". Nothing in React
             draws on the main canvas now. */}
+        {renderOverlay?.(overlayFrame)}
         {imgW > 0 && imgH > 0 && (
-          <DrawPreviewOverlay
-            ref={drawPreviewRef}
-            width={imgW}
-            height={imgH}
-            cssWidth={canvasCss?.w}
-            cssHeight={canvasCss?.h}
-            panOffset={panOffset}
-            zoom={zoom}
-          />
+          <DrawPreviewOverlay ref={drawPreviewRef} {...overlayFrame} />
         )}
 
         <CompareSlider canvasEl={canvasRef.current} />

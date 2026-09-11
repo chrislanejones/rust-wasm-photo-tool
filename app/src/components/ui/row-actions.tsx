@@ -40,6 +40,9 @@ interface RowActionProps {
   /** Native tooltip AND the accessible name — icon-only buttons need one. */
   label: string;
   disabled?: boolean;
+  /** Toggle state for the few row actions that are modes rather than
+   *  one-shots (the duplicate pad). Sets `aria-pressed` and the accent. */
+  pressed?: boolean;
   /** Omit for a permanently-disabled placeholder. */
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
 }
@@ -60,6 +63,7 @@ export function RowAction({
   children,
   label,
   disabled = false,
+  pressed,
   onClick,
 }: RowActionProps) {
   return (
@@ -68,6 +72,8 @@ export function RowAction({
       title={label}
       aria-label={label}
       disabled={disabled || !onClick}
+      aria-pressed={pressed}
+      className={pressed ? "text-theme-primary" : undefined}
       onClick={(e) => {
         e.stopPropagation();
         if (!disabled) onClick?.(e);

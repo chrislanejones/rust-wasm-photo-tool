@@ -85,6 +85,9 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
+import { useDuplicatePad } from "./session/useDuplicatePad";
+import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
+import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
 import { useExportDimensions } from "./session/useExportDimensions";
@@ -1705,7 +1708,7 @@ export function AppShell() {
         s.kind === 5
           ? `Pin ${pinLabelText(s.number, s.label_kind)}`
           : `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`;
-      items.push({ key: `s${s.id}`, type: "shape", id: s.id, label });
+      items.push({ key: `s${s.id}`, type: "shape", id: s.id, label, kind: s.kind });
     });
     return items;
   }, [textTool.annotations, drawingTools.shapes]);
@@ -1824,39 +1827,16 @@ export function AppShell() {
     [stamp, textTool, drawingTools, bumpAnnotations, setSelectedObject],
   );
 
-  /** Down-right nudge applied to a duplicated annotation, in image px. Big
-   *  enough to see the copy is a separate object, small enough that it is
-   *  obviously related to its source. */
-  const DUPLICATE_OFFSET = 12;
-
-  /** Duplicate a placed text or shape from the Reselect list, offset down-right
-   *  so the copy is visibly its own object rather than hidden exactly behind
-   *  the original.
-   *
-   *  Both branches go through ONE engine call that clones the struct, so no
-   *  property can be dropped in transit — see tests/duplicate_annotation.rs.
-   *  Deliberately does NOT change the Align target: you duplicated an object,
-   *  you did not select the copy. */
-  const handleDuplicateObject = useCallback(
-    async (o: ReselectObject) => {
-      const tool = stamp.toolRef.current;
-      if (!tool) return;
-      // AWAITED, and it has to be. Under the ADR-024 worker proxy these return
-      // a Promise, and `Promise < 0` is false for every Promise — so an
-      // un-awaited guard would silently treat "not found" as success and go on
-      // to flush and sync for an object the engine never made. tsc cannot see
-      // it; the engineAsyncMigration contract test can, and did.
-      const newId =
-        o.type === "text"
-          ? await tool.duplicate_text_annotation(o.id, DUPLICATE_OFFSET, DUPLICATE_OFFSET)
-          : await tool.duplicate_shape_annotation(o.id, DUPLICATE_OFFSET, DUPLICATE_OFFSET);
-      if (newId < 0) return; // -1 sentinel: nothing carried that id
-      stamp.flushToCanvas();
-      stamp.syncState();
-      if (o.type === "text") void textTool.refreshAnnotations();
-      bumpAnnotations();
-    },
-    [stamp, textTool, bumpAnnotations],
+  // Reselect's Duplicate button and the directional duplicate pad. Handlers
+  // live in the session hook, not here — AppShell is being dismantled
+  // (CLAUDE.md), and the first cut of this handler sat in this file.
+  const duplicatePad = useDuplicatePad(stamp, drawingTools, textTool, bumpAnnotations);
+  // Mounted through CanvasArea's generic render-prop so CanvasArea stays
+  // ignorant of the pad (and inside its max-lines cap).
+  const renderDuplicatePad = useCallback(
+    (frame: OverlayFrame) =>
+      duplicatePad.canvasProps ? <DuplicatePadOverlay {...frame} {...duplicatePad.canvasProps} /> : null,
+    [duplicatePad.canvasProps],
   );
 
   const redStampTool = useRedStampTool({
@@ -3484,6 +3464,7 @@ export function AppShell() {
                           onTextFontSizeChange={handleTextFontSizeChange}
                           onTextRotationChange={textTool.setTextRotation}
                           annotations={annotationBoxes}
+                          renderOverlay={renderDuplicatePad}
                           hoveredAnnotationId={textTool.hoveredAnnotationId}
                           onCanvasHover={textTool.onCanvasHover}
                           cropSelection={drawingTools.cropSelection}
@@ -3617,6 +3598,7 @@ export function AppShell() {
                       onTextFontSizeChange={handleTextFontSizeChange}
                       onTextRotationChange={textTool.setTextRotation}
                       annotations={annotationBoxes}
+                      renderOverlay={renderDuplicatePad}
                       hoveredAnnotationId={textTool.hoveredAnnotationId}
                       onCanvasHover={textTool.onCanvasHover}
                       cropSelection={drawingTools.cropSelection}
@@ -3780,7 +3762,9 @@ export function AppShell() {
             objects={reselectObjects}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
-            onDuplicateObject={(o) => void handleDuplicateObject(o)}
+            onDuplicateObject={(o) => void duplicatePad.duplicateObject(o)}
+            onToggleDuplicatePad={duplicatePad.togglePad}
+            duplicatePadId={duplicatePad.padId}
             onMoveShape={drawingTools.moveShape}
             userMode={effectiveUserMode}
             layers={stamp.state.layers}

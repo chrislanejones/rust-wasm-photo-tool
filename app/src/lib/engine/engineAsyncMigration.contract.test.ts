@@ -755,7 +755,11 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // false for every Promise — so a duplicate of a stale id would skip its
     // own early return and go on to flush and sync an object the engine
     // never created. This gate caught exactly that on the first write.
-    expect(gate.awaited, "cumulative converted sites").toBe(135);
+    // Duplicate pad — 135 -> 136: the two Reselect sites moved out of
+    // AppShell into useDuplicatePad (−2) and the directional pad added a
+    // third awaited `duplicate_shape_annotation` (+3). Same -1 sentinel, same
+    // reason to await.
+    expect(gate.awaited, "cumulative converted sites").toBe(136);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
