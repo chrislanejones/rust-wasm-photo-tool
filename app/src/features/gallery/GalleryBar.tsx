@@ -448,7 +448,21 @@ function GalleryActions({
               </>
             }
           />
-          <div className={vertical ? "grid grid-cols-2 gap-1.5 [&>button]:w-full" : "flex items-center gap-1.5"}>
+          {/* GRID, not a flex row: `auto-cols-fr` gives Compress Image and
+              Compress All the SAME width whatever their labels measure, and
+              `justify-center` centres the pair as a block. A flex row sized
+              each button to its own text, so the two sat off-centre and
+              visibly mismatched.
+              COMPACT STACKS. One column, full-width buttons — the vertical
+              bar has no room to put two beside each other without clipping
+              the labels. */}
+          <div
+            className={
+              vertical
+                ? "grid grid-cols-1 gap-1.5 [&>button]:w-full"
+                : "grid grid-flow-col auto-cols-fr justify-center gap-1.5 [&>button]:w-full"
+            }
+          >
             {some ? (
               <Button size="large" onClick={() => onAutoCompress("selected")} title="Compress the selected photos" className={btn}>
                 <Zap className="h-3.5 w-3.5" />

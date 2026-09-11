@@ -115,9 +115,10 @@ export function DuplicatePadOverlay({
             e.stopPropagation();
             onDuplicate(dir);
           }}
-          // Opacity is a core utility, so it always emits; the colour comes
-          // from the theme token directly rather than a `bg-theme-*` class,
-          // which cannot be trusted to exist (see CLAUDE.md on inert classes).
+          // Opacity is a core utility, so it always emits. The colour comes
+          // from the theme CSS variable directly rather than a generated
+          // colour utility, which can silently emit no rule at all when its
+          // token does not exist (see CLAUDE.md on inert classes).
           className="opacity-60 hover:opacity-100 focus-visible:opacity-100 transition-opacity"
           style={{
             position: "absolute",

@@ -14,9 +14,17 @@ import { ChevronGlyph, DeleteGlyph, RowAction } from "@/components/ui/row-action
  * type History entries); omit it for a plain jump-to-state row with no ✕
  * (History's "current"/"redo" entries).
  *
- * Visual: reuses the existing `.full-width-badge .type-*` / `.history-dot` /
- * `.large-badge` / `.history-delete` classes (styles.css), plus an
- * `.is-selected` highlight for lists that keep a persistent selection.
+ * Visual: reuses the existing `.full-width-badge .type-*` / `.large-badge` /
+ * `.history-delete` classes (styles.css), plus an `.is-selected` highlight
+ * for lists that keep a persistent selection.
+ *
+ * The coloured dot is gone (2026-09-11): the leading slot is the INDEX, and a
+ * dot beside a number said the same thing twice. `type-*` still colours the
+ * row itself, so the state it carried is not lost.
+ *
+ * Trailing buttons live in one `.row-actions` cluster, hidden until the row is
+ * hovered OR focus enters it. The focus half is not optional — hover-only
+ * reveal hides a focusable control from every keyboard user.
  *
  * a11y: the bar is a `role="button"` (Enter/Space → select; Delete/Backspace →
  * delete when a delete handler is present); the ✕ is a real `<button>` with an
@@ -25,8 +33,19 @@ import { ChevronGlyph, DeleteGlyph, RowAction } from "@/components/ui/row-action
 export interface ReselectBarProps {
   /** Row label (text/shape name, "H · 120px", a history step's label…). */
   label: ReactNode;
-  /** Leading index number, e.g. a History entry's step index. Omit to skip it. */
+  /** Leading slot: a History step index, a Reselect ordinal, or — in `lg` —
+   *  a layer's name. Omit to skip it. */
   index?: ReactNode;
+  /** `lg` is the Layers list: a taller row whose leading slot carries a name
+   *  rather than a number, and which may render `children` beneath itself. */
+  size?: "sm" | "lg";
+  /** Extra trailing buttons, rendered inside `.row-actions` BEFORE the
+   *  built-in duplicate/delete. Lets a caller (Layers) bring its own without
+   *  a second row component drifting away from this one. */
+  actions?: ReactNode;
+  /** Rendered below the row inside the same badge — the Layers opacity
+   *  slider. It stays inside so it inherits the row's selected/hover state. */
+  children?: ReactNode;
   /** Row colour/dot variant — `.full-width-badge.type-*`. Default "redo". */
   type?: "undo" | "redo" | "current";
   /** Persistent-selection highlight (lists without selection just omit it). */
@@ -78,6 +97,9 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
     {
       label,
       index,
+      size = "sm",
+      actions,
+      children,
       type = "redo",
       selected = false,
       onSelect,
@@ -129,71 +151,73 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
         onKeyDown={onKeyDown}
         className={cn(
           `full-width-badge type-${type}`,
+          size === "lg" && "full-width-badge-lg",
           selected && "is-selected",
           disabled && "is-disabled",
           className,
         )}
       >
-        <span className="history-dot" />
-        {index !== undefined && (
-          <span className="history-index">{index}</span>
-        )}
+        {index !== undefined && <span className="history-index">{index}</span>}
         <span className="large-badge">{label}</span>
-        {onMoveUp && (
-          <RowAction
-            label={`${moveUpLabel} (Shift: to front)`}
-            disabled={disabled || !canMoveUp}
-            onClick={(e) => onMoveUp(e.shiftKey)}
-          >
-            <ChevronGlyph up />
-          </RowAction>
-        )}
-        {onMoveDown && (
-          <RowAction
-            label={`${moveDownLabel} (Shift: to back)`}
-            disabled={disabled || !canMoveDown}
-            onClick={(e) => onMoveDown(e.shiftKey)}
-          >
-            <ChevronGlyph up={false} />
-          </RowAction>
-        )}
-        {/* The trailing three, in this order and always visible: directional
-            placeholder, duplicate, delete. Delete stays rightmost, where it
-            has always been. */}
-        {onDirectional ? (
-          <RowAction
-            icon={GamepadDirectional}
-            label={directionalActive ? `Close ${directionalLabel.toLowerCase()}` : directionalLabel}
-            pressed={directionalActive}
-            disabled={disabled}
-            onClick={onDirectional}
-          />
-        ) : (
-          showDirectional && (
-            /* Permanently disabled — see `showDirectional`. Its label says so,
-               rather than reading as a control that is merely unavailable. */
+        <div className="row-actions">
+          {actions}
+          {onMoveUp && (
+            <RowAction
+              label={`${moveUpLabel} (Shift: to front)`}
+              disabled={disabled || !canMoveUp}
+              onClick={(e) => onMoveUp(e.shiftKey)}
+            >
+              <ChevronGlyph up />
+            </RowAction>
+          )}
+          {onMoveDown && (
+            <RowAction
+              label={`${moveDownLabel} (Shift: to back)`}
+              disabled={disabled || !canMoveDown}
+              onClick={(e) => onMoveDown(e.shiftKey)}
+            >
+              <ChevronGlyph up={false} />
+            </RowAction>
+          )}
+          {/* The trailing three, in this order and always visible: directional
+              placeholder, duplicate, delete. Delete stays rightmost, where it
+              has always been. */}
+          {onDirectional ? (
             <RowAction
               icon={GamepadDirectional}
-              label={`${directionalLabel} — rectangles and circles only`}
+              label={directionalActive ? `Close ${directionalLabel.toLowerCase()}` : directionalLabel}
+              pressed={directionalActive}
+              disabled={disabled}
+              onClick={onDirectional}
             />
-          )
-        )}
-        {onDuplicate && (
-          <RowAction
-            icon={Copy}
-            label={duplicateLabel}
-            disabled={disabled}
-            onClick={onDuplicate}
-          />
-        )}
-        {onDelete && (
-          <RowAction
-            icon={DeleteGlyph}
-            label={deleteLabel}
-            disabled={disabled}
-            onClick={onDelete}
-          />
-        )}
+          ) : (
+            showDirectional && (
+              /* Permanently disabled — see `showDirectional`. Its label says so,
+                 rather than reading as a control that is merely unavailable. */
+              <RowAction
+                icon={GamepadDirectional}
+                label={`${directionalLabel} — rectangles and circles only`}
+              />
+            )
+          )}
+          {onDuplicate && (
+            <RowAction
+              icon={Copy}
+              label={duplicateLabel}
+              disabled={disabled}
+              onClick={onDuplicate}
+            />
+          )}
+          {onDelete && (
+            <RowAction
+              icon={DeleteGlyph}
+              label={deleteLabel}
+              disabled={disabled}
+              onClick={onDelete}
+            />
+          )}
+        </div>
+        {children}
       </div>
     );
   },

@@ -921,11 +921,30 @@ textarea:focus-visible {
   padding-top: 0;
 }
 
-.layer-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+/* The Layers list is the `lg` variant of the shared row: taller, and its
+   leading slot carries a NAME rather than a number, so that slot has to be
+   free to grow instead of sitting at the number's fixed 18px. */
+.full-width-badge-lg {
+  padding: 9px 10px;
   flex-wrap: wrap;
+}
+
+.full-width-badge-lg .history-index {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+/* The label slot is only the mask badge here, so it must not claim the width
+   `.large-badge` normally takes from the row. */
+.full-width-badge-lg .large-badge {
+  flex: 0 0 auto;
+}
+
+.layer-row {
+  gap: 6px;
 }
 
 .layer-active {
@@ -956,7 +975,7 @@ textarea:focus-visible {
 }
 
 .layer-name {
-  flex: 1;
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1234,8 +1253,28 @@ textarea:focus-visible {
   background: var(--bg-elevated);
 }
 
-.full-width-badge:hover .history-delete {
+/* HIDDEN UNTIL HOVER (Chris, 2026-09-11). The accessibility half is
+   `:focus-within` below: a Tab user reveals the whole trailing group the
+   moment focus enters the row, so a hover-only reveal never hides a
+   focusable control from the keyboard. */
+.full-width-badge:hover .row-actions,
+.full-width-badge:focus-within .row-actions,
+.full-width-badge:hover .history-delete,
+.full-width-badge:focus-within .history-delete,
+.full-width-badge:hover .history-zmove,
+.full-width-badge:focus-within .history-zmove {
   opacity: 1;
+}
+
+/* The trailing button group. Tight like the Layers list — these are one
+   cluster of related actions, not separate controls scattered along the row. */
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
 
 /* ▲/▼ restack arrows on shape rows — same hover-reveal as the ✕, and a
@@ -1243,11 +1282,12 @@ textarea:focus-visible {
    a state rather than a missing button. Keyboard focus reveals it too:
    hover-only reveal would hide a focusable control from Tab users. */
 .history-zmove {
-  /* Always visible, same reasoning as .history-delete above. */
-  opacity: 1;
+  opacity: 0;
   background: none;
   border: none;
-  color: var(--text-muted);
+  /* --text-secondary, not --text-muted: muted is too light to read against
+     the light-mode row, and these must match the History rows exactly. */
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
@@ -1256,8 +1296,8 @@ textarea:focus-visible {
   justify-content: center;
   transition: all 0.1s;
 }
-.full-width-badge:hover .history-zmove,
-.history-zmove:focus-visible {
+.history-zmove:focus-visible,
+.history-delete:focus-visible {
   opacity: 1;
 }
 .history-zmove:hover:not(:disabled) {
@@ -1268,45 +1308,18 @@ textarea:focus-visible {
   opacity: 0.35;
 }
 
-.history-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.full-width-badge.type-undo .history-dot {
-  background: var(--undo-color);
-}
-
-.full-width-badge.type-current .history-dot {
-  background: var(--current-color);
-  box-shadow: 0 0 8px var(--accent-dim);
-}
-
-.full-width-badge.type-redo .history-dot {
-  background: var(--redo-color);
-  opacity: 0.5;
-}
-
-.full-width-badge.type-current {
+.full-width-badge.type-undo .full-width-badge.type-current .full-width-badge.type-redo .full-width-badge.type-current {
   background: var(--bg-tertiary);
   border-color: var(--border);
-  justify-content: center;
 }
 
-.full-width-badge.type-current .history-dot {
-  background: var(--text-muted);
-}
-
-.full-width-badge.type-current .history-index {
+.full-width-badge.type-current .full-width-badge.type-current .history-index {
   color: var(--text-muted);
 }
 
 .full-width-badge.type-current .large-badge {
   color: var(--accent);
   font-weight: 600;
-  text-align: center;
 }
 
 .full-width-badge.type-redo {
@@ -1325,12 +1338,9 @@ textarea:focus-visible {
   border-color: var(--accent);
 }
 
-.full-width-badge.is-selected .history-dot {
-  background: var(--accent);
-  opacity: 1;
-}
-
-/* The ✕ stays visible while selected so the active row is always deletable. */
+.full-width-badge.is-selected /* A selected row keeps its actions visible — the active row must always be
+   actionable without hunting for it with the pointer. */
+.full-width-badge.is-selected .row-actions,
 .full-width-badge.is-selected .history-delete {
   opacity: 1;
 }
@@ -1355,11 +1365,7 @@ textarea:focus-visible {
   font-weight: 600;
 }
 
-.full-width-badge.type-current .history-dot {
-  background: var(--text-muted);
-}
-
-.full-width-badge.type-current .history-index {
+.full-width-badge.type-current .full-width-badge.type-current .history-index {
   color: var(--text-muted);
 }
 
@@ -1372,15 +1378,11 @@ textarea:focus-visible {
 }
 
 .history-delete {
-  /* ALWAYS VISIBLE (was `opacity: 0` until the row was hovered). A control you
-     cannot see is a control you cannot find, and it was unreachable by touch
-     and invisible to anyone scanning the list rather than sweeping a mouse
-     across it. It rests muted and brightens on hover, so the row still reads
-     calm without hiding its own actions. */
-  opacity: 1;
+  opacity: 0;
   background: none;
   border: none;
-  color: var(--text-muted);
+  /* Matches .history-zmove — one colour for every row action. */
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
