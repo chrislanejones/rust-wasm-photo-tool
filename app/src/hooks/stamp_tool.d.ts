@@ -667,7 +667,13 @@ declare module "stamp_tool" {
     effect_down(
       x: number, y: number, size: number,
       mode: string, intensity: number, pixel_size: number, color: string,
+      /** Stroke-stabilizer level: "off" | "low" | "med" | "high". The same
+       *  leash the paint brush uses — `src/stabilizer.rs`. */
+      stab: string,
     ): void;
+    /** False when the cursor is still inside the stabilizer's leash and
+     *  nothing was stamped — the shared stroke coalescer skips its flush on
+     *  false, so a leashed move costs zero recomposites. */
     effect_move(x: number, y: number): boolean;
     effect_up(): void;
 

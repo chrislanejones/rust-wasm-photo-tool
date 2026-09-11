@@ -88,6 +88,10 @@ required-features = ["threads"]
 # attempt); `cargo test --features tiles` runs them for real — that's what CI
 # does (see .github/workflows/ci.yml).
 [[test]]
+name = "blur_stabilized"
+required-features = ["tiles"]
+
+[[test]]
 name = "replay_parity"
 required-features = ["tiles"]
 

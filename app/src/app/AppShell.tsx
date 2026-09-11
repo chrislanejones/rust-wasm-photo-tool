@@ -1435,6 +1435,7 @@ export function AppShell() {
         toolSettings.blurIntensity,
         toolSettings.pixelSize,
         toolSettings.redactColor,
+        toolSettings.paintStabilizer,
       );
       stamp.flushToCanvas();
     },
@@ -1446,6 +1447,7 @@ export function AppShell() {
       toolSettings.blurIntensity,
       toolSettings.pixelSize,
       toolSettings.redactColor,
+      toolSettings.paintStabilizer,
     ],
   );
 

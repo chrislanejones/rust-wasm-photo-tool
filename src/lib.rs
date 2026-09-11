@@ -112,25 +112,6 @@ pub fn start() {
     console_error_panic_hook::set_once();
 }
 
-/// Maximum number of gallery photos allowed for a given account tier.
-///
-/// Single source of truth for the gallery cap, shared by the upload gate
-/// (`handleAddPhotos`) and the gallery UI on the JS side.
-///
-/// - `"demo"`     — anonymous / not signed in → **12**
-/// - `"loggedIn"` — free account             → **24**
-/// - `"paid"`     — Pro (coming soon)         → **100**
-///
-/// Unknown tiers fall back to the most restrictive demo limit.
-#[wasm_bindgen]
-pub fn photo_limit(tier: &str) -> u32 {
-    match tier {
-        "loggedIn" => 24,
-        "paid" => 100,
-        _ => 12,
-    }
-}
-
 /// Diagnostics-only microbench (Task D, `feat/rayon-parallel-blur`): runs the
 /// rayon-parallel two-pass Gaussian blur over a synthetic `width`×`height`
 /// RGBA buffer at kernel `radius` and discards the result. Exists purely so
@@ -578,6 +559,8 @@ pub struct ImageHorseTool {
     effect_intensity: u32,      // blur strength
     effect_pixel: u32,          // pixelate block size
     effect_color: (u8, u8, u8), // redaction fill
+    /// Blur/pixelate/redact stabilizer — same leash as `paint_stab`.
+    effect_stab: crate::stabilizer::Stabilizer,
     effect_last: Option<(f64, f64)>,
 
     // ── Op-log recorder (tiles feature only — Stage 4 of tile-wiring) ─────
@@ -932,6 +915,7 @@ impl ImageHorseTool {
             #[cfg(feature = "patchmatch")]
             paint_selection_mask: false,
             effect_mode: 0,
+            effect_stab: crate::stabilizer::Stabilizer::default(),
             effect_radius: 0.0,
             effect_intensity: 8,
             effect_pixel: 12,

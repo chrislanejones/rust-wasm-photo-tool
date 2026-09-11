@@ -312,6 +312,15 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                   />
                 )}
 
+                {/* Applies to all three blur modes — it leashes the STROKE,
+                    not the effect, so blur, pixelate and redact all steady
+                    the same way. Same field the Paint brush and Eraser read:
+                    one dial, on everywhere. */}
+                <StabilizerRow
+                  value={settings.paintStabilizer}
+                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
+                />
+
                 {settings.blurMode === "solid" && (
                   <ColorSwatchGrid
                     colors={TEXT_COLORS}
