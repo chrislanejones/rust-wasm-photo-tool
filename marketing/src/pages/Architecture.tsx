@@ -13,9 +13,29 @@ const FILTERS = [
   { key: "pro", label: "Paid users", Icon: CrownIcon },
 ] as const;
 
+/* ⚠️ THE DEMO NOTE IS A FACTUAL CLAIM. Measure it before changing it.
+ *
+ * It said "No account, no network" for months while it was false, twice over
+ * and for two different reasons:
+ *
+ *   1. `app/index.html` <link>ed fonts.googleapis.com on every load, so every
+ *      demo visitor's IP reached Google before touching anything. FIXED — the
+ *      two UI faces are self-hosted now (v8.72).
+ *   2. Clerk's SDK initialises on load even signed out. STILL TRUE. Measured
+ *      on production, logged out, 2026-09-11: 7 requests to
+ *      `<instance>.clerk.accounts.dev` and 2 to `clerk-telemetry.com` before
+ *      any interaction.
+ *
+ * Fixing (1) and leaving the sentence alone is how a claim stays wrong through
+ * the release that was supposed to make it true. What IS true, and is the
+ * thing worth claiming, is that no PHOTO leaves the browser — so that is what
+ * it says now.
+ *
+ * To re-measure: load the app logged out and read
+ * `performance.getEntriesByType("resource")` for origins that are not our own. */
 const NOTES: Record<Tier, string> = {
   all: "Everything, including the parts that aren’t built yet.",
-  demo: "No account, no network. The dashed plane is never opened — this is the demo everyone gets, and it is the whole editor.",
+  demo: "No account, and no photo ever leaves your browser — every edit runs on your machine. Clerk's SDK still calls its own servers on load, so it isn't a zero-network page. The dashed plane is never opened: this is the demo everyone gets, and it is the whole editor.",
   free: "Signing in adds sync, history and one share link. The AI proxy stays dark: nothing is sent to Replicate on this tier.",
   pro: "Everything that ships today. Pro is the only tier where a photo of yours reaches an inference server.",
 };
@@ -208,7 +228,7 @@ export default function Architecture() {
               ["annotations · selection", "Live text & shape overlays · magic-wand"],
               ["stamp · transform", "Clone brush · flip / rotate / resize / crop"],
               ["filters", "Brightness · contrast · gaussian blur"],
-              ["drawing · text", "Arrows / shapes / bézier · embedded fonts"],
+              ["drawing · text · fonts", "Arrows / shapes / bézier · 3 typefaces, rasterised in Rust"],
               ["codec · history", "PNG encode (Rust) · undo snapshots"],
               ["simd", "v128/f32x4 kernels · scalar fallback"],
               ["utils", "json · point math · shared helpers"],
