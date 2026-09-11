@@ -174,6 +174,20 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_userId_usedAt", ["userId", "usedAt"]),
 
+  // ── User colours (the global "+" palette) ──────────────────────────────
+  // One row per saved swatch. Anonymous users keep the same list in
+  // localStorage (hooks/useUserColors.ts); signed-in users read and write
+  // here so the palette follows them across devices. Capped at 32 per user
+  // by the mutation, newest first via `createdAt`.
+  user_colors: defineTable({
+    userId: v.id("users"),
+    /** Normalised `#rrggbb` / `#rrggbbaa`, lowercase. */
+    color: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_createdAt", ["userId", "createdAt"]),
+
   // ── Photo canvas edits (per-user, stored in Convex file storage) ────────
   photo_edits: defineTable({
     userId: v.id("users"),

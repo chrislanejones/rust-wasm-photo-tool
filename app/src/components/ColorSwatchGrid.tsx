@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Plus, X, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, X } from "lucide-react";
 import { useUserColors } from "@/hooks/useUserColors";
-import { parseColor, warmColorParser } from "@/lib/colorParser";
+import { warmColorParser } from "@/lib/colorParser";
+import { ColorPickerDialog } from "@/components/ColorPickerDialog";
 
 interface Props {
   colors: readonly string[];
@@ -19,6 +20,12 @@ interface Props {
   disabled?: boolean;
 }
 
+/**
+ * A row of preset swatches + the user's saved palette + a "+" that opens the
+ * ColorPickerDialog (wheel / square, RGBA / HSL / hex fields). "Use colour" in
+ * the dialog applies to THIS control; the dialog's own palette "+" saves to the
+ * global list every grid shows (localStorage signed out, Convex signed in).
+ */
 export function ColorSwatchGrid({
   colors,
   value,
@@ -27,61 +34,14 @@ export function ColorSwatchGrid({
   allowCustom = true,
   disabled = false,
 }: Props) {
-  const { userColors, addColor, removeColor } = useUserColors();
-  const [adding, setAdding] = useState(false);
-  const [input, setInput] = useState("");
-  const [previewBg, setPreviewBg] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const { userColors, removeColor } = useUserColors();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  // Warm the Rust parser once any picker mounts so the first + click is snappy.
+  // Warm the Rust parser once any picker mounts so the dialog's first open
+  // (which may need it to read an rgba() value) is snappy.
   useEffect(() => {
     warmColorParser();
   }, []);
-
-  useEffect(() => {
-    if (adding) {
-      inputRef.current?.focus();
-      setInput("");
-      setPreviewBg(null);
-      setError(null);
-    }
-  }, [adding]);
-
-  // Live preview as the user types — runs through the Rust parser.
-  useEffect(() => {
-    if (!adding) return;
-    let cancelled = false;
-    if (!input.trim()) {
-      setPreviewBg(null);
-      setError(null);
-      return;
-    }
-    void parseColor(input).then((parsed) => {
-      if (cancelled) return;
-      if (parsed) {
-        setPreviewBg(parsed.css);
-        setError(null);
-      } else {
-        setPreviewBg(null);
-        setError("Not a valid color");
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [input, adding]);
-
-  const handleSubmit = async () => {
-    const parsed = await parseColor(input);
-    if (!parsed) {
-      setError("Not a valid color");
-      return;
-    }
-    addColor(parsed.hex);
-    onChange(parsed.hex);
-    setAdding(false);
-  };
 
   return (
     <div className="space-y-2">
@@ -110,12 +70,14 @@ export function ColorSwatchGrid({
         {allowCustom && (
           <button
             type="button"
-            onClick={() => setAdding((v) => !v)}
+            onClick={() => setPickerOpen(true)}
             disabled={disabled}
-            aria-label="Add custom color"
+            aria-label="Pick a custom color"
+            aria-haspopup="dialog"
+            aria-expanded={pickerOpen}
             className={[
               "flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all",
-              adding
+              pickerOpen
                 ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
                 : "border-dashed border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:text-theme-foreground hover:border-theme-foreground/50",
               disabled && "opacity-40 pointer-events-none",
@@ -128,50 +90,14 @@ export function ColorSwatchGrid({
         )}
       </div>
 
-      {allowCustom && adding && (
-        <div className="space-y-1.5 rounded-md border border-theme-sidebar-border bg-theme-muted/20 p-2">
-          <div className="flex items-center gap-2">
-            <span
-              className="h-7 w-7 shrink-0 rounded-full border border-theme-border"
-              style={{
-                backgroundColor: previewBg ?? "transparent",
-                backgroundImage: previewBg
-                  ? undefined
-                  : "linear-gradient(45deg, rgba(255,255,255,0.08) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.08) 75%, transparent 75%)",
-                backgroundSize: previewBg ? undefined : "8px 8px",
-              }}
-            />
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void handleSubmit();
-                } else if (e.key === "Escape") {
-                  e.preventDefault();
-                  setAdding(false);
-                }
-              }}
-              placeholder="#ff5a3c or rgba(255,90,60,1)"
-              className="flex-1 min-w-0 rounded-md border border-theme-border bg-theme-background/40 px-2 py-1 text-2xs text-theme-foreground placeholder:text-theme-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-theme-primary"
-            />
-            <button
-              type="button"
-              onClick={() => void handleSubmit()}
-              disabled={!previewBg}
-              className="flex items-center justify-center w-7 h-7 rounded-md bg-theme-primary text-theme-primary-foreground hover:bg-theme-primary/90 disabled:opacity-40 disabled:pointer-events-none"
-              aria-label="Add color"
-            >
-              <Check className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          {error && (
-            <p className="text-2xs text-destructive pl-1">{error}</p>
-          )}
-        </div>
+      {allowCustom && (
+        <ColorPickerDialog
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          initialColor={value}
+          onPick={onChange}
+          title={label === "Color" ? "Pick a colour" : `${label} colour`}
+        />
       )}
     </div>
   );
@@ -192,6 +118,10 @@ function Swatch({ color, active, onClick, onRemove, disabled }: SwatchProps) {
   // square, so the swatch reads as "no fill / checkerboard". Solid colours keep
   // their flat fill.
   const isTransparent = color === "transparent";
+  // A translucent pick from the dialog arrives as `#rrggbbaa`. Flat-filled it
+  // reads as a darker opaque colour (50% blue looks navy on the dark panel),
+  // so it sits on the swatch checkerboard the same way the dialog previews it.
+  const isTranslucent = /^#[0-9a-f]{8}$/i.test(color) && !/ff$/i.test(color);
   return (
     <span className="relative inline-flex group">
       <button
@@ -201,6 +131,7 @@ function Swatch({ color, active, onClick, onRemove, disabled }: SwatchProps) {
         className={[
           "w-7 h-7 rounded-full border-2 border-transparent transition-all overflow-hidden",
           isTransparent && "checkerboard-canvas",
+          isTranslucent && "checkerboard",
           disabled && "opacity-40 pointer-events-none",
           active
             ? "scale-110 ring-2 ring-theme-ring ring-offset-2 ring-offset-theme-sidebar"
@@ -208,9 +139,13 @@ function Swatch({ color, active, onClick, onRemove, disabled }: SwatchProps) {
         ]
           .filter(Boolean)
           .join(" ")}
-        style={isTransparent ? undefined : { backgroundColor: color }}
+        style={isTransparent || isTranslucent ? undefined : { backgroundColor: color }}
         aria-label={isTransparent ? "Transparent (checkerboard)" : `Color ${color}`}
-      />
+      >
+        {isTranslucent && (
+          <span className="block h-full w-full" style={{ backgroundColor: color }} />
+        )}
+      </button>
       {onRemove && (
         <button
           type="button"

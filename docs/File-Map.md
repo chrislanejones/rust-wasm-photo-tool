@@ -147,8 +147,10 @@ app/src/
 │   │                                 photo rebuilds the stack. v1–v4 archives still decode and
 │   │                                 collapse to a single layer for back-compat. duplicatePhotoEdit
 │   │                                 copies a photo's archive onto a new id (gallery Duplicate)
-│   ├── useUserColors.ts              localStorage-persisted custom palette shared by every
-│   │                                 ColorSwatchGrid; cross-component sync via custom events
+│   ├── useUserColors.ts              The global "+" palette shared by every ColorSwatchGrid and
+│   │                                 the ColorPickerDialog: localStorage when signed out (in-tab
+│   │                                 sync via a custom event), the Convex `user_colors` table
+│   │                                 when signed in; a failed Convex write falls back to local
 │   └── stamp_tool.d.ts               TypeScript declarations for WASM interface
 ├── components/
 │   ├── TopBar/                       Zoom, panel toggles, export dropdown, delete all
@@ -156,6 +158,12 @@ app/src/
 │   │                                 blank TinyButton whose 3 clicks unlock the Dev Tools (diagnostics
 │   │                                 log + tier selector) in production builds
 │   ├── TabGroup.tsx                  Reusable tab switcher (Stamp, Effects, Brush, future panels)
+│   ├── ColorSwatchGrid.tsx           Preset swatches + the user's saved palette + a "+" that opens
+│   │                                 the ColorPickerDialog; translucent picks sit on a checkerboard
+│   ├── ColorPickerDialog.tsx         The colour dialog behind every "+": wheel / rectangle picker
+│   │                                 (HSV is the source of truth so hue survives black/white),
+│   │                                 hue · brightness · opacity sliders, hex / RGBA / HSL fields,
+│   │                                 and the palette row whose own "+" saves to the global list
 │   ├── MagnifierOverlay.tsx          Floating 11×11 pixel magnifier for color picker eyedropper;
 │   │                                 pixel grid sourced from WASM get_pixel_region, center hex shown
 │   ├── UserMenu.tsx                  Convex/Clerk user menu

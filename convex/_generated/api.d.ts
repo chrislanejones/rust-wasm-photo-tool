@@ -25,6 +25,7 @@ import type * as stripe from "../stripe.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as testReplicate from "../testReplicate.js";
 import type * as textHistory from "../textHistory.js";
+import type * as userColors from "../userColors.js";
 import type * as users from "../users.js";
 
 import type {
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   subscriptions: typeof subscriptions;
   testReplicate: typeof testReplicate;
   textHistory: typeof textHistory;
+  userColors: typeof userColors;
   users: typeof users;
 }>;
 
