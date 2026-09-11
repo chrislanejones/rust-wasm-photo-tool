@@ -43,7 +43,10 @@ const ERASER_MODES: {
     id: "brush",
     label: "Eraser",
     icon: Eraser,
-    title: "Brush",
+    // Header reads "Eraser", matching the sub-tool tile. It said "Brush",
+    // which named the implement rather than the tool and sat directly above
+    // a "Brush Size" field, so the panel opened on the same word twice.
+    title: "Eraser",
     info: "Drag on the canvas to scrub the active layer to transparent — revealing whatever's beneath it. Lower opacity erases gradually. Stroke Stabilizer smooths shaky drags. Local, free, no sign-in.",
   },
   {
@@ -179,7 +182,7 @@ export function AISettings({
               "ai" to eraserTool while this panel is in Brush mode (magic
               mode below routes to magicEraserTool instead). */}
           <SizeSlider
-            label="Brush Size"
+            label="Eraser Size"
             value={settings.eraserSize}
             min={1}
             max={100}
