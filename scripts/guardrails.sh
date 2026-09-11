@@ -196,7 +196,7 @@ check "aria-button" 5 "role=button needs aria-label (§8)" "$n_aria"
 # Overlay engine tests were written into layer.rs's own test module rather than
 # here. Lowered in the same commit as the extraction, per the rule above.
 n_librs=$(wc -l < src/lib.rs)
-check "librs-lines" 5183 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
+check "librs-lines" 4912 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
 
 # ── DEAD EXPORTS ──
 # See scripts/dead-exports-audit.mjs for why this is a scan and not a compiler
