@@ -924,6 +924,20 @@ textarea:focus-visible {
 /* The Layers list is the `lg` variant of the shared row: taller, and its
    leading slot carries a NAME rather than a number, so that slot has to be
    free to grow instead of sitting at the number's fixed 18px. */
+
+/* LAYERS IS THE EXCEPTION: its buttons stay visible. Two reasons, and the
+   first is the one that decides it — THESE GET USED, constantly. Hiding a
+   control behind hover costs a beat every single time, and on the list you
+   reach for most that adds up; History and Reselect rows are read far more
+   often than they are acted on, so there the quiet is worth it.
+
+   The second: the eye is not only an action, it is a STATUS — it reports
+   whether the layer is hidden, and a status you have to hover to read is not
+   a status. The rest of the cluster rides along with it, because revealing
+   one button of six on hover while five sit lit would read as a glitch. */
+.full-width-badge-lg .row-actions {
+  opacity: 1;
+}
 .full-width-badge-lg {
   padding: 9px 10px;
   flex-wrap: wrap;
