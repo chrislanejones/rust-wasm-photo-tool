@@ -2387,3 +2387,67 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .dark .cl-socialButtonsProviderIcon__github {
   filter: invert(1);
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   COLOUR PICKER DIALOG (components/ColorPickerDialog.tsx)
+   The hue / brightness / alpha sliders are native range inputs laid over a
+   gradient <div>, so the track is transparent and the thumb is a hollow ring:
+   a ring reads on any colour the gradient happens to show under it, where the
+   accent-filled default thumb vanishes on an orange hue and the checkerboard
+   fights an opaque one.
+   ═══════════════════════════════════════════════════════════════════════════ */
+input[type="range"].color-range {
+  height: 100%;
+}
+input[type="range"].color-range::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 100%;
+}
+input[type="range"].color-range::-moz-range-track {
+  background: transparent;
+  height: 100%;
+}
+input[type="range"].color-range::-moz-range-progress {
+  background: transparent;
+}
+input[type="range"].color-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 0;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  transition: transform 0.1s;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+}
+input[type="range"].color-range::-webkit-slider-thumb:hover {
+  transform: translateY(-50%) scale(1.15);
+}
+input[type="range"].color-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+input[type="range"].color-range::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+input[type="range"].color-range:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 1.5px rgba(0, 0, 0, 0.55),
+    0 0 0 4px var(--ring);
+}
+input[type="range"].color-range:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 1.5px rgba(0, 0, 0, 0.55),
+    0 0 0 4px var(--ring);
+}

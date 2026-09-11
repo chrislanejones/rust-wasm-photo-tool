@@ -103,8 +103,8 @@
 │  │  Convex (persistent layer, signed-in only)                    │ │
 │  │                                                               │ │
 │  │  users · subscriptions · projects · images · layers ·         │ │
-│  │  annotations · history · recent_texts · photo_edits ·         │ │
-│  │  shares · ai_jobs                                             │ │
+│  │  annotations · history · recent_texts · user_colors ·         │ │
+│  │  photo_edits · shares · ai_jobs                               │ │
 │  │                                                               │ │
 │  │  Auth via Clerk (AUTH_ENABLED false path = fully local)       │ │
 │  └───────────────────────────────────────────────────────────────┘ │
