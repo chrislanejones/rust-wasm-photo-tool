@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { StrokeLeash, getStrokeLeash, NO_LEASH } from "@/lib/strokeLeash";
+import { useToolStore } from "@/stores/useToolStore";
 import type { Anchor, Pt } from "./penPath";
 import { serialize, deserialize, runExclusive, resolveHit } from "./penPath";
 
@@ -78,6 +80,29 @@ export function PenOverlay({
   onEditRequestHandled,
 }: PenOverlayProps) {
   const [anchors, setAnchors] = useState<Anchor[]>([]);
+  // #82 Phase 4a — the pen has no dabs to lag, so "stabilize" here means the
+  // DRAG: anchor moves and handle pulls, which is the twitchiness the setting
+  // actually answers on a mouse. Same `paintStabilizer` field every brush
+  // reads; the leash LENGTH comes from the engine so the table has one home.
+  const stabilizer = useToolStore((st) => st.toolSettings.paintStabilizer);
+  const leashPxRef = useRef(NO_LEASH);
+  useEffect(() => {
+    let cancelled = false;
+    void getStrokeLeash(stabilizer)
+      .then((px) => {
+        if (!cancelled) leashPxRef.current = px;
+      })
+      .catch(() => {
+        // Engine unavailable: no smoothing, which is the default anyway.
+        if (!cancelled) leashPxRef.current = NO_LEASH;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stabilizer]);
+  /** Live leash for the drag in flight. Built at drag START so a mid-drag
+   *  settings change cannot move the tip under the user's hand. */
+  const leashRef = useRef<StrokeLeash | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [closed, setClosed] = useState(false);
   /** Pointer is inside the radius that would close the path. Drives the ring on
@@ -240,7 +265,23 @@ export function PenOverlay({
     const onMove = (e: PointerEvent) => {
       const d = dragRef.current;
       if (!d) return;
-      const { x: ix, y: iy } = mapImg(e.clientX, e.clientY);
+      const raw = mapImg(e.clientX, e.clientY);
+      // Leashed: a move the tip has not cleared yet updates NOTHING, so the
+      // anchor simply does not twitch. `advance` returns the tip to use.
+      const leash = leashRef.current;
+      let ix = raw.x;
+      let iy = raw.y;
+      if (leash?.isOn) {
+        // No explicit `begin`: the FIRST move anchors the tip at the cursor and
+        // returns null, so that one event is swallowed and every move after it
+        // trails properly. Anchoring at the drag's start point instead would
+        // make the first pull cover the whole gap between the anchor and where
+        // the pointer already was, which is a jump, not smoothing.
+        const tip = leash.advance(raw.x, raw.y);
+        if (!tip) return;
+        ix = tip.x;
+        iy = tip.y;
+      }
       setAnchors((a) => {
         if (d.index >= a.length) return a;
         const next = a.slice();
@@ -263,7 +304,42 @@ export function PenOverlay({
         return next;
       });
     };
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
+      // THE RAW CURSOR, never the tip. Handing `flush` the tip compares a
+      // point against itself, returns nothing, and silently leaves the anchor
+      // a leash-length short of where the user let go. That exact bug appeared
+      // twice in the engine in one night (`effect_last`, `end_stroke`), so the
+      // pen gets it checked rather than inherited.
+      const d = dragRef.current;
+      const leash = leashRef.current;
+      if (d && leash?.isOn) {
+        const raw = mapImg(e.clientX, e.clientY);
+        const snap = leash.flush(raw.x, raw.y);
+        if (snap) {
+          setAnchors((a) => {
+            if (d.index >= a.length) return a;
+            const next = a.slice();
+            const an = { ...next[d.index] };
+            if (d.kind === "create" || d.kind === "out") {
+              an.out = { x: snap.x, y: snap.y };
+              an.in = { x: 2 * an.x - snap.x, y: 2 * an.y - snap.y };
+            } else if (d.kind === "in") {
+              an.in = { x: snap.x, y: snap.y };
+              an.out = { x: 2 * an.x - snap.x, y: 2 * an.y - snap.y };
+            } else {
+              const dx = snap.x - an.x;
+              const dy = snap.y - an.y;
+              an.x = snap.x;
+              an.y = snap.y;
+              if (an.in) an.in = { x: an.in.x + dx, y: an.in.y + dy };
+              if (an.out) an.out = { x: an.out.x + dx, y: an.out.y + dy };
+            }
+            next[d.index] = an;
+            return next;
+          });
+        }
+      }
+      leashRef.current = null;
       dragRef.current = null;
     };
     window.addEventListener("pointermove", onMove);
@@ -443,6 +519,7 @@ export function PenOverlay({
     // speculative one that turns out to be wrong is dropped with a `setAnchors`
     // and costs nothing but the frame it was visible for.
     if (anchors.length === 0 && onHitTest) {
+      leashRef.current = new StrokeLeash(leashPxRef.current);
       dragRef.current = { kind: "create", index: 0 };
       setAnchors([{ x: ix, y: iy, in: null, out: null }]);
       const outcome = resolveHit(await onHitTest(ix, iy), seq, hitSeqRef.current);
@@ -467,6 +544,7 @@ export function PenOverlay({
 
     // Create mode only: drop a new anchor (drag pulls its handles).
     if (editingId === null) {
+      leashRef.current = new StrokeLeash(leashPxRef.current);
       dragRef.current = { kind: "create", index: anchors.length };
       setAnchors((arr) => [...arr, { x: ix, y: iy, in: null, out: null }]);
     }
@@ -515,6 +593,7 @@ export function PenOverlay({
         void finish("commit-close", true);
         return;
       }
+      leashRef.current = new StrokeLeash(leashPxRef.current);
       dragRef.current = { kind, index };
     };
 
