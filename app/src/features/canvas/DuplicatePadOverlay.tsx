@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Plus } from "lucide-react";
 
 import type { PadDirection } from "@/lib/duplicatePadGeometry";
 export type { PadDirection };
@@ -24,8 +25,10 @@ interface Props {
 /** Screen px from the shape's edge to the centre of each ⊕. Kept small on
  *  purpose — the brief was "smaller and closer to the rectangle" than the
  *  mock, so the pad reads as part of the shape, not furniture around it. */
-const PUSH_PX = 18;
-const SIZE_PX = 22;
+const PUSH_PX = 16;
+/** 18px, down from 22. The pad sits ON the image, so the buttons should read
+ *  as a light touch beside the shape rather than chrome parked over it. */
+const SIZE_PX = 18;
 
 const DIRS: {
   dir: PadDirection;
@@ -130,9 +133,12 @@ export function DuplicatePadOverlay({
             transformOrigin: "center center",
             borderRadius: "9999px",
             border: "none",
-            background: "var(--primary)",
-            color: "var(--primary-foreground)",
-            font: "700 15px/1 system-ui, sans-serif",
+            // Near-black, NOT the theme accent. These sit on top of the user's
+            // photo, and an accent-coloured disc competes with the image and
+            // with the shape's own stroke; a dark neutral disc reads as a
+            // control without claiming to be part of the picture.
+            background: "#111",
+            color: "#fff",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -141,7 +147,10 @@ export function DuplicatePadOverlay({
             boxShadow: "0 1px 3px rgba(0,0,0,.35)",
           }}
         >
-          +
+          {/* A real icon, not a "+" glyph: the text plus rendered at whatever
+              weight and baseline the host font happened to give it, so it sat
+              visibly off-centre in the disc. */}
+          <Plus size={12} strokeWidth={2.5} aria-hidden="true" />
         </button>
       ))}
     </div>
