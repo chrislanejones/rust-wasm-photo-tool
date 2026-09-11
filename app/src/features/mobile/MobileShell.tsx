@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  Download,
   ImagePlus,
   Trash2,
   Upload,
@@ -18,10 +19,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserMenu } from "@/components/UserMenu";
 import { formatBytes } from "@/lib/format";
-import { getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
+import { getOriginal, getOriginalAsBlobUrl } from "@/lib/dexie/originalsAdapter";
 import { isSvgFile } from "@/lib/rasterizeSvg";
 import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 
@@ -143,6 +145,44 @@ function MobileViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, goto]);
 
+  // ABOVE the `if (!photo) return null` below: hooks must run in the same
+  // order every render, and these sat after that early return.
+  const [saving, setSaving] = useState(false);
+
+  /**
+   * Save the photo's STORED bytes to the device. Deliberately not a render or
+   * an export: there is no editor on a phone, so the file you brought in is
+   * exactly the file you get back, and a re-encode would only lose quality on
+   * the way.
+   *
+   * Revokes inside the same function that created the URL — a split between a
+   * memo and an effect is what broke gallery thumbnails under StrictMode once.
+   */
+  const handleDownload = useCallback(async () => {
+    if (!photo) return;
+    setSaving(true);
+    try {
+      const stored = await getOriginal(photo.originalKey);
+      if (!stored) {
+        toast.error("Couldn't find this image's file");
+        return;
+      }
+      // StoredOriginal carries raw `bytes` + `mimeType`, not a Blob.
+      const url = URL.createObjectURL(
+        new Blob([stored.bytes], { type: stored.mimeType }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = photo.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Couldn't save this image");
+    } finally {
+      setSaving(false);
+    }
+  }, [photo]);
+
   if (!photo) return null;
 
   const dims =
@@ -163,6 +203,15 @@ function MobileViewer({
             {meta ? ` · ${meta}` : ""}
           </p>
         </div>
+        <Button
+          size="tiny"
+          aria-label="Download image"
+          title="Download image"
+          disabled={saving}
+          onClick={() => void handleDownload()}
+        >
+          <Download className="h-4 w-4" />
+        </Button>
         <Button
           size="tiny"
           aria-label="Delete image"

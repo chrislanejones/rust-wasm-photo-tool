@@ -4,6 +4,15 @@ declare module "stamp_tool" {
   /** Gallery photo cap for an account tier ("demo" | "loggedIn" | "paid"). */
   export function photo_limit(tier: string): number;
 
+  /** Stroke-stabilizer leash in px for a UI level ("off"/"low"/"med"/"high");
+   *  0 = off.
+   *
+   *  EXPORTED RATHER THAN PORTED — the `gaussian_kernel` precedent. The pen
+   *  is a JS Bézier overlay with no dabs to lag, so it needs this number on
+   *  the JS side; a second copy of the table would be free to drift from the
+   *  engine's. One call per drag start, not per pointer move. */
+  export function stabilizer_leash(level: string): number;
+
   /** The engine's Gaussian kernel for `radius` (clamped 1..=30).
    *
    *  ⚠️ Exists because a JS PORT of it cannot be bit-exact: `build_gaussian_kernel`
@@ -302,9 +311,16 @@ declare module "stamp_tool" {
     set_zoom(z: number): void;
     get_zoom(): number;
     adjust_zoom(delta: number): void;
-    begin_stroke(dest_x: number, dest_y: number): void;
-    continue_stroke(dest_x: number, dest_y: number): void;
-    end_stroke(): void;
+    /** `stab` is the stroke-stabilizer level ("off"|"low"|"med"|"high") —
+     *  the same leash the paint and blur engines use. */
+    begin_stroke(dest_x: number, dest_y: number, stab: string): void;
+    /** False when the cursor is still inside the stabilizer's leash and
+     *  nothing was stamped, so the coalescer can skip its flush. */
+    continue_stroke(dest_x: number, dest_y: number): boolean;
+    /** `raw_x`/`raw_y` are the TRUE cursor at mouse-up, so the leash can catch
+     *  up before the stroke closes. Passing the stabilized tip instead makes
+     *  the catch-up a no-op and silently drops the stroke's tail. */
+    end_stroke(raw_x: number, raw_y: number): void;
     set_max_history(n: number): void;
     undo(): boolean;
     redo(): boolean;
@@ -658,7 +674,13 @@ declare module "stamp_tool" {
     effect_down(
       x: number, y: number, size: number,
       mode: string, intensity: number, pixel_size: number, color: string,
+      /** Stroke-stabilizer level: "off" | "low" | "med" | "high". The same
+       *  leash the paint brush uses — `src/stabilizer.rs`. */
+      stab: string,
     ): void;
+    /** False when the cursor is still inside the stabilizer's leash and
+     *  nothing was stamped — the shared stroke coalescer skips its flush on
+     *  false, so a leashed move costs zero recomposites. */
     effect_move(x: number, y: number): boolean;
     effect_up(): void;
 
@@ -725,6 +747,15 @@ declare module "stamp_tool" {
       bg_padding: number,
     ): Int32Array;
     get_text_annotations(): string;
+    /** Duplicate a text annotation, offset by (dx, dy). Returns the NEW id,
+     *  or -1 when `id` matches nothing (sentinel, not null — the same shape
+     *  `text_annotation_at` uses).
+     *
+     *  Clones the struct engine-side rather than re-adding from fields, so a
+     *  field added to TextAnnotation later cannot be silently dropped by this
+     *  path — pinned by tests/duplicate_annotation.rs. Pushes one
+     *  "Duplicate Text" history entry. */
+    duplicate_text_annotation(id: number, dx: number, dy: number): number;
     /** Returns whether anything was flattened (ADR-024 Stage 2 — the
      *  verdict comes from the call that does the work, so no caller has to
      *  read state first). Reports the ACTIVE layer, text AND shapes. */
@@ -1319,6 +1350,11 @@ declare module "stamp_tool" {
     set_editing_text(id: number): void;
     /** JSON array of all live shapes (id, kind, x0,y0,x1,y1, r,g,b, stroke_width, arrow_style, number, points). */
     get_shape_annotations(): string;
+    /** Duplicate a shape annotation, offset by (dx, dy). Returns the NEW id,
+     *  or -1 when `id` matches nothing. Offsets `points` alongside the
+     *  endpoints so a polyline copy keeps its own path. Appends, so the copy
+     *  lands on TOP of the draw order. One "Duplicate Shape" history entry. */
+    duplicate_shape_annotation(id: number, dx: number, dy: number): number;
     /** Returns the matching shape id, or -1 if no hit. Newest-first. Lines,
      *  arrows and polylines hit near their stroke; an UNFILLED rect / circle /
      *  hand-circle hits on its outline RING only (the empty middle is a miss,

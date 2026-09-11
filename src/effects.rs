@@ -201,6 +201,7 @@ impl ImageHorseTool {
         intensity: u32,
         pixel_size: u32,
         color: &str,
+        stab: &str,
     ) {
         self.effect_mode = match mode {
             "pixelate" => 1,
@@ -231,6 +232,12 @@ impl ImageHorseTool {
             ));
         }
         self.effect_last = Some((x, y));
+        // The first dab lands at the press point either way, matching paint,
+        // which dabs at the down point before anchoring its tip.
+        self.effect_stab = crate::stabilizer::Stabilizer::for_level(stab);
+        if self.effect_stab.is_on() {
+            self.effect_stab.begin(x, y);
+        }
         self.apply_effect_dab(x, y);
     }
 
@@ -255,26 +262,59 @@ impl ImageHorseTool {
     /// segment (~half-radius steps) so fast drags don't leave gaps. Returns true
     /// if it painted (so the caller knows to re-flush).
     pub fn effect_move(&mut self, x: f64, y: f64) -> bool {
-        let (lx, ly) = match self.effect_last {
-            Some(p) => p,
-            None => return false,
+        let Some((prev_x, prev_y)) = self.effect_last else {
+            return false;
         };
-        let dx = x - lx;
-        let dy = y - ly;
+        // `effect_last` is ALWAYS the raw cursor, never the stabilized tip.
+        // effect_up flushes the leash against it, and a tip stored here would
+        // make that flush a no-op — the last leash-length of every stabilized
+        // stroke would simply not be drawn.
+        self.effect_last = Some((x, y));
+
+        // Stabilized: the leash decides both whether to stamp and from where.
+        // A cursor still inside the leash returns false, which the shared
+        // stroke coalescer reads as "nothing changed" and skips the flush, so
+        // a leashed move costs zero recomposites.
+        let ((lx, ly), (tx, ty)) = if self.effect_stab.is_on() {
+            match self.effect_stab.advance(x, y) {
+                Some(seg) => seg,
+                None => return false,
+            }
+        } else {
+            ((prev_x, prev_y), (x, y))
+        };
+        self.stamp_effect_segment(lx, ly, tx, ty);
+        true
+    }
+
+    /// Stamp dabs along a segment at ~half-radius steps so a fast drag leaves
+    /// no gaps. Starts at step 1: the `from` end was stamped by whatever
+    /// produced it (the press, or the previous move).
+    fn stamp_effect_segment(&mut self, lx: f64, ly: f64, tx: f64, ty: f64) {
+        let dx = tx - lx;
+        let dy = ty - ly;
         let dist = (dx * dx + dy * dy).sqrt();
         let step = (self.effect_radius * 0.5).max(1.0);
         let steps = (dist / step).ceil() as u32;
-        // Start at 1 — (lx, ly) was already stamped on the previous call.
         for i in 1..=steps {
             let t = i as f64 / steps as f64;
             self.apply_effect_dab(lx + dx * t, ly + dy * t);
         }
-        self.effect_last = Some((x, y));
-        true
     }
 
     /// End the effects stroke (the undo snapshot was taken on effect_down).
     pub fn effect_up(&mut self) {
+        // Catch up to where the pointer actually was before closing the op —
+        // the recorder reads `rec_effect` below, so the flush has to stamp
+        // FIRST or the last leash-length of the stroke is missing from both
+        // the canvas and the op log.
+        if let Some((raw_x, raw_y)) = self.effect_last {
+            if self.effect_stab.is_on() {
+                if let Some(((lx, ly), (tx, ty))) = self.effect_stab.flush(raw_x, raw_y) {
+                    self.stamp_effect_segment(lx, ly, tx, ty);
+                }
+            }
+        }
         #[cfg(feature = "tiles")]
         if let Some((pts, radius, intensity, mode)) = self.rec_effect.take() {
             if mode == 0 && !pts.is_empty() {
@@ -286,6 +326,7 @@ impl ImageHorseTool {
             }
         }
         self.effect_last = None;
+        self.effect_stab = crate::stabilizer::Stabilizer::default();
     }
 
     // Note: No end_blur_stroke needed — the snapshot is already saved.

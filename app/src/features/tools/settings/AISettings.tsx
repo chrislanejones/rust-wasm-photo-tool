@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Scissors, Eraser, BroomSparkles, Trash2, Lock } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { StabilizerRow } from "./StabilizerRow";
 import { SizeSlider } from "@/components/SizeSlider";
 import { SectionHeader } from "@/components/ui/section-header";
 import type { MutableRefObject } from "react";
@@ -42,8 +43,11 @@ const ERASER_MODES: {
     id: "brush",
     label: "Eraser",
     icon: Eraser,
-    title: "Brush",
-    info: "Drag on the canvas to scrub the active layer to transparent — revealing whatever's beneath it. Lower opacity erases gradually. Local, free, no sign-in.",
+    // Header reads "Eraser", matching the sub-tool tile. It said "Brush",
+    // which named the implement rather than the tool and sat directly above
+    // a "Brush Size" field, so the panel opened on the same word twice.
+    title: "Eraser",
+    info: "Drag on the canvas to scrub the active layer to transparent — revealing whatever's beneath it. Lower opacity erases gradually. Stroke Stabilizer smooths shaky drags. Local, free, no sign-in.",
   },
   {
     id: "magic",
@@ -178,7 +182,7 @@ export function AISettings({
               "ai" to eraserTool while this panel is in Brush mode (magic
               mode below routes to magicEraserTool instead). */}
           <SizeSlider
-            label="Brush Size"
+            label="Eraser Size"
             value={settings.eraserSize}
             min={1}
             max={100}
@@ -200,6 +204,15 @@ export function AISettings({
             presets={HARDNESS_PRESETS}
             variant="numbers"
             unit="%"
+          />
+          {/* The engine has ALWAYS honoured this on the eraser — `erase_down`
+              takes `settings.paintStabilizer` (usePaintTool.ts:91-98) and
+              `types.ts:39` already documents the setting as "shared by the
+              Paint brush and the Eraser". There was simply no control, so a
+              working feature was unreachable from this panel. */}
+          <StabilizerRow
+            value={settings.paintStabilizer}
+            onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
           />
         </>
       )}
@@ -229,6 +242,12 @@ export function AISettings({
               presets={HARDNESS_PRESETS}
               variant="numbers"
               unit="%"
+            />
+            {/* Last in the row, matching Brush Eraser above. The mask drag is
+                the same paint stroke engine, so the same leash applies. */}
+            <StabilizerRow
+              value={settings.paintStabilizer}
+              onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
             />
           </>
         ) : (

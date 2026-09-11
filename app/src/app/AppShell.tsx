@@ -85,6 +85,9 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
+import { useDuplicatePad } from "./session/useDuplicatePad";
+import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
+import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
 import { useCopyRegionAction } from "./session/useCopyRegionAction";
 import { useExportDimensions } from "./session/useExportDimensions";
@@ -1432,6 +1435,7 @@ export function AppShell() {
         toolSettings.blurIntensity,
         toolSettings.pixelSize,
         toolSettings.redactColor,
+        toolSettings.paintStabilizer,
       );
       stamp.flushToCanvas();
     },
@@ -1443,6 +1447,7 @@ export function AppShell() {
       toolSettings.blurIntensity,
       toolSettings.pixelSize,
       toolSettings.redactColor,
+      toolSettings.paintStabilizer,
     ],
   );
 
@@ -1705,7 +1710,7 @@ export function AppShell() {
         s.kind === 5
           ? `Pin ${pinLabelText(s.number, s.label_kind)}`
           : `${KIND_LABEL[s.kind] ?? "Shape"} #${counters[s.kind]}`;
-      items.push({ key: `s${s.id}`, type: "shape", id: s.id, label });
+      items.push({ key: `s${s.id}`, type: "shape", id: s.id, label, kind: s.kind });
     });
     return items;
   }, [textTool.annotations, drawingTools.shapes]);
@@ -1824,6 +1829,18 @@ export function AppShell() {
     [stamp, textTool, drawingTools, bumpAnnotations, setSelectedObject],
   );
 
+  // Reselect's Duplicate button and the directional duplicate pad. Handlers
+  // live in the session hook, not here — AppShell is being dismantled
+  // (CLAUDE.md), and the first cut of this handler sat in this file.
+  const duplicatePad = useDuplicatePad(stamp, drawingTools, textTool, bumpAnnotations);
+  // Mounted through CanvasArea's generic render-prop so CanvasArea stays
+  // ignorant of the pad (and inside its max-lines cap).
+  const renderDuplicatePad = useCallback(
+    (frame: OverlayFrame) =>
+      duplicatePad.canvasProps ? <DuplicatePadOverlay {...frame} {...duplicatePad.canvasProps} /> : null,
+    [duplicatePad.canvasProps],
+  );
+
   const redStampTool = useRedStampTool({
     toolRef: stamp.toolRef,
     canvasRef,
@@ -1903,6 +1920,22 @@ export function AppShell() {
         file = await rasterizeSvgToPng(file);
         source = file;
       }
+
+      // AN EMPTY WORKSPACE NEVER ASKS — the same rule a multi-image paste
+      // already follows above ("a stack never asks"). Two of this dialog's
+      // three choices stack or merge onto a layer, and with no image open
+      // there is no layer to stack onto: both tiles render disabled and the
+      // only live choice is the gallery. Asking a question with one possible
+      // answer is not a choice, it is a click in the way (Chris, 2026-09-10).
+      //
+      // Gated on the ACTIVE PHOTO, not on gallery length: the layer tiles are
+      // disabled by `hasActivePhoto` at the render site, so this matches
+      // exactly what the dialog would have offered.
+      if (activePhotoId === null) {
+        await handleAddPhotos([file]);
+        return;
+      }
+
       const { pixels, w, h } = await decodeImageSource(source);
       const previewUrl = URL.createObjectURL(source);
       setImportImage((prev) => {
@@ -1913,7 +1946,7 @@ export function AppShell() {
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast.error(`Couldn't read image: ${msg}`);
     }
-  }, []);
+  }, [activePhotoId, handleAddPhotos]);
 
   const handlePasteFromClipboard = useCallback(
     async (items?: DataTransferItemList | null) => {
@@ -3433,6 +3466,7 @@ export function AppShell() {
                           onTextFontSizeChange={handleTextFontSizeChange}
                           onTextRotationChange={textTool.setTextRotation}
                           annotations={annotationBoxes}
+                          renderOverlay={renderDuplicatePad}
                           hoveredAnnotationId={textTool.hoveredAnnotationId}
                           onCanvasHover={textTool.onCanvasHover}
                           cropSelection={drawingTools.cropSelection}
@@ -3566,6 +3600,7 @@ export function AppShell() {
                       onTextFontSizeChange={handleTextFontSizeChange}
                       onTextRotationChange={textTool.setTextRotation}
                       annotations={annotationBoxes}
+                      renderOverlay={renderDuplicatePad}
                       hoveredAnnotationId={textTool.hoveredAnnotationId}
                       onCanvasHover={textTool.onCanvasHover}
                       cropSelection={drawingTools.cropSelection}
@@ -3729,6 +3764,9 @@ export function AppShell() {
             objects={reselectObjects}
             onSelectObject={handleSelectObject}
             onDeleteObject={handleDeleteObject}
+            onDuplicateObject={(o) => void duplicatePad.duplicateObject(o)}
+            onToggleDuplicatePad={duplicatePad.togglePad}
+            duplicatePadId={duplicatePad.padId}
             onMoveShape={drawingTools.moveShape}
             userMode={effectiveUserMode}
             layers={stamp.state.layers}

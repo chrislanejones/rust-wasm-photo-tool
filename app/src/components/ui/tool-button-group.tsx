@@ -5,6 +5,15 @@ export interface ToolButtonOption<T extends string> {
   id: T;
   label: string;
   icon?: React.ComponentType<{ className?: string }>;
+  /** Disable THIS tile only, on top of the group-wide `disabled`. An action
+   *  group is rarely uniformly available — Selection's "All" works with
+   *  nothing selected while Deselect/Delete/Copy/Cut do not. Without this a
+   *  caller has to hand-roll the grid and loses the shared styling. */
+  disabled?: boolean;
+  /** Native tooltip for this tile. Action groups carry their keyboard
+   *  shortcut here ("Select all (Alt+A)"), which is the only place that
+   *  shortcut is discoverable from the panel. */
+  title?: string;
 }
 
 interface Props<T extends string> {
@@ -78,7 +87,8 @@ export function ToolButtonGroup<T extends string>({
               key={opt.id}
               active={value === opt.id}
               stacked={stacked}
-              disabled={disabled}
+              disabled={disabled || opt.disabled}
+              title={opt.title}
               onClick={() => onChange(opt.id)}
             >
               {Icon && <Icon />}

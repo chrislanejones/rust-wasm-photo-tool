@@ -16,6 +16,11 @@ pub struct StampState {
     pub stroke_active: bool,
     pub stroke_pre_snapshot: Option<Snapshot>,
     pub stroke_counter: u32,
+    /// Stroke stabilizer — the same leash the paint and blur engines use.
+    /// The clone OFFSET is fixed at `begin_stroke`, so a lagging tip samples
+    /// a source that lags by the same vector: the clone relationship is
+    /// preserved exactly and only the path is smoothed.
+    pub stab: crate::stabilizer::Stabilizer,
     last_stamp_x: Option<f64>,
     last_stamp_y: Option<f64>,
     /// Frozen copy of the buffer taken at begin_stroke; used as the read-only
@@ -35,6 +40,7 @@ impl StampState {
             opacity: 1.0,
             spacing: 0.25,
             stroke_active: false,
+            stab: crate::stabilizer::Stabilizer::default(),
             stroke_pre_snapshot: None,
             stroke_counter: 0,
             last_stamp_x: None,
@@ -81,6 +87,7 @@ impl StampState {
         dest_x: f64,
         dest_y: f64,
         pre_snapshot: Snapshot,
+        stab: &str,
     ) -> bool {
         let (sx, sy) = match (self.source_x, self.source_y) {
             (Some(x), Some(y)) => (x as f64, y as f64),
@@ -98,21 +105,63 @@ impl StampState {
         self.stroke_src_data = data.to_vec();
         self.stroke_pre_snapshot = Some(pre_snapshot);
         redo_stack.clear();
+        // Anchored at the press point, and the first stamp lands there either
+        // way — matching paint and blur, which both dab at the down point
+        // before the leash takes over.
+        self.stab = crate::stabilizer::Stabilizer::for_level(stab);
+        if self.stab.is_on() {
+            self.stab.begin(dest_x, dest_y);
+        }
         self.stamp_at(data, w, h, dest_x, dest_y);
         true
     }
 
-    pub fn continue_stroke(&mut self, data: &mut [u8], w: i32, h: i32, dest_x: f64, dest_y: f64) {
+    /// Returns whether anything was stamped. It used to return `()`; the bool
+    /// lets the shared stroke coalescer skip its flush when the cursor is
+    /// still inside the leash, the same saving paint and blur already make.
+    pub fn continue_stroke(
+        &mut self,
+        data: &mut [u8],
+        w: i32,
+        h: i32,
+        dest_x: f64,
+        dest_y: f64,
+    ) -> bool {
         if !self.stroke_active {
-            return;
+            return false;
         }
-        self.stroke_to(data, w, h, dest_x, dest_y);
+        if self.stab.is_on() {
+            match self.stab.advance(dest_x, dest_y) {
+                Some((_, (tx, ty))) => self.stroke_to(data, w, h, tx, ty),
+                None => return false,
+            }
+        } else {
+            self.stroke_to(data, w, h, dest_x, dest_y);
+        }
+        true
     }
 
-    pub fn end_stroke(&mut self, history: &mut History) {
+    /// `raw_x` / `raw_y` are the true cursor at mouse-up, so the leash can
+    /// catch up BEFORE the pre-stroke snapshot is pushed — otherwise the
+    /// stabilized tail of the stroke lands outside its own undo step.
+    pub fn end_stroke(
+        &mut self,
+        data: &mut [u8],
+        w: i32,
+        h: i32,
+        raw_x: f64,
+        raw_y: f64,
+        history: &mut History,
+    ) {
         if !self.stroke_active {
             return;
         }
+        if self.stab.is_on() {
+            if let Some((_, (tx, ty))) = self.stab.flush(raw_x, raw_y) {
+                self.stroke_to(data, w, h, tx, ty);
+            }
+        }
+        self.stab = crate::stabilizer::Stabilizer::default();
         self.stroke_active = false;
         if let Some(snap) = self.stroke_pre_snapshot.take() {
             // Route through History so the stroke snapshot is subject to the

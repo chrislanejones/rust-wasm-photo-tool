@@ -5,7 +5,6 @@ import {
   ChartArea,
   ChevronDown,
   ChevronUp,
-  Copy,
   Eye,
   EyeOff,
   History,
@@ -26,6 +25,9 @@ import { activateSubTool } from "@/features/tools/activateSubTool";
 import { subToolByKey } from "@/features/tools/toolGroups";
 import { slideFromRight } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
+// The ✕ lives in row-actions now — it was defined identically here and in
+// reselect-bar.tsx, so a change to one never reached the other.
+import { RowAction } from "@/components/ui/row-actions";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
@@ -45,6 +47,9 @@ export interface ReselectObject {
   id: number;
   /** Display name, e.g. "Text #1", "Square #1", "Line #2". */
   label: string;
+  /** Shape kind (0 rect, 1 circle, …) — shapes only. Decides which rows get
+   *  a live duplicate pad instead of the disabled placeholder. */
+  kind?: number;
 }
 
 /** The toggleable body sections of the Review panel. */
@@ -66,6 +71,12 @@ interface Props {
   onSelectObject: (o: ReselectObject) => void;
   /** Hover-X → delete that object. */
   onDeleteObject: (o: ReselectObject) => void;
+  /** Duplicate a placed object from its Reselect row. */
+  onDuplicateObject: (o: ReselectObject) => void;
+  /** Open/close the directional duplicate pad for a rect/circle row. */
+  onToggleDuplicatePad: (o: ReselectObject) => void;
+  /** Which shape's pad is open, so its row reads pressed. */
+  duplicatePadId: number | null;
   /** ▲/▼ on a SHAPE row → restack it (text has no draw order). Optional so
    *  callers without shape z-order (tests, older composition) still render. */
   onMoveShape?: (id: number, dir: ZMove) => void | boolean | Promise<boolean>;
@@ -102,12 +113,6 @@ interface Props {
   closable?: boolean;
 }
 
-const DeleteGlyph = () => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M2 2l8 8M10 2l-8 8" />
-  </svg>
-);
-
 const TOGGLES: {
   key: SectionKey;
   icon: typeof History;
@@ -137,6 +142,9 @@ export function ReviewPanel({
   objects,
   onSelectObject,
   onDeleteObject,
+  onDuplicateObject,
+  onToggleDuplicatePad,
+  duplicatePadId,
   onMoveShape,
   userMode,
   layers,
@@ -331,11 +339,11 @@ export function ReviewPanel({
               {objects.length === 0 && (
                 <div className="history-empty">
                   <span className="large-badge">
-                    Add text or a shape to reselect it
+                    Add text or a shape to reselect, delete, or duplicate it
                   </span>
                 </div>
               )}
-              {objects.map((o) => {
+              {objects.map((o, oIdx) => {
                 // Shape rows get ▲/▼. `objects` lists shapes in the engine's
                 // draw order (bottom → top), so the id list IS the z-order and
                 // the same helper the hook uses decides which arrow is live.
@@ -343,9 +351,24 @@ export function ReviewPanel({
                 return (
                   <ReselectBar
                     key={o.key}
+                    // An ordinal, where the dot used to be. History rows are
+                    // numbered and these now read the same way down the list.
+                    index={oIdx + 1}
                     label={o.label}
                     onSelect={() => onSelectObject(o)}
                     onDelete={() => onDeleteObject(o)}
+                    onDuplicate={() => onDuplicateObject(o)}
+                    duplicateLabel={`Duplicate ${o.label}`}
+                    // Rect (0) and circle (1) get the live pad; everything
+                    // else keeps the disabled placeholder so the row shape
+                    // stays constant down the list.
+                    onDirectional={
+                      o.type === "shape" && (o.kind === 0 || o.kind === 1)
+                        ? () => onToggleDuplicatePad(o)
+                        : undefined
+                    }
+                    directionalActive={o.type === "shape" && o.id === duplicatePadId}
+                    showDirectional
                     title={`Reselect ${o.label}`}
                     deleteLabel={`Delete ${o.label}`}
                     onMoveUp={
@@ -452,161 +475,120 @@ export function ReviewPanel({
                   const isTop = idx === layers.length - 1;
                   const isBottom = idx === 0;
                   return (
-                    <li
+                    <ReselectBar
                       key={layer.id}
-                      className={`full-width-badge layer-row ${
-                        layer.active ? "layer-active" : ""
-                      } ${layer.id === flashingId ? "layer-swapped" : ""}`}
-                      role="button"
-                      tabIndex={0}
-                      // #10: which layer is active was carried ONLY by the
-                      // `layer-active` class — visible, and announced to
-                      // nobody. `aria-current` rather than `aria-pressed`
-                      // because a layer cannot be un-selected: clicking one
-                      // moves the selection, it does not toggle this row off.
-                      aria-current={layer.active ? "true" : undefined}
-                      // #57: mark the pick BEFORE delegating, so the swap
-                      // this causes is recognised as the user's own and stays
-                      // quiet. Only a selection nobody asked for flashes.
-                      onClick={() => {
-                        markUserSelection(layer.id);
-                        onSelectLayer(layer.id);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          markUserSelection(layer.id);
-                          onSelectLayer(layer.id);
-                        }
-                      }}
-                      title={`Select ${layer.name}`}
-                    >
-                      <Button
-                        size="xs"
-                        title={layer.visible ? "Hide layer" : "Show layer"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleLayerVisible(layer.id, !layer.visible);
-                        }}
-                      >
-                        {/* Icon swap stays here (out of the button component) so
-                            it isn't baked in as a one-off variant. */}
-                        {layer.visible ? <Eye /> : <EyeOff className="opacity-40" />}
-                      </Button>
-
-                      {renamingId === layer.id ? (
-                        <input
-                          className="layer-rename-input"
-                          autoFocus
-                          value={renameDraft}
-                          onChange={(e) => setRenameDraft(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          onBlur={() => commitRename(layer.id)}
-                          onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === "Enter") commitRename(layer.id);
-                            else if (e.key === "Escape") setRenamingId(null);
-                          }}
-                        />
-                      ) : (
-                        <span
-                          className="large-badge layer-name"
-                          onDoubleClick={(e) => {
-                            e.stopPropagation();
-                            setRenameDraft(layer.name);
-                            setRenamingId(layer.id);
-                          }}
-                          title="Double-click to rename"
-                        >
-                          {layer.name}
-                        </span>
-                      )}
-
-                      <div className="layer-row-actions">
-                        <Button
-                          size="xs"
-                          title="Move up"
-                          disabled={isTop}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onMoveLayer(layer.id, idx + 1);
-                          }}
-                        >
-                          <ChevronUp />
-                        </Button>
-                        <Button
-                          size="xs"
-                          title="Move down"
-                          disabled={isBottom}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onMoveLayer(layer.id, idx - 1);
-                          }}
-                        >
-                          <ChevronDown />
-                        </Button>
-                        <Button
-                          size="xs"
-                          title="Merge down"
-                          disabled={isBottom}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onMergeDown(layer.id);
-                          }}
-                        >
-                          <Layers2 />
-                        </Button>
-                        {/* v8.38 — the per-row mask button moved to the Layers
-                            tool panel (Edit → Layers), one set of controls
-                            acting on the selected layer. A masked layer still
-                            announces itself here without offering a control. */}
-                        {layer.hasMask && (
+                      size="lg"
+                      type={layer.active ? "current" : "redo"}
+                      selected={layer.active}
+                      className={`layer-row ${layer.active ? "layer-active" : ""} ${
+                        layer.id === flashingId ? "layer-swapped" : ""
+                      }`}
+                      // The layer's NAME takes the slot a History row gives to
+                      // its step number, so both lists read the same way down
+                      // their leading edge.
+                      index={
+                        renamingId === layer.id ? (
+                          <input
+                            className="layer-rename-input"
+                            autoFocus
+                            value={renameDraft}
+                            onChange={(e) => setRenameDraft(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            onBlur={() => commitRename(layer.id)}
+                            onKeyDown={(e) => {
+                              e.stopPropagation();
+                              if (e.key === "Enter") commitRename(layer.id);
+                              else if (e.key === "Escape") setRenamingId(null);
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className="layer-name"
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              setRenameDraft(layer.name);
+                              setRenamingId(layer.id);
+                            }}
+                            title="Double-click to rename"
+                          >
+                            {layer.name}
+                          </span>
+                        )
+                      }
+                      // The label slot is where the mask badge sits — a masked
+                      // layer announces itself without offering a control
+                      // (v8.38 moved the control to the Layers tool panel).
+                      label={
+                        layer.hasMask ? (
                           <span
                             className="text-theme-muted-foreground"
                             title="Has a layer mask — edit it in the Layers tool (gear above)"
                           >
                             <Aperture className="h-3.5 w-3.5" />
                           </span>
-                        )}
-                        <Button
-                          size="xs"
-                          title="Duplicate layer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDuplicateLayer(layer.id);
-                          }}
-                        >
-                          <Copy />
-                        </Button>
-                        <Button
-                          size="xs"
-                          title="Delete layer"
-                          disabled={layers.length <= 1}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteLayer(layer.id);
-                          }}
-                        >
-                          <DeleteGlyph />
-                        </Button>
-                      </div>
-
-                      {/* Opacity slider for the active layer. */}
+                        ) : null
+                      }
+                      title={`Select ${layer.name}`}
+                      onSelect={() => {
+                        // #57: mark the pick BEFORE delegating, so the swap
+                        // this causes is recognised as the user's own and
+                        // stays quiet. Only a selection nobody asked for
+                        // flashes.
+                        markUserSelection(layer.id);
+                        onSelectLayer(layer.id);
+                      }}
+                      onDelete={
+                        layers.length > 1 ? () => onDeleteLayer(layer.id) : undefined
+                      }
+                      deleteLabel={`Delete ${layer.name}`}
+                      onDuplicate={() => onDuplicateLayer(layer.id)}
+                      duplicateLabel={`Duplicate ${layer.name}`}
+                      // Order, left to right: eye, up, down, merge down, then
+                      // the shared duplicate and delete.
+                      actions={
+                        <>
+                          <RowAction
+                            label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
+                            onClick={() => onToggleLayerVisible(layer.id, !layer.visible)}
+                          >
+                            {/* Icon swap stays out of the button component so
+                                it isn't baked in as a one-off variant. */}
+                            {layer.visible ? <Eye /> : <EyeOff className="opacity-40" />}
+                          </RowAction>
+                          <RowAction
+                            icon={ChevronUp}
+                            label={`Move ${layer.name} up`}
+                            disabled={isTop}
+                            onClick={() => onMoveLayer(layer.id, idx + 1)}
+                          />
+                          <RowAction
+                            icon={ChevronDown}
+                            label={`Move ${layer.name} down`}
+                            disabled={isBottom}
+                            onClick={() => onMoveLayer(layer.id, idx - 1)}
+                          />
+                          <RowAction
+                            icon={Layers2}
+                            label={`Merge ${layer.name} down`}
+                            disabled={isBottom}
+                            onClick={() => onMergeDown(layer.id)}
+                          />
+                        </>
+                      }
+                    >
+                      {/* Opacity shows only for the selected layer, and sits
+                          INSIDE the row so it inherits its hover/selected
+                          state instead of floating under it. */}
                       {layer.active && (
-                        <div
-                          className="layer-opacity"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <div className="layer-opacity" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="range"
                             min={0}
                             max={100}
+                            aria-label={`${layer.name} opacity`}
                             value={Math.round(layer.opacity * 100)}
                             onChange={(e) =>
-                              onSetLayerOpacity(
-                                layer.id,
-                                Number(e.target.value) / 100,
-                              )
+                              onSetLayerOpacity(layer.id, Number(e.target.value) / 100)
                             }
                           />
                           <span className="layer-opacity-val">
@@ -614,12 +596,7 @@ export function ReviewPanel({
                           </span>
                         </div>
                       )}
-
-                      {/* The mask-control bar that lived here moved to the
-                          Layers tool panel in v8.38 — same handlers, one
-                          home, acting on the selected layer (the gear in the
-                          section head is the signpost). */}
-                    </li>
+                    </ReselectBar>
                   );
                 })}
               </ul>

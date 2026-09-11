@@ -216,7 +216,7 @@ export function LayerSettings({
       {show("layer") && (
       <div className="space-y-2">
         <SectionHeader
-          title="Move or Resize Layer"
+          title="Edit Layer"
           info={
             <>
               Pick a layer, then every control below acts on it.{" "}
@@ -266,7 +266,18 @@ export function LayerSettings({
             </div>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
+        {/* Move / Resize / Add mask in ONE row. Add mask used to sit alone in
+            the Layer Mask section below, which meant three things you do TO
+            the selected layer were split across two sections with a heading
+            between them (Chris, 2026-09-10). It only appears while the layer
+            has no mask — once it does, the row is the Move/Resize pair and
+            the mask's own controls take over below. */}
+        <div
+          className={cn(
+            "grid gap-2 [grid-auto-rows:1fr]",
+            mask && activeLayer && !activeLayer.hasMask ? "grid-cols-3" : "grid-cols-2",
+          )}
+        >
           <ToolButton
             stacked
             active={moveActive}
@@ -281,13 +292,26 @@ export function LayerSettings({
             disabled={disabled || !onResizeLayer}
             onClick={onResizeLayer}
           />
+          {mask && activeLayer && !activeLayer.hasMask && (
+            /* Announces the tool switch, as "Paint mask" does: `onAdd` creates
+               the mask AND enters mask editing on the Paint brush, which
+               unmounts this panel. It was the only tile changing the active
+               tool without saying so. */
+            <ActionTile
+              icon={Aperture}
+              label="Add mask"
+              disabled={disabled}
+              onClick={() => mask.onAdd(activeLayer.id)}
+              title="Add a mask and start painting it with the brush — black hides, white reveals"
+            />
+          )}
         </div>
 
         {/* ── Layer mask — ONE set of controls, for the selected layer.
             Moved here from the per-row buttons in Review → Layers (v8.38,
             "none of those mask buttons will be on each layer"): same
             handlers, new home, wired to the dropdown's selection. */}
-        {mask && activeLayer && (
+        {mask && activeLayer && activeLayer.hasMask && (
           <div className={cn("space-y-2", MASK_SECTION_SEP)}>
             <SectionHeader
               title="Layer Mask"
@@ -306,23 +330,11 @@ export function LayerSettings({
                 one-shot ACTIONS are `ActionTile`, which never does. The
                 first cut of this section used plain ToolButtons for the
                 actions, which read as four permanently-unlit toggles. */}
-            {!activeLayer.hasMask ? (
-              <div className="grid gap-2 [grid-auto-rows:1fr]">
-                {/* Announces the tool switch the same way "Paint mask" below
-                    does: `onAdd` creates the mask AND enters mask editing on
-                    the Paint brush, which unmounts this panel. It was the only
-                    tile in this section changing the active tool without
-                    saying so. */}
-                <ActionTile
-                  icon={Aperture}
-                  label="Add mask"
-                  disabled={disabled}
-                  onClick={() => mask.onAdd(activeLayer.id)}
-                  title="Add a mask and start painting it with the brush"
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
+            {/* No "Add mask" branch here any more — the section itself is now
+                gated on `hasMask`, so reaching this point means the mask
+                exists. Adding one is a job you do TO the layer, so it sits
+                with Move and Resize in the row above. */}
+            <div className="grid grid-cols-2 gap-2 [grid-auto-rows:1fr]">
                 {/* One-shot, NOT a toggle — it starts an activity that lives
                     on another panel. `onToggleEdit` switches the app to the
                     Paint brush, which unmounts this panel and (by AppShell's
@@ -358,8 +370,7 @@ export function LayerSettings({
                   onClick={() => mask.onRemove(activeLayer.id)}
                   title="Remove mask"
                 />
-              </div>
-            )}
+            </div>
           </div>
         )}
 

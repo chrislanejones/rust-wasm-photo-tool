@@ -322,13 +322,17 @@
      16px is the value the majority already used, so this standardises DOWN to
      what was mostly true rather than inventing a fourth number.
 
-     ⚠️ THE 32px AT THE BOTTOM OF THE TOOLS BODY IS NOT A MISTAKE and is left
-     alone: Chris asked for that air specifically, because the Compress buttons
-     sat too close to the panel's bottom edge. `--spacing-panel-floor` names it
-     so the next person tidying edges does not "fix" it back.
+     ⚠️ THE FOOTER AIR IS GONE, and the token with it (2026-09-11). A note here
+     used to say 32px at the bottom of the Tools body was deliberate, at Chris's
+     request, because the Compress buttons sat too close to the edge. Two things
+     were true by the time anyone looked: the class it described (`pb-8`) was no
+     longer on the element, and `--spacing-panel-floor` was referenced by
+     nothing — a documented decision with no code under it. Chris has since
+     asked for the opposite ("follow the reference of top bar, button to edge"),
+     so the Tools body now ends in `pb-1.5` = 6px, matching the master bar's own
+     `p-1.5`. The two chrome edges agree rather than each picking a number.
      ─────────────────────────────────────────────────────────────────────── */
-  --spacing-panel: 1rem;        /* 16px — every panel edge */
-  --spacing-panel-floor: 2rem;  /* 32px — the deliberate footer air */
+  --spacing-panel: 1rem;        /* 16px — every panel edge except that floor */
 
   --text-2xs: 0.625rem;   /* 10px */
   --text-xs: 0.75rem;     /* 12px */
@@ -921,11 +925,44 @@ textarea:focus-visible {
   padding-top: 0;
 }
 
-.layer-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+/* The Layers list is the `lg` variant of the shared row: taller, and its
+   leading slot carries a NAME rather than a number, so that slot has to be
+   free to grow instead of sitting at the number's fixed 18px. */
+
+/* LAYERS IS THE EXCEPTION: its buttons stay visible. Two reasons, and the
+   first is the one that decides it — THESE GET USED, constantly. Hiding a
+   control behind hover costs a beat every single time, and on the list you
+   reach for most that adds up; History and Reselect rows are read far more
+   often than they are acted on, so there the quiet is worth it.
+
+   The second: the eye is not only an action, it is a STATUS — it reports
+   whether the layer is hidden, and a status you have to hover to read is not
+   a status. The rest of the cluster rides along with it, because revealing
+   one button of six on hover while five sit lit would read as a glitch. */
+.full-width-badge-lg .row-actions {
+  opacity: 1;
+}
+.full-width-badge-lg {
+  padding: 9px 10px;
   flex-wrap: wrap;
+}
+
+.full-width-badge-lg .history-index {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+/* The label slot is only the mask badge here, so it must not claim the width
+   `.large-badge` normally takes from the row. */
+.full-width-badge-lg .large-badge {
+  flex: 0 0 auto;
+}
+
+.layer-row {
+  gap: 6px;
 }
 
 .layer-active {
@@ -956,7 +993,7 @@ textarea:focus-visible {
 }
 
 .layer-name {
-  flex: 1;
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1234,8 +1271,28 @@ textarea:focus-visible {
   background: var(--bg-elevated);
 }
 
-.full-width-badge:hover .history-delete {
+/* HIDDEN UNTIL HOVER (Chris, 2026-09-11). The accessibility half is
+   `:focus-within` below: a Tab user reveals the whole trailing group the
+   moment focus enters the row, so a hover-only reveal never hides a
+   focusable control from the keyboard. */
+.full-width-badge:hover .row-actions,
+.full-width-badge:focus-within .row-actions,
+.full-width-badge:hover .history-delete,
+.full-width-badge:focus-within .history-delete,
+.full-width-badge:hover .history-zmove,
+.full-width-badge:focus-within .history-zmove {
   opacity: 1;
+}
+
+/* The trailing button group. Tight like the Layers list — these are one
+   cluster of related actions, not separate controls scattered along the row. */
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
 
 /* ▲/▼ restack arrows on shape rows — same hover-reveal as the ✕, and a
@@ -1246,7 +1303,9 @@ textarea:focus-visible {
   opacity: 0;
   background: none;
   border: none;
-  color: var(--text-muted);
+  /* --text-secondary, not --text-muted: muted is too light to read against
+     the light-mode row, and these must match the History rows exactly. */
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
@@ -1255,8 +1314,8 @@ textarea:focus-visible {
   justify-content: center;
   transition: all 0.1s;
 }
-.full-width-badge:hover .history-zmove,
-.history-zmove:focus-visible {
+.history-zmove:focus-visible,
+.history-delete:focus-visible {
   opacity: 1;
 }
 .history-zmove:hover:not(:disabled) {
@@ -1267,45 +1326,18 @@ textarea:focus-visible {
   opacity: 0.35;
 }
 
-.history-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.full-width-badge.type-undo .history-dot {
-  background: var(--undo-color);
-}
-
-.full-width-badge.type-current .history-dot {
-  background: var(--current-color);
-  box-shadow: 0 0 8px var(--accent-dim);
-}
-
-.full-width-badge.type-redo .history-dot {
-  background: var(--redo-color);
-  opacity: 0.5;
-}
-
-.full-width-badge.type-current {
+.full-width-badge.type-undo .full-width-badge.type-current .full-width-badge.type-redo .full-width-badge.type-current {
   background: var(--bg-tertiary);
   border-color: var(--border);
-  justify-content: center;
 }
 
-.full-width-badge.type-current .history-dot {
-  background: var(--text-muted);
-}
-
-.full-width-badge.type-current .history-index {
+.full-width-badge.type-current .full-width-badge.type-current .history-index {
   color: var(--text-muted);
 }
 
 .full-width-badge.type-current .large-badge {
   color: var(--accent);
   font-weight: 600;
-  text-align: center;
 }
 
 .full-width-badge.type-redo {
@@ -1324,12 +1356,9 @@ textarea:focus-visible {
   border-color: var(--accent);
 }
 
-.full-width-badge.is-selected .history-dot {
-  background: var(--accent);
-  opacity: 1;
-}
-
-/* The ✕ stays visible while selected so the active row is always deletable. */
+.full-width-badge.is-selected /* A selected row keeps its actions visible — the active row must always be
+   actionable without hunting for it with the pointer. */
+.full-width-badge.is-selected .row-actions,
 .full-width-badge.is-selected .history-delete {
   opacity: 1;
 }
@@ -1354,11 +1383,7 @@ textarea:focus-visible {
   font-weight: 600;
 }
 
-.full-width-badge.type-current .history-dot {
-  background: var(--text-muted);
-}
-
-.full-width-badge.type-current .history-index {
+.full-width-badge.type-current .full-width-badge.type-current .history-index {
   color: var(--text-muted);
 }
 
@@ -1374,7 +1399,8 @@ textarea:focus-visible {
   opacity: 0;
   background: none;
   border: none;
-  color: var(--text-muted);
+  /* Matches .history-zmove — one colour for every row action. */
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;

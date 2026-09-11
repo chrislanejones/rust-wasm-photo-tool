@@ -17,7 +17,10 @@ interface Props {
 
 /**
  * Heads-up shown when the mobile version (< BP_MOBILE) takes over: upload,
- * add, and view only — no editing on a phone. Same shape as the compact
+ * view and download — no editing on a phone. The copy names downloading
+ * because the viewer really does it (MobileShell's Download button saves the
+ * stored bytes); it said "browse your gallery" while that button did not
+ * exist yet. Same shape as the compact
  * version's notice; dismissible, and AppShell re-arms it once the window
  * grows back past the mobile floor. Replaces the old SmallWindowNotice
  * ("widen the window"), which stopped making sense once phone widths got a
@@ -35,9 +38,9 @@ export function MobileVersionNotice({ open, onOpenChange }: Props) {
         </DialogHeader>
         <DialogBody>
           <DialogDescription>
-            This is the Image Horse mobile version: upload images and browse
-            your gallery. Editing needs more room — open the same gallery on a
-            desktop or a wider window to pick up the full toolset.
+            The mobile version uploads and downloads images. For the full
+            photo editing suite, open Image Horse on a desktop or a wider
+            window.
           </DialogDescription>
         </DialogBody>
         <DialogFooter>

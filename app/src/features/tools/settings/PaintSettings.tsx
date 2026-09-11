@@ -9,6 +9,7 @@ import { SizeSlider } from "@/components/SizeSlider";
 import { ColorSwatchGrid } from "@/components/ColorSwatchGrid";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolButtonGroup } from "@/components/ui/tool-button-group";
+import { StabilizerRow } from "./StabilizerRow";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import { ActionTile } from "@/components/ui/action-tile";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -26,14 +27,6 @@ const BLUR_MODES = [
   { id: "gaussian", label: "Blur" },
   { id: "pixelate", label: "Pixelate" },
   { id: "solid", label: "Solid" },
-] as const;
-
-// Stroke-stabilizer strength (off → high leash). Off by default.
-const STABILIZER_LEVELS = [
-  { id: "off",  label: "Off"  },
-  { id: "low",  label: "Low"  },
-  { id: "med",  label: "Med"  },
-  { id: "high", label: "High" },
 ] as const;
 
 const PEN_WIDTH_PRESETS = [2, 4, 8, 16] as const;
@@ -184,22 +177,12 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                 />
 
                 {/* Stroke Stabilizer — pulled-string "lazy mouse" smoothing. Off by
-                    default; Low/Med/High set the leash (smoothing strength). */}
-                <div className="space-y-2">
-                  <label className="text-2xs text-theme-muted-foreground">
-                    Stroke Stabilizer
-                  </label>
-                  <ToolButtonGroup
-                    options={STABILIZER_LEVELS}
-                    value={settings.paintStabilizer ?? "off"}
-                    onChange={(id) =>
-                      onChange({
-                        ...settings,
-                        paintStabilizer: id as ToolSettings["paintStabilizer"],
-                      })
-                    }
-                  />
-                </div>
+                    default; Low/Med/High set the leash (smoothing strength).
+                    The level table lives in StabilizerRow, the single copy. */}
+                <StabilizerRow
+                  value={settings.paintStabilizer}
+                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
+                />
 
                 {/* ── Smart Brush (behind ih_smart_edge; see lib/smartEdge.ts) ──
                     The second consumer of the edge core that already powers the
@@ -328,6 +311,15 @@ export function PaintSettings({ settings, onChange, activeMode, onModeChange }: 
                     presets={PIXEL_SIZE_PRESETS}
                   />
                 )}
+
+                {/* Applies to all three blur modes — it leashes the STROKE,
+                    not the effect, so blur, pixelate and redact all steady
+                    the same way. Same field the Paint brush and Eraser read:
+                    one dial, on everywhere. */}
+                <StabilizerRow
+                  value={settings.paintStabilizer}
+                  onChange={(paintStabilizer) => onChange({ ...settings, paintStabilizer })}
+                />
 
                 {settings.blurMode === "solid" && (
                   <ColorSwatchGrid

@@ -527,15 +527,6 @@ impl ImageHorseTool {
 
     /// Map a stabilizer level name → trailing-tip leash in px (0 = off). Shared
     /// by the paint brush and the eraser. (Private — not part of the WASM API.)
-    fn leash_for(stab: &str) -> f64 {
-        match stab {
-            "low" => 12.0,
-            "med" => 22.0,
-            "high" => 36.0,
-            _ => 0.0,
-        }
-    }
-
     pub fn paint_down(
         &mut self,
         x: f64,
@@ -552,7 +543,7 @@ impl ImageHorseTool {
         self.paint_hardness = hardness.clamp(0.0, 1.0) as f32;
         let radius = (size * 0.5).max(0.0);
         self.paint_radius = radius;
-        self.paint_leash = Self::leash_for(stab);
+        self.paint_stab = crate::stabilizer::Stabilizer::for_level(stab);
         self.paint_last = Some((x, y));
         self.paint_raw = (x, y);
         // Op-log recorder: the down point starts the painted polyline; the
@@ -573,7 +564,7 @@ impl ImageHorseTool {
             ));
         }
         self.paint_dab(x, y, radius, r, g, b, opacity);
-        if self.paint_leash > 0.0 {
+        if self.paint_stab.is_on() {
             self.paint_stab_begin(x, y);
         }
     }
@@ -599,7 +590,7 @@ impl ImageHorseTool {
         self.paint_hardness = hardness.clamp(0.0, 1.0) as f32;
         let radius = (size * 0.5).max(0.0);
         self.paint_radius = radius;
-        self.paint_leash = Self::leash_for(stab);
+        self.paint_stab = crate::stabilizer::Stabilizer::for_level(stab);
         self.paint_last = Some((x, y));
         self.paint_raw = (x, y);
         #[cfg(feature = "tiles")]
@@ -618,7 +609,7 @@ impl ImageHorseTool {
             ));
         }
         self.paint_dab(x, y, radius, 0, 0, 0, opacity);
-        if self.paint_leash > 0.0 {
+        if self.paint_stab.is_on() {
             self.paint_stab_begin(x, y);
         }
     }
@@ -682,13 +673,13 @@ impl ImageHorseTool {
         self.paint_hardness = hardness.clamp(0.0, 1.0) as f32;
         let radius = (size * 0.5).max(0.0);
         self.paint_radius = radius;
-        self.paint_leash = Self::leash_for(stab);
+        self.paint_stab = crate::stabilizer::Stabilizer::for_level(stab);
         self.paint_last = Some((x, y));
         self.paint_raw = (x, y);
         // Colour is irrelevant when masking; paint_dab sets paint_opacity and
         // recomposites through the paint_mask branch.
         self.paint_dab(x, y, radius, 0, 0, 0, opacity);
-        if self.paint_leash > 0.0 {
+        if self.paint_stab.is_on() {
             self.paint_stab_begin(x, y);
         }
     }
@@ -744,14 +735,14 @@ impl ImageHorseTool {
         self.paint_hardness = hardness.clamp(0.0, 1.0) as f32;
         let radius = (size * 0.5).max(0.0);
         self.paint_radius = radius;
-        self.paint_leash = Self::leash_for(stab);
+        self.paint_stab = crate::stabilizer::Stabilizer::for_level(stab);
         self.paint_last = Some((x, y));
         self.paint_raw = (x, y);
         // Colour/opacity are irrelevant when marking a selection; paint_dab
         // still routes through recomposite_stroke_bbox, which the
         // paint_selection_mask branch intercepts before any pixel math runs.
         self.paint_dab(x, y, radius, 0, 0, 0, 1.0);
-        if self.paint_leash > 0.0 {
+        if self.paint_stab.is_on() {
             self.paint_stab_begin(x, y);
         }
     }
@@ -778,7 +769,7 @@ impl ImageHorseTool {
         self.paint_raw = (x, y);
         let (r, g, b) = self.paint_color;
         let radius = self.paint_radius;
-        let leash = self.paint_leash;
+        let leash = 0.0; // carried on paint_stab now
         let op = self.paint_opacity as f64;
         if leash > 0.0 {
             return self.paint_stab_to(x, y, leash, radius, r, g, b, op);
@@ -795,7 +786,7 @@ impl ImageHorseTool {
     /// the stroke buffers. Returns true if it painted.
     pub fn paint_up(&mut self) -> bool {
         let mut painted = false;
-        if self.paint_leash > 0.0 {
+        if self.paint_stab.is_on() {
             let (rx, ry) = self.paint_raw;
             let (r, g, b) = self.paint_color;
             painted = self.paint_stab_flush(
@@ -825,7 +816,10 @@ impl ImageHorseTool {
             }
         }
         self.paint_last = None;
-        self.paint_leash = 0.0;
+        // Clears the leash AND any trailing tip — the old code reset the leash
+        // to 0 but left `paint_stab_tip` for `paint_stab_flush` to drop.
+        // `Default` does both, so a stroke can never leave a tip behind.
+        self.paint_stab = crate::stabilizer::Stabilizer::default();
         self.paint_cov = Vec::new();
         self.paint_base = Vec::new();
         self.paint_erase = false;
@@ -845,7 +839,7 @@ impl ImageHorseTool {
 
     /// Begin a stabilized stroke with the tip anchored at the press point.
     pub fn paint_stab_begin(&mut self, x: f64, y: f64) {
-        self.paint_stab_tip = Some((x, y));
+        self.paint_stab.begin(x, y);
     }
 
     /// Advance the stabilized tip toward `(raw_x, raw_y)` and paint the
@@ -854,37 +848,26 @@ impl ImageHorseTool {
         &mut self,
         raw_x: f64,
         raw_y: f64,
-        leash: f64,
+        _leash: f64,
         radius: f64,
         r: u8,
         g: u8,
         b: u8,
         opacity: f64,
     ) -> bool {
-        let (tx, ty) = match self.paint_stab_tip {
-            Some(t) => t,
-            None => {
-                self.paint_stab_tip = Some((raw_x, raw_y));
-                return false;
+        // `_leash` is now carried by the Stabilizer itself (set in
+        // `*_down` from the level string) rather than passed per move. The
+        // parameter stays so the four paint-engine drivers keep their
+        // signature; it is the leash they read off `self` anyway.
+        match self.paint_stab.advance(raw_x, raw_y) {
+            Some(((tx, ty), (nx, ny))) => {
+                self.paint_stroke_to(tx, ty, nx, ny, radius, r, g, b, opacity);
+                true
             }
-        };
-        let dx = raw_x - tx;
-        let dy = raw_y - ty;
-        let dist = (dx * dx + dy * dy).sqrt();
-        if dist > leash && dist > 0.0 {
-            let k = 1.0 - leash / dist; // fraction of the gap to close
-            let nx = tx + dx * k;
-            let ny = ty + dy * k;
-            self.paint_stroke_to(tx, ty, nx, ny, radius, r, g, b, opacity);
-            self.paint_stab_tip = Some((nx, ny));
-            true
-        } else {
-            false
+            None => false,
         }
     }
 
-    /// Catch up: paint the final segment from the trailing tip to the real
-    /// cursor so the stroke ends under the pointer, then clear the stabilizer.
     pub fn paint_stab_flush(
         &mut self,
         raw_x: f64,
@@ -895,18 +878,13 @@ impl ImageHorseTool {
         b: u8,
         opacity: f64,
     ) -> bool {
-        let painted = if let Some((tx, ty)) = self.paint_stab_tip {
-            if (tx - raw_x).abs() > 0.001 || (ty - raw_y).abs() > 0.001 {
-                self.paint_stroke_to(tx, ty, raw_x, raw_y, radius, r, g, b, opacity);
+        match self.paint_stab.flush(raw_x, raw_y) {
+            Some(((tx, ty), (nx, ny))) => {
+                self.paint_stroke_to(tx, ty, nx, ny, radius, r, g, b, opacity);
                 true
-            } else {
-                false
             }
-        } else {
-            false
-        };
-        self.paint_stab_tip = None;
-        painted
+            None => false,
+        }
     }
 }
 
