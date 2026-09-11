@@ -66,6 +66,8 @@ interface Props {
   onSelectObject: (o: ReselectObject) => void;
   /** Hover-X → delete that object. */
   onDeleteObject: (o: ReselectObject) => void;
+  /** Duplicate a placed object from its Reselect row. */
+  onDuplicateObject: (o: ReselectObject) => void;
   /** ▲/▼ on a SHAPE row → restack it (text has no draw order). Optional so
    *  callers without shape z-order (tests, older composition) still render. */
   onMoveShape?: (id: number, dir: ZMove) => void | boolean | Promise<boolean>;
@@ -137,6 +139,7 @@ export function ReviewPanel({
   objects,
   onSelectObject,
   onDeleteObject,
+  onDuplicateObject,
   onMoveShape,
   userMode,
   layers,
@@ -331,7 +334,7 @@ export function ReviewPanel({
               {objects.length === 0 && (
                 <div className="history-empty">
                   <span className="large-badge">
-                    Add text or a shape to reselect it
+                    Add text or a shape to reselect, delete, or duplicate it
                   </span>
                 </div>
               )}
@@ -346,6 +349,9 @@ export function ReviewPanel({
                     label={o.label}
                     onSelect={() => onSelectObject(o)}
                     onDelete={() => onDeleteObject(o)}
+                    onDuplicate={() => onDuplicateObject(o)}
+                    duplicateLabel={`Duplicate ${o.label}`}
+                    showDirectional
                     title={`Reselect ${o.label}`}
                     deleteLabel={`Delete ${o.label}`}
                     onMoveUp={

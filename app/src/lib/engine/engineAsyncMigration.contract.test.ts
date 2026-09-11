@@ -748,7 +748,14 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     expect(gate.remaining).toBe(5);
     expect(gate.unawaited).toBe(0);
     expect(gate.truthy).toBe(0);
-    expect(gate.awaited, "cumulative converted sites").toBe(133);
+    // Reselect Duplicate — 133 -> 135: `duplicate_text_annotation` and
+    // `duplicate_shape_annotation`, born awaited and value-consuming. Both
+    // return the new annotation id or the -1 NOT-FOUND sentinel, and -1 is
+    // the whole point: un-awaited, the guard reads `Promise < 0`, which is
+    // false for every Promise — so a duplicate of a stale id would skip its
+    // own early return and go on to flush and sync an object the engine
+    // never created. This gate caught exactly that on the first write.
+    expect(gate.awaited, "cumulative converted sites").toBe(135);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

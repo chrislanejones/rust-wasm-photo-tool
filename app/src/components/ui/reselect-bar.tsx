@@ -32,6 +32,20 @@ export interface ReselectBarProps {
   onSelect: () => void;
   /** Omit entirely for the no-✕ variant. */
   onDelete?: () => void;
+  /** Duplicate affordance, rendered immediately BEFORE the ✕. Omit for rows
+   *  that cannot be duplicated (History entries, guides) — only placed
+   *  objects have a meaningful copy. */
+  onDuplicate?: () => void;
+  /** aria-label for the duplicate button. Default "Duplicate". */
+  duplicateLabel?: string;
+  /** Directional (d-pad) affordance, leftmost of the trailing three. Pass
+   *  `true` to render it DISABLED — a placeholder for nudging the object from
+   *  the row, which has no handler yet. Passing a function is not supported on
+   *  purpose: a live control should arrive with its behaviour, not be switched
+   *  on by a caller guessing what it does. */
+  showDirectional?: boolean;
+  /** aria-label for the directional button. Default "Move". */
+  directionalLabel?: string;
   disabled?: boolean;
   /** Title/tooltip for the row. */
   title?: string;
@@ -57,6 +71,24 @@ const ChevronGlyph = ({ up }: { up: boolean }) => (
   </svg>
 );
 
+/** A d-pad: the four-way directional cross. Drawn inline for the same reason
+ *  as the others — 12×12 at stroke 1.5 so the trailing row reads as one set. */
+const DirectionalGlyph = () => (
+  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M4.5 1.75h3v2.75h2.75v3H7.5v2.75h-3V7.5H1.75v-3H4.5z" />
+  </svg>
+);
+
+/** Two offset rounded rects — the standard "copy" mark, drawn rather than
+ *  imported so it matches ChevronGlyph/DeleteGlyph's 12×12 stroke weight
+ *  exactly. A lucide icon here sat visibly heavier beside them. */
+const DuplicateGlyph = () => (
+  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <rect x="4.25" y="4.25" width="5.5" height="5.5" rx="1" />
+    <path d="M7.75 2.25H2.75a.5.5 0 0 0-.5.5v5" />
+  </svg>
+);
+
 const DeleteGlyph = () => (
   <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
     <path d="M2 2l8 8M10 2l-8 8" />
@@ -72,9 +104,13 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       selected = false,
       onSelect,
       onDelete,
+      onDuplicate,
       disabled = false,
       title,
       deleteLabel = "Delete",
+      duplicateLabel = "Duplicate",
+      showDirectional = false,
+      directionalLabel = "Move",
       onMoveUp,
       onMoveDown,
       canMoveUp = true,
@@ -93,6 +129,11 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
       } else if ((e.key === "Delete" || e.key === "Backspace") && onDelete) {
         e.preventDefault();
         onDelete();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && onDuplicate) {
+        // Keyboard parity with the ✕, which already answers Delete/Backspace.
+        // An icon-only button that only works with a mouse is half a control.
+        e.preventDefault();
+        onDuplicate();
       }
     };
 
@@ -146,6 +187,38 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
             }}
           >
             <ChevronGlyph up={false} />
+          </button>
+        )}
+        {showDirectional && (
+          /* Deliberately always disabled — see `showDirectional`. It is a
+             placeholder, so it carries a title that SAYS so rather than
+             looking like a button that is merely unavailable right now. */
+          <button
+            type="button"
+            className="history-zmove"
+            aria-label={directionalLabel}
+            title={`${directionalLabel} — not available yet`}
+            disabled
+          >
+            <DirectionalGlyph />
+          </button>
+        )}
+        {onDuplicate && (
+          <button
+            type="button"
+            className="history-zmove"
+            aria-label={duplicateLabel}
+            title={duplicateLabel}
+            disabled={disabled}
+            onClick={(e) => {
+              // Same stopPropagation as the ✕ and the arrows: the row itself
+              // is clickable and selects, so without this a duplicate would
+              // also reselect the row it just copied.
+              e.stopPropagation();
+              if (!disabled) onDuplicate();
+            }}
+          >
+            <DuplicateGlyph />
           </button>
         )}
         {onDelete && (

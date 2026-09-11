@@ -725,6 +725,15 @@ declare module "stamp_tool" {
       bg_padding: number,
     ): Int32Array;
     get_text_annotations(): string;
+    /** Duplicate a text annotation, offset by (dx, dy). Returns the NEW id,
+     *  or -1 when `id` matches nothing (sentinel, not null — the same shape
+     *  `text_annotation_at` uses).
+     *
+     *  Clones the struct engine-side rather than re-adding from fields, so a
+     *  field added to TextAnnotation later cannot be silently dropped by this
+     *  path — pinned by tests/duplicate_annotation.rs. Pushes one
+     *  "Duplicate Text" history entry. */
+    duplicate_text_annotation(id: number, dx: number, dy: number): number;
     /** Returns whether anything was flattened (ADR-024 Stage 2 — the
      *  verdict comes from the call that does the work, so no caller has to
      *  read state first). Reports the ACTIVE layer, text AND shapes. */
@@ -1319,6 +1328,11 @@ declare module "stamp_tool" {
     set_editing_text(id: number): void;
     /** JSON array of all live shapes (id, kind, x0,y0,x1,y1, r,g,b, stroke_width, arrow_style, number, points). */
     get_shape_annotations(): string;
+    /** Duplicate a shape annotation, offset by (dx, dy). Returns the NEW id,
+     *  or -1 when `id` matches nothing. Offsets `points` alongside the
+     *  endpoints so a polyline copy keeps its own path. Appends, so the copy
+     *  lands on TOP of the draw order. One "Duplicate Shape" history entry. */
+    duplicate_shape_annotation(id: number, dx: number, dy: number): number;
     /** Returns the matching shape id, or -1 if no hit. Newest-first. Lines,
      *  arrows and polylines hit near their stroke; an UNFILLED rect / circle /
      *  hand-circle hits on its outline RING only (the empty middle is a miss,
