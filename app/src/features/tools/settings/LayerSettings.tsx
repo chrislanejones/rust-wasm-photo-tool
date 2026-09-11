@@ -216,7 +216,7 @@ export function LayerSettings({
       {show("layer") && (
       <div className="space-y-2">
         <SectionHeader
-          title="Move or Resize Layer"
+          title="Edit Layer"
           info={
             <>
               Pick a layer, then every control below acts on it.{" "}
