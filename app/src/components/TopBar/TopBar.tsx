@@ -12,11 +12,15 @@ import {
   type ToggleGroupItem,
 } from "@/components/ui/toggle-button-group";
 import {
-  Upload,
+  // New and Export are a PAIR, so they read as one: the same arrow-and-line
+  // mark, mirrored. Up = images coming in, down = the file going out. `Upload`
+  // and `Download` are different drawings that happened to mean related
+  // things, which made the pair look like two unrelated buttons.
+  ArrowUpFromLine,
   Image,
   Wrench,
   BookOpenCheck,
-  Download,
+  ArrowDownFromLine,
   ZoomIn,
   ZoomOut,
   Undo2,
@@ -290,7 +294,7 @@ export function TopBar({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <IconButton
-                      icon={Upload}
+                      icon={ArrowUpFromLine}
                       label="New"
                       onClick={onToggleUpload}
                       active={showUpload}
@@ -305,7 +309,7 @@ export function TopBar({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <IconButton
-                      icon={Download}
+                      icon={ArrowDownFromLine}
                       label="Export"
                       onClick={onExport}
                       disabled={!canExport}
