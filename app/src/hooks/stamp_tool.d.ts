@@ -934,6 +934,13 @@ declare module "stamp_tool" {
     recomposite(): void;
     /** Every layer in the stack, Canvas included — what the Layers panel shows. */
     layer_count(): number;
+    /** True once an unrecorded edit desynced the op log — snapshot undo only,
+     *  until the next image load.
+     *
+     *  ⚠️ OPTIONAL: `#[cfg(feature = "tiles")]`. The shipped wasm has it, but a
+     *  FEATURELESS build has reached production before (v7.36–v7.45), so every
+     *  caller must feature-detect rather than assume. */
+    oplog_is_broken?(): boolean;
     /** Real PIXEL layers: the Canvas fill does NOT count (ADR-016). A default
      *  document (Canvas + Photo) answers 1. This — not `layer_count()` — is what
      *  decides whether the op log can describe the document (`isLogTrustworthy`). */

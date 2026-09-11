@@ -86,6 +86,7 @@ import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
 import { useDuplicatePad } from "./session/useDuplicatePad";
+import { useOplogHealth } from "./session/useOplogHealth";
 import { DuplicatePadOverlay } from "@/features/canvas/DuplicatePadOverlay";
 import type { OverlayFrame } from "@/features/canvas/overlayFrame";
 import { useCanvasActions } from "./session/useCanvasActions";
@@ -1833,6 +1834,11 @@ export function AppShell() {
   // live in the session hook, not here — AppShell is being dismantled
   // (CLAUDE.md), and the first cut of this handler sat in this file.
   const duplicatePad = useDuplicatePad(stamp, drawingTools, textTool, bumpAnnotations);
+
+  // #37 — say it out loud when undo gets shallower. The op log records 6 of
+  // the engine's 67 snapshotting operations; the rest fall back to snapshot
+  // undo, which on a 24 MP photo is about five steps. Silent until now.
+  useOplogHealth(stamp, activePhotoId, stamp.state.undoCount);
   // Mounted through CanvasArea's generic render-prop so CanvasArea stays
   // ignorant of the pad (and inside its max-lines cap).
   const renderDuplicatePad = useCallback(
