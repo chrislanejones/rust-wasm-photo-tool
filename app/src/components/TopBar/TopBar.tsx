@@ -45,10 +45,11 @@ interface TopBarProps {
   onToggleTools: () => void;
   onToggleGallery: () => void;
   onToggleHistory: () => void;
-  /** Export — the fifth item in the cluster and the only ACTION in it: it
-   *  fires the download rather than toggling a panel, so it never renders
-   *  active. It replaced the Tools panel's full-width "Download & Share
-   *  {FORMAT}" footer, which took a whole row of the sidebar for one button. */
+  /** Export — an ACTION, not a toggle: it fires the download rather than
+   *  opening a panel, so it never renders active. It replaced the Tools
+   *  panel's full-width "Download & Share {FORMAT}" footer, which took a whole
+   *  row of the sidebar for one button, and now sits beside New in the right
+   *  cluster's icon pair rather than in the labelled centre group. */
   onExport: () => void;
   canExport: boolean;
   /** Shared window width (from useBreakpoint) — drives the compact / narrow
@@ -101,15 +102,13 @@ export function TopBar({
   const compact =
     narrow || (winWidth < BP_TIGHT && showTools && showHistory);
 
+  // New and Export are NOT in here any more (Chris, 2026-09-11). They were the
+  // two odd ones out in a group of panel toggles — New opens a dialog, Export
+  // fires a download — and one of them (Export) had to permanently report
+  // `active: false` to sit here at all. They are an icon-only pair in the
+  // right cluster now, shaped exactly like Undo/Redo, so the centre group is
+  // what it claims to be: the three side panels, labelled.
   const toggleButtons: ToggleGroupItem[] = [
-    {
-      key: "N",
-      icon: Upload,
-      label: "New",
-      active: showUpload,
-      onToggle: onToggleUpload,
-      tooltip: { label: "New", shortcut: "Alt + N" },
-    },
     {
       key: "T",
       icon: Wrench,
@@ -133,18 +132,6 @@ export function TopBar({
       active: showHistory,
       onToggle: onToggleHistory,
       tooltip: { label: "Review", shortcut: "Alt + R" },
-    },
-    // The odd one out, deliberately: an ACTION in a group of toggles. It never
-    // reports active — there is no "export mode" to be in — and disables
-    // instead when there is nothing loaded to export.
-    {
-      key: "E",
-      icon: Download,
-      label: "Export",
-      active: false,
-      onToggle: onExport,
-      disabled: !canExport,
-      tooltip: { label: "Export", shortcut: "Alt + E" },
     },
   ];
 
@@ -226,9 +213,9 @@ export function TopBar({
             <Tooltip>
               <TooltipTrigger asChild>
                 {/* THE REVIEW PANEL'S SECTION TOGGLES ARE THE REFERENCE for
-                    every group in this bar (Chris, 2026-08-20). All four —
-                    Undo/Redo, this one, the New/Tools/Gallery/Review toggles
-                    and the cog/user pair — are that group's container copied
+                    every group in this bar (Chris, 2026-08-20). All five —
+                    Undo/Redo, this one, the Tools/Gallery/Review toggles, the
+                    New/Export pair and the cog/user pair — are that container copied
                     literally, `p-1 rounded-lg bg-bg-tertiary`, holding its
                     30px `rounded-md` buttons. The bar used to run three radii
                     and two heights across four clusters; one box is what makes
@@ -270,7 +257,7 @@ export function TopBar({
             </Tooltip>
             </div>
 
-            {/* Center cluster: the four panel toggles, flanked by dividers and
+            {/* Center cluster: the three panel toggles, flanked by dividers and
                 kept dead-centered on the bar by the grid's 1fr/auto/1fr cols. */}
             <div className={compact ? "contents" : "flex items-center gap-3"}>
               {!compact && <div className="w-px h-6 bg-border shrink-0" />}
@@ -283,14 +270,57 @@ export function TopBar({
               {!compact && <div className="w-px h-6 bg-border shrink-0" />}
             </div>
 
-            {/* Right cluster: Settings + Clerk user menu, anchored right.
-                These two used to float loose against the bar background while
-                every other control sat in a group — the same near-miss the
-                toggle group had, one channel over. They are a group now: same
-                `p-1 rounded-lg bg-bg-tertiary` container as Undo/Redo and
+            {/* Right cluster: New/Export, then Settings + Clerk user menu,
+                anchored right — the mirror of the left cluster's Undo/Redo +
+                divider + Zoom, so the bar reads as two icon pairs flanking one
+                labelled group of tabs.
+
+                Settings + user used to float loose against the bar background
+                while every other control sat in a group — the same near-miss
+                the toggle group had, one channel over. They are a group now:
+                same `p-1 rounded-lg bg-bg-tertiary` container as Undo/Redo and
                 Zoom, and `grouped` turns off their standalone fill so the
                 container's own shows through. */}
-            <div className={compact ? "contents" : "flex items-center justify-end min-w-0"}>
+            <div className={compact ? "contents" : "flex items-center justify-end gap-3 min-w-0"}>
+              {/* New / Export — two ACTIONS, no labels, in the Undo/Redo box.
+                  New mirrors a panel so it can report `active`; Export fires a
+                  download and never does, and disables instead when there is
+                  nothing loaded. */}
+              <div className={compact ? "contents" : "flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0"}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <IconButton
+                      icon={Upload}
+                      label="New"
+                      onClick={onToggleUpload}
+                      active={showUpload}
+                      standalone={compact}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="font-semibold">New</p>
+                    <p className="text-muted-foreground text-xs">Alt + N</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <IconButton
+                      icon={Download}
+                      label="Export"
+                      onClick={onExport}
+                      disabled={!canExport}
+                      standalone={compact}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="font-semibold">Export</p>
+                    <p className="text-muted-foreground text-xs">Alt + E</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              {!compact && <div className="w-px h-6 bg-border shrink-0" />}
+
               <div className={compact ? "contents" : "flex items-center gap-1 p-1 rounded-lg bg-bg-tertiary shrink-0"}>
                 <SubscriptionButton
                   general={general}

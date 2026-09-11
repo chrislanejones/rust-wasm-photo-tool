@@ -824,9 +824,73 @@ impl ImageHorseTool {
     }
 }
 
+impl ImageHorseTool {
+    /// Tight non-transparent bounding box `(x, y, w, h)` of the layer at
+    /// `idx`, in document coordinates. A fully transparent layer falls back to
+    /// the whole document, which is the only answer that keeps callers from
+    /// having to special-case an empty layer.
+    pub(crate) fn layer_content_bbox(&self, idx: usize) -> (u32, u32, u32, u32) {
+        let (ow, oh) = (self.width, self.height);
+        let data = &self.layers[idx].buf.data;
+        let (mut minx, mut miny, mut maxx, mut maxy) = (u32::MAX, u32::MAX, 0u32, 0u32);
+        let mut found = false;
+        for y in 0..oh {
+            let row = (y * ow) as usize * 4;
+            for x in 0..ow {
+                if data[row + x as usize * 4 + 3] != 0 {
+                    found = true;
+                    minx = minx.min(x);
+                    miny = miny.min(y);
+                    maxx = maxx.max(x);
+                    maxy = maxy.max(y);
+                }
+            }
+        }
+        if found {
+            (minx, miny, maxx - minx + 1, maxy - miny + 1)
+        } else {
+            (0, 0, ow, oh)
+        }
+    }
+}
+
 #[wasm_bindgen]
 impl ImageHorseTool {
     // ── Layers ───────────────────────────────────────────────────────────
+
+    /// The PHOTO's bounds inside the document: `[x, y, w, h]` in image px.
+    ///
+    /// This is what "how big is my picture" means, and it is NOT the document
+    /// size. A default import is an artboard — a Canvas fill with the photo
+    /// centred on it — so the document is `photo + 2 * canvasPadding`, and
+    /// reporting the document told the user a number 20px larger than the file
+    /// they opened and then sized their resizes from it (#81).
+    ///
+    /// ⚠️ THE TEST IS STRUCTURAL, NOT PIXEL-BASED, and that is the whole
+    /// subtlety. The obvious implementation — "measure the non-transparent
+    /// box" — gets the FLATTENED case wrong: `canvasBgColor` defaults to
+    /// transparent, so flattening a photo onto a transparent canvas leaves a
+    /// layer whose non-transparent box is still just the photo, and the number
+    /// would not change when it should. Chris's rule is that a flattened image
+    /// IS the image, canvas included.
+    ///
+    /// So: a Canvas layer present means the photo is mounted on something and
+    /// its own bounds are the answer; no Canvas layer means the document has
+    /// been flattened (or the Canvas removed) and the document IS the picture.
+    pub fn photo_bounds(&self) -> Vec<u32> {
+        // No Canvas → nothing is mounted on anything → the document is it.
+        let Some(_) = self.canvas_idx() else {
+            return vec![0, 0, self.width, self.height];
+        };
+        // The photo is the bottom-most CONTENT layer, keyed on `kind` and not
+        // on a name (ADR-016): an artboard import calls it "Photo", a plain
+        // `load_image` document calls it "Background".
+        let Some(photo_idx) = self.layers.iter().position(|l| !l.is_canvas()) else {
+            return vec![0, 0, self.width, self.height];
+        };
+        let (x, y, w, h) = self.layer_content_bbox(photo_idx);
+        vec![x, y, w, h]
+    }
 
     /// Every layer in the stack, Canvas included — what the Layers panel shows.
     pub fn layer_count(&self) -> usize {
