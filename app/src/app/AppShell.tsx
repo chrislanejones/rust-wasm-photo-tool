@@ -86,6 +86,7 @@ import { useMaskActions } from "./session/useMaskActions";
 import { usePersistActiveCanvas } from "./session/usePersistActiveCanvas";
 import { useSelectionActions } from "./session/useSelectionActions";
 import { useDuplicatePad } from "./session/useDuplicatePad";
+import { useOplogHealth } from "./session/useOplogHealth";
 import { usePhotoBounds } from "@/hooks/usePhotoBounds";
 import { usePenActions } from "./session/usePenActions";
 import { useCanvasOps } from "./session/useCanvasOps";
@@ -1721,6 +1722,11 @@ export function AppShell() {
   // live in the session hook, not here — AppShell is being dismantled
   // (CLAUDE.md), and the first cut of this handler sat in this file.
   const duplicatePad = useDuplicatePad(stamp, drawingTools, textTool, bumpAnnotations);
+
+  // #37 — say it out loud when undo gets shallower. The op log records 6 of
+  // the engine's 67 snapshotting operations; the rest fall back to snapshot
+  // undo, which on a 24 MP photo is about five steps. Silent until now.
+  useOplogHealth(stamp, activePhotoId, stamp.state.undoCount);
 
   // #81 — the PHOTO's size, not the document's. Both the status bar and the
   // Resize panel read THIS, so the number you are shown and the number an

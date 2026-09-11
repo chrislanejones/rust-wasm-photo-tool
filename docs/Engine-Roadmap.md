@@ -155,6 +155,17 @@ AI-optional) and lean on Rust for the heavy pixel/geometry math.
 11. **Brush DNA** — brushes as recipes (texture / spacing / flow / pressure / scatter / noise /
     blend) exported as a `.brush` file for community sharing.
 12. **Time Machine** — branching edit history; "git for images."
+    **⚠️ BLOCKED ON THE OP LOG (reason filed 2026-09-11, ADR-052).** This sat
+    under "not doing" with no ADR and no recorded reason, which is the worst
+    state for a refused item — nobody could tell whether it was rejected on
+    merit or just never examined. The reason is mechanical: a branching history
+    needs CHEAP BRANCHES, and the op log only records 6 of the engine's 67
+    snapshotting operations. Every tonal adjustment, both flips, both
+    rotations, resize and compress desync it, after which undo falls back to
+    snapshots — about five steps on a 24 MP photo (ADR-052's table). You cannot
+    build a DAG on a history that goes permanently stale the first time
+    somebody moves a slider. It is not refused; it is **Open, blocked on #37**,
+    and it unblocks for free once the tonal ops record.
 13. **Magnetic Selection** — draw loosely and the selection snaps to nearby edges.
 14. **Stroke Cleanup** — rebuild a messy stroke into a perfect Bézier; great for signatures and line
     art.
