@@ -4,6 +4,15 @@
 #
 # Mirrors the *blocking* CI jobs in .github/workflows/ci.yml so a push can't go
 # red on the basics. Uses only local tools (cargo, pnpm/tsc, grep) — no ripgrep.
+#
+# ⚠️ THE MIRROR HAS TO STAY A MIRROR. Every cargo line here carries the same
+# --features CI uses; drop them and this hook goes green on code CI cannot even
+# compile, which is worse than having no hook because it is trusted.
+#
+# `set -e` is what makes these real: each line's EXIT CODE is the verdict. Never
+# re-express a check as a grep of its output — a compile error prints
+# "error: could not compile", never the word FAILED, so a grep for a failure
+# string reports a broken build as passing.
 # The advisory static guardrails (raw colors, z-index, `as any`, unsafe, …) are
 # NOT run here — they're advisory in CI only. See docs/CI-Guardrails.md.
 set -e
@@ -11,8 +20,21 @@ set -e
 echo "• cargo fmt --check"
 cargo fmt --all --check || { echo "✗ run: cargo fmt"; exit 1; }
 
-echo "• cargo clippy -D warnings"
-cargo clippy --all-targets -- -D warnings
+# --features tiles, MATCHING CI. Without it this line silently skips every
+# file gated `#[cfg(all(test, feature = "tiles"))]` — including
+# src/ops_engine_parity.rs, whose `mod` declaration carries the gate so the
+# file itself shows no `cfg(test)` to grep for. On 2026-09-10 an engine
+# signature change left two call sites in that file stale: this hook passed,
+# and CI went red on a plain compile error the hook had never compiled.
+echo "• cargo clippy -D warnings (--features tiles)"
+cargo clippy --all-targets --features tiles -- -D warnings
+
+# cargo test was MISSING ENTIRELY, while this file's own header claims to
+# mirror the blocking CI jobs. CI runs it; a hook that lints but never builds
+# the test targets cannot catch a broken test file. ~24s warm, which is the
+# price of not finding out from CI three minutes later.
+echo "• cargo test --features tiles"
+cargo test --features tiles
 
 echo "• tsc typecheck (stamp-tool)"
 pnpm --filter stamp-tool exec tsc -b
