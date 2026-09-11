@@ -214,6 +214,64 @@ export async function availableFaces(
   return out;
 }
 
+/**
+ * Keep asking until the engine can answer, then report the faces it has.
+ *
+ * ⚠️ THIS EXISTS BECAUSE A REF IS NOT A DEPENDENCY. The engine lives in a
+ * worker (ADR-024) and the panel that wants a font list usually mounts BEFORE
+ * it is up, so `toolRef.current` is `null` at that moment. The first cut of
+ * `useEngineFaces` read the ref once in an effect keyed on `[toolRef]` — a ref
+ * object's identity never changes, so the effect ran exactly once, got the
+ * correct answer "just the embedded face", and **could never ask again.** The
+ * dropdown was stuck at one entry on a real deploy: the whole feature silently
+ * inert, in exactly the shape ADR-051 warned about. It passed locally only
+ * because the manual test loaded an image first and warmed the engine.
+ *
+ * `getTool` is a thunk, not a value, for that reason — the caller must be able
+ * to re-read the ref on every attempt.
+ *
+ * `onUpdate` is called each time the answer improves, so a caller can render
+ * the embedded face immediately and widen the list as registration lands.
+ * Stops at the full set, or at `giveUpMs` — a face missing because its file
+ * 404'd is a permanent answer, and polling forever for it would be a leak.
+ *
+ * Returns a cancel function. Call it on unmount.
+ */
+export function resolveFacesWhenReady(
+  getTool: () => ImageHorseTool | null | undefined,
+  onUpdate: (faces: EngineFace[]) => void,
+  opts: { pollMs?: number; giveUpMs?: number } = {},
+): () => void {
+  const pollMs = opts.pollMs ?? 250;
+  const deadline = Date.now() + (opts.giveUpMs ?? 10_000);
+  let live = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const attempt = () => {
+    if (!live) return;
+    const tool = getTool();
+    if (!tool) {
+      if (Date.now() < deadline) timer = setTimeout(attempt, pollMs);
+      return;
+    }
+    void availableFaces(tool).then((faces) => {
+      if (!live) return;
+      onUpdate(faces);
+      // Registration may simply not have finished. `ensureEngineFonts` is
+      // idempotent, so retrying costs one `has_font` per face and no refetch.
+      if (faces.length < ENGINE_FACES.length && Date.now() < deadline) {
+        timer = setTimeout(attempt, pollMs);
+      }
+    });
+  };
+  attempt();
+
+  return () => {
+    live = false;
+    if (timer) clearTimeout(timer);
+  };
+}
+
 /** Test seam: forget the shared fetch so a spec can re-run `loadFaces`. */
 export function __resetEngineFontsForTest(): void {
   facesPromise = null;

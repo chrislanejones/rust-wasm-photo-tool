@@ -13,6 +13,7 @@ import {
   faceCss,
   ensureEngineFonts,
   availableFaces,
+  resolveFacesWhenReady,
   __resetEngineFontsForTest,
 } from "./engineFonts";
 
@@ -151,3 +152,94 @@ describe("a face that does not load", () => {
     expect(await availableFaces({} as never)).toEqual([ENGINE_FACES[0]]);
   });
 });
+
+describe("resolveFacesWhenReady — a ref is not a dependency", () => {
+  // ⚠️ THE REGRESSION THIS BLOCK EXISTS FOR, and the one the local smoke test
+  // could not see. The first cut read `toolRef.current` once, in an effect
+  // keyed on `[toolRef]`. A ref object's identity never changes, so it ran
+  // exactly once — at mount, when the worker engine is still starting and the
+  // ref holds `null`. The answer ("just the embedded face") was correct, and
+  // nothing could ever ask again: the dropdown was stuck at ONE ENTRY on a real
+  // deploy, the whole feature silently inert.
+  //
+  // It passed locally only because the manual test loaded an image first, which
+  // warmed the engine before the panel mounted. **The engine arriving late is
+  // the normal case**, which is why it is the first test here.
+  const settle = () => new Promise((r) => setTimeout(r, 60));
+
+  it("keeps asking until the engine appears, then reports the full list", async () => {
+    let tool: ReturnType<typeof fakeTool> | null = null;
+    const seen: number[] = [];
+    const cancel = resolveFacesWhenReady(
+      () => tool as never,
+      (f) => seen.push(f.length),
+      { pollMs: 5, giveUpMs: 2000 },
+    );
+    await settle();
+    expect(seen, "answered before the engine existed").toHaveLength(0);
+
+    tool = fakeTool(); // …the worker comes up. Nothing re-renders anything.
+    await new Promise((r) => setTimeout(r, 400));
+    cancel();
+    expect(seen.at(-1)).toBe(ENGINE_FACES.length);
+  });
+
+  it("reports immediately when the engine is already up", async () => {
+    const seen: number[] = [];
+    const cancel = resolveFacesWhenReady(() => fakeTool() as never, (f) => seen.push(f.length), {
+      pollMs: 5,
+      giveUpMs: 2000,
+    });
+    await new Promise((r) => setTimeout(r, 300));
+    cancel();
+    expect(seen.at(-1)).toBe(ENGINE_FACES.length);
+  });
+
+  it("stops on cancel and never reports again", async () => {
+    let tool: ReturnType<typeof fakeTool> | null = null;
+    const seen: number[] = [];
+    const cancel = resolveFacesWhenReady(() => tool as never, (f) => seen.push(f.length), {
+      pollMs: 5,
+      giveUpMs: 2000,
+    });
+    cancel();
+    tool = fakeTool();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(seen, "kept polling after cancel — that is a leak").toHaveLength(0);
+  });
+
+  it("gives up rather than polling forever when no engine ever arrives", async () => {
+    const seen: number[] = [];
+    const cancel = resolveFacesWhenReady(() => null, (f) => seen.push(f.length), {
+      pollMs: 5,
+      giveUpMs: 40,
+    });
+    await new Promise((r) => setTimeout(r, 300));
+    cancel();
+    expect(seen).toHaveLength(0);
+  });
+
+  it("settles at what loaded when one face is permanently unavailable", async () => {
+    // A 404 is a permanent answer. It must not keep the poll running to the
+    // deadline, and it must not drop the faces that DID load.
+    globalThis.fetch = vi.fn(async (url: unknown) =>
+      String(url).includes("Serif")
+        ? ({ ok: false, status: 404 }) as unknown as Response
+        : ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }) as unknown as Response,
+    ) as unknown as typeof fetch;
+
+    const seen: EngineFaceIds[] = [];
+    const cancel = resolveFacesWhenReady(
+      () => fakeTool() as never,
+      (f) => seen.push(f.map((x) => x.id)),
+      { pollMs: 5, giveUpMs: 400 },
+    );
+    await new Promise((r) => setTimeout(r, 500));
+    cancel();
+    const last = seen.at(-1)!;
+    expect(last).not.toContain("liberation-serif");
+    expect(last).toContain("liberation-mono");
+  });
+});
+
+type EngineFaceIds = string[];

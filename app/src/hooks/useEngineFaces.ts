@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
-import { ENGINE_FACES, availableFaces, type EngineFace } from "@/lib/engineFonts";
+import { ENGINE_FACES, resolveFacesWhenReady, type EngineFace } from "@/lib/engineFonts";
 
 /**
  * The typefaces the ENGINE can actually render, for a font `<select>`.
@@ -21,21 +21,17 @@ import { ENGINE_FACES, availableFaces, type EngineFace } from "@/lib/engineFonts
  *      for another eleven releases while every batch render came out in
  *      Liberation Sans. Two tables is how that happens. This is one.
  *
- * Starts at the embedded face alone, which is true with nothing registered,
- * and widens once the shipped .ttf files have reached the engine.
+ * All the waiting logic is in `resolveFacesWhenReady`, deliberately — a ref is
+ * not a dependency, and getting that wrong once already shipped a dropdown
+ * stuck at a single entry. Read its comment before changing this.
  */
 export function useEngineFaces(
   toolRef: MutableRefObject<ImageHorseTool | null> | undefined,
 ): EngineFace[] {
   const [faces, setFaces] = useState<EngineFace[]>([ENGINE_FACES[0]]);
-  useEffect(() => {
-    let live = true;
-    void availableFaces(toolRef?.current).then((f) => {
-      if (live) setFaces(f);
-    });
-    return () => {
-      live = false;
-    };
-  }, [toolRef]);
+  useEffect(
+    () => resolveFacesWhenReady(() => toolRef?.current, setFaces),
+    [toolRef],
+  );
   return faces;
 }
