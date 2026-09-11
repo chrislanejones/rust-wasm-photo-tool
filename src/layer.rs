@@ -513,9 +513,12 @@ pub(crate) fn build_annotation_tile(
     shadow_dx: i32,
     shadow_dy: i32,
     shadow_blur: u32,
+    // Which typeface to rasterise with; "" is the embedded Liberation Sans and
+    // what every annotation written before v8.76 means. See `crate::fonts`.
+    font_id: &str,
 ) -> (Vec<u8>, u32, u32, i32, i32) {
     let rendered = crate::text::grow_to_box_height(
-        crate::text::render_text(text, font_size, r, g, b, bold),
+        crate::text::render_text(text, font_size, r, g, b, bold, font_id),
         box_height,
     );
     let raw_w = rendered.width;
@@ -771,13 +774,14 @@ pub(crate) fn annotation_ink_offset(
     bold: bool,
     background_kind: u8,
     bg_padding: u32,
+    font_id: &str,
 ) -> (i32, i32) {
     let pad = (font_size * 0.25).ceil() as i32;
     let first = text.lines().next().unwrap_or("");
     let (ink_x, ink_y) = if first.trim().is_empty() {
         (pad, pad)
     } else {
-        let rendered = crate::text::render_text(first, font_size, 255, 255, 255, bold);
+        let rendered = crate::text::render_text(first, font_size, 255, 255, 255, bold, font_id);
         crate::utils::ink_bounds(&rendered.pixels, rendered.width, rendered.height)
             .map(|(min_x, min_y, _, _)| (min_x as i32, min_y as i32))
             .unwrap_or((pad, pad))
@@ -1874,6 +1878,12 @@ impl ImageHorseTool {
         shadow_dx: i32,
         shadow_dy: i32,
         shadow_blur: u32,
+        // ⚠️ Unlike the three gaps documented below, the typeface IS carried
+        // here. It has to be: wrap width, box height and the corner quad all
+        // degrade to a LOOK the user can restore with a drag, while a lost
+        // font silently re-renders every word in the wrong face with no handle
+        // to grab. `annotations_to_json` writes it, so this path can read it.
+        font_id: &str,
     ) -> u32 {
         let id = self.next_text_id;
         self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
@@ -1918,6 +1928,7 @@ impl ImageHorseTool {
             shadow_dx,
             shadow_dy,
             shadow_blur,
+            font_id,
         );
         let active = self.active;
         if let Some(layer) = self.layers.get_mut(active) {
@@ -2022,7 +2033,7 @@ mod tests {
         // (text, font_size, r, g, b, bold, x, y, rotation_deg, background_kind,
         //  bg_r, bg_g, bg_b, bg_a, bg_padding, bg_corner_radius, bg_tail)
         t.add_text_annotation(
-            text, 24.0, 0, 0, 0, false, 100, 100, deg, 0, 0, 0, 0, 0, 0, 0, 0,
+            text, 24.0, 0, 0, 0, false, 100, 100, deg, 0, 0, 0, 0, 0, 0, 0, 0, "",
         );
         ink_min(&t)
     }
@@ -2258,12 +2269,12 @@ mod tests {
                             let (tile, w, h, off_x, off_y) = build_annotation_tile(
                                 "Hg", fs, box_h, 255, 255, 255, bold, 0.0, kind, 0, 0, 0,
                                 0, // bg_a = 0: transparent bg, geometry unchanged
-                                pad, 6, 135, false, false, 0, 0, 0, 0, 0, 0, 0,
+                                pad, 6, 135, false, false, 0, 0, 0, 0, 0, 0, 0, "",
                             );
                             assert_eq!((off_x, off_y), (0, 0), "unrotated tile offset");
                             let ink = crate::utils::ink_bounds(&tile, w, h)
                                 .expect("tile has visible ink"); // allow: rust-panic
-                            let want = annotation_ink_offset("Hg", fs, bold, kind, pad);
+                            let want = annotation_ink_offset("Hg", fs, bold, kind, pad, "");
                             assert_eq!(
                                 (ink.0 as i32, ink.1 as i32),
                                 want,
@@ -2285,7 +2296,7 @@ mod tests {
         let plain = |box_h: u32| {
             let (tile, w, h, _, _) = build_annotation_tile(
                 "Hg", 24.0, box_h, 255, 255, 255, false, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, false, false,
-                0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, "",
             );
             let ink = crate::utils::ink_bounds(&tile, w, h).expect("tile has visible ink"); // allow: rust-panic
             (w, h, ink.1)

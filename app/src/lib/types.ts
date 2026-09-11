@@ -46,7 +46,20 @@ export interface ToolSettings extends StampSettings {
   eraserOpacity: number;    // erase strength (0-100%)
   eraserHardness: number;   // edge hardness (0-100%)
   fontSize: number;
+  /** CSS `font-family` for the TEXTAREA preview and the recent-text chips.
+   *  DERIVED from `textFontId` — see `engineFonts.faceCss`. Kept as its own
+   *  field because it is persisted in the Convex `recentTexts` table, where
+   *  rows predating fonts hold plain CSS like "sans-serif". */
   fontFamily: string;
+  /** Which typeface the ENGINE rasterises with. `""` is the embedded
+   *  Liberation Sans; anything else is an id registered through
+   *  `ensureEngineFonts`. This is the SSOT — `fontFamily` follows it.
+   *
+   *  ⚠️ Never set to a face `has_font` reports false for. `textMetricsCache`
+   *  keys on this, and a measurement taken before the face is registered
+   *  answers in the FALLBACK and is then cached against the real id forever.
+   *  `ensureEngineFonts` exists to make that impossible; await it. */
+  textFontId: string;
   fontWeight: "normal" | "bold";
   textColor: string;
   shape?: "rect" | "circle" | "handCircle" | "line";

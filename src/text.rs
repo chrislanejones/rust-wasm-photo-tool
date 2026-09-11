@@ -1,17 +1,29 @@
-/// Pure-Rust text rendering using Liberation Sans (Arial-metric compatible).
-///
-/// Replaces the JS OffscreenCanvas pipeline for both the text tool and red
-/// stamp presets. The browser is no longer involved in font rasterisation —
-/// everything runs inside the WASM binary.
+use crate::layer::build_annotation_tile;
+use crate::{transform, ImageHorseTool};
+/// Pure-Rust text rendering. Replaces the JS OffscreenCanvas pipeline for both
+/// the text tool and red stamp presets — the browser is no longer involved in
+/// font rasterisation, everything runs inside the WASM binary.
 ///
 /// Two public entry points:
 ///   render_text       — plain multi-line text (text tool)
 ///   render_stamp_label — bordered, slightly-rotated stamp label (red stamps)
+///
+/// ## The `font_id` parameter
+///
+/// Every layout function takes one, and `""` means the embedded Liberation
+/// Sans — which is what this module rendered unconditionally until v8.76, and
+/// what every document written before it means. The bytes behind a non-empty
+/// id live in [`crate::fonts`]; read that module's doc before changing
+/// anything here, particularly the note on why registration is monotone.
+///
+/// The id is threaded rather than resolved once at the top because `wrap`,
+/// `measure` and `render_text` are called independently by three different
+/// surfaces (the overlay's box, the engine's tile, and replay) and they MUST
+/// agree. A single ambient "current font" would be a fourth thing to keep in
+/// step, and the three-surface disagreement ADR-051 documents is exactly what
+/// that costs.
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
-
-// Embedded fonts — compiled into the WASM binary.
-static FONT_REGULAR: &[u8] = include_bytes!("fonts/LiberationSans-Regular.ttf");
-static FONT_BOLD: &[u8] = include_bytes!("fonts/LiberationSans-Bold.ttf");
+use wasm_bindgen::prelude::*;
 
 pub struct RenderedText {
     pub pixels: Vec<u8>, // RGBA, row-major
@@ -105,9 +117,31 @@ fn rasterise_line(
 
 /// Render multi-line text into an RGBA pixel buffer.
 /// `dest_x/dest_y` in the caller is the top-left corner of the rendered block.
-pub fn render_text(text: &str, font_size: f32, r: u8, g: u8, b: u8, bold: bool) -> RenderedText {
-    let font_data = if bold { FONT_BOLD } else { FONT_REGULAR };
-    let font = FontRef::try_from_slice(font_data).expect("embedded font is valid");
+#[allow(clippy::too_many_arguments)]
+pub fn render_text(
+    text: &str,
+    font_size: f32,
+    r: u8,
+    g: u8,
+    b: u8,
+    bold: bool,
+    font_id: &str,
+) -> RenderedText {
+    crate::fonts::with_face(font_id, bold, |font| {
+        render_text_with(text, font_size, r, g, b, font)
+    })
+}
+
+/// The body of [`render_text`], against an already-resolved face. Split out so
+/// the face is resolved exactly once per call rather than once per helper.
+fn render_text_with(
+    text: &str,
+    font_size: f32,
+    r: u8,
+    g: u8,
+    b: u8,
+    font: &FontRef<'_>,
+) -> RenderedText {
     let scale = PxScale::from(font_size);
     let sf = font.as_scaled(scale);
 
@@ -117,7 +151,7 @@ pub fn render_text(text: &str, font_size: f32, r: u8, g: u8, b: u8, bold: bool) 
 
     let max_w = lines
         .iter()
-        .map(|l| line_width(l, &font, scale))
+        .map(|l| line_width(l, font, scale))
         .fold(0.0f32, f32::max);
     let pad = (font_size * 0.25).ceil() as u32;
 
@@ -130,7 +164,7 @@ pub fn render_text(text: &str, font_size: f32, r: u8, g: u8, b: u8, bold: bool) 
         let baseline_y = pad as f32 + i as f32 * line_height + ascent;
         rasterise_line(
             line,
-            &font,
+            font,
             scale,
             pad as f32,
             baseline_y,
@@ -162,7 +196,7 @@ pub fn render_stamp_label(
     b: u8,
     angle_deg: f32,
 ) -> RenderedText {
-    let font = FontRef::try_from_slice(FONT_BOLD).expect("embedded font is valid");
+    let font = crate::fonts::embedded_bold();
     let scale = PxScale::from(font_size);
     let sf = font.as_scaled(scale);
 
@@ -279,16 +313,20 @@ pub fn grow_to_box_height(rendered: RenderedText, box_height: u32) -> RenderedTe
 /// its own line rather than broken mid-word — hyphenation is a typographic
 /// decision, and silently splitting a URL or a name would be worse than one
 /// line sticking out.
-pub fn wrap(text: &str, font_size: f32, bold: bool, max_w: f32) -> String {
+pub fn wrap(text: &str, font_size: f32, bold: bool, max_w: f32, font_id: &str) -> String {
     // `<= 0.0` rather than `!(max_w > 0.0)`: clippy rightly objects to negated
     // comparisons on partially-ordered floats. NaN falls through to the
     // no-wrap branch either way, which is the safe answer for a bad width.
     if max_w.is_nan() || max_w <= 0.0 || text.is_empty() {
         return text.to_string();
     }
-    let font_bytes = if bold { FONT_BOLD } else { FONT_REGULAR };
-    let font = FontRef::try_from_slice(font_bytes)
-        .unwrap_or_else(|_| FontRef::try_from_slice(FONT_REGULAR).expect("regular font"));
+    crate::fonts::with_face(font_id, bold, |font| {
+        wrap_with(text, font_size, max_w, font)
+    })
+}
+
+/// The body of [`wrap`], against an already-resolved face.
+fn wrap_with(text: &str, font_size: f32, max_w: f32, font: &FontRef<'_>) -> String {
     let scale = PxScale::from(font_size);
 
     let mut out = String::with_capacity(text.len() + 16);
@@ -302,7 +340,7 @@ pub fn wrap(text: &str, font_size: f32, bold: bool, max_w: f32) -> String {
         // so a second pass copies them through) and what keeps it from
         // rewriting text the user never asked it to touch. The unit test for
         // "   " caught the earlier version silently deleting whitespace.
-        if line_width(para, &font, scale) <= max_w {
+        if line_width(para, font, scale) <= max_w {
             out.push_str(para);
             continue;
         }
@@ -317,7 +355,7 @@ pub fn wrap(text: &str, font_size: f32, bold: bool, max_w: f32) -> String {
             } else {
                 format!("{line} {word}")
             };
-            if line_width(&candidate, &font, scale) <= max_w || line.is_empty() {
+            if line_width(&candidate, font, scale) <= max_w || line.is_empty() {
                 line = candidate;
             } else {
                 out.push_str(&line);
@@ -333,17 +371,19 @@ pub fn wrap(text: &str, font_size: f32, bold: bool, max_w: f32) -> String {
 /// Returns the (width, height) in pixels that `render_text` would produce,
 /// without allocating a full pixel buffer. Used by the JS UI to size the
 /// text-input bounding box before the user commits.
-pub fn measure(text: &str, font_size: f32, bold: bool) -> (u32, u32) {
-    let font_bytes = if bold { FONT_BOLD } else { FONT_REGULAR };
-    let font = FontRef::try_from_slice(font_bytes)
-        .unwrap_or_else(|_| FontRef::try_from_slice(FONT_REGULAR).expect("regular font"));
+pub fn measure(text: &str, font_size: f32, bold: bool, font_id: &str) -> (u32, u32) {
+    crate::fonts::with_face(font_id, bold, |font| measure_with(text, font_size, font))
+}
+
+/// The body of [`measure`], against an already-resolved face.
+fn measure_with(text: &str, font_size: f32, font: &FontRef<'_>) -> (u32, u32) {
     let scale = PxScale::from(font_size);
     let sf = font.as_scaled(scale);
 
     let lines: Vec<&str> = text.split('\n').collect();
     let max_w = lines
         .iter()
-        .map(|l| line_width(l, &font, scale))
+        .map(|l| line_width(l, font, scale))
         .fold(0.0f32, f32::max);
 
     let ascent = sf.ascent();
@@ -471,28 +511,130 @@ pub(crate) fn rotate_pixels(data: &[u8], w: u32, h: u32, angle_deg: f32) -> Rend
     }
 }
 
+/// The wasm-bindgen surface for DESTRUCTIVE text rendering.
+///
+/// `commit_text` burns type straight into the pixel buffer (the batch path);
+/// `measure_text` sizes the box the UI draws around it. Both are text
+/// rendering, so they live beside the rasteriser rather than in `src/lib.rs`,
+/// which is a line ratchet (`librs-lines` in guardrails.sh) and which held
+/// them only because that is where the whole wasm surface started out. A
+/// second `#[wasm_bindgen] impl` block is the pattern `annotations.rs`,
+/// `history.rs` and `fonts.rs` already use.
+#[wasm_bindgen]
+impl ImageHorseTool {
+    pub fn commit_text(
+        &mut self,
+        text: &str,
+        font_size: f32,
+        r: u8,
+        g: u8,
+        b: u8,
+        bold: bool,
+        dest_x: i32,
+        dest_y: i32,
+        angle_deg: f32,
+        background_kind: u8,
+        bg_r: u8,
+        bg_g: u8,
+        bg_b: u8,
+        bg_a: u8,
+        bg_padding: u32,
+        bg_corner_radius: u32,
+        font_id: &str,
+    ) {
+        // Clamp to the two kinds this entry point actually supports — any
+        // other value falls back to "none" rather than reaching
+        // `build_annotation_tile`'s speech-bubble path (kind 2) with a
+        // meaningless zero-length tail.
+        let background_kind = if background_kind == 1 { 1 } else { 0 };
+
+        // Background rect grows outward from the text by `bg_padding`; shift
+        // the tile's base origin so the text itself stays anchored at
+        // (dest_x, dest_y) regardless of whether a background is on.
+        let pad = if background_kind == 1 { bg_padding } else { 0 };
+        let base_x = dest_x - pad as i32;
+        let base_y = dest_y - pad as i32;
+
+        let (tile_pixels, tile_w, tile_h, off_x, off_y) = build_annotation_tile(
+            text,
+            font_size,
+            0, // no box: this path draws to a caller-chosen anchor, not a box
+            r,
+            g,
+            b,
+            bold,
+            angle_deg as f64,
+            background_kind,
+            bg_r,
+            bg_g,
+            bg_b,
+            bg_a,
+            bg_padding,
+            bg_corner_radius,
+            0, // bg_tail — no speech-bubble support on this path
+            false,
+            false,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0, // shadow off
+            font_id,
+        );
+
+        self.snap("Text");
+        transform::paste_region(
+            &mut self.layers[self.active].buf.data,
+            self.width as i32,
+            self.height as i32,
+            &tile_pixels,
+            tile_w,
+            tile_h,
+            base_x + off_x,
+            base_y + off_y,
+        );
+    }
+
+    /// Returns [width, height] in pixels of the text as rendered by `commit_text`,
+    /// without modifying the image buffer. Used to size the text-input handle box.
+    /// ⚠️ Reads NO engine state — the `&self` is a wasm-bindgen calling
+    /// convention, and `textMetricsCache.contract.test.ts` fails if that stops
+    /// being true. `font_id` is an argument and the JS cache key must include
+    /// it; `crate::fonts` has why a face id always means the same outlines.
+    pub fn measure_text(&self, text: &str, font_size: f32, bold: bool, font_id: &str) -> Vec<u32> {
+        let (w, h) = crate::text::measure(text, font_size, bold, font_id);
+        vec![w, h]
+    }
+}
+
 #[cfg(test)]
 mod wrap_tests {
     use super::*;
 
     /// Ink width of one already-broken line, the same way `wrap` measures it.
     fn w(line: &str, size: f32) -> f32 {
-        let font = FontRef::try_from_slice(FONT_REGULAR).unwrap(); // allow: rust-panic
+        let font = crate::fonts::embedded_regular();
         line_width(line, &font, PxScale::from(size))
     }
 
     #[test]
     fn zero_width_is_a_no_op_the_pre_wrap_default() {
         let t = "the quick brown fox jumps over the lazy dog";
-        assert_eq!(wrap(t, 24.0, false, 0.0), t, "wrap_width 0 = do not wrap");
-        assert_eq!(wrap(t, 24.0, false, -5.0), t, "negative is also inert");
+        assert_eq!(
+            wrap(t, 24.0, false, 0.0, ""),
+            t,
+            "wrap_width 0 = do not wrap"
+        );
+        assert_eq!(wrap(t, 24.0, false, -5.0, ""), t, "negative is also inert");
     }
 
     #[test]
     fn breaks_only_where_it_must_and_every_line_fits() {
         let t = "the quick brown fox jumps over the lazy dog";
         let max = 120.0;
-        let out = wrap(t, 24.0, false, max);
+        let out = wrap(t, 24.0, false, max, "");
         assert!(out.contains('\n'), "long text at a narrow width must break");
         for line in out.split('\n') {
             // A single overlong WORD is the one allowed exception.
@@ -513,7 +655,7 @@ mod wrap_tests {
     #[test]
     fn a_word_longer_than_the_box_is_left_whole_not_hyphenated() {
         let t = "antidisestablishmentarianism";
-        let out = wrap(t, 32.0, false, 20.0);
+        let out = wrap(t, 32.0, false, 20.0, "");
         assert_eq!(out, t, "never split mid-word — a URL or name would break");
     }
 
@@ -521,7 +663,7 @@ mod wrap_tests {
     fn authors_own_newlines_stay_hard_breaks() {
         let t = "line one\nline two";
         // Wide enough that no automatic break is needed.
-        let out = wrap(t, 16.0, false, 10_000.0);
+        let out = wrap(t, 16.0, false, 10_000.0, "");
         assert_eq!(out, t, "hard breaks survive, and none are added");
         assert_eq!(out.matches('\n').count(), 1);
     }
@@ -532,16 +674,16 @@ mod wrap_tests {
         // re-wraps on every rebuild. A non-idempotent breaker would creep the
         // layout on each keystroke.
         let t = "the quick brown fox jumps over the lazy dog and keeps running";
-        let once = wrap(t, 20.0, false, 150.0);
-        let twice = wrap(&once, 20.0, false, 150.0);
+        let once = wrap(t, 20.0, false, 150.0, "");
+        let twice = wrap(&once, 20.0, false, 150.0, "");
         assert_eq!(once, twice);
     }
 
     #[test]
     fn empty_and_whitespace_do_not_panic() {
-        assert_eq!(wrap("", 24.0, false, 100.0), "");
-        assert_eq!(wrap("   ", 24.0, false, 100.0), "   ");
-        assert_eq!(wrap("\n\n", 24.0, false, 100.0), "\n\n");
+        assert_eq!(wrap("", 24.0, false, 100.0, ""), "");
+        assert_eq!(wrap("   ", 24.0, false, 100.0, ""), "   ");
+        assert_eq!(wrap("\n\n", 24.0, false, 100.0, ""), "\n\n");
     }
 
     #[test]
@@ -549,15 +691,15 @@ mod wrap_tests {
         // The whitespace-eating bug the test above caught: wrapping must not
         // rewrite text it did not need to break.
         for t in ["  indented", "trailing  ", "a  double  space", "plain"] {
-            assert_eq!(wrap(t, 16.0, false, 5_000.0), t, "mangled {t:?}");
+            assert_eq!(wrap(t, 16.0, false, 5_000.0, ""), t, "mangled {t:?}");
         }
     }
 
     #[test]
     fn a_wider_box_yields_fewer_lines_the_whole_point_of_reflow() {
         let t = "the quick brown fox jumps over the lazy dog";
-        let narrow = wrap(t, 24.0, false, 100.0).matches('\n').count();
-        let wide = wrap(t, 24.0, false, 400.0).matches('\n').count();
+        let narrow = wrap(t, 24.0, false, 100.0, "").matches('\n').count();
+        let wide = wrap(t, 24.0, false, 400.0, "").matches('\n').count();
         assert!(narrow > wide, "narrow={narrow} wide={wide}");
     }
 
@@ -566,7 +708,7 @@ mod wrap_tests {
         // measure() adds `(font_size * 0.25).ceil()` per side; if that drifts,
         // every box-width -> content-width conversion silently misaligns.
         let size = 24.0;
-        let (boxed, _) = measure("x", size, false);
+        let (boxed, _) = measure("x", size, false, "");
         let ink = w("x", size).max(8.0);
         let derived = (boxed as f32 - ink).ceil() / 2.0;
         assert!(

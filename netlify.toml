@@ -15,9 +15,10 @@
   #   3. `pnpm ci` is not a pnpm command at all.
   #
   # THIS FILE WINS TODAY. netlify.toml's `command` overrides the UI setting, and
-  # the shipped wasm proves it: 816,971 B live, against 720,904 B for a measured
-  # featureless build and an 800,000–840,000 B sentinel band (ADR-045, which
-  # narrowed ADR-037's). The "Deploy sentinel (live prod engine)" job is green.
+  # the shipped wasm proves it: 841,355 B built locally at v8.76, against
+  # 720,904 B for a measured featureless build and an 800,000–872,000 B sentinel
+  # band (ADR-053, reviewing ADR-045's, which narrowed ADR-037's). The "Deploy
+  # sentinel (live prod engine)" job is green.
   #
   # So this is a loaded gun, not a live fire. It goes off if netlify.toml is
   # renamed, moved under a `base` subdirectory where Netlify cannot see it, or

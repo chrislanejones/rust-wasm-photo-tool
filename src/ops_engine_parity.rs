@@ -242,7 +242,7 @@ fn text_add_replay_matches_live_annotation() {
     let id = t.add_text_annotation(
         "Parity!", 24.0, 10, 200, 40, true, 14, 22, 15.0, // rotated
         1,    // rect background
-        250, 250, 200, 230, 6, 4, 0,
+        250, 250, 200, 230, 6, 4, 0, "",
     );
     t.recomposite();
 
@@ -253,6 +253,7 @@ fn text_add_replay_matches_live_annotation() {
             wrap_width: 0,
             box_height: 0,
             perspective: crate::perspective::IDENTITY_QUAD,
+            font_id: String::new(),
             text: "Parity!".into(),
             x: 14,
             y: 22,
@@ -367,7 +368,7 @@ fn oplog_undo_covers_text_annotations_via_recomposite_diff() {
     let h0 = composite_hash(&mut t);
 
     let id = t.add_text_annotation(
-        "undo me", 20.0, 0, 0, 0, true, 8, 10, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+        "undo me", 20.0, 0, 0, 0, true, 8, 10, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
     );
     let h1 = composite_hash(&mut t); // recomposite → diff records TextAdd
     assert_eq!(t.oplog_op_count(), 1, "TextAdd recorded by the diff");
@@ -453,6 +454,7 @@ fn persist_restore_round_trip_is_byte_identical_across_keyframes() {
         0,
         0,
         0,
+        "",
     );
     t.recomposite();
     t.update_text_annotation(
@@ -546,6 +548,7 @@ fn persist_restore_keeps_base_annotations_live() {
         wrap_width: 0,
         box_height: 0,
         perspective: crate::perspective::IDENTITY_QUAD,
+        font_id: String::new(),
         id: 1,
         text: "base".into(),
         x: 6,
@@ -580,6 +583,7 @@ fn persist_restore_keeps_base_annotations_live() {
         wrap_width: 0,
         box_height: 0,
         perspective: crate::perspective::IDENTITY_QUAD,
+        font_id: String::new(),
         text: "edited".into(),
         bold: true,
         ..text

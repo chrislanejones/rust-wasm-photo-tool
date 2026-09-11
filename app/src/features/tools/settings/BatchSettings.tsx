@@ -29,6 +29,8 @@ import type { PhotoEntry } from "@/features/gallery/GalleryBar";
 import type { ImageHorseTool } from "stamp_tool";
 import { toast } from "@/components/ui/sonner";
 import { measureTextAwaited } from "@/lib/engine/textMetricsCache";
+import { ensureEngineFonts, faceCss } from "@/lib/engineFonts";
+import { useEngineFaces } from "@/hooks/useEngineFaces";
 
 const LOGO_SIZE_PRESETS = [5, 15, 25, 40] as const;
 
@@ -903,20 +905,8 @@ function RenameBatchPanel({
 
 type TextPosition = PlacementCell;
 
-const TEXT_FONT_FAMILIES = [
-  { label: "Sans Serif", value: "sans-serif" },
-  { label: "Serif", value: "serif" },
-  { label: "Monospace", value: "monospace" },
-  { label: "Arial", value: "Arial, sans-serif" },
-  { label: "Georgia", value: "Georgia, serif" },
-  { label: "Times New Roman", value: "Times New Roman, serif" },
-  { label: "Courier New", value: "Courier New, monospace" },
-  { label: "Verdana", value: "Verdana, sans-serif" },
-  { label: "Impact", value: "Impact, sans-serif" },
-  { label: "Comic Sans", value: "Comic Sans MS, cursive" },
-  { label: "Trebuchet", value: "Trebuchet MS, sans-serif" },
-  { label: "Palatino", value: "Palatino, serif" },
-] as const;
+// The twelve-entry font list that used to live here was the SECOND inert copy
+// of the one #113 removed from the Text tool — `useEngineFaces` has the story.
 
 // Background is a plain solid box only — no speech-bubble/tail here. Batch
 // text is a disposable bake-and-export render per photo (see `applyToAll`
@@ -956,7 +946,9 @@ function TextBatchPanel({
   const [text, setText] = useState("");
   const [fontSize, setFontSize] = useState(32);
   const [bold, setBold] = useState(false);
-  const [fontFamily, setFontFamily] = useState("sans-serif");
+  // The ENGINE's face id, not a CSS string — `faceCss` derives the preview.
+  const [fontId, setFontId] = useState("");
+  const faces = useEngineFaces(stampToolRef);
   const [textColor, setTextColor] = useState("#ffffff");
   const [bgKind, setBgKind] = useState<TextBgKind>("none");
   const [bgColor, setBgColor] = useState("#ffffff");
@@ -1052,8 +1044,13 @@ function TextBatchPanel({
           let composited: Uint8Array;
           try {
             tool.load_image(targetBytes);
+            // ⚠️ THIS ENGINE HAS ITS OWN FONT REGISTRY — it is thread-local
+            // to a wasm INSTANCE and this is a throwaway one per photo.
+            // Without this the batch bakes the fallback face while the preview
+            // shows the chosen one. Idempotent; the bytes are fetched once.
+            await ensureEngineFonts(tool);
             // Measure in Rust so we can corner-align without knowing glyph metrics.
-            const m = await measureTextAwaited(tool, text, fontSize, bold);
+            const m = await measureTextAwaited(tool, text, fontSize, bold, fontId);
             // ADR-024 b1 — AWAITED, and this is the site that made the corrected b1
             // necessary. The note here used to say a miss "becomes reachable under
             // Stage 3.5 and this is where it has to be handled". It could not have
@@ -1093,6 +1090,7 @@ function TextBatchPanel({
               bgA,
               bgPad,
               bgRadius,
+              fontId,
             );
             // The `await` sits INSIDE the wrapper deliberately: `new Uint8Array` of a
             // Promise is an EMPTY typed array, not a throw, and `encode_png_pixels`
@@ -1191,10 +1189,10 @@ function TextBatchPanel({
                 tool.load_image(baseBytes);
               }
             }
-            // Throwaway engine — same reasoning as the logo path above.
+            await ensureEngineFonts(tool); // its font registry starts empty too
             const workW = await tool.width();
             const workH = await tool.height();
-            const m = await measureTextAwaited(tool, text, fontSize, bold);
+            const m = await measureTextAwaited(tool, text, fontSize, bold, fontId);
             // ADR-024 b1 — AWAITED, and this is the site that made the corrected b1
             // necessary. The note here used to say a miss "becomes reachable under
             // Stage 3.5 and this is where it has to be handled". It could not have
@@ -1233,6 +1231,7 @@ function TextBatchPanel({
               bgA,
               bgPad,
               bgRadius,
+              fontId,
             );
             flushToCanvas();
             syncState();
@@ -1270,6 +1269,7 @@ function TextBatchPanel({
     margin,
     photos,
     activePhotoId,
+    fontId,
     setPhotos,
     stampToolRef,
     flushToCanvas,
@@ -1281,7 +1281,7 @@ function TextBatchPanel({
       <div>
         <SectionHeader
           title="Text"
-          info="Rendered in Rust (Liberation Sans). Bold applies to the output; the font family below is a preview only — the baked text stays Liberation Sans."
+          info="Rendered by the engine, not the browser. The font and weight below are what gets baked into every photo."
           className="mb-2"
         />
         <textarea
@@ -1289,7 +1289,7 @@ function TextBatchPanel({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Enter overlay text…"
-          style={{ fontFamily, fontWeight: bold ? "bold" : "normal" }}
+          style={{ fontFamily: faceCss(fontId), fontWeight: bold ? "bold" : "normal" }}
           className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-2xs text-theme-foreground placeholder:text-theme-muted-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
         />
       </div>
@@ -1303,19 +1303,19 @@ function TextBatchPanel({
         unit="px"
       />
 
-      {/* Font family (preview only) + weight (real — Liberation Sans Bold). */}
+      {/* Font family + weight — both real as of v8.76. */}
       <div>
         <p className="text-2xs font-bold uppercase tracking-widest text-theme-muted-foreground mb-2">
           Font
         </p>
         <select
-          value={fontFamily}
-          onChange={(e) => setFontFamily(e.target.value)}
-          style={{ fontFamily }}
+          value={fontId}
+          onChange={(e) => setFontId(e.target.value)}
+          style={{ fontFamily: faceCss(fontId) }}
           className="w-full rounded-md border border-border bg-theme-muted/20 px-2 py-1.5 text-2xs text-theme-foreground focus:outline-none focus:ring-1 focus:ring-theme-primary"
         >
-          {TEXT_FONT_FAMILIES.map((f) => (
-            <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+          {faces.map((f) => (
+            <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
               {f.label}
             </option>
           ))}

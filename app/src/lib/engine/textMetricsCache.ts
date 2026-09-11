@@ -143,6 +143,27 @@ function cached(key: string): readonly number[] | undefined {
 const SEP = "\u0000";
 
 /**
+ * The typeface part of every cache key.
+ *
+ * ⚠️ THIS IS LOAD-BEARING. This module's whole safety argument is that the
+ * engine functions it caches are PURE — "same arguments, same answer, for the
+ * life of the binary", so there is nothing to invalidate. v8.76 gave those
+ * functions a `font_id`, which is a new argument: leaving it out of the key
+ * would make Liberation Serif serve Liberation Sans's metrics for the life of
+ * the page, and text would commit a few pixels off its own preview with no way
+ * to notice.
+ *
+ * The purity argument still holds WITH the id in the key, but only because
+ * `fonts::register` is monotone — an id is never re-pointed at different bytes.
+ * The other half of that is `ensureEngineFonts`: a face must be registered
+ * BEFORE it is measured, or the fallback's answer gets cached against the real
+ * id. Read `engineFonts.ts` before changing either.
+ */
+function fontKey(fontId: string | undefined): string {
+  return fontId ?? "";
+}
+
+/**
  * `[width, height]` in pixels of `text` as `commit_text` would render it.
  *
  * Returns `undefined` when there is no engine AND no cached answer — callers
@@ -154,12 +175,13 @@ export function measureText(
   text: string,
   fontSize: number,
   bold: boolean,
+  fontId?: string,
 ): readonly number[] | undefined {
   // `tool` is no longer read — kept in the signature because every call site
   // has it to hand and dropping it would be churn for no gain, and because
   // `primeTextMetrics` (which does need it) is called with the same arguments.
   void tool;
-  return cached(`m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`);
+  return cached(`m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${fontKey(fontId)}${SEP}${text}`);
 }
 
 /** Where the first line's ink begins inside a plain (no background) tile. */
@@ -168,12 +190,13 @@ export function textInkOffset(
   text: string,
   fontSize: number,
   bold: boolean,
+  fontId?: string,
 ): readonly number[] | undefined {
   // Deliberately NOT delegating to `textInkOffsetBg(..., 0, 0)`: the engine
   // exposes both and the two-arg form is what the render path calls, so it gets
   // its own key rather than depending on the delegation staying true in Rust.
   void tool;
-  return cached(`i${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`);
+  return cached(`i${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${fontKey(fontId)}${SEP}${text}`);
 }
 
 // `textInkOffsetBg`'s SYNCHRONOUS form was deleted in v8.14. Its only callers
@@ -205,12 +228,14 @@ export async function measureTextAwaited(
   text: string,
   fontSize: number,
   bold: boolean,
+  fontId?: string,
 ): Promise<readonly number[] | undefined> {
-  const key = `m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`;
+  const font = fontKey(fontId);
+  const key = `m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${font}${SEP}${text}`;
   const hit = lookup(key);
   if (hit !== undefined) return hit;
   if (!tool) return undefined;
-  return remember(key, Array.from(await tool.measure_text(text, fontSize, bold)));
+  return remember(key, Array.from(await tool.measure_text(text, fontSize, bold, font)));
 }
 
 /**
@@ -235,6 +260,7 @@ export async function textInkOffsetBgAwaited(
   bold: boolean,
   backgroundKind: number,
   bgPadding: number,
+  fontId?: string,
 ): Promise<readonly number[] | undefined> {
   // No `boxHeight` here, and that is a decision rather than an omission: the
   // v8.41 box grows BELOW top-aligned text, so a taller box moves no glyph and
@@ -242,14 +268,15 @@ export async function textInkOffsetBgAwaited(
   // it. If the layout ever goes centred, the height becomes part of the answer
   // and MUST join the key, or every re-edit of a resized box serves a stale
   // offset and the text walks up the canvas a little further each time.
-  const key = `b${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${backgroundKind}${SEP}${bgPadding}${SEP}${text}`;
+  const font = fontKey(fontId);
+  const key = `b${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${backgroundKind}${SEP}${bgPadding}${SEP}${font}${SEP}${text}`;
   const hit = lookup(key);
   if (hit !== undefined) return hit;
   if (!tool) return undefined;
   // The one line that differs from `cached()`: the engine is awaited rather
   // than called for an answer it may not be able to give synchronously.
   const value = Array.from(
-    await tool.text_ink_offset_bg(text, fontSize, bold, backgroundKind, bgPadding),
+    await tool.text_ink_offset_bg(text, fontSize, bold, backgroundKind, bgPadding, font),
   );
   return remember(key, value);
 }
@@ -273,19 +300,21 @@ export async function primeTextMetrics(
   text: string,
   fontSize: number,
   bold: boolean,
+  fontId?: string,
 ): Promise<boolean> {
   if (!tool) return false;
-  const mKey = `m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`;
-  const iKey = `i${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${text}`;
+  const font = fontKey(fontId);
+  const mKey = `m${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${font}${SEP}${text}`;
+  const iKey = `i${SEP}${fontSize}${SEP}${bold ? 1 : 0}${SEP}${font}${SEP}${text}`;
   let filled = false;
   // `store.has`, NOT `lookup` — lookup re-inserts on hit to maintain LRU order,
   // and priming an entry the render is already using should not reorder it.
   if (!store.has(mKey)) {
-    remember(mKey, Array.from(await tool.measure_text(text, fontSize, bold)));
+    remember(mKey, Array.from(await tool.measure_text(text, fontSize, bold, font)));
     filled = true;
   }
   if (!store.has(iKey)) {
-    remember(iKey, Array.from(await tool.text_ink_offset(text, fontSize, bold)));
+    remember(iKey, Array.from(await tool.text_ink_offset(text, fontSize, bold, font)));
     filled = true;
   }
   return filled;

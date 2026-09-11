@@ -21,7 +21,10 @@ export const defaultToolSettings: ToolSettings = {
   eraserOpacity: 100,
   eraserHardness: 70,
   fontSize: 24,
-  fontFamily: "sans-serif",
+  // The embedded face, and its CSS twin. `""` is what every text annotation
+  // written before v8.76 means, so this default is also the migration.
+  textFontId: "",
+  fontFamily: "'IH Liberation Sans', Arial, Helvetica, sans-serif",
   fontWeight: "normal",
   textColor: "#000000",
   blurMode: "gaussian",

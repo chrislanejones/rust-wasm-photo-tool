@@ -34,6 +34,8 @@ import {
   textInkOffset,
   primeTextMetrics,
 } from "@/lib/engine/textMetricsCache";
+import { faceCss } from "@/lib/engineFonts";
+import { wrapPreviewLines } from "@/lib/previewWrap";
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
 import { useToolStore } from "@/stores/useToolStore";
@@ -144,7 +146,11 @@ interface Props {
   onTextBlur?: () => void;
   textSettings?: {
     fontSize: number;
+    /** ⚠️ Not read by the overlay — the face comes from `textFontId`. Kept
+     *  for the recent-text chips only. */
     fontFamily?: string;
+    /** Engine typeface id; `""` = the embedded Liberation Sans. */
+    textFontId?: string;
     fontWeight: string;
     textColor: string;
     /** Background-preview fields. The open textarea renders a live preview
@@ -824,13 +830,21 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const primeFontSize = textInput ? (textInput.fontSize ?? textSettings?.fontSize) : undefined;
     const primeBold =
       textInput ? (textInput.fontWeight ?? textSettings?.fontWeight) === "bold" : false;
+    // Part of every key this fills — see `textMetricsCache.fontKey`.
+    const primeFontId = textSettings?.textFontId ?? "";
     useEffect(() => {
       if (!textInput || primeFontSize === undefined) return;
       const tool = hookResult.toolRef.current;
       if (!tool) return;
       let cancelled = false;
       void (async () => {
-        const filled = await primeTextMetrics(tool, primeText, primeFontSize, primeBold);
+        const filled = await primeTextMetrics(
+          tool,
+          primeText,
+          primeFontSize,
+          primeBold,
+          primeFontId,
+        );
         if (!cancelled && filled) setMetricsTick((t) => t + 1);
       })();
       return () => {
@@ -840,7 +854,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       // output, and depending on it would re-prime forever. (No
       // eslint-disable needed: the rule agrees, because the setter form of
       // `setMetricsTick` reads no state.)
-    }, [textInput, primeText, primeFontSize, primeBold, hookResult]);
+    }, [textInput, primeText, primeFontSize, primeBold, primeFontId, hookResult]);
     // Read once so the layout below re-runs after a prime; the value is unused.
     void metricsTick;
 
@@ -2263,38 +2277,27 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
           const effFontSize = textInput.fontSize ?? textSettings.fontSize;
           const effFontWeight = textInput.fontWeight ?? textSettings.fontWeight;
           const effTextColor = textInput.textColor ?? textSettings.textColor;
+          // ⚠️ ONE FACE FOR ALL THREE SURFACES — the measuring 2D context
+          // below, the textarea, and the engine. Never hardcode a family into
+          // either consumer again; `engineFonts.ts` has the measurements.
+          const effFontId = textSettings.textFontId ?? "";
+          const effFontCss = faceCss(effFontId);
 
           // Measure the text box in screen pixels
           const offscreen = document.createElement("canvas");
           const mctx = offscreen.getContext("2d")!;
           const fs = effFontSize * scaleX;
-          mctx.font = `${effFontWeight} ${fs}px 'Liberation Sans', Arial, sans-serif`;
-          // ── v8.40 — the preview wraps the SAME WAY the engine does ────────
-          // Greedy, and a paragraph that already fits is kept verbatim: that
-          // mirrors `text::wrap` in Rust line for line, so what the user drags
-          // out here is what gets committed. Same font family and size on both
-          // sides, so the break points agree.
+          mctx.font = `${effFontWeight} ${fs}px ${effFontCss}`;
+          // v8.40 — the preview breaks lines where the ENGINE will. See
+          // `wrapPreviewLines`, which mirrors `src/text.rs::wrap`; the font it
+          // measures with is `effFontCss` above, which is the same face.
           const wrapContentW =
             textWrapWidth > 0
               ? textWrapWidth * scaleX - 2 * Math.ceil(effFontSize * 0.25) * scaleX
               : 0;
-          const wrapPara = (para: string): string[] => {
-            if (wrapContentW <= 0 || mctx.measureText(para).width <= wrapContentW) return [para];
-            const out: string[] = [];
-            let line = "";
-            for (const word of para.split(/\s+/).filter(Boolean)) {
-              const candidate = line ? `${line} ${word}` : word;
-              if (mctx.measureText(candidate).width <= wrapContentW || !line) {
-                line = candidate;
-              } else {
-                out.push(line);
-                line = word;
-              }
-            }
-            out.push(line);
-            return out;
-          };
-          const lines = (textInput.text || " ").split("\n").flatMap(wrapPara);
+          const lines = wrapPreviewLines(textInput.text || " ", wrapContentW, (t) =>
+            mctx.measureText(t).width,
+          );
           const rawW = Math.max(60, ...lines.map((l) => mctx.measureText(l || " ").width));
           // A wrapped box is the width the user DRAGGED, not the width of the
           // longest line — otherwise the box would snap inwards to the text
@@ -2579,6 +2582,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                 textInput.text || " ",
                 effFontSize,
                 effFontWeight === "bold",
+                effFontId,
               )
             : undefined;
           const rectLeft = inkBase
@@ -2730,11 +2734,10 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
                   fontSize: fs,
                   fontWeight: effFontWeight,
                   color: effTextColor,
-                  // THE FACE THE ENGINE WILL COMMIT, not the one the panel picked:
-                  // `render_text` takes no font, so every box becomes Liberation
-                  // Sans on commit. Previewing in another face showed glyphs a box
-                  // was not measured for (+26.3% wide in monospace, ADR-051).
-                  fontFamily: "'Liberation Sans', Arial, sans-serif",
+                  // THE FACE THE ENGINE WILL COMMIT. Same expression the box
+                  // was measured with, and the same bytes the engine was given
+                  // — so these glyphs ARE the committed glyphs (v8.76).
+                  fontFamily: effFontCss,
                   lineHeight: 1.3,
                   padding: `${TEXT_OVERLAY_PAD_Y}px ${TEXT_OVERLAY_PAD_X}px`,
                   background: "transparent",
