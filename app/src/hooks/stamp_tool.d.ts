@@ -4,6 +4,15 @@ declare module "stamp_tool" {
   /** Gallery photo cap for an account tier ("demo" | "loggedIn" | "paid"). */
   export function photo_limit(tier: string): number;
 
+  /** Stroke-stabilizer leash in px for a UI level ("off"/"low"/"med"/"high");
+   *  0 = off.
+   *
+   *  EXPORTED RATHER THAN PORTED — the `gaussian_kernel` precedent. The pen
+   *  is a JS Bézier overlay with no dabs to lag, so it needs this number on
+   *  the JS side; a second copy of the table would be free to drift from the
+   *  engine's. One call per drag start, not per pointer move. */
+  export function stabilizer_leash(level: string): number;
+
   /** The engine's Gaussian kernel for `radius` (clamped 1..=30).
    *
    *  ⚠️ Exists because a JS PORT of it cannot be bit-exact: `build_gaussian_kernel`

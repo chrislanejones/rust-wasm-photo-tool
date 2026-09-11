@@ -38,6 +38,7 @@ mod paint;
 pub mod perspective;
 mod selection;
 mod settings;
+mod stabilizer;
 mod stamp;
 mod text;
 mod transform;
@@ -522,10 +523,10 @@ pub struct ImageHorseTool {
     /// `PastePreview`). `None` when no placement is in progress. Committed by
     /// `commit_paste_preview`; transient (never part of a history snapshot).
     paste_preview: Option<PastePreview>,
-    /// Paint stroke-stabilizer trailing tip ("lazy mouse"). Set on stroke start;
-    /// advances toward the cursor only when it pulls past the leash. `None` when
-    /// no stabilized stroke is active.
-    paint_stab_tip: Option<(f64, f64)>,
+    /// Paint stroke stabilizer ("lazy mouse"): this stroke's leash plus its
+    /// trailing tip. The math lives in `stabilizer.rs` so the blur and clone
+    /// engines can share it rather than each re-derive it.
+    paint_stab: crate::stabilizer::Stabilizer,
 
     // ── Paint-brush stroke state ──────────────────────────────────────────
     /// Per-pixel max coverage (0..255) for the active paint stroke. Dabs combine
@@ -539,8 +540,8 @@ pub struct ImageHorseTool {
     paint_color: (u8, u8, u8),
     paint_opacity: f32,
     paint_radius: f64,
-    /// Stabilizer leash in px (0 = off) + last raw-path point (non-stabilized).
-    paint_leash: f64,
+    /// Last raw-path point (non-stabilized). The leash itself now lives on
+    /// `paint_stab` above.
     paint_last: Option<(f64, f64)>,
     paint_raw: (f64, f64),
     /// Brush-edge hardness (0..1): fraction of the radius at full coverage before
@@ -915,13 +916,12 @@ impl ImageHorseTool {
             smart_prev: Vec::new(),
             move_preview: None,
             paste_preview: None,
-            paint_stab_tip: None,
+            paint_stab: crate::stabilizer::Stabilizer::default(),
             paint_cov: Vec::new(),
             paint_base: Vec::new(),
             paint_color: (0, 0, 0),
             paint_opacity: 1.0,
             paint_radius: 0.0,
-            paint_leash: 0.0,
             paint_last: None,
             paint_raw: (0.0, 0.0),
             paint_hardness: 0.8,
