@@ -173,3 +173,76 @@ fn text_rotated_with_background_parity() {
     assert_replay_parity(&fx, &ops);
     assert_op_has_effect(&fx, &ops);
 }
+
+/// A warped SHAPE must replay byte-identically, and the quad must be doing
+/// something.
+///
+/// The parity half is the usual contract. The second half is the one worth
+/// spelling out: `ShapeParams::perspective` is `#[serde(skip)]`, so the quad
+/// physically cannot ride on `ShapeAdd` and travels as its own
+/// `Op::ShapePerspective`. Forget to emit that op — the exact mistake the
+/// comment in `annotation_sync_ops` exists to prevent — and everything still
+/// compiles, replay still produces a valid document, and the only symptom is
+/// that the replayed shape comes back FLAT while the engine's is warped. The
+/// composite hash then diverges, the log marks itself broken, and the user
+/// silently loses op-log undo. So this asserts the two documents differ when
+/// the quad op is present, which is what a dropped op would make false.
+#[test]
+fn shape_perspective_parity() {
+    use stamp_tool::ops::{apply, Document, ShapeParams};
+
+    let fx = fixture("solid_64");
+    let square = ShapeParams {
+        id: 1,
+        kind: 0,
+        x0: 12.0,
+        y0: 12.0,
+        x1: 52.0,
+        y1: 52.0,
+        r: 220,
+        g: 20,
+        b: 20,
+        stroke_width: 3.0,
+        arrow_style: 0,
+        number: 0,
+        label_kind: 0,
+        points: Vec::new(),
+        fill_kind: 1,
+        fill_r: 20,
+        fill_g: 40,
+        fill_b: 220,
+        fill_a: 255,
+        fill2_r: 0,
+        fill2_g: 0,
+        fill2_b: 0,
+        fill2_a: 0,
+        fill_angle: 0,
+        fill_block: 0,
+        perspective: stamp_tool::perspective::IDENTITY_QUAD,
+    };
+    let keystone = [(0.25, 0.0), (0.75, 0.0), (1.0, 1.0), (0.0, 1.0)];
+    let ops = [
+        Op::ShapeAdd(square.clone()),
+        Op::ShapePerspective {
+            id: 1,
+            quad: keystone,
+        },
+    ];
+    assert_replay_parity(&fx, &ops);
+    assert_op_has_effect(&fx, &ops);
+
+    // …and the quad op is not decoration: the same square without it renders
+    // differently.
+    let doc_of = |ops: &[Op]| {
+        let mut d = Document::new(fx.width, fx.height);
+        for op in fx.load_ops().iter().chain(ops.iter()) {
+            apply(op, &mut d);
+        }
+        d.composite_hash()
+    };
+    assert_ne!(
+        doc_of(&[Op::ShapeAdd(square)]),
+        doc_of(&ops),
+        "the ShapePerspective op changed nothing — a dropped quad op looks exactly like this"
+    );
+}

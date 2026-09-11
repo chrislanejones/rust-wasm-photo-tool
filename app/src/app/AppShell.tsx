@@ -3316,6 +3316,7 @@ export function AppShell() {
                           onTextFontSizeChange={handleTextFontSizeChange}
                           onTextRotationChange={textTool.setTextRotation}
                           annotations={annotationBoxes}
+                          shapes={drawingTools.shapes}
                           renderOverlay={renderDuplicatePad}
                           hoveredAnnotationId={textTool.hoveredAnnotationId}
                           onCanvasHover={textTool.onCanvasHover}
@@ -3450,6 +3451,7 @@ export function AppShell() {
                       onTextFontSizeChange={handleTextFontSizeChange}
                       onTextRotationChange={textTool.setTextRotation}
                       annotations={annotationBoxes}
+                      shapes={drawingTools.shapes}
                       renderOverlay={renderDuplicatePad}
                       hoveredAnnotationId={textTool.hoveredAnnotationId}
                       onCanvasHover={textTool.onCanvasHover}

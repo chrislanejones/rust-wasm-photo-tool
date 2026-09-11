@@ -25,7 +25,7 @@ import { CompareSlider } from "./CompareSlider";
 import { PenOverlay } from "./PenOverlay";
 import { CanvasGuidesOverlay } from "./CanvasGuidesOverlay";
 import { ImageGuidesOverlay } from "./ImageGuidesOverlay";
-import { PerspectiveOverlay } from "./PerspectiveOverlay";
+import { PerspectiveLayer } from "./PerspectiveLayer";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { LassoOverlay } from "./LassoOverlay";
 import { DrawPreviewOverlay } from "./DrawPreviewOverlay";
@@ -37,8 +37,6 @@ import {
 import { useGuidesStore } from "@/stores/useGuidesStore";
 import { useTextBoxStore, MIN_WRAP_WIDTH, MIN_BOX_HEIGHT } from "@/stores/useTextBoxStore";
 import { useToolStore } from "@/stores/useToolStore";
-import { usePerspectiveStore } from "@/stores/usePerspectiveStore";
-import { usePerspectiveTool } from "@/hooks/usePerspectiveTool";
 import { useActiveSubTool } from "@/features/tools/activateSubTool";
 import type { ResolvedSubTool } from "@/features/tools/toolGroups";
 import { useUIStore } from "@/stores/useUIStore";
@@ -204,6 +202,10 @@ interface Props {
    *  hover highlight is drawn over the one whose id matches
    *  `hoveredAnnotationId`. */
   annotations?: AnnotationBox[];
+  /** Live shape annotations on the active layer (bbox + id + kind). Only the
+   *  Perspective tool reads them here — it can be pointed at a square or a
+   *  circle the same way it can be pointed at text. */
+  shapes?: { id: number; kind: number; x0: number; y0: number; x1: number; y1: number }[];
   /** Mount an extra overlay inside the canvas frame without touching this file (see overlayFrame.ts). */
   renderOverlay?: (frame: OverlayFrame) => React.ReactNode;
   hoveredAnnotationId?: number | null;
@@ -448,6 +450,7 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
       onTextFontSizeChange,
       onTextRotationChange,
       annotations,
+      shapes,
       renderOverlay,
       hoveredAnnotationId,
       onCanvasHover,
@@ -1385,34 +1388,13 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
     const imageGuides = useGuidesStore((s) => s.guides);
     const guidesLocked = useGuidesStore((s) => s.guidesLocked);
     const selectedGuideId = useGuidesStore((s) => s.selectedGuideId);
-    // ── Perspective tool (v8.42) ────────────────────────────────────────
-    // The hook lives HERE, not in AppShell: everything it needs is already on
-    // `hookResult` (toolRef / syncState / flushToCanvas), and the panel reads
-    // its results out of usePerspectiveStore rather than through props. That is
-    // what let the tool land without adding anything to AppShell.
-    const perspectiveMode = useToolStore((s) => s.perspectiveMode);
-    const perspectiveTargetId = usePerspectiveStore((s) => s.targetId);
-    const setPerspectiveTargetId = usePerspectiveStore((s) => s.setTargetId);
+    // ── Perspective tool ────────────────────────────────────────────────
     // All three sub-tools (Distort / Perspective / Skew) resolve to the one
-    // `perspective` ToolType, so this stays a single check.
+    // `perspective` ToolType, so this stays a single check. Everything else
+    // about the tool — its hook, its quad, its action bar — lives in
+    // PerspectiveLayer; see the note at the top of that file for why it is not
+    // forty more lines in here.
     const perspectiveActive = activeTool === "perspective";
-    const perspectiveTargetBounds = React.useMemo(() => {
-      if (perspectiveTargetId === null) return null;
-      const a = (annotations ?? []).find((n) => n.id === perspectiveTargetId);
-      return a ? { x: a.x, y: a.y, w: a.tile_w, h: a.tile_h } : null;
-    }, [perspectiveTargetId, annotations]);
-    const perspective = usePerspectiveTool({
-      toolRef: hookResult.toolRef,
-      syncState: hookResult.syncState,
-      flushToCanvas: hookResult.flushToCanvas,
-      // A target only counts while the tool is actually active — otherwise a
-      // stale pick from a previous session would silently redirect the next
-      // warp onto an annotation the user is no longer looking at.
-      selectedTextId: perspectiveActive ? perspectiveTargetId : null,
-      imgW,
-      imgH,
-      targetBounds: perspectiveTargetBounds,
-    });
 
     const textWrapWidth = useTextBoxStore((s) => s.wrapWidth);
     const setTextWrapWidth = useTextBoxStore((s) => s.setWrapWidth);
@@ -1612,35 +1594,20 @@ export const CanvasArea = React.forwardRef<HTMLCanvasElement, Props>(
             );
           })()}
 
-        {/* ── Perspective quad + handles ─────────────────────────────────── */}
-        {perspectiveActive &&
-          perspective.quad &&
-          canvasRef.current &&
-          imgW > 0 &&
-          imgH > 0 &&
-          (() => {
-            const canvas = canvasRef.current!;
-            const r = canvas.getBoundingClientRect();
-            return (
-              <PerspectiveOverlay
-                rect={r}
-                sx={r.width / canvas.width}
-                sy={r.height / canvas.height}
-                quad={perspective.quad}
-                mode={perspectiveMode}
-                vector={perspective.targetLabel !== null}
-                onChange={perspective.setQuad}
-                // Pointer-up ends the GESTURE; it does not commit to the
-                // engine. Applying on every release would make an exploratory
-                // drag destructive, so the commit stays on the panel's Apply
-                // button and this is only where a drag stops.
-                onCommit={() => {}}
-                annotations={annotations ?? []}
-                targetId={perspectiveTargetId}
-                onTargetChange={setPerspectiveTargetId}
-              />
-            );
-          })()}
+        {/* ── Perspective quad, handles and actions ──────────────────────── */}
+        {perspectiveActive && canvasRef.current && (
+          <PerspectiveLayer
+            toolRef={hookResult.toolRef}
+            canvasEl={canvasRef.current}
+            syncState={hookResult.syncState}
+            flushToCanvas={hookResult.flushToCanvas}
+            imgW={imgW}
+            imgH={imgH}
+            annotations={annotations ?? []}
+            shapes={shapes ?? []}
+            activeLayerId={hookResult.state.activeLayerId}
+          />
+        )}
 
         {/* Bézier pen overlay — interactive path creation (Paint → Pen). */}
         {penActive && canvasRef.current && (

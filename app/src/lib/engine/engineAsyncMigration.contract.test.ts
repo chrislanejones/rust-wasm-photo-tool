@@ -764,7 +764,20 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // has no `.length` and no indices, so an un-awaited read would silently
     // produce `undefined` bounds and fall back to the document — the exact
     // number this change exists to stop reporting.
-    expect(gate.awaited, "cumulative converted sites").toBe(137);
+    // v8.76 — 137 -> 139: the Perspective tool reaching SHAPES adds TWO
+    // awaited sites in `usePerspectiveTool`, both born awaited rather than
+    // converted and both the exact twins of the text pair already counted
+    // above: `shape_perspective_of` (the reselect seed — it CONSUMES the
+    // stored quad, so it could never have been fire-and-forget; un-awaited it
+    // hands `fromFlat` a Promise, whose `.length` is undefined, and every
+    // reselect would silently restart from a plain rectangle) and
+    // `set_shape_perspective` (the commit, whose boolean decides whether the
+    // canvas is flushed and the history re-synced — and an un-awaited Promise
+    // is truthy, so a refused quad would still repaint and log a step). The
+    // gate numbers below (5 exempt / 0 unawaited / 0 truthy) are again
+    // unchanged, which is the point of updating this number deliberately
+    // instead of loosening the assertion.
+    expect(gate.awaited, "cumulative converted sites").toBe(139);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {

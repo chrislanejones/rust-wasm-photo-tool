@@ -1396,116 +1396,22 @@ impl ImageHorseTool {
         let Some(content) = self.content_idx() else {
             return;
         };
-        let mut pending: Vec<crate::ops::Op> = Vec::new();
-        {
+        // The diff itself is pure — a function of the two lists and the log's
+        // document — so it lives in `ops.rs` next to the variants it emits,
+        // where its four skipped-field hazards are documented once beside the
+        // fields that cause them.
+        let pending = {
             // Guarded, not unwrapped — see oplog_sync_canvas for the rationale.
             let Some(log_ref) = self.oplog.as_ref() else {
                 return;
             };
-            let log_doc = log_ref.live_document();
             let layer = &self.layers[content];
-            if layer.text_annotations.is_empty()
-                && layer.shape_annotations.is_empty()
-                && log_doc.texts.is_empty()
-                && log_doc.shapes.is_empty()
-            {
-                return;
-            }
-            for lt in &log_doc.texts {
-                if !layer.text_annotations.iter().any(|a| a.id == lt.id) {
-                    pending.push(crate::ops::Op::TextRemove { id: lt.id });
-                }
-            }
-            for a in &layer.text_annotations {
-                let params = crate::ops::TextParams::from_annotation(a);
-                // ⚠️ `TextParams::wrap_width`, `box_height` AND `perspective`
-                // are all `#[serde(skip)]` (they have to be — see the fields'
-                // comments), so `TextAdd`/`TextEdit` physically CANNOT carry
-                // any of them. Every such change therefore needs its own
-                // `TextWrap` / `TextBoxHeight` / `TextPerspective` op, or
-                // replay rebuilds the text unboxed and unwarped, the composite
-                // hash diverges, and the log marks itself broken — silently
-                // falling the user back to snapshot undo. The three are handled
-                // identically; keep them that way, because one of them being
-                // forgotten is the failure this comment exists to prevent.
-                // (v8.42 added the third; the comment said "two axes" and this
-                // is what following it looks like.)
-                match log_doc.texts.iter().find(|t| t.id == a.id) {
-                    None => {
-                        let wrap = params.wrap_width;
-                        let box_h = params.box_height;
-                        let quad = params.perspective;
-                        pending.push(crate::ops::Op::TextAdd(params));
-                        if wrap != 0 {
-                            pending.push(crate::ops::Op::TextWrap {
-                                id: a.id,
-                                wrap_width: wrap,
-                            });
-                        }
-                        if box_h != 0 {
-                            pending.push(crate::ops::Op::TextBoxHeight {
-                                id: a.id,
-                                box_height: box_h,
-                            });
-                        }
-                        // The "unset" sentinel for the quad is the IDENTITY,
-                        // not zero — the other two axes get to use 0 because 0
-                        // means "auto" for them, whereas an all-zero quad is a
-                        // collapsed point. Emitting nothing here leaves replay
-                        // at the identity, which is the same thing.
-                        if !crate::perspective::is_identity(&quad) {
-                            pending.push(crate::ops::Op::TextPerspective { id: a.id, quad });
-                        }
-                    }
-                    Some(t) => {
-                        if t.wrap_width != params.wrap_width {
-                            pending.push(crate::ops::Op::TextWrap {
-                                id: a.id,
-                                wrap_width: params.wrap_width,
-                            });
-                        }
-                        if t.box_height != params.box_height {
-                            pending.push(crate::ops::Op::TextBoxHeight {
-                                id: a.id,
-                                box_height: params.box_height,
-                            });
-                        }
-                        if t.perspective != params.perspective {
-                            pending.push(crate::ops::Op::TextPerspective {
-                                id: a.id,
-                                quad: params.perspective,
-                            });
-                        }
-                        // Compare everything EXCEPT the three skipped fields,
-                        // which the branches above already accounted for —
-                        // otherwise a box-only drag would also emit a redundant
-                        // TextEdit (and `TextParams` derives PartialEq over the
-                        // real fields, `#[serde(skip)]` or not, so they DO
-                        // count here).
-                        let mut without_box = t.clone();
-                        without_box.wrap_width = params.wrap_width;
-                        without_box.box_height = params.box_height;
-                        without_box.perspective = params.perspective;
-                        if without_box != params {
-                            pending.push(crate::ops::Op::TextEdit(params));
-                        }
-                    }
-                }
-            }
-            for ls in &log_doc.shapes {
-                if !layer.shape_annotations.iter().any(|s| s.id == ls.id) {
-                    pending.push(crate::ops::Op::ShapeRemove { id: ls.id });
-                }
-            }
-            for s in &layer.shape_annotations {
-                let params = crate::ops::ShapeParams::from_annotation(s);
-                match log_doc.shapes.iter().find(|p| p.id == s.id) {
-                    None => pending.push(crate::ops::Op::ShapeAdd(params)),
-                    Some(p) if *p != params => pending.push(crate::ops::Op::ShapeEdit(params)),
-                    _ => {}
-                }
-            }
-        }
+            crate::ops::annotation_sync_ops(
+                &layer.text_annotations,
+                &layer.shape_annotations,
+                log_ref.live_document(),
+            )
+        };
         for op in pending {
             self.oplog_record(op);
         }

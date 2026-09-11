@@ -84,6 +84,38 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
+### v8.76 — 2026-09-11
+
+**Perspective, Distort and Skew work on the things you drew — squares,
+circles and text — and the box can be cancelled.**
+
+Point the Perspective tool at a square, a circle or a piece of text and the
+warp happens to *that object*, not to the photo underneath it. Until now only
+text worked that way; everything else fell through to the destructive pixel
+warp, so a square you had just drawn sat perfectly still while the picture
+under it was resampled. That is what "it only works with raster" meant, and it
+is fixed: click the object, drag the corners, press Apply.
+
+The result stays an object. Recolour it, move it, drag it to a new size, undo
+it, or click it again and adjust the same corners — the perspective comes
+along, because it is stored on the shape as fractions of its own box rather
+than baked into pixels. Resize a warped square and the warp scales with it.
+
+Apply, Reset and Cancel now sit **on the canvas**, under the box, as well as
+in the panel — the gesture happens there, so the buttons that end it belong
+there. **Esc cancels**, and cancelling takes the whole six-handle frame and
+its grid off the canvas instead of just straightening the corners. When there
+is no box the panel offers a single button to put one back.
+
+Only the objects on the layer you are working in can be picked, and switching
+layers drops the pick rather than leaving the box floating over something that
+is no longer there.
+
+Under it: shapes carry a projective quad the way text has since v8.42, the
+engine warps them through a tile padded past the shape's box so a thick stroke
+is not shaved off, and the on-disk op format steps to v6 — older documents
+decode unchanged and simply mean "no perspective", which is what they meant.
+
 ### v8.75 — 2026-09-11
 
 **Shapes duplicate in any direction, the Stroke Stabilizer steadies every

@@ -42,6 +42,28 @@ pub type Quad = [(f64, f64); 4];
 /// a text edit.
 pub const IDENTITY_QUAD: [(f32, f32); 4] = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
 
+/// A normalised quad that defaults to the IDENTITY rather than to all-zero.
+///
+/// WHY A NEWTYPE FOR FOUR PAIRS OF FLOATS. `[(f32, f32); 4]`'s `Default` is
+/// four corners at the origin — a COLLAPSED POINT, which is not what "no
+/// perspective" means. `ShapeAnnotation` derives `Default` and six of its
+/// constructors build themselves with `..Default::default()`, so a bare array
+/// field would have silently given every pin, polyline and Bézier path a
+/// degenerate warp the moment the field existed.
+///
+/// `ops.rs` already carries the same hazard on the text side and answers it at
+/// runtime with `default_quad_if_unset`, which works but has to be REMEMBERED
+/// at each new call site. This answers it in the type, once: there is no way
+/// to construct the wrong default.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NormQuad(pub [(f32, f32); 4]);
+
+impl Default for NormQuad {
+    fn default() -> Self {
+        NormQuad(IDENTITY_QUAD)
+    }
+}
+
 /// True when a quad is the identity (no perspective applied). Compared with a
 /// small epsilon rather than `==` because the value makes a round trip through
 /// f32 storage and a JS `number`, and an exact bit-compare on a dragged-back-

@@ -10601,3 +10601,26 @@ This activates nothing. The service worker still ships dark.
 | **Fixes** | Two files that existed nowhere in master were landed, and a PR-sweep e2e spec's dead selector repaired — it was reporting a harness miss as a 120s product failure. |
 
 wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
+
+## v8.76 Change Summary — 2026-09-11
+
+**Perspective, Distort and Skew work on the things you drew — squares, circles and text — and the box can be cancelled.**
+
+| Area | Change |
+| --- | --- |
+| **Perspective** | The tool can be pointed at a **square, a circle, a line, an arrow, a pin, a pen path or a piece of text** and warps *that object*, non-destructively. Before this, text was the only vector target and everything else fell through to the destructive pixel warp — which is what *"only works with raster"* meant: the photo under the square moved and the square did not. |
+| **Perspective** | The warped object is **still an object**. Recolour it, move it, drag it to a new size, undo it, or re-select it and adjust the same corners — the perspective comes along, because the quad is stored on the annotation as fractions of its own box and applied at render time. Resize a warped square and the warp scales with it. |
+| **Perspective** | **Apply · Reset · Cancel on the canvas**, under the box, as well as in the panel. The gesture happens on the canvas; the buttons that end it now live there too. |
+| **Perspective** | **Esc cancels** — it takes the whole six-handle frame and its grid off the canvas, instead of straightening the corners and leaving the box there. It used to do nothing at all on a box that had not been dragged yet. Reset (the old Esc behaviour) is still a button. With no box, the panel offers one button to place a new one. |
+| **Perspective** | **Layer separation**: only the objects on the active layer are pickable — both annotation lists are already per-layer — and switching layers drops the pick rather than leaving the box over something that is no longer there. |
+| **Perspective** | The panel names the target: *"Warping **Square** — stays editable"*, versus *"Click an object to warp it, or warp pixels (destructive)"*. |
+| **Engine** | `ShapeAnnotation` carries a normalised projective quad, applied by `render_shape_into` through a tile **padded past the shape's bbox** so a thick stroke or an arrowhead is not shaved off. The padding provably cannot move the transform — the padded corners go through the same homography the bbox defines ([ADR-053](adr/053-a-shapes-perspective-is-normalised-over-its-bbox-and-its-tile-is-padded.md)). |
+| **Engine** | `set_shape_perspective` / `shape_perspective_of`, the square/circle twins of the text pair. One "Perspective" history step per commit; a quad that lands where it started costs none. |
+| **Engine** | `perspective::NormQuad` — a newtype whose `Default` is the IDENTITY. Six shape constructors build with `..Default::default()`, and a bare `[(f32,f32);4]` would have given each of them a collapsed-to-a-point quad. The hazard is answered in the type rather than remembered at each call site. |
+| **Op log** | Format **v5 → v6** by the same prefix-extension recipe as v3/v4/v5: `#[serde(skip)]` on the new field, an appended `Op::ShapePerspective`, a seventh trailing tuple element. v5 blobs decode unchanged and mean "no perspective" — pinned by `v5_blobs_still_decode_under_v6` and `v5_op_bytes_still_decode_under_v6`. |
+| **Refactor** | `oplog_sync_annotations`' diff moved out of `lib.rs` to `ops::annotation_sync_ops`, beside the variants it emits — `src/lib.rs` **4,912 → 4,798** lines, guardrail lowered in the same commit. The Perspective tool's canvas wiring moved out of `CanvasArea.tsx` to `features/canvas/PerspectiveLayer.tsx` — **2,950 → 2,909**, eslint baseline lowered with it. |
+| **Tests** | `tests/shape_perspective.rs` (11), a `ShapePerspective` replay-parity case, seven op-format/sync unit tests, `app/src/lib/perspectiveTarget.test.ts` (8), and `e2e/perspective-vector.spec.ts` — which drives the real browser: draw a square, warp it, read the quad back **out of the engine**, confirm the bbox never moved, then Esc and Cancel. |
+
+### QC
+
+`imagehorse-qc` was **not run** for this cut. What *was* driven in a real browser on the production build: the whole reported flow — import, draw a square, Edit → Perspective, click the square (panel reads "Warping Square"), drag a corner, Apply, and the engine answers with a non-identity quad on that shape while its `x0,y0,x1,y1` are untouched; then Esc clears the box, "Place box" brings it back, and Cancel clears it again. That is `e2e/perspective-vector.spec.ts`, and it is green alongside the rest of the suite. The wasm in this session was built **without `wasm-opt`** (binaryen 117 was unreachable from the container), so no size figure is quoted here — the artifact is not the shipped one.
