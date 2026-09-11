@@ -909,6 +909,30 @@ declare module "stamp_tool" {
       h: number,
       quad: Float32Array,
     ): boolean;
+    /** Set a SHAPE's projective corner quad. `quad` is 8 floats,
+     *  `[x0,y0,…,x3,y3]`, NORMALISED 0..1 across the shape's own BBOX
+     *  (`min(x0,x1), min(y0,y1)` → the opposite corner), in TL/TR/BR/BL order.
+     *  Returns false for a wrong-length quad or an id that isn't on the active
+     *  layer. Pushes one "Perspective" history step. v8.76.
+     *
+     *  The square/circle twin of `set_text_perspective`, and non-destructive in
+     *  the same way: nothing is rasterised: the quad is stored on the
+     *  annotation and applied at render time, so the shape stays a shape and
+     *  can be recoloured, moved, resized and re-warped afterwards.
+     *
+     *  ⚠️ The BASIS IS THE BBOX, mirrored in `lib/perspectiveTarget.ts`
+     *  (`basisOfShape`) and `src/annotations.rs` (`shape_basis_rect`). The two
+     *  must agree to the pixel or a committed warp lands somewhere other than
+     *  where it was dragged.
+     *
+     *  ⚠️ Same hand-sync warning as above. */
+    set_shape_perspective(id: number, quad: Float32Array): boolean;
+    /** A shape's current corner quad, flat (8 floats). EMPTY when the id isn't
+     *  on the active layer — an empty result and an identity quad are different
+     *  answers, so callers check `length`. v8.76.
+     *
+     *  ⚠️ Same hand-sync warning as above. */
+    shape_perspective_of(id: number): Float32Array;
     set_text_shadow(
       id: number,
       on_box: boolean,

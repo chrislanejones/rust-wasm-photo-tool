@@ -195,8 +195,13 @@ check "aria-button" 5 "role=button needs aria-label (§8)" "$n_aria"
 # moved the two hand-built snapshot layers out to layer.rs, and the Color
 # Overlay engine tests were written into layer.rs's own test module rather than
 # here. Lowered in the same commit as the extraction, per the rule above.
+# 4912 -> 4798 (shape perspective, 2026-09-11): `oplog_sync_annotations`'
+# annotation diff — 110 lines of pure comparison over two lists and the log's
+# document — moved out to `ops::annotation_sync_ops`, beside the `Op` variants
+# it emits and the `#[serde(skip)]` fields whose hazards it has to remember.
+# Lowered in the same commit as the extraction, per the rule above.
 n_librs=$(wc -l < src/lib.rs)
-check "librs-lines" 4912 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
+check "librs-lines" 4798 "src/lib.rs is growing (Entropy plan Phase 3)" "$n_librs"
 
 # ── DEAD EXPORTS ──
 # See scripts/dead-exports-audit.mjs for why this is a scan and not a compiler

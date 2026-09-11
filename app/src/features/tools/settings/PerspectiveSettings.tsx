@@ -18,20 +18,39 @@
 //   Skew        — the whole edge slides along its own axis. Opposite edges
 //                 stay parallel, so it is a shear, not a perspective.
 //
-// TWO TARGETS, ONE GESTURE. With a text or shape annotation selected the quad
-// warps THAT, non-destructively: the engine stores the corners on the
-// annotation (normalised, so they survive an edit) and re-renders through them.
-// With nothing selected the quad warps the PIXELS under it, which is
+// TWO TARGETS, ONE GESTURE. With a vector object selected — a text annotation,
+// a square, a circle, any shape the app draws — the quad warps THAT,
+// non-destructively: the engine stores the corners on the annotation
+// (normalised, so they survive an edit or a resize) and re-renders through
+// them. With nothing selected the quad warps the PIXELS under it, which is
 // destructive and lands as one "Perspective" step in Review → History. The
 // panel says which is about to happen rather than making the user infer it
 // from what they last clicked.
+//
+// Shapes became reachable in v8.76. Until then this tool was, in the reporter's
+// words, raster-only: text had the vector path and everything else fell through
+// to the pixel warp, so a square you had just drawn stayed exactly as drawn
+// while the photo underneath it was resampled.
+//
+// THE BUTTONS ARE IN TWO PLACES ON PURPOSE. Apply / Reset / Cancel also sit on
+// the canvas, under the box (`PerspectiveActionBar`), because that is where the
+// gesture is. This copy stays because a control that disappears with the box is
+// not somewhere to put the only way back: after a Cancel the row below becomes
+// the single button that puts the box on the canvas again.
 //
 // Layout follows the house template exactly — the sub-mode tiles are drawn by
 // SubtoolRow in the ToolsSidebar header (via toolModes.ts `modesFor()`), and
 // what remains here is ToolModeToggle's title + lightbulb + body. Do not fork
 // it, and do not add a permanent explanatory paragraph: descriptions go in the
 // lightbulb.
-import { Check, Move3d, RotateCcw, Scan, SquareDashedBottom } from "lucide-react";
+import {
+  Check,
+  Move3d,
+  RotateCcw,
+  Scan,
+  SquareDashedBottom,
+  X,
+} from "lucide-react";
 import { ToolButton } from "@/components/ui/tool-button";
 import { ToolModeToggle } from "@/components/ui/tool-mode-toggle";
 import type { ToolMode } from "@/components/ui/tool-mode-toggle";
@@ -81,6 +100,8 @@ export function PerspectiveSettings({ disabled }: { disabled: boolean }) {
   const valid = usePerspectiveStore((s) => s.valid);
   const targetLabel = usePerspectiveStore((s) => s.targetLabel);
   const api = usePerspectiveStore((s) => s.api);
+  const dismissed = usePerspectiveStore((s) => s.dismissed);
+  const arm = usePerspectiveStore((s) => s.arm);
 
   const vector = targetLabel !== null;
   // `api` is null whenever the canvas hook is not mounted. Disabling on it is
@@ -111,12 +132,14 @@ export function PerspectiveSettings({ disabled }: { disabled: boolean }) {
                     : "inline-block h-2 w-2 rounded-full bg-rose-500"
                 }
               />
-              {vector ? (
+              {dismissed ? (
+                <span>No box on the canvas — place one to start</span>
+              ) : vector ? (
                 <span>
                   Warping <strong>{targetLabel}</strong> — stays editable
                 </span>
               ) : (
-                <span>Warping pixels — this one is destructive</span>
+                <span>Click an object to warp it, or warp pixels (destructive)</span>
               )}
             </div>
           </>
@@ -130,35 +153,57 @@ export function PerspectiveSettings({ disabled }: { disabled: boolean }) {
           title="Transform"
           info={
             <>
-              Drag the corner handles to shape the quad, or an edge handle to
-              move a whole side. <kbd>Esc</kbd> resets it. Apply commits the
-              warp and adds one <em>Perspective</em> step to Review → History,
-              where you can re-select it to pick the quad back up.
+              Click a square, a circle or a piece of text to warp <em>it</em> —
+              non-destructively, so it stays editable afterwards. With nothing
+              picked the quad warps the pixels under it instead. Drag the corner
+              handles to shape it, or an edge handle to move a whole side.
+              <kbd>Esc</kbd> cancels and takes the box off the canvas. Apply
+              adds one <em>Perspective</em> step to Review → History, where you
+              can re-select it to pick the quad back up.
             </>
           }
         />
-        <div className="grid grid-cols-2 gap-2">
+        {dismissed ? (
           <ToolButton
             stacked
-            disabled={disabled || !ready || !dirty || !valid}
-            onClick={() => void api?.apply()}
-            title={
-              !valid
-                ? "The corners cross — untangle the quad first"
-                : "Apply the perspective transform"
-            }
+            disabled={disabled || !ready}
+            onClick={arm}
+            title="Put the perspective box back on the canvas"
           >
-            <Check /> Apply
+            <Scan /> Place box
           </ToolButton>
-          <ToolButton
-            stacked
-            disabled={disabled || !ready || !dirty}
-            onClick={() => api?.reset()}
-            title="Reset the quad to a rectangle (Esc)"
-          >
-            <RotateCcw /> Reset
-          </ToolButton>
-        </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            <ToolButton
+              stacked
+              disabled={disabled || !ready || !dirty || !valid}
+              onClick={() => void api?.apply()}
+              title={
+                !valid
+                  ? "The corners cross — untangle the quad first"
+                  : "Apply the perspective transform"
+              }
+            >
+              <Check /> Apply
+            </ToolButton>
+            <ToolButton
+              stacked
+              disabled={disabled || !ready || !dirty}
+              onClick={() => api?.reset()}
+              title="Reset the quad to a rectangle"
+            >
+              <RotateCcw /> Reset
+            </ToolButton>
+            <ToolButton
+              stacked
+              disabled={disabled || !ready}
+              onClick={() => api?.cancel()}
+              title="Cancel — take the box off the canvas (Esc)"
+            >
+              <X /> Cancel
+            </ToolButton>
+          </div>
+        )}
       </div>
     </div>
   );

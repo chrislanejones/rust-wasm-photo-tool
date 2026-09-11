@@ -180,6 +180,17 @@ app/src/
 │   │   │                             move handle, endpoint circles for lines/arrows. The text
 │   │   │                             overlay rotates around the Rust tile's pivot (via measure_text)
 │   │   │                             so committed text matches the preview
+│   │   ├── PerspectiveLayer.tsx      Everything the Perspective tool puts on the canvas: the state
+│   │   │                             hook, the quad overlay and the action bar. Lives here rather
+│   │   │                             than in CanvasArea because that file is at its max-lines cap
+│   │   ├── PerspectiveOverlay.tsx    The four-corner quad, its handles, the projected 3×3 grid, and
+│   │   │                             one transparent picker per VECTOR OBJECT on the active layer —
+│   │   │                             text and shapes alike — so the tool can be pointed at a square
+│   │   │                             or a circle by clicking it. Green = the engine will take the
+│   │   │                             quad, red = the corners cross
+│   │   ├── PerspectiveActionBar.tsx  Apply · Reset · Cancel, parked under the quad and projected
+│   │   │                             from the same canvas rect so it tracks pan and zoom. Real
+│   │   │                             <button>s (focus, aria-labels), not SVG
 │   │   ├── PenOverlay.tsx            Bézier pen overlay (Paint→Pen): click to drop corner anchors,
 │   │   │                             drag to pull smooth handles, grab any anchor/handle to reshape;
 │   │   │                             click a committed path to re-open it for editing. Commits as a
@@ -244,6 +255,15 @@ app/src/
     ├── animations.ts                 Framer Motion variants — springs, slides, fadeIn, and panelSwap
     │                                 (the upload-actions ⇄ Blank Canvas cross-fade)
     ├── defaultToolSettings.ts        Default tool settings
+    ├── perspective.ts                 Pure geometry for the Perspective tool: the corner quad, the
+    │                                 three drag rules that distinguish Distort / Perspective / Skew,
+    │                                 and the forward homography the overlay draws its grid through.
+    │                                 In TypeScript on purpose — it runs per pointermove, so a worker
+    │                                 round trip here would be banked lag
+    ├── perspectiveTarget.ts           What the tool can point AT: a (kind, id) pair, because text and
+    │                                 shapes are two independent id spaces in the engine. Also
+    │                                 `basisOfShape` — a HAND-MIRROR of `shape_basis_rect` in
+    │                                 src/annotations.rs that the two must agree on to the pixel
     ├── colors.ts                     Color utility helpers
     ├── editPersistence.ts            Per-photo edit persistence via IndexedDB — saves full canvas
     │                                 state + undo/redo history (PNG-encoded) plus the layer stack

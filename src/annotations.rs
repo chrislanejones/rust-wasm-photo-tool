@@ -132,6 +132,26 @@ pub struct ShapeAnnotation {
     pub fill_angle: u16,
     /// Mosaic block size in px for `fill_kind == 3` (pixelate). 0 → default 16.
     pub fill_block: u32,
+    /// Normalised projective corner quad (TL, TR, BR, BL) over the shape's own
+    /// bbox — `(0,0)` is `(min x0/x1, min y0/y1)` and `(1,1)` the opposite
+    /// corner. [`perspective::IDENTITY_QUAD`] means "no perspective" and is
+    /// what every constructor starts from. v8.76.
+    ///
+    /// NORMALISED FOR THE SAME REASON TEXT IS (see [`TextAnnotation::perspective`]
+    /// and `perspective::warp_normalised`): the quad has to survive the shape
+    /// being moved, resized or restyled. A rect dragged twice as wide keeps the
+    /// perspective it was given rather than having it drift off the geometry,
+    /// because the corners describe the SHAPE of the transform, not pixels.
+    ///
+    /// This is what makes Distort / Perspective / Skew vector operations on a
+    /// square or a circle: the shape is still a shape afterwards — recoloured,
+    /// re-filled, re-selected, undone — and the warp is applied at render time.
+    ///
+    /// Wrapped in [`perspective::NormQuad`] so the struct's derived `Default`
+    /// yields the identity; six constructors below build with
+    /// `..Default::default()`, and a bare array would have given each of them
+    /// a collapsed-to-a-point quad.
+    pub perspective: crate::perspective::NormQuad,
 }
 /// Apply the reflow width to `text`, ready for a tile build. Every path that
 /// rasterises text goes through this so wrapping cannot be applied in one
@@ -363,7 +383,7 @@ pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
         }
         pts.push(']');
         out.push_str(&format!(
-            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"points\":{}}}",
+            "{{\"id\":{},\"kind\":{},\"x0\":{},\"y0\":{},\"x1\":{},\"y1\":{},\"r\":{},\"g\":{},\"b\":{},\"stroke_width\":{},\"arrow_style\":{},\"number\":{},\"label_kind\":{},\"fill_kind\":{},\"fill_r\":{},\"fill_g\":{},\"fill_b\":{},\"fill_a\":{},\"fill2_r\":{},\"fill2_g\":{},\"fill2_b\":{},\"fill2_a\":{},\"fill_angle\":{},\"fill_block\":{},\"perspective\":{},\"points\":{}}}",
             s.id, s.kind,
             s.x0, s.y0, s.x1, s.y1,
             s.r, s.g, s.b,
@@ -376,16 +396,206 @@ pub(crate) fn shapes_to_json(shapes: &[ShapeAnnotation]) -> String {
             s.fill2_r, s.fill2_g, s.fill2_b, s.fill2_a,
             s.fill_angle,
             s.fill_block,
+            quad_to_json(&s.perspective.0),
             pts,
         ));
     }
     out.push(']');
     out
 }
+/// The rectangle a shape's [`ShapeAnnotation::perspective`] quad is normalised
+/// against: its plain bbox, `(x, y, w, h)`, with no stroke padding.
+///
+/// ⚠️ MIRRORED BY HAND in `app/src/lib/perspectiveTarget.ts` (`basisOfShape`),
+/// and the two MUST agree
+/// to the pixel. The overlay draws the handles by denormalising the quad onto
+/// this rect and the engine re-normalises against it on commit, so a basis
+/// that differs by even the stroke width would make the committed warp land
+/// somewhere other than where the user dragged it. That is why this is the
+/// bare bbox and not the ink bounds: the bbox is the one rectangle both sides
+/// can compute from `get_shape_annotations` JSON alone, with no knowledge of
+/// how arrowheads or pin labels rasterise.
+///
+/// The ink is not clipped to it — see [`shape_ink_pad`], which widens the
+/// TILE without moving the basis.
+pub(crate) fn shape_basis_rect(s: &ShapeAnnotation) -> (f64, f64, f64, f64) {
+    let x = s.x0.min(s.x1);
+    let y = s.y0.min(s.y1);
+    (x, y, (s.x0 - s.x1).abs(), (s.y0 - s.y1).abs())
+}
+
+/// How far a shape's ink can stray OUTSIDE its bbox, in px.
+///
+/// A stroke straddles the path (half of it outside), an arrowhead is drawn
+/// past the endpoint, and both get an anti-aliased edge on top. Warping a tile
+/// cropped to the bare bbox would shave all of that off, so the tile is grown
+/// by this much on every side — while the quad stays normalised against the
+/// un-padded bbox, so the padding never shifts the transform. It cannot: the
+/// padded tile's corners are mapped through the SAME homography the bbox
+/// defines (see `render_shape_warped`), and a projective map is fixed by four
+/// correspondences, so extending its input rectangle extends the image of it
+/// and changes nothing about the map.
+fn shape_ink_pad(s: &ShapeAnnotation) -> f64 {
+    let stroke = s.stroke_width.max(1.0) * 0.5 + 2.0;
+    if s.kind == 4 {
+        // `draw_arrow`'s own head length, plus the stroke's half-width.
+        stroke + 20.0f64.max(s.stroke_width * 3.0)
+    } else {
+        stroke
+    }
+}
+
+/// The same shape, moved so that `(dx, dy)` becomes its origin — how a shape
+/// is expressed in the coordinates of a tile lifted out of the canvas.
+fn shape_translated(s: &ShapeAnnotation, dx: f64, dy: f64) -> ShapeAnnotation {
+    let mut out = s.clone();
+    out.x0 -= dx;
+    out.y0 -= dy;
+    out.x1 -= dx;
+    out.y1 -= dy;
+    for p in out.points.iter_mut() {
+        p.0 -= dx;
+        p.1 -= dy;
+    }
+    out
+}
+
+/// Rasterise a shape into a fresh transparent tile of `tw × th`, with `s`
+/// already translated into the tile's own coordinates.
+///
+/// `under` is the canvas content the tile was lifted from, needed by exactly
+/// one fill: the mosaic (`fill_kind == 3`) AVERAGES the pixels already beneath
+/// it, so on a blank tile it would average transparency and the shape would
+/// warp to nothing. Seeding the tile with those pixels fixes the average, and
+/// the silhouette pass then throws away everything the shape does not actually
+/// cover — otherwise the whole padded tile would come back opaque and the warp
+/// would drag a rectangle of the photo along with the shape.
+fn shape_tile(s: &ShapeAnnotation, tw: u32, th: u32, under: &[u8]) -> Vec<u8> {
+    let n = tw as usize * th as usize * 4;
+    let mut tile = vec![0u8; n];
+    if s.fill_kind != 3 {
+        render_shape_flat(&mut tile, tw, th, s);
+        return tile;
+    }
+    if under.len() == n {
+        tile.copy_from_slice(under);
+    }
+    render_shape_flat(&mut tile, tw, th, s);
+    // Coverage = the same shape drawn opaque. Its alpha is the shape's own
+    // anti-aliased coverage, so multiplying through keeps soft edges soft.
+    let mut cover = vec![0u8; n];
+    let mut solid = s.clone();
+    solid.fill_kind = 1;
+    solid.fill_a = 255;
+    render_shape_flat(&mut cover, tw, th, &solid);
+    for i in (3..n).step_by(4) {
+        tile[i] = ((tile[i] as u16 * cover[i] as u16 + 127) / 255) as u8;
+    }
+    tile
+}
+
+/// Composite a shape through its perspective quad. Returns false when the warp
+/// cannot be done — a degenerate quad, or one so extreme that the padded tile
+/// crosses the horizon — and the caller then draws the shape flat rather than
+/// dropping it off the canvas.
+fn render_shape_warped(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) -> bool {
+    let (bx, by, bw, bh) = shape_basis_rect(s);
+    if bw < 1.0 || bh < 1.0 {
+        return false;
+    }
+    let q = s.perspective.0;
+    // The quad in ABSOLUTE canvas coords, then the forward map that takes the
+    // basis rect's own space (0..bw, 0..bh) to it.
+    let dst: crate::perspective::Quad = [
+        (bx + q[0].0 as f64 * bw, by + q[0].1 as f64 * bh),
+        (bx + q[1].0 as f64 * bw, by + q[1].1 as f64 * bh),
+        (bx + q[2].0 as f64 * bw, by + q[2].1 as f64 * bh),
+        (bx + q[3].0 as f64 * bw, by + q[3].1 as f64 * bh),
+    ];
+    let src_rect: crate::perspective::Quad = [(0.0, 0.0), (bw, 0.0), (bw, bh), (0.0, bh)];
+    let Some(fwd) = crate::perspective::Homography::from_correspondences(&src_rect, &dst) else {
+        return false;
+    };
+    // Try the padded tile first and fall back to the bare bbox. The pad is
+    // what keeps strokes and arrowheads intact; an extreme keystone can push
+    // the padded corners across the horizon while the bbox itself is still
+    // finite, and a clipped stroke beats a vanished shape.
+    for pad in [shape_ink_pad(s), 0.0] {
+        let tx = (bx - pad).floor() as i32;
+        let ty = (by - pad).floor() as i32;
+        let tw = ((bx + bw + pad).ceil() - tx as f64).max(1.0) as u32;
+        let th = ((by + bh + pad).ceil() - ty as f64).max(1.0) as u32;
+        // The tile's corners, mapped through the basis's own homography and
+        // rebased onto the tile origin — which is exactly the destination quad
+        // `warp_rgba` wants, expressed in the source buffer's space.
+        let corners = [
+            (tx as f64, ty as f64),
+            (tx as f64 + tw as f64, ty as f64),
+            (tx as f64 + tw as f64, ty as f64 + th as f64),
+            (tx as f64, ty as f64 + th as f64),
+        ];
+        let mut local: crate::perspective::Quad = [(0.0, 0.0); 4];
+        let mut ok = true;
+        for (i, (cx, cy)) in corners.iter().enumerate() {
+            match fwd.apply(cx - bx, cy - by) {
+                Some((mx, my)) => local[i] = (mx - tx as f64, my - ty as f64),
+                None => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if !ok {
+            continue;
+        }
+        // Lifted ONLY for the mosaic fill, which is the one fill that reads
+        // what is beneath it — see `shape_tile`. Copying the region for every
+        // warped shape on every composite would be a tile-sized allocation per
+        // shape per frame, bought for nothing.
+        let under = if s.fill_kind == 3 {
+            crate::transform::copy_region(data, w as i32, h as i32, tx, ty, tw, th)
+        } else {
+            Vec::new()
+        };
+        let tile = shape_tile(&shape_translated(s, tx as f64, ty as f64), tw, th, &under);
+        let Some(warped) = crate::perspective::warp_rgba(&tile, tw, th, &local) else {
+            continue;
+        };
+        crate::transform::paste_region(
+            data,
+            w as i32,
+            h as i32,
+            &warped.pixels,
+            warped.w,
+            warped.h,
+            tx + warped.offset_x,
+            ty + warped.offset_y,
+        );
+        return true;
+    }
+    false
+}
+
 /// Composite one shape annotation directly into `data` (RGBA, w×h) using the
 /// same drawing primitives as the instant-commit path, so the live overlay and
 /// the flattened pixels are identical.
+///
+/// A shape carrying a non-identity [`ShapeAnnotation::perspective`] is drawn
+/// into its own tile and resampled through the quad instead — the vector half
+/// of the Perspective tool, and the shape twin of what a text annotation's
+/// tile has done since v8.42. The shape itself is untouched by it: the quad is
+/// a property applied at render time, so a warped square is still a square
+/// that can be recoloured, re-filled, moved and re-warped.
 pub(crate) fn render_shape_into(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
+    if !crate::perspective::is_identity(&s.perspective.0) && render_shape_warped(data, w, h, s) {
+        return;
+    }
+    render_shape_flat(data, w, h, s);
+}
+
+/// The unwarped rasteriser — every shape goes through here in the end, either
+/// straight onto the canvas or into the tile a warp resamples.
+fn render_shape_flat(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     let color = [s.r, s.g, s.b, 255];
     // Interior fill (rect=0, circle=1 only), painted BEFORE the stroke so the
     // outline sits on top. fill_kind: 1 = solid, 2 = linear gradient.
@@ -624,6 +834,7 @@ impl ImageHorseTool {
                 fill2_a: f2[3],
                 fill_angle,
                 fill_block,
+                perspective: crate::perspective::NormQuad::default(),
             });
         id
     }
@@ -686,6 +897,7 @@ impl ImageHorseTool {
                 fill2_a,
                 fill_angle,
                 fill_block,
+                perspective: crate::perspective::NormQuad::default(),
             });
         id
     }
@@ -1858,6 +2070,70 @@ impl ImageHorseTool {
             .find(|a| a.id == id)
             .map(|a| {
                 let q = a.perspective;
+                vec![
+                    q[0].0, q[0].1, q[1].0, q[1].1, q[2].0, q[2].1, q[3].0, q[3].1,
+                ]
+            })
+            .unwrap_or_default()
+    }
+
+    /// Set a SHAPE's projective corner quad (normalised over its own bbox,
+    /// TL/TR/BR/BL). Returns false if `id` isn't on the active layer, or if
+    /// the quad isn't 8 finite floats.
+    ///
+    /// The square/circle twin of [`set_text_perspective`](Self::set_text_perspective),
+    /// and non-destructive in the same way: nothing is rasterised here. The
+    /// quad is stored on the annotation and applied by `render_shape_into` on
+    /// every composite, so the shape stays a shape — restyle it, move it,
+    /// re-fill it, undo it, and the perspective comes along.
+    ///
+    /// THE BASIS IS THE BBOX, not the ink bounds — see [`shape_basis_rect`],
+    /// which the overlay mirrors. Storing fractions of it rather than pixels
+    /// is what lets the same warp survive the shape being dragged to a new
+    /// size afterwards.
+    ///
+    /// `quad` crosses the wasm boundary FLAT (8 floats) for the same reason
+    /// the text setter's does: `[(f32, f32); 4]` has no `FromWasmAbi`.
+    pub fn set_shape_perspective(&mut self, id: u32, quad: &[f32]) -> bool {
+        let Some(quad) = quad_from_flat(quad) else {
+            return false;
+        };
+        let Some(idx) = self.layers[self.active]
+            .shape_annotations
+            .iter()
+            .position(|s| s.id == id)
+        else {
+            return false;
+        };
+        if self.layers[self.active].shape_annotations[idx]
+            .perspective
+            .0
+            == quad
+        {
+            return true; // no-op: don't snap history for a drag that landed where it started
+        }
+        self.snap("Perspective");
+        self.layers[self.active].shape_annotations[idx].perspective =
+            crate::perspective::NormQuad(quad);
+        self.recomposite();
+        true
+    }
+
+    /// A shape's current quad, flat (8 floats), for the Perspective tool's
+    /// RESELECT path — click a warped square and the tool picks its corners
+    /// back up instead of restarting from the rectangle.
+    ///
+    /// Empty vec when the id isn't on the active layer. An empty result and an
+    /// identity quad are different answers ("no such shape" vs "that one is
+    /// unwarped") and the caller distinguishes them by length — the same
+    /// contract [`text_perspective_of`](Self::text_perspective_of) keeps.
+    pub fn shape_perspective_of(&self, id: u32) -> Vec<f32> {
+        self.layers[self.active]
+            .shape_annotations
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| {
+                let q = s.perspective.0;
                 vec![
                     q[0].0, q[0].1, q[1].0, q[1].1, q[2].0, q[2].1, q[3].0, q[3].1,
                 ]

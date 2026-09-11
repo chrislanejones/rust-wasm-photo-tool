@@ -176,8 +176,13 @@ export default tseslint.config(
     rules: { "max-lines": ["warn", { max: 3718 }] },
   },
   {
+    // 2950 -> 2909: the Perspective tool's canvas wiring moved out to
+    // features/canvas/PerspectiveLayer.tsx (the hook, the quad overlay and the
+    // new action bar). Lowered in the same commit as the extraction, per THE
+    // RULE above — this file was three lines from its cap and the change
+    // roughly doubled the block that was in it.
     files: ["app/src/features/canvas/CanvasArea.tsx"],
-    rules: { "max-lines": ["warn", { max: 2950 }] },
+    rules: { "max-lines": ["warn", { max: 2909 }] },
   },
   {
     files: ["app/src/features/tools/settings/BatchSettings.tsx"],
