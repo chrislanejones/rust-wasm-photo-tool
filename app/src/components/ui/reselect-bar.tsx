@@ -1,5 +1,7 @@
 import { forwardRef, type KeyboardEvent, type ReactNode } from "react";
+import { Copy, GamepadDirectional } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ChevronGlyph, DeleteGlyph, RowAction } from "@/components/ui/row-actions";
 
 /**
  * A full-width, clickable "reselect" bar — a labelled row with an optional
@@ -64,36 +66,6 @@ export interface ReselectBarProps {
   moveDownLabel?: string;
   className?: string;
 }
-
-const ChevronGlyph = ({ up }: { up: boolean }) => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d={up ? "M2.5 7.5L6 4l3.5 3.5" : "M2.5 4.5L6 8l3.5-3.5"} />
-  </svg>
-);
-
-/** A d-pad: the four-way directional cross. Drawn inline for the same reason
- *  as the others — 12×12 at stroke 1.5 so the trailing row reads as one set. */
-const DirectionalGlyph = () => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M4.5 1.75h3v2.75h2.75v3H7.5v2.75h-3V7.5H1.75v-3H4.5z" />
-  </svg>
-);
-
-/** Two offset rounded rects — the standard "copy" mark, drawn rather than
- *  imported so it matches ChevronGlyph/DeleteGlyph's 12×12 stroke weight
- *  exactly. A lucide icon here sat visibly heavier beside them. */
-const DuplicateGlyph = () => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <rect x="4.25" y="4.25" width="5.5" height="5.5" rx="1" />
-    <path d="M7.75 2.25H2.75a.5.5 0 0 0-.5.5v5" />
-  </svg>
-);
-
-const DeleteGlyph = () => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M2 2l8 8M10 2l-8 8" />
-  </svg>
-);
 
 export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
   (
@@ -160,80 +132,49 @@ export const ReselectBar = forwardRef<HTMLDivElement, ReselectBarProps>(
         )}
         <span className="large-badge">{label}</span>
         {onMoveUp && (
-          <button
-            type="button"
-            className="history-zmove"
-            aria-label={moveUpLabel}
-            title={`${moveUpLabel} (Shift: to front)`}
+          <RowAction
+            label={`${moveUpLabel} (Shift: to front)`}
             disabled={disabled || !canMoveUp}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!disabled && canMoveUp) onMoveUp(e.shiftKey);
-            }}
+            onClick={(e) => onMoveUp(e.shiftKey)}
           >
             <ChevronGlyph up />
-          </button>
+          </RowAction>
         )}
         {onMoveDown && (
-          <button
-            type="button"
-            className="history-zmove"
-            aria-label={moveDownLabel}
-            title={`${moveDownLabel} (Shift: to back)`}
+          <RowAction
+            label={`${moveDownLabel} (Shift: to back)`}
             disabled={disabled || !canMoveDown}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!disabled && canMoveDown) onMoveDown(e.shiftKey);
-            }}
+            onClick={(e) => onMoveDown(e.shiftKey)}
           >
             <ChevronGlyph up={false} />
-          </button>
+          </RowAction>
         )}
+        {/* The trailing three, in this order and always visible: directional
+            placeholder, duplicate, delete. Delete stays rightmost, where it
+            has always been. */}
         {showDirectional && (
-          /* Deliberately always disabled — see `showDirectional`. It is a
-             placeholder, so it carries a title that SAYS so rather than
-             looking like a button that is merely unavailable right now. */
-          <button
-            type="button"
-            className="history-zmove"
-            aria-label={directionalLabel}
-            title={`${directionalLabel} — not available yet`}
-            disabled
-          >
-            <DirectionalGlyph />
-          </button>
+          /* Permanently disabled — see `showDirectional`. Its label says so,
+             rather than reading as a control that is merely unavailable now. */
+          <RowAction
+            icon={GamepadDirectional}
+            label={`${directionalLabel} — not available yet`}
+          />
         )}
         {onDuplicate && (
-          <button
-            type="button"
-            className="history-zmove"
-            aria-label={duplicateLabel}
-            title={duplicateLabel}
+          <RowAction
+            icon={Copy}
+            label={duplicateLabel}
             disabled={disabled}
-            onClick={(e) => {
-              // Same stopPropagation as the ✕ and the arrows: the row itself
-              // is clickable and selects, so without this a duplicate would
-              // also reselect the row it just copied.
-              e.stopPropagation();
-              if (!disabled) onDuplicate();
-            }}
-          >
-            <DuplicateGlyph />
-          </button>
+            onClick={onDuplicate}
+          />
         )}
         {onDelete && (
-          <button
-            type="button"
-            className="history-delete"
-            aria-label={deleteLabel}
+          <RowAction
+            icon={DeleteGlyph}
+            label={deleteLabel}
             disabled={disabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!disabled) onDelete();
-            }}
-          >
-            <DeleteGlyph />
-          </button>
+            onClick={onDelete}
+          />
         )}
       </div>
     );

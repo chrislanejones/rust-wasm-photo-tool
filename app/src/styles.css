@@ -1243,7 +1243,8 @@ textarea:focus-visible {
    a state rather than a missing button. Keyboard focus reveals it too:
    hover-only reveal would hide a focusable control from Tab users. */
 .history-zmove {
-  opacity: 0;
+  /* Always visible, same reasoning as .history-delete above. */
+  opacity: 1;
   background: none;
   border: none;
   color: var(--text-muted);
@@ -1371,7 +1372,12 @@ textarea:focus-visible {
 }
 
 .history-delete {
-  opacity: 0;
+  /* ALWAYS VISIBLE (was `opacity: 0` until the row was hovered). A control you
+     cannot see is a control you cannot find, and it was unreachable by touch
+     and invisible to anyone scanning the list rather than sweeping a mouse
+     across it. It rests muted and brightens on hover, so the row still reads
+     calm without hiding its own actions. */
+  opacity: 1;
   background: none;
   border: none;
   color: var(--text-muted);

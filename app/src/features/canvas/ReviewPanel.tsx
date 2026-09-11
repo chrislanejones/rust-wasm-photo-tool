@@ -26,6 +26,9 @@ import { activateSubTool } from "@/features/tools/activateSubTool";
 import { subToolByKey } from "@/features/tools/toolGroups";
 import { slideFromRight } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
+// The ✕ lives in row-actions now — it was defined identically here and in
+// reselect-bar.tsx, so a change to one never reached the other.
+import { DeleteGlyph } from "@/components/ui/row-actions";
 import { TinyNumberBox } from "@/components/ui/tiny-number-box";
 import { ReselectBar } from "@/components/ui/reselect-bar";
 import { PanelCloseButton } from "@/components/ui/panel-close-button";
@@ -103,12 +106,6 @@ interface Props {
    *  compact top bar are in play, where the chrome owns open/close instead. */
   closable?: boolean;
 }
-
-const DeleteGlyph = () => (
-  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M2 2l8 8M10 2l-8 8" />
-  </svg>
-);
 
 const TOGGLES: {
   key: SectionKey;
