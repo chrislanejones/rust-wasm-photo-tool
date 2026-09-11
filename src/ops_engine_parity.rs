@@ -211,7 +211,7 @@ fn blur_replay_matches_live_blur_brush() {
     let down = (30.0, 30.0);
     let moves = [(52.0, 38.0), (70.0, 55.0)];
     // size 24 → radius 12; intensity 6; mode "blur" (the default arm).
-    t.effect_down(down.0, down.1, 24.0, "blur", 6, 12, "#000000");
+    t.effect_down(down.0, down.1, 24.0, "blur", 6, 12, "#000000", "off");
     for &(x, y) in &moves {
         t.effect_move(x, y);
     }
@@ -396,7 +396,7 @@ fn oplog_breaks_on_unrecorded_edit_and_falls_back_to_snapshots() {
 
     // An UNRECORDED edit: pixelate via the real effects driver (snaps a
     // snapshot, records no op).
-    t.effect_down(48.0, 40.0, 30.0, "pixelate", 6, 8, "#000000");
+    t.effect_down(48.0, 40.0, 30.0, "pixelate", 6, 8, "#000000", "off");
     t.effect_up();
     let h2 = composite_hash(&mut t);
     assert_ne!(h1, h2, "pixelate visibly changed the canvas");
