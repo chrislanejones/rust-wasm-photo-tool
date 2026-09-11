@@ -89,6 +89,7 @@ export async function restoreLayerStack(
         a.shadow_dx ?? 0,
         a.shadow_dy ?? 0,
         a.shadow_blur ?? 0,
+        a.font_id ?? "",
       );
     }
     for (const s of layer.shapes ?? []) {

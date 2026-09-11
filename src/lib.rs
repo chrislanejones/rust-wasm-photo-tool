@@ -26,6 +26,7 @@ mod describe;
 mod drawing;
 mod edges;
 mod effects;
+mod fonts;
 mod history;
 mod layer;
 mod livewire;
@@ -99,7 +100,7 @@ pub use wasm_bindgen_rayon::init_thread_pool;
 use crate::annotations::build_text_annotation;
 use crate::core::ImageBuffer;
 use crate::history::{History, Snapshot};
-use crate::layer::{build_annotation_tile, composite_layers, composite_layers_into, Layer};
+use crate::layer::{composite_layers, composite_layers_into, Layer};
 use crate::stamp::StampState;
 
 /// Module-init hook: route Rust panics to `console.error` with a readable
@@ -1418,23 +1419,23 @@ impl ImageHorseTool {
             }
             for a in &layer.text_annotations {
                 let params = crate::ops::TextParams::from_annotation(a);
-                // ⚠️ `TextParams::wrap_width`, `box_height` AND `perspective`
-                // are all `#[serde(skip)]` (they have to be — see the fields'
-                // comments), so `TextAdd`/`TextEdit` physically CANNOT carry
-                // any of them. Every such change therefore needs its own
-                // `TextWrap` / `TextBoxHeight` / `TextPerspective` op, or
-                // replay rebuilds the text unboxed and unwarped, the composite
-                // hash diverges, and the log marks itself broken — silently
-                // falling the user back to snapshot undo. The three are handled
-                // identically; keep them that way, because one of them being
-                // forgotten is the failure this comment exists to prevent.
-                // (v8.42 added the third; the comment said "two axes" and this
-                // is what following it looks like.)
+                // ⚠️ `wrap_width`, `box_height`, `perspective` AND `font_id`
+                // are all `#[serde(skip)]` on `TextParams` (they have to be —
+                // see the fields' comments), so `TextAdd`/`TextEdit` physically
+                // CANNOT carry any of them. Each needs its own op — `TextWrap`
+                // / `TextBoxHeight` / `TextPerspective` / `TextFont` — or
+                // replay rebuilds the text unboxed, unwarped and in the wrong
+                // typeface, the composite hash diverges, and the log marks
+                // itself broken, silently dropping the user to snapshot undo.
+                // The four are handled identically; keep them that way. One of
+                // them being forgotten is what this comment exists to prevent,
+                // and it has already happened twice (v8.42, v8.76).
                 match log_doc.texts.iter().find(|t| t.id == a.id) {
                     None => {
                         let wrap = params.wrap_width;
                         let box_h = params.box_height;
                         let quad = params.perspective;
+                        let font = params.font_id.clone();
                         pending.push(crate::ops::Op::TextAdd(params));
                         if wrap != 0 {
                             pending.push(crate::ops::Op::TextWrap {
@@ -1456,6 +1457,14 @@ impl ImageHorseTool {
                         if !crate::perspective::is_identity(&quad) {
                             pending.push(crate::ops::Op::TextPerspective { id: a.id, quad });
                         }
+                        // "" is the embedded face — same "unset means the
+                        // default" shape as `wrap == 0`.
+                        if !font.is_empty() {
+                            pending.push(crate::ops::Op::TextFont {
+                                id: a.id,
+                                font_id: font,
+                            });
+                        }
                     }
                     Some(t) => {
                         if t.wrap_width != params.wrap_width {
@@ -1476,7 +1485,13 @@ impl ImageHorseTool {
                                 quad: params.perspective,
                             });
                         }
-                        // Compare everything EXCEPT the three skipped fields,
+                        if t.font_id != params.font_id {
+                            pending.push(crate::ops::Op::TextFont {
+                                id: a.id,
+                                font_id: params.font_id.clone(),
+                            });
+                        }
+                        // Compare everything EXCEPT the four skipped fields,
                         // which the branches above already accounted for —
                         // otherwise a box-only drag would also emit a redundant
                         // TextEdit (and `TextParams` derives PartialEq over the
@@ -1486,6 +1501,7 @@ impl ImageHorseTool {
                         without_box.wrap_width = params.wrap_width;
                         without_box.box_height = params.box_height;
                         without_box.perspective = params.perspective;
+                        without_box.font_id = params.font_id.clone();
                         if without_box != params {
                             pending.push(crate::ops::Op::TextEdit(params));
                         }
@@ -1787,6 +1803,7 @@ impl ImageHorseTool {
                     t.shadow_dx,
                     t.shadow_dy,
                     t.shadow_blur,
+                    &t.font_id,
                 )
             })
             .collect();
@@ -2694,6 +2711,7 @@ impl ImageHorseTool {
                         (a.shadow_dx as f64 * sx).round() as i32,
                         (a.shadow_dy as f64 * sy).round() as i32,
                         (a.shadow_blur as f64 * s_uniform).round() as u32,
+                        &a.font_id,
                     )
                 })
                 .collect();
@@ -3184,86 +3202,6 @@ impl ImageHorseTool {
     /// `add_text_annotation`/`update_text_annotation` (shadow off, no tail)
     /// so the rect-fill/padding/corner-radius rendering can't drift between
     /// the live-overlay and batch entry points.
-    pub fn commit_text(
-        &mut self,
-        text: &str,
-        font_size: f32,
-        r: u8,
-        g: u8,
-        b: u8,
-        bold: bool,
-        dest_x: i32,
-        dest_y: i32,
-        angle_deg: f32,
-        background_kind: u8,
-        bg_r: u8,
-        bg_g: u8,
-        bg_b: u8,
-        bg_a: u8,
-        bg_padding: u32,
-        bg_corner_radius: u32,
-    ) {
-        // Clamp to the two kinds this entry point actually supports — any
-        // other value falls back to "none" rather than reaching
-        // `build_annotation_tile`'s speech-bubble path (kind 2) with a
-        // meaningless zero-length tail.
-        let background_kind = if background_kind == 1 { 1 } else { 0 };
-
-        // Background rect grows outward from the text by `bg_padding`; shift
-        // the tile's base origin so the text itself stays anchored at
-        // (dest_x, dest_y) regardless of whether a background is on.
-        let pad = if background_kind == 1 { bg_padding } else { 0 };
-        let base_x = dest_x - pad as i32;
-        let base_y = dest_y - pad as i32;
-
-        let (tile_pixels, tile_w, tile_h, off_x, off_y) = build_annotation_tile(
-            text,
-            font_size,
-            0, // no box: this path draws to a caller-chosen anchor, not a box
-            r,
-            g,
-            b,
-            bold,
-            angle_deg as f64,
-            background_kind,
-            bg_r,
-            bg_g,
-            bg_b,
-            bg_a,
-            bg_padding,
-            bg_corner_radius,
-            0, // bg_tail — no speech-bubble support on this path
-            false,
-            false,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0, // shadow off
-        );
-
-        self.snap("Text");
-        transform::paste_region(
-            &mut self.layers[self.active].buf.data,
-            self.width as i32,
-            self.height as i32,
-            &tile_pixels,
-            tile_w,
-            tile_h,
-            base_x + off_x,
-            base_y + off_y,
-        );
-    }
-
-    /// Returns [width, height] in pixels of the text as rendered by `commit_text`,
-    /// without modifying the image buffer. Used to size the text-input handle box.
-    pub fn measure_text(&self, text: &str, font_size: f32, bold: bool) -> Vec<u32> {
-        let (w, h) = crate::text::measure(text, font_size, bold);
-        vec![w, h]
-    }
-
     /// Render a stamp label (e.g. "REJECTED") in Rust, scale it to
     /// `target_size`, and composite it centred on (dest_x, dest_y).
     /// Replaces the JS OffscreenCanvas → stamp_red pipeline for red stamps.
@@ -3768,10 +3706,10 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(200, 100);
         let dest_x = 50i32;
         let dest_y = 30i32;
-        let m = t.measure_text("Hi", 24.0, false);
+        let m = t.measure_text("Hi", 24.0, false, "");
         let raw_h = m[1];
         t.commit_text(
-            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0,
+            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0, "",
         );
         let probe = px(&t, (dest_x - 3) as u32, dest_y as u32 + raw_h / 2);
         assert_eq!(
@@ -3789,10 +3727,10 @@ mod layer_tests {
         let mut t = ImageHorseTool::new(200, 100);
         let dest_x = 50i32;
         let dest_y = 30i32;
-        let m = t.measure_text("Hi", 24.0, false);
+        let m = t.measure_text("Hi", 24.0, false, "");
         let raw_h = m[1];
         t.commit_text(
-            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5, 0,
+            "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5, 0, "",
         );
         let probe = px(&t, (dest_x - 3) as u32, dest_y as u32 + raw_h / 2);
         assert_eq!(
@@ -3816,15 +3754,16 @@ mod layer_tests {
             let mut t = ImageHorseTool::new(200, 100);
             let dest_x = 50i32;
             let dest_y = 30i32;
-            let m = t.measure_text("Hi", 24.0, false);
+            let m = t.measure_text("Hi", 24.0, false, "");
             let raw_h = m[1];
             if bg_on {
                 t.commit_text(
-                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5, 0,
+                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 1, 10, 20, 30, 255, 5,
+                    0, "",
                 );
             } else {
                 t.commit_text(
-                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0,
+                    "Hi", 24.0, 255, 255, 255, false, dest_x, dest_y, 0.0, 0, 0, 0, 0, 0, 5, 0, "",
                 );
             }
             let row = dest_y as u32 + raw_h / 2;
@@ -4493,7 +4432,7 @@ mod layer_persistence_tests {
         let mut t = ImageHorseTool::new(20, 20);
         t.load_image(&solid(20, 20, [10, 20, 30, 255]));
         t.add_text_annotation(
-            "hi", 12.0, 255, 255, 255, false, 15, 12, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+            "hi", 12.0, 255, 255, 255, false, 15, 12, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
         );
         t.add_shape_annotation(
             1, 5.0, 5.0, 8.0, 8.0, "#ff0000", 2.0, 0, 0, "#000000", "#000000", 0, 0,
@@ -4743,7 +4682,7 @@ mod layer_persistence_tests {
         t.restore_text_annotation(
             "hi", 16.0, 0, 0, 0, false, 2, 2, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
             // shadow params (box, text, r, g, b, a, dx, dy, blur)
-            false, false, 0, 0, 0, 0, 0, 0, 0,
+            false, false, 0, 0, 0, 0, 0, 0, 0, "",
         );
         t.finish_layer_restore(0);
         let json = t.get_layer_text_annotations(0);

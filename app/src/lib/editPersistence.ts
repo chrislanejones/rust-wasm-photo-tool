@@ -102,6 +102,16 @@ export interface PersistedAnnotation {
   g: number;
   b: number;
   bold: boolean;
+  /** Engine typeface id; absent or `""` = the embedded Liberation Sans, which
+   *  is what every annotation written before v8.76 means. v8.76.
+   *
+   *  ⚠️ OPTIONAL, AND NOT INDEXED — so it needs no Dexie `.version()` bump and
+   *  no upgrade function, exactly like `background_kind` and the `shadow_*`
+   *  fields below and for the same reason (`db.ts` spells it out on
+   *  `stale?`: Dexie versions key paths and indexes, not blob shape). An old
+   *  row reads back `undefined`, which the restore paths pass to the engine as
+   *  `""`. Nothing is rewritten, nothing is lost. */
+  font_id?: string;
   rotation_deg: number;
   // Background fields (optional for backwards-compat with old persisted entries).
   background_kind?: number;
@@ -391,6 +401,7 @@ export function stripLiveAnnotations(raw: string): PersistedAnnotation[] {
       g: a.g,
       b: a.b,
       bold: a.bold,
+      font_id: a.font_id,
       rotation_deg: a.rotation_deg,
       background_kind: a.background_kind,
       bg_r: a.bg_r,
@@ -434,6 +445,7 @@ export function parseSnapshotAnnotations(raw: string): PersistedAnnotation[] {
       font_size: a.font_size,
       r: a.r, g: a.g, b: a.b,
       bold: a.bold,
+      font_id: a.font_id,
       rotation_deg: a.rotation_deg,
       background_kind: a.background_kind,
       bg_r: a.bg_r,

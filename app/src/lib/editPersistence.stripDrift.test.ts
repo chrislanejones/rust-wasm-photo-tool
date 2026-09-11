@@ -28,6 +28,7 @@ const FULL_ANNOTATION: Required<PersistedAnnotation> = {
   font_size: 32,
   r: 1, g: 2, b: 3,
   bold: true,
+  font_id: "liberation-serif",
   rotation_deg: 15,
   background_kind: 2,
   bg_r: 4, bg_g: 5, bg_b: 6, bg_a: 7,
@@ -55,6 +56,15 @@ describe("stripLiveAnnotations", () => {
   it("preserves the values, not just the keys", () => {
     const [out] = stripLiveAnnotations(ENGINE_JSON);
     expect(out).toEqual(FULL_ANNOTATION);
+  });
+
+  it("carries the typeface — the same regression shape as the shadows below", () => {
+    // v8.76. A dropped `font_id` would put the archive's text back in
+    // Liberation Sans on the other device, which is exactly how the nine
+    // shadow fields were lost before #22: a field added to the engine and not
+    // to the strip map is silently absent, not an error.
+    const [out] = stripLiveAnnotations(ENGINE_JSON);
+    expect(out!.font_id, "font_id must survive stripping").toBe("liberation-serif");
   });
 
   it("carries the nine shadow fields the cloud copy used to drop", () => {

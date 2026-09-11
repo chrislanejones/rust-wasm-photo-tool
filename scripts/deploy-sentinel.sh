@@ -25,8 +25,22 @@
 set -uo pipefail
 
 SITE="${SENTINEL_SITE:-https://rust-wasm-photo-tool.netlify.app}"
+# ── BAND REVIEW, v8.76 (was 800,000-840,000, ADR-045) ────────────────────────
+# ADR-045 sized the old ceiling as "~1.4 perspective-sized features (+16,788 B)"
+# of headroom. Runtime fonts cost +17,852 B measured locally (823,503 ->
+# 841,355) — one perspective-sized feature — so the headroom is spent exactly as
+# budgeted, and this is the band review ADR-045 anticipated rather than a
+# baseline being unbolted to go green. ADR-053 has the arithmetic.
+#
+# ⚠️ ONLY THE CEILING MOVES. Raising the floor to match — which ADR-045's own
+# arithmetic would justify, and which would tighten the featureless detector —
+# is a TRAP, and it was nearly shipped: this script runs against LIVE prod, so a
+# floor above the currently-deployed binary fails the moment it is pushed and
+# stays failing until the deploy lands. A gate that is red for the length of a
+# deploy is a gate people learn to ignore. Tighten the floor in a LATER commit,
+# once a build at the new size is actually live — never in the same one.
 MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
-MAX_WASM="${SENTINEL_MAX_WASM:-840000}"
+MAX_WASM="${SENTINEL_MAX_WASM:-872000}"
 # Methods that only exist when the engine is built --features tiles,patchmatch.
 # `oplog_active` is the tiles/op-log surface; `remove_object` is PatchMatch.
 #

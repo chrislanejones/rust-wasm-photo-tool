@@ -702,7 +702,7 @@ export function useEngineCore(
               a.bg_a ?? 255,
               a.bg_padding ?? 8,
               a.bg_corner_radius ?? 8,
-              a.bg_tail ?? 0,
+              a.bg_tail ?? 0, a.font_id ?? "",
             );
           }
         }
@@ -735,7 +735,7 @@ export function useEngineCore(
               a.bg_a ?? 255,
               a.bg_padding ?? 8,
               a.bg_corner_radius ?? 8,
-              a.bg_tail ?? 0,
+              a.bg_tail ?? 0, a.font_id ?? "",
             );
           }
         }
@@ -768,7 +768,7 @@ export function useEngineCore(
             a.bg_a ?? 255,
             a.bg_padding ?? 8,
             a.bg_corner_radius ?? 8,
-            a.bg_tail ?? 0,
+            a.bg_tail ?? 0, a.font_id ?? "",
           );
         }
       }

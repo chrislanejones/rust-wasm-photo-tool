@@ -50,6 +50,16 @@ pub struct TextAnnotation {
     pub g: u8,
     pub b: u8,
     pub bold: bool,
+    /// Which typeface the engine rasterises this annotation with. `""` is the
+    /// embedded Liberation Sans and is what EVERY annotation written before
+    /// v8.76 means — see [`crate::fonts`], which owns the bytes and the
+    /// fallback rule for an id this binary does not have.
+    ///
+    /// A `String`, not an index into a table: a font id has to survive a saved
+    /// document being reopened on a machine where a different set of faces is
+    /// available, and an index would silently mean a different typeface rather
+    /// than an absent one.
+    pub font_id: String,
     pub rotation_deg: f64,
     // cached pre-rendered tile (rotated): updated whenever the annotation changes.
     // Arc so history snapshots can clone the annotation list cheaply (the tile
@@ -140,12 +150,18 @@ pub struct ShapeAnnotation {
 /// is exactly how a "widening the box does nothing on edit" bug would ship).
 ///
 /// `wrap_width` is the BOX width; the breaker gets the content width.
-pub(crate) fn wrap_for_tile(text: &str, wrap_width: u32, font_size: f32, bold: bool) -> String {
+pub(crate) fn wrap_for_tile(
+    text: &str,
+    wrap_width: u32,
+    font_size: f32,
+    bold: bool,
+    font_id: &str,
+) -> String {
     if wrap_width == 0 {
         return text.to_string();
     }
     let content_w = wrap_width as f32 - 2.0 * crate::text::side_padding(font_size);
-    crate::text::wrap(text, font_size, bold, content_w)
+    crate::text::wrap(text, font_size, bold, content_w, font_id)
 }
 
 /// Build a complete TextAnnotation (config + pre-rendered tile) ready to
@@ -192,12 +208,18 @@ pub(crate) fn build_text_annotation(
     shadow_dx: i32,
     shadow_dy: i32,
     shadow_blur: u32,
+    // Appended rather than slotted in beside `bold`, where it belongs
+    // logically: this function takes thirty positional arguments and has ten
+    // call sites, so a &str in the middle of the list could be transposed with
+    // `text` and still compile. At the end, a missed call site is a compile
+    // error. See `crate::fonts` for what "" means.
+    font_id: &str,
 ) -> TextAnnotation {
     // The tile renders WRAPPED text; the annotation stores the author's RAW
     // text. Keeping the raw text is what makes reflow reversible: drag the box
     // wider and the breaks are recomputed, rather than being stuck with
     // newlines baked in at the old width.
-    let wrapped = wrap_for_tile(text, wrap_width, font_size, bold);
+    let wrapped = wrap_for_tile(text, wrap_width, font_size, bold, font_id);
     let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
         &wrapped,
         font_size,
@@ -224,6 +246,7 @@ pub(crate) fn build_text_annotation(
         shadow_dx,
         shadow_dy,
         shadow_blur,
+        font_id,
     );
     // PERSPECTIVE IS THE LAST STAGE, deliberately: it warps the finished,
     // already-rotated tile. Doing it here rather than inside
@@ -259,6 +282,7 @@ pub(crate) fn build_text_annotation(
         g,
         b,
         bold,
+        font_id: font_id.to_string(),
         rotation_deg,
         tile_pixels: std::sync::Arc::new(tile_pixels),
         tile_w,
@@ -320,7 +344,7 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"perspective\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{}}}",
+            "{{\"id\":{},\"wrap_width\":{},\"box_height\":{},\"perspective\":{},\"text\":\"{}\",\"x\":{},\"y\":{},\"font_size\":{},\"r\":{},\"g\":{},\"b\":{},\"bold\":{},\"font_id\":\"{}\",\"rotation_deg\":{},\"tile_w\":{},\"tile_h\":{},\"tile_offset_x\":{},\"tile_offset_y\":{},\"background_kind\":{},\"bg_r\":{},\"bg_g\":{},\"bg_b\":{},\"bg_a\":{},\"bg_padding\":{},\"bg_corner_radius\":{},\"bg_tail\":{},\"shadow_box\":{},\"shadow_text\":{},\"shadow_r\":{},\"shadow_g\":{},\"shadow_b\":{},\"shadow_a\":{},\"shadow_dx\":{},\"shadow_dy\":{},\"shadow_blur\":{}}}",
             a.id,
             a.wrap_width,
             a.box_height,
@@ -330,6 +354,7 @@ pub(crate) fn annotations_to_json(anns: &[TextAnnotation]) -> String {
             a.font_size,
             a.r, a.g, a.b,
             a.bold,
+            json_escape(&a.font_id),
             a.rotation_deg,
             a.tile_w, a.tile_h,
             a.tile_offset_x, a.tile_offset_y,
@@ -471,7 +496,19 @@ pub(crate) fn render_pin(data: &mut [u8], w: u32, h: u32, s: &ShapeAnnotation) {
     // Shrink multi-character labels ("10", "AA") so they stay inside the disc.
     let chars = label.chars().count().max(1) as f64;
     let font_size = (radius * if chars <= 1.0 { 1.2 } else { 1.9 / chars }).max(9.0) as f32;
-    let rendered = crate::text::render_text(&label, font_size, nr, ng, nb, true);
+    // The embedded face, not the text tool's: a numbered pin is a fixed
+    // graphic whose disc is sized from the glyph's ink box, the same reasoning
+    // that keeps `render_stamp_label` on it. Following a user font would mean
+    // the pin resizes when the Text tool's dropdown changes.
+    let rendered = crate::text::render_text(
+        &label,
+        font_size,
+        nr,
+        ng,
+        nb,
+        true,
+        crate::fonts::DEFAULT_FONT_ID,
+    );
     // Centre by the glyph's visual ink box, not the padded line box, so it sits
     // dead-centre regardless of font ascent/descent padding.
     let (dx, dy) = match ink_bounds(&rendered.pixels, rendered.width, rendered.height) {
@@ -1423,8 +1460,14 @@ impl ImageHorseTool {
     /// pixel-where-typed instead of `0.25·font_size + ascent-inset` below-
     /// right (the mismatch grows with font size). First line only: it owns
     /// the visual anchor the overlay shows.
-    pub fn text_ink_offset(&self, text: &str, font_size: f32, bold: bool) -> Vec<i32> {
-        self.text_ink_offset_bg(text, font_size, bold, 0, 0)
+    pub fn text_ink_offset(
+        &self,
+        text: &str,
+        font_size: f32,
+        bold: bool,
+        font_id: &str,
+    ) -> Vec<i32> {
+        self.text_ink_offset_bg(text, font_size, bold, 0, 0, font_id)
     }
 
     /// `text_ink_offset` extended to every `background_kind`: where the
@@ -1442,12 +1485,24 @@ impl ImageHorseTool {
         bold: bool,
         background_kind: u8,
         bg_padding: u32,
+        font_id: &str,
     ) -> Vec<i32> {
         // No `box_height` parameter, on purpose: v8.41's box grows BELOW
         // top-aligned text, so the height moves no glyph and this answer is
         // independent of it. See the ⚠️ in `layer::annotation_ink_offset`.
-        let (dx, dy) =
-            crate::layer::annotation_ink_offset(text, font_size, bold, background_kind, bg_padding);
+        //
+        // `font_id` IS a parameter, and has to be: the ink inset is a glyph
+        // bearing, which is a property of the outlines. Answering in the wrong
+        // face puts committed text a pixel or two off its own preview, which
+        // is precisely the class of bug ADR-050 spent two releases on.
+        let (dx, dy) = crate::layer::annotation_ink_offset(
+            text,
+            font_size,
+            bold,
+            background_kind,
+            bg_padding,
+            font_id,
+        );
         vec![dx, dy]
     }
 
@@ -1473,6 +1528,7 @@ impl ImageHorseTool {
         bg_padding: u32,
         bg_corner_radius: u32,
         bg_tail: u32,
+        font_id: &str,
     ) -> u32 {
         self.snap("Add Text");
         let id = self.next_text_id;
@@ -1508,6 +1564,7 @@ impl ImageHorseTool {
             0,
             0,
             0, // shadow off; set via set_text_shadow
+            font_id,
         );
         self.layers[self.active].text_annotations.push(ann);
         id
@@ -1551,6 +1608,12 @@ impl ImageHorseTool {
         // Same for the box height — retyping inside a box the user had dragged
         // taller must not collapse it back onto the text.
         let box_height = self.layers[self.active].text_annotations[idx].box_height;
+        // …and the same for the typeface. Fixing a typo must not silently
+        // reset the annotation to Liberation Sans. Set via `set_text_font`,
+        // exactly like the wrap width and box height above.
+        let font_id = self.layers[self.active].text_annotations[idx]
+            .font_id
+            .clone();
         // Preserve the existing drop shadow across a text/background edit.
         let sh = {
             let a = &self.layers[self.active].text_annotations[idx];
@@ -1566,7 +1629,7 @@ impl ImageHorseTool {
                 a.shadow_blur,
             )
         };
-        let wrapped = wrap_for_tile(text, wrap_width, font_size, bold);
+        let wrapped = wrap_for_tile(text, wrap_width, font_size, bold, &font_id);
         let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
             &wrapped,
             font_size,
@@ -1593,6 +1656,7 @@ impl ImageHorseTool {
             sh.6,
             sh.7,
             sh.8,
+            &font_id,
         );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.text = text.to_string();
@@ -1686,6 +1750,9 @@ impl ImageHorseTool {
             a.shadow_dx,
             a.shadow_dy,
             a.shadow_blur,
+            // Carry the typeface through, same reason as the quad above: a box
+            // drag must not silently reset the annotation to Liberation Sans.
+            &a.font_id.clone(),
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -1755,6 +1822,9 @@ impl ImageHorseTool {
             a.shadow_dx,
             a.shadow_dy,
             a.shadow_blur,
+            // Carry the typeface through, same reason as the quad above: a box
+            // drag must not silently reset the annotation to Liberation Sans.
+            &a.font_id.clone(),
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -1781,6 +1851,88 @@ impl ImageHorseTool {
     /// rejected rather than padded: a truncated quad is a caller bug, and
     /// silently completing it with zeros would collapse the annotation to a
     /// point.
+    /// Set a text annotation's TYPEFACE and rebuild its tile. `""` restores the
+    /// embedded Liberation Sans. Returns false if `id` isn't on the active
+    /// layer.
+    ///
+    /// A dedicated setter, matching `set_text_wrap_width` and
+    /// `set_text_box_height` exactly, for the same three reasons: it changes
+    /// one thing, `update_text_annotation` already takes nineteen arguments,
+    /// and it maps 1:1 onto the `Op::TextFont` the recorder emits.
+    ///
+    /// ⚠️ THE FACE IS NOT VALIDATED HERE, on purpose. An unregistered id is
+    /// stored and rendered through `fonts::with_face`'s fallback, so the
+    /// annotation keeps the name of the face its author chose even on a
+    /// machine that does not have it — which is what lets the SAME document
+    /// come back correct once the face is registered. Refusing the id instead
+    /// would quietly rewrite the user's document to Liberation Sans and there
+    /// would be no way back. The caller checks `has_font` before OFFERING a
+    /// face; that is the right place for the check.
+    pub fn set_text_font(&mut self, id: u32, font_id: &str) -> bool {
+        let Some(idx) = self.layers[self.active]
+            .text_annotations
+            .iter()
+            .position(|a| a.id == id)
+        else {
+            return false;
+        };
+        if self.layers[self.active].text_annotations[idx].font_id == font_id {
+            return true; // no-op: re-picking the current face is not an edit
+        }
+        self.snap("Text Font");
+        let (text, fs, bold, wrap_width, box_height) = {
+            let a = &self.layers[self.active].text_annotations[idx];
+            (
+                a.text.clone(),
+                a.font_size,
+                a.bold,
+                a.wrap_width,
+                a.box_height,
+            )
+        };
+        let a = &mut self.layers[self.active].text_annotations[idx];
+        // Rebuild through the same builder every other path uses. Note this
+        // RE-WRAPS: a different face has different advance widths, so a box
+        // the user dragged to a width must re-break its lines at that width
+        // rather than keep the old face's breaks.
+        let rebuilt = build_text_annotation(
+            a.id,
+            &text,
+            wrap_width,
+            box_height,
+            a.perspective,
+            fs,
+            a.r,
+            a.g,
+            a.b,
+            bold,
+            a.x,
+            a.y,
+            a.rotation_deg,
+            a.background_kind,
+            a.bg_r,
+            a.bg_g,
+            a.bg_b,
+            a.bg_a,
+            a.bg_padding,
+            a.bg_corner_radius,
+            a.bg_tail,
+            a.shadow_box,
+            a.shadow_text,
+            a.shadow_r,
+            a.shadow_g,
+            a.shadow_b,
+            a.shadow_a,
+            a.shadow_dx,
+            a.shadow_dy,
+            a.shadow_blur,
+            font_id,
+        );
+        self.layers[self.active].text_annotations[idx] = rebuilt;
+        self.recomposite();
+        true
+    }
+
     pub fn set_text_perspective(&mut self, id: u32, quad: &[f32]) -> bool {
         let Some(quad) = quad_from_flat(quad) else {
             return false;
@@ -1838,6 +1990,9 @@ impl ImageHorseTool {
             a.shadow_dx,
             a.shadow_dy,
             a.shadow_blur,
+            // Carry the typeface through, same reason as the quad above: a box
+            // drag must not silently reset the annotation to Liberation Sans.
+            &a.font_id.clone(),
         );
         self.layers[self.active].text_annotations[idx] = rebuilt;
         self.recomposite();
@@ -1920,6 +2075,9 @@ impl ImageHorseTool {
         // text / background config.
         let wrap_w = self.layers[self.active].text_annotations[idx].wrap_width;
         let box_h = self.layers[self.active].text_annotations[idx].box_height;
+        let font_id = self.layers[self.active].text_annotations[idx]
+            .font_id
+            .clone();
         let (text, fs, r, g, b, bold, rot, bk, br, bgc, bb, ba, bpad, brad, btail) = {
             let a = &self.layers[self.active].text_annotations[idx];
             (
@@ -1942,10 +2100,10 @@ impl ImageHorseTool {
         };
         // Wrapped for the same reason as every other tile build — a shadow
         // edit must not silently re-lay-out the text unwrapped.
-        let wrapped = wrap_for_tile(&text, wrap_w, fs, bold);
+        let wrapped = wrap_for_tile(&text, wrap_w, fs, bold, &font_id);
         let (tile_pixels, tile_w, tile_h, tile_offset_x, tile_offset_y) = build_annotation_tile(
             &wrapped, fs, box_h, r, g, b, bold, rot, bk, br, bgc, bb, ba, bpad, brad, btail,
-            on_box, on_text, c[0], c[1], c[2], alpha, dx, dy, blur,
+            on_box, on_text, c[0], c[1], c[2], alpha, dx, dy, blur, &font_id,
         );
         let a = &mut self.layers[self.active].text_annotations[idx];
         a.shadow_box = on_box;
@@ -2192,7 +2350,7 @@ mod text_shadow_history_tests {
 
     fn fresh_text(t: &mut ImageHorseTool) -> u32 {
         t.add_text_annotation(
-            "hi", 24.0, 255, 255, 255, false, 10, 10, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+            "hi", 24.0, 255, 255, 255, false, 10, 10, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
         )
     }
 

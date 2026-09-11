@@ -61,7 +61,7 @@ fn add_a_shape(t: &mut ImageHorseTool) -> u32 {
 
 fn add_some_text(t: &mut ImageHorseTool) -> u32 {
     t.add_text_annotation(
-        "hi", 12.0, 0, 0, 0, false, 2, 2, 0.0, 0, 0, 0, 0, 0, 0, 0, 0,
+        "hi", 12.0, 0, 0, 0, false, 2, 2, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
     )
 }
 

@@ -15,27 +15,29 @@ import { useAIJob } from "@/hooks/useAIJob";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { useToolStore } from "@/stores/useToolStore";
 import type { TextMode } from "@/stores/useToolStore";
+import { faceCss } from "@/lib/engineFonts";
+import { useEngineFaces } from "@/hooks/useEngineFaces";
 
 /**
- * ⚠️ ONE FACE, AND THE SELECTOR SAYS SO.
+ * ⚠️ THIS LIST IS ONLY EVER THE FACES THE ENGINE CAN ACTUALLY RENDER.
  *
- * Text is rasterised inside the engine (`src/text.rs`, ab_glyph) with the one
- * family compiled in: Liberation Sans. `render_text` takes no font parameter,
- * so no choice made here has ever reached the pixels. This used to be a
- * twelve-entry list — Georgia, Impact, Comic Sans… — and picking one changed
- * the textarea's glyphs and nothing else: on commit the text snapped back to
- * Liberation Sans. A control that changes the preview and not the result is
- * worse than one that does nothing visible, because it teaches people the
- * feature works.
+ * The twelve-entry list this replaces — Georgia, Impact, Comic Sans… — was
+ * inert for the whole of its life: text is rasterised inside the engine
+ * (`src/text.rs`, ab_glyph), `render_text` took no font parameter, and picking
+ * a family changed the textarea's glyphs and nothing else. On commit the text
+ * snapped back to Liberation Sans. #113 cut it to one entry rather than leave a
+ * control that teaches people a feature works when it does not.
  *
- * So the select is disabled with the reason next to it, the same shape as
- * Generate in the AI dialog. When fonts arrive (ADR-051: the user brings a
- * .ttf/.otf and the engine takes a font id) this becomes the real list.
+ * The engine takes a `font_id` now, so the list is real again — and it is built
+ * from `has_font`, not from a hardcoded array, so it can only ever offer a face
+ * whose bytes the engine has. That is the rule that keeps this honest: a face
+ * that failed to load is absent rather than broken, and there is no state in
+ * which picking an entry here does not move the pixels.
+ *
+ * It is also why the list is loaded in an effect rather than rendered from
+ * `ENGINE_FACES` directly — see `ensureEngineFonts` on why measuring a face
+ * before it is registered poisons the metrics cache.
  */
-const TEXT_FACE = {
-  label: "Liberation Sans",
-  value: "'Liberation Sans', Arial, sans-serif",
-} as const;
 
 const FONT_SIZE_PRESETS = [16, 32, 48, 72] as const;
 
@@ -128,6 +130,10 @@ export function TextSettings({
   activePhotoId,
   stampToolRef,
 }: TextSettingsProps) {
+  // Only faces the ENGINE reports it can render — never `ENGINE_FACES`
+  // directly. `useEngineFaces` has the two reasons why.
+  const faces = useEngineFaces(stampToolRef);
+
   // Store-backed, not local state: the hoisted SubtoolRow, the command palette
   // and hash routing all read this mode through toolModes.ts. While it was a
   // `useState` here none of the three could see it.
@@ -186,7 +192,7 @@ export function TextSettings({
               variant="numbers"
             />
 
-            {/* Font Family — disabled, and it says why. See TEXT_FACE. */}
+            {/* Font Family — real, and only as long as the list is. See above. */}
             <div className="space-y-4">
               <div className="flex items-center gap-1.5">
                 <label className="text-2xs text-theme-muted-foreground">
@@ -196,25 +202,36 @@ export function TextSettings({
                   label="Font Family"
                   info={
                     <>
-                      Text is drawn by the engine, not the browser, and the engine
-                      has one face built in: <strong>Liberation Sans</strong>. The
-                      families that used to be listed here only changed the preview
-                      — on commit the text always came out in this one. Bringing
-                      your own .ttf / .otf is the plan (ADR-051).
+                      Text is drawn by the engine, not the browser. These faces
+                      ship with the app and are handed to the engine as font
+                      files, so what you type is what gets committed — the
+                      preview, the box it sits in and the exported pixels are
+                      all the same typeface. Nothing is fetched from Google.
                     </>
                   }
                 />
               </div>
               <div className="relative">
                 <select
-                  disabled
-                  defaultValue={TEXT_FACE.value}
-                  className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring cursor-not-allowed"
-                  style={{ fontFamily: TEXT_FACE.value }}
+                  value={settings.textFontId ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...settings,
+                      textFontId: e.target.value,
+                      // `fontFamily` follows the id rather than being picked
+                      // independently — one of the three surfaces ADR-051
+                      // found disagreeing was exactly this one drifting.
+                      fontFamily: faceCss(e.target.value),
+                    })
+                  }
+                  className="w-full appearance-none rounded-lg bg-theme-muted px-3 py-2 pr-8 text-xs text-theme-foreground border border-transparent focus:outline-none focus:border-theme-ring"
+                  style={{ fontFamily: faceCss(settings.textFontId ?? "") }}
                 >
-                  <option value={TEXT_FACE.value} style={{ fontFamily: TEXT_FACE.value }}>
-                    {TEXT_FACE.label}
-                  </option>
+                  {faces.map((f) => (
+                    <option key={f.id} value={f.id} style={{ fontFamily: f.css }}>
+                      {f.label}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-muted-foreground" />
               </div>

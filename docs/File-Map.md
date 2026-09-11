@@ -59,9 +59,18 @@ src/
 │                   hand-drawn circle); fill_rounded_rect + fill_triangle_public for speech bubbles;
 │                   Bézier pen paths — flatten_cubic_path (de Casteljau) strokes the curve via
 │                   draw_polyline, fill_polygon (scanline even-odd) backs the optional path background
-├── text.rs         Liberation Sans font embedded at compile time (subset to Latin-1 + Extended-A
-│                   for a 60% WASM size cut); renders text → pixel buffer; rotate_pixels for
-│                   annotation tiles
+├── text.rs         Renders text → pixel buffer with ab_glyph; rotate_pixels for annotation
+│                   tiles; word-wrap that the JS preview mirrors line for line. Every layout
+│                   function takes a font_id — "" is the embedded face. Also holds the
+│                   wasm-bindgen commit_text / measure_text pair (moved out of lib.rs, which
+│                   is a line ratchet)
+├── fonts.rs        The typeface registry (ADR-053). Liberation Sans Regular+Bold are embedded
+│                   at compile time (subset to Latin-1 + Extended-A for a 60% WASM size cut) and
+│                   are the fallback for any id this binary has no bytes for. Other faces arrive
+│                   at RUNTIME via register_font — they cannot be embedded, one more face is
+│                   ~62 KB against a size band with ~17 KB of headroom. ⚠️ Registration is
+│                   MONOTONE: an id is never re-pointed at new bytes, because textMetricsCache
+│                   keys on it and can never be invalidated
 ├── codec.rs        PNG encoding, thumbnail generation with bilinear scaling;
 │                   history snapshot serialization (get/inject undo/redo PNG blobs)
 ├── utils.rs        Shared leaf helpers — json_escape, flat_to_points, points_bbox,

@@ -597,9 +597,15 @@ declare module "stamp_tool" {
       bg_a: number,
       bg_padding: number,
       bg_corner_radius: number,
+      font_id: string,
     ): void;
     /** Returns [width, height] in pixels for the given text, without committing. */
-    measure_text(text: string, font_size: number, bold: boolean): Uint32Array;
+    measure_text(
+      text: string,
+      font_size: number,
+      bold: boolean,
+      font_id: string,
+    ): Uint32Array;
     /** Render a stamp label (bordered, rotated) entirely in Rust and composite centred on dest. */
     commit_red_stamp(
       label: string,
@@ -707,6 +713,7 @@ declare module "stamp_tool" {
       bg_padding: number,
       bg_corner_radius: number,
       bg_tail: number,
+      font_id: string,
     ): number;
     update_text_annotation(
       id: number,
@@ -733,7 +740,12 @@ declare module "stamp_tool" {
     text_annotation_count(): number;
     /** [dx, dy] where the first line's glyph ink begins inside the
      *  annotation tile — the overlay↔engine anchor mapping for bg-kind 0. */
-    text_ink_offset(text: string, font_size: number, bold: boolean): Int32Array;
+    text_ink_offset(
+      text: string,
+      font_size: number,
+      bold: boolean,
+      font_id: string,
+    ): Int32Array;
     /** `text_ink_offset` extended to every background kind: [dx, dy] of the
      *  first line's ink inside the FULL tile (bubble tail margin +
      *  bg_padding included; no-shadow geometry). The overlay↔engine anchor
@@ -745,6 +757,7 @@ declare module "stamp_tool" {
       bold: boolean,
       background_kind: number,
       bg_padding: number,
+      font_id: string,
     ): Int32Array;
     get_text_annotations(): string;
     /** Duplicate a text annotation, offset by (dx, dy). Returns the NEW id,
@@ -791,6 +804,7 @@ declare module "stamp_tool" {
       bg_padding: number,
       bg_corner_radius: number,
       bg_tail: number,
+      font_id: string,
     ): boolean;
     push_annotation_to_redo_snapshot(
       snap_idx: number,
@@ -805,6 +819,7 @@ declare module "stamp_tool" {
       bg_padding: number,
       bg_corner_radius: number,
       bg_tail: number,
+      font_id: string,
     ): boolean;
 
     // Item 9: Crop preview in WASM
@@ -815,13 +830,19 @@ declare module "stamp_tool" {
 
     // Live text annotations (non-destructive overlay layer)
     text_annotation_count(): number;
-    text_ink_offset(text: string, font_size: number, bold: boolean): Int32Array;
+    text_ink_offset(
+      text: string,
+      font_size: number,
+      bold: boolean,
+      font_id: string,
+    ): Int32Array;
     text_ink_offset_bg(
       text: string,
       font_size: number,
       bold: boolean,
       background_kind: number,
       bg_padding: number,
+      font_id: string,
     ): Int32Array;
     add_text_annotation(
       text: string,
@@ -841,6 +862,7 @@ declare module "stamp_tool" {
       bg_padding: number,
       bg_corner_radius: number,
       bg_tail: number,
+      font_id: string,
     ): number;
     update_text_annotation(
       id: number,
@@ -878,6 +900,27 @@ declare module "stamp_tool" {
      *  ⚠️ Same hand-sync warning as above — this file ambiently SHADOWS pkg's
      *  generated types, so a drift here type-checks and dies at runtime. */
     set_text_box_height(id: number, box_height: number): boolean;
+    /** Set a text annotation's TYPEFACE and rebuild its tile. `""` restores the
+     *  embedded Liberation Sans. Returns false if `id` isn't on the active
+     *  layer. v8.76.
+     *
+     *  The face is NOT validated: an id this binary has no bytes for renders
+     *  in the fallback but is STILL STORED, so the same document comes back
+     *  correct once `ensureEngineFonts` has registered it. Check `has_font`
+     *  before OFFERING a face, not before setting one.
+     *
+     *  ⚠️ Same hand-sync warning as above — this file ambiently SHADOWS pkg's
+     *  generated types, so a drift here type-checks and dies at runtime. */
+    set_text_font(id: number, font_id: string): boolean;
+    /** Hand the engine a TTF/OTF face to rasterise with, under `font_id`.
+     *  Throws (a string) on anything `ab_glyph` cannot read — a truncated
+     *  download, a WOFF2 file, a hostile file. Idempotent: re-registering an
+     *  id already present succeeds and changes nothing, which is what keeps
+     *  `textMetricsCache` sound. v8.76. */
+    register_font(font_id: string, bold: boolean, bytes: Uint8Array): void;
+    /** Whether `font_id` at `bold` will actually be used rather than silently
+     *  falling back to the embedded Liberation Sans. v8.76. */
+    has_font(font_id: string, bold: boolean): boolean;
     /** Set a text annotation's projective corner quad and rebuild its tile
      *  through it. `quad` is 8 floats, `[x0,y0,…,x3,y3]`, NORMALISED 0..1
      *  across the tile, in TL/TR/BR/BL order. Returns false for a wrong-length
@@ -1118,6 +1161,7 @@ declare module "stamp_tool" {
       shadow_text: boolean,
       shadow_r: number, shadow_g: number, shadow_b: number, shadow_a: number,
       shadow_dx: number, shadow_dy: number, shadow_blur: number,
+      font_id: string,
     ): number;
     /** Finish a layer-restore: set active index + recomposite. */
     finish_layer_restore(active_index: number): void;
