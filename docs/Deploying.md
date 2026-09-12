@@ -2,8 +2,8 @@
 
 ## Which config belongs to which site
 
-Vercel picks a project's config file by its **Root Directory** setting. Two
-projects build out of this one repo, and they do NOT share a config — get the
+Vercel picks a project's config file by its **Root Directory** setting. Several
+projects build out of this one repo and they do NOT share a config — get the
 mapping wrong and a project builds the other site.
 
 | Site | Config | Vercel Root Directory | Output | Domain |
@@ -25,12 +25,47 @@ install over it. The root `vercel.json` is the tested version.
 it "fails the same way Vercel would". If that setting ever changes, change the CI
 job with it — that job is what keeps this table honest.
 
-> ⚠️ Worth confirming in the dashboard rather than assuming: the project whose
-> Root Directory is the repo root is named `image-horse`, which is the name the
-> *marketing* site deployed under at `image-horse.vercel.app`. The name and the
-> config disagree about which site it is. There is also a
-> `rust-wasm-photo-tool-app` project rooted at `app/`, which no config in this
-> repo targets.
+**Three Vercel projects are currently attached to this repo**, which is one more
+than there is work for. From the deployment bot's own metadata:
+
+| Project | Root Directory | Reads | Notes |
+| --- | --- | --- | --- |
+| `image-horse-marketing` | `marketing` | `marketing/vercel.json` | the marketing site |
+| `image-horse` | *(repo root)* | `vercel.json` | builds the **editor**, despite the name — it is the name the marketing site used at `image-horse.vercel.app` |
+| `rust-wasm-photo-tool-app` | `app` | *(nothing)* | no config in this repo targets `app/`; it builds on Vercel's defaults |
+
+> ⚠️ Two of these want a decision that cannot be made from the repo. `image-horse`
+> and `rust-wasm-photo-tool-app` both appear to be aimed at the editor, and only
+> one of them reads a config this repo controls. Whichever is not serving a domain
+> should be deleted — an extra project is a second deploy on every push and a
+> second thing to keep configured.
+
+### The one non-obvious Vercel setting
+
+The marketing project's Root Directory is `marketing`, and it **also needs
+"Include files outside of the Root Directory in the Build Step" turned ON.**
+Without it the install fails before a line of the site is built:
+
+```
+ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC
+No catalog entry '@types/react' was found for catalog 'default'.
+```
+
+`marketing/package.json` declares react, react-dom, vite, typescript and the
+React types as `"catalog:"`, and the catalog those resolve against lives in
+`pnpm-workspace.yaml` at the **repo root**. Root Directory alone gives the build
+only the `marketing/` subtree, so pnpm has a specifier it cannot resolve.
+
+Reproduced by copying `marketing/` somewhere on its own and running
+`pnpm install`; it fails identically. This is not something a config file in this
+repo can fix — removing `catalog:` would work but would undo the single source of
+truth for shared versions that `pnpm-workspace.yaml` exists to provide. It is a
+project setting, and the same setting the editor project needs for the Rust crate.
+
+CI does not catch it: `.github/workflows/ci.yml`'s `marketing` job checks out the
+whole repo and only *runs* from `marketing/`, so the workspace root is always
+present there. The mirror is faithful about the working directory and cannot be
+faithful about the file set.
 
 ### DNS
 
