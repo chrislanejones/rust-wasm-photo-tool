@@ -1,34 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm run build:marketing",
-  "installCommand": "pnpm install",
-  "outputDirectory": "marketing/dist",
   "framework": null,
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
+  "installCommand": "curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none && . $HOME/.cargo/env && cargo install wasm-pack --version 0.15.0 --locked && pnpm install",
+  "buildCommand": ". $HOME/.cargo/env && ./scripts/build-wasm.sh && pnpm --filter stamp-tool build && ./scripts/write-build-info.sh www-dist",
+  "outputDirectory": "www-dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(), interest-cohort=()"
         },
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-2kzO0RCVLXlFIInFPo4scxTQKGqCV5AmH72rPA4nFK8=' https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' blob: data: https://f1avkyiqgj.ufs.sh https://*.ufs.sh; connect-src 'self' blob: data: https://*.clerk.accounts.dev https://*.convex.cloud wss://*.convex.cloud https://*.ufs.sh https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; frame-src 'self' https://*.clerk.accounts.dev; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     }
