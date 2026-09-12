@@ -19,7 +19,7 @@ export const SITE_URL = "https://imagehorse.app";
 /** Where the editor lives. A different host to the marketing site, so it is
  *  deliberately NOT in the sitemap: it is an app, not a document, and letting
  *  it compete for the same queries splits the signal across two hostnames. */
-export const APP_URL = "https://app.imagehorse.app";
+export const APP_URL = "https://edit.imagehorse.app";
 
 export const SITE_NAME = "Image Horse";
 

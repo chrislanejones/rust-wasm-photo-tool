@@ -1,78 +1,37 @@
 # Deploying
 
-## Which config belongs to which project
+Two sites, two hosts today, one host once the migration below is finished.
 
-Two Vercel projects are linked to this repo, and Vercel picks a project's config
-file by its **Root Directory** setting. Get this mapping wrong and a project
-builds the other site.
-
-| Vercel project | Root Directory | Reads | Builds | Output |
+| What | Domain | Project root | Config | Status |
 | --- | --- | --- | --- | --- |
-| `image-horse` | *(repo root)* | [`vercel.json`](../vercel.json) | the **editor** | `www-dist` |
-| `rust-wasm-photo-tool-app` | `app` | *(no config in `app/`)* | — | — |
-| the marketing project | `marketing` | [`marketing/vercel.json`](../marketing/vercel.json) | the **marketing site** | `marketing/dist` |
-
-> The marketing row is confirmed by the repo's own CI: the `marketing` job in
-> `.github/workflows/ci.yml` runs with `working-directory: marketing` precisely
-> so it "fails the same way Vercel would", and its comment records that Vercel's
-> Root Directory is `/marketing`. That job is the guard against this table going
-> stale — if the Root Directory ever changes, make the CI job follow it.
->
-> ⚠️ **Still worth confirming in the dashboard: which project serves the apex.**
-> The repo-root `vercel.json` builds the *editor*, and the project whose Root
-> Directory is the repo root is named `image-horse` — the name the marketing site
-> deployed under at `image-horse.vercel.app`. Those two do not sit together
-> comfortably. Check which project each domain is attached to before moving DNS.
->
-> There is no `app/vercel.json`. One was added in the first draft of this branch
-> and removed: it hand-ported the old `netlify.toml` build command, including the
-> `curl … rustup-init` step that commit `55b02cf` had *just* proved fails on
-> Vercel — the build image ships Rust already, with `CARGO_HOME=/rust`, and
-> rustup-init refuses to install over it. The root `vercel.json` is the tested
-> version; do not reintroduce a second one.
-
-Domains, once the mapping is confirmed:
-
-| Record | Name | Value |
-| --- | --- | --- |
-| `A` | `@` | Vercel's apex IP (from the project's Domains tab) |
-| `CNAME` | `www` | `cname.vercel-dns.com` |
-| `CNAME` | `app` | `cname.vercel-dns.com` |
-
-Add **both** `imagehorse.app` and `www.imagehorse.app` to the marketing project.
-The `www` → apex redirect is a 308 in `marketing/vercel.json` rather than a
-dashboard setting, so the canonical host is version-controlled next to the
-`<link rel="canonical">` that has to agree with it.
-
-Netlify is **still live** and still builds every PR preview. `netlify.toml` stays
-until `scripts/deploy-sentinel.sh` passes against the Vercel host — see
-"Retiring Netlify" below.
+| Marketing | `imagehorse.app` (+ `www` → apex) | repo root | [`vercel.json`](../vercel.json) | Vercel, live |
+| Editor | `edit.imagehorse.app` | repo root | [`vercel.json` (repo root)](../vercel.json (repo root)) | **Vercel config written, not yet deployed** |
+| Editor (old) | `rust-wasm-photo-tool.netlify.app` | repo root | [`netlify.toml`](../netlify.toml) | Netlify, **still live — do not delete yet** |
 
 ---
 
 ## The marketing site
 
-`pnpm run build:marketing` runs four steps; the last two are the ones worth
-knowing about:
+Nothing about it needs a human after the first deploy. `pnpm run build:marketing`
+runs four steps, and the last two are the ones worth knowing about:
 
 1. `tsc -b` — typecheck.
 2. `vite build` — the client bundle, into `marketing/dist`.
-3. `vite build --ssr src/entry-server.tsx` — the same React tree compiled for
+3. `vite build --ssr src/entry-server.tsx` — the same React tree, compiled for
    Node, into `marketing/dist-ssr`.
 4. `node scripts/prerender.mjs` — renders every route from step 3 into the shell
    from step 2, and writes `sitemap.xml`, `robots.txt` and `404.html`.
 
-Step 4 is what makes the site indexable at all; the comment at the top of
-[`marketing/scripts/prerender.mjs`](../marketing/scripts/prerender.mjs) explains
-why a client-rendered SPA is invisible to everything except Googlebot. It fails
-the build loudly if `marketing/index.html` has lost its `seo:start` / `seo:end`
-markers, rather than shipping five copies of an empty shell.
+Step 4 is what makes the site indexable at all; see the comment at the top of
+[`marketing/scripts/prerender.mjs`](../marketing/scripts/prerender.mjs) for why.
+It fails the build loudly if `marketing/index.html` has lost its `seo:start` /
+`seo:end` markers, rather than shipping five copies of an empty shell.
 
 ### Why sitemap entries often have no `lastmod`
 
 Expect most production `<url>` entries to carry no `lastmod`, and do not "fix" it
-by stamping the build time — that is the one thing that makes the field actively
-harmful.
+by stamping the build time — that is the one change that would make the field
+actively harmful.
 
 `lastmod` comes from the last commit touching the files behind each route. A
 shallow clone's oldest commit has no visible parents, so every file in it reads
@@ -98,8 +57,8 @@ crawler can find.
 
 ### Regenerating the share cards
 
-The OG images are committed, not built — a production deploy should not download
-a 150 MB browser to re-render five pictures.
+The OG images are committed, not built — a production deploy should not be
+downloading a 150 MB browser to re-render five pictures.
 
 ```bash
 pnpm build:marketing                              # needs dist-ssr/entry-server.js
@@ -107,73 +66,85 @@ node marketing/scripts/gen-og-images.mjs
 ```
 
 Re-run it after changing a title in `seo.ts` or a headline in the script. If
-Playwright's browsers are not where it expects:
+Playwright's browsers are not where it expects, point at one:
 `CHROMIUM_PATH=/path/to/chrome node marketing/scripts/gen-og-images.mjs`.
 
 ---
 
-## Retiring Netlify
+## Moving the editor off Netlify
 
-Not yet done, and the order matters — none of these steps takes the editor
+`vercel.json` (repo root) is a port of the build command in `netlify.toml`, which stays
+the source of truth for that chain until this is validated. **It has not been
+run on Vercel yet.** The steps, in an order that never leaves the editor
 offline:
 
-1. **Confirm the project/domain mapping** in the Vercel dashboard (see the
-   warning above), and that every environment variable currently set on Netlify
-   is set on the Vercel project too — the Convex and Clerk keys in particular.
-   Missing keys do not fail the build; they produce a logged-out-only app, which
-   is a supported path and therefore a silent failure.
+1. **Create the Vercel project** against this repo, and in its settings:
+   - **Root Directory** = `app`. This is what makes Vercel read
+     `vercel.json` (repo root) rather than the repo-root one, which belongs to the
+     marketing site. Two projects cannot share one config file.
+   - **Include files outside of the Root Directory** = **ON**. Required: the
+     Rust crate, `Cargo.toml`, `rust-toolchain.toml` and `scripts/` all live
+     above `app/`.
+   - Node version 20, matching `netlify.toml`'s `NODE_VERSION`.
+   - Every environment variable currently set on Netlify — Convex and Clerk keys
+     in particular. Missing keys do not fail the build; they produce a
+     logged-out-only app, which is a supported path and therefore a silent
+     failure.
 
-2. **Run the sentinel against the Vercel deployment**, before any DNS moves:
+2. **Deploy to the Vercel preview URL and check the engine**, before any DNS
+   moves:
 
    ```bash
-   SENTINEL_SITE=https://<the-vercel-url> ./scripts/deploy-sentinel.sh
+   SENTINEL_SITE=https://<preview>.vercel.app ./scripts/deploy-sentinel.sh
    ```
 
    This is not optional. The exact failure it exists to catch — a build command
    missing `--features tiles,patchmatch`, shipping a featureless wasm that looks
    fine until you use a tool — went unnoticed for ten releases on Netlify. A
-   migrated build command is precisely when it can happen again.
+   ported build command is precisely when it can happen again.
 
-3. **Point `app.imagehorse.app` at the editor project**, re-run the sentinel
-   against it by hand, and only then change its default:
+3. **Point `edit.imagehorse.app` at the Vercel project** (CNAME to
+   `cname.vercel-dns.com`), and re-run the sentinel against the real hostname.
 
-   ```bash
-   SENTINEL_SITE=https://app.imagehorse.app ./scripts/deploy-sentinel.sh
-   ```
+4. **Only then retire Netlify**: delete the Netlify site, delete `netlify.toml`,
+   and drop its references from `docs/CI.md` and the sentinel's comments.
 
-   `scripts/deploy-sentinel.sh` still defaults to the Netlify host on purpose —
-   it has to follow whatever is actually serving users. Changing it first was
-   tried on this branch and CI rejected it in under a minute: three fetches,
-   three 404s. Note the shape of that failure, because it is informative —
-   `app.imagehorse.app` answered with an HTTP 404 rather than failing to resolve,
-   which is what Vercel returns for a domain that resolves to it but is not
-   attached to any project. The DNS is the easy half; the domain also has to be
-   added to the project.
+`scripts/deploy-sentinel.sh` already defaults to `https://edit.imagehorse.app`,
+so once step 3 is done the CI job checks the new host with no further change.
 
-   The reason to care about the ordering is not the red run. It is that a check
-   which is red for a reason everyone knows about gets ignored or switched off —
-   and this is the check that exists to catch a featureless wasm, which once
-   shipped for ten releases without anyone noticing.
+### One loaded gun to clear while you are in there
 
-4. **Only then**: delete the Netlify site, delete `netlify.toml`, and drop its
-   references from `docs/CI.md` and the sentinel's comments.
+`netlify.toml`'s comment header documents a stale duplicate of the build command
+in the Netlify UI, which is missing the feature flags and the toolchain pins. It
+is currently harmless because `netlify.toml` overrides it. Deleting the Netlify
+site removes that hazard permanently — which is a reason to finish step 4 rather
+than leave Netlify parked "just in case".
 
-Step 4 also clears a standing hazard. `netlify.toml`'s header documents a stale
-duplicate of the build command living in the Netlify UI, missing the feature
-flags and the toolchain pins. It is harmless only because `netlify.toml`
-overrides it — which is a reason to finish the migration rather than leave
-Netlify parked "just in case".
+---
+
+## DNS
+
+| Record | Name | Value |
+| --- | --- | --- |
+| `A` | `@` | Vercel's apex IP (from the project's Domains tab) |
+| `CNAME` | `www` | `cname.vercel-dns.com` |
+| `CNAME` | `app` | `cname.vercel-dns.com` |
+
+Add **both** `imagehorse.app` and `www.imagehorse.app` to the marketing project.
+The `www` → apex redirect is in `vercel.json` as a 308 rather than configured in
+the dashboard, so the canonical host is version-controlled next to the
+`<link rel="canonical">` that has to agree with it.
 
 ---
 
 ## After the first deploy on the new domain
 
-One-time, and none of it can be done from the repo:
+These are one-time, and none of them can be done from the repo:
 
 - **Google Search Console** — add `imagehorse.app` as a domain property (DNS TXT
   verification covers the subdomains too), then submit
-  `https://imagehorse.app/sitemap.xml`. Nothing indexes faster for having a
-  sitemap submitted; this is where you find out if something is broken.
+  `https://imagehorse.app/sitemap.xml`. Nothing gets indexed faster for having a
+  sitemap submitted, but this is where you find out if something is broken.
 - **Bing Webmaster Tools** — same, and it can import the Search Console setup.
   Worth doing: Bing does not render JavaScript the way Google does, so the
   prerendering is what makes the site legible to it at all, and this is how you
@@ -181,6 +152,6 @@ One-time, and none of it can be done from the repo:
 - **Check the redirect** — `curl -sI https://www.imagehorse.app/pricing` should
   return `308` with `location: https://imagehorse.app/pricing`.
 - **Check the 404** — `curl -sI https://imagehorse.app/nope` should return `404`,
-  not `200`. A `200` means a catch-all rewrite came back.
-- **Re-scrape the share cards** — X, LinkedIn and Facebook each cache the old
+  not `200`. A `200` means the catch-all rewrite came back.
+- **Re-scrape the share cards** — X, LinkedIn and Facebook all cache the old
   unfurl per URL. Their debuggers force a refresh.
