@@ -24,11 +24,12 @@ project builds the other site.
 > are absent passes in CI and fails on Vercel — see the next section for the case
 > that actually bit.
 >
-> ⚠️ **Still worth confirming in the dashboard: which project serves the apex.**
-> The repo-root `vercel.json` builds the *editor*, and the project whose Root
-> Directory is the repo root is named `image-horse` — the name the marketing site
-> deployed under at `image-horse.vercel.app`. Those two do not sit together
-> comfortably. Check which project each domain is attached to before moving DNS.
+> ⚠️ **The apex has been serving the editor.** That is not a hypothetical to
+> check — #135 established it. The project serving `imagehorse.app` had its Root
+> Directory at the repo root, so Vercel read the *root* `vercel.json`, and #133
+> repointed that file at the editor build. Until the apex is pointed at a project
+> that builds `marketing/`, none of the prerendering, sitemap or metadata below is
+> what visitors or crawlers actually get.
 >
 > There is no `app/vercel.json`. One was added in the first draft of this branch
 > and removed: it hand-ported the old `netlify.toml` build command, including the
@@ -37,11 +38,22 @@ project builds the other site.
 > rustup-init refuses to install over it. The root `vercel.json` is the tested
 > version; do not reintroduce a second one.
 
-### The one non-obvious Vercel setting
+### Two things that stop a marketing deploy
 
-The marketing project's Root Directory is `marketing`, and it **also needs
-"Include files outside of the Root Directory in the Build Step" turned ON.**
-Without it the install fails before a line of the site is built:
+**1. The config must be schema-valid, and JSON-valid is not enough.** Vercel's
+config schema is `additionalProperties: false` at every level, so a `"//"`
+comment key makes the whole file invalid and the deployment is rejected with a
+400 *before a build starts*. This file carried 8 of them and was never once
+usable. See [`marketing/VERCEL-CONFIG.md`](../marketing/VERCEL-CONFIG.md), which
+now holds the prose that used to be those keys — keep it there.
+
+The trap worth naming: `json.load()` succeeding proves the file is JSON, not that
+Vercel will accept it. Checking the former and reporting the config "valid" is
+how this shipped.
+
+**2. Expect `catalog:` to bite once the config is valid and the Root Directory
+is `marketing`.** Not the failure above — a different one, further along, and it
+has not been observed on Vercel yet because nothing has got that far:
 
 ```
 ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC
@@ -50,21 +62,22 @@ No catalog entry '@types/react' was found for catalog 'default'.
 
 `marketing/package.json` declares react, react-dom, vite, typescript and the
 React types as `"catalog:"`, and the catalog they resolve against lives in
-`pnpm-workspace.yaml` at the **repo root**. Root Directory alone gives the build
-only the `marketing/` subtree, so pnpm has a specifier it cannot resolve.
+`pnpm-workspace.yaml` at the **repo root**. A Root Directory of `marketing`
+hands the build only that subtree, so pnpm gets a specifier it cannot resolve.
+Reproduced locally by copying `marketing/` out on its own and running
+`pnpm install`; it fails exactly like that. The fix is the project setting
+**"Include files outside of the Root Directory in the Build Step"** — the same
+one the editor project needs for the Rust crate.
 
-Reproduced by copying `marketing/` somewhere on its own and running
-`pnpm install`; it fails identically. Not fixable from the repo — dropping
-`catalog:` would work and would undo the single source of truth for shared
-versions that `pnpm-workspace.yaml` exists to be. It is a project setting, and
-the editor project needs the same one for the Rust crate.
+Not fixable from the repo: dropping `catalog:` would also work and would undo
+the single source of truth for shared versions that `pnpm-workspace.yaml` exists
+to be.
 
-`app/package.json` uses `catalog:` too, which is why `rust-wasm-photo-tool-app`
-fails the same way. That project has no path to working regardless: rooted at
-`app/`, it cannot build the wasm engine, because `Cargo.toml` and
-`scripts/build-wasm.sh` are above it. `image-horse` already builds the editor
-correctly from the repo root, so the `app/`-rooted project is redundant and
-worth deleting rather than fixing.
+`app/package.json` uses `catalog:` too, so an `app/`-rooted project would hit the
+same wall — and `rust-wasm-photo-tool-app` has no path to working regardless,
+since from `app/` it cannot build the wasm engine (`Cargo.toml` and
+`scripts/build-wasm.sh` are above it). `image-horse` already builds the editor
+from the repo root, so that project is redundant rather than broken.
 
 Domains, once the mapping is confirmed:
 
