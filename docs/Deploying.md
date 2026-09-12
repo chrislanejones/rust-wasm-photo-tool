@@ -20,10 +20,15 @@ one was written and removed, because it hand-ported `netlify.toml`'s
 — the build image ships Rust with `CARGO_HOME=/rust` and rustup-init refuses to
 install over it. The root `vercel.json` is the tested version.
 
-**The marketing root directory is pinned by CI.** The `marketing` job in
-`.github/workflows/ci.yml` runs with `working-directory: marketing` precisely so
-it "fails the same way Vercel would". If that setting ever changes, change the CI
-job with it — that job is what keeps this table honest.
+**The marketing root directory is mirrored by CI — the directory, and nothing
+else.** The `marketing` job in `.github/workflows/ci.yml` runs with
+`working-directory: marketing`, and its comment says this is so it "fails the
+same way Vercel would". Read that narrowly: the job reproduces Vercel's *working
+directory*, not its *file set*. It checks out the whole repository, so anything
+that breaks only because files above `marketing/` are absent passes there and
+fails on Vercel — see "The one non-obvious Vercel setting" below for the case
+that actually bit. If the Root Directory setting ever changes, change the CI job
+with it; that is what keeps this table honest.
 
 **Three Vercel projects are currently attached to this repo**, which is one more
 than there is work for. From the deployment bot's own metadata:
