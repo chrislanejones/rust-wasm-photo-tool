@@ -63,7 +63,7 @@ Design decisions live in **[docs/adr/](docs/adr/INDEX.md)**. Superseded investig
 
 ## The marketing site
 
-`marketing/` — the five-page site at **[image-horse.vercel.app](https://image-horse.vercel.app/)**:
+`marketing/` — the five-page site at **[imagehorse.app](https://imagehorse.app/)**:
 home, architecture, features, pricing, trail log. Vite + React 19 + react-router,
 plain CSS off the tokens in `src/tokens.css` (no Tailwind, no UI library).
 Vercel builds it via the root `vercel.json` — **don't delete that file**, it's what

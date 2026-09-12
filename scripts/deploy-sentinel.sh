@@ -28,19 +28,28 @@ set -uo pipefail
 # serving users right now, because a sentinel aimed anywhere else is not a
 # weaker check — it is no check at all, and a permanently red one at that.
 #
-# It was briefly changed to https://edit.imagehorse.app ahead of the DNS move and
-# CI caught it immediately: three fetch attempts, three 404s, "SENTINEL FAIL:
-# could not fetch". The domain does not resolve to the editor yet. The danger of
-# leaving it that way is not the red run, it is that a check which is red for a
-# reason everybody knows about gets ignored or switched off, and then the real
-# failure it exists to catch — a featureless wasm, which once shipped for ten
-# releases — goes through unnoticed.
+# FLIPPED to edit.imagehorse.app on 2026-09-12, which is now the host serving
+# the editor. The two preconditions this comment used to name were both met
+# first, in this order:
+#   1. `vercel domains add edit.imagehorse.app image-horse` — the domain resolves
+#      to the editor project and serves it over HTTPS on Vercel nameservers.
+#   2. A manual run against that host PASSED:
+#        823,479 B, features tiles,patchmatch, all exports declared,
+#        tier 1 (served wasm == the build's own record) ✓
 #
-# Flip it to https://edit.imagehorse.app as step 3 of docs/Deploying.md, AFTER the
-# domain points at the editor and a manual run against that host passes:
+# The earlier attempts to point this at app./edit.imagehorse.app were premature
+# and CI correctly rejected them: three fetch attempts, three 404s, "SENTINEL
+# FAIL: could not fetch", because the domain did not resolve to the editor yet.
+# The danger of leaving it that way was never the red run — it is that a check
+# which is red for a reason everybody knows about gets ignored or switched off,
+# and then the real failure it exists to catch (a featureless wasm, which once
+# shipped for ten releases) goes through unnoticed.
 #
-#   SENTINEL_SITE=https://edit.imagehorse.app ./scripts/deploy-sentinel.sh
-SITE="${SENTINEL_SITE:-https://rust-wasm-photo-tool.netlify.app}"
+# The Netlify host stays alive as the rollback path and is NOT the default any
+# more. To aim this anywhere else for one run:
+#
+#   SENTINEL_SITE=https://rust-wasm-photo-tool.netlify.app ./scripts/deploy-sentinel.sh
+SITE="${SENTINEL_SITE:-https://edit.imagehorse.app}"
 MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
 MAX_WASM="${SENTINEL_MAX_WASM:-840000}"
 # Methods that only exist when the engine is built --features tiles,patchmatch.
