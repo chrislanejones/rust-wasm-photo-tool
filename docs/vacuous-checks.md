@@ -135,3 +135,28 @@ looked like deleted work.
 **Rule: wait for each merge to settle before issuing the next.** Poll
 `gh pr view <n> --json mergeable` until it is `MERGEABLE` rather than assuming
 the previous merge has landed.
+## `dead-exports` never checks the engine in CI (found 2026-09-12)
+
+`scripts/guardrails.sh` runs `scripts/dead-exports-audit.mjs`, whose engine half
+reads `pkg/stamp_tool.d.ts`. **`pkg/` is gitignored, and the guardrails CI job
+never builds it** — the job is `checkout` → install ripgrep → `guardrails.sh`,
+with no `build:wasm` step. The audit handles the absence gracefully
+(`dead-exports-audit.mjs:164` prints *"note: pkg/stamp_tool.d.ts absent"* to
+stderr and continues), so it reports **0 WASM dead exports and passes**.
+
+The engine half of this check has therefore never run in CI. It fires only on a
+machine that happens to have built `pkg/`, which is why it can sit at baseline 0
+while a real violation exists.
+
+**Proof it is not theoretical:** running it locally against a built `pkg/` finds
+`history_max_bytes` — exported from `src/settings.rs:62` with a doc comment
+explaining that JS reads it ("JS estimates the depth from the live document size
+and this number"), and `git log --all -G "history_max_bytes" -- app/src` is
+**empty**: the JS caller was never written. Shipped in #127, invisible to CI ever
+since.
+
+**Fix options:** build wasm in the guardrails job (slow, ~3 min), or split the
+engine half into a job that already has `pkg/` (the `Rust / WASM` job does), or
+make the audit **fail** rather than note when `pkg/` is missing and the engine
+half was expected. Failing closed is the cheapest and matches the ratchet's
+stated intent.

@@ -85,59 +85,41 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.75 — 2026-09-11
+### v8.76 — 2026-09-12
 
-**Shapes duplicate in any direction, the Stroke Stabilizer steadies every
-brush, and the lists stop disagreeing with each other.**
+**The editor has its own address, and the front page is the front page again.**
 
-Pick a rectangle or a circle out of Review → Reselect and press the d-pad on
-its row: four ⊕ appear around the shape on the canvas. Press one and you get
-another copy of the same size, clear of the original, in that direction. Press
-the left one twice and you get two marching left. Each side counts on its own,
-so a press upward afterwards goes above the original rather than above the
-last copy — which is what you want when you are building a diagram out of
-repeated boxes.
+Image Horse has moved to its own domain. The site is at imagehorse.app, the
+editor opens at edit.imagehorse.app, and www redirects to the apex. The old
+Netlify address still works and stays up for now, so nothing you have
+bookmarked breaks.
 
-Any placed text or shape can also be duplicated straight from its row. The
-copy is made inside the engine by cloning the object rather than rebuilding it
-from a list of properties, so nothing about it can be quietly left behind — a
-shadow, a rotation, a background, a perspective warp all come with it.
+For a few hours the front page served the editor instead of the site. Two
+projects share this repo, and a Root Directory setting decides which one builds
+which site; the marketing project was still pointed at the repo root, where the
+config had just been changed to build the editor. It points at `marketing/`
+now. Junk URLs give a real 404 again instead of quietly answering with the home
+page, and the site carries its own security headers rather than borrowing the
+editor's.
 
-The Stroke Stabilizer used to reach only the Paint brush. It now steadies the
-Eraser, the blur brush, pixelate, redact and the clone stamp, from the one
-setting — turn it on because your hand shakes and it is on everywhere. The
-Eraser had in fact been honouring it all along; there was simply no control in
-the panel to switch it on. On the clone stamp the source offset is kept
-exactly, so the smoothing changes the path and nothing else.
+Underneath that sat a config file that had never once worked. Vercel rejects
+any key it does not recognise, and `marketing/vercel.json` carried eight
+comment keys, so every deploy that read it was refused before a build started.
+Nothing noticed, because nothing had ever read it. Those comments live beside
+the file now instead of inside it.
 
-History, Reselect and the Layers list are one component now instead of three
-that had drifted apart. Row buttons sit together in one cluster, the coloured
-dots are gone in favour of the numbers that were already beside them, and
-Reselect rows are numbered too. History and Reselect keep their buttons out of
-sight until you hover or tab into a row; the Layers list keeps its visible,
-because those get used constantly and the eye is reporting a state, not just
-offering an action.
+Ten entries on the Features page were drawing a plain square where an icon
+should be. The feature list is generated from the repo's own list; the icon map
+beside it is written by hand. Eight features had shipped without an icon, and
+two more had been renamed, which drops the icon just as quietly. Every feature
+has one now, and anything unmapped falls back to a dot, so the next gap looks
+like a gap rather than a broken tile.
 
-The gallery bar's header is three columns — the count on the left, the
-compress buttons centred, the actions on the right — and the compress pair is
-centred on the bar rather than on the space left over, so it stops shifting
-when a selection appears.
-
-The "+" on any colour swatch opens a real colour picker — a hue wheel or a
-saturation/brightness rectangle, with hex, RGB and HSL fields that all track
-each other. Colours you keep land in a palette that follows you: saved locally
-when you are logged out, synced to your account when you are signed in.
-
-Smaller things: dropping an image with nothing open goes straight to the
-gallery instead of asking a question with one possible answer; the status
-bar's second number is labelled; the Eraser panel says "Eraser" rather than
-"Brush" above a field called Brush Size; and the mobile version can save a
-photo to your device, which the notice now says.
-
-Known and open: on a freshly imported photo the status bar reports the
-document size, which includes the canvas border, and a resize to an exact
-width applies that width to the document rather than the picture. Export of an
-untouched photo is correct.
+Smaller things: the sitemap stops stamping every URL with the deploy date — a
+shallow clone has no history to read a real date from, so it was inventing one;
+the editor's canonical link and share card name edit.imagehorse.app rather than
+a build host; and the check that proves the shipped engine is real now watches
+the address that actually serves it.
 
 ## License
 

@@ -10601,3 +10601,20 @@ This activates nothing. The service worker still ships dark.
 | **Fixes** | Two files that existed nowhere in master were landed, and a PR-sweep e2e spec's dead selector repaired — it was reporting a harness miss as a 120s product failure. |
 
 wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
+
+## v8.76 Change Summary — 2026-09-12
+
+**The editor has its own address, and the front page is the front page again.**
+
+| Area | Change |
+| --- | --- |
+| **Hosting** | Image Horse runs on its own domain. The site is at `imagehorse.app`, the editor at `edit.imagehorse.app`, and `www` 308s to the apex. The Netlify address still works and stays up as the rollback path. |
+| **Hosting** | The apex had been serving the **editor**. Two Vercel projects share this repo and a Root Directory setting picks which config each reads; the marketing project was still rooted at the repo root, where `vercel.json` had just been repointed at the editor build. It is rooted at `marketing/` now. |
+| **Hosting** | `marketing/vercel.json` had never been valid. Vercel's config schema is `additionalProperties: false` at every level, so the eight `"//"` comment keys it carried made every deploy that read it a 400 *before a build started*. It went unnoticed because no project had ever read the file. The prose moved to `marketing/VERCEL-CONFIG.md`. |
+| **Site** | Unmatched paths return a real 404 again instead of answering with the home page at status 200 — the catch-all rewrite belonged to the editor's config, not the site's. |
+| **Site** | The marketing site carries its own security headers (`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS) and its own content-security policy, rather than inheriting the editor's — it loads no wasm, no Clerk and no Convex, so it allows none of them. |
+| **Features page** | Ten entries drew a plain square instead of an icon. `features.ts` is generated from `docs/Features.md`; the icon map beside it is hand-written, and eight features had shipped with no entry while two more had been renamed, which drops the icon just as quietly. All 48 features are mapped, and the fallback is now a dot rather than `Square` — which "Blank Canvas" legitimately uses, so an unmapped feature had been indistinguishable from a real one. |
+| **SEO** | The sitemap stops stamping every URL with the deploy date. A shallow clone has no history to read a real `lastmod` from, so it invented one for all five URLs. |
+| **SEO** | The editor's canonical link and `og:url` name `edit.imagehorse.app` instead of a build host. |
+| **Engine** | The wasm builds on Vercel unchanged — 823,479 B, `features tiles,patchmatch`, exports intact, served copy matching its own build record. The feature set now has one home, `scripts/build-wasm.sh`, instead of being duplicated in a host config. |
+| **Deploy check** | `scripts/deploy-sentinel.sh` follows production to `edit.imagehorse.app`, after a manual run against that host passed. Note its limit: it inspects the wasm binary, not whether the app mounts — it passed green while the editor rendered a blank screen. |

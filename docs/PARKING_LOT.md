@@ -2767,3 +2767,19 @@ GREEN on prose (quiet, and it is the direction that lets things through).
 Fix when someone is next in that file: strip `//` and `/* */` before matching,
 then re-baseline. Expect the count to RISE, and expect some of the new entries
 to be real.
+
+## `history_max_bytes` is exported and never called (found 2026-09-12)
+
+`src/settings.rs:62` exports it through `wasm_bindgen`, and its own doc comment
+says why: *"JS estimates the depth from the live document size and this number;
+hardcoding 512 MB there would be a second copy of a value that already lives
+here."* That JS never arrived — `git log --all -G "history_max_bytes" -- app/src`
+returns nothing, so the wire was **never connected**, not lost.
+
+It came in with #127 (the undo-degradation warning, ADR-052). So either the
+warning is computing its depth from a hardcoded number after all — the exact
+duplication the export exists to prevent — or it is not computing it at all.
+**Check which before deciding**: wire the caller up, or delete the export.
+
+Not fixed here because it is another feature's decision, and because the gate
+that should have caught it cannot — see `docs/vacuous-checks.md`.

@@ -46,6 +46,15 @@ import {
   SunMoon,
   Ruler,
   Database,
+  PanelLeft,
+  Route,
+  MousePointerClick,
+  Palette,
+  ScanText,
+  CopyPlus,
+  Copy,
+  Magnet,
+  CircleSmall,
 } from "lucide-react";
 
 export const GROUP_ICONS: Record<string, ElementType> = {
@@ -57,12 +66,12 @@ export const GROUP_ICONS: Record<string, ElementType> = {
 export const FEATURE_ICONS: Record<string, ElementType> = {
   "Clone Stamp": Stamp,
   "Red Stamps": BadgeCheck,
-  "Edit & Move (Crop · Transform · Align · Select)": Move,
+  "Edit group (Crop · Transform · Color Picker · Resize Layer · Canvas Size · Guides)": Move,
   "Text Shadow": Layers2,
   "Security tab": ShieldCheck,
   "Responsive / snapped windows": MonitorSmartphone,
   "Keyboard accessibility": Keyboard,
-  Resize: Maximize2,
+  "Resize & Compress": Maximize2,
   Levels: SlidersHorizontal,
   Histogram: BarChart3,
   "Fast integer compositing": Zap,
@@ -96,9 +105,25 @@ export const FEATURE_ICONS: Record<string, ElementType> = {
   "Light / Dark / System theme": SunMoon,
   "Rulers & Grids": Ruler,
   "State management (Zustand)": Database,
+
+  // v8.6x tool-registry arc. These shipped in docs/Features.md — which
+  // regenerates features.ts — while this file, which is hand-maintained, was
+  // not updated, so all eight rendered as the fallback.
+  "Five-group toolbar": PanelLeft,
+  "Sub-tool routing": Route,
+  "Sub-tool canvas dispatch": MousePointerClick,
+  "Colour picker history": Palette,
+  OCR: ScanText,
+  "Directional duplicate pad": CopyPlus,
+  "Duplicate from the Reselect row": Copy,
+  "Stroke Stabilizer, everywhere": Magnet,
 };
 
-const FALLBACK_ICON = Square;
+// A DOT, not a square — deliberately. `Square` was the fallback, and "Blank
+// Canvas" legitimately maps to `Square` too, so an unmapped feature was
+// indistinguishable from a real one and just looked like a broken tile. A dot
+// reads as "no icon yet" and matches what the header above has always claimed.
+const FALLBACK_ICON = CircleSmall;
 
 export function getFeatureIcon(name: string): ElementType {
   return FEATURE_ICONS[name] ?? FALLBACK_ICON;
