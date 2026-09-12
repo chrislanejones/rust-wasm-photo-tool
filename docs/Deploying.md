@@ -12,13 +12,17 @@ builds the other site.
 | `rust-wasm-photo-tool-app` | `app` | *(no config in `app/`)* | — | — |
 | the marketing project | `marketing` | [`marketing/vercel.json`](../marketing/vercel.json) | the **marketing site** | `marketing/dist` |
 
-> ⚠️ **Unverified: which project serves `imagehorse.app`.** The repo-root
-> `vercel.json` builds the *editor* (`feat/app-on-vercel`), and the project whose
-> Root Directory is the repo root is named `image-horse` — the name the marketing
-> site used to deploy under at `image-horse.vercel.app`. Those two facts do not
-> sit together comfortably, and the Vercel dashboard is the only place to settle
-> it. Before pointing DNS anywhere, confirm which project each domain is attached
-> to.
+> The marketing row is confirmed by the repo's own CI: the `marketing` job in
+> `.github/workflows/ci.yml` runs with `working-directory: marketing` precisely
+> so it "fails the same way Vercel would", and its comment records that Vercel's
+> Root Directory is `/marketing`. That job is the guard against this table going
+> stale — if the Root Directory ever changes, make the CI job follow it.
+>
+> ⚠️ **Still worth confirming in the dashboard: which project serves the apex.**
+> The repo-root `vercel.json` builds the *editor*, and the project whose Root
+> Directory is the repo root is named `image-horse` — the name the marketing site
+> deployed under at `image-horse.vercel.app`. Those two do not sit together
+> comfortably. Check which project each domain is attached to before moving DNS.
 >
 > There is no `app/vercel.json`. One was added in the first draft of this branch
 > and removed: it hand-ported the old `netlify.toml` build command, including the
@@ -63,6 +67,24 @@ Step 4 is what makes the site indexable at all; the comment at the top of
 why a client-rendered SPA is invisible to everything except Googlebot. It fails
 the build loudly if `marketing/index.html` has lost its `seo:start` / `seo:end`
 markers, rather than shipping five copies of an empty shell.
+
+### Why sitemap entries often have no `lastmod`
+
+Expect most production `<url>` entries to carry no `lastmod`, and do not "fix" it
+by stamping the build time — that is the one thing that makes the field actively
+harmful.
+
+`lastmod` comes from the last commit touching the files behind each route. A
+shallow clone's oldest commit has no visible parents, so every file in it reads
+as having been *added* there, and `git log -1 -- <path>` answers with that commit
+for anything older than the cutoff. At depth 1 — which is what Vercel and
+`actions/checkout@v4` both give you — that is the whole tree, and all five routes
+would claim to have changed at the moment of the deploy. Google learns to ignore
+a sitemap that says that.
+
+So `prerender.mjs` reads `.git/shallow` and discards any date resolving to a
+boundary commit, per file. Routes whose real commit is inside the fetched history
+keep a true date; the rest get none. An absent hint costs nothing.
 
 ### Adding a page
 
