@@ -1,14 +1,16 @@
-# ⚠️ SUPERSEDED, BUT STILL LIVE. The editor is moving to Vercel at
-# app.imagehorse.app; app/vercel.json is a port of the `command` below and has
-# NOT been validated by a real deploy yet. Until it has been — and until
-# scripts/deploy-sentinel.sh passes against the new host — THIS file is what
-# actually ships the editor, and it stays. Do not delete it to tidy up.
+# ⚠️ SUPERSEDED, BUT STILL LIVE — and still the thing serving deploy previews.
+# The editor's Vercel build now lives in the repo-root vercel.json (see the
+# feat/app-on-vercel commits, which took two failed deploys to get the Rust
+# toolchain right). This file has not been retired because the Netlify site is
+# still up and still building every PR.
 #
-# The migration steps, in an order that never takes the editor offline, are in
-# docs/Deploying.md. Step 4 is deleting this file; steps 1-3 come first.
+# Do not delete it to tidy up. Retire it only after scripts/deploy-sentinel.sh
+# passes against the Vercel host — the featureless-wasm bug the comments below
+# describe is exactly the class of failure a host migration can reintroduce
+# silently. docs/Deploying.md has the order.
 #
-# Everything below is unchanged and remains the source of truth for the build
-# chain. If you edit the command here, port the same edit to app/vercel.json.
+# Everything below is unchanged. If you edit the build command here, check
+# whether the root vercel.json needs the same edit.
 
 [build]
   # ⚠️ A SECOND, STALE COPY OF THIS COMMAND LIVES IN THE NETLIFY UI (#56).
