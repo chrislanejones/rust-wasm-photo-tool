@@ -1,89 +1,52 @@
 # Deploying
 
-## Which config belongs to which site
+## Which config belongs to which project
 
-Vercel picks a project's config file by its **Root Directory** setting. Several
-projects build out of this one repo and they do NOT share a config — get the
-mapping wrong and a project builds the other site.
+Two Vercel projects are linked to this repo, and Vercel picks a project's config
+file by its **Root Directory** setting. Get this mapping wrong and a project
+builds the other site.
 
-| Site | Config | Vercel Root Directory | Output | Domain |
+| Vercel project | Root Directory | Reads | Builds | Output |
 | --- | --- | --- | --- | --- |
-| **Editor** | [`vercel.json`](../vercel.json) (repo root) | *(repo root)* | `www-dist` | `edit.imagehorse.app` |
-| **Marketing** | [`marketing/vercel.json`](../marketing/vercel.json) | `marketing` | `marketing/dist` | `imagehorse.app` (+ `www` → apex) |
-| Editor (old) | [`netlify.toml`](../netlify.toml) | *(repo root)* | `www-dist` | `rust-wasm-photo-tool.netlify.app` — **still live** |
+| `image-horse` | *(repo root)* | [`vercel.json`](../vercel.json) | the **editor** | `www-dist` |
+| `rust-wasm-photo-tool-app` | `app` | *(no config in `app/`)* | — | — |
+| the marketing project | `marketing` | [`marketing/vercel.json`](../marketing/vercel.json) | the **marketing site** | `marketing/dist` |
 
-**The editor roots at the repo root and cannot root at `app/`.** `Cargo.toml`,
-`rust-toolchain.toml` and `scripts/build-wasm.sh` all live above `app/`, so from
-there the engine has nothing to build. There is deliberately no `app/vercel.json`;
-one was written and removed, because it hand-ported `netlify.toml`'s
-`curl … rustup-init` step, which commit `55b02cf` had just proved fails on Vercel
-— the build image ships Rust with `CARGO_HOME=/rust` and rustup-init refuses to
-install over it. The root `vercel.json` is the tested version.
+> The marketing row is confirmed by the repo's own CI: the `marketing` job in
+> `.github/workflows/ci.yml` runs with `working-directory: marketing` precisely
+> so it "fails the same way Vercel would", and its comment records that Vercel's
+> Root Directory is `/marketing`. That job is the guard against this table going
+> stale — if the Root Directory ever changes, make the CI job follow it.
+>
+> ⚠️ **Still worth confirming in the dashboard: which project serves the apex.**
+> The repo-root `vercel.json` builds the *editor*, and the project whose Root
+> Directory is the repo root is named `image-horse` — the name the marketing site
+> deployed under at `image-horse.vercel.app`. Those two do not sit together
+> comfortably. Check which project each domain is attached to before moving DNS.
+>
+> There is no `app/vercel.json`. One was added in the first draft of this branch
+> and removed: it hand-ported the old `netlify.toml` build command, including the
+> `curl … rustup-init` step that commit `55b02cf` had *just* proved fails on
+> Vercel — the build image ships Rust already, with `CARGO_HOME=/rust`, and
+> rustup-init refuses to install over it. The root `vercel.json` is the tested
+> version; do not reintroduce a second one.
 
-**The marketing root directory is mirrored by CI — the directory, and nothing
-else.** The `marketing` job in `.github/workflows/ci.yml` runs with
-`working-directory: marketing`, and its comment says this is so it "fails the
-same way Vercel would". Read that narrowly: the job reproduces Vercel's *working
-directory*, not its *file set*. It checks out the whole repository, so anything
-that breaks only because files above `marketing/` are absent passes there and
-fails on Vercel — see "The one non-obvious Vercel setting" below for the case
-that actually bit. If the Root Directory setting ever changes, change the CI job
-with it; that is what keeps this table honest.
-
-**Three Vercel projects are currently attached to this repo**, which is one more
-than there is work for. From the deployment bot's own metadata:
-
-| Project | Root Directory | Reads | Notes |
-| --- | --- | --- | --- |
-| `image-horse-marketing` | `marketing` | `marketing/vercel.json` | the marketing site |
-| `image-horse` | *(repo root)* | `vercel.json` | builds the **editor**, despite the name — it is the name the marketing site used at `image-horse.vercel.app` |
-| `rust-wasm-photo-tool-app` | `app` | *(nothing)* | no config in this repo targets `app/`; it builds on Vercel's defaults |
-
-> ⚠️ Two of these want a decision that cannot be made from the repo. `image-horse`
-> and `rust-wasm-photo-tool-app` both appear to be aimed at the editor, and only
-> one of them reads a config this repo controls. Whichever is not serving a domain
-> should be deleted — an extra project is a second deploy on every push and a
-> second thing to keep configured.
-
-### The one non-obvious Vercel setting
-
-The marketing project's Root Directory is `marketing`, and it **also needs
-"Include files outside of the Root Directory in the Build Step" turned ON.**
-Without it the install fails before a line of the site is built:
-
-```
-ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC
-No catalog entry '@types/react' was found for catalog 'default'.
-```
-
-`marketing/package.json` declares react, react-dom, vite, typescript and the
-React types as `"catalog:"`, and the catalog those resolve against lives in
-`pnpm-workspace.yaml` at the **repo root**. Root Directory alone gives the build
-only the `marketing/` subtree, so pnpm has a specifier it cannot resolve.
-
-Reproduced by copying `marketing/` somewhere on its own and running
-`pnpm install`; it fails identically. This is not something a config file in this
-repo can fix — removing `catalog:` would work but would undo the single source of
-truth for shared versions that `pnpm-workspace.yaml` exists to provide. It is a
-project setting, and the same setting the editor project needs for the Rust crate.
-
-CI does not catch it: `.github/workflows/ci.yml`'s `marketing` job checks out the
-whole repo and only *runs* from `marketing/`, so the workspace root is always
-present there. The mirror is faithful about the working directory and cannot be
-faithful about the file set.
-
-### DNS
+Domains, once the mapping is confirmed:
 
 | Record | Name | Value |
 | --- | --- | --- |
 | `A` | `@` | Vercel's apex IP (from the project's Domains tab) |
 | `CNAME` | `www` | `cname.vercel-dns.com` |
-| `CNAME` | `edit` | `cname.vercel-dns.com` |
+| `CNAME` | `app` | `cname.vercel-dns.com` |
 
 Add **both** `imagehorse.app` and `www.imagehorse.app` to the marketing project.
 The `www` → apex redirect is a 308 in `marketing/vercel.json` rather than a
 dashboard setting, so the canonical host is version-controlled next to the
 `<link rel="canonical">` that has to agree with it.
+
+Netlify is **still live** and still builds every PR preview. `netlify.toml` stays
+until `scripts/deploy-sentinel.sh` passes against the Vercel host — see
+"Retiring Netlify" below.
 
 ---
 
@@ -105,19 +68,11 @@ why a client-rendered SPA is invisible to everything except Googlebot. It fails
 the build loudly if `marketing/index.html` has lost its `seo:start` / `seo:end`
 markers, rather than shipping five copies of an empty shell.
 
-`vite.config.ts` sets `ssr.noExternal: true`, and it is load-bearing. Without it
-the SSR build leaves React external and `prerender.mjs` resolves a second
-physical copy out of the pnpm store — react-dom binds one React, the components
-import another, and the dispatcher is null the moment a hook runs
-(`Cannot read properties of null (reading 'useContext')`). Naming packages
-individually does not fix it: the app imports `react-router-dom`, which stays
-external and pulls its own `react-router`.
-
 ### Why sitemap entries often have no `lastmod`
 
 Expect most production `<url>` entries to carry no `lastmod`, and do not "fix" it
-by stamping the build time — that is the one change that would make the field
-actively harmful.
+by stamping the build time — that is the one thing that makes the field actively
+harmful.
 
 `lastmod` comes from the last commit touching the files behind each route. A
 shallow clone's oldest commit has no visible parents, so every file in it reads
@@ -159,56 +114,54 @@ Playwright's browsers are not where it expects:
 
 ## Retiring Netlify
 
-Not finished. Netlify still serves the editor and still builds every PR preview,
-so `netlify.toml` stays until these are done, in this order:
+Not yet done, and the order matters — none of these steps takes the editor
+offline:
 
-1. **Attach `edit.imagehorse.app` to the editor project** and get a production
-   deployment onto it.
+1. **Confirm the project/domain mapping** in the Vercel dashboard (see the
+   warning above), and that every environment variable currently set on Netlify
+   is set on the Vercel project too — the Convex and Clerk keys in particular.
+   Missing keys do not fail the build; they produce a logged-out-only app, which
+   is a supported path and therefore a silent failure.
 
-   **This is the current blocker.** `scripts/deploy-sentinel.sh` already points
-   at `edit.imagehorse.app`, and the host answers `404` — so the sentinel is
-   failing on master itself, not just on branches. Note the shape of that
-   failure: a 404 rather than a DNS error is what Vercel returns for a domain
-   that resolves to it but has no project attached or no production deployment.
-   The DNS is the easy half.
+2. **Run the sentinel against the Vercel deployment**, before any DNS moves:
 
-   Confirm too that every environment variable set on Netlify is set on the
-   Vercel project — Convex and Clerk keys in particular. Missing keys do not
-   fail the build; they produce a logged-out-only app, which is a supported path
-   and therefore a silent failure.
+   ```bash
+   SENTINEL_SITE=https://<the-vercel-url> ./scripts/deploy-sentinel.sh
+   ```
 
-2. **Run the sentinel by hand against the real host** before trusting CI's copy:
+   This is not optional. The exact failure it exists to catch — a build command
+   missing `--features tiles,patchmatch`, shipping a featureless wasm that looks
+   fine until you use a tool — went unnoticed for ten releases on Netlify. A
+   migrated build command is precisely when it can happen again.
+
+3. **Point `edit.imagehorse.app` at the editor project**, re-run the sentinel
+   against it by hand, and only then change its default:
 
    ```bash
    SENTINEL_SITE=https://edit.imagehorse.app ./scripts/deploy-sentinel.sh
    ```
 
-   Not optional. The failure it exists to catch — a build command missing
-   `--features tiles,patchmatch`, shipping a featureless wasm that looks fine
-   until you use a tool — went unnoticed for ten releases on Netlify. A migrated
-   build command is exactly when it can happen again.
+   `scripts/deploy-sentinel.sh` still defaults to the Netlify host on purpose —
+   it has to follow whatever is actually serving users. Changing it first was
+   tried on this branch and CI rejected it in under a minute: three fetches,
+   three 404s. Note the shape of that failure, because it is informative —
+   `edit.imagehorse.app` answered with an HTTP 404 rather than failing to resolve,
+   which is what Vercel returns for a domain that resolves to it but is not
+   attached to any project. The DNS is the easy half; the domain also has to be
+   added to the project.
 
-3. **Only then**: delete the Netlify site, delete `netlify.toml`, and drop its
+   The reason to care about the ordering is not the red run. It is that a check
+   which is red for a reason everyone knows about gets ignored or switched off —
+   and this is the check that exists to catch a featureless wasm, which once
+   shipped for ten releases without anyone noticing.
+
+4. **Only then**: delete the Netlify site, delete `netlify.toml`, and drop its
    references from `docs/CI.md` and the sentinel's comments.
 
-### On pointing the sentinel at a host that isn't serving
-
-`SENTINEL_SITE`'s default has to follow whatever is actually serving users, and
-it has now been moved ahead of the domain twice on this work — once to
-`app.imagehorse.app` (wrong hostname entirely) and once to `edit.imagehorse.app`
-before it was attached. Both turned CI red within a minute.
-
-The cost is not the red run. It is that a check red for a reason everybody knows
-about stops being read, and this is the check standing between a featureless wasm
-and production. If step 1 is going to take a while, park the default on whatever
-is serving and move it in step 2.
-
-### One loaded gun to clear while you are in there
-
-`netlify.toml`'s header documents a stale duplicate of the build command living
-in the Netlify UI, missing the feature flags and the toolchain pins. It is
-harmless only because `netlify.toml` overrides it. Deleting the Netlify site
-removes that hazard permanently — a reason to finish step 3 rather than leave
+Step 4 also clears a standing hazard. `netlify.toml`'s header documents a stale
+duplicate of the build command living in the Netlify UI, missing the feature
+flags and the toolchain pins. It is harmless only because `netlify.toml`
+overrides it — which is a reason to finish the migration rather than leave
 Netlify parked "just in case".
 
 ---
