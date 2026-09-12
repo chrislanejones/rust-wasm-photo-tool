@@ -946,6 +946,41 @@ a { color: inherit; }
   max-width: 18ch;
 }
 
+/* ── 404 ───────────────────────────────────────────────────────
+ * Shares .page-head above, so a wrong URL lands with its heading at exactly the
+ * same height as a right one — the page should read as part of the site, not as
+ * the server falling over. Only the link list below it is new.
+ */
+
+.notfound__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-lg);
+  list-style: none;
+  padding: 0 var(--page-gutter) var(--space-3xl);
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.notfound__links a {
+  color: var(--color-ink-2);
+  text-decoration: none;
+  padding: var(--space-2xs) 0;
+  border-bottom: 1px solid var(--color-rule-strong);
+  transition: color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+}
+
+.notfound__links a:hover {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.notfound__links a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
 /* ── mobile collapse — burger + sheet ──────────────────────────
  * The links are now real pages, not same-page anchors: hiding them on mobile
  * with no replacement would strand every sub-page. So below the breakpoint

@@ -1,0 +1,15 @@
+# app.imagehorse.app — the editor.
+#
+# Crawling is ALLOWED here and indexing is not, which sounds backwards and is
+# the only combination that works. The "do not index this host" instruction is
+# the <meta name="robots" content="noindex"> in index.html, and a crawler has to
+# fetch the page to read it. Disallow it here instead and Google never sees the
+# noindex — it just stops fetching, and the URL can still be listed from inbound
+# links, as a result with no title and no description. So: let it in, and let the
+# page turn it away.
+#
+# The pages worth ranking are all on https://imagehorse.app, which has its own
+# robots.txt and the sitemap.
+
+User-agent: *
+Allow: /

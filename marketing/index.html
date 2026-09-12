@@ -3,13 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Crop it, compress it, annotate it, gallop. — Image Horse</title>
+
+    <!-- seo:start -->
+    <!-- Everything from seo:start through seo:end is REPLACED, per route, by
+         scripts/prerender.mjs, which reads the values from src/seo.ts. So a title
+         or description edited here changes only what `vite dev` shows; the built
+         site takes its own from the route table. This note sits INSIDE the markers
+         on purpose — outside them it would survive into all five built pages.
+         Do not remove the markers: the prerender step throws if it cannot find
+         them, rather than silently shipping five copies of this shell. -->
+    <title>Image Horse — private photo editor that runs in your browser</title>
     <meta
       name="description"
-      content="A browser image editor built in Rust and shipped as WebAssembly. Editing runs on your own machine on every tier. Sign-in and the AI passes are the only things that reach a server — and the app tells you before they do."
+      content="Crop, compress, annotate and batch-edit photos without uploading them. A Rust and WebAssembly image editor that runs on your own machine — no account needed."
     />
+    <!-- seo:end -->
+
     <meta name="theme-color" content="#1b1210" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

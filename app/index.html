@@ -31,7 +31,32 @@
       })();
     </script>
     <link rel="icon" href="/Image-Horse-Logo.svg" type="image/svg+xml" />
-    <title>Image Horse</title>
+
+    <!-- The editor is a single page behind a canvas: there is no text here for a
+         crawler to rank, and the marketing site at imagehorse.app is what should
+         answer a search. So this is not indexed — without the noindex the two
+         hosts compete for the same brand query and the one that wins is the one
+         with nothing on it. `follow` still lets the link equity pass through.
+         The canonical is self-referential rather than pointing at imagehorse.app:
+         a canonical to a page with different content is ignored, and pointing an
+         app at a marketing page is exactly that case. -->
+    <title>Image Horse — browser photo editor</title>
+    <meta
+      name="description"
+      content="Crop, compress, annotate and edit photos in your browser. Editing runs on your own machine in WebAssembly."
+    />
+    <meta name="robots" content="noindex, follow" />
+    <link rel="canonical" href="https://app.imagehorse.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Image Horse" />
+    <meta property="og:title" content="Image Horse — browser photo editor" />
+    <meta
+      property="og:description"
+      content="Crop, compress, annotate and edit photos in your browser. Editing runs on your own machine in WebAssembly."
+    />
+    <meta property="og:url" content="https://app.imagehorse.app/" />
+    <meta property="og:image" content="https://imagehorse.app/og/default.png" />
+    <meta name="twitter:card" content="summary_large_image" />
     <!-- Fonts are SELF-HOSTED (app/src/fonts.css, files in public/fonts).
          This used to <link> fonts.googleapis.com, which put every visitor's IP
          in front of Google before they clicked anything — logged out included —

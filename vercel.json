@@ -4,33 +4,76 @@
   "installCommand": "pnpm install",
   "outputDirectory": "marketing/dist",
   "framework": null,
-  "rewrites": [
+
+  "//": [
+    "This is the MARKETING project (imagehorse.app). The editor is a second",
+    "Vercel project with its Root Directory set to app/ — it reads app/vercel.json,",
+    "not this file. See docs/Deploying.md.",
+    "",
+    "THERE IS NO CATCH-ALL REWRITE ANY MORE, and that is the point of the change.",
+    "It used to be `/(.*)` -> `/index.html`, which is the standard SPA fallback and",
+    "was wrong here in both directions. Now that marketing/scripts/prerender.mjs",
+    "emits a real file per route, the rewrite would shadow them: Vercel checks the",
+    "filesystem before it applies rewrites, so /features would still resolve to",
+    "features/index.html — but any junk URL answered with the home page at status",
+    "200 is a soft 404, and Google treats a site that 200s everything as one whose",
+    "URLs cannot be trusted. With no rewrite, unmatched paths fall through to",
+    "dist/404.html with an actual 404, which is what 404.html is for on Vercel."
+  ],
+
+  "cleanUrls": true,
+  "trailingSlash": false,
+
+  "redirects": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "//": "One hostname holds the ranking signal. www is a separate origin to a crawler, so it is redirected rather than served — permanently (308), so the redirect itself is what gets cached and indexed. The apex is canonical because that is what src/seo.ts writes into every <link rel=canonical> and every sitemap entry; changing one without the other splits the site in two.",
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.imagehorse.app" }],
+      "destination": "https://imagehorse.app/:path*",
+      "permanent": true
     }
   ],
+
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(), interest-cohort=()"
         },
         {
+          "//": "`.app` is on the HSTS preload list at the TLD, so browsers already refuse plaintext here — this header is what keeps that true if the site ever moves to a domain that isn't.",
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
           "key": "Content-Security-Policy-Report-Only",
           "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        },
+        {
+          "//": "The SAFE default, deliberately applied to everything and then narrowed below. It is the right value for the HTML: those filenames are stable across deploys, so a cached copy would keep pointing at the previous build's hashed assets. Matching on a .html suffix instead does NOT work here — a prerendered route is requested as /features, with no extension, and only resolves to features/index.html after this stage.",
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
+    },
+    {
+      "//": "ORDER MATTERS: this rule also matches /(.*) above, and Vercel applies every matching rule in order with the last write of a given header winning. So this must stay BELOW the block that sets the default, or the assets get max-age=0. Everything under /assets/ carries a content hash in its filename, so a changed file is a changed URL and this can never serve a stale one; `immutable` additionally stops the revalidation request browsers make on reload, which is a real repeat-visit difference.",
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "//": "Same ordering rule. An hour is long enough to absorb a crawl spike and short enough that a new page shows up in the next fetch.",
+      "source": "/(sitemap.xml|robots.txt)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }]
+    },
+    {
+      "//": "The share cards and icons change only when scripts/gen-og-images.mjs is re-run, and a scraper refetching one on every unfurl is pure waste. A day, not a year: unlike /assets/ these filenames are NOT content-hashed, so a stale copy is possible and should expire on its own.",
+      "source": "/(og/.*|apple-touch-icon.png|icon-192.png|icon-512.png|favicon.svg)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
     }
   ]
 }

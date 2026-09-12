@@ -24,7 +24,7 @@
 # Runnable by hand — that is the point:  ./scripts/deploy-sentinel.sh
 set -uo pipefail
 
-SITE="${SENTINEL_SITE:-https://rust-wasm-photo-tool.netlify.app}"
+SITE="${SENTINEL_SITE:-https://app.imagehorse.app}"
 MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
 MAX_WASM="${SENTINEL_MAX_WASM:-840000}"
 # Methods that only exist when the engine is built --features tiles,patchmatch.
