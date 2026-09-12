@@ -2,21 +2,27 @@
 
 ## Which config belongs to which project
 
-Two Vercel projects are linked to this repo, and Vercel picks a project's config
-file by its **Root Directory** setting. Get this mapping wrong and a project
-builds the other site.
+Three Vercel projects are linked to this repo, and Vercel picks a project's
+config file by its **Root Directory** setting. Get this mapping wrong and a
+project builds the other site.
 
 | Vercel project | Root Directory | Reads | Builds | Output |
 | --- | --- | --- | --- | --- |
 | `image-horse` | *(repo root)* | [`vercel.json`](../vercel.json) | the **editor** | `www-dist` |
 | `rust-wasm-photo-tool-app` | `app` | *(no config in `app/`)* | — | — |
-| the marketing project | `marketing` | [`marketing/vercel.json`](../marketing/vercel.json) | the **marketing site** | `marketing/dist` |
+| `image-horse-marketing` | `marketing` | [`marketing/vercel.json`](../marketing/vercel.json) | the **marketing site** | `marketing/dist` |
 
 > The marketing row is confirmed by the repo's own CI: the `marketing` job in
-> `.github/workflows/ci.yml` runs with `working-directory: marketing` precisely
-> so it "fails the same way Vercel would", and its comment records that Vercel's
-> Root Directory is `/marketing`. That job is the guard against this table going
-> stale — if the Root Directory ever changes, make the CI job follow it.
+> `.github/workflows/ci.yml` runs with `working-directory: marketing`, and its
+> comment records that Vercel's Root Directory is `/marketing`. If that setting
+> ever changes, change the CI job with it — that job is what keeps this table
+> honest.
+>
+> Read the job's own "fails the same way Vercel would" narrowly, though: it
+> reproduces Vercel's *working directory*, not its *file set*. It checks out the
+> whole repository, so anything that breaks only because files above `marketing/`
+> are absent passes in CI and fails on Vercel — see the next section for the case
+> that actually bit.
 >
 > ⚠️ **Still worth confirming in the dashboard: which project serves the apex.**
 > The repo-root `vercel.json` builds the *editor*, and the project whose Root
@@ -31,13 +37,42 @@ builds the other site.
 > rustup-init refuses to install over it. The root `vercel.json` is the tested
 > version; do not reintroduce a second one.
 
+### The one non-obvious Vercel setting
+
+The marketing project's Root Directory is `marketing`, and it **also needs
+"Include files outside of the Root Directory in the Build Step" turned ON.**
+Without it the install fails before a line of the site is built:
+
+```
+ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC
+No catalog entry '@types/react' was found for catalog 'default'.
+```
+
+`marketing/package.json` declares react, react-dom, vite, typescript and the
+React types as `"catalog:"`, and the catalog they resolve against lives in
+`pnpm-workspace.yaml` at the **repo root**. Root Directory alone gives the build
+only the `marketing/` subtree, so pnpm has a specifier it cannot resolve.
+
+Reproduced by copying `marketing/` somewhere on its own and running
+`pnpm install`; it fails identically. Not fixable from the repo — dropping
+`catalog:` would work and would undo the single source of truth for shared
+versions that `pnpm-workspace.yaml` exists to be. It is a project setting, and
+the editor project needs the same one for the Rust crate.
+
+`app/package.json` uses `catalog:` too, which is why `rust-wasm-photo-tool-app`
+fails the same way. That project has no path to working regardless: rooted at
+`app/`, it cannot build the wasm engine, because `Cargo.toml` and
+`scripts/build-wasm.sh` are above it. `image-horse` already builds the editor
+correctly from the repo root, so the `app/`-rooted project is redundant and
+worth deleting rather than fixing.
+
 Domains, once the mapping is confirmed:
 
 | Record | Name | Value |
 | --- | --- | --- |
 | `A` | `@` | Vercel's apex IP (from the project's Domains tab) |
 | `CNAME` | `www` | `cname.vercel-dns.com` |
-| `CNAME` | `app` | `cname.vercel-dns.com` |
+| `CNAME` | `edit` | `cname.vercel-dns.com` |
 
 Add **both** `imagehorse.app` and `www.imagehorse.app` to the marketing project.
 The `www` → apex redirect is a 308 in `marketing/vercel.json` rather than a
