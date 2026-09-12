@@ -1,4 +1,4 @@
-# app.imagehorse.app — the editor.
+# edit.imagehorse.app — the editor.
 #
 # Crawling is ALLOWED here and indexing is not, which sounds backwards and is
 # the only combination that works. The "do not index this host" instruction is
