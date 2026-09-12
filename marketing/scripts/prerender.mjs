@@ -98,22 +98,51 @@ function documentFor(route) {
 // moment of the last deploy is a file it learns to ignore. So each route's date
 // comes from the last commit that touched the files behind it.
 //
-// %cs is the committer date as bare YYYY-MM-DD, which is already the W3C date
-// form the sitemap spec wants, with no timezone to get wrong.
+// %cs is the committer date as bare YYYY-MM-DD, already the W3C date form the
+// sitemap spec wants, with no timezone to get wrong.
 //
-// Shallow clones are the expected failure here: CI and Vercel both fetch with a
-// truncated history, so a file's last commit may simply not be in the tree. A
-// route with no answer is emitted with no `lastmod` rather than with today's —
-// omitting the hint costs nothing, inventing it discredits the other four.
+// ⚠️ A TRUNCATED HISTORY PRODUCES A CONVINCING WRONG ANSWER. The intuition that
+// a shallow clone makes `git log -- <path>` come back empty is wrong. The oldest
+// commit a shallow clone has — the "shallow boundary", listed in .git/shallow —
+// has no parents as far as git can see, so every file present in it reads as
+// having been ADDED there. `git log -1 -- <any path>` then answers with that
+// commit for anything older than the cutoff. At depth 1 that is the entire tree:
+// all five routes come back with the same date, the date of the deploy. Which is
+// precisely the signal this field exists to avoid, and it would have shipped —
+// Vercel clones shallow, and CI's actions/checkout@v4 defaults to fetch-depth 1.
+//
+// Blanket-rejecting shallow repositories is the obvious fix and it is too blunt:
+// a clone deep enough to contain a file's real last commit gives the right
+// answer for that file, and this repo's own CI checkout is exactly that case —
+// measured here, releases.ts resolved to a genuine commit while the page
+// components resolved to the boundary.
+//
+// So the test is per file, and it is the precise one: resolve the commit as well
+// as the date, and treat a hit on a boundary commit as "not known" rather than
+// as a date. Real dates survive; manufactured ones do not.
+const shallowBoundary = new Set(
+  (() => {
+    try {
+      return readFileSync(join(repoRoot, ".git", "shallow"), "utf8").split("\n").filter(Boolean);
+    } catch {
+      return []; // A full clone has no .git/shallow, which is the good case.
+    }
+  })(),
+);
+
 function lastCommitDate(paths) {
   const dates = paths
     .map((p) => {
       try {
-        return execFileSync("git", ["log", "-1", "--format=%cs", "--", p], {
+        const line = execFileSync("git", ["log", "-1", "--format=%H %cs", "--", p], {
           cwd: repoRoot,
           encoding: "utf8",
           stdio: ["ignore", "pipe", "ignore"],
         }).trim();
+        const [sha, date] = line.split(" ");
+        // The boundary commit did not "change" this file, it is just where the
+        // history stops. No date is better than that one.
+        return sha && !shallowBoundary.has(sha) ? date : "";
       } catch {
         return "";
       }
