@@ -7,6 +7,8 @@ import Architecture from "./pages/Architecture";
 import Features from "./pages/Features";
 import Pricing from "./pages/Pricing";
 import Trail from "./pages/Trail";
+import NotFound from "./pages/NotFound";
+import useHead from "./useHead";
 
 /** Client-side routing keeps the scroll position across pages, which is the
  *  wrong default for a set of documents: follow a link and you land halfway
@@ -30,6 +32,11 @@ function ScrollBehaviour() {
 }
 
 export default function App() {
+  // Title, description, canonical and JSON-LD follow the route. The prerendered
+  // HTML already carries the right ones for the page a visitor lands on; this is
+  // what keeps them right after a client-side navigation.
+  useHead();
+
   const [searchOpen, setSearchOpen] = useState(false);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
 
@@ -59,6 +66,10 @@ export default function App() {
         <Route path="/features" element={<Features />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/trail-log" element={<Trail />} />
+        {/* A catch-all, so an unknown URL gets a page that says so instead of a
+            bare nav over empty space. Paired with a real 404 status from the
+            host — see scripts/prerender.mjs. */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <CommandPalette open={searchOpen} onClose={closeSearch} />
     </>
