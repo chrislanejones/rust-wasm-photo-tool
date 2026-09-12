@@ -134,10 +134,26 @@ offline:
    fine until you use a tool — went unnoticed for ten releases on Netlify. A
    migrated build command is precisely when it can happen again.
 
-3. **Point `app.imagehorse.app` at the editor project** and re-run the sentinel
-   against the real hostname. `scripts/deploy-sentinel.sh` already defaults to
-   `https://app.imagehorse.app`, so from here the CI job checks the new host with
-   no further change.
+3. **Point `app.imagehorse.app` at the editor project**, re-run the sentinel
+   against it by hand, and only then change its default:
+
+   ```bash
+   SENTINEL_SITE=https://app.imagehorse.app ./scripts/deploy-sentinel.sh
+   ```
+
+   `scripts/deploy-sentinel.sh` still defaults to the Netlify host on purpose —
+   it has to follow whatever is actually serving users. Changing it first was
+   tried on this branch and CI rejected it in under a minute: three fetches,
+   three 404s. Note the shape of that failure, because it is informative —
+   `app.imagehorse.app` answered with an HTTP 404 rather than failing to resolve,
+   which is what Vercel returns for a domain that resolves to it but is not
+   attached to any project. The DNS is the easy half; the domain also has to be
+   added to the project.
+
+   The reason to care about the ordering is not the red run. It is that a check
+   which is red for a reason everyone knows about gets ignored or switched off —
+   and this is the check that exists to catch a featureless wasm, which once
+   shipped for ten releases without anyone noticing.
 
 4. **Only then**: delete the Netlify site, delete `netlify.toml`, and drop its
    references from `docs/CI.md` and the sentinel's comments.

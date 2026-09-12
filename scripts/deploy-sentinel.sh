@@ -24,7 +24,23 @@
 # Runnable by hand — that is the point:  ./scripts/deploy-sentinel.sh
 set -uo pipefail
 
-SITE="${SENTINEL_SITE:-https://app.imagehorse.app}"
+# ⚠️ THIS DEFAULT FOLLOWS PRODUCTION, NOT THE PLAN. It is the host that is
+# serving users right now, because a sentinel aimed anywhere else is not a
+# weaker check — it is no check at all, and a permanently red one at that.
+#
+# It was briefly changed to https://app.imagehorse.app ahead of the DNS move and
+# CI caught it immediately: three fetch attempts, three 404s, "SENTINEL FAIL:
+# could not fetch". The domain does not resolve to the editor yet. The danger of
+# leaving it that way is not the red run, it is that a check which is red for a
+# reason everybody knows about gets ignored or switched off, and then the real
+# failure it exists to catch — a featureless wasm, which once shipped for ten
+# releases — goes through unnoticed.
+#
+# Flip it to https://app.imagehorse.app as step 3 of docs/Deploying.md, AFTER the
+# domain points at the editor and a manual run against that host passes:
+#
+#   SENTINEL_SITE=https://app.imagehorse.app ./scripts/deploy-sentinel.sh
+SITE="${SENTINEL_SITE:-https://rust-wasm-photo-tool.netlify.app}"
 MIN_WASM="${SENTINEL_MIN_WASM:-800000}"
 MAX_WASM="${SENTINEL_MAX_WASM:-840000}"
 # Methods that only exist when the engine is built --features tiles,patchmatch.
