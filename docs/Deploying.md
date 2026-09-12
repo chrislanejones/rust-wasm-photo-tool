@@ -38,22 +38,26 @@ project builds the other site.
 > rustup-init refuses to install over it. The root `vercel.json` is the tested
 > version; do not reintroduce a second one.
 
-### Two things that stop a marketing deploy
+### What actually stopped the marketing deploy
 
-**1. The config must be schema-valid, and JSON-valid is not enough.** Vercel's
+**The config has to be schema-valid, and JSON-valid is not enough.** Vercel's
 config schema is `additionalProperties: false` at every level, so a `"//"`
 comment key makes the whole file invalid and the deployment is rejected with a
-400 *before a build starts*. This file carried 8 of them and was never once
-usable. See [`marketing/VERCEL-CONFIG.md`](../marketing/VERCEL-CONFIG.md), which
-now holds the prose that used to be those keys — keep it there.
+400 *before a build starts*. `marketing/vercel.json` carried 8 of them and was
+never once usable. Fixed in #135; the prose those keys held now lives in
+[`marketing/VERCEL-CONFIG.md`](../marketing/VERCEL-CONFIG.md) — keep it there.
+
+That was the whole blocker. With the schema fixed, `image-horse-marketing`
+builds and deploys clean.
 
 The trap worth naming: `json.load()` succeeding proves the file is JSON, not that
-Vercel will accept it. Checking the former and reporting the config "valid" is
-how this shipped.
+Vercel will accept it. Checking the former and calling the config "valid" is how
+this shipped.
 
-**2. Expect `catalog:` to bite once the config is valid and the Root Directory
-is `marketing`.** Not the failure above — a different one, further along, and it
-has not been observed on Vercel yet because nothing has got that far:
+#### A `catalog:` failure that does NOT happen on Vercel
+
+Worth recording because it looks like it should, and predicting it here was
+wrong. Copy `marketing/` somewhere on its own and run `pnpm install` and you get:
 
 ```
 ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC
@@ -61,23 +65,20 @@ No catalog entry '@types/react' was found for catalog 'default'.
 ```
 
 `marketing/package.json` declares react, react-dom, vite, typescript and the
-React types as `"catalog:"`, and the catalog they resolve against lives in
-`pnpm-workspace.yaml` at the **repo root**. A Root Directory of `marketing`
-hands the build only that subtree, so pnpm gets a specifier it cannot resolve.
-Reproduced locally by copying `marketing/` out on its own and running
-`pnpm install`; it fails exactly like that. The fix is the project setting
-**"Include files outside of the Root Directory in the Build Step"** — the same
-one the editor project needs for the Rust crate.
+React types as `"catalog:"`, and that catalog lives in `pnpm-workspace.yaml` at
+the repo root. So the reasoning was: Root Directory `marketing` hands the build
+only that subtree, therefore Vercel must hit the same wall and needs "Include
+files outside of the Root Directory in the Build Step".
 
-Not fixable from the repo: dropping `catalog:` would also work and would undo
-the single source of truth for shared versions that `pnpm-workspace.yaml` exists
-to be.
+**It does not, and it doesn't.** The first schema-valid deployment installed and
+built fine. Vercel's Root Directory is not equivalent to a standalone copy of
+that directory — the workspace root is reachable. Do not go turning settings on
+to fix this; there is nothing to fix.
 
-`app/package.json` uses `catalog:` too, so an `app/`-rooted project would hit the
-same wall — and `rust-wasm-photo-tool-app` has no path to working regardless,
-since from `app/` it cannot build the wasm engine (`Cargo.toml` and
-`scripts/build-wasm.sh` are above it). `image-horse` already builds the editor
-from the repo root, so that project is redundant rather than broken.
+The general lesson is the same one as above, pointed the other way: a local
+reproduction proves what your machine does, not what the platform does. Both
+halves of this section were originally asserted from something that was not the
+platform.
 
 Domains, once the mapping is confirmed:
 
