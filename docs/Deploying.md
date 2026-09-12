@@ -2,27 +2,34 @@
 
 ## Which config belongs to which project
 
-Two Vercel projects are linked to this repo, and Vercel picks a project's config
-file by its **Root Directory** setting. Get this mapping wrong and a project
-builds the other site.
+Three Vercel projects are linked to this repo, and Vercel picks a project's
+config file by its **Root Directory** setting. Get this mapping wrong and a
+project builds the other site.
 
 | Vercel project | Root Directory | Reads | Builds | Output |
 | --- | --- | --- | --- | --- |
 | `image-horse` | *(repo root)* | [`vercel.json`](../vercel.json) | the **editor** | `www-dist` |
 | `rust-wasm-photo-tool-app` | `app` | *(no config in `app/`)* | — | — |
-| the marketing project | `marketing` | [`marketing/vercel.json`](../marketing/vercel.json) | the **marketing site** | `marketing/dist` |
+| `image-horse-marketing` | `marketing` | [`marketing/vercel.json`](../marketing/vercel.json) | the **marketing site** | `marketing/dist` |
 
 > The marketing row is confirmed by the repo's own CI: the `marketing` job in
-> `.github/workflows/ci.yml` runs with `working-directory: marketing` precisely
-> so it "fails the same way Vercel would", and its comment records that Vercel's
-> Root Directory is `/marketing`. That job is the guard against this table going
-> stale — if the Root Directory ever changes, make the CI job follow it.
+> `.github/workflows/ci.yml` runs with `working-directory: marketing`, and its
+> comment records that Vercel's Root Directory is `/marketing`. If that setting
+> ever changes, change the CI job with it — that job is what keeps this table
+> honest.
 >
-> ⚠️ **Still worth confirming in the dashboard: which project serves the apex.**
-> The repo-root `vercel.json` builds the *editor*, and the project whose Root
-> Directory is the repo root is named `image-horse` — the name the marketing site
-> deployed under at `image-horse.vercel.app`. Those two do not sit together
-> comfortably. Check which project each domain is attached to before moving DNS.
+> Read the job's own "fails the same way Vercel would" narrowly, though: it
+> reproduces Vercel's *working directory*, not its *file set*. It checks out the
+> whole repository, so anything that breaks only because files above `marketing/`
+> are absent passes in CI and fails on Vercel — see the next section for the case
+> that actually bit.
+>
+> ⚠️ **The apex has been serving the editor.** That is not a hypothetical to
+> check — #135 established it. The project serving `imagehorse.app` had its Root
+> Directory at the repo root, so Vercel read the *root* `vercel.json`, and #133
+> repointed that file at the editor build. Until the apex is pointed at a project
+> that builds `marketing/`, none of the prerendering, sitemap or metadata below is
+> what visitors or crawlers actually get.
 >
 > There is no `app/vercel.json`. One was added in the first draft of this branch
 > and removed: it hand-ported the old `netlify.toml` build command, including the
@@ -31,13 +38,55 @@ builds the other site.
 > rustup-init refuses to install over it. The root `vercel.json` is the tested
 > version; do not reintroduce a second one.
 
+### What actually stopped the marketing deploy
+
+**The config has to be schema-valid, and JSON-valid is not enough.** Vercel's
+config schema is `additionalProperties: false` at every level, so a `"//"`
+comment key makes the whole file invalid and the deployment is rejected with a
+400 *before a build starts*. `marketing/vercel.json` carried 8 of them and was
+never once usable. Fixed in #135; the prose those keys held now lives in
+[`marketing/VERCEL-CONFIG.md`](../marketing/VERCEL-CONFIG.md) — keep it there.
+
+That was the whole blocker. With the schema fixed, `image-horse-marketing`
+builds and deploys clean.
+
+The trap worth naming: `json.load()` succeeding proves the file is JSON, not that
+Vercel will accept it. Checking the former and calling the config "valid" is how
+this shipped.
+
+#### A `catalog:` failure that does NOT happen on Vercel
+
+Worth recording because it looks like it should, and predicting it here was
+wrong. Copy `marketing/` somewhere on its own and run `pnpm install` and you get:
+
+```
+ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC
+No catalog entry '@types/react' was found for catalog 'default'.
+```
+
+`marketing/package.json` declares react, react-dom, vite, typescript and the
+React types as `"catalog:"`, and that catalog lives in `pnpm-workspace.yaml` at
+the repo root. So the reasoning was: Root Directory `marketing` hands the build
+only that subtree, therefore Vercel must hit the same wall and needs "Include
+files outside of the Root Directory in the Build Step".
+
+**It does not, and it doesn't.** The first schema-valid deployment installed and
+built fine. Vercel's Root Directory is not equivalent to a standalone copy of
+that directory — the workspace root is reachable. Do not go turning settings on
+to fix this; there is nothing to fix.
+
+The general lesson is the same one as above, pointed the other way: a local
+reproduction proves what your machine does, not what the platform does. Both
+halves of this section were originally asserted from something that was not the
+platform.
+
 Domains, once the mapping is confirmed:
 
 | Record | Name | Value |
 | --- | --- | --- |
 | `A` | `@` | Vercel's apex IP (from the project's Domains tab) |
 | `CNAME` | `www` | `cname.vercel-dns.com` |
-| `CNAME` | `app` | `cname.vercel-dns.com` |
+| `CNAME` | `edit` | `cname.vercel-dns.com` |
 
 Add **both** `imagehorse.app` and `www.imagehorse.app` to the marketing project.
 The `www` → apex redirect is a 308 in `marketing/vercel.json` rather than a
