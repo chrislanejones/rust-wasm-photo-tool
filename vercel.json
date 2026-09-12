@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none && . $HOME/.cargo/env && cargo install wasm-pack --version 0.15.0 --locked && pnpm install",
-  "buildCommand": ". $HOME/.cargo/env && ./scripts/build-wasm.sh && pnpm --filter stamp-tool build && ./scripts/write-build-info.sh www-dist",
+  "installCommand": "curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none && . ${CARGO_HOME:-$HOME/.cargo}/env && cargo install wasm-pack --version 0.15.0 --locked && pnpm install",
+  "buildCommand": ". ${CARGO_HOME:-$HOME/.cargo}/env && ./scripts/build-wasm.sh && pnpm --filter stamp-tool build && ./scripts/write-build-info.sh www-dist",
   "outputDirectory": "www-dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
