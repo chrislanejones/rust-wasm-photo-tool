@@ -14,7 +14,7 @@
     "gen:og": "node scripts/gen-og-images.mjs"
   },
   "dependencies": {
-    "lucide-react": "^1.25.0",
+    "lucide-react": "^1.45.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-router": "^7.18.3",
