@@ -370,6 +370,20 @@ before estimating — grep the exported method list, not the issue title.
 
 ## OPEN — no Content-Security-Policy on either site (2026-09-03)
 
+**Update 2026-09-14 — measured on the live responses, not the config.** The
+headers shipped in v8.70 (ADR-048) and are on all three origins. What is still
+open:
+
+| Item | State |
+|---|---|
+| `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app`, `imagehorse.app` and the Netlify site |
+| Clickjacking | ❌ **never enforced.** `frame-ancestors 'none'` sits inside the *report-only* CSP, so all three origins rendered in a cross-origin iframe (headless Chromium, with a must-block and a must-load control). `X-Frame-Options: DENY` added on `fix/x-frame-options-deny` |
+| CSP enforcing flip | ❌ still report-only — ADR-048's follow-up |
+| `app/src/lib/cspInlineHash.test.ts` | ⚠️ checks the inline-script hash against **`netlify.toml` only**. Production reads the root `vercel.json`, so the policy users get is unguarded. The two hashes match today |
+| ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135. Amendment owed |
+
+The table below is the state before v8.70, kept for history.
+
 Found by the night-0902 security pass. Live responses from **both** the app and
 the marketing site carry exactly one security header:
 
