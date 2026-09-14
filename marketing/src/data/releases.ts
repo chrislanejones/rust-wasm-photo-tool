@@ -24,6 +24,25 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.77",
+    date: "2026-09-14",
+    headline: "Other sites can't frame the editor, and A/B compare lines up",
+    entries: [
+      {
+        tag: "fix",
+        text: "Other websites can no longer load the editor or the front page inside a frame of their own. A rule meant to stop that has been there since v8.70, but it sat in the half of the security policy that only reports, so it never blocked anything. Both sites now send a header the browser enforces by itself, checked in a real browser before and after.",
+      },
+      {
+        tag: "ui",
+        text: "A/B compare lines up. With the default canvas border, the original half was stretched across the border while the edited half showed it, so the two sides differed in something that isn't your picture. The original now sits exactly over the photo, the border looks the same on both sides, and turning compare off leaves your document exactly as it was.",
+      },
+      {
+        tag: "rust",
+        text: "The engine the editor downloads is now byte-for-byte the one the test builds produce: 823,503 bytes. Vercel keeps its Rust packages somewhere the build wasn't told to tidy up, so real file paths ended up inside the binary and production ran 24 bytes different from every other build of the same code. One line fixed it.",
+      },
+    ],
+  },
+  {
     version: "v8.76",
     date: "2026-09-12",
     headline: "The editor has its own address, and the front page is the front page again",

@@ -10618,3 +10618,14 @@ wasm: 818,925 B → 822,629 B. `src/lib.rs` 5,183 → 5,167 lines.
 | **SEO** | The editor's canonical link and `og:url` name `edit.imagehorse.app` instead of a build host. |
 | **Engine** | The wasm builds on Vercel unchanged — 823,479 B, `features tiles,patchmatch`, exports intact, served copy matching its own build record. The feature set now has one home, `scripts/build-wasm.sh`, instead of being duplicated in a host config. |
 | **Deploy check** | `scripts/deploy-sentinel.sh` follows production to `edit.imagehorse.app`, after a manual run against that host passed. Note its limit: it inspects the wasm binary, not whether the app mounts — it passed green while the editor rendered a blank screen. |
+
+## v8.77 Change Summary — 2026-09-14
+
+**Other sites can't frame the editor, and A/B compare lines up.**
+
+| Area | Change |
+| --- | --- |
+| **Security** | Both sites send `X-Frame-Options: DENY`. ADR-048 counted `frame-ancestors 'none'` as enforcing, but it shipped inside `Content-Security-Policy-Report-Only`, which blocks nothing: since v8.70, `edit.imagehorse.app`, `imagehorse.app` and the Netlify site all rendered inside a cross-origin iframe. Proven in Chromium with a must-block and a must-load control, then proven blocked with the header (#144). |
+| **Compare** | The A/B overlay covers `photo_bounds` instead of the whole canvas. On a 400×300 photo with the default 10px artboard the overlay was 420×320, and the original was stretched across the band. Now the band shows through the same on both halves. Nothing in the document changes, so leaving compare has nothing to restore. A unit test and an e2e spec pin it, and each fails against the old geometry (#146). |
+| **Engine** | Vercel's wasm is byte-identical to CI's: **823,503 B, `102e26d9…`**. Vercel's `CARGO_HOME` is `/rust`, which matched none of the `--remap-path-prefix` entries, so 27 registry paths were embedded and production ran 24 B off every other builder (823,479 B). One line in `.cargo/config.toml`, verified against the served preview asset, not only the build record (#145). |
+| **Docs** | Vacuous check #15 (the guardrails CI job never builds wasm) and why `netlify.toml` stays. Three findings parked: `history_max_bytes` has no caller; `cspInlineHash.test.ts` guards `netlify.toml` only; and the scheduled `cargo audit` has been red for eight weeks because the job lacks `issues: write`. It found no vulnerabilities. |

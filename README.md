@@ -85,41 +85,28 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.76 — 2026-09-12
+### v8.77 — 2026-09-14
 
-**The editor has its own address, and the front page is the front page again.**
+**Other sites can't frame the editor, and A/B compare lines up.**
 
-Image Horse has moved to its own domain. The site is at imagehorse.app, the
-editor opens at edit.imagehorse.app, and www redirects to the apex. The old
-Netlify address still works and stays up for now, so nothing you have
-bookmarked breaks.
+Other websites can no longer load the editor or the front page inside a frame
+of their own. A rule meant to stop that has been there since v8.70, but it sat
+in the half of the security policy that only reports, so it never blocked
+anything. Both sites now send `X-Frame-Options: DENY`, which the browser
+enforces by itself. Checked in a real browser before and after: the live sites
+loaded inside a frame, and with the new header they don't.
 
-For a few hours the front page served the editor instead of the site. Two
-projects share this repo, and a Root Directory setting decides which one builds
-which site; the marketing project was still pointed at the repo root, where the
-config had just been changed to build the editor. It points at `marketing/`
-now. Junk URLs give a real 404 again instead of quietly answering with the home
-page, and the site carries its own security headers rather than borrowing the
-editor's.
+A/B compare lays the original over the photo, not over the whole canvas. With
+the default 10px canvas border, the original half was stretched across the
+border while the edited half showed it, so the two sides differed in something
+that isn't the picture. The border now looks the same on both sides, and
+turning compare off leaves the document exactly as it was.
 
-Underneath that sat a config file that had never once worked. Vercel rejects
-any key it does not recognise, and `marketing/vercel.json` carried eight
-comment keys, so every deploy that read it was refused before a build started.
-Nothing noticed, because nothing had ever read it. Those comments live beside
-the file now instead of inside it.
-
-Ten entries on the Features page were drawing a plain square where an icon
-should be. The feature list is generated from the repo's own list; the icon map
-beside it is written by hand. Eight features had shipped without an icon, and
-two more had been renamed, which drops the icon just as quietly. Every feature
-has one now, and anything unmapped falls back to a dot, so the next gap looks
-like a gap rather than a broken tile.
-
-Smaller things: the sitemap stops stamping every URL with the deploy date — a
-shallow clone has no history to read a real date from, so it was inventing one;
-the editor's canonical link and share card name edit.imagehorse.app rather than
-a build host; and the check that proves the shipped engine is real now watches
-the address that actually serves it.
+The engine the editor downloads is now byte-for-byte the one CI builds: 823,503
+bytes. Vercel keeps its Rust packages under `/rust`, a path the build wasn't
+told to scrub, so real file paths ended up inside the binary and production ran
+24 bytes different from every other build of the same code. The code was never
+different. Now the bytes aren't either.
 
 ## License
 
