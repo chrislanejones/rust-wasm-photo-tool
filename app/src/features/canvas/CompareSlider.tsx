@@ -1,16 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useUIStore } from "@/stores/useUIStore";
 import { useToolStore } from "@/stores/useToolStore";
+import { useGalleryStore } from "@/stores/useGalleryStore";
+import { usePhotoBounds } from "@/hooks/usePhotoBounds";
+import { comparePhotoRect } from "@/lib/comparePhotoRect";
+import type { ImageHorseTool } from "stamp_tool";
 
 interface CompareSliderProps {
   /** The canvas element rendering the current edited image — we mirror its bounding box. */
   canvasEl: HTMLCanvasElement | null;
+  /** The engine, for `photo_bounds` — the overlay covers the photo, not the artboard. */
+  toolRef: MutableRefObject<ImageHorseTool | null>;
+  /** Pixel-change counter (`undoCount`): a resize, an undo or a flatten moves the photo. */
+  revision: number;
 }
+
+/** Handed to `usePhotoBounds` while compare is closed, so it asks the engine nothing. */
+const NO_TOOL: MutableRefObject<ImageHorseTool | null> = { current: null };
 
 /**
  * Squoosh-style A/B compare. Renders an overlay positioned exactly over the
- * canvas. The "before" layer fills that same box via background-size 100% 100%,
+ * PHOTO inside the canvas — not over the artboard around it (see `rect`). The
+ * "before" layer fills that same box via background-size 100% 100%,
  * so both layers share one coordinate space regardless of zoom/pan.
  *
  * LEFT of the divider is the ORIGINAL (the before layer is clipped from the
@@ -18,7 +30,7 @@ interface CompareSliderProps {
  * through. Every part of the labelling below exists to say that without being
  * read twice — see the label block.
  */
-export function CompareSlider({ canvasEl }: CompareSliderProps) {
+export function CompareSlider({ canvasEl, toolRef, revision }: CompareSliderProps) {
   // The "before" original URL + whether compare is on now come from the UI store
   // (were prop-drilled AppShell → CanvasArea → here before stage 1).
   const beforeUrl = useUIStore((s) => s.originalUrl);
@@ -30,6 +42,10 @@ export function CompareSlider({ canvasEl }: CompareSliderProps) {
   const position = useUIStore((s) => s.comparePosition);
   const setPosition = useUIStore((s) => s.setComparePosition);
   const activeSubTool = useToolStore((s) => s.activeSubTool);
+  // Asked only while compare is open — a closed slider must not add an engine
+  // round trip to every stroke. Same revision AppShell's status bar reads.
+  const layerRevision = useGalleryStore((s) => s.layerRevision);
+  const photoBounds = usePhotoBounds(active ? toolRef : NO_TOOL, revision + layerRevision);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [box, setBox] = useState<{
@@ -135,24 +151,31 @@ export function CompareSlider({ canvasEl }: CompareSliderProps) {
 
   if (!active || !beforeUrl || !box) return null;
 
+  // Over the whole canvas box, the original was stretched across the artboard
+  // band on its half while the edit showed the band on the other — two sides
+  // that differed in something nobody asked to compare. Inset to the photo, the
+  // band shows through identically on both. Nothing in the document changes, so
+  // closing compare has nothing to restore. Unknown bounds keep the full box.
+  const rect = comparePhotoRect(box, canvasEl?.width ?? 0, canvasEl?.height ?? 0, photoBounds);
+
   const clipPercent = position * 100;
 
   // Room test in PIXELS, not percent: a chip is ~90px wide whatever the image
   // is, so "is there space for it" cannot be asked in percent. Below this the
   // chip fades rather than being sliced by its half's overflow clip.
   const LABEL_ROOM = 104;
-  const originalRoom = box.width * position >= LABEL_ROOM;
-  const editedRoom = box.width * (1 - position) >= LABEL_ROOM;
+  const originalRoom = rect.width * position >= LABEL_ROOM;
+  const editedRoom = rect.width * (1 - position) >= LABEL_ROOM;
 
   return (
     <div
       ref={overlayRef}
       className="absolute z-20 cursor-col-resize select-none"
       style={{
-        left: box.left,
-        top: box.top,
-        width: box.width,
-        height: box.height,
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
         touchAction: "none",
       }}
       onPointerDown={onPointerDown}
