@@ -22,7 +22,7 @@ pnpm dev               # → pnpm --filter stamp-tool dev
 pnpm dev:marketing     # → pnpm --filter photo-horse-marketing dev
 ```
 
-**Deploying:** the **marketing site** deploys on **Vercel** with its **Root Directory set to `marketing/`** — Vercel reads `marketing/vercel.json` (`pnpm install` + `pnpm build`, output `dist`); pnpm resolves the workspace `catalog:` from the repo root. The **editor app** deploys on **Netlify** from the repo (git) root — `netlify.toml` installs Rust + `wasm-pack`, builds the app, and publishes `www-dist`.
+**Deploying:** the **marketing site** deploys on **Vercel** with its **Root Directory set to `marketing/`** — Vercel reads `marketing/vercel.json` (`pnpm install` + `pnpm build`, output `dist`); pnpm resolves the workspace `catalog:` from the repo root. The **editor app** deploys on **Vercel** from the repo (git) root — the root `vercel.json` installs Rust + `wasm-pack`, builds the app, and publishes `www-dist` to **edit.imagehorse.app** (since v8.76). Netlify still builds the same tree from `netlify.toml` and is kept as the rollback path, so both hosts are live and only one is canonical.
 
 ## With Convex
 
