@@ -94,8 +94,13 @@ dashboard setting, so the canonical host is version-controlled next to the
 `<link rel="canonical">` that has to agree with it.
 
 Netlify is **still live** and still builds every PR preview. `netlify.toml` stays
-until `scripts/deploy-sentinel.sh` passes against the Vercel host — see
-"Retiring Netlify" below.
+— see "Retiring Netlify" below. Its stated precondition is now MET: the sentinel
+passes against `edit.imagehorse.app` and defaults to it (2026-09-12). What keeps
+the file is no longer that condition but a choice — Netlify is the rollback path,
+and it is the only other builder that proves the wasm is reproducible off this
+laptop. Measured the morning after the move: same commit, Netlify and CI and this
+laptop all 823,503 B, Vercel 823,479 B. Keeping a second builder is what made that
+visible at all.
 
 ---
 
@@ -190,7 +195,11 @@ offline:
    SENTINEL_SITE=https://edit.imagehorse.app ./scripts/deploy-sentinel.sh
    ```
 
-   `scripts/deploy-sentinel.sh` still defaults to the Netlify host on purpose —
+   **DONE 2026-09-12** (#136): the default is now `https://edit.imagehorse.app`.
+   The paragraph below is kept because the failure it describes is the reason the
+   order matters, not because the step is still pending.
+
+   `scripts/deploy-sentinel.sh` used to default to the Netlify host on purpose —
    it has to follow whatever is actually serving users. Changing it first was
    tried on this branch and CI rejected it in under a minute: three fetches,
    three 404s. Note the shape of that failure, because it is informative —

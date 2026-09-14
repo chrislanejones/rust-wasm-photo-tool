@@ -4,6 +4,47 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — `history_max_bytes` is exported and nothing calls it (2026-09-12)
+
+Found by `scripts/dead-exports-audit.mjs` running locally with `pkg/` built. It
+is a plain `#[wasm_bindgen]` export in `src/settings.rs:62`, not feature-gated,
+and its own doc comment says JS is meant to read it: "JS estimates the depth
+from the live document size and this number; hardcoding 512 MB there would be a
+second copy of a value that already lives here" (ADR-052). There is no caller in
+`app/`.
+
+⚠️ **Do not delete it on the strength of "zero references."** That is the
+`useRealTier` shape — a zero-reference export that was a MISSING WIRE, not dead
+code. Run the pickaxe first (`git log --all -G "history_max_bytes"`) to tell
+"never connected" from "lost", and read ADR-052 for what the undo-depth
+estimate was supposed to do.
+
+## OPEN — the `guardrails` CI job never builds wasm (2026-09-12)
+
+So the dead-exports engine half counts **0** in CI and cannot fail there; it is
+vacuous check #15 in `docs/vacuous-checks.md`. Fixing it is a one-line job
+change (build wasm before the script), but it turns CI **red** on the export
+above the moment it lands — so the two are one decision, not two. Sequence:
+resolve `history_max_bytes`, then make the gate able to see it.
+
+## OPEN — scheduled `cargo audit` has been red every week since at least 2026-07-27 (2026-09-14)
+
+Every **scheduled** run of `ci.yml` in the last eight weeks concluded `failure`,
+and it was never a vulnerability. Read from the 2026-09-14 run's log:
+
+| | |
+|---|---|
+| Vulnerabilities | **0** — "No vulnerabilities were found" |
+| Warnings | 2 unmaintained (`atomic-polyfill` RUSTSEC-2023-0089, `spin`), 1 yanked (`ttf-parser`) |
+| What fails | `rustsec/audit-check@v2` then tries to open a GitHub issue: `Resource not accessible by integration` |
+| Why | the `cargo-audit` job grants `contents: read` and `checks: write` — no `issues: write` |
+
+Push and PR runs of the same job pass, so a red is only ever visible on the
+cron — which is also the run nobody opens. Two ways out, one decision: grant
+`issues: write` (this repo has **zero** issues on purpose, so weekly auto-issues
+may be unwanted), or stop the action from filing issues and read the warnings
+from the check-run. Separately, the three warnings deserve a look on their own.
+
 ## OPEN — should cut-to-layer produce a FULL-CANVAS layer? (2026-09-06)
 
 Split out of the closed #72 below, which proved the engine is correctly scoped
