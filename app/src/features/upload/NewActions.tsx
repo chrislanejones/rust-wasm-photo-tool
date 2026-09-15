@@ -39,6 +39,7 @@ import {
   rejectReason,
 } from "./aiImageDraft";
 import { isSvgFile } from "@/lib/rasterizeSvg";
+import { namePastedImage } from "@/lib/pastedImageName";
 
 interface SizePreset {
   id: string;
@@ -373,12 +374,7 @@ export function NewActions({
       for (const item of items) {
         for (const type of item.types) {
           if (type.startsWith("image/")) {
-            const blob = await item.getType(type);
-            files.push(
-              new File([blob], `pasted-image.${type.split("/")[1] ?? "png"}`, {
-                type,
-              }),
-            );
+            files.push(namePastedImage(await item.getType(type)));
           }
         }
       }
@@ -409,7 +405,8 @@ export function NewActions({
       const files = Array.from(items)
         .filter((i) => i.type.startsWith("image/"))
         .map((i) => i.getAsFile())
-        .filter((f): f is File => f !== null);
+        .filter((f): f is File => f !== null)
+        .map(namePastedImage);
       if (files.length) {
         e.preventDefault();
         processFiles(files);

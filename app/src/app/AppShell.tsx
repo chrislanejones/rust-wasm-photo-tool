@@ -23,6 +23,7 @@ import { useStampTeardown } from "@/hooks/useStampTeardown";
 import { useEffectiveTool } from "@/hooks/useEffectiveTool";
 import { canEncode } from "@/lib/encodeSupport";
 import { createStrokeCoalescer } from "@/lib/strokeCoalescer";
+import { namePastedImage } from "@/lib/pastedImageName";
 import type { StrokeCoalescer } from "@/lib/strokeCoalescer";
 import type { ToolType, StampSettings, ToolSettings } from "@/lib/types";
 import { springStandard, instantTransition, fadeIn, imageLoadBarFade, imageLoadBarProgress } from "@/lib/animations";
@@ -1856,7 +1857,6 @@ export function AppShell() {
   const handlePasteFromClipboard = useCallback(
     async (items?: DataTransferItemList | null) => {
       let source: Blob | null = null;
-      let fileName = "pasted.png";
       if (items) {
         // Collect EVERY image on the clipboard, not just the first. Pasting a
         // multi-file selection out of a file manager hands over one item per
@@ -1867,18 +1867,15 @@ export function AppShell() {
         const pasted = Array.from(items)
           .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
           .map((it) => it.getAsFile())
-          .filter((f): f is File => f !== null);
+          .filter((f): f is File => f !== null)
+          .map(namePastedImage);
         if (pasted.length >= 2) {
           // A stack never asks — straight to the gallery. handleAddPhotos
           // trims to the tier cap and toasts when it had to.
           await handleAddPhotos(pasted);
           return;
         }
-        const only = pasted[0];
-        if (only) {
-          source = only;
-          if (only.name) fileName = only.name;
-        }
+        if (pasted[0]) source = pasted[0];
       }
       if (!source) {
         try {
@@ -1904,13 +1901,7 @@ export function AppShell() {
         }
       }
       if (!source) return;
-      const file =
-        source instanceof File
-          ? source
-          : new File([source], fileName, {
-              type: source.type || "image/png",
-            });
-      await openImportDialog(source, file);
+      await openImportDialog(source, namePastedImage(source));
     },
     [openImportDialog, handleAddPhotos],
   );
