@@ -816,7 +816,7 @@ export function NewActions({
             title="Image Horse Website"
             standalone
             onClick={() =>
-              window.open("https://image-horse.vercel.app/", "_blank", "noopener")
+              window.open("https://imagehorse.app/", "_blank", "noopener")
             }
           />
           <IconButton
