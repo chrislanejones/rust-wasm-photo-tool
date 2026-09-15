@@ -176,7 +176,7 @@ export function EffectsSettings({
   return (
     <div className="space-y-3 -mt-2">
       <SectionHeader
-        title="Levels"
+        title="Adjustments"
         info="Brightness, Contrast, and Blur each latch to the slider's released position — drag again to apply another delta on top. All are undo-able."
       />
 

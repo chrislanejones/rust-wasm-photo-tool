@@ -62,6 +62,12 @@ pub struct History {
     /// `settings::DEFAULT_MAX_HISTORY_BYTES`). Enforced alongside `max_history`
     /// on every push so large/multi-layer canvases can't balloon to GBs.
     pub max_bytes: usize,
+    /// Moves on EVERY change to the history — push, undo, redo, delete, clear.
+    /// Undo depth is not a substitute: undo followed by a new edit lands on the
+    /// same depth with different pixels. Anything that holds a copy of the
+    /// document across calls (the Levels preview) compares this before writing
+    /// the copy back. Never persisted; it only has to be monotonic per session.
+    pub generation: u64,
 }
 
 impl History {
@@ -71,6 +77,7 @@ impl History {
             redo_stack: Vec::new(),
             max_history: settings::DEFAULT_MAX_HISTORY,
             max_bytes: settings::DEFAULT_MAX_HISTORY_BYTES,
+            generation: 0,
         }
     }
 
@@ -83,6 +90,7 @@ impl History {
 
     /// Push a pre-built snapshot onto the undo stack. Clears the redo stack.
     pub fn push(&mut self, snap: Snapshot) {
+        self.generation += 1;
         self.undo_stack.push_back(snap);
         self.trim();
         self.redo_stack.clear();
@@ -92,6 +100,7 @@ impl History {
     /// stroke path, which pushes its pre-stroke snapshot directly. Enforces the
     /// same count + byte limits as [`push`](Self::push).
     pub fn push_stroke(&mut self, snap: Snapshot) {
+        self.generation += 1;
         self.undo_stack.push_back(snap);
         self.trim();
     }
@@ -123,6 +132,7 @@ impl History {
     /// reads naturally). Returns `None` when there is nothing to undo.
     pub fn undo(&mut self, current: Snapshot) -> Option<Snapshot> {
         if let Some(snap) = self.undo_stack.pop_back() {
+            self.generation += 1;
             let mut cur = current;
             cur.label = snap.label.clone();
             // The redo entry stands in for the step being undone, so it keeps
@@ -140,6 +150,7 @@ impl History {
     /// `current` is pushed back onto the undo stack.
     pub fn redo(&mut self, current: Snapshot) -> Option<Snapshot> {
         if let Some(snap) = self.redo_stack.pop() {
+            self.generation += 1;
             let mut cur = current;
             cur.label = snap.label.clone();
             // Mirror of `undo` — the undo entry keeps the redone step's kind.
@@ -178,12 +189,14 @@ impl History {
         if index >= self.undo_stack.len() {
             return false;
         }
+        self.generation += 1;
         self.undo_stack.remove(index);
         self.redo_stack.clear();
         true
     }
 
     pub fn clear(&mut self) {
+        self.generation += 1;
         self.undo_stack.clear();
         self.redo_stack.clear();
     }
@@ -266,6 +279,7 @@ impl ImageHorseTool {
     /// history is not yet persisted; restored snapshots are single-layer.)
     pub fn inject_undo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
         let layer = Layer::from_snapshot_pixels(data, w, h);
+        self.hist.generation += 1;
         self.hist.undo_stack.push_back(Snapshot {
             // Reconstructed from the op log — it rebuilds a document, it does
             // not change a setting, so it carries the live quality (ADR-031).
@@ -283,6 +297,7 @@ impl ImageHorseTool {
     /// Append a raw-RGBA snapshot to the redo stack (used when restoring a session).
     pub fn inject_redo_snapshot(&mut self, data: &[u8], w: u32, h: u32, label: &str) {
         let layer = Layer::from_snapshot_pixels(data, w, h);
+        self.hist.generation += 1;
         self.hist.redo_stack.push(Snapshot {
             export_quality: self.export_quality,
             label: label.to_string(),

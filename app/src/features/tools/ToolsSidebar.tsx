@@ -10,6 +10,9 @@ import type {
 import type { ExportFormat } from "@/lib/exportImage";
 import type { StampMode } from "./settings/StampSettings";
 import type { ShapesMode } from "@/stores/useToolStore";
+import { useToolStore } from "@/stores/useToolStore";
+import type { LevelsControls } from "@/hooks/useTransforms";
+import { LevelsSettings } from "./settings/LevelsSettings";
 import { ToolGrid } from "./ToolGrid";
 import { SubtoolRow } from "./SubtoolRow";
 import { useActiveSubTool } from "./activateSubTool";
@@ -91,6 +94,8 @@ interface ToolsSidebarProps {
   onShadows?: (amount: number) => void;
   onHighlights?: (amount: number) => void;
   onSharpen?: (amount: number) => void;
+  /** Enhance › Levels: live preview and commit (useTransforms). */
+  levels?: LevelsControls;
   imageReady: boolean;
   /** Apply Compression & Resize (w, h, Rust resampling-filter code). */
   onResize: (newW: number, newH: number, filter: number) => void;
@@ -190,6 +195,7 @@ export function ToolsSidebar({
   onShadows,
   onHighlights,
   onSharpen,
+  levels,
   imageReady,
   onResize,
   onResizeOnly,
@@ -238,6 +244,8 @@ export function ToolsSidebar({
   aiEnabled = false,
   onAIResult,
 }: ToolsSidebarProps) {
+  // `effects` is two tiles — Adjustments and Levels — told apart by this mode.
+  const effectsMode = useToolStore((s) => s.effectsMode);
   // PHASE 2: the panel switch routes on SUB-TOOL, not on legacy tool id, for
   // the groups that absorbed several old tools. Edit is the case that needs it
   // most — Crop, Transform and Color Picker are all `crop`, so switching on the
@@ -397,7 +405,17 @@ export function ToolsSidebar({
           />
         )}
 
-        {activeTool === "effects" && (
+        {activeTool === "effects" && effectsMode === "levels" && (
+          <LevelsSettings
+            // Keyed on the photo so switching photos starts fresh sliders and a
+            // fresh preview on the new pixels.
+            key={activePhotoId ?? "no-photo"}
+            levels={levels}
+            imageReady={imageReady}
+          />
+        )}
+
+        {activeTool === "effects" && effectsMode !== "levels" && (
           <EffectsSettings
             settings={toolSettings}
             onChange={onToolSettingsChange}

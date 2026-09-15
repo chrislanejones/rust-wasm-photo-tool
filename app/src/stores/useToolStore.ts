@@ -36,6 +36,11 @@ export type ShapesMode = (typeof SHAPES_MODES)[number];
  *  bare value tuple for hydration validation. */
 export const ERASER_MODE_VALUES = ["brush", "magic", "rembg", "inpaint"] as const;
 export type EraserMode = (typeof ERASER_MODE_VALUES)[number];
+/** The `effects` tool's two panels: `adjust` = the Adjustments sliders,
+ *  `levels` = the Levels panel. NOT PERSISTED — it is kept out of the
+ *  `partialize` allowlist, so a reload reopens Adjustments (the long-standing
+ *  default) and no storage schema changes. */
+export type EffectsMode = "adjust" | "levels";
 /** Text tool sub-modes: `text` = the type tool, `background` = the plate/bubble
  *  behind it, `ocr` = read text out of the image. Lifted here out of
  *  TextSettings.tsx local `useState` in the new-ui-toolbar arc — while it was
@@ -163,6 +168,7 @@ export interface ToolState {
   stampSubMode: StampSubMode;
   shapesMode: ShapesMode;
   eraserMode: EraserMode;
+  effectsMode: EffectsMode;
   textMode: TextMode;
   /** Which drag rule the Perspective tool's handles obey.
    *
@@ -212,6 +218,7 @@ export interface ToolState {
   setStampSubMode: (v: SetArg<StampSubMode>) => void;
   setShapesMode: (v: SetArg<ShapesMode>) => void;
   setEraserMode: (v: SetArg<EraserMode>) => void;
+  setEffectsMode: (v: SetArg<EffectsMode>) => void;
   setTextMode: (v: SetArg<TextMode>) => void;
   setPerspectiveMode: (v: SetArg<PerspectiveMode>) => void;
   setBatchMode: (v: SetArg<BatchMode>) => void;
@@ -248,6 +255,7 @@ export const useToolStore = create<ToolState>()(
       stampSubMode: "clone",
       shapesMode: "shapes",
       eraserMode: "brush",
+      effectsMode: "adjust",
       textMode: "text",
       perspectiveMode: "perspective",
       batchMode: "logo",
@@ -303,6 +311,7 @@ export const useToolStore = create<ToolState>()(
         set((s) => ({ stampSubMode: resolveSet(v, s.stampSubMode) })),
       setShapesMode: (v) => set((s) => ({ shapesMode: resolveSet(v, s.shapesMode) })),
       setEraserMode: (v) => set((s) => ({ eraserMode: resolveSet(v, s.eraserMode) })),
+      setEffectsMode: (v) => set((s) => ({ effectsMode: resolveSet(v, s.effectsMode) })),
       setTextMode: (v) => set((s) => ({ textMode: resolveSet(v, s.textMode) })),
       setPerspectiveMode: (v) =>
         set((s) => ({ perspectiveMode: resolveSet(v, s.perspectiveMode) })),

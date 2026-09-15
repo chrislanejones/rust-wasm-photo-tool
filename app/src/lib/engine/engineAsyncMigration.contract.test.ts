@@ -764,7 +764,14 @@ describe("Stage 3.5 — value-consuming engine calls become async", () => {
     // has no `.length` and no indices, so an un-awaited read would silently
     // produce `undefined` bounds and fall back to the document — the exact
     // number this change exists to stop reporting.
-    expect(gate.awaited, "cumulative converted sites").toBe(137);
+    // Levels (#87) — 137 -> 141: `useTransforms`' Levels controls, born
+    // awaited. `levels_preview_set` (twice: the move, and the retry after a
+    // re-begin), `levels_preview_cancel` and `levels_apply` all return a
+    // boolean that decides whether to flush or re-begin, and under the worker
+    // an un-awaited boolean is a Promise, which is always truthy: a stale
+    // preview would never re-begin and every cancel would flush for nothing.
+    // Remaining stays 5 and un-awaited stays 0, so nothing new is unconverted.
+    expect(gate.awaited, "cumulative converted sites").toBe(141);
   });
 
   it("has no engine call the audit cannot see (multi-line receiver)", () => {
