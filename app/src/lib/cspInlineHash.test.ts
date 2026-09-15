@@ -16,14 +16,28 @@ import { resolve } from "node:path";
  * this repo would catch it: no gate serves headers, so tsc, eslint, the build
  * and the deploy sentinel all pass.
  *
- * So this test recomputes the hash from index.html and asserts netlify.toml
- * still names it. It fails in CI at the moment the script changes, which is the
- * moment someone can still fix it cheaply.
+ * So this test recomputes the hash from index.html and asserts that EVERY
+ * header config serving the app still names it:
+ *
+ *   vercel.json    production (edit.imagehorse.app) — the policy users get
+ *   netlify.toml   the old Netlify origin, still serving while the gallery
+ *                  decision is open, and a second builder
+ *
+ * ⚠️ It used to read netlify.toml ONLY, and stayed that way through the move to
+ * Vercel. With vercel.json's hash deliberately broken it went 2/2 green
+ * (2026-09-15) — a test guarding a file production does not serve. If a third
+ * host ever serves the app, add its config below or this goes vacuous again.
+ *
+ * The hash is looked for inside each CSP header's `script-src` directive, not
+ * anywhere in the file: both files carry long rationale comments, and a hash
+ * left behind in one of those would otherwise satisfy the check.
  *
  * If you changed the theme script deliberately: run this test, take the hash it
- * prints, and paste it into netlify.toml's `script-src`.
+ * prints, and paste it into `script-src` in BOTH files.
  */
 const ROOT = resolve(__dirname, "../../..");
+
+const CSP_KEY = /^content-security-policy(-report-only)?$/i;
 
 function inlineScripts(html: string): string[] {
   // Only `<script>` with no attributes — the ones a hash applies to. A
@@ -43,9 +57,48 @@ function inlineScripts(html: string): string[] {
 const sha256 = (s: string) =>
   `sha256-${createHash("sha256").update(s, "utf8").digest("base64")}`;
 
+type VercelJson = {
+  headers?: { source: string; headers: { key: string; value: string }[] }[];
+};
+
+/** Every CSP header value in vercel.json, report-only or enforcing. */
+function policiesFromVercelJson(text: string): string[] {
+  const config = JSON.parse(text) as VercelJson;
+  return (config.headers ?? [])
+    .flatMap((rule) => rule.headers)
+    .filter((h) => CSP_KEY.test(h.key))
+    .map((h) => h.value);
+}
+
+/** Every CSP header value in netlify.toml, report-only or enforcing. */
+function policiesFromNetlifyToml(text: string): string[] {
+  // No TOML parser in the tree, so match the header's own assignment —
+  // `Content-Security-Policy… = """…"""` at the start of a line — which a `#`
+  // comment cannot be. A trailing `\` in a TOML multi-line string swallows the
+  // newline and the next line's indentation, so join those the same way.
+  return [
+    ...text.matchAll(
+      /^[ \t]*Content-Security-Policy(?:-Report-Only)?[ \t]*=[ \t]*"""([\s\S]*?)"""/gim,
+    ),
+  ].map((m) => m[1].replace(/\\\r?\n\s*/g, ""));
+}
+
+/** The source tokens of a policy's `script-src` directive, or [] if absent. */
+function scriptSrc(policy: string): string[] {
+  for (const directive of policy.split(";")) {
+    const [name, ...tokens] = directive.trim().split(/\s+/);
+    if (name?.toLowerCase() === "script-src") return tokens;
+  }
+  return [];
+}
+
+const CONFIGS = [
+  { file: "vercel.json", policies: policiesFromVercelJson },
+  { file: "netlify.toml", policies: policiesFromNetlifyToml },
+];
+
 describe("CSP inline-script hash", () => {
   const html = readFileSync(resolve(ROOT, "app/index.html"), "utf8");
-  const netlify = readFileSync(resolve(ROOT, "netlify.toml"), "utf8");
   const scripts = inlineScripts(html);
 
   it("index.html carries exactly one attribute-less inline script", () => {
@@ -54,14 +107,24 @@ describe("CSP inline-script hash", () => {
     expect(scripts).toHaveLength(1);
   });
 
-  it("netlify.toml's script-src names that script's current hash", () => {
-    const want = sha256(scripts[0]);
-    expect(
-      netlify.includes(want),
-      `netlify.toml does not allow the current inline script.\n` +
-        `Expected script-src to contain:  '${want}'\n` +
-        `The theme setter in app/index.html changed; paste that hash into the ` +
-        `Content-Security-Policy-Report-Only line in netlify.toml.`,
-    ).toBe(true);
+  describe.each(CONFIGS)("$file", ({ file, policies }) => {
+    it("every CSP header's script-src names that script's current hash", () => {
+      const want = `'${sha256(scripts[0])}'`;
+      const found = policies(readFileSync(resolve(ROOT, file), "utf8"));
+
+      // Zero policies would make the loop below assert nothing — a renamed
+      // header key must fail here, not pass silently.
+      expect(found.length, `${file} has no Content-Security-Policy header`).toBeGreaterThan(0);
+
+      for (const policy of found) {
+        expect(
+          scriptSrc(policy),
+          `${file} does not allow the current inline script.\n` +
+            `Expected script-src to contain:  ${want}\n` +
+            `The theme setter in app/index.html changed; paste that hash into ` +
+            `script-src in vercel.json AND netlify.toml.`,
+        ).toContain(want);
+      }
+    });
   });
 });
