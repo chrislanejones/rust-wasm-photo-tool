@@ -18,11 +18,22 @@ const TOAST_ID = "legacy-host-moved";
 export function MovedNotice() {
   useEffect(() => {
     if (!isLegacyHost(window.location.hostname)) return;
-    toast.info("Image Horse has moved to edit.imagehorse.app", {
+    // Plain `toast`, not `toast.info`, and wrapped: the Toaster lays every
+    // toast out as ONE row (icon · text · action), which squeezed this much
+    // text to ~110px beside the button and broke the address mid-word
+    // ("edit.imagehorse.ap / p") on the Netlify preview. With no icon, the
+    // text takes the full first row and the button wraps below it, still
+    // right-aligned by the Toaster's own `ml-auto`. sonner APPENDS these to
+    // the Toaster's classNames, so only additions are safe here — nothing
+    // that has to win against an existing class. `pr-5` clears the close X.
+    toast("Image Horse has moved to edit.imagehorse.app", {
       id: TOAST_ID,
       duration: Infinity,
+      classNames: { toast: "flex-wrap", content: "basis-full", title: "pr-5" },
+      // Kept short on purpose (Chris, 2026-09-15). Only signed-out users lose
+      // anything, so they are the only ones addressed.
       description:
-        "This address starts forwarding there on September 29. Signed in? Your gallery is already there. Not signed in? Photos saved here stay on this address, so download them first with Alt+Shift+E (Export all).",
+        "Not signed in? Download your photos first with Alt+Shift+E. This address forwards there on September 29.",
       action: {
         label: "Open the new address",
         onClick: () => window.open(EDITOR_URL, "_blank", "noopener"),
