@@ -4,6 +4,17 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — mobile Download saves a file with no extension (2026-09-15)
+
+Noticed while fixing the pasted-export name (`fix/pasted-export-name`), not
+touched by it. `MobileShell.tsx:176` downloads the stored ORIGINAL as
+`a.download = photo.name`, and gallery names are stored with the extension
+stripped (`useImageSession.ts:401`). So a pasted image would save as `pasted`
+and `beach.jpg` as `beach` — no `.png` / `.jpg`. Read from the code only; not
+yet observed on a phone. The desktop export paths append `-revised` + the real
+extension and are unaffected. Fix is likely `extFromMime(stored.mimeType)`;
+decide first whether mobile should save the original (as now) or the edit.
+
 ## OPEN — `history_max_bytes` is exported and nothing calls it (2026-09-12)
 
 Found by `scripts/dead-exports-audit.mjs` running locally with `pkg/` built. It
