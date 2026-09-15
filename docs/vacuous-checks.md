@@ -4,7 +4,7 @@ A **vacuous check** is a gate that is green because it is incapable of being
 red. It is worse than no gate: it costs the same to run, it occupies the slot
 where a real check would go, and it actively reports safety.
 
-This repo has now produced **fifteen**, in three families. They are collected here
+This repo has now produced **sixteen**, in three families. They are collected here
 because they keep being found one at a time and re-derived from scratch.
 
 > **Where this lives.** `CLAUDE.md` is gitignored — an edit there is local to one
@@ -63,6 +63,7 @@ The check ran against something other than what it claimed to check.
 | 13 | a green check that had **SKIPPED itself** | the sentinel's tier 2 skips when CI's commit differs from the live one. On a fix PR it did exactly that, the job went green, and the green said nothing about whether the fix worked (2026-09-07) |
 | 14 | a merge rehearsal run with the **wrong merge verb** | the dry run used `git merge`; the real script used `gh pr merge --squash`. Equivalent for independent PRs, **not** for a stacked one — see below (2026-09-07) |
 | 15 | `guardrails.sh` **dead-exports, engine half** | the CI job checks out and runs the script — it never builds wasm, and `pkg/` is gitignored, so `pkg/stamp_tool.d.ts` is **absent**, the audit prints a `note:` and counts **0**. Green in CI for its whole life while `history_max_bytes` sits exported with no JS caller. Only ever fires on a laptop that happens to have built `pkg/` (2026-09-12) |
+| 16 | `cspInlineHash.test.ts` | checked the CSP inline-script hash in **`netlify.toml`** while production's headers come from the root **`vercel.json`**. The one security-header guard in the suite. With `vercel.json`'s hash deliberately broken it went **2/2 green**. It also matched the hash anywhere in the file, so one left in a comment would have passed too (2026-09-15) |
 
 **Rule.** Verify the observation happened before believing what it says, and
 that it was an observation of **the thing you meant**.

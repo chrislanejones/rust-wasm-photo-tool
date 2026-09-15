@@ -379,7 +379,7 @@ open:
 | `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ live and enforcing on `edit.imagehorse.app`, `imagehorse.app` and the Netlify site |
 | Clickjacking | ❌ **never enforced.** `frame-ancestors 'none'` sits inside the *report-only* CSP, so all three origins rendered in a cross-origin iframe (headless Chromium, with a must-block and a must-load control). `X-Frame-Options: DENY` added on `fix/x-frame-options-deny` |
 | CSP enforcing flip | ❌ still report-only — ADR-048's follow-up |
-| `app/src/lib/cspInlineHash.test.ts` | ⚠️ checks the inline-script hash against **`netlify.toml` only**. Production reads the root `vercel.json`, so the policy users get is unguarded. The two hashes match today |
+| `app/src/lib/cspInlineHash.test.ts` | ✅ **fixed on `fix/csp-hash-reads-vercel-json`** (2026-09-15). It read `netlify.toml` only, and went **2/2 green with `vercel.json`'s hash broken**. Now checks both files, reading the hash out of each CSP header's `script-src` rather than anywhere in the file |
 | ADR-048 | ⚠️ still says `frame-ancestors` is enforcing, and that the app's headers live in `netlify.toml` with marketing's in the root `vercel.json`. Both false since #135. Amendment owed |
 
 The table below is the state before v8.70, kept for history.
