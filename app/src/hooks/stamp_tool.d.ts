@@ -499,6 +499,20 @@ declare module "stamp_tool" {
     adjust_highlights(amount: number): void;
     /** Unsharp-mask sharpen over the whole active layer. 0 = no sharpening. */
     adjust_sharpen(amount: number): void;
+    /** Levels: open a live preview on the active layer (one copy of its
+     *  pixels). `false` if one is already open. See src/levels.rs. */
+    levels_preview_begin(): boolean;
+    /** Whether a Levels preview is open. */
+    levels_preview_active(): boolean;
+    /** Recompute the preview from the copy — black/white 0..=255, gamma > 0.
+     *  Never an undo step. `false` means there is no live preview (it was
+     *  dropped because history moved), so begin again. */
+    levels_preview_set(black: number, white: number, gamma: number): boolean;
+    /** Close the preview and put the copy back. `true` when pixels changed. */
+    levels_preview_cancel(): boolean;
+    /** Commit Levels as ONE undo step and ONE recorded `Op::Levels`. The
+     *  identity (0, 255, 1) changes nothing. `true` when pixels changed. */
+    levels_apply(black: number, white: number, gamma: number): boolean;
     blur_region(
       cx: number,
       cy: number,

@@ -3092,6 +3092,7 @@ export function AppShell() {
             onShadows={stamp.adjustShadows}
             onHighlights={stamp.adjustHighlights}
             onSharpen={stamp.adjustSharpen}
+            levels={stamp.levels}
             imageReady={hasImage}
             onResize={handleApplyCompression}
             onResizeOnly={handleApplyResizeOnly}

@@ -97,6 +97,9 @@ name = "clone_stabilized"
 name = "paint_stabilized"
 
 [[test]]
+name = "levels"
+
+[[test]]
 name = "blur_stabilized"
 required-features = ["tiles"]
 

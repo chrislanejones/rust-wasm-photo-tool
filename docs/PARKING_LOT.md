@@ -4,6 +4,37 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
+## OPEN — in the running app, undo of ANY recorded edit breaks the op log (2026-09-15)
+
+Found while testing the Levels tile, and **not caused by it**. Undo still shows
+the right pixels, so nothing is lost — but it always takes the snapshot path,
+so the undo depth the op log exists to protect (ADR-052: ~10 steps on a 12 MP
+photo, ~5 on 24 MP) is never actually delivered.
+
+| Run (fresh Canvas + Photo document, production build) | After undo |
+|---|---|
+| A — paint stroke via engine calls, `t.undo()` | ✅ replays: cursor 1 → 0, log healthy |
+| B — Levels preview → apply via engine calls, `t.undo()` | ✅ replays: cursor 1 → 0, log healthy |
+| C — **paint stroke through the real UI**, Ctrl+Z | ❌ cursor stays 1, `oplog_status` = "broken — snapshot undo has taken over" |
+| Levels through the real UI, Ctrl+Z **or** a direct `t.undo()` | ❌ same as C |
+
+So the break happens BETWEEN the edit and the undo, and only when the app's
+own flush path runs: `flushToCanvas` → `onOplogFlush` (persistence writer) and
+`blitLiveEngine`. `try_oplog_undo` refuses and `oplog_engine_in_sync()` fails,
+although the log's base (keyframe 0) is still the untouched photo and one
+correct op is recorded. Ruled out: tiles flush (returns early on a 2-layer
+document), `calculate_histogram` (read-only), the PageUp and Ctrl+Z key
+handlers (a focused range slider returns early; undo is a bare `t.undo()`),
+`restoreOplog` (only on photo open).
+
+**Why every gate is green:** the Rust parity tests and the op-log undo tests
+drive the engine directly and never run the app's flush or persistence path —
+vacuous-checks family 3, "the observation was never taken".
+
+**Next step:** replay run A with `blitLiveEngine` and `onOplogFlush` added one
+at a time to find the call that desyncs the log, then an e2e that paints and
+undoes through the UI and asserts `oplog_is_broken() === false`.
+
 ## OPEN — mobile Download saves a file with no extension (2026-09-15)
 
 Noticed while fixing the pasted-export name (`fix/pasted-export-name`), not

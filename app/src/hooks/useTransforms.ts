@@ -13,6 +13,20 @@ import { webgpuEnabled, gpuUsable } from "@/lib/webgpu/detect";
 import { gaussianBlurGpu } from "@/lib/webgpu/gpuBlur";
 import type { EngineCore } from "./useEngineCore";
 
+/** Enhance › Levels, as its panel drives it (see the `levels` block below). */
+export interface LevelsControls {
+  /** Open a live preview on the active layer. Resolves false with no engine. */
+  begin: () => Promise<boolean>;
+  /** Move the preview. Latest wins; never an undo step. */
+  preview: (black: number, white: number, gamma: number) => void;
+  /** Close the preview and put the photo back. */
+  cancel: () => Promise<void>;
+  /** Commit as one undo step. Resolves whether pixels changed. */
+  apply: (black: number, white: number, gamma: number) => Promise<boolean>;
+  /** Histogram of the current composite: R, G, B and luma, 256 bins each. */
+  histogram: () => Promise<Uint32Array | null>;
+}
+
 export function useTransforms(engine: EngineCore) {
   const {
     toolRef,
@@ -416,6 +430,90 @@ export function useTransforms(engine: EngineCore) {
     [toolRef, flushToCanvas, syncState],
   );
 
+  // ── Levels (Enhance › Levels) ─────────────────────────────────────────────
+  // A live preview the panel drives while it is open, then one commit. The
+  // engine keeps a copy of the layer and recomputes from it on every move
+  // (src/levels.rs), so moves never compound and a preview is never an undo
+  // step.
+  //
+  // STABLE IDENTITY ON PURPOSE. The panel opens its preview in an effect keyed
+  // on this object. If the object changed whenever `flushToCanvas` did, that
+  // effect would cancel and reopen the preview in the middle of a drag, so the
+  // callbacks read flush and sync through refs and the object depends on
+  // `toolRef` alone.
+  //
+  // LATEST WINS. Slider input outruns the worker, so at most one
+  // `levels_preview_set` is in flight and newer values overwrite the unsent
+  // one, the backpressure the brushes use (lib/strokeCoalescer.ts). `open`
+  // gates the loop: once the panel cancels or applies, a queued move must not
+  // quietly reopen a preview behind it.
+  const levelsFlushRef = useRef(flushToCanvas);
+  levelsFlushRef.current = flushToCanvas;
+  const levelsSyncRef = useRef(syncState);
+  levelsSyncRef.current = syncState;
+  const levelsOpenRef = useRef(false);
+  const levelsPendingRef = useRef<[number, number, number] | null>(null);
+  const levelsBusyRef = useRef(false);
+
+  const levels = useMemo<LevelsControls>(
+    () => ({
+      begin: async () => {
+        const t = toolRef.current;
+        if (!t) return false;
+        levelsOpenRef.current = true;
+        await t.levels_preview_begin();
+        return true;
+      },
+      preview: (black, white, gamma) => {
+        levelsPendingRef.current = [black, white, gamma];
+        if (levelsBusyRef.current) return;
+        levelsBusyRef.current = true;
+        void (async () => {
+          try {
+            while (levelsPendingRef.current && levelsOpenRef.current) {
+              const [b, w, g] = levelsPendingRef.current;
+              levelsPendingRef.current = null;
+              const t = toolRef.current;
+              if (!t) break;
+              let ok = await t.levels_preview_set(b, w, g);
+              if (!ok && levelsOpenRef.current) {
+                // The engine dropped a stale preview: history moved under it
+                // (an undo, say). Start again from the document as it is now.
+                await t.levels_preview_begin();
+                ok = await t.levels_preview_set(b, w, g);
+              }
+              if (ok) levelsFlushRef.current();
+            }
+          } finally {
+            levelsBusyRef.current = false;
+          }
+        })();
+      },
+      cancel: async () => {
+        levelsOpenRef.current = false;
+        levelsPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return;
+        if (await t.levels_preview_cancel()) levelsFlushRef.current();
+      },
+      apply: async (black, white, gamma) => {
+        levelsOpenRef.current = false;
+        levelsPendingRef.current = null;
+        const t = toolRef.current;
+        if (!t) return false;
+        const changed = await t.levels_apply(black, white, gamma);
+        levelsFlushRef.current();
+        levelsSyncRef.current();
+        return changed;
+      },
+      histogram: async () => {
+        const t = toolRef.current;
+        return t ? await t.calculate_histogram() : null;
+      },
+    }),
+    [toolRef],
+  );
+
   return useMemo(
     () => ({
       copyRegion,
@@ -436,6 +534,7 @@ export function useTransforms(engine: EngineCore) {
       adjustShadows,
       adjustHighlights,
       adjustSharpen,
+      levels,
     }),
     [
       copyRegion,
@@ -456,6 +555,7 @@ export function useTransforms(engine: EngineCore) {
       adjustShadows,
       adjustHighlights,
       adjustSharpen,
+      levels,
     ],
   );
 }
