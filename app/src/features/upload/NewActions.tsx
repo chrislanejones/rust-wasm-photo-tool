@@ -182,6 +182,17 @@ interface Props {
 const GENERATE_BLOCKED_REASON =
   "Image generation isn't connected yet — the model still needs choosing.";
 
+/**
+ * HIDDEN until Generate works (Chris, 2026-09-15). The dialog opened for
+ * everyone and ended at a disabled button: something users could open and
+ * could not use, which is worse than not offering it. The tile below is the
+ * ONLY way into `aiMode`, so gating the tile makes the whole step unreachable
+ * while the prompt / references / consent code stays intact and tested.
+ *
+ * When the text-to-image job type lands: wire Generate, then flip this.
+ */
+const AI_IMAGE_READY = false;
+
 export function NewActions({
   onFiles,
   onFilesAdded,
@@ -701,11 +712,14 @@ export function NewActions({
                 className="flex flex-1 flex-col items-center gap-4"
               >
                 {/* Three columns of stacked tiles — the same ActionTile the
-                    tool panels use (Select → Magic Wand), icon on top. Five
-                    tiles, so the second row holds two; `Create AI Image` is
-                    disabled until it exists. Was four full-width Buttons in
-                    two columns. */}
-                <div className="grid grid-cols-3 gap-3 w-full">
+                    tool panels use (Select → Magic Wand), icon on top. While
+                    `Create AI Image` is hidden (AI_IMAGE_READY) there are
+                    four tiles, laid out 2×2 — in three columns the fourth sat
+                    alone beside a blank gap and read as something missing.
+                    Five tiles in three columns when it returns. */}
+                <div
+                  className={`grid ${AI_IMAGE_READY ? "grid-cols-3" : "grid-cols-2"} gap-3 w-full`}
+                >
                   <ActionTile
                     ref={firstButtonRef}
                     icon={FolderOpen}
@@ -731,29 +745,30 @@ export function NewActions({
                     onClick={() => setBlankMode(true)}
                     title="Start with a new canvas"
                   />
-                  {/* ⚠️ NOT DISABLED, deliberately. A greyed tile teaches
-                      people the feature does not exist. This opens for
-                      everyone; the gate is on Generate, so a free user sees
-                      the whole flow, composes a prompt, and meets the upsell
+                  {/* Hidden, not disabled — see AI_IMAGE_READY. When it
+                      returns it opens for everyone; the gate is on Generate,
+                      so a free user sees the whole flow and meets the upsell
                       at the moment they understand what they would be buying.
                       The key says which it is before they start. */}
-                  <div className="relative flex flex-1">
-                    <ActionTile
-                      icon={Sparkles}
-                      label="Create AI Image"
-                      onClick={() => setAiMode(true)}
-                      title="Generate an image from a description (Pro)"
-                    />
-                    <span
-                      aria-hidden
-                      // Top-left of the tile, left of the icon, on the optical
-                      // line of the icon's top rather than the tile's corner.
-                      className="pointer-events-none absolute left-1.5 top-1.5 text-theme-primary"
-                    >
-                      <KeyRound className="h-3 w-3" />
-                    </span>
-                    <span className="sr-only">Pro feature</span>
-                  </div>
+                  {AI_IMAGE_READY && (
+                    <div className="relative flex flex-1">
+                      <ActionTile
+                        icon={Sparkles}
+                        label="Create AI Image"
+                        onClick={() => setAiMode(true)}
+                        title="Generate an image from a description (Pro)"
+                      />
+                      <span
+                        aria-hidden
+                        // Top-left of the tile, left of the icon, on the optical
+                        // line of the icon's top rather than the tile's corner.
+                        className="pointer-events-none absolute left-1.5 top-1.5 text-theme-primary"
+                      >
+                        <KeyRound className="h-3 w-3" />
+                      </span>
+                      <span className="sr-only">Pro feature</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Dotted drop zone — highlights + nudges when an image is
