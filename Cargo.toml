@@ -94,6 +94,9 @@ name = "photo_bounds"
 name = "clone_stabilized"
 
 [[test]]
+name = "paint_stabilized"
+
+[[test]]
 name = "blur_stabilized"
 required-features = ["tiles"]
 
