@@ -85,28 +85,32 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v8.77 — 2026-09-14
+### v8.78 — 2026-09-15
 
-**Other sites can't frame the editor, and A/B compare lines up.**
+**The Stroke Stabilizer steadies your line again, and a pasted picture saves as `pasted-revised`.**
 
-Other websites can no longer load the editor or the front page inside a frame
-of their own. A rule meant to stop that has been there since v8.70, but it sat
-in the half of the security policy that only reports, so it never blocked
-anything. Both sites now send `X-Frame-Options: DENY`, which the browser
-enforces by itself. Checked in a real browser before and after: the live sites
-loaded inside a frame, and with the new header they don't.
+The Stroke Stabilizer had been doing worse than nothing since v8.75. With it
+on, a stroke drew your raw line, then closed itself with a straight line back to
+where you started: an L came out as a triangle, a U as a box. It happened on
+every setting, on the Paint brush, the Eraser, mask painting and the Magic
+Eraser brush. One line in the engine had the leash stuck at zero. Your line
+trails the cursor again, and a new test fails if a stroke ever closes itself.
 
-A/B compare lays the original over the photo, not over the whole canvas. With
-the default 10px canvas border, the original half was stretched across the
-border while the edited half showed it, so the two sides differed in something
-that isn't the picture. The border now looks the same on both sides, and
-turning compare off leaves the document exactly as it was.
+A picture you paste in, like a screenshot or "Copy image" from a web page, now
+exports as `pasted-revised` instead of `image-revised`. The browser calls every
+pasted picture `image.png`, so that's what the file ended up named. Copy an
+actual file in File Explorer and paste it, and it keeps its own name.
 
-The engine the editor downloads is now byte-for-byte the one CI builds: 823,503
-bytes. Vercel keeps its Rust packages under `/rust`, a path the build wasn't
-told to scrub, so real file paths ended up inside the binary and production ran
-24 bytes different from every other build of the same code. The code was never
-different. Now the bytes aren't either.
+Create AI Image is hidden until it works. It opened a dialog you could fill in
+and then couldn't generate from.
+
+If you're still on the old Netlify address, you'll see a notice that the editor
+moved to edit.imagehorse.app, and that on September 29 the old address starts
+forwarding there. Photos saved there without signing in live in your browser
+for that address only, so download them first with Alt+Shift+E.
+
+The website link on the start screen goes to imagehorse.app instead of an old
+host.
 
 ## License
 

@@ -24,6 +24,29 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v8.78",
+    date: "2026-09-15",
+    headline: "The Stroke Stabilizer steadies your line again, and a pasted picture saves as pasted-revised",
+    entries: [
+      {
+        tag: "fix",
+        text: "The Stroke Stabilizer works again. Since v8.75 it did worse than nothing: a stroke drew your raw line, then closed itself with a straight line back to where you started, so an L came out as a triangle and a U as a box. It happened on every setting and on the Paint brush, the Eraser, mask painting and the Magic Eraser brush. One line in the engine had the leash stuck at zero.",
+      },
+      {
+        tag: "ui",
+        text: "A picture you paste in, like a screenshot or \"Copy image\" from a web page, exports as pasted-revised instead of image-revised. Paste an actual file from File Explorer and it keeps its own name.",
+      },
+      {
+        tag: "ui",
+        text: "Create AI Image is hidden until it works. It opened a dialog you could fill in and then couldn't generate from.",
+      },
+      {
+        tag: "infra",
+        text: "The old Netlify address shows a notice that the editor moved to edit.imagehorse.app and starts forwarding there on September 29. Photos saved there without signing in stay with that address, so the notice says to download them first.",
+      },
+    ],
+  },
+  {
     version: "v8.77",
     date: "2026-09-14",
     headline: "Other sites can't frame the editor, and A/B compare lines up",
