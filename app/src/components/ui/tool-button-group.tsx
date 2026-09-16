@@ -14,6 +14,18 @@ export interface ToolButtonOption<T extends string> {
    *  shortcut here ("Select all (Alt+A)"), which is the only place that
    *  shortcut is discoverable from the panel. */
   title?: string;
+  /** Light THIS tile from its OWN state instead of from the group's `value`.
+   *  For an independent toggle sitting in a group of plain actions — Guides is
+   *  H / V / Clear / Lock, where three are actions and Lock is on or off, and
+   *  Rulers & Grid is two independent on/off features side by side. A
+   *  single-select `value` cannot express either: as an action group (no
+   *  `value`) the toggle loses its lit state, and as a select group the
+   *  actions gain one they should not have.
+   *
+   *  Setting it also makes the tile a real toggle button to assistive tech —
+   *  `aria-pressed` is emitted for tiles that carry this and for no others, so
+   *  a plain action is never announced as "not pressed". */
+  active?: boolean;
 }
 
 interface Props<T extends string> {
@@ -46,9 +58,14 @@ const COL_CLASS: Record<2 | 3 | 4 | 5, string> = {
 };
 
 /**
- * A grid of ToolButtons that act as a single-select group. Shares the
- * border/active styling with the Shapes / Crop / Effects pickers so all
- * "pick one of N" controls look the same across the app.
+ * A grid of ToolButtons. Three modes, all the same grid:
+ *  - SELECT — pass `value`; one tile is lit (Shapes, Crop ratios, Effects).
+ *  - ACTION — omit `value`; nothing ever lights (Wand → Selection).
+ *  - TOGGLE — give an option its own `active`; that tile lights from its own
+ *    state and gets `aria-pressed` (Guides → Lock, Rulers & Grid).
+ *
+ * Shares the border/active styling across all three so every "row of tiles"
+ * control in the app looks the same.
  */
 export function ToolButtonGroup<T extends string>({
   options,
@@ -85,7 +102,8 @@ export function ToolButtonGroup<T extends string>({
           return (
             <ToolButton
               key={opt.id}
-              active={value === opt.id}
+              active={opt.active ?? value === opt.id}
+              aria-pressed={opt.active}
               stacked={stacked}
               disabled={disabled || opt.disabled}
               title={opt.title}

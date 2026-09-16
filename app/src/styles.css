@@ -113,6 +113,17 @@
   --accent-ui-foreground: #2a2622;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
+  /* Destructive TEXT on a destructive TINT — the "Remove canvas" action, and
+     any future one like it. `--destructive` itself cannot do this job: the
+     tint it makes (`bg-destructive/15` over the panel) resolves to #f7dad6
+     here, and #dc2626 on that measures 3.66:1 — under the 4.5:1 WCAG 1.4.3
+     asks of 12px semibold. MEASURED in the browser, 2026-09-16; the dark
+     theme's twin measured 3.98:1, which is the same shortfall lib/styles.ts
+     already documents for the confirm-dialog button it replaced with a solid
+     fill. A panel control is not a dialog's final "yes, delete it", so the
+     tint stays and the INK deepens instead: this is red-700 to
+     `--destructive`'s red-600, 4.9:1 on the same tint. */
+  --destructive-strong: #b91c1c;
   --input: #d8d0c2;
   --ring: #c98f3f;
 
@@ -191,6 +202,10 @@
   --focus-ring: #eeeeee;
   --destructive: #e55032;
   --destructive-foreground: #ffffff;
+  /* Dark counterpart — the tint resolves to #36201b here and #e55032 on it is
+     3.98:1. Same hue, lifted until it clears: 4.95:1. Lifting rather than
+     deepening because the tint is the dark thing in this theme. */
+  --destructive-strong: #ef6a4a;
   --input: #484848;
   --ring: #fcdfc2;
 }
@@ -213,6 +228,7 @@
   --color-accent-foreground: var(--accent-ui-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-strong: var(--destructive-strong);
   --color-confirm: var(--confirm);
   --color-confirm-foreground: var(--confirm-foreground);
   --color-confirm-danger: var(--confirm-danger);

@@ -9,7 +9,10 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SizeSlider } from "@/components/SizeSlider";
-import { Button } from "@/components/ui/button";
+import {
+  PanelAction,
+  PanelActionBar,
+} from "@/components/ui/panel-action-bar";
 import type { LevelsControls } from "@/hooks/useTransforms";
 
 /** The identity. Gamma is held ×100 so the slider stays integer. */
@@ -182,24 +185,19 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
         valueDisplay={String(white)}
       />
 
-      <div className="flex gap-2">
-        <Button
-          size="large"
-          className="flex-1"
-          onClick={reset}
-          disabled={!imageReady || isIdentity}
-        >
+      {/* Restore on the left, commit on the right, each only as wide as its own
+          label — the shared two-up panel footer. */}
+      <PanelActionBar layout="split">
+        <PanelAction onClick={reset} disabled={!imageReady || isIdentity}>
           Reset
-        </Button>
-        <Button
-          size="large"
-          className="flex-1"
+        </PanelAction>
+        <PanelAction
           onClick={() => void apply()}
           disabled={!imageReady || isIdentity}
         >
           Apply
-        </Button>
-      </div>
+        </PanelAction>
+      </PanelActionBar>
     </div>
   );
 }
