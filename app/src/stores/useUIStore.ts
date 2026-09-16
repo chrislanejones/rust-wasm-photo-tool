@@ -39,6 +39,11 @@ interface UIState {
   showTopBar: boolean;
   masterTab: MasterTab;
   showTools: boolean;
+  /** The New dialog's AI switch. OFF (default) keeps the promise on the
+   *  marketing site — nothing leaves the tab — by hiding the one tile whose
+   *  job is to send a prompt to a server. ON adds `Create AI Image` to the
+   *  grid. A remembered choice, so it persists like masterTab. */
+  aiToolsEnabled: boolean;
   showGallery: boolean;
   showHistory: boolean;
   /** Mobile-version heads-up (view/upload only, no editing) dismissed for this
@@ -103,6 +108,7 @@ interface UIState {
   setShowTopBar: (v: SetArg<boolean>) => void;
   setMasterTab: (v: SetArg<MasterTab>) => void;
   setShowTools: (v: SetArg<boolean>) => void;
+  setAiToolsEnabled: (v: SetArg<boolean>) => void;
   setShowGallery: (v: SetArg<boolean>) => void;
   setShowHistory: (v: SetArg<boolean>) => void;
   setMobileNoticeDismissed: (v: SetArg<boolean>) => void;
@@ -146,6 +152,7 @@ export const useUIStore = create<UIState>()(
       showTopBar: false,
       masterTab: "tools",
       showTools: false,
+      aiToolsEnabled: false,
       showGallery: false,
       showHistory: false,
       mobileNoticeDismissed: false,
@@ -179,6 +186,8 @@ export const useUIStore = create<UIState>()(
       setShowTopBar: (v) => set((s) => ({ showTopBar: resolveSet(v, s.showTopBar) })),
       setMasterTab: (v) => set((s) => ({ masterTab: resolveSet(v, s.masterTab) })),
       setShowTools: (v) => set((s) => ({ showTools: resolveSet(v, s.showTools) })),
+      setAiToolsEnabled: (v) =>
+        set((s) => ({ aiToolsEnabled: resolveSet(v, s.aiToolsEnabled) })),
       setShowGallery: (v) => set((s) => ({ showGallery: resolveSet(v, s.showGallery) })),
       setShowHistory: (v) => set((s) => ({ showHistory: resolveSet(v, s.showHistory) })),
       setMobileNoticeDismissed: (v) =>
@@ -284,6 +293,8 @@ export const useUIStore = create<UIState>()(
         // same class as masterTab. The palette OPEN flag stays transient.
         recentCommands: s.recentCommands,
         commandUsage: s.commandUsage,
+        // The AI switch is a remembered choice, same class as masterTab.
+        aiToolsEnabled: s.aiToolsEnabled,
       }),
       // Same hydration guard as useToolStore: runs every rehydrate, not just
       // on a version bump. masterTab is checked against its current union;
@@ -302,6 +313,10 @@ export const useUIStore = create<UIState>()(
           commandUsage: p.commandUsage
             ? validatedNumberRecord(p.commandUsage)
             : current.commandUsage,
+          aiToolsEnabled:
+            typeof p.aiToolsEnabled === "boolean"
+              ? p.aiToolsEnabled
+              : current.aiToolsEnabled,
         };
       },
     },

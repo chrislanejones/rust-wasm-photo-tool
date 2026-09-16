@@ -10,6 +10,8 @@ export interface ToolButtonOption<T extends string> {
    *  nothing selected while Deselect/Delete/Copy/Cut do not. Without this a
    *  caller has to hand-roll the grid and loses the shared styling. */
   disabled?: boolean;
+  /** Key badge in this tile's top-left corner — see ToolButton's `pro`. */
+  pro?: boolean;
   /** Native tooltip for this tile. Action groups carry their keyboard
    *  shortcut here ("Select all (Alt+A)"), which is the only place that
    *  shortcut is discoverable from the panel. */
@@ -106,6 +108,7 @@ export function ToolButtonGroup<T extends string>({
               aria-pressed={opt.active}
               stacked={stacked}
               disabled={disabled || opt.disabled}
+              pro={opt.pro}
               title={opt.title}
               onClick={() => onChange(opt.id)}
             >

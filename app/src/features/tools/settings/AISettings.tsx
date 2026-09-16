@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { StabilizerRow } from "./StabilizerRow";
 import { SizeSlider } from "@/components/SizeSlider";
 import { SectionHeader } from "@/components/ui/section-header";
+import { ToolButtonGroup } from "@/components/ui/tool-button-group";
 import type { MutableRefObject } from "react";
 import type { ImageHorseTool } from "stamp_tool";
 import type { ToolSettings } from "@/lib/types";
@@ -269,20 +270,55 @@ export function AISettings({
             </div>
           )}
 
-          <button
-              type="button"
-              onClick={() => runModel("rembg")}
-              disabled={!canRun || busy}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
-              {busy && lastType === "rembg" && <Spinner size={14} />}
-              {lastType === "rembg" && phase === "uploading"
-                ? "Uploading..."
-                : lastType === "rembg" && phase === "running"
-                  ? "Removing background..."
-                  : "Remove Background"}
-          </button>
+          {/* The same stacked tile group Select → Wand's Selection row uses,
+              in ACTION mode (no `value`, so nothing ever lights). These were
+              two hand-rolled `bg-purple-600` buttons with white text — a
+              colour that is in no theme token and a shape that matched nothing
+              else in the sidebar, which is why they read as a different app.
+              The key badge replaces the inline `Lock` glyph: same message,
+              same corner as `Create AI Image`, and it no longer competes with
+              the spinner for the row. */}
+          <ToolButtonGroup<"rembg" | "inpaint">
+            columns={2}
+            stacked
+            disabled={!canRun || busy}
+            onChange={(id) => {
+              if (id === "rembg") void runModel("rembg");
+              else openObjModal();
+            }}
+            options={[
+              {
+                id: "rembg",
+                label:
+                  lastType === "rembg" && phase === "uploading"
+                    ? "Uploading..."
+                    : lastType === "rembg" && phase === "running"
+                      ? "Removing..."
+                      : "Remove Background",
+                icon:
+                  busy && lastType === "rembg"
+                    ? () => <Spinner size={24} />
+                    : Scissors,
+                pro: true,
+                title: "Remove the background (Pro)",
+              },
+              {
+                id: "inpaint",
+                label:
+                  lastType === "inpaint" && phase === "uploading"
+                    ? "Uploading..."
+                    : lastType === "inpaint" && phase === "running"
+                      ? "Removing..."
+                      : "Remove Object",
+                icon:
+                  busy && lastType === "inpaint"
+                    ? () => <Spinner size={24} />
+                    : BroomSparkles,
+                pro: true,
+                title: "Remove an object (Pro)",
+              },
+            ]}
+          />
           {lastType === "rembg" && error && (
             <p className="text-2xs text-destructive leading-relaxed">{error}</p>
           )}
@@ -292,20 +328,6 @@ export function AISettings({
             </p>
           )}
 
-          <button
-              type="button"
-              onClick={openObjModal}
-              disabled={!canRun || busy}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {!aiEnabled && <Lock className="h-3.5 w-3.5" />}
-              {busy && lastType === "inpaint" && <Spinner size={14} />}
-              {lastType === "inpaint" && phase === "uploading"
-                ? "Uploading..."
-                : lastType === "inpaint" && phase === "running"
-                  ? "Removing object..."
-                  : "Remove Object"}
-          </button>
           {lastType === "inpaint" && error && (
             <p className="text-2xs text-destructive leading-relaxed">{error}</p>
           )}
