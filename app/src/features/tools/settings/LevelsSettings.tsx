@@ -20,7 +20,14 @@ const BLACK = 0;
 const WHITE = 255;
 const GAMMA = 100;
 
-const HIST_H = 64;
+// 120, not 64. At 64 the graph was a short strip sitting above three
+// full-height slider rows and the panel read as controls with a thumbnail
+// attached. Matching the stack's height lets the two halves read as one block.
+// Kept in sync with the `h-30` below so the viewBox maps 1:1 to rendered
+// pixels — `preserveAspectRatio="none"` means the SHAPE is identical at any
+// HIST_H (the path is normalised against `max`), so this value exists to keep
+// stroke widths and the midtone dash predictable, not to change the curve.
+const HIST_H = 120;
 
 interface LevelsSettingsProps {
   levels?: LevelsControls;
@@ -127,7 +134,7 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
           <svg
             viewBox={`0 0 255 ${HIST_H}`}
             preserveAspectRatio="none"
-            className="block h-16 w-full text-theme-muted-foreground"
+            className="block h-30 w-full text-theme-muted-foreground"
             role="img"
             aria-label="Histogram of the photo's brightness, with the black point, midtones and white point marked"
           >
@@ -148,7 +155,7 @@ export function LevelsSettings({ levels, imageReady }: LevelsSettingsProps) {
             ))}
           </svg>
         ) : (
-          <p className="py-5 text-center text-xs text-theme-muted-foreground">
+          <p className="grid h-30 place-items-center text-center text-xs text-theme-muted-foreground">
             {imageReady ? "Reading the photo…" : "Open a photo to see its histogram."}
           </p>
         )}
