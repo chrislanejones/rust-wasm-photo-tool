@@ -50,6 +50,15 @@ const ALLOW = new Map([
   ["ring-vs-box", "prose — a comment contrasting ring hit-testing with box hit-testing"],
   ["text-annotations-changed", "a window CustomEvent name (CLAUDE.md Stage 3 is removing it)"],
   ["text-to-image", "prose — the job type the AI dialog does not have yet"],
+  // The switch thumb writes this ONLY as `data-[state=unchecked]:bg-text-secondary`.
+  // That variant IS emitted — `.data-\[state\=unchecked\]\:bg-text-secondary{
+  // background-color:var(--text-secondary)}` is in the built sheet — but CANDIDATE's
+  // character set stops at `[`, so the matcher is handed the bare tail and looks for a
+  // bare `.bg-text-secondary` rule that correctly does not exist. Widening CANDIDATE to
+  // cover `data-[…]` was tried and traded this for the same half-capture on
+  // command.tsx's `[&_[cmdk-group-heading]]:` classes, so the character set stays as the
+  // header describes and this one class is named here instead.
+  ["bg-text-secondary", "emitted only behind a data-[state] variant the matcher cannot capture whole"],
 ]);
 
 function sourceFiles(dir) {
