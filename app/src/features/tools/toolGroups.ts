@@ -71,6 +71,7 @@ import {
   SwatchBook,
   Type,
   BroomSparkles,
+  Sparkles,
   Wand2,
   Zap,
 } from "lucide-react";
@@ -231,6 +232,22 @@ const enhanceGroup: ToolGroupDefinition = {
       keywords: [
         "levels", "black point", "white point", "midtones", "gamma",
         "histogram", "tones", "exposure",
+      ],
+    },
+    {
+      // Its own tile because it is a different job again: one click for a whole
+      // look, rather than five sliders. Each preset is a named stack of the
+      // Adjustments filters (src/presets.rs) and commits as ONE undo step —
+      // the four-button Quick Adjust grid inside Adjustments cost two.
+      id: "presets",
+      label: "Presets",
+      description: "One-click colour looks, previewed on your photo before you commit",
+      icon: Sparkles,
+      tool: "effects",
+      mode: "presets",
+      keywords: [
+        "presets", "looks", "filters", "vivid", "fade", "warm", "cool",
+        "one click", "colour", "color", "style",
       ],
     },
     {

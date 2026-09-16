@@ -2,7 +2,9 @@
 // Replicate + Convex pipeline (useAIJob). Text Extract (OCR) moved to the
 // Text tool (TextSettings.tsx) — it's a text-shaped feature, not an
 // image-shaped one, and it has its own dedicated useAIJob instance there now.
-// 4x Upscale's Coming Soon placeholder moved to EffectsSettings.tsx.
+// 4x Upscale has NO placeholder anywhere any more: its greyed tile lived in
+// the Quick Adjust grid, and that grid was retired when Enhance › Presets
+// landed. There is no surface for it in the editor until it is built.
 import { useState } from "react";
 import { Scissors, Eraser, BroomSparkles, Trash2, Lock } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";

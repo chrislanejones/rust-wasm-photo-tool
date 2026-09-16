@@ -6,31 +6,17 @@
 //! `Op::Levels` had an apply, serialization and tests but no producer (ADR-052):
 //! a recorder for a feature the engine did not have.
 //!
-//! PREVIEW WORKS FROM A COPY. `levels_preview_begin` copies the active layer
-//! once. Every slider move recomputes the layer FROM that copy, through a
-//! 256-entry LUT on the stack with no allocation per move, so moves never
-//! compound. `levels_preview_cancel` puts the copy back; `levels_apply` puts it
-//! back, snapshots, applies once and records one `Op::Levels`. A preview never
-//! touches history, so it is never an undo step.
-//!
-//! A STALE COPY MUST NEVER BE WRITTEN BACK. If history changes while a preview
-//! is open (undo, redo, another edit, a new image), the layer is no longer the
-//! one that was copied, and restoring the copy would erase that change. Undo
-//! depth alone cannot see it: undo followed by a new edit lands on the same
-//! depth with different pixels. `History::generation` moves on every one of
-//! those events, so every write checks it first and the preview drops itself
-//! when it has moved.
+//! PREVIEW WORKS FROM A COPY. `tonal_preview_begin` copies the active layer
+//! once (the slot is shared with colour presets — see `tonal_preview.rs`, which
+//! also documents why a stale copy is never written back). Every slider move
+//! recomputes the layer FROM that copy, through a 256-entry LUT on the stack
+//! with no allocation per move, so moves never compound. `tonal_preview_cancel`
+//! puts the copy back; `levels_apply` puts it back, snapshots, applies once and
+//! records one `Op::Levels`. A preview never touches history, so it is never an
+//! undo step.
 use wasm_bindgen::prelude::*;
 
 use crate::ImageHorseTool;
-
-/// An open preview: which layer, the history generation it was taken at, and
-/// that layer's untouched pixels.
-pub(crate) struct LevelsPreview {
-    layer: usize,
-    generation: u64,
-    base: Vec<u8>,
-}
 
 /// The 256-entry remap for one channel value: `black` and `white` input points,
 /// output `gamma`. The only copy of this math — `Op::Levels` calls it too.
@@ -80,80 +66,22 @@ fn remap_in_place(data: &mut [u8], lut: &[u8; 256]) {
     }
 }
 
-impl ImageHorseTool {
-    /// True when a preview is open AND still describes the live layer: the
-    /// history has not moved since the copy was taken, and the layer is the
-    /// same size.
-    fn levels_preview_is_current(&self) -> bool {
-        match &self.levels_preview {
-            Some(p) => {
-                p.generation == self.hist.generation
-                    && self
-                        .layers
-                        .get(p.layer)
-                        .is_some_and(|l| l.buf.data.len() == p.base.len())
-            }
-            None => false,
-        }
-    }
-}
-
 #[wasm_bindgen]
 impl ImageHorseTool {
-    /// Start a Levels preview on the active layer: one copy of its pixels.
-    /// `false` when a preview is already open or there is no active layer.
-    pub fn levels_preview_begin(&mut self) -> bool {
-        if self.levels_preview.is_some() {
-            return false;
-        }
-        let Some(layer) = self.layers.get(self.active) else {
-            return false;
-        };
-        self.levels_preview = Some(LevelsPreview {
-            layer: self.active,
-            generation: self.hist.generation,
-            base: layer.buf.data.clone(),
-        });
-        true
-    }
-
-    /// Whether a preview is open (it may still be stale; writes check that).
-    pub fn levels_preview_active(&self) -> bool {
-        self.levels_preview.is_some()
-    }
-
     /// Recompute the previewed layer from the copy. Never touches history.
     /// `false` means there is no live preview — never begun, or dropped because
     /// history moved — and the caller should begin a new one.
     pub fn levels_preview_set(&mut self, black: u8, white: u8, gamma: f32) -> bool {
-        if !self.levels_preview_is_current() {
-            self.levels_preview = None;
+        if !self.tonal_preview_is_current() {
+            self.tonal_preview = None;
             return false;
         }
         let lut = levels_lut(black, white, gamma);
-        if let Some(p) = &self.levels_preview {
+        if let Some(p) = &self.tonal_preview {
             if let Some(layer) = self.layers.get_mut(p.layer) {
                 remap_into(&mut layer.buf.data, &p.base, &lut);
                 return true;
             }
-        }
-        false
-    }
-
-    /// Close the preview and put the untouched pixels back. `true` when pixels
-    /// were restored (the caller should flush). A stale preview is dropped
-    /// WITHOUT writing: its copy no longer matches the document.
-    pub fn levels_preview_cancel(&mut self) -> bool {
-        let current = self.levels_preview_is_current();
-        let Some(p) = self.levels_preview.take() else {
-            return false;
-        };
-        if !current {
-            return false;
-        }
-        if let Some(layer) = self.layers.get_mut(p.layer) {
-            layer.buf.data.copy_from_slice(&p.base);
-            return true;
         }
         false
     }
@@ -163,7 +91,7 @@ impl ImageHorseTool {
     /// the untouched pixels exactly once. The identity (0, 255, 1.0) records
     /// nothing. Returns whether pixels changed (the caller should flush).
     pub fn levels_apply(&mut self, black: u8, white: u8, gamma: f32) -> bool {
-        let restored = self.levels_preview_cancel();
+        let restored = self.tonal_preview_cancel();
         if is_identity(black, white, gamma) || self.layers.get(self.active).is_none() {
             return restored;
         }

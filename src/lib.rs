@@ -31,6 +31,7 @@ mod layer;
 mod levels;
 mod livewire;
 mod paint;
+mod presets;
 // Pure-geometry projective transforms (the Perspective tool). `pub` for the
 // same reason `ops`/`tiles` are: the integration tests in `tests/` build
 // `TextParams` literals and need `IDENTITY_QUAD` by name. No wasm-bindgen
@@ -42,6 +43,7 @@ mod settings;
 mod stabilizer;
 mod stamp;
 mod text;
+mod tonal_preview;
 mod transform;
 mod utils;
 
@@ -588,8 +590,9 @@ pub struct ImageHorseTool {
     #[cfg(feature = "tiles")]
     #[allow(clippy::type_complexity)]
     rec_effect: Option<(Vec<(f64, f64)>, f64, u32, u8)>,
-    /// Open Levels preview: the untouched layer copy (see `levels.rs`).
-    levels_preview: Option<crate::levels::LevelsPreview>,
+    /// Open tonal preview (Levels or a colour preset): the untouched layer
+    /// copy. ONE slot for both — see `tonal_preview.rs`.
+    tonal_preview: Option<crate::tonal_preview::TonalPreview>,
 }
 
 impl ImageHorseTool {
@@ -934,7 +937,7 @@ impl ImageHorseTool {
             rec_stroke: None,
             #[cfg(feature = "tiles")]
             rec_effect: None,
-            levels_preview: None,
+            tonal_preview: None,
         }
     }
 

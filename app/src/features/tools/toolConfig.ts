@@ -93,7 +93,8 @@ export const TOOLS: ToolDefinition[] = [
     // DISPLAY label only — id stays "ai" (shortcut 6, persistence, routing
     // are load-bearing; renamed here the same way "crop"→"Adjust & Select"
     // and "compress"→"Resize" were). Was the AI tool; OCR moved to Text,
-    // 4x Upscale moved to Effects, and this slot is now Eraser: PatchMatch/
+    // 4x Upscale moved to Effects and then away entirely (its greyed tile went
+    // with the Quick Adjust grid), and this slot is now Eraser: PatchMatch/
     // Magic Eraser + Background Removal + Object Removal (AISettings.tsx).
     id: "ai",
     label: "Eraser",

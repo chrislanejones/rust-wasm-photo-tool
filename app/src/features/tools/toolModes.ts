@@ -44,6 +44,7 @@ import {
   Trash2,
   Type,
   BroomSparkles,
+  Sparkles,
   Aperture,
   SunDim,
 } from "lucide-react";
@@ -112,13 +113,14 @@ const LEGACY_SUBMODES: Partial<Record<ToolType, ToolModeInfo[]>> = {
       keywords: ["ai rename", "smart rename", "describe", "content", "auto name", "batch"],
     },
   ],
-  // `effects` is two tiles on one tool id: Adjustments and Levels.
+  // `effects` is three tiles on one tool id: Adjustments, Levels and Presets.
   // `setModeOf` refuses any mode not listed here, silently — without this row
   // the Levels tile set nothing and the panel stayed on Adjustments (caught by
   // routeState.test.ts's round-trip, not by a click).
   effects: [
     { id: "adjust", label: "Adjustments", icon: SunDim, keywords: ["brightness", "contrast", "saturation", "adjust"] },
     { id: "levels", label: "Levels", icon: Aperture, keywords: ["levels", "black point", "white point", "midtones", "gamma"] },
+    { id: "presets", label: "Presets", icon: Sparkles, keywords: ["presets", "looks", "filters", "vivid", "fade", "warm", "one click"] },
   ],
 };
 

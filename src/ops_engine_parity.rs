@@ -1347,7 +1347,7 @@ fn levels_records_one_op_and_oplog_undo_restores_it() {
     t.set_oplog_undo(true);
     let h0 = composite_hash(&mut t);
 
-    assert!(t.levels_preview_begin());
+    assert!(t.tonal_preview_begin());
     t.levels_preview_set(10, 240, 0.9);
     t.levels_preview_set(30, 220, 1.3);
     assert!(t.levels_apply(30, 220, 1.3));
