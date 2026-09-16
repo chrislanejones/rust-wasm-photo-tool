@@ -184,14 +184,24 @@ const GENERATE_BLOCKED_REASON =
   "Image generation isn't connected yet — the model still needs choosing.";
 
 /*
- * THE AI TILE IS BEHIND A SWITCH, NOT A CONSTANT (Chris, 2026-09-16).
+ * WHAT LEAVES THE TAB IS BEHIND A SWITCH (Chris, 2026-09-16).
  * v8.78 hid `Create AI Image` outright because Generate was a dead button.
  * That fixed the wrong thing: the real tension is the marketing promise —
- * "Nothing leaves your tab by accident" — against the one tile whose job is to
- * send a prompt to a server. Hiding it kept the promise by deleting the
- * feature; a switch keeps it by making the send a CHOICE.
- * `useUIStore.aiToolsEnabled`, default OFF, persisted. Off: four in-browser
- * tiles. On: the fifth joins and the Create AI Image step is reachable.
+ * "Nothing leaves your tab by accident" — against a tile whose job is to send
+ * a prompt to a server. Hiding it kept the promise by deleting the feature; a
+ * switch keeps it by making the send a CHOICE.
+ * `useUIStore.onlineFeaturesEnabled`, default OFF, persisted. Off: four
+ * in-browser tiles. On: the fifth joins and Create AI Image is reachable.
+ *
+ * ⚠️ NAMED FOR THE AXIS, NOT FOR AI — settled BEFORE shipping because it is a
+ * persisted key: rename it after real browsers have written it and you owe a
+ * migration plus orphaned values. AI is the first thing on this list, not the
+ * only one — `app/index.html` pulls DM Sans and JetBrains Mono from Google on
+ * EVERY load, logged-out, which is what actually makes /architecture's "No
+ * account, no network" false (ADR-051). Putting those behind this switch means
+ * self-hosting or a fallback face, but the flag is named for that job now so
+ * it will not need a second one.
+ *
  * Generate is STILL disabled (see GENERATE_BLOCKED_REASON) — the switch
  * restores the way in; the job type restores the way out.
  */
@@ -217,8 +227,8 @@ export function NewActions({
   const [blankMode, setBlankMode] = useState(false);
   // Create AI Image — step 2 of this same menu, which is why its left button is
   // Back rather than Cancel: it returns here, it does not abandon the flow.
-  const aiToolsEnabled = useUIStore((s) => s.aiToolsEnabled);
-  const setAiToolsEnabled = useUIStore((s) => s.setAiToolsEnabled);
+  const onlineFeaturesEnabled = useUIStore((s) => s.onlineFeaturesEnabled);
+  const setOnlineFeaturesEnabled = useUIStore((s) => s.setOnlineFeaturesEnabled);
   const [aiMode, setAiMode] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiRatio, setAiRatio] = useState<string>(ASPECT_RATIOS[0].id);
@@ -718,12 +728,12 @@ export function NewActions({
               >
                 {/* Three columns of stacked tiles — the same ActionTile the
                     tool panels use (Select → Magic Wand), icon on top. While
-                    `Create AI Image` is off (aiToolsEnabled) there are
+                    `Create AI Image` is off (onlineFeaturesEnabled) there are
                     four tiles, laid out 2×2 — in three columns the fourth sat
                     alone beside a blank gap and read as something missing.
                     Five tiles in three columns when it returns. */}
                 <div
-                  className={`grid ${aiToolsEnabled ? "grid-cols-3" : "grid-cols-2"} gap-3 w-full`}
+                  className={`grid ${onlineFeaturesEnabled ? "grid-cols-3" : "grid-cols-2"} gap-3 w-full`}
                 >
                   <ActionTile
                     ref={firstButtonRef}
@@ -755,7 +765,7 @@ export function NewActions({
                       so a free user sees the whole flow and meets the upsell
                       at the moment they understand what they would be buying.
                       The key says which it is before they start. */}
-                  {aiToolsEnabled && (
+                  {onlineFeaturesEnabled && (
                     <ActionTile
                       icon={Sparkles}
                       label="Create AI Image"
@@ -862,23 +872,23 @@ export function NewActions({
               the room. */}
           <div className="col-start-3 flex items-center gap-2">
             <label
-              htmlFor="ai-tools-switch"
+              htmlFor="online-features-switch"
               className={`select-none text-xs text-text-secondary ${
                 aiMode ? "cursor-not-allowed opacity-50" : "cursor-pointer"
               }`}
             >
-              {aiToolsEnabled ? "AI tools on" : "Everything in your browser"}
+              {onlineFeaturesEnabled ? "Online features on" : "Everything in your browser"}
             </label>
             <Switch
-              id="ai-tools-switch"
-              checked={aiToolsEnabled}
-              onCheckedChange={(on) => setAiToolsEnabled(on)}
+              id="online-features-switch"
+              checked={onlineFeaturesEnabled}
+              onCheckedChange={(on) => setOnlineFeaturesEnabled(on)}
               disabled={aiMode}
-              aria-label="AI tools — sends your prompt to a server"
+              aria-label="Online features — lets this tab send data to a server"
               title={
                 aiMode
                   ? "Hit Back first — this would close the step you're in and lose your prompt."
-                  : "Off: everything stays in this tab. On: adds Create AI Image, which sends your prompt (and any attached images) to a server."
+                  : "Off: everything stays in this tab. On: adds features that send data out — today that is Create AI Image, which sends your prompt and any attached images to a server."
               }
             />
           </div>
