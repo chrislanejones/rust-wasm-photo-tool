@@ -183,3 +183,23 @@ export const CONFIRM_AFFIRMATIVE =
  * shimmer's colour isn't hard-coded inside the component.
  */
 export const SKELETON_BASE = "skeleton block bg-muted";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DIALOG SCRIM — the one backdrop behind every modal surface.
+
+   ⚠️ THIS EXISTED NINE TIMES BEFORE IT EXISTED ONCE. `ui/dialog` shipped its
+   default overlay with no blur, so each dialog that wanted one hand-rolled a
+   backdrop and picked its own opacity: .40, .42, .60, .70 and .80 all shipped
+   at the same time, two of them with no blur at all and one blurring at 2px
+   instead of 8px. The escape hatch that allowed it is `DialogContent`'s
+   `overlayClassName` prop — still there for a genuine z-index override, but a
+   scrim or blur passed through it is now drift, not configuration.
+
+   The colours live in styles.css (`--overlay-scrim`, `--overlay-blur`) and are
+   applied by the `.dialog-scrim` class. Tune the look there; this constant only
+   decides WHERE the scrim sits. Note it carries no z-index — dialogs stack on
+   different rungs of the ladder, so each overlay still supplies its own
+   `z-[var(--z-*)]`.
+   ──────────────────────────────────────────────────────────────────────────── */
+export const DIALOG_OVERLAY = "fixed inset-0 dialog-scrim";
+

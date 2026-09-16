@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { X, Eraser, Undo2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { dialogZoom, fadeIn } from "@/lib/animations";
+import { DIALOG_OVERLAY } from "@/lib/styles";
 
 interface Props {
   open: boolean;
@@ -156,7 +157,7 @@ export function ObjectRemovalModal({
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className={`${DIALOG_OVERLAY} z-[var(--z-modal)] flex items-center justify-center p-4`}
           onClick={busy ? undefined : onClose}
         >
           <motion.div
