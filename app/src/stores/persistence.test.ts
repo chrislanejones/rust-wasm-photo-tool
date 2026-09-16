@@ -104,10 +104,15 @@ describe("useToolStore persistence", () => {
 describe("useUIStore persistence", () => {
   const { partialize, merge } = useUIStore.persist.getOptions();
 
-  it("partializes exactly masterTab, recentCommands, commandUsage", () => {
+  // aiToolsEnabled joined the list deliberately: the New dialog's AI switch is
+  // a remembered choice, the same class of preference as masterTab. It is named
+  // here rather than the assertion being loosened — an EXACT key list is the
+  // whole point of this test, since the failure it guards against is a
+  // transient flag silently becoming persisted state.
+  it("partializes exactly masterTab, recentCommands, commandUsage, aiToolsEnabled", () => {
     const persisted = partialize!(useUIStore.getState());
     expect(Object.keys(persisted).sort()).toEqual(
-      ["commandUsage", "masterTab", "recentCommands"].sort(),
+      ["aiToolsEnabled", "commandUsage", "masterTab", "recentCommands"].sort(),
     );
   });
 
