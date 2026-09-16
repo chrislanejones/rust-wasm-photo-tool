@@ -5,6 +5,9 @@ import App from "./App";
 // tokens first — styles.css consumes every one of these custom properties.
 import "./tokens.css";
 import "./styles.css";
+import { initAnalytics } from "./lib/analytics";
+
+initAnalytics();
 
 const container = document.getElementById("root")!;
 
