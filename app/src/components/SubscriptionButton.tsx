@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { toast } from "sonner";
+import { DIALOG_OVERLAY } from "@/lib/styles";
 import {
   Settings,
   SlidersHorizontal,
@@ -467,7 +468,7 @@ export function SubscriptionButton({
       {restoreConfirmOpen &&
         createPortal(
           <div
-            className="fixed inset-0 z-[var(--z-idle)] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+            className={`${DIALOG_OVERLAY} z-[var(--z-idle)] flex items-center justify-center p-4`}
             onClick={() => setRestoreConfirmOpen(false)}
           >
             <div

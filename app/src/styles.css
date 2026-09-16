@@ -54,6 +54,19 @@
   --z-devpreview: 210; /* Settings → Dev Tests dialog previews (above the settings modal) */
   --z-cursor: 45; /* brush cursor / clone source marker — above canvas chrome, below dialogs/overlays */
 
+  /* ── Dialog scrim — the single source for every modal backdrop. ──
+     ⚠️ THIS EXISTED NINE TIMES BEFORE IT EXISTED ONCE. The New dialog, the
+     shortcut modal, object removal, the idle and multi-tab screens, the
+     subscription sheet, AppShell's inline scrim, `ui/dialog`'s default and
+     the drag-and-drop affordance each carried their own copy: five different
+     opacities (.40 / .42 / .60 / .70 / .80), two blur radii (8px and 2px)
+     and two with no blur at all. The drift had one cause — `ui/dialog`
+     shipped its default WITHOUT a blur, so every dialog that wanted one
+     hand-rolled a backdrop and picked its own number. Change these two
+     values, never a class. */
+  --overlay-scrim: rgb(0 0 0 / 0.65);
+  --overlay-blur: 8px;
+
   /* ── Motion — durations + shared easing. ── */
   --dur-fast: 0.1s;
   --dur-base: 0.15s;
@@ -1094,6 +1107,22 @@ textarea:focus-visible {
   margin-left: auto;
 }
 
+/* The ONE dialog backdrop. Colour and radius come from --overlay-scrim and
+   --overlay-blur; this class exists so the pair is applied identically
+   everywhere and so a non-Radix overlay can reach it too.
+
+   It deliberately does NOT fade in. Animating opacity on a full-viewport
+   backdrop-filter makes the browser re-blur the entire screen every frame:
+   measured on the New dialog, frames went 16.7ms → 150, 150, 150, 183, 183,
+   183… and never recovered inside the 600ms window. With the blur static the
+   same open costs one ~117ms mount hitch and is back at 60fps six frames
+   later. The panel animates; the scrim just appears. */
+.dialog-scrim {
+  background: var(--overlay-scrim);
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  backdrop-filter: blur(var(--overlay-blur));
+}
+
 /* ── Full-window image-drop affordance (drag an image anywhere over the app) ──
    A dimmed scrim with a spinning gradient border ring around the viewport (the
    "Claude in Chrome" glow) and a centered prompt. Non-interactive. */
@@ -1105,9 +1134,9 @@ textarea:focus-visible {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  background: rgba(10, 12, 16, 0.42);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
+  background: var(--overlay-scrim);
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  backdrop-filter: blur(var(--overlay-blur));
 }
 
 @property --drop-angle {
