@@ -9,6 +9,7 @@ import Pricing from "./pages/Pricing";
 import Trail from "./pages/Trail";
 import NotFound from "./pages/NotFound";
 import useHead from "./useHead";
+import { trackPageView } from "./lib/analytics";
 
 /** Client-side routing keeps the scroll position across pages, which is the
  *  wrong default for a set of documents: follow a link and you land halfway
@@ -36,6 +37,18 @@ export default function App() {
   // HTML already carries the right ones for the page a visitor lands on; this is
   // what keeps them right after a client-side navigation.
   useHead();
+
+  // GA4's own page_view is switched off (see lib/analytics.ts), so this is the
+  // only thing that counts a page — including the first. It sits AFTER
+  // `useHead()` on purpose: effects in one component run in declaration order,
+  // so the title is already the new route's by the time this reads it.
+  // Sending from inside ScrollBehaviour instead would invert that — a child's
+  // effects run before its parent's — and every hit would carry the PREVIOUS
+  // page's title.
+  const { pathname: analyticsPath, search: analyticsSearch } = useLocation();
+  useEffect(() => {
+    trackPageView(analyticsPath + analyticsSearch);
+  }, [analyticsPath, analyticsSearch]);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
